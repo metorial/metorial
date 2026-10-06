@@ -16,8 +16,6 @@ import {
   updateUserTool,
   userLifecycleTool
 } from './tools';
-import { eventHookTrigger, systemLogPollTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     listPoliciesTool,
     manageUserFactorsTool
   ],
-  triggers: [eventHookTrigger, systemLogPollTrigger]
+  triggers: []
 });

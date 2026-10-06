@@ -1,64 +1,15 @@
-# Slates Specification for ToolJet
+# ToolJet API scope
 
-## Overview
+This integration retains eleven public tools. User, workspace and application operations use the documented Enterprise self-hosted `/api/ext` surface and configured static `Basic` token. Workflow invocation/status uses `/api/v2/webhooks/workflows` with its separate Bearer token. Instance roots may be HTTP or HTTPS and include a deployment path/port; no destination is guessed from a token. New connections persist their instance URL; validated historical configuration remains a fallback. No dashboard/session authentication grants, current-user identity, SCIM, GitSync, database administration or new deployment capabilities are added.
 
-ToolJet is an open-source low-code platform for building internal tools, dashboards, and business applications. It provides a visual app builder with drag-and-drop UI components, a built-in PostgreSQL-based database (ToolJet Database), workflow automation, and connections to 80+ data sources including databases, APIs, and SaaS tools. It can be self-hosted or used via ToolJet Cloud.
+Native fidelity: user lookup returns a user object or `[]` when no user matches; missing lookup is distinct from a Community/edition route 404. User creation accepts active/invited, requires workspaces and can send an invitation when no password is supplied. The historical archived input remains declared but is explicitly refused before creation with archive-after-create guidance. Native creation status and identifiers are returned, not echoed request state. User updates verify readable fields through the exact native user ID; passwords remain unreadable. Role/membership operations distinguish server acknowledgment from independent field confirmation.
 
-## Authentication
+Full workspace replacement is `PUT /user/{id}/workspaces`, requires ADMIN/MEMBER roles, uppercase ACTIVE/ARCHIVED statuses and UUID group items, and removes omitted memberships. An explicit empty array is supported; absent workspaces is refused. Single-relation `PATCH` preserves the other workspace memberships and accepts the documented lowercase status/group locators. No concurrent-write protection is invented.
 
-ToolJet uses a static access token for API authentication. By default, the ToolJet API is disabled. To enable the API, you must set environment variables: `ENABLE_EXTERNAL_API=true` and `EXTERNAL_API_ACCESS_TOKEN=<access_token>` in the `.env` file. The access token is created by you.
+App export is POST-only JSON and produces a bounded downloadable file. `exportTJDB` includes table schemas; no data-backup claim. No native expiry is supplied, so no renewal endpoint is invented. App import’s documented receipt is a message without created-app identity. Import success means the request was accepted, with unverified object identity and manual reconciliation explicitly reported. No public app deletion or rollback is documented.
 
-You need to pass the access token in the `Authorization` header to authenticate your requests. The access token should be sent in the format `Basic <access_token>`.
+Workflow `trigger`, `triggerAsync` and `status` use their documented routes, exact environment and execution ID. Native synchronous response and status values remain arbitrary JSON; async receipts require the native execution ID and timestamp. No cancellation, completion on timeout, refund or reversal of external effects is claimed.
 
-Example:
+User/workspace/app list routes have no documented pagination parameters. Native arrays are accepted in full up to the local 1,000-item safety bound; overflow fails. Local HTTP/JSON/export limits are 30 seconds and 8 MiB, independent of provider entitlement/capacity. Public and complete error graphs are checked offline; shared internal trace retention is not claimed universally eliminated.
 
-```
-Authorization: Basic <access_token>
-```
-
-The base URL for all API requests is `https://{your-tooljet-instance.com}/api/ext/`.
-
-**Note:** The ToolJet API is a paid feature available on self-hosted instances. The access token is not an OAuth token or API key generated through a UI — it is a static value configured directly in the server environment.
-
-For webhook-triggered workflows, a separate authentication mechanism is used. Authentication is mandatory for webhooks. Use a bearer token in the Authorization header: `Authorization: Bearer <secret_token>`. Each workflow has its own unique endpoint URL and API token, which can be found in the workflow's Triggers tab.
-
-## Features
-
-### User Management
-
-Programmatically manage users on the ToolJet instance. The API allows you to interact with the ToolJet platform programmatically to manage users and their workspace relations. You can:
-
-- List all users with their workspace permissions and group memberships, with optional filtering by group names.
-- Look up a specific user by UUID or email address.
-- Create new users with name, email, password, status (active/archived), and workspace assignments including group memberships.
-- Update user details such as name, email, password, and status.
-- Update a user's role within a specific workspace.
-
-### Workspace Management
-
-Retrieve information about all workspaces on the instance, including their status and associated groups. You can also manage user-workspace relationships:
-
-- Replace all workspace relations for a user (or remove all by sending an empty array).
-- Update a specific workspace relation for a user, including status and group assignments.
-
-### Application Export and Import
-
-Move applications between ToolJet instances or workspaces. Export a ToolJet application from a specified workspace, including pages, queries, data sources, environments, versions, and metadata.
-
-- **Export:** Supports options to include/exclude ToolJet Database data (`exportTJDB`), export a specific app version (`appVersion`), or export all versions (`exportAllVersions`).
-- **Import:** Import an application JSON into a workspace, optionally specifying a custom app name.
-
-### Workflow Triggering via Webhooks
-
-ToolJet Workflows enable users to create complex, data-centric automations using a visual, node-based interface. It extends ToolJet's capabilities beyond building user interfaces, allowing developers and business users to automate processes, integrate data from various sources, and execute custom logic.
-
-- ToolJet supports webhook triggers that allow you to run a workflow when a webhook is received.
-- You can choose the environment (e.g., development, staging, production) to modify the webhook endpoint URL.
-- Parameters can be passed to workflows via the request body, with defined parameter names and types.
-- The webhook endpoint format is: `{TOOLJET_HOST}/api/v2/webhooks/workflows/:id/trigger`
-
-## Events
-
-ToolJet's API does not provide outbound webhook subscriptions or event notification mechanisms for listening to platform changes (e.g., user created, app deployed). ToolJet supports webhook and manual triggers, but these are _inbound_ — they allow external systems to trigger ToolJet workflows, not for ToolJet to notify external systems of events.
-
-The provider does not support events.
+Primary documentation: https://docs.tooljet.com/api/ ; https://docs.tooljet.com/api/tooljet-api/ ; https://docs.tooljet.com/api/tooljet-api/users/get-all-users/ ; https://docs.tooljet.com/api/tooljet-api/users/get-user/ ; https://docs.tooljet.com/api/tooljet-api/users/create-user/ ; https://docs.tooljet.com/api/tooljet-api/users/update-user/ ; https://docs.tooljet.com/api/tooljet-api/users/update-user-role/ ; https://docs.tooljet.com/api/tooljet-api/users/replace-user-workspace/ ; https://docs.tooljet.com/api/tooljet-api/users/replace-user-workspaces/ ; https://docs.tooljet.com/api/tooljet-api/workspaces/get-all-app-details/ ; https://docs.tooljet.com/api/tooljet-api/apps/export-application/ ; https://docs.tooljet.com/api/tooljet-api/apps/import-application/ ; https://docs.tooljet.com/docs/workflows/triggers/webhook/ ; https://docs.tooljet.com/docs/setup/env-vars/ . The current workspace leaf could not be retrieved during this audit; its existing documented route/contract is retained conservatively and requires live acceptance.

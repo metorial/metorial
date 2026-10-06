@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SatisMeterClient } from '../lib/client';
+import { projectIdSchema, resolveProject } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let insertResponseTool = SlateTool.create(spec, {
   name: 'Insert Survey Response',
   key: 'insert_response',
-  description: `Submit a survey response programmatically. Associate the response with a specific survey and provide answers to its questions. Supports identified users (via userId) or anonymous respondents (via anonymousId). Optionally specify the delivery method and user traits.`,
+  description: `Submit a survey response programmatically. Associate the response with a specific survey and provide answers to its questions. Requires exactly one identified user (userId) or anonymous respondent (anonymousId). Responses are retained and user deletion only anonymizes them. Optionally specify the delivery method and user traits.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       surveyId: z
         .string()
         .describe('ID of the survey (campaign) to associate the response with'),
@@ -59,7 +61,7 @@ export let insertResponseTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SatisMeterClient(ctx.auth.token, ctx.auth.writeKey);
     await client.insertResponse({
-      writeKey: ctx.auth.writeKey,
+      projectId: resolveProject(ctx.input.projectId, ctx.config),
       campaignId: ctx.input.surveyId,
       userId: ctx.input.userId,
       anonymousId: ctx.input.anonymousId,

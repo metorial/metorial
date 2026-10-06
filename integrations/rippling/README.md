@@ -1,57 +1,19 @@
-# <img src="https://provider-logos.metorial-cdn.com/Rippiling.jpeg" height="20"> Rippling
+# Rippling
 
-Manage employee data, company information, and organizational structures in Rippling's unified workforce platform. Retrieve active and terminated employee details including roles, departments, and work locations. Access company information such as addresses, work locations, and contact details. Create and manage employee groups across departments and teams. Automate user provisioning and deprovisioning for third-party applications. Push ATS candidates into the Rippling onboarding flow. Approve or decline leave requests. Retrieve SAML SSO metadata for app integrations. Receive webhook notifications for employee lifecycle events such as account creation, suspension, and deletion.
+Read workforce and company information through Rippling's v1 platform API. The integration retains 19 tools for employees, organizational reference data, app groups, leave, current-user identity, candidate onboarding and SAML metadata.
 
-## Tools
+Use `platform_v1` with a v1 customer API token or a configured v1 partner OAuth app. The newer v2 REST API has different resources and permissions; selecting the retained `v2` setting fails before a request. This does not imply that either provider API has been retired.
 
-### List Departments
+Partner OAuth requires the app name from `https://app.rippling.com/apps/PLATFORM/{APPNAME}/authorize`. Configure that name in the OAuth connection input. Installation scopes are configured in the Rippling app listing, and customer administrators consent to that listing's scopes. The connection requests documented company and employee prerequisite scopes and fields needed by retained tools; it excludes unrelated OIDC and personal-contact scopes. The exact documented read permissions, group permissions, leave-processing permission and SAML metadata permission must be approved in the app listing. Optional returned fields depend on the app's granted access. Existing connections with additional grants can still return those fields.
 
-Retrieve all departments in the company. Supports pagination for companies with many departments.
+Read tools validate provider response shapes and exact requested identities. Paginated lists return one page and its count; use `limit` and `offset` to request further pages. A page is not a total company count. `sendAllRoles` applies only when including terminated employees and can bypass app provisioning rules.
 
-### Get Company
+Group tools require a v1 partner OAuth app with Group Management enabled; customer API tokens cannot use them. Group member IDs are employee role IDs from `list_employees`. Updates replace the full membership list when supplied and read omitted fields from the exact group. Use the returned opaque `versionToken` for concurrency. The legacy numeric `version` remains supported only when it faithfully represents the provider token; opaque versions are not converted into invented numbers. Concurrency failures require a new read and are never retried automatically. Group changes can affect personnel access and membership.
 
-Retrieve the current company's details including name, address, work locations, primary email, and phone number. The company is determined by the API token or OAuth access token used.
+Leave processing changes a pending request's personnel state and requires an administrator or manager. Candidate onboarding is available only to v1 partner OAuth applications, excludes customer API keys, and can initiate a new-hire workflow. Neither workflow has a documented automatic reversal in this integration. Verify provider state before retrying an uncertain change.
 
-### Get Current User
+SAML metadata is delivered as a downloadable XML file for a SAML-enabled v1 partner OAuth app installation. Its `metadata` output now describes the filename and MIME type instead of containing XML. Rippling documents a 404 response when that app feature is unavailable.
 
-Retrieve information about the Rippling user whose access token is being used. Useful for SSO flows and identifying the authenticated user. Returns the user's ID, work email, and company ID.
+Private verification requires a controlled company identity. Read scenarios compare tool results with independent provider reads. Group lifecycle writes require explicit isolated-company permission; leave decline requires explicit permission for a retained effect. Candidate onboarding is disabled in the private suite because the v1 documentation supplies no candidate readback or reversal endpoint. Missing local credentials do not disable the suite.
 
-### List Custom Fields
-
-Retrieve custom field definitions configured for the company. Custom fields allow companies to store additional employee or resource information beyond standard fields.
-
-### Get Employee
-
-Retrieve detailed information about a specific employee by their ID. Returns comprehensive employee data including name, email, title, department, employment status, and more.
-
-### List Leave Types
-
-Retrieve the company's configured leave types. Can optionally filter by the system that manages each leave type.
-
-### Get SAML Metadata
-
-Retrieve SAML IDP metadata for app integrations that have SAML enabled. The metadata is unique per customer app installation and changes with each new installation. Returns XML-formatted SAML metadata.
-
-### List Employees
-
-Retrieve a list of employees from Rippling. Can list only active employees or include terminated employees as well. Supports pagination for large result sets.
-
-### Create Group
-
-Create a new employee group in Rippling associated with a third-party application. Groups represent subsets of employees and can be used for department segmentation, mailing lists, access control, etc.
-
-### List Leave Requests
-
-Retrieve leave requests from Rippling. Can be filtered by date range and status to find specific requests.
-
-### Push ATS Candidate
-
-Push a candidate from an applicant tracking system directly into the Rippling onboarding flow. This initiates the onboarding process for a new hire in Rippling.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Official references: [v1 API](https://developer.rippling.com/documentation/base-api/), [partner installation](https://developer.rippling.com/documentation/developer-portal/v1-guides/installation), [group management](https://developer.rippling.com/documentation/developer-portal/v1-guides/group-management), [v2 quickstart](https://developer.rippling.com/documentation/rest-api/essentials/quickstart).

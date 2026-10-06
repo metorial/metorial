@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid, nonemptyPatch, recordSchema, required } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageDepartment = SlateTool.create(spec, {
@@ -27,19 +28,15 @@ export let manageDepartment = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      department: z
-        .any()
+      department: recordSchema
         .optional()
         .describe('Single department object (for get, create, update)'),
-      departments: z.array(z.any()).optional().describe('List of departments (for list)'),
+      departments: z.array(recordSchema).optional().describe('List of departments (for list)'),
       nextCursor: z.string().optional().describe('Cursor for next page (for list)')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = clientFor(ctx);
 
     let { action } = ctx.input;
 
@@ -58,7 +55,7 @@ export let manageDepartment = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.departmentId) throw new Error('departmentId is required for get action');
+      if (!ctx.input.departmentId) throw invalid('departmentId is required for get action');
       let department = await client.getDepartment(ctx.input.departmentId);
       return {
         output: { department },
@@ -67,8 +64,10 @@ export let manageDepartment = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
-      let department = await client.createDepartment({ name: ctx.input.name });
+      if (!ctx.input.name) throw invalid('name is required for create action');
+      let department = await client.createDepartment({
+        name: required(ctx.input.name, 'name')
+      });
       return {
         output: { department },
         message: `Created department **${ctx.input.name}**.`
@@ -76,8 +75,9 @@ export let manageDepartment = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.departmentId)
-        throw new Error('departmentId is required for update action');
+      if (!ctx.input.departmentId) throw invalid('departmentId is required for update action');
+      nonemptyPatch({ name: ctx.input.name });
+      if (ctx.input.name !== undefined) required(ctx.input.name, 'name');
       let department = await client.updateDepartment(ctx.input.departmentId, {
         name: ctx.input.name
       });
@@ -87,6 +87,6 @@ export let manageDepartment = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw invalid(`Unknown action: ${action}`);
   })
   .build();

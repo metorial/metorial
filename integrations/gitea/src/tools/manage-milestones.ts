@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let milestoneOutputSchema = z.object({
@@ -26,14 +27,14 @@ export let listMilestones = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       state: z
         .enum(['open', 'closed', 'all'])
         .optional()
         .describe('Filter by milestone state'),
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page')
     })
   )
   .output(
@@ -42,7 +43,7 @@ export let listMilestones = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let milestones = await client.listMilestones(ctx.input.owner, ctx.input.repo, {
       state: ctx.input.state,
       page: ctx.input.page,
@@ -79,8 +80,8 @@ export let createMilestone = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       title: z.string().describe('Milestone title'),
       description: z.string().optional().describe('Milestone description'),
       dueOn: z.string().optional().describe('Due date in ISO 8601 format')
@@ -88,7 +89,7 @@ export let createMilestone = SlateTool.create(spec, {
   )
   .output(milestoneOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let m = await client.createMilestone(ctx.input.owner, ctx.input.repo, {
       title: ctx.input.title,
       description: ctx.input.description,

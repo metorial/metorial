@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { generationMetadata, modelInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let generateBlog = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let generateBlog = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      title: z.string().describe('The blog article title'),
+      title: z.string().min(1).describe('The blog article title'),
       keywords: z
         .array(z.string())
         .optional()
@@ -22,22 +23,22 @@ export let generateBlog = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Blog categories for content targeting'),
-      model: z
-        .enum(['velox-1', 'alta-1', 'sophos-1', 'chat-sophos-1'])
-        .optional()
-        .describe('AI model to use'),
+      model: modelInput,
       maxTokens: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Maximum number of tokens to generate (default: 2048)'),
       temperature: z
         .number()
         .min(0)
-        .max(1)
+        .max(2)
         .optional()
-        .describe('Creativity level from 0 to 1. Default: 0.7'),
+        .describe("Creativity level from 0 to 2. Omit to use the model's default"),
       generationCount: z
         .number()
+        .int()
         .min(1)
         .max(5)
         .optional()
@@ -54,12 +55,16 @@ export let generateBlog = SlateTool.create(spec, {
       articles: z
         .array(
           z.object({
-            text: z.string().describe('Generated blog article content'),
+            text: z.string().min(1).describe('Generated blog article content'),
             index: z.number().describe('Index of this generation')
           })
         )
         .describe('Array of generated blog articles'),
-      remainingCredits: z.number().describe('Remaining API credits')
+      ...generationMetadata,
+      remainingCredits: z
+        .number()
+        .optional()
+        .describe('Remaining API credits when the balance can be retrieved')
     })
   )
   .handleInvocation(async ctx => {
@@ -82,9 +87,13 @@ export let generateBlog = SlateTool.create(spec, {
     return {
       output: {
         articles: outputs.map(o => ({ text: o.text, index: o.index })),
+        balanceWarning: result.balanceWarning,
+        completionId: result.completionId,
+        model: result.model,
+        usage: result.usage,
         remainingCredits: result.data.remaining_credits
       },
-      message: `Generated **${outputs.length}** blog article(s) for title "${ctx.input.title}". Remaining credits: ${result.data.remaining_credits}.`
+      message: `Generated **${outputs.length}** blog article(s) for title "${ctx.input.title}". ${result.balanceWarning ?? `Remaining credits: ${result.data.remaining_credits}.`}`
     };
   })
   .build();

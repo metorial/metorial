@@ -23,8 +23,6 @@ import {
   updateApiKey,
   updateGuardrail
 } from './tools';
-import { creditBalanceChange, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     updateGuardrail,
     deleteGuardrail
   ],
-  triggers: [inboundWebhook, creditBalanceChange]
+  triggers: []
 });

@@ -6,17 +6,19 @@ import {
   convertFile,
   createArchive,
   createJob,
+  deleteJob,
+  downloadJobFiles,
   extractMetadata,
   generateThumbnail,
+  getCurrentUser,
   getJob,
   listFormats,
   listJobs,
+  manageTask,
   mergeFiles,
   optimizeFile,
   processPdf
 } from './tools';
-import { jobEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,7 +34,11 @@ export let provider = Slate.create({
     getJob,
     listJobs,
     listFormats,
-    createJob
+    createJob,
+    getCurrentUser,
+    manageTask,
+    deleteJob,
+    downloadJobFiles
   ],
-  triggers: [jobEvent]
+  triggers: []
 });

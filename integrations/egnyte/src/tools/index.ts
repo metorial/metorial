@@ -1,4 +1,5 @@
 export { createAuditReportTool, getAuditReportTool } from './audit-report';
+export { downloadFileTool, uploadFileTool } from './file-content';
 export { getFileInfoTool } from './get-file-info';
 export { listFolderTool } from './list-folder';
 export { addCommentTool, deleteCommentTool, listCommentsTool } from './manage-comments';
@@ -32,4 +33,6 @@ export {
   getWorkflowTool,
   listWorkflowTasksTool
 } from './manage-workflows';
+
+export { getCurrentUserTool, getResourceTool, listResourcesTool } from './resources';
 export { searchTool } from './search';

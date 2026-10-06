@@ -1,66 +1,27 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+import { Client } from './lib/client';
+import { token } from './lib/schemas';
+export const auth = SlateAuth.create()
+  .output(z.object({ token }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'Personal Access Token',
     key: 'pat',
-
     inputSchema: z.object({
-      token: z
-        .string()
-        .describe(
-          'Hashnode Personal Access Token (PAT). Generate one at https://hashnode.com/settings/developer'
-        )
+      token: token.describe(
+        'Personal access token from Account Settings → Developer / API tokens. Pro entitlement and role restrictions apply separately to publication operations.'
+      )
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-
+    getOutput: async ctx => ({ output: { token: ctx.input.token.replace(/^Bearer /i, '') } }),
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axiosInstance = createAxios({
-        baseURL: 'https://gql.hashnode.com'
-      });
-
-      let response = await axiosInstance.post(
-        '/',
-        {
-          query: `query Me {
-          me {
-            id
-            username
-            name
-            email
-            profilePicture
-          }
-        }`
-        },
-        {
-          headers: {
-            Authorization: ctx.output.token
-          }
-        }
-      );
-
-      let user = response.data?.data?.me;
-
+      const user = await new Client({ token: ctx.output.token }).getMe();
       return {
         profile: {
-          id: user?.id,
-          email: user?.email,
-          name: user?.name || user?.username,
-          imageUrl: user?.profilePicture
+          id: user.id,
+          email: user.email ?? undefined,
+          name: user.name ?? user.username,
+          imageUrl: user.profilePicture ?? undefined
         }
       };
     }

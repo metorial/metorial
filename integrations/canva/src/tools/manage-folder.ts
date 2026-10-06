@@ -30,7 +30,7 @@ export let getFolder = SlateTool.create(spec, {
   )
   .output(folderOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let folder = await client.getFolder(ctx.input.folderId);
 
     return {
@@ -57,7 +57,7 @@ export let createFolder = SlateTool.create(spec, {
   )
   .output(folderOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let folder = await client.createFolder({
       name: ctx.input.name,
       parentFolderId: ctx.input.parentFolderId
@@ -83,7 +83,7 @@ export let updateFolder = SlateTool.create(spec, {
   )
   .output(folderOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let folder = await client.updateFolder(ctx.input.folderId, {
       name: ctx.input.name
     });
@@ -114,12 +114,12 @@ export let deleteFolder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     await client.deleteFolder(ctx.input.folderId);
 
     return {
       output: { deleted: true },
-      message: `Deleted folder ${ctx.input.folderId}. Contents have been moved to Trash.`
+      message: `Deleted folder ${ctx.input.folderId}. Your content was moved to Trash, while content owned by other users was moved to their top-level Projects; this is not permanent erasure.`
     };
   })
   .build();
@@ -164,7 +164,9 @@ export let listFolderItems = SlateTool.create(spec, {
       items: z
         .array(
           z.object({
-            type: z.string().describe('Item type: "design", "folder", or "image"'),
+            type: z
+              .string()
+              .describe('Native item type: design, folder, image, or brand_template'),
             folder: folderOutputSchema
               .optional()
               .describe('Folder details (when type is "folder")'),
@@ -181,6 +183,18 @@ export let listFolderItems = SlateTool.create(spec, {
               })
               .optional()
               .describe('Design details (when type is "design")'),
+            brandTemplate: z
+              .object({
+                brandTemplateId: z.string(),
+                title: z.string().optional(),
+                viewUrl: z.string().optional(),
+                createUrl: z.string().optional(),
+                createdAt: z.number(),
+                updatedAt: z.number(),
+                thumbnailUrl: z.string().optional()
+              })
+              .optional()
+              .describe('Brand template details when returned by Canva'),
             image: z
               .object({
                 assetId: z.string(),
@@ -189,8 +203,8 @@ export let listFolderItems = SlateTool.create(spec, {
                 tags: z.array(z.string()),
                 createdAt: z.number(),
                 updatedAt: z.number(),
-                ownerUserId: z.string(),
-                ownerTeamId: z.string(),
+                ownerUserId: z.string().optional(),
+                ownerTeamId: z.string().optional(),
                 thumbnailUrl: z.string().optional()
               })
               .optional()
@@ -202,7 +216,7 @@ export let listFolderItems = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let result = await client.listFolderItems(ctx.input.folderId, {
       itemTypes: ctx.input.itemTypes,
       sortBy: ctx.input.sortBy,
@@ -240,7 +254,7 @@ export let moveFolderItem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     await client.moveFolderItem({
       itemId: ctx.input.itemId,
       toFolderId: ctx.input.toFolderId

@@ -1,13 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, optionalStrings, optionalText, text } from '../lib/client';
 import { spec } from '../spec';
 
 export let createCampaign = SlateTool.create(spec, {
   name: 'Create Campaign',
   key: 'create_campaign',
-  description: `Create a new outreach campaign. Returns the new campaign's ID, sequence ID, and schedule IDs. The campaign is created in a running state by default.`,
+  description: `Create an outreach campaign with an empty sequence and a default schedule. Returns its identifiers and provider-reported state. Review the campaign before adding or launching leads; creating it does not prove that messages can be sent.`,
   tags: {
+    readOnly: false,
     destructive: false
   }
 })
@@ -26,18 +27,16 @@ export let createCampaign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.createCampaign(ctx.input.name);
-
+    const result = await new Client({ token: ctx.auth.token }).createCampaign(ctx.input.name);
     return {
       output: {
-        campaignId: result._id,
-        name: result.name,
-        sequenceId: result.sequenceId,
-        scheduleIds: result.scheduleIds,
-        state: result.state
+        campaignId: text(result._id),
+        name: optionalText(result.name),
+        sequenceId: optionalText(result.sequenceId),
+        scheduleIds: optionalStrings(result.scheduleIds),
+        state: optionalText(result.state ?? result.status)
       },
-      message: `Created campaign **"${result.name}"** with ID \`${result._id}\`.`
+      message: `Created campaign \`${text(result._id)}\` with its sequence and schedule. Review its configuration before launching leads.`
     };
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { nativeId, optionalText, reject, stringArray } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageAutomation = SlateTool.create(spec, {
@@ -103,10 +104,7 @@ export let manageAutomation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let { action, automationId } = ctx.input;
 
@@ -117,13 +115,13 @@ export let manageAutomation = SlateTool.create(spec, {
       });
 
       let automations = result.automations.map((a: Record<string, unknown>) => ({
-        automationId: Number(a.id),
-        automationType: a.automation ? String(a.automation) : undefined,
-        name: a.name ? String(a.name) : undefined,
-        trigger: a.trigger ? String(a.trigger) : undefined,
-        path: a.path ? String(a.path) : undefined,
+        automationId: nativeId(a.id),
+        automationType: optionalText(a.automation),
+        name: optionalText(a.name),
+        trigger: optionalText(a.trigger),
+        path: optionalText(a.path),
         disabled: typeof a.disabled === 'boolean' ? a.disabled : undefined,
-        lastModifiedAt: a.last_modified_at ? String(a.last_modified_at) : undefined
+        lastModifiedAt: optionalText(a.last_modified_at)
       }));
 
       return {
@@ -133,7 +131,7 @@ export let manageAutomation = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!automationId) throw new Error('automationId is required for get');
+      if (!automationId) reject('automationId is required for get');
       let a = await client.getAutomation(automationId);
       return {
         output: {
@@ -144,16 +142,16 @@ export let manageAutomation = SlateTool.create(spec, {
     }
 
     if (action === 'run') {
-      if (!automationId) throw new Error('automationId is required for run');
+      if (!automationId) reject('automationId is required for run');
       await client.runAutomation(automationId);
       return {
         output: { triggered: true },
-        message: `Manually triggered automation **${automationId}**`
+        message: `Files.com accepted the manual run for automation **${automationId}**. This does not confirm completion.`
       };
     }
 
     if (action === 'delete') {
-      if (!automationId) throw new Error('automationId is required for delete');
+      if (!automationId) reject('automationId is required for delete');
       await client.deleteAutomation(automationId);
       return {
         output: { deleted: true },
@@ -185,7 +183,7 @@ export let manageAutomation = SlateTool.create(spec, {
       data.exclude_pattern = ctx.input.excludePattern;
 
     if (action === 'create') {
-      if (!ctx.input.automationType) throw new Error('automationType is required for create');
+      if (!ctx.input.automationType) reject('automationType is required for create');
       let a = await client.createAutomation(data);
       return {
         output: {
@@ -196,7 +194,7 @@ export let manageAutomation = SlateTool.create(spec, {
     }
 
     // update
-    if (!automationId) throw new Error('automationId is required for update');
+    if (!automationId) reject('automationId is required for update');
     let a = await client.updateAutomation(automationId, data);
     return {
       output: {
@@ -208,15 +206,13 @@ export let manageAutomation = SlateTool.create(spec, {
   .build();
 
 let mapAutomation = (a: Record<string, unknown>) => ({
-  automationId: Number(a.id),
-  automationType: a.automation ? String(a.automation) : undefined,
-  name: a.name ? String(a.name) : undefined,
-  description: a.description ? String(a.description) : undefined,
-  trigger: a.trigger ? String(a.trigger) : undefined,
-  path: a.path ? String(a.path) : undefined,
-  destinations: Array.isArray(a.destinations) ? a.destinations.map(String) : undefined,
+  automationId: nativeId(a.id),
+  automationType: optionalText(a.automation),
+  name: optionalText(a.name),
+  description: optionalText(a.description),
+  trigger: optionalText(a.trigger),
+  path: optionalText(a.path),
+  destinations: stringArray(a.destinations),
   disabled: typeof a.disabled === 'boolean' ? a.disabled : undefined,
-  scheduleDescription: a.human_readable_schedule
-    ? String(a.human_readable_schedule)
-    : undefined
+  scheduleDescription: optionalText(a.human_readable_schedule)
 });

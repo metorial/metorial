@@ -6,25 +6,20 @@ import {
   createInvoice,
   createOrderConfirmation,
   createQuotation,
+  downloadDocument,
   getContact,
   getInvoice,
   getPayment,
   getProfile,
+  getResource,
   listArticles,
   listContacts,
+  listReferenceData,
   listVouchers,
   manageArticle,
   manageVoucher,
   updateContact
 } from './tools';
-import {
-  articleEvents,
-  contactEvents,
-  invoiceEvents,
-  paymentEvents,
-  voucherEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,7 +37,10 @@ export let provider = Slate.create({
     manageVoucher,
     listVouchers,
     getPayment,
-    getProfile
+    getProfile,
+    getResource,
+    downloadDocument,
+    listReferenceData
   ],
-  triggers: [contactEvents, invoiceEvents, articleEvents, voucherEvents, paymentEvents]
+  triggers: []
 });

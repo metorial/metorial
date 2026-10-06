@@ -1,18 +1,17 @@
 {
   "name": "@metorial/ramp",
-  "description": "Manage corporate card spending, bill payments, reimbursements, and accounting automation. Create and manage virtual and physical cards with configurable spending limits, merchant restrictions, and spend programs. Track and retrieve transactions with filtering by date, merchant, status, and sync state. Create, approve, and pay bills for accounts payable workflows. Process employee reimbursements for out-of-pocket expenses and mileage. Manage users, departments, locations, and entities for organizational structure. Sync transactions, bills, reimbursements, and statements to external accounting systems with GL account and custom field management. Upload and manage receipts with OCR processing. Retrieve vendor and merchant data. Receive real-time webhook notifications for transaction, bill, reimbursement, and accounting sync events.",
+  "description": "Read transactions, reimbursements, vendors, entities and business balances. Manage users, departments, spend programs, approved bills, physical cards and funds, with exact resource readbacks and deferred user-task status. Bill creation may initiate payment; termination is permanent.",
   "categories": ["financial-data-and-stock-market"],
   "skills": [
     "manage corporate cards",
     "track transactions",
-    "create and pay bills",
-    "process reimbursements",
+    "manage approved bills",
+    "read reimbursements",
     "enforce spending limits",
     "manage spend programs",
-    "sync accounting data",
     "manage users and departments",
-    "upload receipts",
-    "manage vendors"
+    "read vendors",
+    "verify deferred user tasks"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/ramp.svg"
 }

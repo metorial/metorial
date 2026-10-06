@@ -20,8 +20,6 @@ import {
   updateRoom,
   updateTaskStatus
 } from './tools';
-import { messageEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     handleContactRequest,
     getFiles
   ],
-  triggers: [messageEvent]
+  triggers: []
 });

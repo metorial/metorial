@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let searchImagesTool = SlateTool.create(spec, {
@@ -14,7 +15,7 @@ export let searchImagesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project URL slug'),
+      projectId: projectIdSchema,
       prompt: z
         .string()
         .optional()
@@ -27,11 +28,19 @@ export let searchImagesTool = SlateTool.create(spec, {
         .optional()
         .describe('Filter to images in the dataset (true) or not yet added (false)'),
       batchId: z.string().optional().describe('Filter images by batch ID'),
-      offset: z.number().optional().describe('Pagination offset (default 0)'),
+      offset: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Pagination offset (default 0)'),
       limit: z
         .number()
+        .int()
+        .min(1)
+        .max(250)
         .optional()
-        .describe('Maximum number of results to return (default 50, max 250)')
+        .describe('Maximum number of results to return (default 100, max 250)')
     })
   )
   .output(
@@ -55,16 +64,32 @@ export let searchImagesTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth, ctx.config);
     let workspaceId = await client.getWorkspaceId();
+    let likeImage: string | undefined;
+    if (ctx.input.likeImageId) {
+      const data = await client.getImage(
+        workspaceId,
+        ctx.input.projectId,
+        ctx.input.likeImageId
+      );
+      const image = data.image || data;
+      if (typeof image.name !== 'string' || !image.name) {
+        throw createApiServiceError(
+          'Roboflow did not return a filename for the reference image. Choose an image ID returned by search_images.'
+        );
+      }
+      likeImage = image.name;
+    }
 
     let data = await client.searchImages(workspaceId, ctx.input.projectId, {
       prompt: ctx.input.prompt,
-      likeImage: ctx.input.likeImageId,
+      likeImage,
       tag: ctx.input.tag,
       className: ctx.input.className,
       inDataset: ctx.input.inDataset,
       batchId: ctx.input.batchId,
-      offset: ctx.input.offset,
-      limit: ctx.input.limit,
+      batch: ctx.input.batchId ? true : undefined,
+      offset: ctx.input.offset ?? 0,
+      limit: ctx.input.limit ?? 100,
       fields: ['id', 'name', 'labels', 'split', 'tags', 'owner', 'created']
     });
 

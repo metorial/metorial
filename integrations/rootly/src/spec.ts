@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'rootly',
   name: 'Rootly',
   description:
-    'Incident management platform for engineering teams providing on-call scheduling, incident response, retrospectives, status pages, and workflow automation.',
+    'Manage incidents, alerts, follow-up action items and heartbeat monitors, and inspect current on-call coverage and response configuration.',
   metadata: {},
   config,
   auth

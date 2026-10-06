@@ -1,15 +1,89 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  requestAxios,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { apiFailure } from './lib/errors';
 
-let accountsAxios = createAxios({
-  baseURL: 'https://accounts.salesloft.com'
+const tokenSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().min(1).optional(),
+  expires_in: z
+    .number()
+    .positive()
+    .max((8.64e15 - Date.now()) / 1000)
 });
-
-let apiAxios = createAxios({
-  baseURL: 'https://api.salesloft.com/v2'
-});
-
-export let auth = SlateAuth.create()
+const tokenRequest = async (data: Record<string, string>, previousRefreshToken?: string) => {
+  const client = createAxios({
+    baseURL: 'https://accounts.salesloft.com',
+    timeout: 30000,
+    maxRedirects: 0,
+    validateStatus: () => true
+  });
+  const response = await requestAxios(
+    'Salesloft OAuth exchange',
+    () =>
+      client.post<unknown>('/oauth/token', data, {
+        headers: { 'Content-Type': 'application/json' }
+      }),
+    error => apiFailure('OAuth exchange', error)
+  );
+  if (response.status < 200 || response.status >= 300)
+    throw apiFailure('OAuth exchange', { response: { status: response.status } });
+  const parsed = tokenSchema.safeParse(response.data);
+  if (!parsed.success)
+    throw createApiServiceError(
+      'Salesloft returned an invalid OAuth token response. Reconnect the account.'
+    );
+  const output = normalizeOAuthTokenResponse(parsed.data, {
+    providerLabel: 'Salesloft',
+    operation: 'token exchange',
+    previousRefreshToken,
+    required: true
+  });
+  if (!output.refreshToken)
+    throw createApiServiceError(
+      'Salesloft did not return a refresh token. Reconnect the OAuth account.'
+    );
+  return { output };
+};
+const getProfile = async (ctx: { output: { token: string } }) => {
+  const user = await new Client({ token: ctx.output.token }).getMe();
+  return {
+    profile: {
+      id: String(user.id),
+      email: user.email ?? undefined,
+      name: user.name ?? undefined,
+      firstName: user.first_name ?? undefined,
+      lastName: user.last_name ?? undefined
+    }
+  };
+};
+const scopes = [
+  ['people:read', 'Read People'],
+  ['people:write', 'Create and Update People'],
+  ['people:delete', 'Delete People'],
+  ['accounts:read', 'Read Accounts'],
+  ['accounts:write', 'Create and Update Accounts'],
+  ['accounts:delete', 'Delete Accounts'],
+  ['cadences:read', 'Read Cadences and Memberships'],
+  ['cadences:write', 'Enroll People in Cadences'],
+  ['cadences:delete', 'Remove Cadence Memberships'],
+  ['calls:read', 'Read Call Activities'],
+  ['calls:write', 'Log Calls'],
+  ['emails:read', 'Read Emails and Templates'],
+  ['email_contents:read', 'Read Email Subjects'],
+  ['tasks:read', 'Read Tasks'],
+  ['notes:read', 'Read Notes'],
+  ['notes:write', 'Create and Update Notes'],
+  ['notes:delete', 'Delete Notes'],
+  ['team:read', 'Read Users']
+].map(([scope, title]) => ({ scope: scope!, title: title!, description: title! }));
+export const auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
@@ -21,6 +95,7 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'OAuth',
     key: 'oauth',
+    scopes,
     docs: [
       {
         type: 'docs.auth.oauth',
@@ -33,186 +108,60 @@ export let auth = SlateAuth.create()
         url: 'https://developers.salesloft.com/docs/platform/api-basics/scopes/'
       }
     ],
-
-    scopes: [
-      {
-        title: 'People Read',
-        description: 'Read people/contacts information',
-        scope: 'people:read'
-      },
-      {
-        title: 'People Write',
-        description: 'Create and update people/contacts',
-        scope: 'people:write'
-      },
-      {
-        title: 'Accounts Read',
-        description: 'Read account/company data',
-        scope: 'accounts:read'
-      },
-      {
-        title: 'Accounts Write',
-        description: 'Create and update accounts',
-        scope: 'accounts:write'
-      },
-      { title: 'Cadences Read', description: 'Read cadence data', scope: 'cadences:read' },
-      {
-        title: 'Cadences Write',
-        description: 'Create and manage cadences',
-        scope: 'cadences:write'
-      },
-      { title: 'Calls Read', description: 'Read call activity data', scope: 'calls:read' },
-      {
-        title: 'Calls Write',
-        description: 'Create and update call records',
-        scope: 'calls:write'
-      },
-      { title: 'Emails Read', description: 'Read email activity data', scope: 'emails:read' },
-      { title: 'Emails Write', description: 'Create and send emails', scope: 'emails:write' },
-      { title: 'Tasks Read', description: 'Read task data', scope: 'tasks:read' },
-      { title: 'Tasks Write', description: 'Create and manage tasks', scope: 'tasks:write' },
-      { title: 'Notes Read', description: 'Read note data', scope: 'notes:read' },
-      { title: 'Notes Write', description: 'Create and manage notes', scope: 'notes:write' },
-      { title: 'Meetings Read', description: 'Read meeting data', scope: 'meetings:read' },
-      {
-        title: 'Conversations Read',
-        description: 'Read conversation data',
-        scope: 'conversations:read'
-      },
-      { title: 'Team Read', description: 'Read team and user data', scope: 'team:read' },
-      {
-        title: 'Email Contents Read',
-        description: 'Read email bodies and subjects (privileged)',
-        scope: 'email_contents:read'
-      },
-      {
-        title: 'CRM ID Person Write',
-        description: 'Write to CRM ID field of Person (privileged)',
-        scope: 'crm_id_person:write'
-      },
-      {
-        title: 'CRM ID Account Write',
-        description: 'Write to CRM ID field of Account (privileged)',
-        scope: 'crm_id_account:write'
-      }
-    ],
-
     getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
+      const params = new URLSearchParams({
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
         response_type: 'code',
         state: ctx.state
       });
-
-      if (ctx.scopes.length > 0) {
-        params.set('scope', ctx.scopes.join(' '));
-      }
-
-      return {
-        url: `https://accounts.salesloft.com/oauth/authorize?${params.toString()}`
-      };
+      if (ctx.scopes.length) params.set('scope', ctx.scopes.join(' '));
+      return { url: `https://accounts.salesloft.com/oauth/authorize?${params}` };
     },
-
-    handleCallback: async ctx => {
-      let response = await accountsAxios.post('/oauth/token', {
+    handleCallback: async ctx =>
+      tokenRequest({
         client_id: ctx.clientId,
         client_secret: ctx.clientSecret,
         code: ctx.code,
         grant_type: 'authorization_code',
         redirect_uri: ctx.redirectUri
-      });
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
+      }),
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken?.trim())
+        throw createApiServiceError(
+          'The Salesloft OAuth refresh token is missing. Reconnect the account.'
+        );
+      return tokenRequest(
+        {
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          grant_type: 'refresh_token',
+          refresh_token: ctx.output.refreshToken
+        },
+        ctx.output.refreshToken
+      );
     },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let response = await accountsAxios.post('/oauth/token', {
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        grant_type: 'refresh_token',
-        refresh_token: ctx.output.refreshToken
-      });
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let response = await apiAxios.get('/me.json', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data.data;
-
-      return {
-        profile: {
-          id: String(user.id),
-          email: user.email,
-          name: user.name,
-          firstName: user.first_name,
-          lastName: user.last_name
-        }
-      };
-    }
+    getProfile
   })
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Key',
     key: 'api_key',
-
     inputSchema: z.object({
-      apiKey: z.string().describe('SalesLoft API Key (starts with "ak_")')
+      apiKey: z
+        .string()
+        .describe(
+          'Salesloft API key from the issuing user. Partner applications should use OAuth.'
+        )
     }),
-
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.apiKey
-        }
-      };
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError('A Salesloft API key is required.');
+      return { output: { token: ctx.input.apiKey } };
     },
-
-    getProfile: async (ctx: any) => {
-      let response = await apiAxios.get('/me.json', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data.data;
-
-      return {
-        profile: {
-          id: String(user.id),
-          email: user.email,
-          name: user.name,
-          firstName: user.first_name,
-          lastName: user.last_name
-        }
-      };
-    }
+    getProfile
   });

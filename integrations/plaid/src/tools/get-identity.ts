@@ -31,7 +31,7 @@ let ownerSchema = z.object({
         region: z.string().nullable().optional(),
         postalCode: z.string().nullable().optional(),
         country: z.string().nullable().optional(),
-        primary: z.boolean()
+        primary: z.boolean().optional()
       })
     )
     .describe('Account holder addresses')
@@ -76,24 +76,24 @@ export let getIdentityTool = SlateTool.create(spec, {
 
     let result = await client.getIdentity(ctx.input.accessToken, ctx.input.accountIds);
 
-    let accounts = (result.accounts || []).map((a: any) => ({
+    let accounts = result.accounts.map(a => ({
       accountId: a.account_id,
       name: a.name,
       type: a.type,
       subtype: a.subtype,
-      owners: (a.owners || []).map((o: any) => ({
-        names: o.names || [],
-        emails: (o.emails || []).map((e: any) => ({
+      owners: a.owners.map(o => ({
+        names: o.names,
+        emails: o.emails.map(e => ({
           address: e.data,
           primary: e.primary,
           type: e.type
         })),
-        phoneNumbers: (o.phone_numbers || []).map((p: any) => ({
+        phoneNumbers: o.phone_numbers.map(p => ({
           number: p.data,
           primary: p.primary,
           type: p.type
         })),
-        addresses: (o.addresses || []).map((addr: any) => ({
+        addresses: o.addresses.map(addr => ({
           street: addr.data?.street ?? null,
           city: addr.data?.city ?? null,
           region: addr.data?.region ?? null,

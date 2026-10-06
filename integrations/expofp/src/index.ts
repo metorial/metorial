@@ -28,8 +28,6 @@ import {
   upsertSessions,
   upsertSessionTracks
 } from './tools';
-import { boothChanges, exhibitorChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -60,5 +58,5 @@ export let provider = Slate.create({
     upsertSessionTracks,
     deleteSessionTracks
   ],
-  triggers: [inboundWebhook, exhibitorChanges, boothChanges]
+  triggers: []
 });

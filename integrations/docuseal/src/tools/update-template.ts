@@ -14,7 +14,14 @@ export let updateTemplate = SlateTool.create(spec, {
       name: z.string().optional().describe('New template name'),
       folderName: z.string().optional().describe('New folder name'),
       externalId: z.string().optional().describe('New external ID'),
-      roles: z.array(z.string()).optional().describe('Updated submitter role names')
+      roles: z
+        .array(z.string())
+        .optional()
+        .describe('Role names applied by position; omitted trailing roles stay unchanged'),
+      archived: z
+        .boolean()
+        .optional()
+        .describe('Archive or restore the template; archival retains its history')
     })
   )
   .output(
@@ -34,7 +41,8 @@ export let updateTemplate = SlateTool.create(spec, {
       name: ctx.input.name,
       folderName: ctx.input.folderName,
       externalId: ctx.input.externalId,
-      roles: ctx.input.roles
+      roles: ctx.input.roles,
+      archived: ctx.input.archived
     });
 
     return {

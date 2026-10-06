@@ -19,8 +19,6 @@ import {
   submitPost,
   vote
 } from './tools';
-import { inboundWebhook, newComment, newMessage, newPost } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     manageFlair,
     manageWiki
   ],
-  triggers: [inboundWebhook, newPost, newComment, newMessage]
+  triggers: []
 });

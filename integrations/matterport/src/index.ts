@@ -14,8 +14,6 @@ import {
   updateModel,
   updateTag
 } from './tools';
-import { modelEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     getDimensions,
     getNotes
   ],
-  triggers: [modelEvents]
+  triggers: []
 });

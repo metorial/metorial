@@ -1,11 +1,28 @@
-# <img src="logo.svg" height="20"> Uptimerobot
+# UptimeRobot
 
-Monitor website, server, and service uptime, downtime, and response times. Create and manage monitors (HTTP, keyword, ping, port, heartbeat, DNS) to track availability. Configure alert contacts and notification integrations (Slack, PagerDuty, Teams, webhooks, etc.) for up/down, SSL, and domain expiry events. Create and customize public status pages to display service health. Define maintenance windows to suppress alerts during scheduled downtime. Retrieve account information, subscription details, and monitor limits.
+Monitor website and service availability, investigate downtime incidents, and manage monitoring settings.
 
-## License
+## Connections
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
+Create an account-level credential under **Integrations & API** in your UptimeRobot dashboard. Read-only credentials support reads; changes require a credential with write access. Monitor-specific keys do not support account identity discovery.
 
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+- **Current API Token** uses API v3 and Bearer authentication. Choose it for **Who Am I**, **List Current Monitors**, **Get Monitor**, **Manage Monitor**, and **List Incidents**.
+- **Legacy API Key** uses API v2. Choose it for alert contacts, status pages, maintenance windows, account details, and the existing **List Monitors**, **Create Monitor**, **Update Monitor**, and **Delete Monitor** tools.
+
+The provider keeps v2 available but directs new workflows to v3. A credential connection selects one API version; use separate connections when a workflow needs both sets of tools.
+
+## Monitoring
+
+Current monitor tools support HTTP, keyword, ping, port, heartbeat and DNS monitoring. Create and update enforce settings appropriate to the monitor type. Creating a current monitor assigns no alert contacts unless you explicitly supply them. Updating assignments to an empty array clears them. Plan limits determine intervals and available features.
+
+Returned monitor information excludes API keys, heartbeat ping URLs, HTTP authentication credentials, private headers and request bodies. Returned HTTP URLs omit credentials and query parameters. Configure or retrieve a heartbeat ping URL in the provider dashboard.
+
+List tools expose pagination. Continue legacy lists with `offset` and `limit`; continue current monitor and incident lists with `nextCursor`, preserving the filters. Incidents are read-only; deleting a monitor permanently removes its history.
+
+Status-page creation requires selected monitor IDs, or an explicit choice to include every monitor. Contact creation may send an activation notification. The retained legacy SMS contact choice returns an unsupported-operation error because SMS contact creation is deprecated. Maintenance windows require a supported paid plan.
+
+## API documentation
+
+- [Current API](https://uptimerobot.com/api/v3/)
+- [Official OpenAPI specification](https://cdn.uptimerobot.com/api/openapi.yaml)
+- [Legacy API](https://uptimerobot.com/api/legacy/)

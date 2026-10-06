@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { WorkdayClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCustomReport = SlateTool.create(spec, {
@@ -14,7 +14,7 @@ export let getCustomReport = SlateTool.create(spec, {
   ],
   constraints: [
     'RaaS does not natively support pagination — large reports may take longer to return',
-    'Workday enforces a timeout limit (typically 30 minutes) and a 2GB response size limit'
+    'The connection and report definition must allow web-service access. CSV returns a downloadable file.'
   ],
   tags: {
     readOnly: true
@@ -35,28 +35,38 @@ export let getCustomReport = SlateTool.create(spec, {
     z.object({
       reportData: z
         .any()
-        .describe(
-          'Report data returned by Workday (structure depends on the report definition)'
-        )
+        .describe('Structured JSON report data, or null when CSV is prepared for download'),
+      fileName: z.string().optional().describe('CSV download filename'),
+      mimeType: z.string().optional().describe('CSV media type')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
-    let result = await client.getCustomReport(ctx.input.reportOwner, ctx.input.reportName, {
-      format: ctx.input.format,
+    if (ctx.input.format === 'csv') {
+      const download = client.reportDownload(
+        ctx.input.reportOwner,
+        ctx.input.reportName,
+        ctx.input.prompts
+      );
+      await ctx.addAttachment({
+        type: 'url',
+        ...download,
+        filename: 'report.csv',
+        mimeType: 'text/csv'
+      });
+      return {
+        output: { reportData: null, fileName: 'report.csv', mimeType: 'text/csv' },
+        message: 'Prepared the custom report CSV for download.'
+      };
+    }
+    const result = await client.getCustomReport(ctx.input.reportOwner, ctx.input.reportName, {
+      format: 'json',
       prompts: ctx.input.prompts
     });
-
     return {
-      output: {
-        reportData: result
-      },
-      message: `Retrieved custom report **${ctx.input.reportName}** owned by ${ctx.input.reportOwner}.`
+      output: { reportData: result },
+      message: 'Retrieved the authorized custom report data.'
     };
   })
   .build();

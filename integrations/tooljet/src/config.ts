@@ -1,12 +1,4 @@
 import { SlateConfig } from 'slates';
-import { z } from 'zod';
-
-export let config = SlateConfig.create(
-  z.object({
-    baseUrl: z
-      .string()
-      .describe(
-        'The base URL of your ToolJet instance (e.g., https://your-tooljet-instance.com)'
-      )
-  })
-);
+import { z } from './lib/validation';
+// Preserve previously stored instance settings without offering a duplicate connection field.
+export const config = SlateConfig.create(z.object({}).passthrough());

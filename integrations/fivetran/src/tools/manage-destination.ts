@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FivetranClient } from '../lib/client';
+import { destinationId, groupId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let destinationOutputSchema = z.object({
-  destinationId: z.string().describe('Unique identifier of the destination'),
-  groupId: z.string().describe('Group this destination belongs to'),
+  destinationId: destinationId,
+  groupId: groupId,
   service: z.string().describe('Destination service type (e.g., "snowflake", "big_query")'),
   region: z.string().optional().describe('Data processing region'),
   networkingMethod: z.string().optional().describe('Networking method for connectivity'),
@@ -15,8 +16,11 @@ let destinationOutputSchema = z.object({
   config: z
     .record(z.string(), z.any())
     .optional()
-    .describe('Service-specific destination configuration'),
-  setupTests: z.array(z.record(z.string(), z.any())).optional().describe('Setup test results')
+    .describe('Stored configuration is omitted to protect destination credentials'),
+  setupTests: z
+    .array(z.record(z.string(), z.any()))
+    .optional()
+    .describe('Setup test statuses; diagnostic messages and details are omitted')
 });
 
 let mapDestination = (d: any) => ({
@@ -28,7 +32,6 @@ let mapDestination = (d: any) => ({
   setupStatus: d.setup_status,
   timeZoneOffset: d.time_zone_offset,
   daylightSavingTimeEnabled: d.daylight_saving_time_enabled,
-  config: d.config,
   setupTests: d.setup_tests
 });
 
@@ -62,14 +65,14 @@ export let listDestinations = SlateTool.create(spec, {
 export let getDestination = SlateTool.create(spec, {
   name: 'Get Destination',
   key: 'get_destination',
-  description: `Retrieve full details of a specific destination, including its configuration and setup test results.`,
+  description: `Retrieve full details of a specific destination, including its status and safe setup-test results. Stored destination credentials are omitted.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      destinationId: z.string().describe('ID of the destination to retrieve')
+      destinationId: destinationId
     })
   )
   .output(destinationOutputSchema)
@@ -95,7 +98,7 @@ export let createDestination = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      groupId: z.string().describe('ID of the group for the destination'),
+      groupId: groupId,
       service: z
         .string()
         .describe('Destination service type (e.g., "snowflake", "big_query", "redshift")'),
@@ -103,7 +106,10 @@ export let createDestination = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Data processing region (e.g., "GCP_US_EAST4", "AWS_US_EAST_1")'),
-      timeZoneOffset: z.string().optional().describe('Time zone offset (e.g., "+0", "-5")'),
+      timeZoneOffset: z
+        .string()
+        .optional()
+        .describe('Time zone offset required for creation (e.g., "0", "-5")'),
       daylightSavingTimeEnabled: z
         .boolean()
         .optional()
@@ -125,11 +131,12 @@ export let createDestination = SlateTool.create(spec, {
       group_id: ctx.input.groupId,
       service: ctx.input.service
     };
-    if (ctx.input.region) body.region = ctx.input.region;
-    if (ctx.input.timeZoneOffset) body.time_zone_offset = ctx.input.timeZoneOffset;
+    if (ctx.input.region !== undefined) body.region = ctx.input.region;
+    if (ctx.input.timeZoneOffset !== undefined)
+      body.time_zone_offset = ctx.input.timeZoneOffset;
     if (ctx.input.daylightSavingTimeEnabled !== undefined)
       body.daylight_saving_time_enabled = ctx.input.daylightSavingTimeEnabled;
-    if (ctx.input.config) body.config = ctx.input.config;
+    if (ctx.input.config !== undefined) body.config = ctx.input.config;
     if (ctx.input.trustCertificates !== undefined)
       body.trust_certificates = ctx.input.trustCertificates;
     if (ctx.input.trustFingerprints !== undefined)
@@ -152,7 +159,7 @@ export let updateDestination = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      destinationId: z.string().describe('ID of the destination to update'),
+      destinationId: destinationId,
       region: z.string().optional().describe('Data processing region'),
       timeZoneOffset: z.string().optional().describe('Time zone offset'),
       daylightSavingTimeEnabled: z
@@ -172,11 +179,12 @@ export let updateDestination = SlateTool.create(spec, {
     let client = new FivetranClient(ctx.auth.token);
 
     let body: Record<string, any> = {};
-    if (ctx.input.region) body.region = ctx.input.region;
-    if (ctx.input.timeZoneOffset) body.time_zone_offset = ctx.input.timeZoneOffset;
+    if (ctx.input.region !== undefined) body.region = ctx.input.region;
+    if (ctx.input.timeZoneOffset !== undefined)
+      body.time_zone_offset = ctx.input.timeZoneOffset;
     if (ctx.input.daylightSavingTimeEnabled !== undefined)
       body.daylight_saving_time_enabled = ctx.input.daylightSavingTimeEnabled;
-    if (ctx.input.config) body.config = ctx.input.config;
+    if (ctx.input.config !== undefined) body.config = ctx.input.config;
     if (ctx.input.trustCertificates !== undefined)
       body.trust_certificates = ctx.input.trustCertificates;
     if (ctx.input.trustFingerprints !== undefined)
@@ -201,7 +209,7 @@ export let deleteDestination = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      destinationId: z.string().describe('ID of the destination to delete')
+      destinationId: destinationId
     })
   )
   .output(

@@ -21,8 +21,6 @@ import {
   updateContactCustomFields,
   updateSmsConsent
 } from './tools';
-import { inboundWebhook, newContact, newUnsubscribe } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     trackOrderFulfilled,
     trackCustomEvent
   ],
-  triggers: [inboundWebhook, newContact, newUnsubscribe]
+  triggers: []
 });

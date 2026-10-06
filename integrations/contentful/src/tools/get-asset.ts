@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { resourceId, selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getAsset = SlateTool.create(spec, {
@@ -13,12 +14,19 @@ export let getAsset = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      assetId: z.string().describe('The ID of the asset to retrieve.')
+      ...selection,
+      api: z
+        .enum(['management', 'delivery', 'preview'])
+        .optional()
+        .describe(
+          'API for legacy token-only connections. Must match the credential type; reconnect if unknown.'
+        ),
+      assetId: resourceId.describe('The ID of the asset to retrieve.')
     })
   )
   .output(
     z.object({
-      assetId: z.string(),
+      assetId: resourceId,
       title: z.record(z.string(), z.string()).optional(),
       description: z.record(z.string(), z.string()).optional(),
       file: z
@@ -41,7 +49,7 @@ export let getAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
     let asset = await client.getAsset(ctx.input.assetId);
 
     let fields = asset.fields || {};

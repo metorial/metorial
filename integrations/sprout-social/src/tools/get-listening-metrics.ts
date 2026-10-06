@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, listeningValues, range } from '../lib/client';
+import { customerIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getListeningMetrics = SlateTool.create(spec, {
@@ -23,6 +24,7 @@ export let getListeningMetrics = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      customerId: customerIdSchema,
       topicId: z.string().describe('Listening topic ID.'),
       startTime: z.string().describe('Start time in ISO 8601 or YYYY-MM-DD format.'),
       endTime: z.string().describe('End time in ISO 8601 or YYYY-MM-DD format.'),
@@ -55,17 +57,20 @@ export let getListeningMetrics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    range(ctx.input.startTime, ctx.input.endTime);
+    const networks = listeningValues(ctx.input.networks, 'network');
+    const sentiment = listeningValues(ctx.input.sentiment, 'sentiment');
     let client = new Client({
       token: ctx.auth.token,
-      customerId: ctx.config.customerId
+      customerId: ctx.input.customerId ?? ctx.config.customerId
     });
 
     let filters: string[] = [`created_time.in(${ctx.input.startTime}..${ctx.input.endTime})`];
-    if (ctx.input.networks?.length) {
-      filters.push(`network.eq(${ctx.input.networks.join(',')})`);
+    if (networks?.length) {
+      filters.push(`network.eq(${networks.join(',')})`);
     }
-    if (ctx.input.sentiment?.length) {
-      filters.push(`sentiment.eq(${ctx.input.sentiment.join(',')})`);
+    if (sentiment?.length) {
+      filters.push(`sentiment.eq(${sentiment.join(',')})`);
     }
 
     let result = await client.getListeningTopicMetrics(ctx.input.topicId, {
@@ -75,13 +80,13 @@ export let getListeningMetrics = SlateTool.create(spec, {
       timezone: ctx.input.timezone
     });
 
-    let metricsData = (result?.data ?? []).map((item: any) => ({
+    let metricsData = result.data.map((item: any) => ({
       dimensions: item.dimensions,
       metrics: item.metrics
     }));
 
     return {
       output: { metricsData },
-      message: `Retrieved **${metricsData.length}** aggregated metric data points for topic ${ctx.input.topicId}.`
+      message: `Retrieved **${metricsData.length}** aggregated metric data points for the selected topic.`
     };
   });

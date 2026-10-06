@@ -1,106 +1,130 @@
-import { SlateTool } from 'slates';
-import { z } from 'zod';
+import { pickDefined, SlateTool } from 'slates';
 import { Client } from '../lib/client';
+import { mappedUser, userSchema, workspaceId } from '../lib/schemas';
+import { fail, id, type Row, z } from '../lib/validation';
 import { spec } from '../spec';
 
-let groupInput = z.object({
-  groupName: z.string().describe('Name of the group'),
-  groupId: z.string().optional().describe('ID of the group (optional)')
-});
-
-let workspaceRelationInput = z.object({
-  workspaceId: z.string().describe('UUID of the workspace'),
-  workspaceName: z.string().optional().describe('Name of the workspace'),
-  status: z.enum(['active', 'archived']).optional().describe('User status in this workspace'),
-  groups: z.array(groupInput).optional().describe('Groups to assign the user to')
-});
-
-export let manageUserWorkspaces = SlateTool.create(spec, {
+const group = z.object({ groupName: z.string().optional(), groupId: z.string().optional() });
+export const manageUserWorkspaces = SlateTool.create(spec, {
   name: 'Manage User Workspaces',
   key: 'manage_user_workspaces',
-  description: `Replace all workspace relations for a user or update a single workspace relation. Use **replaceAll** mode to set the complete list of workspace assignments (an empty array removes all). Use **updateOne** mode to update a specific workspace relation including status and group assignments.`,
+  description:
+    'Replace the complete workspace membership set or update one relation. Discover IDs with list_workspaces. Explicit empty replaceAll removes every membership; omitted workspaces never implies removal.',
   instructions: [
-    'To remove all workspace relations, use replaceAll mode with an empty workspaces array.',
-    'When using updateOne mode, provide the targetWorkspaceId to identify which workspace relation to update.'
+    'replaceAll requires native ADMIN or MEMBER role, active/archived status and group UUIDs. Native PUT uses uppercase status values; names alone are not valid group locators for this route.',
+    'No compare-and-swap is available. Coordinate concurrent membership changes; the request may take effect before readback fails.'
   ],
-  tags: {
-    destructive: false
-  }
+  tags: { destructive: true }
 })
   .input(
     z.object({
-      userId: z.string().describe('UUID of the user whose workspace relations to manage'),
-      mode: z
-        .enum(['replaceAll', 'updateOne'])
-        .describe(
-          'Operation mode: replaceAll replaces all workspace relations, updateOne updates a single relation'
-        ),
+      userId: z.string(),
+      mode: z.enum(['replaceAll', 'updateOne']),
       workspaces: z
-        .array(workspaceRelationInput)
-        .optional()
-        .describe('Workspace relations to set (used with replaceAll mode)'),
-      targetWorkspaceId: z
-        .string()
-        .optional()
-        .describe('UUID of the specific workspace to update (used with updateOne mode)'),
-      updateStatus: z
-        .enum(['active', 'archived'])
-        .optional()
-        .describe('New status for the workspace relation (used with updateOne mode)'),
-      updateGroups: z
-        .array(groupInput)
-        .optional()
-        .describe('New group assignments (used with updateOne mode)')
+        .array(
+          z.object({
+            workspaceId,
+            workspaceName: z.string().optional(),
+            status: z.enum(['active', 'archived']).optional(),
+            role: z
+              .enum(['ADMIN', 'MEMBER'])
+              .optional()
+              .describe('Required by native replaceAll. Do not infer role from a group name.'),
+            groups: z.array(group).optional()
+          })
+        )
+        .optional(),
+      targetWorkspaceId: workspaceId.optional(),
+      updateStatus: z.enum(['active', 'archived']).optional(),
+      updateGroups: z.array(group).optional()
     })
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation was successful')
+      success: z.boolean(),
+      user: userSchema.optional(),
+      verification: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
-
+    let body: Row | Row[];
     if (ctx.input.mode === 'replaceAll') {
-      let apiWorkspaces = (ctx.input.workspaces ?? []).map(w => ({
-        id: w.workspaceId,
-        name: w.workspaceName,
-        status: w.status,
-        groups: w.groups?.map(g => ({
-          id: g.groupId,
-          name: g.groupName
-        }))
-      }));
-
-      await client.replaceUserWorkspaces(ctx.input.userId, apiWorkspaces);
-
-      return {
-        output: { success: true },
-        message: `Replaced all workspace relations for user ${ctx.input.userId}. Set **${apiWorkspaces.length}** workspace(s).`
-      };
+      if (ctx.input.workspaces === undefined)
+        fail(
+          'Provide workspaces explicitly; use [] only when intentionally removing all memberships.'
+        );
+      if (
+        ctx.input.targetWorkspaceId !== undefined ||
+        ctx.input.updateStatus !== undefined ||
+        ctx.input.updateGroups !== undefined
+      )
+        fail('Do not mix updateOne fields with replaceAll.');
+      const seen = new Set<string>();
+      body = ctx.input.workspaces.map(w => {
+        const wid = id(w.workspaceId, 'workspace UUID');
+        if (seen.has(wid)) fail('Workspace assignments must have unique UUIDs.');
+        seen.add(wid);
+        if (w.role === undefined || w.status === undefined)
+          fail(
+            'Each replaceAll assignment requires role ADMIN/MEMBER and status active/archived. Discover and specify the intended values; no role is inferred.'
+          );
+        const groups = w.groups?.map(g => {
+          if (!g.groupId)
+            fail(
+              'replaceAll requires a group UUID for every group; discover IDs with list_workspaces.'
+            );
+          return { id: id(g.groupId, 'group UUID') };
+        });
+        return pickDefined({
+          id: wid,
+          name: w.workspaceName,
+          role: w.role,
+          status: w.status.toUpperCase(),
+          groups
+        });
+      });
     } else {
-      if (!ctx.input.targetWorkspaceId) {
-        throw new Error('targetWorkspaceId is required when using updateOne mode');
-      }
-
-      let body: any = {};
-      if (ctx.input.updateStatus) body.status = ctx.input.updateStatus;
-      if (ctx.input.updateGroups) {
-        body.groups = ctx.input.updateGroups.map(g => ({
-          id: g.groupId,
-          name: g.groupName
-        }));
-      }
-
-      await client.updateUserWorkspace(ctx.input.userId, ctx.input.targetWorkspaceId, body);
-
-      return {
-        output: { success: true },
-        message: `Updated workspace relation for user ${ctx.input.userId} in workspace ${ctx.input.targetWorkspaceId}.`
-      };
+      if (!ctx.input.targetWorkspaceId)
+        fail('Provide targetWorkspaceId from list_workspaces for updateOne.');
+      if (ctx.input.workspaces !== undefined) fail('Do not mix workspaces with updateOne.');
+      if (ctx.input.updateStatus === undefined && ctx.input.updateGroups === undefined)
+        fail('Provide updateStatus or updateGroups for updateOne.');
+      body = pickDefined({
+        status: ctx.input.updateStatus,
+        groups: ctx.input.updateGroups?.map(g => {
+          if (!g.groupId && !g.groupName) fail('Each group requires a UUID or name.');
+          return pickDefined({ id: g.groupId, name: g.groupName });
+        })
+      });
     }
+    const client = new Client(ctx.auth, ctx.config),
+      before = await client.getUser(ctx.input.userId);
+    if (ctx.input.mode === 'replaceAll')
+      await client.replaceUserWorkspaces(before.id, body as Row[]);
+    else
+      await client.updateUserWorkspace(
+        before.id,
+        id(ctx.input.targetWorkspaceId, 'workspace UUID'),
+        body as Row
+      );
+    let after: Awaited<ReturnType<Client['getUser']>>;
+    try {
+      after = await client.getUser(before.id);
+    } catch {
+      fail(
+        'ToolJet accepted the membership request but exact readback failed. Reconcile current memberships before retrying.',
+        'update_unverified',
+        { userId: before.id }
+      );
+    }
+    return {
+      output: {
+        success: true,
+        user: mappedUser(after),
+        verification: 'request_accepted_native_memberships_returned'
+      },
+      message:
+        'ToolJet accepted the membership request; inspect the returned current native assignments.'
+    };
   })
   .build();

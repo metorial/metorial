@@ -50,21 +50,24 @@ export let clusterStatus = SlateTool.create(spec, {
     let includeDetails = ctx.input.includeNodeDetails !== false;
 
     let [meta, liveCheck, readyCheck] = await Promise.all([
-      client.getMeta().catch(() => null),
-      client.getLiveness().catch(() => false),
-      client.getReadiness().catch(() => false)
+      client.getMeta(),
+      client.getLiveness(),
+      client.getReadiness()
     ]);
 
     let nodesData: any = null;
     if (includeDetails) {
-      nodesData = await client.getNodes({ output: 'verbose' }).catch(() => null);
+      nodesData = await client.getNodes({ output: 'verbose' });
     }
 
     return {
       output: {
         version: meta?.version,
         hostname: meta?.hostname,
-        modules: meta?.modules,
+        modules: Object.entries(meta.modules || {}).map(([name, details]) => ({
+          name,
+          details
+        })),
         isLive: liveCheck,
         isReady: readyCheck,
         nodes: nodesData?.nodes

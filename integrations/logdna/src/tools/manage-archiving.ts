@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type ArchiveConfig, archiveMissing, Client } from '../lib/client';
 import { spec } from '../spec';
 
 let archiveOutputSchema = z.object({
@@ -25,7 +25,11 @@ export let getArchiveConfig = SlateTool.create(spec, {
   .input(z.object({}))
   .output(archiveOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let a = await client.getArchiveConfig();
 
     return {
@@ -52,13 +56,13 @@ export let saveArchiveConfig = SlateTool.create(spec, {
   instructions: [
     'Provide the "integration" field and the corresponding fields for your storage provider.',
     'For IBM: provide bucket, endpoint, ibmApiKey, resourceInstanceId.',
-    'For S3: provide bucket, and optionally endpoint, s3AccessKey, s3SecretKey.',
+    'For S3: provide bucket, and optionally endpoint, accessKey, secretKey together.',
     'For Azure Blob: provide accountName, accountKey.',
     'For GCS: provide bucket, projectId.',
     'For DigitalOcean Spaces: provide space, endpoint, accessKey, secretKey.',
     'For Swift: provide authUrl, username, password, tenantName.'
   ],
-  tags: { destructive: false, readOnly: false }
+  tags: { destructive: true, readOnly: false }
 })
   .input(
     z.object({
@@ -84,9 +88,13 @@ export let saveArchiveConfig = SlateTool.create(spec, {
   )
   .output(archiveOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
 
-    let archivePayload: any = {
+    let archivePayload: ArchiveConfig = {
       integration: ctx.input.integration
     };
 
@@ -107,17 +115,20 @@ export let saveArchiveConfig = SlateTool.create(spec, {
     if (ctx.input.tenantName) archivePayload.tenantname = ctx.input.tenantName;
     if (ctx.input.expires) archivePayload.expires = ctx.input.expires;
 
-    // Try to update first; if that fails (no existing config), create
-    let a: any;
+    let exists: boolean;
     try {
-      a = await client.updateArchiveConfig(archivePayload);
-    } catch {
-      a = await client.createArchiveConfig(archivePayload);
+      exists = Boolean((await client.getArchiveConfig()).integration);
+    } catch (error) {
+      if (!archiveMissing(error)) throw error;
+      exists = false;
     }
+    const a = exists
+      ? await client.updateArchiveConfig(archivePayload)
+      : await client.createArchiveConfig(archivePayload);
 
     return {
       output: {
-        integration: a.integration || ctx.input.integration,
+        integration: a.integration,
         bucket: a.bucket,
         endpoint: a.endpoint,
         resourceInstanceId: a.resourceinstanceid,
@@ -143,7 +154,11 @@ export let deleteArchiveConfig = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     await client.deleteArchiveConfig();
 
     return {

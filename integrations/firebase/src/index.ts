@@ -14,13 +14,6 @@ import {
   sendFcmMessage,
   updateRemoteConfig
 } from './tools';
-import {
-  firestoreDocumentChanges,
-  inboundWebhook,
-  realtimeDbChanges,
-  userChanges
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -37,5 +30,5 @@ export let provider = Slate.create({
     manageStorage,
     getFirebaseApps
   ],
-  triggers: [inboundWebhook, firestoreDocumentChanges, realtimeDbChanges, userChanges]
+  triggers: []
 });

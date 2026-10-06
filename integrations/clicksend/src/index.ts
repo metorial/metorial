@@ -18,8 +18,6 @@ import {
   sendVoiceTool,
   updateContactTool
 } from './tools';
-import { inboundSmsTrigger, smsDeliveryReceiptTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     getAccountTool,
     listDedicatedNumbersTool
   ],
-  triggers: [inboundSmsTrigger, smsDeliveryReceiptTrigger]
+  triggers: []
 });

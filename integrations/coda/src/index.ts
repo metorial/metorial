@@ -47,8 +47,6 @@ import {
   updateRowTool,
   upsertRowsTool
 } from './tools';
-import { rowChangesTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -98,5 +96,5 @@ export let provider = Slate.create({
     getDocAnalyticsTool,
     getUserInfoTool
   ],
-  triggers: [rowChangesTrigger]
+  triggers: []
 });

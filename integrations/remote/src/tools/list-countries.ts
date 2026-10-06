@@ -1,35 +1,36 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { spec } from '../spec';
-
-export let listCountries = SlateTool.create(spec, {
-  name: 'List Countries',
-  key: 'list_countries',
-  description: `List all countries supported by Remote for employment. Returns country codes, names, and available features. Use country codes when creating employments or estimating costs.`,
-  tags: {
-    readOnly: true
-  }
-})
-  .input(z.object({}))
-  .output(
-    z.object({
-      countries: z.array(z.record(z.string(), z.any())).describe('List of supported countries')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment ?? 'production'
-    });
-
-    let result = await client.listCountries();
-    let countries = result?.data ?? result?.countries ?? [];
-
+import { collection } from '../lib/client';
+import { remoteTool } from '../lib/tool';
+import { recordSchema } from '../lib/validation';
+export let listCountries = remoteTool(
+  {
+    name: 'List Countries',
+    key: 'list_countries',
+    description:
+      'List Remote employment countries or the cost-calculator country and region catalog. Employment support does not guarantee complete onboarding availability.',
+    tags: { readOnly: true }
+  },
+  z.object({
+    catalog: z
+      .enum(['employment', 'cost_calculator'])
+      .optional()
+      .describe(
+        'Defaults to employment. The cost catalog supplies region and currency identifiers for estimates.'
+      )
+  }),
+  z.object({
+    countries: z.array(recordSchema),
+    catalog: z.enum(['employment', 'cost_calculator']).optional()
+  }),
+  async (client, input) => {
+    let catalog = input.catalog ?? 'employment';
+    let countries = collection(
+      await client.get(catalog === 'employment' ? '/countries' : '/cost-calculator/countries'),
+      'countries'
+    );
     return {
-      output: {
-        countries
-      },
-      message: `Found **${countries.length}** supported countries.`
+      output: { countries, catalog },
+      message: `Retrieved ${countries.length} entries from the ${catalog} country catalog.`
     };
-  });
+  }
+);

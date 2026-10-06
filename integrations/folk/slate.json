@@ -1,6 +1,6 @@
 {
   "name": "@metorial/folk",
-  "description": "Manage contacts, companies, deals, and pipelines in a relationship-focused CRM. Create, read, update, and delete people and companies with custom fields. Track deals and opportunities within groups. Organize contacts into customizable groups for different workflows. Attach notes and reminders to contacts. Monitor interaction metadata including interaction counts and last interaction times. Subscribe to webhooks for real-time notifications on changes to people, companies, deals, notes, and reminders.",
+  "description": "Manage people, companies, group-scoped deals, notes, and tasks in Folk. Discover accessible groups and custom fields, filter contact lists, and complete or reopen tasks. Existing reminder workflows remain available during the provider's deprecation window.",
   "categories": ["crm-and-sales-tools"],
   "skills": [
     "manage contacts and people",
@@ -9,9 +9,9 @@
     "organize contacts into groups",
     "manage custom fields",
     "create and manage notes",
-    "set and track reminders",
-    "monitor interaction metadata",
-    "subscribe to webhook events"
+    "manage and complete tasks",
+    "maintain existing reminders",
+    "discover authenticated identity"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/folk.png"
 }

@@ -13,6 +13,12 @@ export let listMemberships = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Native next-page URL returned by this tool. Use alone; do not add filters.'
+        ),
       roomId: z.string().optional().describe('ID of the space to list members for'),
       personId: z.string().optional().describe('Filter by person ID (requires roomId)'),
       personEmail: z.string().optional().describe('Filter by email (requires roomId)'),
@@ -24,6 +30,7 @@ export let listMemberships = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: z.string().optional().describe('URL for the next native page, if present'),
       memberships: z
         .array(
           z.object({
@@ -48,11 +55,12 @@ export let listMemberships = SlateTool.create(spec, {
       roomId: ctx.input.roomId,
       personId: ctx.input.personId,
       personEmail: ctx.input.personEmail,
-      max: ctx.input.max
+      max: ctx.input.max,
+      nextPageUrl: ctx.input.nextPageUrl
     });
 
     let items = result.items || [];
-    let memberships = items.map((m: any) => ({
+    let memberships = items.map(m => ({
       membershipId: m.id,
       roomId: m.roomId,
       personId: m.personId,
@@ -65,7 +73,7 @@ export let listMemberships = SlateTool.create(spec, {
     }));
 
     return {
-      output: { memberships },
+      output: { memberships, nextPageUrl: result.nextPageUrl },
       message: `Found **${memberships.length}** member(s).`
     };
   })

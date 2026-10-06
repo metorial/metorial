@@ -63,7 +63,7 @@ export let updateAccount = SlateTool.create(spec, {
       rev = String(existing.rev);
     }
 
-    let accountData: Record<string, any> = {};
+    let accountData: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) accountData.name = ctx.input.name;
     if (ctx.input.urls !== undefined) accountData.url = ctx.input.urls;
     if (ctx.input.phones !== undefined) accountData.phone = ctx.input.phones;

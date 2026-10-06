@@ -14,14 +14,6 @@ import {
   verifyLicenseKey,
   verifySubscription
 } from './tools';
-import {
-  newAffiliateTrigger,
-  newLeadTrigger,
-  newSaleTrigger,
-  newSubscriptionTrigger,
-  subscriptionCancellationTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,11 +30,5 @@ export let provider = Slate.create({
     verifySubscription,
     getAccount
   ],
-  triggers: [
-    newSaleTrigger,
-    newLeadTrigger,
-    newAffiliateTrigger,
-    newSubscriptionTrigger,
-    subscriptionCancellationTrigger
-  ]
+  triggers: []
 });

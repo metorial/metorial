@@ -20,7 +20,7 @@ export let updateSubmitter = SlateTool.create(spec, {
       email: z.string().optional().describe('Updated email address'),
       phone: z.string().optional().describe('Updated phone in E.164 format'),
       values: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Field values to pre-fill or update (field name -> value)'),
       externalId: z.string().optional().describe('Updated external ID'),
@@ -29,8 +29,11 @@ export let updateSubmitter = SlateTool.create(spec, {
       completed: z
         .boolean()
         .optional()
-        .describe('Set true to auto-complete signing for this submitter'),
-      metadata: z.record(z.string(), z.any()).optional().describe('Updated custom metadata'),
+        .describe('Set true to irreversibly complete signing for this pending submitter'),
+      metadata: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Updated custom metadata'),
       completedRedirectUrl: z.string().optional().describe('Redirect URL after completion'),
       requirePhone2fa: z.boolean().optional().describe('Require phone 2FA'),
       requireEmail2fa: z.boolean().optional().describe('Require email 2FA'),
@@ -46,7 +49,7 @@ export let updateSubmitter = SlateTool.create(spec, {
   .output(
     z.object({
       submitterId: z.number().describe('Updated submitter ID'),
-      email: z.string().optional().describe('Submitter email'),
+      email: z.string().nullable().optional().describe('Submitter email'),
       name: z.string().nullable().optional().describe('Submitter name'),
       status: z.string().optional().describe('Submitter status'),
       updatedAt: z.string().optional().describe('Last updated timestamp')

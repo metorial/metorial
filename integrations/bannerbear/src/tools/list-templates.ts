@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { nonempty } from '../lib/contracts';
+import { templateOutput } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTemplates = SlateTool.create(spec, {
@@ -14,6 +17,7 @@ export let listTemplates = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       page: z.number().optional().describe('Page number for pagination (default 1)'),
       limit: z
         .number()
@@ -41,28 +45,20 @@ export let listTemplates = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let results = await client.listTemplates({
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const result = await client.listTemplates({
       page: ctx.input.page,
       limit: ctx.input.limit,
       tag: ctx.input.tag,
       name: ctx.input.name
     });
-
-    let templates = (Array.isArray(results) ? results : []).map((t: any) => ({
-      templateUid: t.uid,
-      name: t.name,
-      width: t.width,
-      height: t.height,
-      previewUrl: t.preview_url || null,
-      tags: t.tags || [],
-      createdAt: t.created_at
+    const templates = result.map(item => ({
+      ...templateOutput(item),
+      createdAt: nonempty(item.created_at)
     }));
-
     return {
       output: { templates },
-      message: `Found ${templates.length} template(s).${ctx.input.tag ? ` Filtered by tag: "${ctx.input.tag}".` : ''}${ctx.input.name ? ` Filtered by name: "${ctx.input.name}".` : ''}`
+      message: `Returned ${templates.length} template(s) on page ${ctx.input.page ?? 1}. Continue with the next numbered page until an empty page; listings can change between requests.`
     };
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/validation';
 import { spec } from '../spec';
 
 let versionSchema = z.object({
@@ -20,7 +21,7 @@ export let manageFileVersions = SlateTool.create(spec, {
   key: 'manage_file_versions',
   description: `List, get details, delete, or restore file versions. ImageKit maintains version history for files, allowing you to view previous versions and restore them.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -51,11 +52,13 @@ export let manageFileVersions = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.operation === 'list' && ctx.input.versionId !== undefined)
+      throw invalid('versionId applies only to get, delete, and restore.');
     if (ctx.input.operation === 'list') {
       let versions = await client.listFileVersions(ctx.input.fileId);
-      let mapped = (versions as any[]).map((v: any) => ({
+      let mapped = versions.map(v => ({
         fileId: v.fileId,
-        versionId: v.versionInfo?.id || v.id,
+        versionId: v.versionInfo!.id,
         name: v.name,
         filePath: v.filePath,
         url: v.url,
@@ -72,14 +75,14 @@ export let manageFileVersions = SlateTool.create(spec, {
     }
 
     if (ctx.input.operation === 'get') {
-      if (!ctx.input.versionId) throw new Error('versionId is required for get operation');
+      if (!ctx.input.versionId) throw invalid('versionId is required for get operation');
       let v = await client.getFileVersionDetails(ctx.input.fileId, ctx.input.versionId);
 
       return {
         output: {
           version: {
             fileId: v.fileId,
-            versionId: v.versionInfo?.id || v.id,
+            versionId: v.versionInfo!.id,
             name: v.name,
             filePath: v.filePath,
             url: v.url,
@@ -94,7 +97,7 @@ export let manageFileVersions = SlateTool.create(spec, {
     }
 
     if (ctx.input.operation === 'delete') {
-      if (!ctx.input.versionId) throw new Error('versionId is required for delete operation');
+      if (!ctx.input.versionId) throw invalid('versionId is required for delete operation');
       await client.deleteFileVersion(ctx.input.fileId, ctx.input.versionId);
 
       return {
@@ -104,14 +107,14 @@ export let manageFileVersions = SlateTool.create(spec, {
     }
 
     if (ctx.input.operation === 'restore') {
-      if (!ctx.input.versionId) throw new Error('versionId is required for restore operation');
+      if (!ctx.input.versionId) throw invalid('versionId is required for restore operation');
       let v = await client.restoreFileVersion(ctx.input.fileId, ctx.input.versionId);
 
       return {
         output: {
           version: {
             fileId: v.fileId,
-            versionId: v.versionInfo?.id || v.id,
+            versionId: v.versionInfo!.id,
             name: v.name,
             filePath: v.filePath,
             url: v.url,
@@ -125,6 +128,6 @@ export let manageFileVersions = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown operation: ${ctx.input.operation}`);
+    throw invalid(`Unknown operation: ${ctx.input.operation}`);
   })
   .build();

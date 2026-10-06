@@ -6,11 +6,13 @@ import { spec } from '../spec';
 
 export let createRunTool = SlateTool.create(spec, {
   name: 'Create Run',
+  tags: { destructive: true },
   key: 'create_run',
-  description: `Trigger a new Terraform run (plan, apply, or destroy) in a workspace. Supports plan-only, refresh-only, destroy runs, targeted resources, and resource replacement. For VCS-connected workspaces, uses the latest configuration; for API-driven workspaces, optionally specify a configuration version.`,
+  description: `Queue a Terraform run that may plan, apply, or destroy real infrastructure and incur costs in a workspace. Supports plan-only, refresh-only, destroy runs, targeted resources, and resource replacement. For VCS-connected workspaces, uses the latest configuration; for API-driven workspaces, optionally specify a configuration version.`,
   instructions: [
     'Set isDestroy to true for a destroy run.',
     'Set planOnly to true for a speculative plan that cannot be applied.',
+    'allowEmptyApply can automatically apply an empty plan even when autoApply is false; leave it false when apply must wait for separate approval.',
     'Use targetAddrs to plan/apply only specific resources (e.g., ["aws_instance.web"]).',
     'Use replaceAddrs to force recreation of specific resources.'
   ]
@@ -24,6 +26,12 @@ export let createRunTool = SlateTool.create(spec, {
         .optional()
         .describe('Whether this is a destroy run (default: false)'),
       autoApply: z.boolean().optional().describe('Override auto-apply setting for this run'),
+      allowEmptyApply: z
+        .boolean()
+        .optional()
+        .describe(
+          'Allow applying a plan with no changes, for example to upgrade state. Empty plans automatically apply in this mode even when autoApply is false; normal run permissions still apply.'
+        ),
       planOnly: z
         .boolean()
         .optional()

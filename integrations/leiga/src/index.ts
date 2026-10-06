@@ -36,14 +36,6 @@ import {
   updateSubtaskTool,
   updateVersionTool
 } from './tools';
-import {
-  attachmentEventsTrigger,
-  commentEventsTrigger,
-  issueEventsTrigger,
-  sprintEventsTrigger,
-  subtaskEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -82,11 +74,5 @@ export let provider = Slate.create({
     listOrgMembersTool,
     listProjectMembersTool
   ],
-  triggers: [
-    issueEventsTrigger,
-    commentEventsTrigger,
-    sprintEventsTrigger,
-    subtaskEventsTrigger,
-    attachmentEventsTrigger
-  ]
+  triggers: []
 });

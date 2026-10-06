@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageCustomContent = SlateTool.create(spec, {
   name: 'Manage Custom Content Index',
   key: 'manage_custom_content',
-  description: `Index, list, or delete external custom content in Slite's AI knowledge base so the Ask feature can reference it when answering questions. Use **action** to select the operation.`,
+  description: `Index, list, or delete external custom content in Slite's AI knowledge base through provider-deprecated endpoints, where enabled, so the Ask feature can reference it when answering questions. Use **action** to select the operation.`,
   instructions: [
     'Use action "index" to add or update custom content for AI search.',
     'Use action "list" to view indexed content for a given root data source.',
@@ -20,7 +21,11 @@ export let manageCustomContent = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['index', 'list', 'delete']).describe('Operation to perform'),
-      rootId: z.string().describe('Root data source identifier'),
+      rootId: z
+        .string()
+        .describe(
+          'Existing custom data source root created in the provider application; this integration cannot create it'
+        ),
       contentId: z
         .string()
         .optional()
@@ -42,12 +47,27 @@ export let manageCustomContent = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('URL to the original content (required for index)'),
-      page: z.number().optional().describe('Page number for listing (0-indexed)'),
-      hitsPerPage: z.number().optional().describe('Results per page for listing (1-100)')
+      page: z
+        .number()
+        .int()
+        .nonnegative()
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Page number for listing (0-indexed)'),
+      hitsPerPage: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page for listing (1-100)')
     })
   )
   .output(
     z.object({
+      page: z.number().optional(),
+      totalPages: z.number().optional(),
+      hasMore: z.boolean().optional(),
       indexed: z.boolean().optional().describe('Whether content was successfully indexed'),
       deleted: z.boolean().optional().describe('Whether content was successfully deleted'),
       hits: z
@@ -66,16 +86,30 @@ export let manageCustomContent = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let { action, rootId } = ctx.input;
 
+    let indexFields = [
+      'title',
+      'content',
+      'contentType',
+      'contentUpdatedAt',
+      'contentUrl'
+    ] as const;
+    if (
+      (action !== 'index' && indexFields.some(key => ctx.input[key] !== undefined)) ||
+      (action !== 'list' &&
+        (ctx.input.page !== undefined || ctx.input.hitsPerPage !== undefined)) ||
+      (action === 'list' && ctx.input.contentId !== undefined)
+    )
+      throw invalid('Provide only fields for the selected custom-content action.');
     if (action === 'index') {
       if (
-        !ctx.input.contentId ||
-        !ctx.input.title ||
-        !ctx.input.content ||
-        !ctx.input.contentType ||
-        !ctx.input.contentUpdatedAt ||
-        !ctx.input.contentUrl
+        ctx.input.contentId === undefined ||
+        ctx.input.title === undefined ||
+        ctx.input.content === undefined ||
+        ctx.input.contentType === undefined ||
+        ctx.input.contentUpdatedAt === undefined ||
+        ctx.input.contentUrl === undefined
       ) {
-        throw new Error(
+        throw invalid(
           'contentId, title, content, contentType, contentUpdatedAt, and contentUrl are required for the index action'
         );
       }
@@ -96,7 +130,7 @@ export let manageCustomContent = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.contentId) {
-        throw new Error('contentId is required for the delete action');
+        throw invalid('contentId is required for the delete action');
       }
       await client.deleteCustomContent(rootId, ctx.input.contentId);
       return {
@@ -107,14 +141,19 @@ export let manageCustomContent = SlateTool.create(spec, {
 
     // list
     let result = await client.listCustomContent(rootId, ctx.input.page, ctx.input.hitsPerPage);
-    let hits = (result.hits || []).map((item: any) => ({
+    let hits = result.hits.map(item => ({
       contentId: item.id,
       title: item.title,
       url: item.url
     }));
 
     return {
-      output: { hits },
+      output: {
+        hits,
+        page: result.page,
+        totalPages: result.nbPages,
+        hasMore: result.page + 1 < result.nbPages
+      },
       message: `Listed **${hits.length}** indexed content item(s) for root \`${rootId}\``
     };
   })

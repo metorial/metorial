@@ -1,20 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapCard } from '../lib/schemas';
 import { spec } from '../spec';
 
 let cardSchema = z.object({
   cardId: z.string().describe('Unique identifier of the card'),
   owner: z
     .object({
-      userId: z.string().optional(),
-      type: z.string().optional()
+      userId: z.string().nullish(),
+      type: z.string().nullish()
     })
     .optional()
     .describe('Card owner information'),
   cardName: z.string().nullable().optional().describe('Name of the card'),
-  cardType: z.string().optional().describe('Type of card: VIRTUAL or PHYSICAL'),
-  status: z.string().describe('Card status: ACTIVE, LOCKED, TERMINATED'),
+  cardType: z.string().nullish().describe('Type of card: VIRTUAL or PHYSICAL'),
+  status: z.string().nullish().describe('Card status: ACTIVE, LOCKED, TERMINATED'),
   lastFour: z.string().nullable().optional().describe('Last four digits of the card number'),
   spendControls: z
     .object({
@@ -24,7 +25,7 @@ let cardSchema = z.object({
           currency: z.string().nullable().describe('Currency code')
         })
         .optional(),
-      spendDuration: z.string().optional().describe('Duration of the spend limit'),
+      spendDuration: z.string().nullish().describe('Duration of the spend limit'),
       lockAfterDate: z
         .string()
         .nullable()
@@ -57,41 +58,15 @@ export let listCards = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.listCards({
+    const result = await new Client({ token: ctx.auth.token }).listCards({
       user_id: ctx.input.userId,
       cursor: ctx.input.cursor,
       limit: ctx.input.limit
     });
-
-    let cards = result.items.map((c: any) => ({
-      cardId: c.id,
-      owner: c.owner ? { userId: c.owner.user_id, type: c.owner.type } : undefined,
-      cardName: c.card_name,
-      cardType: c.card_type,
-      status: c.status,
-      lastFour: c.last_four,
-      spendControls: c.spend_controls
-        ? {
-            spendLimit: c.spend_controls.spend_limit
-              ? {
-                  amount: c.spend_controls.spend_limit.amount,
-                  currency: c.spend_controls.spend_limit.currency
-                }
-              : undefined,
-            spendDuration: c.spend_controls.spend_duration,
-            lockAfterDate: c.spend_controls.lock_after_date
-          }
-        : undefined
-    }));
-
+    const cards = result.items.map(mapCard);
     return {
-      output: {
-        cards,
-        nextCursor: result.next_cursor
-      },
-      message: `Found **${cards.length}** card(s).${result.next_cursor ? ' More results available.' : ''}`
+      output: { cards, nextCursor: result.next_cursor },
+      message: `Returned ${cards.length} cards.`
     };
   })
   .build();

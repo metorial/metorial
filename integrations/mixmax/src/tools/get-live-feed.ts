@@ -52,10 +52,9 @@ export let getLiveFeed = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let results = data.results || data.messages || data || [];
-    if (!Array.isArray(results)) results = [];
+    let results = data.results;
 
-    let messages = results.map((m: any) => ({
+    let messages = results.map(m => ({
       messageId: m._id,
       fromEmail: m.fromEmail,
       fromName: m.fromName,

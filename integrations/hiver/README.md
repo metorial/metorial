@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/hiver.png" height="20"> Hiver
 
-Manage shared email inboxes and customer support conversations within Gmail and Outlook. List and browse shared inboxes, retrieve and update conversations (status, assignee, tags), search users and tags per inbox, and track email activity. Receive real-time webhooks for conversation updates, new inbound/outbound conversations, sent/received emails, internal notes, and CSAT ratings.
+Manage shared email inboxes and customer support conversations within Gmail and Outlook. List and browse shared inboxes, retrieve and update conversations (status, assignee, tags), search users and tags per inbox, and track email activity.
 
 ## Tools
 

@@ -29,8 +29,6 @@ import {
   updateTicket,
   updateUser
 } from './tools';
-import { articleEvents, organizationEvents, ticketEvents, userEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,5 +60,5 @@ export let provider = Slate.create({
     listTicketFields,
     listMacros
   ],
-  triggers: [ticketEvents, userEvents, organizationEvents, articleEvents]
+  triggers: []
 });

@@ -17,7 +17,7 @@ export let setSandboxTimeout = SlateTool.create(spec, {
   .input(
     z.object({
       sandboxId: z.string().describe('The unique identifier of the sandbox.'),
-      timeout: z.number().describe('New timeout in seconds from now.')
+      timeout: z.number().int().min(0).max(86400).describe('New timeout in seconds from now.')
     })
   )
   .output(

@@ -12,8 +12,6 @@ import {
   manageCollection,
   searchProducts
 } from './tools';
-import { collectionCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     getCollectionResults,
     getAccount
   ],
-  triggers: [collectionCompleted]
+  triggers: []
 });

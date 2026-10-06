@@ -6,9 +6,10 @@ import { spec } from '../spec';
 export let getAccountDetails = SlateTool.create(spec, {
   name: 'Get Account Details',
   key: 'get_account_details',
-  description: `Retrieve UptimeRobot account details including email, monitor limits, default check interval, and current monitor counts by status.`,
+  description: `Use a Legacy API Key connection (API v2). Retrieve UptimeRobot account details including email, monitor limits, default check interval, and current monitor counts by status.`,
   tags: {
-    readOnly: true
+    readOnly: true,
+    destructive: false
   }
 })
   .input(z.object({}))
@@ -23,7 +24,7 @@ export let getAccountDetails = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let account = await client.getAccountDetails();
 

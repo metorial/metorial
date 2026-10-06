@@ -1,0 +1,977 @@
+{
+  "list_credentials": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "get_credential": {
+    "type": "object",
+    "required": ["credentialId"],
+    "properties": {
+      "credentialId": {
+        "type": "string"
+      }
+    }
+  },
+  "create_credential": {
+    "type": "object",
+    "properties": {
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      },
+      "acl": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "ownerId": {
+        "type": "string"
+      }
+    }
+  },
+  "update_credential": {
+    "type": "object",
+    "required": ["credentialId"],
+    "properties": {
+      "credentialId": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      },
+      "acl": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "delete_credential": {
+    "type": "object",
+    "required": ["credentialId"],
+    "properties": {
+      "credentialId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_ssh_credentials": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "create_ssh_credential": {
+    "type": "object",
+    "required": ["publicKey"],
+    "properties": {
+      "publicKey": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      },
+      "acl": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "ownerId": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_ssh_credential": {
+    "type": "object",
+    "required": ["sshCredentialId"],
+    "properties": {
+      "sshCredentialId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_ssh_certificate_authorities": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "create_ssh_certificate_authority": {
+    "type": "object",
+    "properties": {
+      "privateKeyType": {
+        "type": "string",
+        "enum": ["rsa", "ecdsa", "ed25519"]
+      },
+      "ellipticCurve": {
+        "type": "string"
+      },
+      "keySize": {
+        "type": "number"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_ssh_certificate_authority": {
+    "type": "object",
+    "required": ["sshCaId"],
+    "properties": {
+      "sshCaId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_tls_certificates": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "get_tls_certificate": {
+    "type": "object",
+    "required": ["certificateId"],
+    "properties": {
+      "certificateId": {
+        "type": "string"
+      }
+    }
+  },
+  "upload_tls_certificate": {
+    "type": "object",
+    "required": ["certificatePem", "privateKeyPem"],
+    "properties": {
+      "certificatePem": {
+        "type": "string"
+      },
+      "privateKeyPem": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_tls_certificate": {
+    "type": "object",
+    "required": ["certificateId"],
+    "properties": {
+      "certificateId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_certificate_authorities": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "create_certificate_authority": {
+    "type": "object",
+    "required": ["caPem"],
+    "properties": {
+      "caPem": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_certificate_authority": {
+    "type": "object",
+    "required": ["certificateAuthorityId"],
+    "properties": {
+      "certificateAuthorityId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_event_subscriptions": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "get_event_subscription": {
+    "type": "object",
+    "required": ["subscriptionId"],
+    "properties": {
+      "subscriptionId": {
+        "type": "string"
+      }
+    }
+  },
+  "create_event_subscription": {
+    "type": "object",
+    "required": ["sources", "destinationIds"],
+    "properties": {
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "destinationIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "update_event_subscription": {
+    "type": "object",
+    "required": ["subscriptionId"],
+    "properties": {
+      "subscriptionId": {
+        "type": "string"
+      },
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "destinationIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_event_subscription": {
+    "type": "object",
+    "required": ["subscriptionId"],
+    "properties": {
+      "subscriptionId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_event_destinations": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "create_event_destination": {
+    "type": "object",
+    "required": ["target"],
+    "properties": {
+      "target": {},
+      "format": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_event_destination": {
+    "type": "object",
+    "required": ["destinationId"],
+    "properties": {
+      "destinationId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_vaults": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "create_vault": {
+    "type": "object",
+    "required": ["name"],
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "update_vault": {
+    "type": "object",
+    "required": ["vaultId"],
+    "properties": {
+      "vaultId": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_vault": {
+    "type": "object",
+    "required": ["vaultId"],
+    "properties": {
+      "vaultId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_secrets": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "create_secret": {
+    "type": "object",
+    "required": ["name", "secretValue"],
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "secretValue": {
+        "type": "string"
+      },
+      "vaultId": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "update_secret": {
+    "type": "object",
+    "required": ["secretId"],
+    "properties": {
+      "secretId": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "secretValue": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_secret": {
+    "type": "object",
+    "required": ["secretId"],
+    "properties": {
+      "secretId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_domains": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "get_domain": {
+    "type": "object",
+    "required": ["domainId"],
+    "properties": {
+      "domainId": {
+        "type": "string"
+      }
+    }
+  },
+  "create_domain": {
+    "type": "object",
+    "required": ["domain"],
+    "properties": {
+      "domain": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      },
+      "certificateId": {
+        "type": "string"
+      },
+      "certificateManagementPolicy": {
+        "type": "object",
+        "required": ["authority"],
+        "properties": {
+          "authority": {
+            "type": "string"
+          },
+          "privateKeyType": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "update_domain": {
+    "type": "object",
+    "required": ["domainId"],
+    "properties": {
+      "domainId": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      },
+      "certificateId": {
+        "type": "string"
+      },
+      "certificateManagementPolicy": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["authority"],
+            "properties": {
+              "authority": {
+                "type": "string"
+              },
+              "privateKeyType": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    }
+  },
+  "delete_domain": {
+    "type": "object",
+    "required": ["domainId"],
+    "properties": {
+      "domainId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_addresses": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "get_address": {
+    "type": "object",
+    "required": ["addressId"],
+    "properties": {
+      "addressId": {
+        "type": "string"
+      }
+    }
+  },
+  "create_address": {
+    "type": "object",
+    "properties": {
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      },
+      "region": {
+        "type": "string",
+        "enum": ["us", "eu", "ap", "au", "sa", "jp", "in"]
+      }
+    }
+  },
+  "update_address": {
+    "type": "object",
+    "required": ["addressId"],
+    "properties": {
+      "addressId": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_address": {
+    "type": "object",
+    "required": ["addressId"],
+    "properties": {
+      "addressId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_tunnels": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "get_tunnel": {
+    "type": "object",
+    "required": ["tunnelId"],
+    "properties": {
+      "tunnelId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_tunnel_sessions": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "restart_tunnel_session": {
+    "type": "object",
+    "required": ["sessionId"],
+    "properties": {
+      "sessionId": {
+        "type": "string"
+      }
+    }
+  },
+  "stop_tunnel_session": {
+    "type": "object",
+    "required": ["sessionId"],
+    "properties": {
+      "sessionId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_ip_policies": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "get_ip_policy": {
+    "type": "object",
+    "required": ["policyId"],
+    "properties": {
+      "policyId": {
+        "type": "string"
+      }
+    }
+  },
+  "create_ip_policy": {
+    "type": "object",
+    "properties": {
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "update_ip_policy": {
+    "type": "object",
+    "required": ["policyId"],
+    "properties": {
+      "policyId": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_ip_policy": {
+    "type": "object",
+    "required": ["policyId"],
+    "properties": {
+      "policyId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_ip_policy_rules": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "create_ip_policy_rule": {
+    "type": "object",
+    "required": ["ipPolicyId", "cidr", "action"],
+    "properties": {
+      "ipPolicyId": {
+        "type": "string"
+      },
+      "cidr": {
+        "type": "string"
+      },
+      "action": {
+        "type": "string",
+        "enum": ["allow", "deny"]
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_ip_policy_rule": {
+    "type": "object",
+    "required": ["ruleId"],
+    "properties": {
+      "ruleId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_api_keys": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "get_api_key": {
+    "type": "object",
+    "required": ["apiKeyId"],
+    "properties": {
+      "apiKeyId": {
+        "type": "string"
+      }
+    }
+  },
+  "create_api_key": {
+    "type": "object",
+    "properties": {
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      },
+      "ownerId": {
+        "type": "string"
+      }
+    }
+  },
+  "update_api_key": {
+    "type": "object",
+    "required": ["apiKeyId"],
+    "properties": {
+      "apiKeyId": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      }
+    }
+  },
+  "delete_api_key": {
+    "type": "object",
+    "required": ["apiKeyId"],
+    "properties": {
+      "apiKeyId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_endpoints": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "get_endpoint": {
+    "type": "object",
+    "required": ["endpointId"],
+    "properties": {
+      "endpointId": {
+        "type": "string"
+      }
+    }
+  },
+  "create_endpoint": {
+    "type": "object",
+    "required": ["url"],
+    "properties": {
+      "url": {
+        "type": "string"
+      },
+      "trafficPolicy": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      },
+      "bindings": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "update_endpoint": {
+    "type": "object",
+    "required": ["endpointId"],
+    "properties": {
+      "endpointId": {
+        "type": "string"
+      },
+      "url": {
+        "type": "string"
+      },
+      "trafficPolicy": {
+        "type": "string"
+      },
+      "description": {
+        "type": "string"
+      },
+      "metadata": {
+        "type": "string"
+      },
+      "bindings": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "delete_endpoint": {
+    "type": "object",
+    "required": ["endpointId"],
+    "properties": {
+      "endpointId": {
+        "type": "string"
+      }
+    }
+  },
+  "list_bot_users": {
+    "type": "object",
+    "properties": {
+      "beforeId": {
+        "type": "string"
+      },
+      "limit": {
+        "type": "number"
+      }
+    }
+  },
+  "get_bot_user": {
+    "type": "object",
+    "required": ["botUserId"],
+    "properties": {
+      "botUserId": {
+        "type": "string"
+      }
+    }
+  },
+  "create_bot_user": {
+    "type": "object",
+    "required": ["name"],
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "active": {
+        "type": "boolean"
+      }
+    }
+  },
+  "update_bot_user": {
+    "type": "object",
+    "required": ["botUserId"],
+    "properties": {
+      "botUserId": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "active": {
+        "type": "boolean"
+      }
+    }
+  },
+  "delete_bot_user": {
+    "type": "object",
+    "required": ["botUserId"],
+    "properties": {
+      "botUserId": {
+        "type": "string"
+      }
+    }
+  }
+}

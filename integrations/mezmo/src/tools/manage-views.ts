@@ -1,49 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MezmoClient } from '../lib/client';
+import { channelSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
-let channelSchema = z
-  .object({
-    integration: z
-      .enum(['email', 'webhook', 'pagerduty', 'slack'])
-      .describe('Alert channel type'),
-    emails: z.array(z.string()).optional().describe('Email addresses for email alerts'),
-    url: z.string().optional().describe('Webhook URL'),
-    key: z.string().optional().describe('PagerDuty or Slack key'),
-    method: z.string().optional().describe('HTTP method for webhook (POST, PUT, etc.)'),
-    headers: z
-      .record(z.string(), z.string())
-      .optional()
-      .describe('Custom headers for webhook'),
-    bodyTemplate: z
-      .record(z.string(), z.unknown())
-      .optional()
-      .describe('Custom body template for webhook'),
-    triggerlimit: z
-      .number()
-      .optional()
-      .describe('Number of lines that must match to trigger alert'),
-    triggerinterval: z
-      .string()
-      .optional()
-      .describe('Time interval for the trigger (e.g., "30", "1m", "15m")'),
-    operator: z.string().optional().describe('Alert condition operator (presence, absence)'),
-    immediate: z
-      .string()
-      .optional()
-      .describe('Whether to send alert immediately ("true" or "false")'),
-    terminal: z
-      .string()
-      .optional()
-      .describe('Whether to include terminal output ("true" or "false")'),
-    timezone: z.string().optional().describe('Timezone for alert schedule')
-  })
-  .describe('Alert channel configuration');
-
 let viewOutputSchema = z.object({
-  viewId: z.string().describe('Unique view identifier'),
-  name: z.string().describe('View name'),
+  viewId: z.string().min(1).describe('Unique view identifier'),
+  name: z.string().min(1).describe('View name'),
   query: z.string().describe('Search query'),
   apps: z.array(z.string()).describe('Filtered applications'),
   hosts: z.array(z.string()).describe('Filtered hostnames'),
@@ -62,6 +25,7 @@ export let listViews = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of items returned'),
       views: z.array(viewOutputSchema).describe('List of views')
     })
   )
@@ -69,20 +33,20 @@ export let listViews = SlateTool.create(spec, {
     let client = new MezmoClient({ token: ctx.auth.token });
     let views = await client.listViews();
 
-    let mapped = (Array.isArray(views) ? views : []).map(v => ({
-      viewId: v.viewID || '',
-      name: v.name || '',
-      query: v.query || '',
-      apps: v.apps || [],
-      hosts: v.hosts || [],
-      levels: v.levels || [],
-      tags: v.tags || [],
-      categories: v.category || [],
-      presetAlertIds: v.presetids || []
+    let mapped = views.map(v => ({
+      viewId: v.viewID,
+      name: v.name,
+      query: v.query,
+      apps: v.apps,
+      hosts: v.hosts,
+      levels: v.levels,
+      tags: v.tags,
+      categories: v.category,
+      presetAlertIds: v.presetids
     }));
 
     return {
-      output: { views: mapped },
+      output: { views: mapped, returnedCount: mapped.length },
       message: `Found **${mapped.length}** view(s).`
     };
   })
@@ -91,12 +55,12 @@ export let listViews = SlateTool.create(spec, {
 export let createView = SlateTool.create(spec, {
   name: 'Create View',
   key: 'create_view',
-  description: `Create a new view in Mezmo with search filters and optional alert channels. Views are saved search queries that help you organize and monitor specific log data.`,
-  tags: { readOnly: false, destructive: false }
+  description: `Create a new view in Mezmo with search filters and optional alert channels. Configured alerts can notify their recipients when matching logs arrive. Views are saved search queries that help you organize and monitor specific log data.`,
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
-      name: z.string().describe('Name of the view'),
+      name: z.string().min(1).describe('Name of the view'),
       query: z.string().optional().describe('Search query for the view'),
       apps: z.array(z.string()).optional().describe('Applications to filter'),
       hosts: z.array(z.string()).optional().describe('Hostnames to filter'),
@@ -110,7 +74,7 @@ export let createView = SlateTool.create(spec, {
         .array(channelSchema)
         .optional()
         .describe('Alert channels to attach to the view'),
-      presetAlertId: z.string().optional().describe('Preset alert ID to attach')
+      presetAlertId: z.string().min(1).optional().describe('Preset alert ID to attach')
     })
   )
   .output(viewOutputSchema)
@@ -125,21 +89,21 @@ export let createView = SlateTool.create(spec, {
       levels: ctx.input.levels,
       tags: ctx.input.tags,
       category: ctx.input.categories,
-      channels: ctx.input.channels as any,
+      channels: ctx.input.channels,
       presetid: ctx.input.presetAlertId
     });
 
     return {
       output: {
-        viewId: result.viewID || '',
-        name: result.name || '',
-        query: result.query || '',
-        apps: result.apps || [],
-        hosts: result.hosts || [],
-        levels: result.levels || [],
-        tags: result.tags || [],
-        categories: result.category || [],
-        presetAlertIds: result.presetids || []
+        viewId: result.viewID,
+        name: result.name,
+        query: result.query,
+        apps: result.apps,
+        hosts: result.hosts,
+        levels: result.levels,
+        tags: result.tags,
+        categories: result.category,
+        presetAlertIds: result.presetids
       },
       message: `Created view **${result.name}** with ID \`${result.viewID}\`.`
     };
@@ -150,12 +114,12 @@ export let updateView = SlateTool.create(spec, {
   name: 'Update View',
   key: 'update_view',
   description: `Update an existing view's configuration including its name, search query, filters, and alert channels. Can also attach or detach preset alerts.`,
-  tags: { readOnly: false, destructive: false }
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
-      viewId: z.string().describe('ID of the view to update'),
-      name: z.string().optional().describe('New name for the view'),
+      viewId: z.string().min(1).describe('ID of the view to update'),
+      name: z.string().min(1).optional().describe('New name for the view'),
       query: z.string().optional().describe('Updated search query'),
       apps: z.array(z.string()).optional().describe('Updated applications filter'),
       hosts: z.array(z.string()).optional().describe('Updated hostnames filter'),
@@ -163,7 +127,7 @@ export let updateView = SlateTool.create(spec, {
       tags: z.array(z.string()).optional().describe('Updated tags filter'),
       categories: z.array(z.string()).optional().describe('Updated categories'),
       channels: z.array(channelSchema).optional().describe('Updated alert channels'),
-      presetAlertId: z.string().optional().describe('Preset alert ID to attach')
+      presetAlertId: z.string().min(1).optional().describe('Preset alert ID to attach')
     })
   )
   .output(viewOutputSchema)
@@ -178,21 +142,21 @@ export let updateView = SlateTool.create(spec, {
       levels: ctx.input.levels,
       tags: ctx.input.tags,
       category: ctx.input.categories,
-      channels: ctx.input.channels as any,
+      channels: ctx.input.channels,
       presetid: ctx.input.presetAlertId
     });
 
     return {
       output: {
-        viewId: result.viewID || '',
-        name: result.name || '',
-        query: result.query || '',
-        apps: result.apps || [],
-        hosts: result.hosts || [],
-        levels: result.levels || [],
-        tags: result.tags || [],
-        categories: result.category || [],
-        presetAlertIds: result.presetids || []
+        viewId: result.viewID,
+        name: result.name,
+        query: result.query,
+        apps: result.apps,
+        hosts: result.hosts,
+        levels: result.levels,
+        tags: result.tags,
+        categories: result.category,
+        presetAlertIds: result.presetids
       },
       message: `Updated view **${result.name}** (\`${result.viewID}\`).`
     };
@@ -207,7 +171,7 @@ export let deleteView = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      viewId: z.string().describe('ID of the view to delete')
+      viewId: z.string().min(1).describe('ID of the view to delete')
     })
   )
   .output(

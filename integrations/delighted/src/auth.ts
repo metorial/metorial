@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { rejectUnavailableDelighted } from './lib/unavailable';
 
 export let auth = SlateAuth.create()
   .output(
@@ -15,14 +16,9 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Your Delighted API key. Found under Integrations > API in your Delighted account.'
+          'Legacy Delighted API key field retained for compatibility. Customer access ended on July 1, 2026; do not enter new credentials.'
         )
     }),
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    }
+    getOutput: async () => rejectUnavailableDelighted(),
+    getProfile: async () => rejectUnavailableDelighted()
   });

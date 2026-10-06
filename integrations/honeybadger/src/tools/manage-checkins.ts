@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HoneybadgerClient } from '../lib/client';
+import type { CheckIn } from '../lib/types';
+import { nextUrlSchema, projectIdSchema, requireUpdate } from '../lib/validation';
 import { spec } from '../spec';
 
 let checkInSchema = z.object({
@@ -35,10 +37,11 @@ export let manageCheckIns = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextUrl: nextUrlSchema,
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete'])
         .describe('Action to perform'),
-      projectId: z.string().describe('Project ID'),
+      projectId: projectIdSchema,
       checkInId: z
         .string()
         .optional()
@@ -63,13 +66,17 @@ export let manageCheckIns = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextUrl: z
+        .string()
+        .optional()
+        .describe('Next-page URL, when another page may be available'),
       checkIns: z.array(checkInSchema).optional().describe('List of check-ins'),
       checkIn: checkInSchema.optional().describe('Check-in details'),
       success: z.boolean().describe('Whether the operation succeeded')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HoneybadgerClient({ token: ctx.auth.token });
+    let client = new HoneybadgerClient(ctx.auth);
     let {
       action,
       projectId,
@@ -83,34 +90,34 @@ export let manageCheckIns = SlateTool.create(spec, {
       cronTimezone
     } = ctx.input;
 
-    let mapCheckIn = (c: any) => ({
+    let mapCheckIn = (c: CheckIn) => ({
       checkInId: String(c.id),
-      name: c.name,
-      slug: c.slug,
-      url: c.url,
-      state: c.state,
-      scheduleType: c.schedule_type,
-      reportPeriod: c.report_period,
-      gracePeriod: c.grace_period,
-      cronSchedule: c.cron_schedule,
-      cronTimezone: c.cron_timezone,
-      reportedAt: c.reported_at,
-      expectedAt: c.expected_at,
-      missedCount: c.missed_count
+      name: c.name ?? undefined,
+      slug: c.slug ?? undefined,
+      url: c.url ?? undefined,
+      state: c.state ?? undefined,
+      scheduleType: c.schedule_type ?? undefined,
+      reportPeriod: c.report_period ?? undefined,
+      gracePeriod: c.grace_period ?? undefined,
+      cronSchedule: c.cron_schedule ?? undefined,
+      cronTimezone: c.cron_timezone ?? undefined,
+      reportedAt: c.reported_at ?? undefined,
+      expectedAt: c.expected_at ?? undefined,
+      missedCount: c.missed_count ?? undefined
     });
 
     switch (action) {
       case 'list': {
-        let data = await client.listCheckIns(projectId);
+        let data = await client.listCheckIns(projectId, ctx.input.nextUrl);
         let checkIns = (data.results || []).map(mapCheckIn);
         return {
-          output: { checkIns, success: true },
+          output: { checkIns, nextUrl: data.links?.next ?? undefined, success: true },
           message: `Found **${checkIns.length}** check-in(s).`
         };
       }
 
       case 'get': {
-        if (!checkInId) throw new Error('checkInId is required for get action');
+        if (!checkInId) throw createApiServiceError('checkInId is required for get action');
         let checkIn = await client.getCheckIn(projectId, checkInId);
         return {
           output: { checkIn: mapCheckIn(checkIn), success: true },
@@ -120,7 +127,18 @@ export let manageCheckIns = SlateTool.create(spec, {
 
       case 'create': {
         if (!name || !scheduleType)
-          throw new Error('name and scheduleType are required for create action');
+          throw createApiServiceError('name and scheduleType are required for create action');
+        if (scheduleType === 'simple' && !reportPeriod)
+          throw createApiServiceError('reportPeriod is required for a simple check-in.');
+        if (scheduleType === 'cron' && !cronSchedule)
+          throw createApiServiceError('cronSchedule is required for a cron check-in.');
+        if (
+          (scheduleType === 'simple' && (cronSchedule || cronTimezone)) ||
+          (scheduleType === 'cron' && reportPeriod)
+        )
+          throw createApiServiceError(
+            'Use fields matching the selected check-in schedule type.'
+          );
         let created = await client.createCheckIn(projectId, {
           name,
           slug,
@@ -137,9 +155,22 @@ export let manageCheckIns = SlateTool.create(spec, {
       }
 
       case 'update': {
-        if (!checkInId) throw new Error('checkInId is required for update action');
+        if (!checkInId) throw createApiServiceError('checkInId is required for update action');
+        if (scheduleType !== undefined)
+          throw createApiServiceError('scheduleType cannot be changed after creation.');
+        requireUpdate(name, slug, reportPeriod, gracePeriod, cronSchedule, cronTimezone);
+        const existing = await client.getCheckIn(projectId, checkInId);
+        if (
+          (existing.schedule_type === 'simple' &&
+            (cronSchedule !== undefined || cronTimezone !== undefined)) ||
+          (existing.schedule_type === 'cron' && reportPeriod !== undefined)
+        )
+          throw createApiServiceError(
+            'Use fields matching this check-in’s existing schedule type.'
+          );
         await client.updateCheckIn(projectId, checkInId, {
           name,
+          slug,
           reportPeriod,
           gracePeriod,
           cronSchedule,
@@ -152,7 +183,7 @@ export let manageCheckIns = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!checkInId) throw new Error('checkInId is required for delete action');
+        if (!checkInId) throw createApiServiceError('checkInId is required for delete action');
         await client.deleteCheckIn(projectId, checkInId);
         return {
           output: { success: true },
@@ -161,7 +192,7 @@ export let manageCheckIns = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw createApiServiceError(`Unknown action: ${action}`);
     }
   })
   .build();

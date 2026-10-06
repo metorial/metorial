@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'wave',
   name: 'Wave',
   description:
-    'Wave Financial (WaveApps) is a free accounting and invoicing platform for small businesses providing accounting, invoicing, receipt scanning, and payment processing capabilities.',
+    'Manage Wave businesses, customers, invoices, products, taxes and accounting records. API access depends on Wave permissions and subscription eligibility.',
   metadata: {},
   config,
   auth

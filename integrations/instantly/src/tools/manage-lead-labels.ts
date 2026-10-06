@@ -1,16 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageLeadLabels = SlateTool.create(spec, {
   name: 'Manage Lead Labels',
   key: 'manage_lead_labels',
-  description: `List, create, update, or delete lead labels. Labels categorize lead statuses and responses within campaigns (e.g., Interested, Not Interested, Meeting Booked).`,
+  description: `List, create, update, or delete lead labels. Labels categorize lead statuses and responses within campaigns. Current labels have a positive, negative, or neutral category; the current API does not expose color settings.`,
   instructions: [
     'Use action "list" to view all lead labels.',
-    'Use action "create" to add a new label with a name and optional color.',
-    'Use action "update" to rename or recolor an existing label.',
+    'Use action "create" with a name and interestStatusLabel category.',
+    'Use action "update" to change the name, category, or description of an existing label.',
     'Use action "delete" to remove a label by its ID.'
   ]
 })
@@ -25,7 +25,14 @@ export let manageLeadLabels = SlateTool.create(spec, {
       color: z
         .string()
         .optional()
-        .describe('Label color hex code (for "create" and "update" actions).'),
+        .describe(
+          'Legacy color field. Current API does not support color updates; omit this field.'
+        ),
+      interestStatusLabel: z
+        .enum(['positive', 'negative', 'neutral'])
+        .optional()
+        .describe('Required category for create; optional for update.'),
+      description: z.string().optional().describe('Description for create or update.'),
       limit: z
         .number()
         .min(1)
@@ -68,15 +75,14 @@ export let manageLeadLabels = SlateTool.create(spec, {
 
       let labels = result.items.map((l: any) => ({
         labelId: l.id,
-        name: l.name,
-        color: l.color,
-        interestValue: l.interest_value
+        name: l.label,
+        interestValue: l.interest_status
       }));
 
       return {
         output: {
           labels,
-          nextStartingAfter: result.next_starting_after,
+          nextStartingAfter: result.next_starting_after ?? null,
           success: true
         },
         message: `Found **${labels.length}** lead label(s).`
@@ -84,9 +90,16 @@ export let manageLeadLabels = SlateTool.create(spec, {
     }
 
     if (action === 'create' && ctx.input.name) {
+      if (ctx.input.color !== undefined)
+        throw invalid('The current lead-label API does not support color. Omit color.');
+      if (!ctx.input.interestStatusLabel)
+        throw invalid(
+          'Provide interestStatusLabel: positive, negative, or neutral to create a label.'
+        );
       let result = await client.createLeadLabel({
         name: ctx.input.name,
-        color: ctx.input.color
+        interestStatusLabel: ctx.input.interestStatusLabel,
+        description: ctx.input.description
       });
       return {
         output: { label: result, success: true },
@@ -95,9 +108,19 @@ export let manageLeadLabels = SlateTool.create(spec, {
     }
 
     if (action === 'update' && ctx.input.labelId) {
+      if (ctx.input.color !== undefined)
+        throw invalid('The current lead-label API does not support color. Omit color.');
+      if (
+        ctx.input.name === undefined &&
+        ctx.input.interestStatusLabel === undefined &&
+        ctx.input.description === undefined
+      ) {
+        throw invalid('Provide a name, interestStatusLabel, or description to update.');
+      }
       let result = await client.updateLeadLabel(ctx.input.labelId, {
         name: ctx.input.name,
-        color: ctx.input.color
+        interestStatusLabel: ctx.input.interestStatusLabel,
+        description: ctx.input.description
       });
       return {
         output: { label: result, success: true },
@@ -113,9 +136,6 @@ export let manageLeadLabels = SlateTool.create(spec, {
       };
     }
 
-    return {
-      output: { success: false },
-      message: 'Missing required parameters for the specified action.'
-    };
+    throw invalid('Provide the required fields for the selected action.');
   })
   .build();

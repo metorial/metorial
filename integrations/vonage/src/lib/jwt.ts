@@ -1,97 +1,65 @@
-// Vonage JWT generation utility
-// JWTs are signed with RS256 (RSA-SHA256) using the application's private key
-
-let base64UrlEncode = (str: string): string => {
-  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-};
-
-let textToArrayBuffer = (text: string): ArrayBuffer => {
-  let encoder = new TextEncoder();
-  return encoder.encode(text).buffer as ArrayBuffer;
-};
-
-let pemToArrayBuffer = (pem: string): ArrayBuffer => {
-  let b64 = pem
-    .replace(/-----BEGIN (?:RSA )?PRIVATE KEY-----/g, '')
-    .replace(/-----END (?:RSA )?PRIVATE KEY-----/g, '')
-    .replace(/\s/g, '');
-  let binaryString = atob(b64);
-  let bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
+import { createPrivateKey, createPublicKey, randomUUID, sign } from 'node:crypto';
+import { id, invalid } from './validation';
+export function rsaPrivateKey(value: string) {
+  try {
+    if (
+      typeof value !== 'string' ||
+      value.length > 16384 ||
+      !/-----BEGIN (?:RSA )?PRIVATE KEY-----/.test(value)
+    )
+      throw invalid('Provide the RSA private key contents.');
+    const key = createPrivateKey(value);
+    if (
+      key.asymmetricKeyType !== 'rsa' ||
+      (key.asymmetricKeyDetails?.modulusLength ?? 0) < 2048
+    )
+      throw invalid('Use an RSA private key of at least 2048 bits.');
+    return key;
+  } catch {
+    throw invalid(
+      'Provide an unencrypted RSA private key of at least 2048 bits in PKCS#1 or PKCS#8 PEM format.'
+    );
   }
-  return bytes.buffer as ArrayBuffer;
-};
-
-let arrayBufferToBase64Url = (buffer: ArrayBuffer): string => {
-  let bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]!);
+}
+export function rsaPublicKey(value: string) {
+  try {
+    if (
+      typeof value !== 'string' ||
+      value.length > 16384 ||
+      !value.startsWith('-----BEGIN PUBLIC KEY-----')
+    )
+      throw invalid('Provide a public key.');
+    const key = createPublicKey(value);
+    if (
+      key.asymmetricKeyType !== 'rsa' ||
+      (key.asymmetricKeyDetails?.modulusLength ?? 0) < 2048
+    )
+      throw invalid('Provide an RSA public key.');
+    return key.export({ type: 'spki', format: 'pem' }).toString();
+  } catch {
+    throw invalid(
+      'Provide the RSA public key from a saved keypair of at least 2048 bits. Keep the matching private key securely.'
+    );
   }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-};
-
-let generateJti = (): string => {
-  let chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < 32; i++) {
-    result += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return result;
-};
-
-export let generateVonageJwt = async (
+}
+export async function generateVonageJwt(
   applicationId: string,
   privateKey: string
-): Promise<string> => {
-  let now = Math.floor(Date.now() / 1000);
-
-  let header = {
-    alg: 'RS256',
-    typ: 'JWT'
-  };
-
-  let payload = {
-    application_id: applicationId,
-    iat: now,
-    jti: generateJti(),
-    exp: now + 15 * 60, // 15 minutes TTL
-    acl: {
-      paths: {
-        '/*/users/**': {},
-        '/*/conversations/**': {},
-        '/*/sessions/**': {},
-        '/*/devices/**': {},
-        '/*/image/**': {},
-        '/*/media/**': {},
-        '/*/applications/**': {},
-        '/*/push/**': {},
-        '/*/knocking/**': {},
-        '/*/legs/**': {}
-      }
-    }
-  };
-
-  let headerEncoded = base64UrlEncode(JSON.stringify(header));
-  let payloadEncoded = base64UrlEncode(JSON.stringify(payload));
-  let signingInput = `${headerEncoded}.${payloadEncoded}`;
-
-  let keyData = pemToArrayBuffer(privateKey);
-  let cryptoKey = await crypto.subtle.importKey(
-    'pkcs8',
-    keyData,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  let signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    cryptoKey,
-    textToArrayBuffer(signingInput)
-  );
-
-  let signatureEncoded = arrayBufferToBase64Url(signature);
-  return `${signingInput}.${signatureEncoded}`;
-};
+): Promise<string> {
+  id(applicationId);
+  const key = rsaPrivateKey(privateKey),
+    now = Math.floor(Date.now() / 1000);
+  const encoded = [
+    { alg: 'RS256', typ: 'JWT' },
+    { application_id: applicationId, iat: now, exp: now + 900, jti: randomUUID() }
+  ]
+    .map(value => Buffer.from(JSON.stringify(value)).toString('base64url'))
+    .join('.');
+  try {
+    return `${encoded}.${sign('RSA-SHA256', Buffer.from(encoded), key).toString('base64url')}`;
+  } catch {
+    throw invalid(
+      'The application private key could not sign a request. Reconnect with its matching unencrypted RSA key.'
+    );
+  }
+}

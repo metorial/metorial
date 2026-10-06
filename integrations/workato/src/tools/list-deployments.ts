@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import * as map from '../lib/mappers';
+import { malformed, numericId, records } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listDeploymentsTool = SlateTool.create(spec, {
@@ -13,6 +15,10 @@ export let listDeploymentsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      deploymentId: z
+        .string()
+        .optional()
+        .describe('Read one exact deployment instead of listing.'),
       projectId: z.string().optional().describe('Filter by project ID'),
       environmentType: z
         .enum(['sandbox', 'test', 'stage', 'uat', 'preprod', 'prod'])
@@ -28,45 +34,37 @@ export let listDeploymentsTool = SlateTool.create(spec, {
     z.object({
       deployments: z.array(
         z.object({
-          deploymentId: z.number().describe('Deployment ID'),
-          projectId: z.string().nullable().describe('Project ID'),
-          environmentType: z.string().describe('Target environment'),
-          state: z.string().describe('Deployment state'),
-          title: z.string().nullable().describe('Deployment title'),
-          description: z.string().nullable().describe('Deployment description'),
+          deploymentId: z.number().optional().describe('Deployment ID'),
+          projectId: z.string().nullable().optional().describe('Project ID'),
+          environmentType: z.string().optional().describe('Target environment'),
+          state: z.string().optional().describe('Deployment state'),
+          title: z.string().nullable().optional().describe('Deployment title'),
+          description: z.string().nullable().optional().describe('Deployment description'),
           performedByName: z
             .string()
             .nullable()
+            .optional()
             .describe('Person who performed the deployment'),
-          createdAt: z.string().describe('Deployment creation timestamp'),
-          updatedAt: z.string().describe('Last update timestamp')
+          createdAt: z.string().optional().describe('Deployment creation timestamp'),
+          updatedAt: z.string().optional().describe('Last update timestamp')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let result = await client.listDeployments({
-      projectId: ctx.input.projectId,
-      environmentType: ctx.input.environmentType,
-      state: ctx.input.state
-    });
-
-    let items = result.items ?? (Array.isArray(result) ? result : []);
-    let deployments = items.map((d: any) => ({
-      deploymentId: d.id,
-      projectId: d.project_id ?? null,
-      environmentType: d.environment_type,
-      state: d.state,
-      title: d.title ?? null,
-      description: d.description ?? null,
-      performedByName: d.performed_by_name ?? null,
-      createdAt: d.created_at,
-      updatedAt: d.updated_at
-    }));
-
+    const client = createClient(ctx);
+    const result = ctx.input.deploymentId
+      ? { items: [await client.getDeployment(ctx.input.deploymentId)] }
+      : await client.listDeployments(ctx.input);
+    const deployments = records(result.items).map(map.deployment);
+    if (
+      ctx.input.deploymentId &&
+      String(deployments[0]?.deploymentId) !==
+        numericId(ctx.input.deploymentId, 'deploymentId')
+    )
+      malformed();
     return {
       output: { deployments },
-      message: `Found **${deployments.length}** deployments.`
+      message: `Returned ${deployments.length} deployments with native state.`
     };
   });

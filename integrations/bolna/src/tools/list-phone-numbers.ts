@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -55,6 +55,10 @@ export let listPhoneNumbers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
+    if (ctx.input.searchPattern && !ctx.input.searchCountry) {
+      throw createApiServiceError('Provide searchCountry when using searchPattern.');
+    }
+
     if (ctx.input.searchCountry) {
       let available = await client.searchPhoneNumbers(
         ctx.input.searchCountry,
@@ -66,8 +70,8 @@ export let listPhoneNumbers = SlateTool.create(spec, {
         output: {
           availableNumbers: availList.map((n: any) => ({
             phoneNumber: n.phone_number,
-            region: n.region,
-            price: n.price
+            region: n.region ?? undefined,
+            price: n.price ?? undefined
           }))
         },
         message: `Found **${availList.length}** available phone number(s) in ${ctx.input.searchCountry}.`
@@ -82,11 +86,11 @@ export let listPhoneNumbers = SlateTool.create(spec, {
         ownedNumbers: ownedList.map((n: any) => ({
           phoneNumberId: n.id,
           phoneNumber: n.phone_number,
-          agentId: n.agent_id,
-          telephonyProvider: n.telephony_provider,
-          price: n.price,
-          renewalAt: n.renewal_at,
-          createdAt: n.created_at
+          agentId: n.agent_id ?? undefined,
+          telephonyProvider: n.telephony_provider ?? undefined,
+          price: n.price ?? undefined,
+          renewalAt: n.renewal_at ?? undefined,
+          createdAt: n.created_at ?? undefined
         }))
       },
       message: `Found **${ownedList.length}** owned phone number(s).`

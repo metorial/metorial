@@ -1,14 +1,19 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let teamOutputSchema = z.object({
-  teamId: z.number().describe('Team ID'),
+  teamId: z.number().describe('Team ID; use list_teams to discover it'),
   name: z.string().describe('Team name'),
   description: z.string().describe('Team description'),
   permission: z.string().describe('Team permission level (read, write, admin, owner)'),
   units: z.array(z.string()).describe('Accessible unit types'),
+  unitsMap: z
+    .record(z.string(), z.string())
+    .optional()
+    .describe('Per-unit permissions when provided by the instance'),
   includesAllRepos: z.boolean().describe('Whether the team has access to all repos')
 });
 
@@ -22,9 +27,9 @@ export let listTeams = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgName: z.string().describe('Organization username'),
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      orgName: z.string().min(1).describe('Organization username'),
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page')
     })
   )
   .output(
@@ -33,7 +38,7 @@ export let listTeams = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let teams = await client.listOrgTeams(ctx.input.orgName, {
       page: ctx.input.page,
       limit: ctx.input.limit
@@ -47,6 +52,7 @@ export let listTeams = SlateTool.create(spec, {
           description: t.description || '',
           permission: t.permission,
           units: t.units || [],
+          unitsMap: t.units_map,
           includesAllRepos: t.includes_all_repositories
         }))
       },
@@ -65,7 +71,7 @@ export let createTeam = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgName: z.string().describe('Organization username'),
+      orgName: z.string().min(1).describe('Organization username'),
       name: z.string().describe('Team name'),
       description: z.string().optional().describe('Team description'),
       permission: z
@@ -76,6 +82,12 @@ export let createTeam = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Accessible units (e.g., "repo.code", "repo.issues", "repo.pulls")'),
+      unitsMap: z
+        .record(z.string(), z.enum(['none', 'read', 'write', 'admin', 'owner']))
+        .optional()
+        .describe(
+          'Per-unit permissions on current Gitea versions; takes precedence over legacy units'
+        ),
       includesAllRepos: z
         .boolean()
         .optional()
@@ -84,12 +96,17 @@ export let createTeam = SlateTool.create(spec, {
   )
   .output(teamOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
+    if (ctx.input.permission === 'owner')
+      throw createApiServiceError(
+        'The owner permission belongs to the automatically managed Owners team. Use read, write, or admin for a new team.'
+      );
     let t = await client.createTeam(ctx.input.orgName, {
       name: ctx.input.name,
       description: ctx.input.description,
       permission: ctx.input.permission,
-      units: ctx.input.units,
+      units: ctx.input.unitsMap ? undefined : ctx.input.units,
+      unitsMap: ctx.input.unitsMap,
       includesAllRepositories: ctx.input.includesAllRepos
     });
 
@@ -100,6 +117,7 @@ export let createTeam = SlateTool.create(spec, {
         description: t.description || '',
         permission: t.permission,
         units: t.units || [],
+        unitsMap: t.units_map,
         includesAllRepos: t.includes_all_repositories
       },
       message: `Created team **${t.name}** in **${ctx.input.orgName}** with ${t.permission} permissions`
@@ -110,26 +128,59 @@ export let createTeam = SlateTool.create(spec, {
 export let manageTeamMember = SlateTool.create(spec, {
   name: 'Manage Team Member',
   key: 'manage_team_member',
-  description: `Add or remove a user from an organization team.`,
+  description: `List a team's members, or add or remove a user from an organization team.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
-      teamId: z.number().describe('Team ID'),
-      username: z.string().describe('Username to add or remove'),
-      action: z.enum(['add', 'remove']).describe('Whether to add or remove the user')
+      teamId: integerInput(1).describe('Team ID; use list_teams to discover it'),
+      username: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('Username required when action is add or remove'),
+      action: z
+        .enum(['add', 'remove', 'list'])
+        .describe('Membership action; list discovers and verifies current members'),
+      page: integerInput(1).optional(),
+      limit: integerInput(0).optional()
     })
   )
   .output(
     z.object({
       success: z.boolean().describe('Whether the operation succeeded'),
-      action: z.string().describe('Action performed')
+      action: z.string().describe('Action performed'),
+      members: z
+        .array(z.object({ userId: z.number(), username: z.string(), fullName: z.string() }))
+        .optional()
+        .describe('Current members when action is list')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
+
+    if (ctx.input.action === 'list') {
+      const members = await client.listTeamMembers(ctx.input.teamId, {
+        page: ctx.input.page,
+        limit: ctx.input.limit
+      });
+      return {
+        output: {
+          success: true,
+          action: 'list',
+          members: members.map(member => ({
+            userId: member.id,
+            username: member.login,
+            fullName: member.full_name || member.login
+          }))
+        },
+        message: `Found **${members.length}** members in team **#${ctx.input.teamId}**.`
+      };
+    }
+    if (!ctx.input.username)
+      throw createApiServiceError('Provide username when adding or removing a team member.');
 
     if (ctx.input.action === 'add') {
       await client.addTeamMember(ctx.input.teamId, ctx.input.username);

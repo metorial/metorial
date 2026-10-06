@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -16,11 +17,12 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'EmailOctopus API key. Generate one in your account settings under Integrations & APIs.'
+          'Current EmailOctopus API v2 key from Integrations & APIs. Keys labelled legacy cannot authenticate this API.'
         )
     }),
 
     getOutput: async ctx => {
+      await new Client({ token: ctx.input.token }).getLists(undefined, 1);
       return {
         output: {
           token: ctx.input.token

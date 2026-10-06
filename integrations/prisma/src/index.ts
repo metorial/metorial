@@ -6,17 +6,19 @@ import {
   createProject,
   deleteConnection,
   deleteDatabase,
+  deleteProject,
+  getCurrentUser,
   getDatabase,
   getDatabaseBackups,
   getDatabaseUsage,
   getProject,
   listConnections,
   listDatabases,
+  listProjects,
+  listRegions,
   listWorkspaces,
   transferProject
 } from './tools';
-import { databaseChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,7 +34,11 @@ export let provider = Slate.create({
     createConnection,
     deleteConnection,
     getDatabaseBackups,
-    getDatabaseUsage
+    getDatabaseUsage,
+    getCurrentUser,
+    listProjects,
+    listRegions,
+    deleteProject
   ],
-  triggers: [inboundWebhook, databaseChanges]
+  triggers: []
 });

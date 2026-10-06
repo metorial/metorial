@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { StitchConnectClient } from '../lib/client';
+import { resolveRegion, StitchConnectClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let startReplication = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let startReplication = SlateTool.create(spec, {
   key: 'start_replication',
   description: `Initiates a replication (sync) job for a data source. This triggers Stitch to extract data from the source and load it into the destination. The source must be fully configured before starting replication.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -25,18 +25,18 @@ export let startReplication = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let result = await client.startReplication(ctx.input.sourceId);
 
     return {
       output: {
-        requestId: result?.request_id || result?.job_name || null,
-        status: result?.status || 'started'
+        requestId: result.job_name,
+        status: null
       },
-      message: `Started replication for source **${ctx.input.sourceId}**.`
+      message: `Requested replication for source **${ctx.input.sourceId}**.`
     };
   })
   .build();
@@ -44,7 +44,7 @@ export let startReplication = SlateTool.create(spec, {
 export let stopReplication = SlateTool.create(spec, {
   name: 'Stop Replication',
   key: 'stop_replication',
-  description: `Stops an active replication (sync) job for a data source. Use this to cancel an in-progress extraction.`,
+  description: `Requests stopping an in-progress extraction for a source. Already extracted data may still be prepared or loaded; this does not erase destination data.`,
   tags: {
     destructive: true
   }
@@ -63,8 +63,8 @@ export let stopReplication = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let result = await client.stopReplication(ctx.input.sourceId);
@@ -72,9 +72,9 @@ export let stopReplication = SlateTool.create(spec, {
     return {
       output: {
         success: true,
-        status: result?.status || 'stopped'
+        status: String(result.status)
       },
-      message: `Stopped replication for source **${ctx.input.sourceId}**.`
+      message: `Accepted the stop request for source **${ctx.input.sourceId}**.`
     };
   })
   .build();
@@ -82,7 +82,7 @@ export let stopReplication = SlateTool.create(spec, {
 export let listExtractions = SlateTool.create(spec, {
   name: 'List Extractions',
   key: 'list_extractions',
-  description: `Lists recent extraction jobs for the Stitch account. Shows the status, timing, and details of data extraction operations. Requires the Stitch client ID to be set in configuration.`,
+  description: `Lists the latest completed extraction per source from the past 60 days, including paused or deleted sources. This does not list active jobs or all historical runs. Uses the account ID discovered when connecting, with configured client ID as a fallback.`,
   constraints: [
     'Rate limited to 30 requests per 10 minutes.',
     'Results are paginated with a maximum of 100 records per page.'
@@ -98,27 +98,32 @@ export let listExtractions = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      extractions: z.array(z.any()).describe('List of extraction job records'),
+      extractions: z.array(z.unknown()).describe('List of extraction job records'),
       page: z.number().nullable().describe('Current page number'),
-      total: z.number().nullable().describe('Total number of extraction records')
+      total: z.number().nullable().describe('Total number of extraction records'),
+      nextPage: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Next page to request; null when the provider has no next link')
     })
   )
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let result = await client.listExtractions(ctx.input.page);
-    let extractions =
-      result?.data || result?.extractions || (Array.isArray(result) ? result : []);
+    let extractions = result.data;
 
     return {
       output: {
         extractions,
         page: result?.page ?? null,
-        total: result?.total ?? null
+        total: result.total,
+        nextPage: result.links?.next ? result.page + 1 : null
       },
       message: `Retrieved **${extractions.length}** extraction record(s).`
     };
@@ -128,7 +133,7 @@ export let listExtractions = SlateTool.create(spec, {
 export let listLoads = SlateTool.create(spec, {
   name: 'List Loads',
   key: 'list_loads',
-  description: `Lists recent data load operations for the Stitch account. Shows loading status, row counts, and timing for data being written to the destination warehouse. Requires the Stitch client ID to be set in configuration.`,
+  description: `Lists recent data load operations for the Stitch account. Shows loading status, row counts, and timing for data being written to the destination warehouse. Uses the account ID discovered when connecting, with configured client ID as a fallback.`,
   constraints: [
     'Rate limited to 30 requests per 10 minutes.',
     'Results are paginated with a maximum of 100 records per page.'
@@ -144,26 +149,32 @@ export let listLoads = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      loads: z.array(z.any()).describe('List of load operation records'),
+      loads: z.array(z.unknown()).describe('List of load operation records'),
       page: z.number().nullable().describe('Current page number'),
-      total: z.number().nullable().describe('Total number of load records')
+      total: z.number().nullable().describe('Total number of load records'),
+      nextPage: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Next page to request; null when the provider has no next link')
     })
   )
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let result = await client.listLoads(ctx.input.page);
-    let loads = result?.data || result?.loads || (Array.isArray(result) ? result : []);
+    let loads = result.data;
 
     return {
       output: {
         loads,
         page: result?.page ?? null,
-        total: result?.total ?? null
+        total: result.total,
+        nextPage: result.links?.next ? result.page + 1 : null
       },
       message: `Retrieved **${loads.length}** load record(s).`
     };
@@ -173,7 +184,7 @@ export let listLoads = SlateTool.create(spec, {
 export let getExtractionLogs = SlateTool.create(spec, {
   name: 'Get Extraction Logs',
   key: 'get_extraction_logs',
-  description: `Retrieves detailed logs for a specific extraction job. Use this to debug extraction failures or monitor extraction progress. Requires the Stitch client ID to be set in configuration.`,
+  description: `Retrieves detailed logs for a specific extraction job. Use this to debug extraction failures or monitor extraction progress. Uses the account ID discovered when connecting, with configured client ID as a fallback.`,
   constraints: ['Rate limited to 30 requests per 10 minutes.'],
   tags: {
     readOnly: true
@@ -186,21 +197,31 @@ export let getExtractionLogs = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      logs: z.any().describe('Extraction job logs and details')
+      logs: z.unknown().describe('Download metadata for the extraction log file')
     })
   )
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
-    let logs = await client.getExtractionLogs(ctx.input.jobName);
-
+    let file = await client.getExtractionLogs(ctx.input.jobName);
+    await ctx.addAttachment({
+      type: 'url',
+      url: file.url,
+      mimeType: file.mimeType,
+      refreshAt: file.expiresAt,
+      refreshReference: {
+        jobName: ctx.input.jobName,
+        clientId: file.clientId,
+        region: resolveRegion(ctx.auth.region, ctx.config)
+      }
+    });
     return {
-      output: { logs },
-      message: `Retrieved logs for extraction job **${ctx.input.jobName}**.`
+      output: { logs: { jobName: ctx.input.jobName, mimeType: file.mimeType } },
+      message: `Prepared a downloadable log file for extraction job **${ctx.input.jobName}**.`
     };
   })
   .build();

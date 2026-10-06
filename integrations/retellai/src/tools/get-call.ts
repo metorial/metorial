@@ -37,6 +37,11 @@ export let getCall = SlateTool.create(spec, {
         .any()
         .optional()
         .describe('Post-call analysis including sentiment, summary, and custom data'),
+      latency: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Per-component latency metrics'),
+      agentVersion: z.number().optional().describe('Agent version used for this call'),
       callCost: z.any().optional().describe('Cost breakdown of the call'),
       disconnectionReason: z.string().optional().describe('Reason the call was disconnected'),
       metadata: z.any().optional().describe('Custom metadata attached to the call')
@@ -63,6 +68,8 @@ export let getCall = SlateTool.create(spec, {
         recordingUrl: call.recording_url,
         callAnalysis: call.call_analysis,
         callCost: call.call_cost,
+        latency: call.latency,
+        agentVersion: call.agent_version,
         disconnectionReason: call.disconnection_reason,
         metadata: call.metadata
       },

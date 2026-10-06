@@ -23,9 +23,10 @@ export let getUserTool = SlateTool.create(spec, {
   .output(userSchema)
   .handleInvocation(async ctx => {
     let client = new VimeoClient(ctx.auth.token);
-    let user = ctx.input.userId
-      ? await client.getUser(ctx.input.userId)
-      : await client.getMe();
+    let user =
+      ctx.input.userId !== undefined
+        ? await client.getUser(ctx.input.userId)
+        : await client.getMe();
     let mapped = mapUser(user);
 
     return {

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { customerIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getPublishingPost = SlateTool.create(spec, {
@@ -17,6 +18,7 @@ export let getPublishingPost = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      customerId: customerIdSchema,
       publishingPostId: z.string().describe('The publishing post ID to retrieve.')
     })
   )
@@ -28,14 +30,14 @@ export let getPublishingPost = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      customerId: ctx.config.customerId
+      customerId: ctx.input.customerId ?? ctx.config.customerId
     });
 
     let result = await client.getPublishingPost(ctx.input.publishingPostId);
-    let posts = result?.data ?? [];
+    let posts = result.data;
 
     return {
       output: { posts },
-      message: `Retrieved publishing post \`${ctx.input.publishingPostId}\` with **${posts.length}** entr${posts.length === 1 ? 'y' : 'ies'}.`
+      message: `Retrieved **${posts.length}** publishing post entr${posts.length === 1 ? 'y' : 'ies'}.`
     };
   });

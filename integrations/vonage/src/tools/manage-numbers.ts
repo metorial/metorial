@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VonageRestClient } from '../lib/client';
+import { invalid, protect } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageNumbers = SlateTool.create(spec, {
@@ -72,6 +73,9 @@ Combines number search, purchase, and management in one tool.`,
   )
   .output(
     z.object({
+      size: z.number().optional().describe('Requested native page size'),
+      index: z.number().optional().describe('Requested page, starting at 1'),
+      nextIndex: z.number().optional().describe('Next page; absent when complete'),
       count: z.number().optional().describe('Total number of matching results'),
       numbers: z
         .array(
@@ -81,6 +85,12 @@ Combines number search, purchase, and management in one tool.`,
             type: z.string().optional().describe('Number type'),
             cost: z.string().optional().describe('Monthly cost'),
             features: z.array(z.string()).optional().describe('Supported features'),
+            moHttpUrl: z.unknown().optional().describe('Inbound SMS webhook'),
+            voiceCallbackType: z.unknown().optional().describe('Voice callback type'),
+            voiceCallbackValue: z.unknown().optional().describe('Voice callback value'),
+            voiceStatusCallback: z.unknown().optional().describe('Voice status webhook'),
+            limitations: z.unknown().optional().describe('Native feature limitations'),
+            initialPrice: z.unknown().optional().describe('Setup fee as a decimal EUR string'),
             applicationId: z.string().optional().describe('Linked application ID')
           })
         )
@@ -93,6 +103,7 @@ Combines number search, purchase, and management in one tool.`,
     })
   )
   .handleInvocation(async ctx => {
+    protect(ctx.input, [ctx.auth.apiSecret, ctx.auth.privateKey ?? '']);
     let client = new VonageRestClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret
@@ -100,7 +111,7 @@ Combines number search, purchase, and management in one tool.`,
 
     switch (ctx.input.action) {
       case 'search': {
-        if (!ctx.input.country) throw new Error('country is required for search');
+        if (!ctx.input.country) throw invalid('country is required for search');
         let searchResult = await client.searchNumbers({
           country: ctx.input.country,
           type: ctx.input.type,
@@ -110,7 +121,7 @@ Combines number search, purchase, and management in one tool.`,
           index: ctx.input.index
         });
         return {
-          output: { count: searchResult.count, numbers: searchResult.numbers },
+          output: { ...searchResult },
           message: `Found **${searchResult.count}** available number(s) in **${ctx.input.country}**. Showing **${searchResult.numbers.length}** results.`
         };
       }
@@ -124,14 +135,14 @@ Combines number search, purchase, and management in one tool.`,
           pattern: ctx.input.pattern
         });
         return {
-          output: { count: listResult.count, numbers: listResult.numbers },
+          output: { ...listResult },
           message: `You own **${listResult.count}** number(s). Showing **${listResult.numbers.length}** results.`
         };
       }
 
       case 'buy': {
         if (!ctx.input.country || !ctx.input.msisdn)
-          throw new Error('country and msisdn are required for buy');
+          throw invalid('country and msisdn are required for buy');
         await client.buyNumber(ctx.input.country, ctx.input.msisdn);
         return {
           output: { success: true },
@@ -141,7 +152,7 @@ Combines number search, purchase, and management in one tool.`,
 
       case 'cancel': {
         if (!ctx.input.country || !ctx.input.msisdn)
-          throw new Error('country and msisdn are required for cancel');
+          throw invalid('country and msisdn are required for cancel');
         await client.cancelNumber(ctx.input.country, ctx.input.msisdn);
         return {
           output: { success: true },
@@ -151,7 +162,7 @@ Combines number search, purchase, and management in one tool.`,
 
       case 'update': {
         if (!ctx.input.country || !ctx.input.msisdn)
-          throw new Error('country and msisdn are required for update');
+          throw invalid('country and msisdn are required for update');
         await client.updateNumber({
           country: ctx.input.country,
           msisdn: ctx.input.msisdn,

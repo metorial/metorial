@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { workspaceClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let triggerSync = SlateTool.create(spec, {
   name: 'Trigger Sync',
   key: 'trigger_sync',
-  description: `Programmatically triggers a sync run. By default, performs an incremental sync. Set forceFullSync to true to force a complete resync of all records.`,
+  description: `Requests a sync run; acceptance does not mean completion. The run can query a warehouse, transfer data, incur costs and delete destination records in mirror mode. By default, performs an incremental sync. Set forceFullSync to true to force a complete resync of all records.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
+      workspaceId,
       syncId: z.number().describe('ID of the sync to trigger.'),
       forceFullSync: z
         .boolean()
@@ -26,10 +28,7 @@ export let triggerSync = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = await workspaceClient(ctx);
 
     let result = await client.triggerSync(ctx.input.syncId, ctx.input.forceFullSync);
 

@@ -22,13 +22,6 @@ import {
   updateCheckin,
   updateUser
 } from './tools';
-import {
-  checkinResponseTrigger,
-  formResponseTrigger,
-  kudosPostedTrigger,
-  organizationEventTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -53,10 +46,5 @@ export let provider = Slate.create({
     giveKudos,
     getOrganization
   ],
-  triggers: [
-    checkinResponseTrigger,
-    formResponseTrigger,
-    kudosPostedTrigger,
-    organizationEventTrigger
-  ]
+  triggers: []
 });

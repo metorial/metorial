@@ -1,6 +1,6 @@
 {
   "name": "@google/google-calendar",
-  "description": "Create, read, update, and delete calendar events and calendars. Manage attendees, recurring events, and reminders. Check free/busy availability for scheduling. Share calendars and control access permissions. Create events from natural language text with quick add. Manage special event types like focus time, out of office, and working location. Subscribe to or remove calendars from a user's calendar list. Sync calendar changes incrementally and receive webhook notifications for event, calendar list, ACL, and settings changes.",
+  "description": "Create, read, update, and delete calendar events and calendars. Manage attendees, recurring events, and reminders. Check free/busy availability for scheduling. Share calendars and control access permissions. Create events from natural language text with quick add. Manage special event types like focus time, out of office, and working location. Subscribe to or remove calendars from a user's calendar list. Sync calendar changes incrementally.",
   "categories": ["scheduling-and-calendars"],
   "skills": [
     "create and manage events",
@@ -11,8 +11,7 @@
     "manage attendees and invitations",
     "create secondary calendars",
     "sync calendar changes incrementally",
-    "manage out of office events",
-    "watch for calendar changes"
+    "manage out of office events"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/google-calendar.svg"
 }

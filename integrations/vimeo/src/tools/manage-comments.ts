@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VimeoClient } from '../lib/client';
+import { nativeComment, parse, uriId } from '../lib/native';
 import { paginationInputSchema, paginationOutputSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
@@ -13,14 +14,17 @@ let commentSchema = z.object({
   authorUri: z.string().nullable().optional().describe('URI of the comment author')
 });
 
-let mapComment = (c: any) => ({
-  commentId: c.uri?.replace(/.*\/comments\//, '') ?? '',
-  uri: c.uri ?? '',
-  text: c.text ?? '',
-  createdOn: c.created_on ?? '',
-  authorName: c.user?.name ?? 'Unknown',
-  authorUri: c.user?.uri ?? null
-});
+let mapComment = (value: unknown) => {
+  const c = parse(nativeComment, value);
+  return {
+    commentId: uriId(c.uri, 'comments'),
+    uri: c.uri,
+    text: c.text,
+    createdOn: c.created_on,
+    authorName: c.user.name,
+    authorUri: c.user.uri
+  };
+};
 
 export let listCommentsTool = SlateTool.create(spec, {
   name: 'List Video Comments',
@@ -51,9 +55,10 @@ export let listCommentsTool = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total ?? 0,
-        page: result.page ?? 1,
-        perPage: result.perPage ?? comments.length,
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+        paging: result.paging,
         comments
       },
       message: `Found **${result.total ?? comments.length}** comments on video ${ctx.input.videoId}`

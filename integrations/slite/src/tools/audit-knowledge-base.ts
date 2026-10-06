@@ -25,8 +25,18 @@ export let auditKnowledgeBase = SlateTool.create(spec, {
         .describe('Filter by review states (not available for inactive/empty)'),
       ownerIdList: z.array(z.string()).optional().describe('Filter by owner user IDs'),
       channelIdList: z.array(z.string()).optional().describe('Filter by channel IDs'),
-      sinceDaysAgo: z.number().optional().describe('Only include notes from the last N days'),
-      first: z.number().optional().describe('Maximum number of results (1-50, default 20)'),
+      sinceDaysAgo: z
+        .number()
+        .nonnegative()
+        .optional()
+        .describe('Only include notes from the last N days (all/public categories only)'),
+      first: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .optional()
+        .describe('Maximum number of results (1-50, default 20)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -66,7 +76,7 @@ export let auditKnowledgeBase = SlateTool.create(spec, {
       cursor: ctx.input.cursor
     };
 
-    let result: any;
+    let result: Awaited<ReturnType<Client['listKnowledgeManagementNotes']>>;
     switch (ctx.input.category) {
       case 'all':
         result = await client.listKnowledgeManagementNotes(params);
@@ -82,7 +92,7 @@ export let auditKnowledgeBase = SlateTool.create(spec, {
         break;
     }
 
-    let notes = (result.notes || []).map((note: any) => ({
+    let notes = result.notes.map(note => ({
       noteId: note.id,
       title: note.title,
       url: note.url,
@@ -95,11 +105,11 @@ export let auditKnowledgeBase = SlateTool.create(spec, {
     return {
       output: {
         notes,
-        total: result.total ?? notes.length,
-        hasNextPage: result.hasNextPage ?? false,
-        nextCursor: result.nextCursor ?? null
+        total: result.total,
+        hasNextPage: result.hasNextPage,
+        nextCursor: result.nextCursor
       },
-      message: `Found **${notes.length}** ${ctx.input.category} note(s) (total: ${result.total ?? notes.length})${result.hasNextPage ? ' — more results available' : ''}`
+      message: `Found **${notes.length}** ${ctx.input.category} note(s) (total: ${result.total})${result.hasNextPage ? ' — more results available' : ''}`
     };
   })
   .build();

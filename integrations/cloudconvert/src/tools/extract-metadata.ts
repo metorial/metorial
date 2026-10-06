@@ -1,84 +1,54 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invalidResponse } from '../lib/errors';
+import { createAndRead, jobMessage } from '../lib/jobs';
+import { sourceUrl, tagInput, waitInput } from '../lib/schemas';
+import type { Tasks } from '../lib/validation';
 import { spec } from '../spec';
-
-export let extractMetadata = SlateTool.create(spec, {
+export const extractMetadata = SlateTool.create(spec, {
   name: 'Extract File Metadata',
   key: 'extract_metadata',
-  description: `Extract metadata from a file using ExifTool. Returns properties like page count, image/video resolution, author, creation date, and more.
-
-Useful for inspecting file properties before processing or for cataloging files.`,
-  tags: {
-    destructive: false,
-    readOnly: true
-  }
+  description:
+    'Create a metadata extraction job for a file at a public URL. Returns the actual ExifTool metadata when complete; this operation creates jobs but does not consume conversion credits.',
+  tags: { destructive: false, readOnly: false }
 })
   .input(
     z.object({
-      sourceUrl: z.string().describe('URL of the file to extract metadata from'),
-      inputFormat: z
-        .string()
-        .optional()
-        .describe('Input file format (auto-detected if omitted)'),
-      tag: z.string().optional().describe('Tag to label the job'),
-      waitForCompletion: z
-        .boolean()
-        .optional()
-        .default(true)
-        .describe('Wait for metadata extraction to complete')
+      sourceUrl,
+      inputFormat: z.string().min(1).optional(),
+      tag: tagInput,
+      waitForCompletion: waitInput
     })
   )
   .output(
     z.object({
-      jobId: z.string().describe('ID of the metadata job'),
-      status: z.string().describe('Current status of the job'),
-      metadata: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe('Extracted metadata properties')
+      jobId: z.string(),
+      status: z.string(),
+      metadata: z.record(z.string(), z.unknown()).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let metadataTask: Record<string, any> = {
-      operation: 'metadata',
-      input: ['import-file']
+    const tasks: Tasks = {
+      'import-file': { operation: 'import/url', url: ctx.input.sourceUrl },
+      'extract-metadata': {
+        operation: 'metadata',
+        input: ['import-file'],
+        ...(ctx.input.inputFormat ? { input_format: ctx.input.inputFormat } : {})
+      }
     };
-
-    if (ctx.input.inputFormat) metadataTask.input_format = ctx.input.inputFormat;
-
-    let tasks: Record<string, any> = {
-      'import-file': {
-        operation: 'import/url',
-        url: ctx.input.sourceUrl
-      },
-      'extract-metadata': metadataTask
-    };
-
-    let job = await client.createJob(tasks, ctx.input.tag);
-
-    if (ctx.input.waitForCompletion) {
-      job = await client.waitForJob(job.id);
-    }
-
-    let metadataResultTask = (job.tasks ?? []).find((t: any) => t.operation === 'metadata');
-    let metadata = metadataResultTask?.result?.metadata ?? {};
-
+    const job = await createAndRead(ctx, tasks, ctx.input);
+    const metadata = job.tasks.find(task => task.operation === 'metadata')?.result?.metadata;
+    if (job.status === 'finished' && metadata === undefined)
+      throw invalidResponse(
+        `Metadata job ${job.id} finished without metadata. Inspect this existing job before creating another one.`
+      );
     return {
       output: {
         jobId: job.id,
         status: job.status,
         metadata: job.status === 'finished' ? metadata : undefined
       },
-      message:
-        job.status === 'finished'
-          ? `Extracted metadata with ${Object.keys(metadata).length} properties.`
-          : `Metadata extraction job created (status: ${job.status}).`
+      message: jobMessage(job, 'Metadata extraction')
     };
   })
   .build();

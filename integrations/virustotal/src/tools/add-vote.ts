@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 let resourceTypeMap: Record<string, string> = {
@@ -32,17 +33,22 @@ export let addVote = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the vote was successfully recorded')
+      success: z.boolean().describe('Whether the native vote receipt was confirmed'),
+      voteId: z.string().optional().describe('Native vote ID'),
+      verdict: z.enum(['malicious', 'harmless']).optional().describe('Native recorded verdict')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    let client = new Client(ctx.auth);
     let apiType = resourceTypeMap[ctx.input.resourceType] ?? ctx.input.resourceType;
-    await client.addVote(apiType, ctx.input.resourceId, ctx.input.verdict);
+    const vote = await client.addVote(apiType, ctx.input.resourceId, ctx.input.verdict);
 
     return {
       output: {
-        success: true
+        success: true,
+        voteId: vote.id,
+        verdict: vote.attributes?.verdict
       },
       message: `Voted **${ctx.input.verdict}** on ${ctx.input.resourceType} \`${ctx.input.resourceId}\`.`
     };

@@ -27,7 +27,7 @@ describe('google-ads provider contract', () => {
         'upload_offline_conversions',
         'manage_audience_lists'
       ],
-      triggerIds: ['lead_form_submit'],
+      triggerIds: [],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'list_accounts', readOnly: true, destructive: false },
@@ -42,10 +42,10 @@ describe('google-ads provider contract', () => {
         { id: 'upload_offline_conversions', readOnly: false, destructive: false },
         { id: 'manage_audience_lists', readOnly: false, destructive: false }
       ],
-      triggers: [{ id: 'lead_form_submit', invocationType: 'webhook' }]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(12);
+    expect(contract.actions).toHaveLength(11);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual(['loginCustomerId']);
 
     let expectedScopes = {
@@ -59,8 +59,7 @@ describe('google-ads provider contract', () => {
       manage_conversion_actions: googleAdsActionScopes.manageConversionActions,
       generate_keyword_ideas: googleAdsActionScopes.generateKeywordIdeas,
       upload_offline_conversions: googleAdsActionScopes.uploadOfflineConversions,
-      manage_audience_lists: googleAdsActionScopes.manageAudienceLists,
-      lead_form_submit: googleAdsActionScopes.leadFormSubmit
+      manage_audience_lists: googleAdsActionScopes.manageAudienceLists
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

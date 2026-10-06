@@ -70,7 +70,7 @@ export let listCampaigns = SlateTool.create(spec, {
       name: c.name,
       status: c.status,
       timestampCreated: c.timestamp_created,
-      timestampUpdated: c.timestamp_updated
+      timestampUpdated: c.timestamp_updated ?? undefined
     }));
 
     return {

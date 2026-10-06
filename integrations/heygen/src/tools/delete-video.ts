@@ -23,7 +23,7 @@ export let deleteVideo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HeyGenClient({ token: ctx.auth.token });
+    let client = new HeyGenClient(ctx.auth);
 
     await client.deleteVideo(ctx.input.videoId);
 

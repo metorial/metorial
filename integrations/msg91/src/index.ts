@@ -18,14 +18,6 @@ import {
   validateEmail,
   verifyOtp
 } from './tools';
-import {
-  emailDeliveryReport,
-  rcsDeliveryReport,
-  smsDeliveryReport,
-  voiceCallReport,
-  whatsappDeliveryReport
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,11 +38,5 @@ export let provider = Slate.create({
     trackEvent,
     getMessagingLogs
   ],
-  triggers: [
-    smsDeliveryReport,
-    emailDeliveryReport,
-    whatsappDeliveryReport,
-    voiceCallReport,
-    rcsDeliveryReport
-  ]
+  triggers: []
 });

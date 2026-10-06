@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { workspaceClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listWebhooks = SlateTool.create(spec, {
@@ -11,27 +12,24 @@ export let listWebhooks = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ workspaceId }))
   .output(
     z.object({
       webhooks: z.array(
         z.object({
-          webhookId: z.number().describe('Unique identifier of the webhook.'),
-          name: z.string().describe('Name of the webhook.'),
-          description: z.string().nullable().describe('Description of the webhook.'),
+          webhookId: z.number().optional().describe('Unique identifier of the webhook.'),
+          name: z.string().optional().describe('Name of the webhook.'),
+          description: z.string().nullish().describe('Description of the webhook.'),
           endpoint: z.string().describe('HTTPS URL receiving webhook events.'),
-          events: z.array(z.string()).describe('Subscribed event types.'),
-          createdAt: z.string().describe('When the webhook was created.'),
-          updatedAt: z.string().describe('When the webhook was last updated.')
+          events: z.array(z.string()).optional().describe('Subscribed event types.'),
+          createdAt: z.string().nullish().describe('When the webhook was created.'),
+          updatedAt: z.string().nullish().describe('When the webhook was last updated.')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = await workspaceClient(ctx);
 
     let webhooks = await client.listWebhooks();
 

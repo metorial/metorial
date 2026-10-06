@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { WriterClient } from '../lib/client';
+import { fileIdSchema, graphIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let addFileToGraph = SlateTool.create(spec, {
   name: 'Add File to Knowledge Graph',
   key: 'add_file_to_graph',
-  description: `Add an uploaded file to a Knowledge Graph. The file must be uploaded to Writer first using the file upload process. Once added, the file's content becomes queryable through the Knowledge Graph.`,
+  description: `Add an uploaded file to a Knowledge Graph. Call list_knowledge_graphs and list_files to discover IDs. Upload the file with upload_file and wait for get_file to report completed before adding it.`,
   instructions: [
     'The file must already be uploaded to Writer before it can be added to a Knowledge Graph.',
     'Supported file types: PDF, TXT, DOC/DOCX, PPT/PPTX, EML, HTML, SRT, CSV, XLS/XLSX.'
@@ -17,8 +18,8 @@ export let addFileToGraph = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      graphId: z.string().describe('ID of the Knowledge Graph to add the file to'),
-      fileId: z.string().describe('ID of the file to add')
+      graphId: graphIdSchema,
+      fileId: fileIdSchema
     })
   )
   .output(
@@ -46,15 +47,15 @@ export let addFileToGraph = SlateTool.create(spec, {
 export let removeFileFromGraph = SlateTool.create(spec, {
   name: 'Remove File from Knowledge Graph',
   key: 'remove_file_from_graph',
-  description: `Remove a file from a Knowledge Graph. The file itself is not deleted and can be re-added later or used with other graphs.`,
+  description: `Remove a file from a Knowledge Graph. Call list_knowledge_graphs and list_files to discover IDs. The file can be re-added later or used with other graphs.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      graphId: z.string().describe('ID of the Knowledge Graph to remove the file from'),
-      fileId: z.string().describe('ID of the file to remove')
+      graphId: graphIdSchema,
+      fileId: fileIdSchema
     })
   )
   .output(

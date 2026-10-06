@@ -14,8 +14,6 @@ import {
   sortFilterTable,
   writeRange
 } from './tools';
-import { inboundWebhook, workbookChanged } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     invokeFunction,
     manageSessions
   ],
-  triggers: [inboundWebhook, workbookChanged]
+  triggers: []
 });

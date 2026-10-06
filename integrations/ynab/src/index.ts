@@ -2,9 +2,11 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createAccount,
+  createPayee,
   createTransaction,
   deleteTransaction,
   getBudget,
+  getCurrentUser,
   getMonth,
   getTransaction,
   importTransactions,
@@ -21,11 +23,11 @@ import {
   updatePayee,
   updateTransaction
 } from './tools';
-import { accountChanges, inboundWebhook, transactionChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    createPayee,
     listBudgets,
     getBudget,
     listAccounts,
@@ -46,5 +48,5 @@ export let provider = Slate.create({
     listMonths,
     getMonth
   ],
-  triggers: [inboundWebhook, transactionChanges, accountChanges]
+  triggers: []
 });

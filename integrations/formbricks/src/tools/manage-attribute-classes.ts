@@ -1,14 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let listAttributeClasses = SlateTool.create(spec, {
   name: 'List Attribute Classes',
   key: 'list_attribute_classes',
-  description: `List all attribute classes in the environment. Attribute classes define custom properties on contacts used for segmentation and targeting.`,
+  instructions: [
+    'Use list_contact_attribute_keys for current native key discovery. Attribute-definition writes require the provider UI.'
+  ],
+  description: `DEPRECATED — use list_contact_attribute_keys for native discovery. List all attribute classes in the environment. Attribute classes define custom properties on contacts used for segmentation and targeting.`,
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(z.object({}))
@@ -26,34 +29,22 @@ export let listAttributeClasses = SlateTool.create(spec, {
       )
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let classes = await client.listAttributeClasses();
-
-    let mapped = classes.map((ac: any) => ({
-      attributeClassId: ac.id,
-      name: ac.name ?? '',
-      type: ac.type,
-      description: ac.description,
-      environmentId: ac.environmentId,
-      createdAt: ac.createdAt ?? ''
-    }));
-
-    return {
-      output: { attributeClasses: mapped },
-      message: `Found **${mapped.length}** attribute class(es).`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'Historical attribute-class routes are not supported by the current Formbricks v1 API. Use list_contact_attribute_keys to discover native keys; manage attribute definitions in the provider UI.',
+      { reason: 'unsupported_legacy_api' }
+    );
   })
   .build();
 
 export let createAttributeClass = SlateTool.create(spec, {
   name: 'Create Attribute Class',
   key: 'create_attribute_class',
-  description: `Create a new attribute class to define a custom property on contacts. Attributes are used for segmentation and survey targeting.`
+  instructions: [
+    'Use list_contact_attribute_keys for discovery and the provider UI for definition changes.'
+  ],
+  tags: { deprecated: true },
+  description: `DEPRECATED — the historical route is absent from the current v1 API. Use the provider UI to manage contact attributes. Create a new attribute class to define a custom property on contacts. Attributes are used for segmentation and survey targeting.`
 })
   .input(
     z.object({
@@ -71,35 +62,24 @@ export let createAttributeClass = SlateTool.create(spec, {
       name: z.string().describe('Name of the created attribute class')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let attrClass = await client.createAttributeClass({
-      environmentId: ctx.input.environmentId,
-      name: ctx.input.name,
-      type: ctx.input.type,
-      ...(ctx.input.description ? { description: ctx.input.description } : {})
-    });
-
-    return {
-      output: {
-        attributeClassId: attrClass.id,
-        name: attrClass.name ?? ctx.input.name
-      },
-      message: `Created attribute class **${attrClass.name ?? ctx.input.name}** with ID \`${attrClass.id}\`.`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'Historical attribute-class routes are not supported by the current Formbricks v1 API. Use list_contact_attribute_keys to discover native keys; manage attribute definitions in the provider UI.',
+      { reason: 'unsupported_legacy_api' }
+    );
   })
   .build();
 
 export let deleteAttributeClass = SlateTool.create(spec, {
   name: 'Delete Attribute Class',
   key: 'delete_attribute_class',
-  description: `Delete an attribute class. This removes the custom property definition from the environment.`,
+  instructions: [
+    'Use list_contact_attribute_keys for discovery and the provider UI for definition changes.'
+  ],
+  description: `DEPRECATED — the historical route is absent from the current v1 API. Use the provider UI to manage contact attributes. Delete an attribute class. This removes the custom property definition from the environment.`,
   tags: {
-    destructive: true
+    destructive: true,
+    deprecated: true
   }
 })
   .input(
@@ -112,19 +92,10 @@ export let deleteAttributeClass = SlateTool.create(spec, {
       attributeClassId: z.string().describe('ID of the deleted attribute class')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    await client.deleteAttributeClass(ctx.input.attributeClassId);
-
-    return {
-      output: {
-        attributeClassId: ctx.input.attributeClassId
-      },
-      message: `Deleted attribute class \`${ctx.input.attributeClassId}\`.`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'Historical attribute-class routes are not supported by the current Formbricks v1 API. Use list_contact_attribute_keys to discover native keys; manage attribute definitions in the provider UI.',
+      { reason: 'unsupported_legacy_api' }
+    );
   })
   .build();

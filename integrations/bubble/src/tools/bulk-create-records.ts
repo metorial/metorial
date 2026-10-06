@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let bulkCreateRecords = SlateTool.create(spec, {
@@ -29,23 +29,30 @@ export let bulkCreateRecords = SlateTool.create(spec, {
       recordIds: z
         .array(z.string())
         .describe('Array of unique IDs for the newly created records.'),
-      totalCreated: z.number().describe('Total number of records created.')
+      totalCreated: z.number().describe('Number of successfully created records.'),
+      partialFailure: z
+        .boolean()
+        .optional()
+        .describe('Whether any requested row was rejected.'),
+      failures: z
+        .array(z.object({ index: z.number(), message: z.string() }))
+        .optional()
+        .describe('Rejected zero-based input rows; accepted records remain.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.appBaseUrl,
-      token: ctx.auth?.token
-    });
+    const client = clientFor(ctx);
 
     let result = await client.bulkCreateRecords(ctx.input.dataType, ctx.input.records);
 
     return {
       output: {
         recordIds: result.ids,
-        totalCreated: result.ids.length
+        totalCreated: result.ids.length,
+        partialFailure: result.partialFailure,
+        failures: result.failures
       },
-      message: `Created **${result.ids.length}** ${ctx.input.dataType} record(s) in bulk.`
+      message: `Created **${result.ids.length}** ${ctx.input.dataType} record(s) in bulk.${result.partialFailure ? ' Some rows failed; accepted records remain. Reconcile before repeating.' : ''}`
     };
   })
   .build();

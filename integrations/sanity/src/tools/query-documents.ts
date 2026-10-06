@@ -1,75 +1,44 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SanityClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid, scopes } from '../lib/schemas';
 import { spec } from '../spec';
 
-export let queryDocuments = SlateTool.create(spec, {
+export const queryDocuments = SlateTool.create(spec, {
   name: 'Query Documents',
   key: 'query_documents',
-  description: `Query documents from Sanity's Content Lake using GROQ (Graph-Relational Object Queries). Supports filtering, projections, ordering, slicing, and references across documents within a dataset. Use parameters to safely pass dynamic values into queries.`,
+  description:
+    'Query a selected dataset with GROQ. Call list_projects and manage_datasets to discover scope. Results preserve the query shape; apply explicit GROQ ordering and slices to bound reads.',
   instructions: [
-    'Use GROQ syntax for queries. Example: `*[_type == "article"]{ title, slug, _createdAt }` to get all articles with selected fields.',
-    'Use the params field to pass dynamic values into queries safely. Reference them with `$` prefix in the query, e.g., `*[_type == $type]` with params `{ "type": "article" }`.',
-    'Use the perspective option to query drafts ("previewDrafts") or only published content ("published").'
+    'Use params for values referenced by $name in GROQ.',
+    'For pagination, order by _id and filter _id > $lastId; no automatic count or completion marker is inferred.',
+    'previewDrafts remains supported as the legacy drafts alias. Draft perspectives require the uncached API.'
   ],
-  tags: {
-    readOnly: true
-  }
+  tags: { readOnly: true }
 })
   .input(
     z.object({
-      query: z
-        .string()
-        .describe('GROQ query string. Example: *[_type == "post"]{ title, body, _id }'),
-      params: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe(
-          'Query parameters for safe value substitution. Keys should match $-prefixed variables in the query.'
-        ),
-      perspective: z
-        .enum(['published', 'previewDrafts', 'raw'])
-        .optional()
-        .describe(
-          'Query perspective. "published" returns only published documents, "previewDrafts" overlays drafts on published, "raw" returns all documents as-is.'
-        ),
-      useCdn: z
-        .boolean()
-        .optional()
-        .describe(
-          'Use the CDN-cached endpoint for faster reads. Only works for published content.'
-        )
+      ...scopes,
+      query: z.string().min(1),
+      params: z.record(z.string(), z.unknown()).optional(),
+      perspective: z.enum(['published', 'previewDrafts', 'raw', 'drafts']).optional(),
+      useCdn: z.boolean().optional()
     })
   )
-  .output(
-    z.object({
-      result: z
-        .any()
-        .describe('Query result data. Shape depends on the GROQ query and projection used.'),
-      ms: z.number().optional().describe('Query execution time in milliseconds.')
-    })
-  )
+  .output(z.object({ result: z.unknown(), ms: z.number().optional() }))
   .handleInvocation(async ctx => {
-    let client = new SanityClient({
-      token: ctx.auth.token,
-      projectId: ctx.config.projectId,
-      dataset: ctx.config.dataset,
-      apiVersion: ctx.config.apiVersion
-    });
-
-    let response = await client.query(ctx.input.query, ctx.input.params, {
+    if (
+      ctx.input.useCdn &&
+      (ctx.input.perspective === 'drafts' || ctx.input.perspective === 'previewDrafts')
+    )
+      throw invalid('Set useCdn to false for drafts or previewDrafts.');
+    const result = await clientFor(ctx).query(ctx.input.query, ctx.input.params, {
       perspective: ctx.input.perspective,
       useCdn: ctx.input.useCdn
     });
-
-    let resultCount = Array.isArray(response.result) ? response.result.length : 1;
-
     return {
-      output: {
-        result: response.result,
-        ms: response.ms
-      },
-      message: `Query executed in ${response.ms}ms. Returned ${Array.isArray(response.result) ? `${resultCount} result(s)` : 'a single value'}.`
+      output: { result: result.result, ms: result.ms },
+      message: 'Retrieved the native GROQ result.'
     };
   })
   .build();

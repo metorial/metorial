@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageWorkflowTags = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let manageWorkflowTags = SlateTool.create(spec, {
   key: 'manage_workflow_tags',
   description: `Get or update the tags assigned to a workflow. Use this to organize workflows by setting their tags, or to inspect current tag assignments.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -35,19 +35,16 @@ export let manageWorkflowTags = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
-    let rawTags: any[];
+    let rawTags: Awaited<ReturnType<typeof client.getWorkflowTags>>;
     if (ctx.input.tagIds) {
       rawTags = await client.updateWorkflowTags(ctx.input.workflowId, ctx.input.tagIds);
     } else {
       rawTags = await client.getWorkflowTags(ctx.input.workflowId);
     }
 
-    let tags = (rawTags || []).map((t: any) => ({
+    let tags = (rawTags || []).map(t => ({
       tagId: String(t.id),
       name: t.name || '',
       createdAt: t.createdAt,

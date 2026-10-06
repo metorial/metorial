@@ -1,139 +1,98 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createAxios, normalizeOAuthTokenResponse, requestAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { credential, invalid, type LeverAuth, row, safeApiError } from './lib/contracts';
 
-let scopes = [
-  {
-    title: 'Offline Access',
-    description: 'Required to receive a refresh token for persistent authentication',
-    scope: 'offline_access'
-  },
-  {
-    title: 'Applications Read',
-    description: 'View all opportunity applications',
-    scope: 'applications:read:admin'
-  },
-  {
-    title: 'Archive Reasons',
-    description: 'View all archive reasons',
-    scope: 'archive_reasons:read:admin'
-  },
-  {
-    title: 'Confidential Access',
-    description: 'Access all confidential data',
-    scope: 'confidential:access:admin'
-  },
-  {
-    title: 'Contacts Read',
-    description: 'View opportunity contacts',
-    scope: 'contact:read:admin'
-  },
-  {
-    title: 'Contacts Write',
-    description: 'Manage opportunity contacts',
-    scope: 'contact:write:admin'
-  },
-  { title: 'Feedback Read', description: 'View feedback forms', scope: 'feedback:read:admin' },
-  {
-    title: 'Feedback Write',
-    description: 'Manage feedback forms',
-    scope: 'feedback:write:admin'
-  },
-  {
-    title: 'Files Read',
-    description: 'View files attached to opportunities',
-    scope: 'files:read:admin'
-  },
-  {
-    title: 'Files Write',
-    description: 'Manage files attached to opportunities',
-    scope: 'files:write:admin'
-  },
-  { title: 'Forms Read', description: 'View profile forms', scope: 'forms:read:admin' },
-  { title: 'Forms Write', description: 'Manage profile forms', scope: 'forms:write:admin' },
-  { title: 'Interviews Read', description: 'View interviews', scope: 'interviews:read:admin' },
-  {
-    title: 'Interviews Write',
-    description: 'Manage interviews',
-    scope: 'interviews:write:admin'
-  },
-  { title: 'Notes Read', description: 'View notes', scope: 'notes:read:admin' },
-  { title: 'Notes Write', description: 'Manage notes', scope: 'notes:write:admin' },
-  { title: 'Offers Read', description: 'View all offers', scope: 'offers:read:admin' },
-  {
-    title: 'Opportunities Read',
-    description: 'View opportunities',
-    scope: 'opportunities:read:admin'
-  },
-  {
-    title: 'Opportunities Write',
-    description: 'Manage opportunities',
-    scope: 'opportunities:write:admin'
-  },
-  { title: 'Panels Read', description: 'View interview panels', scope: 'panels:read:admin' },
-  {
-    title: 'Panels Write',
-    description: 'Manage interview panels',
-    scope: 'panels:write:admin'
-  },
-  { title: 'Postings Read', description: 'View job postings', scope: 'postings:read:admin' },
-  {
-    title: 'Postings Write',
-    description: 'Manage job postings',
-    scope: 'postings:write:admin'
-  },
-  {
-    title: 'Referrals Read',
-    description: 'View all referrals',
-    scope: 'referrals:read:admin'
-  },
-  {
-    title: 'Requisitions Read',
-    description: 'View requisitions',
-    scope: 'requisitions:read:admin'
-  },
-  {
-    title: 'Requisitions Write',
-    description: 'Manage requisitions',
-    scope: 'requisitions:write:admin'
-  },
-  { title: 'Resumes Read', description: 'View all resumes', scope: 'resumes:read:admin' },
-  {
-    title: 'Sources Read',
-    description: 'View all candidate sources',
-    scope: 'sources:read:admin'
-  },
-  {
-    title: 'Stages Read',
-    description: 'View all pipeline stages',
-    scope: 'stages:read:admin'
-  },
-  { title: 'Tags Read', description: 'View all tags', scope: 'tags:read:admin' },
-  { title: 'Uploads Write', description: 'Manage file uploads', scope: 'uploads:write:admin' },
-  { title: 'Users Read', description: 'View users', scope: 'users:read:admin' },
-  { title: 'Users Write', description: 'Manage users', scope: 'users:write:admin' },
-  { title: 'Webhooks Read', description: 'View webhooks', scope: 'webhooks:read:admin' },
-  { title: 'Webhooks Write', description: 'Manage webhooks', scope: 'webhooks:write:admin' }
+// Write scopes include reads. The provider limits partner applications to twenty scopes.
+const scopeIds = [
+  'offline_access',
+  'applications:read:admin',
+  'archive_reasons:read:admin',
+  'contact:write:admin',
+  'feedback:read:admin',
+  'feedback_templates:read:admin',
+  'files:read:admin',
+  'interviews:write:admin',
+  'notes:write:admin',
+  'offers:read:admin',
+  'opportunities:write:admin',
+  'panels:read:admin',
+  'postings:write:admin',
+  'referrals:read:admin',
+  'requisitions:write:admin',
+  'resumes:read:admin',
+  'sources:read:admin',
+  'stages:read:admin',
+  'tags:read:admin',
+  'users:write:admin'
 ];
-
+const scopes = scopeIds.map(scope => ({
+  scope,
+  title:
+    scope === 'offline_access' ? 'Offline access' : scope.split(':').slice(0, 2).join(' '),
+  description:
+    scope === 'offline_access'
+      ? 'Refresh the connection'
+      : `Access ${scope.split(':')[0]} required by the available tools`
+}));
+const tokenOutput = (
+  value: unknown,
+  environment: 'production' | 'sandbox',
+  previousRefreshToken?: string
+) => {
+  const data = row(value);
+  if (data.token_type !== undefined && data.token_type !== 'Bearer')
+    invalid('Lever returned an unsupported OAuth token type. Reconnect the account.');
+  const seconds =
+    typeof data.expires_in === 'string' ? Number(data.expires_in) : data.expires_in;
+  if (
+    typeof seconds !== 'number' ||
+    !Number.isFinite(seconds) ||
+    seconds <= 0 ||
+    seconds > 31536000
+  )
+    invalid('Lever returned an invalid OAuth token expiry. Reconnect the account.');
+  const normalized = normalizeOAuthTokenResponse(data, {
+    providerLabel: 'Lever',
+    required: true,
+    previousRefreshToken,
+    refreshTokenFallbackMode: 'falsy'
+  });
+  const token = credential(normalized.token, 'OAuth access token');
+  const refreshToken = credential(normalized.refreshToken, 'OAuth refresh token');
+  return { ...normalized, token, refreshToken, environment, isApiKey: false };
+};
 function createLeverOauth(name: string, key: string, environment: 'production' | 'sandbox') {
-  let isSandbox = environment === 'sandbox';
-  let authUrl = isSandbox
-    ? 'https://sandbox-lever.auth0.com/authorize'
-    : 'https://auth.lever.co/authorize';
-  let tokenUrl = isSandbox
-    ? 'https://sandbox-lever.auth0.com/oauth/token'
-    : 'https://auth.lever.co/oauth/token';
-  let audience = isSandbox ? 'https://api.sandbox.lever.co/v1/' : 'https://api.lever.co/v1/';
-
+  const authHost =
+    environment === 'sandbox' ? 'https://sandbox-lever.auth0.com' : 'https://auth.lever.co';
+  const audience =
+    environment === 'sandbox'
+      ? 'https://api.sandbox.lever.co/v1/'
+      : 'https://api.lever.co/v1/';
+  const exchange = async (body: Record<string, string>, previousRefreshToken?: string) => {
+    const response = await requestAxios(
+      'OAuth token exchange',
+      () =>
+        createAxios({ timeout: 30000, maxRedirects: 0 }).post<unknown>(
+          `${authHost}/oauth/token`,
+          new URLSearchParams(body).toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        ),
+      safeApiError
+    );
+    if (response.status !== 200)
+      throw safeApiError({ response: { status: response.status } }, 'OAuth token exchange');
+    return tokenOutput(response.data, environment, previousRefreshToken);
+  };
   return {
     type: 'auth.oauth' as const,
     name,
     key,
+    scopes,
     docs: [
       {
         type: 'docs.auth.oauth' as const,
         name: 'OAuth documentation',
-        url: 'https://hire.lever.co/developer/documentation#authentication'
+        url: 'https://hire.lever.co/developer/oauth'
       },
       {
         type: 'docs.auth.oauth_scopes' as const,
@@ -141,89 +100,89 @@ function createLeverOauth(name: string, key: string, environment: 'production' |
         url: 'https://hire.lever.co/developer/documentation#scopes'
       }
     ],
-    scopes,
-
-    getAuthorizationUrl: async (ctx: any) => {
-      let params = new URLSearchParams({
-        client_id: ctx.clientId,
-        redirect_uri: ctx.redirectUri,
-        response_type: 'code',
-        state: ctx.state,
-        audience,
-        scope: ctx.scopes.join(' ')
-      });
-      return { url: `${authUrl}?${params.toString()}` };
-    },
-
-    handleCallback: async (ctx: any) => {
-      let http = createAxios();
-      let response = await http.post(tokenUrl, {
+    getAuthorizationUrl: async (ctx: {
+      clientId: string;
+      redirectUri: string;
+      state: string;
+      scopes: string[];
+    }) => ({
+      url: `${authHost}/authorize?${new URLSearchParams({ client_id: ctx.clientId, redirect_uri: ctx.redirectUri, response_type: 'code', state: ctx.state, audience, scope: (ctx.scopes.length ? ctx.scopes : scopeIds).join(' ') })}`
+    }),
+    handleCallback: async (ctx: {
+      clientId: string;
+      clientSecret: string;
+      code: string;
+      redirectUri: string;
+    }) => ({
+      output: await exchange({
         grant_type: 'authorization_code',
         client_id: ctx.clientId,
         client_secret: ctx.clientSecret,
-        code: ctx.code,
+        code: credential(ctx.code, 'OAuth authorization code'),
         redirect_uri: ctx.redirectUri
-      });
-      let data = response.data;
+      })
+    }),
+    handleTokenRefresh: async (ctx: {
+      clientId: string;
+      clientSecret: string;
+      output: LeverAuth;
+    }) => {
+      if (
+        ctx.output.isApiKey === true ||
+        (ctx.output.environment !== undefined && ctx.output.environment !== environment)
+      )
+        invalid(
+          'Stored OAuth connection does not match this authentication method. Reconnect the account.'
+        );
+      const refreshToken = credential(
+        ctx.output.refreshToken,
+        'Stored OAuth refresh token; reconnect if missing'
+      );
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt: data.expires_in
-            ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-            : undefined,
-          environment
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let http = createAxios();
-      let response = await http.post(tokenUrl, {
-        grant_type: 'refresh_token',
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        refresh_token: ctx.output.refreshToken
-      });
-      let data = response.data;
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt: data.expires_in
-            ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-            : undefined,
-          environment
-        }
+        output: await exchange(
+          {
+            grant_type: 'refresh_token',
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret,
+            refresh_token: refreshToken
+          },
+          refreshToken
+        )
       };
     }
   };
 }
-
 function createLeverApiKey(name: string, key: string, environment: 'production' | 'sandbox') {
   return {
     type: 'auth.token' as const,
     name,
     key,
     inputSchema: z.object({
-      apiKey: z.string().describe('Lever API key for basic auth')
+      apiKey: z.string().describe('Lever API key for this environment')
     }),
-    getOutput: async (ctx: { input: { apiKey: string } }) => ({
-      output: {
-        token: ctx.input.apiKey,
-        environment
-      }
-    })
+    getOutput: async (ctx: { input: { apiKey: string } }) => {
+      const token = credential(ctx.input.apiKey, 'API key');
+      if (token.includes(':')) invalid('API key must not contain a colon.');
+      return {
+        output: {
+          token,
+          environment,
+          isApiKey: true,
+          basicAuthorization: `Basic ${Buffer.from(`${token}:`).toString('base64')}`
+        }
+      };
+    }
   };
 }
-
-export let auth = SlateAuth.create()
+export const auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
-      environment: z.enum(['production', 'sandbox'])
+      environment: z.enum(['production', 'sandbox']),
+      isApiKey: z.boolean().optional(),
+      basicAuthorization: z.string().optional()
     })
   )
   .addOauth(createLeverOauth('Production', 'oauth_production', 'production'))

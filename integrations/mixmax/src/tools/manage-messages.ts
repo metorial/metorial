@@ -59,8 +59,8 @@ export let listMessages = SlateTool.create(spec, {
       next: ctx.input.cursor
     });
 
-    let results = data.results || data || [];
-    let messages = results.map((m: any) => ({
+    let results = data.results;
+    let messages = results.map(m => ({
       messageId: m._id,
       userId: m.userId,
       subject: m.subject,
@@ -130,7 +130,7 @@ export let getMessage = SlateTool.create(spec, {
 export let createDraftMessage = SlateTool.create(spec, {
   name: 'Create Draft Message',
   key: 'create_draft_message',
-  description: `Create a draft email message without sending it. The draft can later be reviewed, updated, and sent via the Send Draft tool. Supports HTML body content.`,
+  description: `Create an unsent draft email with optional recipients and HTML body. The API has no documented draft deletion endpoint, so drafts can remain retained until removed through the product.`,
   tags: {
     destructive: false
   }

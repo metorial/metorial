@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listAssistants = SlateTool.create(spec, {
@@ -14,8 +15,8 @@ export let listAssistants = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number to retrieve'),
-      pageSize: z.number().optional().describe('Number of items per page')
+      page: z.number().int().min(1).optional().describe('Page number to retrieve'),
+      pageSize: z.number().int().min(1).optional().describe('Number of items per page')
     })
   )
   .output(
@@ -31,6 +32,8 @@ export let listAssistants = SlateTool.create(spec, {
               .array(z.string())
               .optional()
               .describe('Attached knowledge base IDs'),
+            structureIds: z.array(z.string()).optional().describe('Attached structure IDs'),
+            retrieverIds: z.array(z.string()).optional().describe('Attached retriever IDs'),
             rulesetIds: z.array(z.string()).optional().describe('Attached ruleset IDs'),
             toolIds: z.array(z.string()).optional().describe('Attached tool IDs'),
             createdAt: z.string().describe('Creation timestamp'),
@@ -38,6 +41,7 @@ export let listAssistants = SlateTool.create(spec, {
           })
         )
         .describe('List of assistants'),
+      pagination: paginationSchema.optional().describe('Page navigation metadata'),
       totalCount: z.number().describe('Total number of assistants'),
       totalPages: z.number().describe('Total number of pages')
     })
@@ -55,6 +59,8 @@ export let listAssistants = SlateTool.create(spec, {
       description: a.description,
       model: a.model,
       knowledgeBaseIds: a.knowledge_base_ids,
+      structureIds: a.structure_ids,
+      retrieverIds: a.retriever_ids,
       rulesetIds: a.ruleset_ids,
       toolIds: a.tool_ids,
       createdAt: a.created_at,
@@ -64,6 +70,7 @@ export let listAssistants = SlateTool.create(spec, {
     return {
       output: {
         assistants,
+        pagination: result.pagination,
         totalCount: result.pagination.totalCount,
         totalPages: result.pagination.totalPages
       },

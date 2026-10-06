@@ -8,8 +8,6 @@ import {
   uploadBulkList,
   verifyEmail
 } from './tools';
-import { emailDeliveryEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -20,5 +18,5 @@ export let provider = Slate.create({
     listBulkLists,
     downloadBulkResults
   ],
-  triggers: [emailDeliveryEvents]
+  triggers: []
 });

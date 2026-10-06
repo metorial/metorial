@@ -25,8 +25,6 @@ import {
   uploadSessionFile,
   webSearch
 } from './tools';
-import { inboundWebhook, sessionStatusChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -54,5 +52,5 @@ export let provider = Slate.create({
     getDownload,
     deleteDownload
   ],
-  triggers: [inboundWebhook, sessionStatusChange]
+  triggers: []
 });

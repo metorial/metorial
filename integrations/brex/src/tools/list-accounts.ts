@@ -1,13 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapAccount } from '../lib/schemas';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 let accountSchema = z.object({
   accountId: z.string().describe('Unique identifier of the account'),
   accountType: z.string().describe('Account type: card or cash'),
   name: z.string().nullable().optional().describe('Account name'),
-  status: z.string().optional().describe('Account status'),
+  status: z.string().nullish().describe('Account status'),
   currentBalance: z
     .object({
       amount: z.number().describe('Balance in cents'),
@@ -59,61 +61,19 @@ export let listAccounts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let accounts: any[] = [];
-    let type = ctx.input.accountType ?? 'all';
-
-    if (type === 'card' || type === 'all') {
-      try {
-        let cardAccounts = await client.listCardAccounts();
-        accounts.push(
-          ...cardAccounts.items.map((a: any) => ({
-            accountId: a.id,
-            accountType: 'card',
-            name: a.name ?? null,
-            status: a.status,
-            currentBalance: null,
-            availableBalance: null,
-            accountNumber: null,
-            routingNumber: null,
-            isPrimary: false
-          }))
+    const client = new Client({ token: ctx.auth.token });
+    const type = ctx.input.accountType ?? 'all';
+    const accounts: ReturnType<typeof mapAccount>[] = [];
+    if (type !== 'cash')
+      accounts.push(...(await client.listCardAccounts()).map(a => mapAccount(a, 'card')));
+    if (type !== 'card') {
+      const result = await client.listCashAccounts();
+      if (result.next_cursor)
+        fail(
+          'Brex returned incomplete cash-account discovery without a documented continuation request. No complete account list can be reported.'
         );
-      } catch (_e) {
-        ctx.warn('Could not fetch card accounts');
-      }
+      accounts.push(...result.items.map(a => mapAccount(a, 'cash')));
     }
-
-    if (type === 'cash' || type === 'all') {
-      try {
-        let cashAccounts = await client.listCashAccounts();
-        let primaryAccount = await client.getPrimaryCashAccount().catch(() => null);
-
-        accounts.push(
-          ...cashAccounts.items.map((a: any) => ({
-            accountId: a.id,
-            accountType: 'cash',
-            name: a.name ?? null,
-            status: a.status,
-            currentBalance: a.current_balance
-              ? { amount: a.current_balance.amount, currency: a.current_balance.currency }
-              : null,
-            availableBalance: a.available_balance
-              ? { amount: a.available_balance.amount, currency: a.available_balance.currency }
-              : null,
-            accountNumber: a.account_number ?? null,
-            routingNumber: a.routing_number ?? null,
-            isPrimary: primaryAccount ? a.id === primaryAccount.id : false
-          }))
-        );
-      } catch (_e) {
-        ctx.warn('Could not fetch cash accounts');
-      }
-    }
-
-    return {
-      output: { accounts },
-      message: `Found **${accounts.length}** account(s).`
-    };
+    return { output: { accounts }, message: `Returned ${accounts.length} accounts.` };
   })
   .build();

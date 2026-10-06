@@ -1,11 +1,19 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { instanceUrl, sudoUsername, token } from './lib/validation';
 
-export let auth = SlateAuth.create()
+const instance = z
+  .string()
+  .describe(
+    'Sourcegraph instance URL. HTTPS self-hosted instances and HTTP localhost development are supported. Saved with these credentials.'
+  );
+
+export const auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
-      authorizationHeader: z.string()
+      authorizationHeader: z.string(),
+      instanceUrl: z.string().optional()
     })
   )
   .addTokenAuth({
@@ -15,15 +23,16 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe(
-          'Sourcegraph access token. Generate one at https://<your-instance>/user/settings/tokens'
-        )
+        .describe('Personal or service-account access token from the instance user settings.'),
+      instanceUrl: instance
     }),
     getOutput: async ctx => {
+      const credential = token(ctx.input.token);
       return {
         output: {
-          token: ctx.input.token,
-          authorizationHeader: `token ${ctx.input.token}`
+          token: credential,
+          authorizationHeader: `token ${credential}`,
+          instanceUrl: instanceUrl(ctx.input.instanceUrl)
         }
       };
     }
@@ -33,14 +42,20 @@ export let auth = SlateAuth.create()
     name: 'Sudo Access Token',
     key: 'sudo_token',
     inputSchema: z.object({
-      token: z.string().describe('Sourcegraph sudo access token with site-admin:sudo scope'),
-      sudoUsername: z.string().describe('Username to perform actions as')
+      token: z.string().describe('Access token with site-admin:sudo scope.'),
+      sudoUsername: z
+        .string()
+        .describe('Username to act as; the current-user tool reports the effective user.'),
+      instanceUrl: instance
     }),
     getOutput: async ctx => {
+      const credential = token(ctx.input.token);
+      const username = sudoUsername(ctx.input.sudoUsername);
       return {
         output: {
-          token: ctx.input.token,
-          authorizationHeader: `token-sudo user="${ctx.input.sudoUsername}",token="${ctx.input.token}"`
+          token: credential,
+          authorizationHeader: `token-sudo user="${username}",token="${credential}"`,
+          instanceUrl: instanceUrl(ctx.input.instanceUrl)
         }
       };
     }

@@ -1,15 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DataPlaneClient } from '../lib/client';
 import { spec } from '../spec';
 
 let contextSchema = z
-  .record(z.string(), z.any())
+  .record(z.string(), z.unknown())
   .optional()
   .describe('Contextual information about the event (e.g., ip, library, locale)');
 
 let integrationsSchema = z
-  .record(z.string(), z.any())
+  .record(z.string(), z.unknown())
   .optional()
   .describe('Destination-specific flags to enable/disable forwarding');
 
@@ -31,6 +31,10 @@ Requires a Data Plane URL and Source Write Key to be configured. Use this tool f
 })
   .input(
     z.object({
+      messageId: z
+        .string()
+        .optional()
+        .describe('Unique event identifier for deduplication and downstream correlation.'),
       eventType: z
         .enum(['identify', 'track', 'page', 'screen', 'group', 'alias'])
         .describe('Type of event to send'),
@@ -41,11 +45,11 @@ Requires a Data Plane URL and Source Write Key to be configured. Use this tool f
         .optional()
         .describe('Name of the tracked event (required for track events)'),
       traits: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('User or group traits (used in identify and group events)'),
       properties: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Event or page/screen properties (used in track, page, screen events)'),
       groupId: z.string().optional().describe('Group identifier (required for group events)'),
@@ -69,103 +73,45 @@ Requires a Data Plane URL and Source Write Key to be configured. Use this tool f
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.sourceWriteKey) {
-      throw new Error(
+      throw createApiServiceError(
         'Source Write Key is required to send events. Please configure it in your authentication settings.'
       );
     }
-    if (!ctx.config.datePlaneUrl) {
-      throw new Error(
+    if (!(ctx.config.dataPlaneUrl ?? ctx.config.datePlaneUrl)) {
+      throw createApiServiceError(
         'Data Plane URL is required to send events. Please configure it in your settings.'
       );
     }
 
     let client = new DataPlaneClient({
       sourceWriteKey: ctx.auth.sourceWriteKey,
-      dataPlaneUrl: ctx.config.datePlaneUrl
+      dataPlaneUrl: (ctx.config.dataPlaneUrl ?? ctx.config.datePlaneUrl)!
     });
 
-    let {
-      eventType,
-      userId,
-      anonymousId,
-      event,
-      traits,
-      properties,
-      groupId,
-      previousId,
-      name,
-      context,
-      timestamp,
-      integrations
-    } = ctx.input;
-
-    switch (eventType) {
-      case 'identify':
-        await client.identify({
-          userId,
-          anonymousId,
-          traits,
-          context,
-          timestamp,
-          integrations
-        });
-        break;
-      case 'track':
-        if (!event) throw new Error('Event name is required for track events.');
-        await client.track({
-          userId,
-          anonymousId,
-          event,
-          properties,
-          context,
-          timestamp,
-          integrations
-        });
-        break;
-      case 'page':
-        await client.page({
-          userId,
-          anonymousId,
-          name,
-          properties,
-          context,
-          timestamp,
-          integrations
-        });
-        break;
-      case 'screen':
-        await client.screen({
-          userId,
-          anonymousId,
-          name,
-          properties,
-          context,
-          timestamp,
-          integrations
-        });
-        break;
-      case 'group':
-        if (!groupId) throw new Error('Group ID is required for group events.');
-        await client.group({
-          userId,
-          anonymousId,
-          groupId,
-          traits,
-          context,
-          timestamp,
-          integrations
-        });
-        break;
-      case 'alias':
-        if (!userId) throw new Error('User ID is required for alias events.');
-        if (!previousId) throw new Error('Previous ID is required for alias events.');
-        await client.alias({ userId, previousId, context, timestamp, integrations });
-        break;
-    }
+    let { eventType, ...data } = ctx.input;
+    // Keep the established field names; omit event-type fields that do not apply.
+    let common = {
+      userId: data.userId,
+      anonymousId: data.anonymousId,
+      context: data.context,
+      timestamp: data.timestamp,
+      integrations: data.integrations,
+      messageId: data.messageId
+    };
+    if (eventType === 'identify') await client.identify({ ...common, traits: data.traits });
+    if (eventType === 'track')
+      await client.track({ ...common, event: data.event, properties: data.properties });
+    if (eventType === 'page')
+      await client.page({ ...common, name: data.name, properties: data.properties });
+    if (eventType === 'screen')
+      await client.screen({ ...common, name: data.name, properties: data.properties });
+    if (eventType === 'group')
+      await client.group({ ...common, groupId: data.groupId, traits: data.traits });
+    if (eventType === 'alias') await client.alias({ ...common, previousId: data.previousId });
 
     return {
       output: { success: true },
-      message: `Successfully sent **${eventType}** event${userId ? ` for user \`${userId}\`` : ''}${event ? ` (\`${event}\`)` : ''}.`
+      message: `RudderStack accepted the ${eventType} event for ingestion. This does not confirm downstream delivery.`
     };
   })
   .build();

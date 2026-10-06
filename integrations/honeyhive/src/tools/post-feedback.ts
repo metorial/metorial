@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,6 +44,14 @@ export let postFeedback = SlateTool.create(spec, {
       serverUrl: ctx.config.serverUrl
     });
 
+    if (
+      Object.entries(ctx.input).every(
+        ([key, value]) => key === 'eventId' || value === undefined
+      )
+    )
+      throw createApiServiceError(
+        'Provide feedback, metrics, userProperties, or metadata to attach.'
+      );
     await client.updateEvent({
       event_id: ctx.input.eventId,
       feedback: ctx.input.feedback,

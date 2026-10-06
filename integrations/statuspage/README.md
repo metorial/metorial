@@ -1,69 +1,28 @@
-# <img src="https://provider-logos.metorial-cdn.com/statuspage.png" height="20"> Statuspage
+# Statuspage
 
-Manage status pages to communicate incidents, outages, and scheduled maintenance to customers. Create, update, and resolve incidents with lifecycle tracking. Manage components representing infrastructure pieces and their statuses (operational, degraded, partial/major outage). Create and publish incident postmortems. Configure scheduled maintenance with subscriber reminders and auto-transitions. Manage subscribers (email, SMS, Slack, webhook, Teams) scoped to pages, components, or incidents. Submit and display custom system performance metrics. Create reusable incident templates for faster response. Control page access with user groups and role-based permissions. Configure embeddable status widgets.
+Manage Statuspage pages, components, component groups, incidents, postmortems, subscribers and system metrics with an API key.
 
-## Tools
+Use `list_pages` to discover accessible page IDs. The connection can store an optional default page, and every page-scoped tool accepts a `pageId` override. The API key's permissions determine access. The management API allows approximately one request per second per key; space calls and inspect a write's result before repeating it after an error.
 
-### Create Incident
+| Tools | Operations |
+| --- | --- |
+| list_pages, get_page, update_page | Discover pages, inspect settings, and update name/domain/time zone and subscription preferences |
+| list_components, manage_component | Paginated discovery and component create/update/delete |
+| manage_component_group | Paginated discovery and component-group create/update/delete |
+| list_incidents, get_incident, create_incident, update_incident | Paginated discovery/search; realtime, scheduled and historical creation; updates, resolution and deletion |
+| list_incident_templates | Paginated inspection of existing incident templates |
+| manage_postmortem | Inspect and save drafts; publish or revert a resolved incident's postmortem |
+| list_subscribers, manage_subscriber | Paginated contact/state search; inspect, create email/SMS/webhook subscriptions, and unsubscribe |
+| manage_metric, submit_metric_data | Discover existing metric providers; metric list/get/create/rename/delete; submit custom data for asynchronous processing |
 
-Create a new incident on the status page. Supports realtime, scheduled, and backfilled (historical) incident types. - **Realtime**: Set \
+Incident updates and postmortem publication change the status page and can notify subscribers or Twitter. Subscriber creation can send confirmation messages; trial pages ignore confirmation suppression. Slack, Teams and integration-partner subscriptions use their product setup flows. The current API does not restore unsubscribed subscribers; the legacy `resubscribe` option reports that limitation. Custom CSS content is configured in the management interface, not through `update_page.cssBody`.
 
-### Get Incident
+Component, group, template and metric pages use `limit` up to 100 and page numbers beginning at 1. Subscribers use page numbers beginning at 0; their size is capped at 100 when searching contact text. Incident search uses the all-incidents filter. Unresolved and scheduled lists do not support keyword search.
 
-Retrieve detailed information about a specific incident including its full update history, affected components, and current status.
+The page's `url` setting is the company website linked from its logo. The status page itself is located at its domain or provider subdomain.
 
-### Get Page
-
-Retrieve the status page profile and settings including name, domain, subdomain, time zone, branding, and notification preferences. Use this to inspect current page configuration.
-
-### List Components
-
-List all components on the status page. Returns each component's name, status, group, and configuration. Use this to get an overview of all infrastructure pieces being tracked.
-
-### List Incident Templates
-
-List all incident templates configured for the status page. Templates contain pre-filled incident names, messages, statuses, and component associations for quick incident creation.
-
-### List Incidents
-
-List incidents on the status page with optional filtering. Can retrieve all incidents, only unresolved, only scheduled, or search by keyword.
-
-### List Subscribers
-
-List subscribers on the status page with optional filtering by type and state. Returns subscriber contact information and subscription scope.
-
-### Manage Component Group
-
-Create, update, or delete component groups on the status page. Component groups organize related components together. - To **create**: omit \
-
-### Manage Component
-
-Create, update, or delete a component on the status page. Components represent infrastructure pieces like APIs, apps, and services. - To **create**: omit \
-
-### Manage Postmortem
-
-Create, update, publish, or revert a postmortem for a resolved incident. Postmortems support a draft workflow: - **Get**: Retrieve the current postmortem for an incident. - **Save draft**: Provide \
-
-### Manage Subscriber
-
-Create, unsubscribe, or reactivate a subscriber on the status page. - To **create**: provide the subscriber \
-
-### Submit Metric Data
-
-Submit custom metric data points to a metric on the status page. Data points are timestamp/value pairs displayed as performance charts. Data should be submitted at least every 5 minutes for continuous display. Can backfill up to 28 days.
-
-### Update Incident
-
-Update an existing incident's status, message, impact, or associated components. Each update creates a new entry in the incident timeline. Use this to progress an incident through its lifecycle (investigating -> identified -> monitoring -> resolved) or to delete it.
-
-### Update Page
-
-Update status page profile settings such as name, domain, subdomain, time zone, branding/CSS, and subscriber notification preferences.
+See the [official API reference](https://developer.statuspage.io/) for permissions and provider limits.
 
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>

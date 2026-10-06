@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/zoom.svg" height="20"> Zoom
 
-Create, schedule, and manage video meetings and webinars. Manage users, roles, and account settings. Access and download cloud recordings and transcripts. Send and manage chat messages and channels. Handle Zoom Phone call logs, voicemails, and SMS. Manage meeting registrants, polls, and breakout rooms. Retrieve usage reports, meeting participant reports, and dashboard analytics. Configure Zoom Rooms and contact center settings. Receive real-time webhook notifications for meeting, webinar, recording, user, phone, and chat events.
+Create, schedule, and manage video meetings and webinars. Manage users, roles, and account settings. Access and download cloud recordings and transcripts. Send and manage chat messages and channels. Handle Zoom Phone call logs, voicemails, and SMS. Manage meeting registrants, polls, and breakout rooms. Retrieve usage reports, meeting participant reports, and dashboard analytics. Configure Zoom Rooms and contact center settings.
 
 ## Tools
 

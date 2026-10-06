@@ -10,8 +10,6 @@ import {
   getWeatherMapTile,
   getWeatherOverview
 } from './tools';
-import { weatherAlerts } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     getWeatherOverview,
     getWeatherMapTile
   ],
-  triggers: [weatherAlerts]
+  triggers: []
 });

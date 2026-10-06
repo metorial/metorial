@@ -21,8 +21,6 @@ import {
   runActor,
   searchStoreActors
 } from './tools';
-import { actorBuildEvent, actorRunEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     buildActor,
     manageWebhook
   ],
-  triggers: [actorRunEvent, actorBuildEvent]
+  triggers: []
 });

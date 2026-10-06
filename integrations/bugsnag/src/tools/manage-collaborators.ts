@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugsnagClient } from '../lib/client';
+import { pageInput, pageOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let collaboratorSchema = z.object({
@@ -18,12 +19,13 @@ export let manageCollaborators = SlateTool.create(spec, {
   key: 'manage_collaborators',
   description: `List, invite, update, or remove collaborators in a Bugsnag organization. Use **list** to see all collaborators, **invite** to add a new one by email, **update** to change permissions, or **remove** to revoke access.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      ...pageInput,
       action: z.enum(['list', 'invite', 'update', 'remove']).describe('Operation to perform'),
       organizationId: z.string().describe('Organization ID'),
       collaboratorId: z
@@ -44,6 +46,7 @@ export let manageCollaborators = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pageOutput,
       collaborators: z
         .array(collaboratorSchema)
         .optional()
@@ -53,33 +56,35 @@ export let manageCollaborators = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
+    let client = new BugsnagClient(ctx.auth);
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('Organization ID is required.');
+    if (!orgId) throw createApiServiceError('Organization ID is required.');
 
     if (ctx.input.action === 'list') {
       let collaborators = await client.listOrganizationCollaborators(orgId, {
-        perPage: ctx.input.perPage
+        perPage: ctx.input.perPage,
+        pageUrl: ctx.input.pageUrl
       });
 
-      let mapped = collaborators.map((c: any) => ({
-        collaboratorId: c.id,
-        name: c.name,
-        email: c.email,
-        admin: c.is_admin ?? c.admin,
-        twoFactorEnabled: c.two_factor_enabled,
-        pendingInvitation: c.pending_invitation,
-        createdAt: c.created_at
+      let mapped = collaborators.map(c => ({
+        collaboratorId: c.id ?? undefined,
+        name: c.name ?? undefined,
+        email: c.email ?? undefined,
+        admin: c.is_admin ?? undefined,
+        twoFactorEnabled: c.two_factor_enabled ?? undefined,
+        pendingInvitation: c.pending_invitation ?? undefined,
+        createdAt: c.created_at ?? undefined
       }));
 
       return {
-        output: { collaborators: mapped },
+        output: { collaborators: mapped, ...client.pageInfo },
         message: `Found **${mapped.length}** collaborator(s).`
       };
     }
 
     if (ctx.input.action === 'invite') {
-      if (!ctx.input.email) throw new Error('Email is required to invite a collaborator.');
+      if (!ctx.input.email)
+        throw createApiServiceError('Email is required to invite a collaborator.');
 
       let result = await client.inviteCollaborator(orgId, {
         email: ctx.input.email,
@@ -90,11 +95,11 @@ export let manageCollaborators = SlateTool.create(spec, {
       return {
         output: {
           collaborator: {
-            collaboratorId: result.id,
-            name: result.name,
-            email: result.email,
-            admin: result.is_admin ?? result.admin,
-            pendingInvitation: true
+            collaboratorId: result.id ?? undefined,
+            name: result.name ?? undefined,
+            email: result.email ?? undefined,
+            admin: result.is_admin ?? undefined,
+            pendingInvitation: result.pending_invitation ?? undefined
           }
         },
         message: `Invited **${ctx.input.email}** to the organization.`
@@ -103,12 +108,14 @@ export let manageCollaborators = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.collaboratorId)
-        throw new Error('Collaborator ID is required for update.');
+        throw createApiServiceError('Collaborator ID is required for update.');
 
-      let updateData: Record<string, any> = {};
+      let updateData: Record<string, unknown> = {};
       if (ctx.input.admin !== undefined) updateData.admin = ctx.input.admin;
       if (ctx.input.projectIds) updateData.project_ids = ctx.input.projectIds;
 
+      if (!Object.keys(updateData).length)
+        throw createApiServiceError('Supply admin or projectIds to update permissions.');
       let result = await client.updateCollaborator(
         orgId,
         ctx.input.collaboratorId,
@@ -118,10 +125,10 @@ export let manageCollaborators = SlateTool.create(spec, {
       return {
         output: {
           collaborator: {
-            collaboratorId: result.id,
-            name: result.name,
-            email: result.email,
-            admin: result.is_admin ?? result.admin
+            collaboratorId: result.id ?? undefined,
+            name: result.name ?? undefined,
+            email: result.email ?? undefined,
+            admin: result.is_admin ?? undefined
           }
         },
         message: `Updated collaborator \`${ctx.input.collaboratorId}\`.`
@@ -130,7 +137,7 @@ export let manageCollaborators = SlateTool.create(spec, {
 
     if (ctx.input.action === 'remove') {
       if (!ctx.input.collaboratorId)
-        throw new Error('Collaborator ID is required for removal.');
+        throw createApiServiceError('Collaborator ID is required for removal.');
 
       await client.removeCollaborator(orgId, ctx.input.collaboratorId);
 
@@ -140,6 +147,6 @@ export let manageCollaborators = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -5,24 +5,40 @@ import {
   createAnnotation,
   createBuild,
   createPipeline,
+  deleteAnnotation,
   deletePipeline,
+  downloadArtifact,
+  downloadJobLog,
+  getAgent,
   getBuild,
   getJobLog,
   getPipeline,
   listAgents,
+  listAnnotations,
   listArtifacts,
   listBuilds,
+  listClusters,
+  listOrganizations,
   listPipelines,
+  listTeams,
   manageBuild,
   manageJob,
   stopAgent,
-  updatePipeline
+  updatePipeline,
+  whoAmI
 } from './tools';
-import { agentEvents, buildEvents, jobEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    whoAmI.build(),
+    listOrganizations.build(),
+    listClusters.build(),
+    listTeams.build(),
+    getAgent.build(),
+    listAnnotations.build(),
+    deleteAnnotation.build(),
+    downloadJobLog.build(),
+    downloadArtifact.build(),
     listPipelines.build(),
     getPipeline.build(),
     createPipeline.build(),
@@ -40,5 +56,5 @@ export let provider = Slate.create({
     listArtifacts.build(),
     createAnnotation.build()
   ],
-  triggers: [buildEvents.build(), jobEvents.build(), agentEvents.build()]
+  triggers: []
 });

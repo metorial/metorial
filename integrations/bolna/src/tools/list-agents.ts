@@ -41,10 +41,10 @@ export let listAgents = SlateTool.create(spec, {
         agents: agentList.map((a: any) => ({
           agentId: a.id,
           agentName: a.agent_name,
-          agentStatus: a.agent_status,
-          agentType: a.agent_type,
-          createdAt: a.created_at,
-          updatedAt: a.updated_at
+          agentStatus: a.agent_status ?? undefined,
+          agentType: a.agent_type ?? undefined,
+          createdAt: a.created_at ?? undefined,
+          updatedAt: a.updated_at ?? undefined
         })),
         totalCount: agentList.length
       },

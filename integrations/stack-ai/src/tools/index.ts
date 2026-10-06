@@ -7,3 +7,5 @@ export * from './knowledge-bases';
 export * from './manage-documents';
 export * from './run-action';
 export * from './run-flow';
+export * from './upload-document';
+export * from './upload-knowledge-base-resource';

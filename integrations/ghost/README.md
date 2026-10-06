@@ -1,73 +1,15 @@
-# <img src="https://provider-logos.metorial-cdn.com/ghost.png" height="20"> Ghost
+# Ghost
 
-Manage a Ghost publishing platform including posts, pages, tags, members, newsletters, tiers, and site settings. Create, read, update, and delete posts and pages with support for draft, published, and scheduled states. Organize content with tags. Browse, add, and edit members and their subscriptions. Manage membership tiers and promotional offers. Configure and manage multiple newsletters. Upload images and themes. Read site settings and staff/user data. Access published content via a read-only Content API for headless CMS use cases. Register and manage webhooks for events such as post publishing, member changes, and tag updates.
+Read and manage posts, pages, tags, members, newsletters, promotional offers and webhooks. Browse tiers and staff, validate the current connection, read exact tier or user details, and download an HTML or JSON snapshot of one post or page.
 
-## Tools
+Connect with a Custom Integration Admin key or original staff access key (`id:hex-secret`) and the HTTPS Ghost Admin site URL, including any site subdirectory. The Admin domain can differ from the public site domain. Both key types sign a fresh JWT for each request. Staff permissions depend on the role; integration permissions are fixed. A previously generated JWT is not a durable connection credential and must be replaced with the original key. No OAuth or automatic key rotation is provided.
 
-### Browse Members
+A Content API key offers published-content reads. On supported read tools, `api: content` explicitly selects an optional Content key supplied with an Admin connection; it never falls back to Admin or provides Admin writes. Existing connections retain validated `adminDomain` config fallback; reconnect to bind the URL to credentials. The site endpoint alone is public and does not validate credentials. `get_current_context` also makes an authenticated content read and returns a native user only for a declared staff connection.
 
-List and search members (subscribers) of your Ghost site. Supports filtering by status, label, newsletter subscription, and more. Include **newsletters** and **labels** for detailed subscription info.
+The fifteen legacy tool keys remain available. Added tools are `get_current_context`, `get_resource` (tier or staff user by exact ID), and `export_content` (one current post/page as HTML or JSON, at most 16 MiB). Exports are local snapshots, not backups, PDF rendering, or historical revisions. HTML conversion on writes is lossy; explicitly set `source: html`. Updating content requires the last known `updatedAt`. Tag and author relations replace existing relations, and unmatched tag names may create new tags. Publishing and scheduling can produce irreversible email and webhook effects.
 
-### Browse Newsletters
+Browse tools return native pagination. Legacy `limit: 0` is translated to Ghost's `all` value, subject to the response size bound; no automatic paging or retry is performed. Sparse field selections preserve omitted fields instead of inventing values. Financial values remain exact native minor currency units; values outside JavaScript's safe range are refused.
 
-List newsletters configured on your Ghost site. Ghost supports multiple newsletters, each independently configurable for different audiences or content types.
+Webhook resources have no independent GET/list endpoint. Creation receipts supply their exact IDs; updating/deleting integration webhooks is restricted by Ghost to the authenticated integration. Successful deletion does not undo deliveries. Newsletter sender changes may send verification mail and remain pending; native verification metadata is returned. Archived newsletters and offers remain in Ghost. Deleting members does not promise removal of Stripe, mail, analytics, or other external records.
 
-### Browse Pages
-
-List and search static pages from your Ghost site. Pages are standalone content (e.g., About, Contact) separate from the blog post feed. Supports filtering, pagination, and including related resources.
-
-### Browse Posts
-
-List and search posts from your Ghost site. Supports filtering by status, tag, author, visibility and more using Ghost's filter syntax. Returns paginated results with post metadata.
-
-### Browse Tags
-
-List tags from your Ghost site. Tags are used to organize posts and pages. Use **include** with \
-
-### Browse Tiers
-
-List membership tiers configured on your Ghost site. Tiers define pricing levels and content access for paid subscriptions. Includes pricing details when requested.
-
-### Browse Users
-
-List staff users of your Ghost site. Users are staff members with role-based permissions (Contributor, Author, Editor, Administrator, Owner). This is a read-only view of staff data.
-
-### Get Site
-
-Retrieve site-level metadata and configuration from your Ghost instance, including title, description, logo, language, and other global settings.
-
-### Manage Member
-
-Create, read, update, or delete a member (subscriber) on your Ghost site. Members can be free or paid subscribers with associated labels and newsletter subscriptions.
-
-### Manage Newsletter
-
-Create, read, or update a newsletter on your Ghost site. Newsletters define how content is distributed via email to members.
-
-### Manage Offer
-
-Create, read, update, or browse promotional offers. Offers provide discounts or free trials for specific membership tiers, generating unique signup URLs.
-
-### Manage Page
-
-Create, read, update, or delete a static page on your Ghost site. Pages are standalone content separate from the blog post feed, commonly used for About, Contact, or other permanent pages.
-
-### Manage Post
-
-Create, read, update, or delete a post on your Ghost site. Supports creating drafts, publishing, scheduling, and updating content in HTML or Lexical format. Can also fetch a specific post by ID or slug.
-
-### Manage Tag
-
-Create, read, update, or delete a tag. Tags organize posts and pages into categories. Internal tags (prefixed with \
-
-### Manage Webhook
-
-Create, update, or delete a webhook on your Ghost site. Webhooks send HTTP POST payloads to a target URL when specified events occur.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Images, themes, uploads, broad site administration, sessions, trigger subscriptions and key refresh are outside this integration's tool surface.

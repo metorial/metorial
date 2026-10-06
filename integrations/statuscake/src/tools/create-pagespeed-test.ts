@@ -29,7 +29,9 @@ export let createPagespeedTest = SlateTool.create(spec, {
       alertBigger: z
         .number()
         .optional()
-        .describe('Alert if page size exceeds this value in bytes'),
+        .describe(
+          'Alert if page size exceeds this value in provider kilobytes (KB); zero disables the alert'
+        ),
       alertSlower: z
         .number()
         .optional()
@@ -37,8 +39,13 @@ export let createPagespeedTest = SlateTool.create(spec, {
       alertSmaller: z
         .number()
         .optional()
-        .describe('Alert if page size is smaller than this value in bytes'),
-      tags: z.array(z.string()).optional().describe('Tags for the test'),
+        .describe(
+          'Alert if page size is smaller than this value in provider kilobytes (KB); zero disables the alert'
+        ),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Legacy field; tags are not supported by the current page-speed API'),
       paused: z.boolean().optional().describe('Whether the test starts paused')
     })
   )
@@ -60,11 +67,11 @@ export let createPagespeedTest = SlateTool.create(spec, {
       ...rest
     } = ctx.input;
 
-    let data: Record<string, any> = {
+    let data: Record<string, unknown> = {
       ...rest,
       website_url: websiteUrl,
       check_rate: checkRate,
-      location_iso: locationIso
+      region: locationIso
     };
 
     if (contactGroups) data.contact_groups = contactGroups;
@@ -73,7 +80,7 @@ export let createPagespeedTest = SlateTool.create(spec, {
     if (alertSmaller !== undefined) data.alert_smaller = alertSmaller;
 
     let result = await client.createPagespeedTest(data);
-    let testId = String(result?.data?.new_id ?? result?.new_id ?? '');
+    let testId = result.data.new_id;
 
     return {
       output: { testId },

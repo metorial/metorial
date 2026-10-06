@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { graphqlValue, validateCollectionName, validateDistance } from '../lib/graphql';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -7,7 +8,7 @@ export let aggregateCollection = SlateTool.create(spec, {
   name: 'Aggregate Collection',
   key: 'aggregate_collection',
   description: `Run aggregation queries over a collection to compute metrics like counts, sums, averages, min/max, top occurrences, and more. Supports grouping by a property and filtering with a where clause.
-Provide the raw GraphQL aggregation body for full flexibility, or use the simplified parameters.`,
+Provide the GraphQL metric selection and optional aggregation filters. Requires GraphQL to be enabled on the cluster.`,
   instructions: [
     'For text properties: count, topOccurrences { value occurs }',
     'For number/int properties: count, minimum, maximum, mean, median, mode, sum',
@@ -38,6 +39,8 @@ Provide the raw GraphQL aggregation body for full flexibility, or use the simpli
         .describe('Narrow aggregation to semantically similar objects'),
       objectLimit: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Limit the number of objects considered when using nearText'),
       tenant: z.string().optional().describe('Tenant name for multi-tenant collections'),
@@ -57,10 +60,22 @@ Provide the raw GraphQL aggregation body for full flexibility, or use the simpli
     let { collectionName, graphqlBody, where, groupBy, nearText, objectLimit, tenant, limit } =
       ctx.input;
 
+    validateCollectionName(collectionName);
+    if (nearText) validateDistance(nearText);
+    if (
+      nearText &&
+      objectLimit === undefined &&
+      nearText.distance === undefined &&
+      nearText.certainty === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide objectLimit, distance, or certainty when aggregating with nearText.'
+      );
+    }
     let args: string[] = [];
 
     if (where) {
-      args.push(`where: ${JSON.stringify(where).replace(/"(\w+)":/g, '$1:')}`);
+      args.push(`where: ${graphqlValue(where)}`);
     }
     if (groupBy && groupBy.length > 0) {
       args.push(`groupBy: ${JSON.stringify(groupBy)}`);
@@ -72,7 +87,7 @@ Provide the raw GraphQL aggregation body for full flexibility, or use the simpli
       args.push(`nearText: { ${ntParts.join(', ')} }`);
     }
     if (objectLimit !== undefined) args.push(`objectLimit: ${objectLimit}`);
-    if (tenant) args.push(`tenant: "${tenant}"`);
+    if (tenant) args.push(`tenant: ${JSON.stringify(tenant)}`);
     if (limit !== undefined) args.push(`limit: ${limit}`);
 
     let argsStr = args.length > 0 ? `(${args.join(', ')})` : '';
@@ -90,10 +105,6 @@ Provide the raw GraphQL aggregation body for full flexibility, or use the simpli
     }`;
 
     let result = await client.graphql(query);
-
-    if (result.errors && result.errors.length > 0) {
-      throw new Error(`GraphQL error: ${result.errors.map((e: any) => e.message).join(', ')}`);
-    }
 
     let aggregation = result.data?.Aggregate?.[collectionName];
 

@@ -15,8 +15,6 @@ import {
   uploadPresentation,
   versionHistory
 } from './tools';
-import { driveItemChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     getThumbnails,
     createFolder
   ],
-  triggers: [driveItemChanges]
+  triggers: []
 });

@@ -24,17 +24,6 @@ import {
   manageProducts,
   searchPipedrive
 } from './tools';
-import {
-  activityEvents,
-  dealEvents,
-  leadEvents,
-  noteEvents,
-  organizationEvents,
-  personEvents,
-  pipelineEvents,
-  productEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -61,14 +50,5 @@ export let provider = Slate.create({
     getActivityTypes.build(),
     convertLeadToDeal.build()
   ],
-  triggers: [
-    dealEvents.build(),
-    leadEvents.build(),
-    personEvents.build(),
-    organizationEvents.build(),
-    activityEvents.build(),
-    productEvents.build(),
-    noteEvents.build(),
-    pipelineEvents.build()
-  ]
+  triggers: []
 });

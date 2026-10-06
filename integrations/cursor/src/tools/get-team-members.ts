@@ -6,8 +6,11 @@ import { spec } from '../spec';
 export let getTeamMembers = SlateTool.create(spec, {
   name: 'Get Team Members',
   key: 'get_team_members',
-  description: `Retrieve all team members and their details. Requires an Admin API key.`,
+  description:
+    'DEPRECATED — use `list_team_members` instead. Retrieve team members using the legacy numeric-ID contract. Current Cursor responses use encoded user IDs.',
+  instructions: ['Use list_team_members for current encoded member IDs.'],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

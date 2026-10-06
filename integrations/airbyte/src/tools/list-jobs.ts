@@ -14,9 +14,20 @@ export let listJobsTool = SlateTool.create(spec, {
   .input(
     z.object({
       connectionId: z.string().optional().describe('Filter jobs by connection UUID.'),
-      jobType: z.enum(['sync', 'reset']).optional().describe('Filter by job type.'),
+      jobType: z
+        .enum(['sync', 'reset', 'refresh', 'clear'])
+        .optional()
+        .describe('Filter by job type.'),
       status: z
-        .enum(['pending', 'running', 'incomplete', 'failed', 'succeeded', 'cancelled'])
+        .enum([
+          'pending',
+          'queued',
+          'running',
+          'incomplete',
+          'failed',
+          'succeeded',
+          'cancelled'
+        ])
         .optional()
         .describe('Filter by job status.'),
       workspaceIds: z.array(z.string()).optional().describe('Filter jobs by workspace IDs.'),

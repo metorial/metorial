@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,17 +6,19 @@ import { spec } from '../spec';
 export let controlImage = SlateTool.create(spec, {
   name: 'Control Image',
   key: 'control_image',
-  description: `Generate controlled variations of images using structural guidance. Three control modes:
+  description: `DEPRECATED — use \`transform_image\` instead. Generate controlled variations of images using structural guidance. Three control modes:
 - **sketch**: Transform rough sketches into polished images, guided by contour lines and edges
 - **structure**: Maintain structural composition while restyling the content
 - **style**: Transfer the visual style from a reference image to generate new content`,
   instructions: [
+    'Use transform_image to receive a downloadable file with current generation controls.',
     'For sketch mode, provide a line drawing or sketch as the input image.',
     'For structure mode, the input image composition will be preserved while content is modified.',
     'For style mode, the input image style will be analyzed and applied to generate the prompt.',
     'Use controlStrength to balance between the reference image influence and creative freedom.'
   ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }
@@ -83,7 +85,7 @@ export let controlImage = SlateTool.create(spec, {
         result = await client.controlStyle(params);
         break;
       default:
-        throw new Error(`Unknown control mode: ${input.mode}`);
+        throw createApiServiceError(`Unknown control mode: ${input.mode}`);
     }
 
     return {

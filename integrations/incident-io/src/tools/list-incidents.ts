@@ -33,7 +33,16 @@ export let listIncidents = SlateTool.create(spec, {
       severityIds: z.array(z.string()).optional().describe('Filter by severity IDs'),
       statusCategory: z
         .array(
-          z.enum(['triage', 'declined', 'merged', 'canceled', 'live', 'learning', 'closed'])
+          z.enum([
+            'triage',
+            'declined',
+            'merged',
+            'canceled',
+            'live',
+            'learning',
+            'closed',
+            'paused'
+          ])
         )
         .optional()
         .describe('Filter by status category'),
@@ -54,6 +63,7 @@ export let listIncidents = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      returnedCount: z.number().int().nonnegative(),
       incidents: z.array(
         z.object({
           incidentId: z.string(),
@@ -90,7 +100,7 @@ export let listIncidents = SlateTool.create(spec, {
       createdAtLte: ctx.input.createdBefore
     });
 
-    let incidents = result.incidents.map((inc: any) => ({
+    let incidents = result.incidents.map(inc => ({
       incidentId: inc.id,
       reference: inc.reference,
       name: inc.name,
@@ -108,8 +118,9 @@ export let listIncidents = SlateTool.create(spec, {
     return {
       output: {
         incidents,
+        returnedCount: incidents.length,
         nextCursor: result.pagination_meta?.after || undefined,
-        totalCount: result.pagination_meta?.total_record_count || undefined
+        totalCount: result.pagination_meta?.total_record_count ?? undefined
       },
       message: `Found **${incidents.length}** incident(s).${result.pagination_meta?.after ? ' More results available.' : ''}`
     };

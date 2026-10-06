@@ -32,7 +32,7 @@ describe('gemini provider contract', () => {
         'update_cached_content',
         'delete_cached_content'
       ],
-      triggerIds: ['inbound_webhook'],
+      triggerIds: [],
       authMethodIds: ['api_key'],
       tools: [
         { id: 'generate_text', readOnly: true, destructive: false },
@@ -53,10 +53,10 @@ describe('gemini provider contract', () => {
         { id: 'update_cached_content', readOnly: false, destructive: false },
         { id: 'delete_cached_content', readOnly: false, destructive: true }
       ],
-      triggers: [{ id: 'inbound_webhook', invocationType: 'webhook' }]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(18);
+    expect(contract.actions).toHaveLength(17);
 
     let apiKey = await client.getAuthMethod('api_key');
     expect(apiKey.authenticationMethod.type).toBe('auth.token');

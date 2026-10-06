@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SatisMeterClient } from '../lib/client';
+import { projectIdSchema, resolveProject } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let deleteUserTool = SlateTool.create(spec, {
   name: 'Delete User',
   key: 'delete_user',
-  description: `Permanently delete a user from SatisMeter. Requires the SatisMeter internal user ID (not the external userId). Use the **List Users** tool first to find the internal ID.`,
+  description: `Delete a user's personal data from SatisMeter. Existing survey responses remain with anonymized user data. Requires the SatisMeter internal user ID (not the external userId). Use the **List Users** tool first to find the internal ID.`,
   instructions: [
     'The userInternalId is the SatisMeter internal ID, not the userId you provided during creation. Use List Users to find it.'
   ],
@@ -16,6 +17,7 @@ export let deleteUserTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       userInternalId: z
         .string()
         .describe(
@@ -31,7 +33,10 @@ export let deleteUserTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new SatisMeterClient(ctx.auth.token, ctx.auth.writeKey);
-    await client.deleteUser(ctx.input.userInternalId);
+    await client.deleteUser(
+      resolveProject(ctx.input.projectId, ctx.config),
+      ctx.input.userInternalId
+    );
 
     return {
       output: { userInternalId: ctx.input.userInternalId, success: true },

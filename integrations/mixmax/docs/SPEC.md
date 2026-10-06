@@ -1,123 +1,39 @@
-Now I have enough information to create the specification. Let me compile it all.
+# Mixmax API coverage
 
-# Slates Specification for Mixmax
+The integration uses the documented REST API at `https://api.mixmax.com/v1` with the `X-API-Token` header. Token identity comes from `GET /users/me`; its required documented identity field is `_id`. No OAuth or token-refresh flow is documented for this authentication method. Managed API keys and account features can have narrower access than personal keys.
 
-## Overview
+The current [getting-started guide](https://developer.mixmax.com/reference/getting-started-with-the-api) says the API is available to all users. Individual features still require suitable permissions, plans, or connected services. This is not a claim that every endpoint works on every account.
 
-Mixmax is a sales engagement platform that operates as a Gmail extension, providing email tracking, sequences (automated email campaigns), templates, polls, meeting scheduling, and CRM integration. It offers a REST API for programmatic access to manage contacts, sequences, messages, meetings, and reporting data.
+## Tools
 
-## Authentication
+All 40 existing action keys and schema field types are retained. Two focused read tools bring the total to 42:
 
-Mixmax uses **API token authentication**. There is no OAuth2 flow.
+- `list_tasks`: `GET /tasks`, task-query filtering, cursor pagination, 1–500 records, optional timezone. Managed API keys require `tasks:read`.
+- `search_sequence_recipients`: `GET /sequences/search`, recipient email query or email array, optional sequence ID, offset and limit, total and recipient identifiers/state.
 
-- **How to obtain a token:** Generate a developer API token in Mixmax Settings → Integrations. Click "Create Mixmax API Token" and copy the token. The token is only shown once.
-- **Plan requirement:** API access is restricted to annual Growth+ or Enterprise plans.
-- **Base URL:** `https://api.mixmax.com/v1/`
+The existing tools cover identity/preferences, sequence listing and recipient enrollment/cancellation/readback; direct sending and message drafts/readback; template listing/read/update/Trash/send; deprecated contact CRUD/search; meeting types and invite listing; rules; unsubscribe lists; email activity/reports/polls; teams/memberships; connected Salesforce search/create/update.
 
-The API token can be provided in two ways:
+## API mappings and limits
 
-1. **HTTP Header (recommended):** Pass the token as the `X-API-Token` header.
+- Most collections return `results`, `next`, and `hasNext`. Limits and offsets are validated as safe integers. Sequence recipients use an array, offset pagination, at most 50 records, and the first 10,000 records. Task pages allow up to 500; report/live-feed pages up to 10,000.
+- Sequence listing filters sequence names with `name`. Recipient search is a separate endpoint and returns an object containing `total` and `results`.
+- Recipient enrollment wraps records in `recipients`, supplies the documented matching email personalization variable, and checks every returned recipient outcome. Non-success or incomplete results raise an error containing the known sequence ID and reported outcomes; partial writes must be inspected before retrying. `scheduledAt: false` retains drafts. Omission activates immediately and can send email. Activated-recipient reads exclude drafts, so their absence cannot prove draft state.
+- Cancellation of one recipient sends an `emails` array. Empty bulk cancellation is rejected because it would cancel all active sequences. Unsupported `sequenceIds` and ambiguous mixed modes fail locally.
+- Direct `/send` does not provide tracking. Tracking-enabled direct sends fail locally and are never silently rerouted. Drafts can be tracked and sent explicitly. There is no documented draft DELETE endpoint or email recall capability.
+- Template `title` and `source` map to existing `subject` and `body` fields. Deletion moves the template to Trash, retained for 28 days.
+- Contacts are [deprecated but still functional](https://developer.mixmax.com/reference/contacts). Creation can merge existing email addresses and returns no body; the integration confirms the unique ID with an exact-email lookup. Updates use the documented `contact` wrapper. Contact-group updates are not documented and fail locally.
+- Rules map `enabled` to inverse `isPaused` and serialize JSON Sift filters. Actions use a separate provider API; legacy inline `actions` fields fail locally rather than reporting false success.
+- Team membership reads use `memberId`. Invitations wrap `members`, require an email, send invitation mail, and can affect billing. Adding by user ID is unsupported. Team/rule `modifiedAt` maps to the existing update date field.
+- Meeting invitations use `creationDate`. Meeting-type duration and buffer are validated, preserving zero-minute buffer values. The provider does not allow deleting the last meeting type.
+- Numeric millisecond message/poll dates convert to ISO strings to preserve existing output types. Live-feed numeric timestamps remain numbers and numeric activity flags become booleans. `livePoll` means recipients can view results.
+- Salesforce updates use `PUT` with a matching `Id`. A successful HTTP status is insufficient: the Salesforce result must confirm `success` without errors. The basic search page does not publish its query parameter in the current definition; the existing `q` contract is retained and requires live verification.
 
-   ```
-   X-API-Token: 45e99c6b-386d-4aa1-a2b4-296568a40ff2
-   ```
+## Errors and privacy
 
-2. **Query parameter:** Pass the token as the `apiToken` query string parameter.
-   ```
-   https://api.mixmax.com/v1/users/me?apiToken=YOUR_TOKEN
-   ```
+Requests use a fixed API origin, bounded timeouts, and no redirects. User validation and service failures use structured service errors. Transport error parents and causes retain only a safe status surrogate, never the raw request or response. Returned arbitrary preferences, report data and Salesforce records use credential redaction and omit credential metadata while preserving ordinary user fields and false/zero values.
 
-The token is scoped to the individual user who generated it. There is no workspace-level authentication — each user must generate their own token.
+No tool downloads or generates a file, and no legacy event trigger remains registered.
 
-## Features
+## Official references
 
-### Sequences (Automated Campaigns)
-
-Manage automated multi-step email sequences. List available sequences, search sequences, add recipients to a sequence with custom variables (e.g., personalization fields), cancel sequences for specific recipients, and view sent sequence data. Sequences can be organized into folders.
-
-### Messages & Sending Email
-
-Create, read, update, and send individual email messages. Supports composing messages with recipients (to, cc, bcc), subjects, and HTML bodies. Also provides a test-send capability for previewing emails.
-
-### Contacts & Contact Groups (Deprecated)
-
-Manage contacts (people you've emailed via Mixmax), including creating, updating, deleting, and searching contacts. Contacts can be organized into contact groups. Notes can be attached to individual contacts. Note: The contacts API is marked as deprecated.
-
-### Templates (Snippets)
-
-Manage reusable email templates. Create, read, update, and delete templates. Templates can be organized using tags (snippet tags). Templates can also be sent directly via the API.
-
-### Meeting Scheduling
-
-Manage appointment links and meeting types for calendar scheduling. Create and configure meeting types, view meeting invites, and access meeting summaries and transcripts. Appointment links allow recipients to self-book time on your calendar.
-
-### Polls & Q&A
-
-Access poll results and Q&A responses embedded in emails. View individual poll/Q&A results including vote data and respondent information.
-
-### Live Feed
-
-Access the live feed of email activity events (opens, clicks, replies, etc.). Supports saved searches to filter live feed events.
-
-### Insights & Reporting
-
-Create and manage insights reports for email analytics. Also supports querying tabular report data for custom analysis.
-
-### Rules (Webhooks)
-
-Create and manage rules that intercept real-time events and route them to webhooks or trigger actions. Rules support event-based triggers (e.g., email sent, opened, clicked) and time-based (recurring) triggers. Filters using a Sift-based domain-specific language allow matching on specific event properties. Each rule can have one or more associated actions.
-
-### Salesforce Integration
-
-Interact with Salesforce data directly through Mixmax, including managing Salesforce accounts, contacts, leads, opportunities, and tasks. Supports searching, creating, reading, and updating Salesforce records. Requires a connected Salesforce account.
-
-### Unsubscribes
-
-Manage the list of unsubscribed email addresses. Add or remove addresses from the unsubscribe list.
-
-### File Requests
-
-View file request data — instances where a recipient was asked to upload a file via email.
-
-### User Preferences & Profile
-
-Read and update the authenticated user's preferences and profile information.
-
-### Message Integrations (Enhancements, Slash Commands, Link Resolvers, Sidebars)
-
-Register and manage custom integrations that extend the Mixmax compose window. Includes enhancements (interactive content like polls or availability inserted via the Enhance menu), slash commands (content inserted via "/" commands), link resolvers (rich previews for URLs), and sidebar widgets.
-
-### Teams
-
-Create and manage teams within a Mixmax workspace, including adding and removing team members.
-
-## Events
-
-Mixmax supports outgoing webhooks through its **Rules** system. Rules intercept real-time events, evaluate optional filter conditions, and route matching events to a configured webhook URL or other action.
-
-### Message Events
-
-- **message:sent** — Fires when an email is sent. Includes recipient list, subject, body, and message metadata.
-- **message:received** — Fires when an email reply is received. Includes sender info, subject, body, and thread information.
-
-### Engagement Events
-
-- **opened** — Fires when a recipient opens a tracked email. Includes recipient info, user agent, timestamp, and IP address.
-- **clicked** — Fires when a recipient clicks a tracked link. Includes the link URL, link text, and recipient info.
-- **downloaded** — Fires when a recipient downloads an attached file. Includes the file name and recipient info.
-
-### Poll & Survey Events
-
-- **poll:voted** — Fires when a recipient votes on a poll embedded in an email. Includes the poll question, options, selected vote, and respondent info.
-
-### Meeting Events
-
-- **meetinginvites:confirmed** — Fires when a recipient confirms a meeting invitation. Includes the selected timeslot, organizer details, guest info, and meeting title.
-
-### Unsubscribe Events
-
-- **unsubscribe:created** — Fires when a recipient clicks an unsubscribe link. Includes the recipient email, message ID, and sequence ID.
-
-### Incoming Webhooks
-
-Mixmax also supports **incoming webhooks**, allowing external systems to push data into Mixmax to trigger actions such as adding recipients to a sequence, adding contacts to a list, or sending an email. Incoming webhooks are configured via the Rules UI and accept JSON payloads with at minimum an `email` field.
+[Authentication and paging](https://developer.mixmax.com/reference/getting-started-with-the-api), [identity](https://developer.mixmax.com/reference/user), [tasks](https://developer.mixmax.com/reference/listtasks), [sequence names](https://developer.mixmax.com/reference/sequences-1), [recipient search](https://developer.mixmax.com/reference/sequencessearch), [enrollment/drafts](https://developer.mixmax.com/reference/sequencessequenceidrecipients), [activated recipients](https://developer.mixmax.com/reference/sequencesidrecipients), [direct sending](https://developer.mixmax.com/reference/send-post), [template update](https://developer.mixmax.com/reference/snippets-id-patch), [template Trash](https://developer.mixmax.com/reference/snippets-id-delete), [contact update](https://developer.mixmax.com/reference/contactsid-1), [rules](https://developer.mixmax.com/reference/rules-2), [team invitations](https://developer.mixmax.com/reference/teams-members-post), [meeting types](https://developer.mixmax.com/reference/meetingtypesid-1), [Salesforce updates](https://developer.mixmax.com/reference/salesforceopportunityid-1).

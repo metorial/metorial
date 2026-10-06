@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import * as map from '../lib/mappers';
+import { malformed, numericId } from '../lib/validation';
 import { spec } from '../spec';
 
 export let deployProjectTool = SlateTool.create(spec, {
@@ -8,7 +10,7 @@ export let deployProjectTool = SlateTool.create(spec, {
   key: 'deploy_project',
   description: `Build and deploy a Workato project to a target environment. This performs a one-step build-and-deploy operation. Use to promote project changes across environments (sandbox, test, stage, uat, preprod, prod).`,
   instructions: [
-    'The project must have changes to deploy. Deploying an unchanged project will have no effect.'
+    'This creates a retained asynchronous deployment and may change target resources. Read the returned deployment ID to verify completion.'
   ],
   tags: {
     destructive: true
@@ -16,7 +18,9 @@ export let deployProjectTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project ID to deploy'),
+      projectId: z
+        .string()
+        .describe('Project ID or f followed by the project folder ID to deploy'),
       environmentType: z
         .enum(['sandbox', 'test', 'stage', 'uat', 'preprod', 'prod'])
         .describe('Target environment'),
@@ -26,34 +30,31 @@ export let deployProjectTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      deploymentId: z.number().describe('Deployment ID'),
-      projectId: z.string().describe('Project ID'),
-      environmentType: z.string().describe('Target environment'),
-      state: z.string().describe('Deployment state (pending, success, failed)'),
+      deploymentId: z.number().optional().describe('Deployment ID'),
+      projectId: z.string().optional().describe('Project ID'),
+      environmentType: z.string().optional().describe('Target environment'),
+      state: z.string().optional().describe('Deployment state (pending, success, failed)'),
       performedByName: z
         .string()
         .nullable()
+        .optional()
         .describe('Name of the person who performed the deployment'),
-      createdAt: z.string().describe('Deployment creation timestamp')
+      createdAt: z.string().optional().describe('Deployment creation timestamp')
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let result = await client.deployProject(ctx.input.projectId, {
-      environmentType: ctx.input.environmentType,
-      title: ctx.input.title,
-      description: ctx.input.description
-    });
-
+    const client = createClient(ctx);
+    const result = await client.deployProject(ctx.input.projectId, ctx.input);
+    const output = map.deployment(result);
+    if (
+      !output.projectId ||
+      output.environmentType !== ctx.input.environmentType ||
+      (!ctx.input.projectId.startsWith('f') &&
+        output.projectId !== numericId(ctx.input.projectId, 'projectId'))
+    )
+      malformed();
     return {
-      output: {
-        deploymentId: result.id,
-        projectId: result.project_id ?? ctx.input.projectId,
-        environmentType: result.environment_type ?? ctx.input.environmentType,
-        state: result.state ?? 'pending',
-        performedByName: result.performed_by_name ?? null,
-        createdAt: result.created_at
-      },
-      message: `Deployment **${result.id}** for project ${ctx.input.projectId} to **${ctx.input.environmentType}** — state: ${result.state ?? 'pending'}.`
+      output: { ...output, projectId: output.projectId },
+      message: `Deployment ${output.deploymentId}: ${output.state}. Use list_deployments with deploymentId to read exact status. Submission does not prove completion.`
     };
   });

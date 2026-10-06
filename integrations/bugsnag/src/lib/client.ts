@@ -1,436 +1,381 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+import { z } from 'zod';
+import type {
+  BugsnagError,
+  Collaborator,
+  Comment,
+  Event,
+  EventField,
+  Filters,
+  Organization,
+  PageOptions,
+  Pivot,
+  PivotValue,
+  Project,
+  Release,
+  SavedSearch,
+  SearchOptions,
+  Trend
+} from './types';
+
+export const apiEndpoints = [
+  'https://api.bugsnag.com',
+  'https://api.bugsnag.smartbear.com'
+] as const;
+export type BugsnagAuth = { token: string; apiEndpoint?: (typeof apiEndpoints)[number] };
+export const filtersSchema = z.record(
+  z.string(),
+  z.array(
+    z.object({
+      type: z.enum(['eq', 'ne', 'empty']),
+      value: z.string(),
+      child_value: z.string().optional()
+    })
+  )
+);
+export const requireId = (value: string | undefined, label: string) => {
+  if (!value?.trim())
+    throw createApiServiceError(`${label} is required.`, { reason: 'invalid_input' });
+  return value;
+};
+const segment = (value: string) => {
+  requireId(value, 'Resource ID');
+  if (value === '.' || value === '..')
+    throw createApiServiceError('Resource ID must not be a relative path segment.', {
+      reason: 'invalid_input'
+    });
+  try {
+    return encodeURIComponent(value);
+  } catch {
+    throw createApiServiceError('Resource ID contains invalid Unicode.', {
+      reason: 'invalid_input'
+    });
+  }
+};
 
 export class BugsnagClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios;
+  private endpoint: string;
+  private adaptError;
+  pageInfo: { nextPageUrl?: string; totalCount?: number; rateLimitRemaining?: number } = {};
 
-  constructor(config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://api.bugsnag.com',
-      headers: {
-        Authorization: `token ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+  constructor(auth: BugsnagAuth) {
+    requireId(auth.token, 'Personal auth token');
+    this.endpoint = auth.apiEndpoint ?? apiEndpoints[0];
+    if (!apiEndpoints.some(endpoint => endpoint === this.endpoint))
+      throw createApiServiceError('Choose a documented Bugsnag Data Access endpoint.', {
+        reason: 'invalid_input'
+      });
+    this.adaptError = (error: unknown) =>
+      buildApiServiceError(error, {
+        parent: {},
+        providerLabel: 'Bugsnag',
+        reason: 'upstream_error',
+        extractMessage: (failure, helpers) =>
+          helpers.extractMessage(failure).split(auth.token).join('[redacted]')
+      });
+    this.axios = createAuthenticatedAxios({
+      baseURL: this.endpoint,
+      authHeader: { value: `token ${auth.token}` },
+      headers: { 'X-Version': '2' },
+      timeout: 30_000,
+      maxRedirects: 0,
+      validateStatus: status => (status >= 200 && status < 300) || status === 429,
+      errorAdapter: this.adaptError
     });
   }
-
-  // ─── Organizations ──────────────────────────────────────────
-
-  async listOrganizations(): Promise<any[]> {
-    let response = await this.axios.get('/user/organizations');
-    return response.data;
-  }
-
-  async getOrganization(organizationId: string): Promise<any> {
-    let response = await this.axios.get(`/organizations/${organizationId}`);
-    return response.data;
-  }
-
-  // ─── Projects ───────────────────────────────────────────────
-
-  async listProjects(
-    organizationId: string,
-    params?: { perPage?: number; offset?: string }
-  ): Promise<any[]> {
-    let response = await this.axios.get(`/organizations/${organizationId}/projects`, {
-      params: {
-        per_page: params?.perPage,
-        offset: params?.offset
-      }
-    });
-    return response.data;
-  }
-
-  async getProject(projectId: string): Promise<any> {
-    let response = await this.axios.get(`/projects/${projectId}`);
-    return response.data;
-  }
-
-  async createProject(
-    organizationId: string,
-    data: { name: string; type?: string }
-  ): Promise<any> {
-    let response = await this.axios.post(`/organizations/${organizationId}/projects`, data);
-    return response.data;
-  }
-
-  async updateProject(projectId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/projects/${projectId}`, data);
-    return response.data;
-  }
-
-  async deleteProject(projectId: string): Promise<void> {
-    await this.axios.delete(`/projects/${projectId}`);
-  }
-
-  // ─── Errors ─────────────────────────────────────────────────
-
-  async listErrors(
-    projectId: string,
-    params?: {
-      perPage?: number;
-      offset?: string;
-      sort?: string;
-      direction?: string;
-      filters?: Record<string, any>;
+  private paginationUrl(value: string, path: string) {
+    let url: URL;
+    try {
+      url = new URL(value, this.endpoint);
+    } catch {
+      throw createApiServiceError('The pagination URL is invalid.', {
+        reason: 'invalid_input'
+      });
     }
-  ): Promise<any[]> {
-    let queryParams: Record<string, any> = {
-      per_page: params?.perPage,
-      offset: params?.offset,
-      sort: params?.sort,
-      direction: params?.direction
+    if (
+      url.origin !== this.endpoint ||
+      url.pathname !== path ||
+      url.username ||
+      url.password ||
+      url.hash ||
+      [...url.searchParams.keys()].some(key =>
+        /^(auth_token|authorization|api_key|token)$/i.test(key)
+      )
+    )
+      throw createApiServiceError(
+        'Use the next-page URL returned for this resource and account endpoint.',
+        { reason: 'invalid_input' }
+      );
+    return url.toString();
+  }
+  private async request<T>(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    path: string,
+    data?: unknown,
+    params?: URLSearchParams
+  ) {
+    const response = await this.axios.request<T>({ method, url: path, data, params });
+    if (response.status === 429) {
+      const error = this.adaptError({ response });
+      error.data.reason = 'rate_limited';
+      const retry = Number(response.headers['retry-after']);
+      if (Number.isFinite(retry) && retry >= 0) error.data.retryAfterSeconds = retry;
+      throw error;
+    }
+    if (
+      method !== 'DELETE' &&
+      !(response.status === 204 && path.endsWith('/stability_trend')) &&
+      !isApiErrorRecord(response.data) &&
+      !(Array.isArray(response.data) && response.data.every(isApiErrorRecord))
+    )
+      throw createApiServiceError('Bugsnag returned an invalid resource response.', {
+        reason: 'invalid_response'
+      });
+    return response;
+  }
+  private searchParams(options: SearchOptions = {}) {
+    const params = new URLSearchParams();
+    if (options.perPage !== undefined) {
+      if (!Number.isInteger(options.perPage) || options.perPage < 1 || options.perPage > 100)
+        throw createApiServiceError('Results per page must be an integer from 1 to 100.', {
+          reason: 'invalid_input'
+        });
+      params.set('per_page', String(options.perPage));
+    }
+    if (options.sort) params.set('sort', options.sort);
+    if (options.direction) params.set('direction', options.direction);
+    for (const [field, values] of Object.entries(options.filters ?? {})) {
+      for (const value of values) {
+        params.append(`filters[${field}][][type]`, value.type);
+        params.append(`filters[${field}][][value]`, value.value);
+        if (value.child_value !== undefined)
+          params.append(`filters[${field}][][child_value]`, value.child_value);
+      }
+    }
+    return params;
+  }
+  private async list<T>(
+    path: string,
+    options: SearchOptions = {},
+    extra: Record<string, string | undefined> = {}
+  ) {
+    const params = options.pageUrl ? undefined : this.searchParams(options);
+    for (const [key, value] of Object.entries(extra))
+      if (value !== undefined) params?.set(key, value);
+    const response = await this.request<T[]>(
+      'GET',
+      options.pageUrl ? this.paginationUrl(options.pageUrl, path) : path,
+      undefined,
+      params
+    );
+    if (!Array.isArray(response.data))
+      throw createApiServiceError('Bugsnag returned an invalid result list.', {
+        reason: 'invalid_response'
+      });
+    const link = String(response.headers.link ?? '');
+    const next = /<([^>]+)>\s*;\s*rel=(?:"next"|next)(?=\s*(?:,|;|$))/.exec(link)?.[1];
+    const numericHeader = (key: string) => {
+      const value = response.headers[key];
+      if (value === undefined || value === '') return undefined;
+      const number = Number(value);
+      return Number.isFinite(number) ? number : undefined;
     };
-
-    if (params?.filters) {
-      for (let [key, value] of Object.entries(params.filters)) {
-        queryParams[`filters[${key}][]`] = value;
-      }
-    }
-
-    let response = await this.axios.get(`/projects/${projectId}/errors`, {
-      params: queryParams
-    });
-    return response.data;
-  }
-
-  async getError(projectId: string, errorId: string): Promise<any> {
-    let response = await this.axios.get(`/projects/${projectId}/errors/${errorId}`);
-    return response.data;
-  }
-
-  async updateError(
-    projectId: string,
-    errorId: string,
-    data: Record<string, any>
-  ): Promise<any> {
-    let response = await this.axios.patch(`/projects/${projectId}/errors/${errorId}`, data);
-    return response.data;
-  }
-
-  async deleteError(projectId: string, errorId: string): Promise<void> {
-    await this.axios.delete(`/projects/${projectId}/errors/${errorId}`);
-  }
-
-  async bulkUpdateErrors(
-    projectId: string,
-    data: {
-      operation: string;
-      query?: Record<string, any>;
-      errorIds?: string[];
-    }
-  ): Promise<any> {
-    let response = await this.axios.patch(`/projects/${projectId}/errors`, data);
-    return response.data;
-  }
-
-  // ─── Events ─────────────────────────────────────────────────
-
-  async listEvents(
-    projectId: string,
-    params?: {
-      perPage?: number;
-      offset?: string;
-      sort?: string;
-      direction?: string;
-      filters?: Record<string, any>;
-    }
-  ): Promise<any[]> {
-    let queryParams: Record<string, any> = {
-      per_page: params?.perPage,
-      offset: params?.offset,
-      sort: params?.sort,
-      direction: params?.direction
+    this.pageInfo = {
+      nextPageUrl: next ? this.paginationUrl(next, path) : undefined,
+      totalCount: numericHeader('x-total-count'),
+      rateLimitRemaining: numericHeader('x-ratelimit-remaining')
     };
-
-    if (params?.filters) {
-      for (let [key, value] of Object.entries(params.filters)) {
-        queryParams[`filters[${key}][]`] = value;
-      }
-    }
-
-    let response = await this.axios.get(`/projects/${projectId}/events`, {
-      params: queryParams
+    return response.data;
+  }
+  listOrganizations(options?: PageOptions) {
+    return this.list<Organization>('/user/organizations', options);
+  }
+  async getOrganization(id: string) {
+    return (await this.request<Organization>('GET', `/organizations/${segment(id)}`)).data;
+  }
+  listProjects(id: string, options?: PageOptions) {
+    return this.list<Project>(`/organizations/${segment(id)}/projects`, options);
+  }
+  async getProject(id: string) {
+    return (await this.request<Project>('GET', `/projects/${segment(id)}`)).data;
+  }
+  async createProject(id: string, data: { name: string; type: string }) {
+    return (
+      await this.request<Project>('POST', `/organizations/${segment(id)}/projects`, data)
+    ).data;
+  }
+  async updateProject(id: string, data: Record<string, unknown>) {
+    return (await this.request<Project>('PATCH', `/projects/${segment(id)}`, data)).data;
+  }
+  async deleteProject(id: string) {
+    await this.request('DELETE', `/projects/${segment(id)}`);
+  }
+  listErrors(id: string, options?: SearchOptions) {
+    return this.list<BugsnagError>(`/projects/${segment(id)}/errors`, options);
+  }
+  async getError(project: string, id: string) {
+    return (
+      await this.request<BugsnagError>(
+        'GET',
+        `/projects/${segment(project)}/errors/${segment(id)}`
+      )
+    ).data;
+  }
+  async updateError(project: string, id: string, data: Record<string, unknown>) {
+    return (
+      await this.request<BugsnagError>(
+        'PATCH',
+        `/projects/${segment(project)}/errors/${segment(id)}`,
+        data
+      )
+    ).data;
+  }
+  async deleteError(project: string, id: string) {
+    await this.request('DELETE', `/projects/${segment(project)}/errors/${segment(id)}`);
+  }
+  listEvents(project: string, options?: SearchOptions) {
+    return this.list<Event>(`/projects/${segment(project)}/events`, options);
+  }
+  listErrorEvents(project: string, id: string, options?: SearchOptions) {
+    return this.list<Event>(
+      `/projects/${segment(project)}/errors/${segment(id)}/events`,
+      options
+    );
+  }
+  async getEvent(project: string, id: string) {
+    return (
+      await this.request<Event>('GET', `/projects/${segment(project)}/events/${segment(id)}`)
+    ).data;
+  }
+  async getTrends(
+    project: string,
+    error?: string,
+    options: { resolution?: string; bucketsCount?: number; filters?: Filters } = {}
+  ) {
+    const params = this.searchParams({ filters: options.filters });
+    if (options.resolution) params.set('resolution', options.resolution);
+    else params.set('buckets_count', String(options.bucketsCount ?? 30));
+    const response = await this.request<Trend[]>(
+      'GET',
+      `/projects/${segment(project)}${error ? `/errors/${segment(error)}` : ''}/trends`,
+      undefined,
+      params
+    );
+    if (!Array.isArray(response.data))
+      throw createApiServiceError('Bugsnag returned an invalid trend result.', {
+        reason: 'invalid_response'
+      });
+    return response.data;
+  }
+  listProjectPivots(project: string) {
+    return this.list<Pivot>(`/projects/${segment(project)}/pivots`);
+  }
+  getPivotValues(project: string, field: string, options?: PageOptions) {
+    return this.list<PivotValue>(
+      `/projects/${segment(project)}/pivots/${segment(field)}/values`,
+      options
+    );
+  }
+  listReleases(project: string, options: PageOptions & { releaseStage?: string } = {}) {
+    if (!options.pageUrl && options.perPage !== undefined && options.perPage > 10)
+      throw createApiServiceError('Releases per page must be an integer from 1 to 10.', {
+        reason: 'invalid_input'
+      });
+    return this.list<Release>(`/projects/${segment(project)}/releases`, options, {
+      release_stage: options.releaseStage
     });
-    return response.data;
+  }
+  async getProjectStability(project: string) {
+    const response = await this.request<unknown>(
+      'GET',
+      `/projects/${segment(project)}/stability_trend`
+    );
+    return response.status === 204 ? null : response.data;
   }
 
-  async listErrorEvents(
-    projectId: string,
-    errorId: string,
-    params?: {
-      perPage?: number;
-      offset?: string;
-    }
-  ): Promise<any[]> {
-    let response = await this.axios.get(`/projects/${projectId}/errors/${errorId}/events`, {
-      params: {
-        per_page: params?.perPage,
-        offset: params?.offset
-      }
-    });
-    return response.data;
+  listOrganizationCollaborators(org: string, options?: PageOptions) {
+    return this.list<Collaborator>(`/organizations/${segment(org)}/collaborators`, options);
   }
-
-  async getEvent(projectId: string, eventId: string): Promise<any> {
-    let response = await this.axios.get(`/projects/${projectId}/events/${eventId}`);
-    return response.data;
-  }
-
-  async deleteEvent(projectId: string, eventId: string): Promise<void> {
-    await this.axios.delete(`/projects/${projectId}/events/${eventId}`);
-  }
-
-  // ─── Trends ─────────────────────────────────────────────────
-
-  async getProjectTrends(
-    projectId: string,
-    params?: {
-      filters?: Record<string, any>;
-      resolution?: string;
-    }
-  ): Promise<any[]> {
-    let queryParams: Record<string, any> = {
-      resolution: params?.resolution
-    };
-
-    if (params?.filters) {
-      for (let [key, value] of Object.entries(params.filters)) {
-        queryParams[`filters[${key}][]`] = value;
-      }
-    }
-
-    let response = await this.axios.get(`/projects/${projectId}/trends`, {
-      params: queryParams
-    });
-    return response.data;
-  }
-
-  async getErrorTrends(projectId: string, errorId: string): Promise<any[]> {
-    let response = await this.axios.get(`/projects/${projectId}/errors/${errorId}/trends`);
-    return response.data;
-  }
-
-  // ─── Pivots ─────────────────────────────────────────────────
-
-  async listProjectPivots(
-    projectId: string,
-    params?: {
-      filters?: Record<string, any>;
-    }
-  ): Promise<any[]> {
-    let queryParams: Record<string, any> = {};
-
-    if (params?.filters) {
-      for (let [key, value] of Object.entries(params.filters)) {
-        queryParams[`filters[${key}][]`] = value;
-      }
-    }
-
-    let response = await this.axios.get(`/projects/${projectId}/pivots`, {
-      params: queryParams
-    });
-    return response.data;
-  }
-
-  async getPivotValues(
-    projectId: string,
-    displayId: string,
-    params?: {
-      filters?: Record<string, any>;
-    }
-  ): Promise<any[]> {
-    let queryParams: Record<string, any> = {};
-
-    if (params?.filters) {
-      for (let [key, value] of Object.entries(params.filters)) {
-        queryParams[`filters[${key}][]`] = value;
-      }
-    }
-
-    let response = await this.axios.get(`/projects/${projectId}/pivots/${displayId}`, {
-      params: queryParams
-    });
-    return response.data;
-  }
-
-  // ─── Releases ───────────────────────────────────────────────
-
-  async listReleases(
-    projectId: string,
-    params?: {
-      perPage?: number;
-      offset?: string;
-      releaseStage?: string;
-    }
-  ): Promise<any[]> {
-    let response = await this.axios.get(`/projects/${projectId}/releases`, {
-      params: {
-        per_page: params?.perPage,
-        offset: params?.offset,
-        release_stage: params?.releaseStage
-      }
-    });
-    return response.data;
-  }
-
-  async getRelease(projectId: string, releaseId: string): Promise<any> {
-    let response = await this.axios.get(`/projects/${projectId}/releases/${releaseId}`);
-    return response.data;
-  }
-
-  async listReleaseGroups(projectId: string): Promise<any[]> {
-    let response = await this.axios.get(`/projects/${projectId}/release_groups`);
-    return response.data;
-  }
-
-  // ─── Stability ──────────────────────────────────────────────
-
-  async getProjectStability(
-    projectId: string,
-    params?: {
-      releaseStage?: string;
-    }
-  ): Promise<any> {
-    let response = await this.axios.get(`/projects/${projectId}/stability_trend`, {
-      params: {
-        release_stage: params?.releaseStage
-      }
-    });
-    return response.data;
-  }
-
-  // ─── Collaborators ─────────────────────────────────────────
-
-  async listOrganizationCollaborators(
-    organizationId: string,
-    params?: {
-      perPage?: number;
-      offset?: string;
-    }
-  ): Promise<any[]> {
-    let response = await this.axios.get(`/organizations/${organizationId}/collaborators`, {
-      params: {
-        per_page: params?.perPage,
-        offset: params?.offset
-      }
-    });
-    return response.data;
-  }
-
   async inviteCollaborator(
-    organizationId: string,
-    data: {
-      email: string;
-      admin?: boolean;
-      project_ids?: string[];
-    }
-  ): Promise<any> {
-    let response = await this.axios.post(
-      `/organizations/${organizationId}/collaborators`,
-      data
+    org: string,
+    data: { email: string; admin?: boolean; project_ids?: string[] }
+  ) {
+    return (
+      await this.request<Collaborator>(
+        'POST',
+        `/organizations/${segment(org)}/collaborators`,
+        data
+      )
+    ).data;
+  }
+  async updateCollaborator(org: string, id: string, data: Record<string, unknown>) {
+    return (
+      await this.request<Collaborator>(
+        'PATCH',
+        `/organizations/${segment(org)}/collaborators/${segment(id)}`,
+        data
+      )
+    ).data;
+  }
+  async removeCollaborator(org: string, id: string) {
+    await this.request(
+      'DELETE',
+      `/organizations/${segment(org)}/collaborators/${segment(id)}`
     );
-    return response.data;
   }
-
-  async updateCollaborator(
-    organizationId: string,
-    userId: string,
-    data: Record<string, any>
-  ): Promise<any> {
-    let response = await this.axios.patch(
-      `/organizations/${organizationId}/collaborators/${userId}`,
-      data
+  listComments(project: string, error: string, options?: PageOptions) {
+    return this.list<Comment>(
+      `/projects/${segment(project)}/errors/${segment(error)}/comments`,
+      options
     );
-    return response.data;
   }
-
-  async removeCollaborator(organizationId: string, userId: string): Promise<void> {
-    await this.axios.delete(`/organizations/${organizationId}/collaborators/${userId}`);
+  async createComment(project: string, error: string, message: string) {
+    return (
+      await this.request<Comment>(
+        'POST',
+        `/projects/${segment(project)}/errors/${segment(error)}/comments`,
+        { message }
+      )
+    ).data;
   }
-
-  // ─── Comments ───────────────────────────────────────────────
-
-  async listComments(projectId: string, errorId: string): Promise<any[]> {
-    let response = await this.axios.get(`/projects/${projectId}/errors/${errorId}/comments`);
-    return response.data;
+  async updateComment(id: string, message: string) {
+    return (await this.request<Comment>('PATCH', `/comments/${segment(id)}`, { message }))
+      .data;
   }
-
-  async createComment(projectId: string, errorId: string, message: string): Promise<any> {
-    let response = await this.axios.post(`/projects/${projectId}/errors/${errorId}/comments`, {
-      message
-    });
-    return response.data;
+  async deleteComment(id: string) {
+    await this.request('DELETE', `/comments/${segment(id)}`);
   }
-
-  async getComment(projectId: string, commentId: string): Promise<any> {
-    let response = await this.axios.get(`/projects/${projectId}/comments/${commentId}`);
-    return response.data;
+  listEventFields(project: string) {
+    return this.list<EventField>(`/projects/${segment(project)}/event_fields`);
   }
-
-  async updateComment(commentId: string, message: string): Promise<any> {
-    let response = await this.axios.patch(`/comments/${commentId}`, { message });
-    return response.data;
+  listSavedSearches(project: string) {
+    return this.list<SavedSearch>(`/projects/${segment(project)}/saved_searches`);
   }
-
-  async deleteComment(commentId: string): Promise<void> {
-    await this.axios.delete(`/comments/${commentId}`);
-  }
-
-  // ─── Event Fields ──────────────────────────────────────────
-
-  async listEventFields(projectId: string): Promise<any[]> {
-    let response = await this.axios.get(`/projects/${projectId}/event_fields`);
-    return response.data;
-  }
-
-  // ─── Saved Searches ────────────────────────────────────────
-
-  async listSavedSearches(projectId: string): Promise<any[]> {
-    let response = await this.axios.get(`/projects/${projectId}/saved_searches`);
-    return response.data;
-  }
-
   async createSavedSearch(
-    projectId: string,
-    data: {
-      name: string;
-      search_filters: Record<string, any>;
-    }
-  ): Promise<any> {
-    let response = await this.axios.post(`/projects/${projectId}/saved_searches`, data);
-    return response.data;
+    project: string,
+    data: { name: string; filters: Filters; project_default: boolean }
+  ) {
+    return (
+      await this.request<SavedSearch>('POST', '/saved_searches', {
+        project_id: project,
+        ...data
+      })
+    ).data;
   }
-
-  async getSavedSearch(searchId: string): Promise<any> {
-    let response = await this.axios.get(`/saved_searches/${searchId}`);
-    return response.data;
+  async getSavedSearch(id: string) {
+    return (await this.request<SavedSearch>('GET', `/saved_searches/${segment(id)}`)).data;
   }
-
-  async updateSavedSearch(searchId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/saved_searches/${searchId}`, data);
-    return response.data;
+  async updateSavedSearch(id: string, data: Record<string, unknown>) {
+    return (await this.request<SavedSearch>('PATCH', `/saved_searches/${segment(id)}`, data))
+      .data;
   }
-
-  async deleteSavedSearch(searchId: string): Promise<void> {
-    await this.axios.delete(`/saved_searches/${searchId}`);
-  }
-
-  // ─── Current User ──────────────────────────────────────────
-
-  async getCurrentUser(): Promise<any> {
-    let response = await this.axios.get('/user');
-    return response.data;
-  }
-
-  // ─── Teams ─────────────────────────────────────────────────
-
-  async listTeams(organizationId: string): Promise<any[]> {
-    let response = await this.axios.get(`/organizations/${organizationId}/teams`);
-    return response.data;
-  }
-
-  async createTeam(organizationId: string, data: { name: string }): Promise<any> {
-    let response = await this.axios.post(`/organizations/${organizationId}/teams`, data);
-    return response.data;
+  async deleteSavedSearch(id: string) {
+    await this.request('DELETE', `/saved_searches/${segment(id)}`);
   }
 }

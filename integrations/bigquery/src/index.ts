@@ -31,8 +31,6 @@ import {
   updateModel,
   updateTable
 } from './tools';
-import { datasetUpdated, inboundWebhook, jobCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -66,5 +64,5 @@ export let provider = Slate.create({
     createRoutine,
     deleteRoutine
   ],
-  triggers: [inboundWebhook, jobCompleted, datasetUpdated]
+  triggers: []
 });

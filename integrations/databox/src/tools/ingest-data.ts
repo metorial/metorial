@@ -1,21 +1,32 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdInput, idempotencyInput } from '../lib/models';
 import { spec } from '../spec';
 
 export let ingestData = SlateTool.create(spec, {
   name: 'Ingest Data',
   key: 'ingest_data',
   description: `Pushes a batch of data records into a Databox dataset. Each record is a JSON object whose keys match the dataset's columns. Supports real-time and event-based updates.`,
+  tags: { destructive: true },
   instructions: [
-    'Each record should be a flat JSON object with keys corresponding to dataset columns.',
+    'Records must contain JSON-compatible values and finite numbers. Use ISO 8601 strings with an explicit timezone for datetime columns; values are not coerced or converted into legacy metric timestamps.',
     'Include a datetime column (e.g. "occurredAt") for time-based metrics and date range selection in Databox.'
   ],
-  constraints: ['Maximum **100 records** per ingestion request.']
+  constraints: [
+    'v1: maximum 100 records per request. v2: maximum 500 records or 10 MB per request.',
+    'Ingestion may overwrite primary-key matches and create history. Request acceptance is not row-level success; poll get_ingestion_status and independently read the dataset.'
+  ]
 })
   .input(
     z.object({
-      datasetId: z.string().describe('UUID of the dataset to ingest data into'),
+      accountId: accountIdInput,
+      idempotencyKey: idempotencyInput,
+      datasetId: z
+        .string()
+        .describe(
+          'Identifier of the dataset (v1 UUID or v2 decimal ID encoded as text) to ingest data into'
+        ),
       records: z
         .array(z.record(z.string(), z.unknown()))
         .describe(
@@ -31,8 +42,11 @@ export let ingestData = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.ingestData(ctx.input.datasetId, ctx.input.records);
+    let client = new Client({ token: ctx.auth.token, apiVersion: ctx.config.apiVersion });
+    let result = await client.ingestData(ctx.input.datasetId, ctx.input.records, {
+      accountId: ctx.input.accountId,
+      idempotencyKey: ctx.input.idempotencyKey
+    });
 
     return {
       output: {
@@ -40,7 +54,7 @@ export let ingestData = SlateTool.create(spec, {
         status: result.status,
         message: result.message
       },
-      message: `Ingested **${ctx.input.records.length}** record(s) into dataset **${ctx.input.datasetId}**. Ingestion ID: \`${result.ingestionId}\`.`
+      message: `Submitted **${ctx.input.records.length}** record(s) for processing in dataset **${ctx.input.datasetId}**. Verify ingestion **${result.ingestionId}** before treating rows as stored.`
     };
   })
   .build();

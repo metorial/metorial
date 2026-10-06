@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PrismaClient } from '../lib/client';
+import { paginationInput, paginationOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listWorkspaces = SlateTool.create(spec, {
@@ -11,9 +12,10 @@ export let listWorkspaces = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object(paginationInput))
   .output(
     z.object({
+      ...paginationOutput,
       workspaces: z
         .array(
           z.object({
@@ -31,9 +33,9 @@ export let listWorkspaces = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new PrismaClient(ctx.auth.token);
-    let workspaces = await client.listWorkspaces();
+    let workspaces = await client.listWorkspaces(ctx.input);
 
-    let mapped = workspaces.map(w => ({
+    let mapped = workspaces.data.map(w => ({
       workspaceId: w.id,
       displayName: w.displayName ?? w.name,
       slug: w.slug,
@@ -41,7 +43,11 @@ export let listWorkspaces = SlateTool.create(spec, {
     }));
 
     return {
-      output: { workspaces: mapped },
+      output: {
+        workspaces: mapped,
+        nextCursor: workspaces.nextCursor,
+        hasMore: workspaces.hasMore
+      },
       message: `Found **${mapped.length}** workspace(s).`
     };
   })

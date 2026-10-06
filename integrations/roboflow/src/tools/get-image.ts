@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getImageTool = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let getImageTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project URL slug'),
+      projectId: projectIdSchema,
       imageId: z.string().describe('Unique image identifier')
     })
   )

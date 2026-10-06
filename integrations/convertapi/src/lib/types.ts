@@ -9,21 +9,8 @@ export interface ConvertApiFileResult {
 
 export interface ConvertApiConversionResponse {
   conversionCost: number;
-  conversionTime: number;
+  conversionTime?: number;
   files: ConvertApiFileResult[];
-}
-
-export interface ConvertApiRawConversionResponse {
-  ConversionCost: number;
-  ConversionTime: number;
-  Files: Array<{
-    FileName: string;
-    FileExt: string;
-    FileSize: number;
-    FileId?: string;
-    Url?: string;
-    FileData?: string;
-  }>;
 }
 
 export interface ConvertApiUploadResponse {
@@ -32,15 +19,8 @@ export interface ConvertApiUploadResponse {
   fileExt: string;
 }
 
-export interface ConvertApiRawUploadResponse {
-  FileId: string;
-  FileName: string;
-  FileExt: string;
-}
-
 export interface ConvertApiUserInfo {
-  secret: string;
-  apiKey: number;
+  apiKey?: number;
   active: boolean;
   fullName: string;
   email: string;
@@ -48,28 +28,26 @@ export interface ConvertApiUserInfo {
   conversionsConsumed: number;
 }
 
-export interface ConvertApiRawUserInfo {
-  Secret: string;
-  ApiKey: number;
-  Active: boolean;
-  FullName: string;
-  Email: string;
-  ConversionsTotal: number;
-  ConversionsConsumed: number;
-}
-
 export interface ConvertApiAsyncJobResponse {
   jobId: string;
 }
 
-export interface ConvertApiRawAsyncJobResponse {
-  JobId: string;
-}
-
-export interface ConverterInfo {
+export interface ConverterParameter {
   name: string;
+  type: string;
+  required: boolean;
+  array: boolean;
+  description: string | null;
+  defaultValue: string | null;
+}
+export interface ConverterInfo {
   sourceFormat: string;
   destinationFormat: string;
+  converterSourceFormat?: string;
+  converterSourceFormats?: string[];
+  converterDestinationFormats?: string[];
+  converterDestinationFormat?: string;
+  parameters?: ConverterParameter[];
 }
 
 export interface ConvertApiParameter {

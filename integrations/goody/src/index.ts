@@ -16,8 +16,6 @@ import {
   sendGift,
   updateOrderExpiration
 } from './tools';
-import { orderBatchEvents, orderEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     listPaymentMethods,
     listWorkspaces
   ],
-  triggers: [orderEvents, orderBatchEvents]
+  triggers: []
 });

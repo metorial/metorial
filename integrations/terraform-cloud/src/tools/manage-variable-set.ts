@@ -1,7 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { organizationNameSchema } from '../lib/contracts';
 import { createClient } from '../lib/helpers';
-import { mapPagination } from '../lib/mappers';
+import { mapPagination, mapVariableSet } from '../lib/mappers';
 import { spec } from '../spec';
 
 let variableSetSchema = z.object({
@@ -13,25 +14,17 @@ let variableSetSchema = z.object({
   updatedAt: z.string()
 });
 
-let mapVariableSet = (data: any) => ({
-  variableSetId: data.id || '',
-  name: data.attributes?.name || '',
-  description: data.attributes?.description || '',
-  global: data.attributes?.global ?? false,
-  createdAt: data.attributes?.['created-at'] || '',
-  updatedAt: data.attributes?.['updated-at'] || ''
-});
-
 export let listVariableSetsTool = SlateTool.create(spec, {
   name: 'List Variable Sets',
   key: 'list_variable_sets',
-  description: `List all variable sets in the organization. Variable sets allow sharing common variables across multiple workspaces without duplicating them.`,
+  description: `Call list_organizations to select an organization or use the optional configured default. List all variable sets in the organization. Variable sets allow sharing common variables across multiple workspaces without duplicating them.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       pageNumber: z.number().optional().describe('Page number for pagination'),
       pageSize: z.number().optional().describe('Number of results per page')
     })
@@ -67,10 +60,11 @@ export let listVariableSetsTool = SlateTool.create(spec, {
 export let createVariableSetTool = SlateTool.create(spec, {
   name: 'Create Variable Set',
   key: 'create_variable_set',
-  description: `Create a reusable variable set. Apply it globally to all workspaces or scope it to specific workspaces and projects.`
+  description: `Call list_organizations to select an organization or use the optional configured default. Create a reusable variable set. Apply it globally to all workspaces or scope it to specific workspaces and projects.`
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       name: z.string().describe('Name for the variable set'),
       description: z.string().optional().describe('Description of the variable set'),
       global: z

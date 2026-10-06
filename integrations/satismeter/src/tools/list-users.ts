@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SatisMeterClient } from '../lib/client';
+import { projectIdSchema, resolveProject } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listUsersTool = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listUsersTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       userId: z
         .string()
         .optional()
@@ -52,11 +54,11 @@ export let listUsersTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SatisMeterClient(ctx.auth.token, ctx.auth.writeKey);
     let result = await client.listUsers({
-      projectId: ctx.config.projectId,
+      projectId: resolveProject(ctx.input.projectId, ctx.config),
       userId: ctx.input.userId
     });
 
-    let users = (Array.isArray(result) ? result : []).map((u: any) => ({
+    let users = result.map(u => ({
       userInternalId: u.id,
       userId: u.userId,
       traits: u.traits,

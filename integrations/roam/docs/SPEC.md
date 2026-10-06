@@ -1,75 +1,21 @@
-Let me check the Postman collection and the official Roam Research backend API details.Now I have enough information to write the specification. Let me also check the Roam Research backend API on GitHub for more details about the available endpoints.Now I have sufficient information. Let me compile the specification.
+# Roam Research integration
 
-# Slates Specification for Roam
+This package uses the hosted Backend API, not the unrelated Roam HQ API or the desktop-local API. The [vendor backend SDK](https://github.com/Roam-Research/backend-sdks/tree/master/typescript) and its [native implementation](https://github.com/Roam-Research/backend-sdks/blob/master/typescript/src/index.ts) are the authoritative wire evidence. The [vendor documentation graph](https://roamresearch.com/#/app/developer-documentation/page/tIaOPdXCj) requires the JavaScript app; unauthenticated text retrieval did not expose its page contents. No current service acceptance is inferred from documentation availability.
 
-## Overview
+## Connection
 
-Roam Research is a note-taking tool for networked thought that organizes information as a graph database of interconnected pages and blocks. It is as easy to use as a word document or bulleted list, and as powerful for finding, collecting, and connecting related ideas as a graph database. It provides a Backend API (currently in public beta) that allows external programmatic access to read and write graph data.
+Retain api_token.apiToken and graphName configuration for existing connections. The graph name is visible in its Roam URL, not an undiscoverable tenant ID. Backend graph tokens are graph-scoped; use read-only for reads and read+edit for writes on a non-encrypted hosted graph. No verified profile, self endpoint, OAuth refresh, graph discovery, local desktop transport or append-only behavior is invented. The API uses POST under https://api.roamresearch.com/api/graph/{encodedGraphName}, with X-Authorization: Bearer. Documented routing to HTTPS peer-N.api.roamresearch.com is followed only with the same exact graph/action path, within two hops; credentials are not forwarded to other destinations.
 
-## Authentication
+## Retained capabilities and essential reads
 
-Roam Research uses API token-based authentication. Roam Research uses API keys for authentication.
+The thirteen retained keys cover query_graph, pull_data, get_page, create_page, update_page, delete_page, create_block, update_block, move_block, delete_block, add_daily_note, search_blocks and batch_actions. Added get_block reads an exact UID with native metadata, and list_pages discovers title/UID pairs via q. list_pages uses a local sorted output cap and truthfully exposes truncation; there is no native cursor or guaranteed full-graph inventory. search_blocks retains case-sensitive parameterized Datalog substring semantics rather than silently switching to ranked search.
 
-**Generating a Token:**
+Native q/pull responses require the result envelope, including null for absent pulls. Title lookups escape EDN strings. Scalar content, false, heading 0 and explicit empty query arguments remain intact. Write actions use the native create/move/update/delete page/block shapes. The existing batch key adds the documented update-page branch; local limits are 100 actions and 1 MiB JSON.
 
-This API is used outside of the Roam Research webapp. You can create and edit roam-graph-tokens from a new section "API tokens" in the "Graph" tab in the Settings. Only graph owners can generate API tokens. Tokens have an **Access Scope** that can be set to either **read** or **edit**. In most cases, you want to change the "Access Scope" of the token from "read" to "edit".
+Create operations assign a UID before sending when none is supplied, retain it in recovery guidance and confirm exact native outcomes. Updates/moves/deletions pre-read the exact target and check the requested outcome afterward. An already absent delete returns success false without sending another write. Write acceptance is distinct from unresolved readback; a failure may leave changes or part of a batch behind, and no write is automatically retried. Deletion does not erase retained history, logs or backups. Batch verification retains earlier requested fields unless a later action replaces them or deletes/recreates the target, and checks the final parent and position. Conflicting later sibling edits can leave position confirmation unresolved. It does not promise rollback or verify every intermediate state.
 
-**Using the Token:**
+add_daily_note defaults to today's UTC MM-DD-YYYY UID and verifies a real calendar date. The exact daily page must already exist; open or create it in Roam first. This replaces the unsupported previous auto-create promise without inventing a daily page title.
 
-All API requests are scoped to a specific graph and authenticated via a Bearer token. The base URL pattern is:
+## Page JSON
 
-`https://api.roamresearch.com/api/graph/{GRAPH_NAME}/{action}`
-
-The token is passed as an `X-Authorization: Bearer {api_token}` header (or as a standard `Authorization: Bearer {api_token}` header).
-
-**Required credentials:**
-
-- **API Token**: Generated from Roam Settings → Graph → API Tokens.
-- **Graph Name**: The name of the Roam graph to access.
-
-**Limitations:**
-
-- You might not be the owner of the graph (only graph owners can create API tokens). The graph may be an encrypted graph — Roam's backend does not work with encrypted graphs, due to them being end-to-end encrypted.
-
-## Features
-
-### Page Management
-
-Create, update, and delete pages in a Roam graph. Available operations include `createPage`, `updatePage`, and `deletePage`. Pages are identified by their title.
-
-### Block Management
-
-Create, update, move, and delete blocks (the fundamental content units in Roam). Available operations include `createBlock`, `moveBlock`, `updateBlock`, and `deleteBlock`. Blocks are identified by unique UIDs and can be nested hierarchically under pages or other blocks.
-
-- Blocks support Roam's markup syntax including `[[page references]]`, `#tags`, `((block references))`, and TODO/DONE markers.
-- Blocks can be positioned by specifying a parent UID and order.
-
-### Datalog Querying
-
-Query the graph database using Datalog, a declarative query language. This allows powerful, flexible retrieval of data across the entire graph based on relationships between pages and blocks.
-
-- Queries use the Datomic-style Datalog syntax (`:find`, `:where` clauses).
-- Supports parameterized queries via `args`.
-- The `pull` operation can retrieve specific entity data by pattern.
-- Queries can search for blocks by content, find pages by title, traverse references, and perform aggregations.
-
-### Data Pull
-
-Retrieve structured data for a specific entity (page or block) by its identifier. This complements the query feature by providing a direct lookup mechanism to pull all or selected attributes of a known entity.
-
-### Daily Notes
-
-Add content as child blocks to a daily note page. This is useful for quick capture and journaling workflows.
-
-- Content is typically prepended or appended to the current day's page.
-- The daily page UID follows a date-based format (e.g., `MM-DD-YYYY`).
-
-### Graph Export
-
-Export the full graph data as JSON for backup or synchronization purposes.
-
-- Roam's backend does not work with encrypted graphs, so exports are only available for non-encrypted graphs.
-
-## Events
-
-The provider does not support events. Roam Research's Backend API does not offer webhooks or built-in event subscription mechanisms for receiving real-time notifications about changes in a graph.
+get_page optionally generates JSON from its exact native page read, within an 8 MiB bound. This is a page file, not a full graph backup or native export job. No provider file download or expiry/renewal contract is claimed. There are no triggers or replacement groups.

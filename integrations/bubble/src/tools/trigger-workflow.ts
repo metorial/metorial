@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let triggerWorkflow = SlateTool.create(spec, {
@@ -14,12 +14,18 @@ If the workflow is configured to return data, the response will contain the retu
     'Parameter names must match exactly what is defined in the workflow configuration.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      method: z
+        .enum(['POST', 'GET'])
+        .optional()
+        .describe(
+          'Configured workflow HTTP method from get_api_spec; defaults to POST. GET workflows can also change data.'
+        ),
       workflowName: z
         .string()
         .describe('Name of the API workflow to trigger, as defined in the Bubble editor.'),
@@ -41,14 +47,12 @@ If the workflow is configured to return data, the response will contain the retu
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.appBaseUrl,
-      token: ctx.auth?.token
-    });
+    const client = clientFor(ctx);
 
     let response = await client.triggerWorkflow(
       ctx.input.workflowName,
-      ctx.input.parameters ?? {}
+      ctx.input.parameters ?? {},
+      ctx.input.method
     );
 
     return {

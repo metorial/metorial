@@ -1,65 +1,39 @@
-# <img src="https://provider-logos.metorial-cdn.com/ashby.svg" height="20"> Ashby
+# Ashby
 
-Manage the full recruiting lifecycle in an applicant tracking system. Create, update, search, and list candidates, applications, and jobs. Track applications through hiring pipeline stages, change stages and sources, and transfer between jobs. Schedule and manage interviews, interviewer pools, and interview plans. Create, update, and approve offers. Manage job postings (publish, unpublish, update content) and job boards. Create and track openings (headcount). Manage organizational structure including departments, locations, and users. Set custom fields, add tags, notes, and files to candidates. Upload resumes, anonymize candidates, and handle referrals. Generate reports, submit feedback, create survey requests, and add assessments. Receive webhooks for candidate hires, stage changes, application updates, interview schedules, job and offer changes, and more.
+Read and manage candidates, applications, jobs, interview schedules and offer forms through Ashby's documented public API. Discover the organization resources those workflows require, inspect the connected API key and download candidate or offer files.
 
-## Tools
+Connect an API key from Developer Settings. Enable `apiKeysRead` for connection/identity verification and the endpoint-specific permissions needed by each workflow. The API key is the Basic-auth username with an empty password. No organization ID or OAuth setup is required. The connected key's observed API version is exposed by the identity tool; the reference used here is `2026-01-01`.
 
-### Create Application
+| Tool | Behavior |
+| --- | --- |
+| Create Candidate | Creates a full name and primary personal email/phone; social links use a separate update. |
+| Get Candidate | Reads an exact ID or one unambiguous email/name match, including visible field and file metadata. |
+| Update Candidate | Updates profile fields and separately adds a tag, note or project membership. |
+| Create Application | Associates an existing candidate and job, with optional documented pipeline/source fields. |
+| Update Application | Changes stage/source, transfers between jobs, or changes hiring-team membership. |
+| List Applications | Reads one page or an exact application, with documented expansions. |
+| Create Job | Creates a job with a title and explicit department/team and location IDs. |
+| List Jobs | Reads an exact job, one filtered page or bounded title-search results. |
+| Update Job | Changes details/status or replaces compensation tiers through separate operations. |
+| Manage Offer | Reads offers, starts a form in an existing process, submits a form or force-approves the latest version. |
+| Manage Interview Schedule | Lists exact schedule/event IDs, creates schedules, updates existing events or cancels a schedule. |
+| List Organization Data | Discovers departments, locations, users, sources, archive reasons, tags, candidates, projects, field definitions, plans/stages/interviews and hiring roles. |
+| Set Custom Field | Sets or clears a supported Candidate, Application, Job or Opening field. Offer fields use offer forms. |
+| Get Current API Key Identity | Returns key title, creation time, endpoint permissions and observed API version. |
+| Download Candidate or Offer File | Prepares a downloadable file from its exact provider handle. |
 
-Creates a new application for a candidate on a job in Ashby. An application represents a candidate's progression through the hiring pipeline for a specific job. Optionally specify an interview plan, starting stage, source, or credited user.
+Pagination uses `perPage` from 1–100 and opaque cursor/sync tokens. Preserve native `pageInfo` fields, including absence/null. Follow pages until the provider explicitly reports `moreDataAvailable: false`; an omitted flag is not proof of completion. Job title search is bounded by `perPage`, does not accept sync/cursor tokens and applies a combined status filter locally. Source, archive-reason, hiring-role and plan-bound interview-stage discovery are not paginated. User search uses an exact email.
 
-### Create Candidate
+Compound writes are sequential and are not atomic. A failure after an accepted operation identifies confirmed prior operations; a response/readback failure can leave completion unknown. Read the exact resource before retrying. Warning codes can indicate partially accepted metadata. Recruiting, notification, calendar, compensation and approval history may remain after a later state change.
 
-Creates a new candidate in Ashby with name, email, phone, and social links. Returns the created candidate's ID and basic profile information.
+Application transfers require an explicit target stage and plan; the exact target job's default plan is used only when available. Hiring-role names must resolve uniquely, or pass the discovered role ID. Schedule updates require the existing event ID from the exact selected schedule and are limited by Ashby to schedules created with the same key. Feedback deletion is denied during event updates.
 
-### Create Job
+Offer process, form-instance, offer-record and offer-version IDs are distinct. `start` requires an existing prepared process and returns a form instance; `create` requires that process and form ID. Neither form submission nor starting a version implies offer delivery or acceptance. `approve` force-approves the current version and overrides the approval process. Native offers do not provide top-level creation/update timestamps; version timestamps are exposed instead.
 
-Creates a new job in Ashby with a title and optional location, department, and default interview plan. Returns the created job's ID and basic details.
+Legacy tool keys and field types are retained. Unsupported legacy nonpersonal contact types, Offer custom-field writes and old offer/application-ID routing combinations fail with actionable guidance. Job creation still accepts the legacy optional-ID schema but requires its documented department/team and location fields before writing. No candidate deletion, file upload, reports, feedback, job posting, headcount or webhook operations are included. Ashby-generated demo files may not be downloadable; file access URLs are renewed on each download because the API does not document their lifetime.
 
-### Get Candidate
-
-Retrieves detailed information about a candidate. Can look up by ID or search by email/name. When searching by email or name, returns the first matching candidate.
-
-### List Applications
-
-Lists applications with pagination or retrieves detailed information about a specific application. Applications represent a candidate's progress through the hiring pipeline for a particular job.
-
-### List Jobs
-
-Lists or searches jobs in Ashby. Can paginate through all jobs or search by term and status. When a search term or status filter is provided, the search endpoint is used instead of the list endpoint.
-
-### List Organization Data
-
-Lists departments, locations, users, sources, archive reasons, candidate tags, or interview stages from the Ashby organization. Returns results in a consistent format regardless of resource type.
-
-### Manage Interview Schedule
-
-Creates, updates, cancels, or lists interview schedules in Ashby. Use this tool to coordinate interview scheduling for candidates in the hiring pipeline.
-
-### Manage Offer
-
-Creates, retrieves, lists, updates, approves, or starts offers in Ashby. Use this tool to manage the full offer lifecycle for candidates in the hiring pipeline.
-
-### Set Custom Field
-
-Sets a custom field value on an Ashby entity. Use the list organization tool with \
-
-### Update Application
-
-Updates an existing application in Ashby. Supports multiple actions: change the interview stage (optionally with an archive reason), change the application source, transfer the application to a different job, and add or remove hiring team members. Multiple actions can be performed in a single call.
-
-### Update Candidate
-
-Updates a candidate's profile in Ashby. Supports changing name, email, phone, social links, adding tags, creating notes, and assigning to projects. Multiple operations can be performed in a single call.
-
-### Update Job
-
-Updates a job's details, status, or compensation. Supports changing the title, location, department, status, and compensation in a single call.
+[Authentication](https://developers.ashbyhq.com/docs/authentication) · [API versions](https://developers.ashbyhq.com/docs/api-versions) · [API reference](https://developers.ashbyhq.com/reference/introduction)
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE)

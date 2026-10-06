@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapUser } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -27,7 +28,7 @@ export let listUsers = SlateTool.create(spec, {
           userId: z.number().describe('Unique user identifier'),
           name: z.string().describe('Full name of the user'),
           email: z.string().describe('Email address'),
-          available: z.boolean().describe('Whether the user is available'),
+          available: z.boolean().optional().describe('Whether the user is available'),
           availabilityStatus: z
             .string()
             .nullable()
@@ -35,45 +36,29 @@ export let listUsers = SlateTool.create(spec, {
           timeZone: z.string().nullable().describe('User timezone'),
           language: z.string().nullable().describe('User language'),
           wrapUpTime: z.number().nullable().describe('Wrap-up time in seconds'),
-          createdAt: z.string().describe('Creation date as ISO string')
+          createdAt: z.string().optional().describe('Creation date as ISO string')
         })
       ),
+      perPage: z.number().optional(),
+      nextPageLink: z.string().nullable().optional(),
+      previousPageLink: z.string().nullable().optional(),
+      collectionLimit: z.number().optional(),
+      historyWindowMonths: z.number().optional(),
       totalCount: z.number().describe('Total number of users'),
       currentPage: z.number().describe('Current page number')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth);
-
-    let result = await client.listUsers({
-      from: ctx.input.from,
-      to: ctx.input.to,
-      order: ctx.input.order,
-      page: ctx.input.page,
-      perPage: ctx.input.perPage
-    });
-
-    let users = result.items.map((user: any) => ({
-      userId: user.id,
-      name: user.name || `${user.first_name || ''} ${user.last_name || ''}`.trim(),
-      email: user.email,
-      available: user.available ?? false,
-      availabilityStatus: user.availability_status ?? null,
-      timeZone: user.time_zone ?? null,
-      language: user.language ?? null,
-      wrapUpTime: user.wrap_up_time ?? null,
-      createdAt: user.created_at
-        ? new Date(user.created_at * 1000).toISOString()
-        : new Date().toISOString()
-    }));
-
+    const result = await new Client(ctx.auth).listUsers(ctx.input);
     return {
       output: {
-        users,
+        users: result.items.map(mapUser),
         totalCount: result.meta.total,
-        currentPage: result.meta.currentPage
+        currentPage: result.meta.currentPage,
+        perPage: result.meta.perPage,
+        nextPageLink: result.meta.nextPageLink
       },
-      message: `Found **${result.meta.total}** users (showing page ${result.meta.currentPage}, ${users.length} results).`
+      message: `Retrieved ${result.items.length} users from native page ${result.meta.currentPage}.`
     };
   })
   .build();

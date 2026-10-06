@@ -1,7 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  connectionId: z.string().describe('Unique connection identifier'),
+  name: z.string().optional().describe('Connection name'),
+  type: z.string().optional().describe('Connection type'),
+  lastModified: z.string().optional().describe('Last modification timestamp'),
+  offline: z.boolean().optional().describe('Whether the connection is offline'),
+  pingResult: z.any().optional().describe('Result of the connection ping test, if requested'),
+  rawConnection: z.any().describe('Credential-filtered native connection object')
+});
 
 export let getConnection = SlateTool.create(spec, {
   name: 'Get Connection',
@@ -21,48 +32,14 @@ export let getConnection = SlateTool.create(spec, {
         .describe('If true, also ping the connection to verify it is operational')
     })
   )
-  .output(
-    z.object({
-      connectionId: z.string().describe('Unique connection identifier'),
-      name: z.string().optional().describe('Connection name'),
-      type: z.string().optional().describe('Connection type'),
-      lastModified: z.string().optional().describe('Last modification timestamp'),
-      offline: z.boolean().optional().describe('Whether the connection is offline'),
-      pingResult: z
-        .any()
-        .optional()
-        .describe('Result of the connection ping test, if requested'),
-      rawConnection: z.any().describe('Full connection object from the API')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let connection = await client.getConnection(ctx.input.connectionId);
-
-    let pingResult: any;
-    if (ctx.input.testConnection) {
-      try {
-        pingResult = await client.pingConnection(ctx.input.connectionId);
-      } catch (err: any) {
-        pingResult = { error: err.message || 'Ping failed' };
-      }
-    }
-
-    return {
-      output: {
-        connectionId: connection._id,
-        name: connection.name,
-        type: connection.type,
-        lastModified: connection.lastModified,
-        offline: connection.offline,
-        pingResult,
-        rawConnection: connection
-      },
-      message: `Retrieved connection **${connection.name || connection._id}**${pingResult ? ` (ping: ${pingResult.code === 200 ? 'OK' : 'failed'})` : ''}.`
-    };
+    const result = await invoke('get_connection', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

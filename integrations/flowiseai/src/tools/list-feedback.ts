@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FlowiseClient } from '../lib/client';
+import { FlowiseClient, parseFlowiseList } from '../lib/client';
 import { spec } from '../spec';
 
 export let listFeedback = SlateTool.create(spec, {
@@ -46,7 +46,7 @@ export let listFeedback = SlateTool.create(spec, {
 
     let { chatflowId, ...params } = ctx.input;
     let result = await client.listFeedback(chatflowId, params);
-    let entries = Array.isArray(result) ? result : [];
+    let { items: entries } = parseFlowiseList(result);
 
     return {
       output: {

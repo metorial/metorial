@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getAccountFields = SlateTool.create(spec, {
   name: 'Get Account Fields',
   key: 'get_account_fields',
-  description: `Retrieve all available employee field definitions for the BambooHR account. Returns field IDs, names, types, and aliases. Useful for discovering what fields can be used in employee requests, reports, and webhook configurations.`,
+  description: `Retrieve visible employee field definitions, including field IDs, names, types and aliases for employee reads, writes and reports.`,
   tags: {
     readOnly: true,
     destructive: false
@@ -19,13 +19,10 @@ export let getAccountFields = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getFields();
-    let fields = Array.isArray(data) ? data : [];
+    let fields = data;
 
     return {
       output: {
@@ -64,14 +61,11 @@ export let getAccountMetadata = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let includes = ctx.input.include || ['lists', 'tables', 'users'];
 
-    let output: any = {};
+    let output: { lists?: unknown; tables?: unknown; users?: unknown } = {};
     let promises: Promise<void>[] = [];
 
     if (includes.includes('lists')) {

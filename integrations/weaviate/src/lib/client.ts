@@ -1,7 +1,7 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class WeaviateClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { instanceUrl: string; token?: string }) {
     let headers: Record<string, string> = {
@@ -10,9 +10,33 @@ export class WeaviateClient {
     if (config.token) {
       headers.Authorization = `Bearer ${config.token}`;
     }
-    this.axios = createAxios({
+    let url: URL;
+    try {
+      url = new URL(config.instanceUrl);
+    } catch {
+      throw createApiServiceError('Enter a valid Weaviate instance URL.');
+    }
+    if (
+      !['https:', 'http:'].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      throw createApiServiceError(
+        'Use an HTTP or HTTPS instance URL without credentials, query parameters, or a fragment.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: config.instanceUrl.replace(/\/+$/, ''),
-      headers
+      headers,
+      timeout: 60000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Weaviate',
+          reason: 'weaviate_api_error'
+        })
     });
   }
 
@@ -23,18 +47,27 @@ export class WeaviateClient {
     return res.data;
   }
 
+  async getCurrentUser(): Promise<any> {
+    let res = await this.axios.get('/v1/users/own-info');
+    return res.data;
+  }
+
   async getNodes(params?: { output?: string }): Promise<any> {
     let res = await this.axios.get('/v1/nodes', { params });
     return res.data;
   }
 
   async getLiveness(): Promise<boolean> {
-    let res = await this.axios.get('/v1/.well-known/live');
+    let res = await this.axios.get('/v1/.well-known/live', {
+      validateStatus: status => status === 200 || status === 503
+    });
     return res.status === 200;
   }
 
   async getReadiness(): Promise<boolean> {
-    let res = await this.axios.get('/v1/.well-known/ready');
+    let res = await this.axios.get('/v1/.well-known/ready', {
+      validateStatus: status => status === 200 || status === 503
+    });
     return res.status === 200;
   }
 
@@ -46,7 +79,7 @@ export class WeaviateClient {
   }
 
   async getCollection(collectionName: string): Promise<any> {
-    let res = await this.axios.get(`/v1/schema/${collectionName}`);
+    let res = await this.axios.get(`/v1/schema/${encodeURIComponent(collectionName)}`);
     return res.data;
   }
 
@@ -56,38 +89,50 @@ export class WeaviateClient {
   }
 
   async updateCollection(collectionName: string, updates: any): Promise<any> {
-    let res = await this.axios.put(`/v1/schema/${collectionName}`, updates);
+    let res = await this.axios.put(
+      `/v1/schema/${encodeURIComponent(collectionName)}`,
+      updates
+    );
     return res.data;
   }
 
   async deleteCollection(collectionName: string): Promise<void> {
-    await this.axios.delete(`/v1/schema/${collectionName}`);
+    await this.axios.delete(`/v1/schema/${encodeURIComponent(collectionName)}`);
   }
 
   async addProperty(collectionName: string, property: any): Promise<any> {
-    let res = await this.axios.post(`/v1/schema/${collectionName}/properties`, property);
+    let res = await this.axios.post(
+      `/v1/schema/${encodeURIComponent(collectionName)}/properties`,
+      property
+    );
     return res.data;
   }
 
   // ── Tenants ──
 
   async listTenants(collectionName: string): Promise<any[]> {
-    let res = await this.axios.get(`/v1/schema/${collectionName}/tenants`);
+    let res = await this.axios.get(`/v1/schema/${encodeURIComponent(collectionName)}/tenants`);
     return res.data as any[];
   }
 
   async addTenants(collectionName: string, tenants: any[]): Promise<any> {
-    let res = await this.axios.post(`/v1/schema/${collectionName}/tenants`, tenants);
+    let res = await this.axios.post(
+      `/v1/schema/${encodeURIComponent(collectionName)}/tenants`,
+      tenants
+    );
     return res.data;
   }
 
   async updateTenants(collectionName: string, tenants: any[]): Promise<any> {
-    let res = await this.axios.put(`/v1/schema/${collectionName}/tenants`, tenants);
+    let res = await this.axios.put(
+      `/v1/schema/${encodeURIComponent(collectionName)}/tenants`,
+      tenants
+    );
     return res.data;
   }
 
   async deleteTenants(collectionName: string, tenantNames: string[]): Promise<void> {
-    await this.axios.delete(`/v1/schema/${collectionName}/tenants`, {
+    await this.axios.delete(`/v1/schema/${encodeURIComponent(collectionName)}/tenants`, {
       data: tenantNames
     });
   }
@@ -116,7 +161,10 @@ export class WeaviateClient {
       tenant?: string;
     }
   ): Promise<any> {
-    let res = await this.axios.get(`/v1/objects/${collectionName}/${objectId}`, { params });
+    let res = await this.axios.get(
+      `/v1/objects/${encodeURIComponent(collectionName)}/${encodeURIComponent(objectId)}`,
+      { params }
+    );
     return res.data;
   }
 
@@ -125,6 +173,7 @@ export class WeaviateClient {
     properties: Record<string, any>;
     id?: string;
     vector?: number[];
+    vectors?: Record<string, unknown>;
     tenant?: string;
   }): Promise<any> {
     let res = await this.axios.post('/v1/objects', object);
@@ -136,12 +185,17 @@ export class WeaviateClient {
     objectId: string,
     object: {
       class: string;
+      id?: string;
       properties: Record<string, any>;
       vector?: number[];
+      vectors?: Record<string, unknown>;
       tenant?: string;
     }
   ): Promise<any> {
-    let res = await this.axios.put(`/v1/objects/${collectionName}/${objectId}`, object);
+    let res = await this.axios.put(
+      `/v1/objects/${encodeURIComponent(collectionName)}/${encodeURIComponent(objectId)}`,
+      object
+    );
     return res.data;
   }
 
@@ -151,10 +205,15 @@ export class WeaviateClient {
     patch: {
       class: string;
       properties: Record<string, any>;
+      vector?: number[];
+      vectors?: Record<string, unknown>;
       tenant?: string;
     }
   ): Promise<void> {
-    await this.axios.patch(`/v1/objects/${collectionName}/${objectId}`, patch);
+    await this.axios.patch(
+      `/v1/objects/${encodeURIComponent(collectionName)}/${encodeURIComponent(objectId)}`,
+      patch
+    );
   }
 
   async deleteObject(
@@ -164,22 +223,10 @@ export class WeaviateClient {
       tenant?: string;
     }
   ): Promise<void> {
-    await this.axios.delete(`/v1/objects/${collectionName}/${objectId}`, { params });
-  }
-
-  async checkObjectExists(
-    collectionName: string,
-    objectId: string,
-    params?: {
-      tenant?: string;
-    }
-  ): Promise<boolean> {
-    try {
-      let res = await this.axios.head(`/v1/objects/${collectionName}/${objectId}`, { params });
-      return res.status === 204;
-    } catch {
-      return false;
-    }
+    await this.axios.delete(
+      `/v1/objects/${encodeURIComponent(collectionName)}/${encodeURIComponent(objectId)}`,
+      { params }
+    );
   }
 
   // ── Batch Operations ──
@@ -201,7 +248,8 @@ export class WeaviateClient {
     }
   ): Promise<any> {
     let res = await this.axios.delete('/v1/batch/objects', {
-      data: { match, ...params }
+      data: { match, dryRun: params?.dryRun, output: params?.output },
+      params: { tenant: params?.tenant }
     });
     return res.data;
   }
@@ -218,8 +266,9 @@ export class WeaviateClient {
     }
   ): Promise<void> {
     await this.axios.post(
-      `/v1/objects/${collectionName}/${objectId}/references/${refProperty}`,
-      ref
+      `/v1/objects/${encodeURIComponent(collectionName)}/${encodeURIComponent(objectId)}/references/${encodeURIComponent(refProperty)}`,
+      { beacon: ref.beacon },
+      { params: { tenant: ref.tenant } }
     );
   }
 
@@ -233,8 +282,8 @@ export class WeaviateClient {
     }
   ): Promise<void> {
     await this.axios.delete(
-      `/v1/objects/${collectionName}/${objectId}/references/${refProperty}`,
-      { data: ref }
+      `/v1/objects/${encodeURIComponent(collectionName)}/${encodeURIComponent(objectId)}/references/${encodeURIComponent(refProperty)}`,
+      { data: { beacon: ref.beacon }, params: { tenant: ref.tenant } }
     );
   }
 
@@ -246,6 +295,24 @@ export class WeaviateClient {
       body.variables = variables;
     }
     let res = await this.axios.post('/v1/graphql', body);
+    if (res.data.errors?.length) {
+      throw createApiServiceError(
+        `Weaviate GraphQL query failed: ${res.data.errors.map((error: { message?: string }) => error.message || 'Unknown query error').join('; ')}`,
+        { reason: 'weaviate_graphql_error' }
+      );
+    }
+    return res.data;
+  }
+
+  async search(
+    collectionName: string,
+    method: string,
+    body: Record<string, unknown>
+  ): Promise<any> {
+    let res = await this.axios.post(
+      `/v1/search/${encodeURIComponent(collectionName)}/${method}`,
+      body
+    );
     return res.data;
   }
 
@@ -259,12 +326,14 @@ export class WeaviateClient {
       exclude?: string[];
     }
   ): Promise<any> {
-    let res = await this.axios.post(`/v1/backups/${backend}`, body);
+    let res = await this.axios.post(`/v1/backups/${encodeURIComponent(backend)}`, body);
     return res.data;
   }
 
   async getBackupStatus(backend: string, backupId: string): Promise<any> {
-    let res = await this.axios.get(`/v1/backups/${backend}/${backupId}`);
+    let res = await this.axios.get(
+      `/v1/backups/${encodeURIComponent(backend)}/${encodeURIComponent(backupId)}`
+    );
     return res.data;
   }
 
@@ -276,46 +345,17 @@ export class WeaviateClient {
       exclude?: string[];
     }
   ): Promise<any> {
-    let res = await this.axios.post(`/v1/backups/${backend}/${backupId}/restore`, body || {});
+    let res = await this.axios.post(
+      `/v1/backups/${encodeURIComponent(backend)}/${encodeURIComponent(backupId)}/restore`,
+      body || {}
+    );
     return res.data;
   }
 
   async getRestoreStatus(backend: string, backupId: string): Promise<any> {
-    let res = await this.axios.get(`/v1/backups/${backend}/${backupId}/restore`);
+    let res = await this.axios.get(
+      `/v1/backups/${encodeURIComponent(backend)}/${encodeURIComponent(backupId)}/restore`
+    );
     return res.data;
-  }
-
-  // ── Roles (RBAC) ──
-
-  async listRoles(): Promise<any[]> {
-    let res = await this.axios.get('/v1/authz/roles');
-    return res.data as any[];
-  }
-
-  async getRole(roleName: string): Promise<any> {
-    let res = await this.axios.get(`/v1/authz/roles/${roleName}`);
-    return res.data;
-  }
-
-  async createRole(role: { name: string; permissions: any[] }): Promise<any> {
-    let res = await this.axios.post('/v1/authz/roles', role);
-    return res.data;
-  }
-
-  async deleteRole(roleName: string): Promise<void> {
-    await this.axios.delete(`/v1/authz/roles/${roleName}`);
-  }
-
-  async assignRoleToUser(roleName: string, userId: string): Promise<void> {
-    await this.axios.post(`/v1/authz/roles/${roleName}/users/${userId}`);
-  }
-
-  async revokeRoleFromUser(roleName: string, userId: string): Promise<void> {
-    await this.axios.delete(`/v1/authz/roles/${roleName}/users/${userId}`);
-  }
-
-  async getUserRoles(userId: string): Promise<any[]> {
-    let res = await this.axios.get(`/v1/authz/users/${userId}/roles`);
-    return res.data as any[];
   }
 }

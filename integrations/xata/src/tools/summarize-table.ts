@@ -6,13 +6,15 @@ import { spec } from '../spec';
 export let summarizeTable = SlateTool.create(spec, {
   name: 'Summarize Table',
   key: 'summarize_table',
-  description: `Run strongly consistent calculations (count, sum, average, min, max) on groups of data. Use this for real-time statistics and group-by operations without relying on the eventually consistent search store.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Run strongly consistent calculations (count, sum, average, min, max) on groups of data. Use this for real-time statistics and group-by operations without relying on the eventually consistent search store.`,
   instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.',
     'Group by columns to break results into groups, e.g. ["status", "region"].',
     'Summaries define calculations, e.g. {"total": {"sum": "amount"}, "avgPrice": {"average": "price"}}.',
     'Filter narrows the dataset before grouping and summarizing.'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -75,8 +77,9 @@ export let summarizeTable = SlateTool.create(spec, {
 export let aggregateTable = SlateTool.create(spec, {
   name: 'Aggregate Table',
   key: 'aggregate_table',
-  description: `Run analytics aggregations on a table using the search/analytics engine. Supports count, sum, average, min, max, unique count, date histograms, top values, percentiles, and nested sub-aggregations.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Run analytics aggregations on a table using the search/analytics engine. Supports count, sum, average, min, max, unique count, date histograms, top values, percentiles, and nested sub-aggregations.`,
   instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.',
     'Aggregation definitions follow Xata syntax, e.g. {"totalOrders": {"count": "*"}, "byStatus": {"topValues": {"column": "status", "size": 10}}}.',
     'Nested sub-aggregations can be specified via the "aggs" key inside a bucket aggregation.'
   ],
@@ -85,6 +88,7 @@ export let aggregateTable = SlateTool.create(spec, {
     'Available on Pro and Enterprise plans only.'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

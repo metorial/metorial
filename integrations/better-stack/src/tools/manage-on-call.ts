@@ -1,5 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import {
+  type ApiResource,
+  nextUrlSchema,
+  onCallUsers,
+  type ResourceResponse,
+  requireFields,
+  teamNameSchema
+} from '../lib/api';
 import { UptimeClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -8,7 +16,7 @@ let onCallSchema = z.object({
   name: z.string().nullable().describe('Calendar name'),
   defaultCalendar: z.boolean().nullable().describe('Whether this is the default calendar'),
   onCallNow: z
-    .array(z.record(z.string(), z.any()))
+    .array(z.record(z.string(), z.unknown()))
     .nullable()
     .describe('Currently on-call members'),
   createdAt: z.string().nullable().describe('Creation timestamp'),
@@ -20,7 +28,7 @@ let escalationPolicySchema = z.object({
   name: z.string().nullable().describe('Policy name'),
   repeatCount: z.number().nullable().describe('Number of times to repeat escalation'),
   repeatDelay: z.number().nullable().describe('Delay between repeats in seconds'),
-  steps: z.array(z.record(z.string(), z.any())).nullable().describe('Escalation steps'),
+  steps: z.array(z.record(z.string(), z.unknown())).nullable().describe('Escalation steps'),
   createdAt: z.string().nullable().describe('Creation timestamp')
 });
 
@@ -28,6 +36,7 @@ export let manageOnCall = SlateTool.create(spec, {
   name: 'Manage On-Call',
   key: 'manage_on_call',
   description: `Manage on-call calendars and escalation policies. List, create, update, or delete on-call calendars and escalation policies. On-call calendars define who is on call, while escalation policies define how alerts are routed.`,
+  tags: { readOnly: false, destructive: true },
   instructions: [
     'Use resource "calendar" for on-call calendar operations.',
     'Use resource "policy" for escalation policy operations.',
@@ -37,6 +46,7 @@ export let manageOnCall = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamName: teamNameSchema,
       resource: z.enum(['calendar', 'policy']).describe('Resource type to manage'),
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete'])
@@ -55,9 +65,10 @@ export let manageOnCall = SlateTool.create(spec, {
         .optional()
         .describe('Delay between repeats in seconds (for policy create/update)'),
       steps: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .optional()
         .describe('Escalation steps configuration (for policy create/update)'),
+      nextUrl: nextUrlSchema,
       page: z.number().optional().describe('Page number for list action'),
       perPage: z.number().optional().describe('Results per page for list action')
     })
@@ -71,6 +82,7 @@ export let manageOnCall = SlateTool.create(spec, {
         .optional()
         .describe('List of escalation policies'),
       policy: escalationPolicySchema.optional().describe('Single escalation policy'),
+      nextUrl: z.string().optional().describe('Next-page URL, when available'),
       hasMore: z.boolean().optional().describe('Whether more results are available'),
       deleted: z.boolean().optional().describe('Whether the resource was deleted')
     })
@@ -78,31 +90,32 @@ export let manageOnCall = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new UptimeClient({
       token: ctx.auth.token,
-      teamName: ctx.config.teamName
+      tokenType: ctx.auth.tokenType,
+      teamName: ctx.input.teamName ?? ctx.config.teamName
     });
 
     let { resource, action, resourceId } = ctx.input;
 
-    let mapCalendar = (item: any) => {
-      let attrs = item.attributes || item;
+    let mapCalendar = (item: ApiResource) => {
+      let attrs = item.attributes;
       return {
         calendarId: String(item.id),
         name: attrs.name || null,
         defaultCalendar: attrs.default_calendar ?? null,
-        onCallNow: attrs.on_call_now || null,
+        onCallNow: onCallUsers(item),
         createdAt: attrs.created_at || null,
         updatedAt: attrs.updated_at || null
       };
     };
 
-    let mapPolicy = (item: any) => {
-      let attrs = item.attributes || item;
+    let mapPolicy = (item: ApiResource) => {
+      let attrs = item.attributes;
       return {
         policyId: String(item.id),
         name: attrs.name || null,
         repeatCount: attrs.repeat_count ?? null,
         repeatDelay: attrs.repeat_delay ?? null,
-        steps: attrs.steps || null,
+        steps: item.steps ?? attrs.steps ?? null,
         createdAt: attrs.created_at || null
       };
     };
@@ -110,18 +123,23 @@ export let manageOnCall = SlateTool.create(spec, {
     if (resource === 'calendar') {
       if (action === 'list') {
         let result = await client.listOnCallCalendars({
+          nextUrl: ctx.input.nextUrl,
           page: ctx.input.page,
           perPage: ctx.input.perPage
         });
         let calendars = (result.data || []).map(mapCalendar);
         return {
-          output: { calendars, hasMore: !!result.pagination?.next },
+          output: {
+            calendars,
+            hasMore: !!result.pagination?.next,
+            nextUrl: result.pagination?.next ?? undefined
+          },
           message: `Found **${calendars.length}** on-call calendar(s).`
         };
       }
 
       if (action === 'get') {
-        if (!resourceId) throw new Error('resourceId is required');
+        if (!resourceId) throw createApiServiceError('resourceId is required');
         let result = await client.getOnCallCalendar(resourceId);
         return {
           output: { calendar: mapCalendar(result.data || result) },
@@ -130,7 +148,7 @@ export let manageOnCall = SlateTool.create(spec, {
       }
 
       if (action === 'delete') {
-        if (!resourceId) throw new Error('resourceId is required');
+        if (!resourceId) throw createApiServiceError('resourceId is required');
         await client.deleteOnCallCalendar(resourceId);
         return {
           output: { deleted: true },
@@ -138,14 +156,15 @@ export let manageOnCall = SlateTool.create(spec, {
         };
       }
 
-      let body: Record<string, any> = {};
+      let body: Record<string, unknown> = {};
       if (ctx.input.name) body.name = ctx.input.name;
 
-      let result: any;
+      let result: ResourceResponse;
       if (action === 'create') {
+        requireFields(ctx.input.name);
         result = await client.createOnCallCalendar(body);
       } else {
-        if (!resourceId) throw new Error('resourceId is required');
+        if (!resourceId) throw createApiServiceError('resourceId is required');
         result = await client.updateOnCallCalendar(resourceId, body);
       }
       return {
@@ -157,18 +176,23 @@ export let manageOnCall = SlateTool.create(spec, {
     // Escalation Policies
     if (action === 'list') {
       let result = await client.listEscalationPolicies({
+        nextUrl: ctx.input.nextUrl,
         page: ctx.input.page,
         perPage: ctx.input.perPage
       });
       let policies = (result.data || []).map(mapPolicy);
       return {
-        output: { policies, hasMore: !!result.pagination?.next },
+        output: {
+          policies,
+          hasMore: !!result.pagination?.next,
+          nextUrl: result.pagination?.next ?? undefined
+        },
         message: `Found **${policies.length}** escalation policy(ies).`
       };
     }
 
     if (action === 'get') {
-      if (!resourceId) throw new Error('resourceId is required');
+      if (!resourceId) throw createApiServiceError('resourceId is required');
       let result = await client.getEscalationPolicy(resourceId);
       return {
         output: { policy: mapPolicy(result.data || result) },
@@ -177,7 +201,7 @@ export let manageOnCall = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!resourceId) throw new Error('resourceId is required');
+      if (!resourceId) throw createApiServiceError('resourceId is required');
       await client.deleteEscalationPolicy(resourceId);
       return {
         output: { deleted: true },
@@ -185,17 +209,18 @@ export let manageOnCall = SlateTool.create(spec, {
       };
     }
 
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (ctx.input.name) body.name = ctx.input.name;
     if (ctx.input.repeatCount !== undefined) body.repeat_count = ctx.input.repeatCount;
     if (ctx.input.repeatDelay !== undefined) body.repeat_delay = ctx.input.repeatDelay;
     if (ctx.input.steps) body.steps = ctx.input.steps;
 
-    let result: any;
+    let result: ResourceResponse;
     if (action === 'create') {
+      requireFields(ctx.input.name);
       result = await client.createEscalationPolicy(body);
     } else {
-      if (!resourceId) throw new Error('resourceId is required');
+      if (!resourceId) throw createApiServiceError('resourceId is required');
       result = await client.updateEscalationPolicy(resourceId, body);
     }
     return {

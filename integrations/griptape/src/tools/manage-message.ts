@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageMessage = SlateTool.create(spec, {
@@ -25,8 +26,8 @@ export let manageMessage = SlateTool.create(spec, {
       input: z.string().optional().describe('User input text (for create/update)'),
       output: z.string().optional().describe('Assistant output text (for create/update)'),
       metadata: z.record(z.string(), z.any()).optional().describe('Custom metadata'),
-      page: z.number().optional().describe('Page number (for list)'),
-      pageSize: z.number().optional().describe('Page size (for list)')
+      page: z.number().int().min(1).optional().describe('Page number (for list)'),
+      pageSize: z.number().int().min(1).optional().describe('Page size (for list)')
     })
   )
   .output(
@@ -52,6 +53,7 @@ export let manageMessage = SlateTool.create(spec, {
         )
         .optional()
         .describe('List of messages (for list action)'),
+      pagination: paginationSchema.optional().describe('Page navigation metadata'),
       totalCount: z.number().optional().describe('Total messages count (for list action)')
     })
   )
@@ -59,9 +61,11 @@ export let manageMessage = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.threadId) throw new Error('threadId is required for create');
-      if (!ctx.input.input) throw new Error('input is required for create');
-      if (!ctx.input.output) throw new Error('output is required for create');
+      if (!ctx.input.threadId) throw createApiServiceError('threadId is required for create');
+      if (ctx.input.input === undefined)
+        throw createApiServiceError('input is required for create');
+      if (ctx.input.output === undefined)
+        throw createApiServiceError('output is required for create');
       let result = await client.createMessage(ctx.input.threadId, {
         input: ctx.input.input,
         output: ctx.input.output,
@@ -83,7 +87,7 @@ export let manageMessage = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.messageId) throw new Error('messageId is required for get');
+      if (!ctx.input.messageId) throw createApiServiceError('messageId is required for get');
       let result = await client.getMessage(ctx.input.messageId);
       return {
         output: {
@@ -101,7 +105,8 @@ export let manageMessage = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.messageId) throw new Error('messageId is required for update');
+      if (!ctx.input.messageId)
+        throw createApiServiceError('messageId is required for update');
       let result = await client.updateMessage(ctx.input.messageId, {
         input: ctx.input.input,
         output: ctx.input.output,
@@ -123,7 +128,8 @@ export let manageMessage = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.messageId) throw new Error('messageId is required for delete');
+      if (!ctx.input.messageId)
+        throw createApiServiceError('messageId is required for delete');
       await client.deleteMessage(ctx.input.messageId);
       return {
         output: { messageId: ctx.input.messageId, deleted: true },
@@ -132,7 +138,7 @@ export let manageMessage = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'list') {
-      if (!ctx.input.threadId) throw new Error('threadId is required for list');
+      if (!ctx.input.threadId) throw createApiServiceError('threadId is required for list');
       let result = await client.listMessages(ctx.input.threadId, {
         page: ctx.input.page,
         pageSize: ctx.input.pageSize
@@ -145,11 +151,15 @@ export let manageMessage = SlateTool.create(spec, {
         createdAt: m.created_at
       }));
       return {
-        output: { messages, totalCount: result.pagination.totalCount },
+        output: {
+          messages,
+          pagination: result.pagination,
+          totalCount: result.pagination.totalCount
+        },
         message: `Found **${result.pagination.totalCount}** message(s) in thread ${ctx.input.threadId}.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

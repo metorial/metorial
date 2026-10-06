@@ -1,89 +1,29 @@
-# <img src="https://provider-logos.metorial-cdn.com/greenhouse.png" height="20"> Greenhouse
+# Greenhouse
 
-Manage recruiting workflows in the Greenhouse applicant tracking system (ATS). Create, read, update, and delete candidates, applications, jobs, and offers. Track candidates through hiring stages, manage interview schedules and scorecards, and handle offer approval workflows. Ingest candidates from external sources such as agencies and job portals. Build custom career sites and job boards. Manage organizational data including departments, offices, users, custom fields, and rejection reasons. Handle employee onboarding profiles and tasks. Receive real-time webhook notifications for candidate, application, job, interview, and organization events. Supports prospect management, candidate merging, GDPR anonymization, and assessment integrations.
+Manage candidate records and applications through Harvest v3. Read jobs, offers, users, departments, offices and interviews; discover rejection reasons and download application files.
 
-## Tools
+Authentication requires Harvest v3 OAuth. Greenhouse made Harvest v1/v2 and API keys unavailable after August 31, 2026. Existing API-key connections must reconnect; their keys are never sent as v3 bearer tokens.
 
-### Add Candidate Note
+For a custom integration, create Harvest v3 OAuth credentials in Greenhouse API Credentials and supply the client ID and secret. An optional acting user ID selects a Site Admin; omission uses the credential’s integration service user. Remove the retired `onBehalfOf` setting. For partner OAuth, Greenhouse must approve the application, scopes and redirect URI. Custom access tokens are regenerated; partner access tokens are refreshed using the issued refresh token. `get_current_context` verifies organization, subject and granted scopes with the issuing client. It does not infer a current person from the first user in a list.
 
-Add a note to a candidate's activity feed in Greenhouse. Notes can have different visibility levels (admin only, private, or public). Requires the **On-Behalf-Of** user ID in config.
+All list endpoints require Site Admin or integration service user access. Private candidates, notes, offers and fields require additional Greenhouse permissions. An empty page does not establish that the organization has no such records.
 
-### Advance or Move Application
+The 19 existing tool keys are retained. Four additions provide current connection verification, rejection reason discovery, application file discovery and file downloads. Lists return `hasMore` and `nextCursor` from Greenhouse pagination links. Use `cursor` alone on subsequent pages. Application file lists also retain their application ID to verify ownership. Legacy `page` supports only the first page. Date filters support one created or updated range per request.
 
-Advance an application to the next interview stage, or move it to a specific stage. Use **advance** to progress to the next stage automatically, or **move** to jump to a specific target stage. Requires the **On-Behalf-Of** user ID in config.
+Harvest v3 compatibility limits:
 
-### Create Candidate
+- Find candidates associated with a job through `list_applications(jobId)` and the returned candidate IDs. The retired `list_candidates.jobId` filter fails with this remediation.
+- Creating a candidate supports at most one application job ID. Social profiles use optional `socialMediaUrls`; typed legacy `socialMediaAddresses` require migration. No extra application writes occur behind a candidate creation.
+- Job creation requires `numberOfOpenings` and a template whose required custom fields are already supplied. Job deletion is not available through Harvest. Created jobs and audit history remain.
+- Rejection requires `rejectionReasonId`; discover it with `list_rejection_reasons`. Email scheduling requires a template and timestamp. Rejection confirmation does not prove email delivery.
+- Automatic advance uses the documented v3 move operation with its target omitted. Explicit moves use job interview stage IDs from `get_job(includeStages)`. Transition rules may send automated emails and retain stage history.
+- Candidate tags resolve unique existing organization tag names. Removing a tag deletes only that candidate’s membership; it does not delete the tag definition.
+- Expanded v1 relationships that v3 no longer returns remain omitted. Available relationship IDs are returned instead; omitted values are not replaced with invented empty collections or names.
+- Offer `sentAt` and `startsAt` preserve provider calendar dates. V3 has no `sent` status; inspect `sentAt` instead.
+- Candidate notes preserve author and visibility. Their records can be removed only as part of permanent candidate deletion; audit effects can remain. No note deletion tool is provided.
 
-Create a new candidate in Greenhouse. You can optionally associate the candidate with one or more jobs by providing application job IDs. Requires the **On-Behalf-Of** user ID in config.
+Downloads verify the file’s application ID and provide a downloadable file with metadata. Greenhouse URLs last seven days and can be renewed. API bearer credentials are not forwarded to the file host.
 
-### Create Job
+Requests are not automatically retried. After an ambiguous write failure, inspect the candidate, application or job in Greenhouse before submitting the change again.
 
-Create a new job in Greenhouse based on a template job. The template job's settings, stages, and configuration will be copied. Requires the **On-Behalf-Of** user ID in config.
-
-### Get Application
-
-Retrieve detailed information about a specific application by its ID. Returns application status, current stage, source, associated jobs, rejection reason, and custom fields.
-
-### Get Candidate
-
-Retrieve detailed information about a specific candidate by their ID. Returns full candidate profile including contact information, tags, custom fields, and associated applications.
-
-### Get Job
-
-Retrieve detailed information about a specific job by its ID. Returns job details including departments, offices, hiring team, openings, stages, and custom fields.
-
-### Get User
-
-Retrieve detailed information about a specific Greenhouse user by their ID. Returns user name, email, admin status, and account details.
-
-### List Applications
-
-List and filter applications in Greenhouse. Filter by job, status (active, rejected, hired), or date ranges. Returns paginated results with current stage and source information.
-
-### List Candidates
-
-List and search candidates in Greenhouse. Supports filtering by email, date ranges, and associated job. Returns paginated results.
-
-### List Departments
-
-List all departments in Greenhouse. Returns department names, hierarchy (parent/child relationships), and external IDs.
-
-### List Jobs
-
-List and filter jobs in Greenhouse. Filter by status (open, closed, draft), department, or office. Returns paginated results with department, office, and opening information.
-
-### List Offers
-
-List offers in Greenhouse. Can list all offers globally or filter by a specific application. Supports filtering by status and date ranges.
-
-### List Offices
-
-List all offices in Greenhouse. Returns office names, hierarchy (parent/child relationships), locations, and external IDs.
-
-### List Scheduled Interviews
-
-List scheduled interviews in Greenhouse. Filter by application or date ranges. Returns interview details including time, location, interviewers, and scorecard status.
-
-### List Users
-
-List users in Greenhouse. Supports filtering by email and date ranges. Returns paginated results with user details and permissions info.
-
-### Manage Candidate Tags
-
-Add or remove tags on a candidate in Greenhouse. Use the action field to specify whether to add or remove the tag. Requires the **On-Behalf-Of** user ID in config.
-
-### Reject Application
-
-Reject a candidate's application. Optionally specify a rejection reason, notes, and whether to send a rejection email. Requires the **On-Behalf-Of** user ID in config.
-
-### Update Candidate
-
-Update an existing candidate's information in Greenhouse. Only provided fields will be updated. Requires the **On-Behalf-Of** user ID in config.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Official documentation: [Authentication](https://harvestdocs.greenhouse.io/docs/authentication), [Partner OAuth](https://harvestdocs.greenhouse.io/docs/harvest-partner-oauth), [Pagination](https://harvestdocs.greenhouse.io/docs/pagination), [Write migration](https://harvestdocs.greenhouse.io/docs/write-endpoint-migration-guide), [V1/v2 retirement](https://support.greenhouse.io/hc/en-us/articles/5888163769883-Create-Harvest-API-credentials-for-an-integration).

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubActionsClient } from '../lib/client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let controlWorkflowRun = SlateTool.create(spec, {
@@ -54,6 +55,7 @@ export let controlWorkflowRun = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new GitHubActionsClient(ctx.auth.token);
     let { owner, repo, runId, action } = ctx.input;
 
@@ -62,7 +64,7 @@ export let controlWorkflowRun = SlateTool.create(spec, {
         await client.cancelWorkflowRun(owner, repo, runId);
         return {
           output: { actionPerformed: 'cancelled', runId },
-          message: `Cancelled workflow run **#${runId}** in **${owner}/${repo}**.`
+          message: `GitHub accepted cancellation for workflow run **#${runId}** in **${owner}/${repo}**.`
         };
 
       case 'rerun':
@@ -79,15 +81,19 @@ export let controlWorkflowRun = SlateTool.create(spec, {
           message: `Re-running failed jobs for workflow run **#${runId}** in **${owner}/${repo}**.`
         };
 
-      case 'rerun_job':
+      case 'rerun_job': {
         if (!ctx.input.jobId) {
-          throw new Error('jobId is required when action is "rerun_job".');
+          throw createApiServiceError('jobId is required when action is "rerun_job".');
         }
+        const job = await client.getJob(owner, repo, ctx.input.jobId);
+        if (job.run_id !== runId)
+          throw createApiServiceError('The supplied jobId does not belong to runId.');
         await client.rerunWorkflowJob(owner, repo, ctx.input.jobId);
         return {
           output: { actionPerformed: 'rerun_job', runId },
           message: `Re-running job **${ctx.input.jobId}** from workflow run **#${runId}**.`
         };
+      }
 
       case 'delete':
         await client.deleteWorkflowRun(owner, repo, runId);
@@ -104,9 +110,13 @@ export let controlWorkflowRun = SlateTool.create(spec, {
         };
 
       case 'review_deployment':
-        if (!ctx.input.deploymentEnvironmentIds || !ctx.input.deploymentState) {
-          throw new Error(
-            'deploymentEnvironmentIds and deploymentState are required for "review_deployment".'
+        if (
+          !ctx.input.deploymentEnvironmentIds?.length ||
+          !ctx.input.deploymentState ||
+          !ctx.input.deploymentComment?.trim()
+        ) {
+          throw createApiServiceError(
+            'Nonempty deploymentEnvironmentIds, deploymentState, and deploymentComment are required for "review_deployment".'
           );
         }
         await client.reviewPendingDeployments(

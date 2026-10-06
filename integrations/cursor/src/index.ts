@@ -1,34 +1,58 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  cancelAgentRun,
+  createAgentRun,
+  createCloudAgent,
   deleteAgent,
   deleteRepoBlocklist,
   downloadArtifact,
+  downloadCloudArtifact,
   followUpAgent,
   getAgent,
+  getAgentRun,
   getApiKeyInfo,
   getAuditLogs,
+  getCloudAgent,
   getConversation,
   getDailyUsage,
+  getFileUrl,
   getRepoBlocklists,
   getSpend,
   getTeamMembers,
+  getTeamSpending,
   getUsageEvents,
   launchAgent,
   listAgentArtifacts,
+  listAgentRuns,
   listAgents,
+  listCloudAgentArtifacts,
+  listCloudAgents,
   listModels,
   listRepositories,
+  listTeamMembers,
+  manageCloudAgent,
   removeTeamMember,
   setSpendLimit,
   stopAgent,
   upsertRepoBlocklists
 } from './tools';
-import { agentStatusChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    createCloudAgent,
+    listCloudAgents,
+    getCloudAgent,
+    createAgentRun,
+    listAgentRuns,
+    getAgentRun,
+    cancelAgentRun,
+    manageCloudAgent,
+    listCloudAgentArtifacts,
+    downloadCloudArtifact,
+    getFileUrl,
+    listTeamMembers,
+    getTeamSpending,
     launchAgent,
     getAgent,
     listAgents,
@@ -52,5 +76,5 @@ export let provider = Slate.create({
     upsertRepoBlocklists,
     deleteRepoBlocklist
   ],
-  triggers: [agentStatusChange]
+  triggers: []
 });

@@ -9,8 +9,6 @@ import {
   setPublishSettings,
   updateForm
 } from './tools';
-import { formUpdated, inboundWebhook, newResponse } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     listResponses,
     manageWatches
   ],
-  triggers: [inboundWebhook, newResponse, formUpdated]
+  triggers: []
 });

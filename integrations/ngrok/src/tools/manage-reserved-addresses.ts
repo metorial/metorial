@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import type { ReservedAddr } from '../lib/models';
 import { spec } from '../spec';
 
 let addressOutputSchema = z.object({
@@ -13,7 +14,7 @@ let addressOutputSchema = z.object({
   region: z.string().describe('Region')
 });
 
-let mapAddress = (a: any) => ({
+let mapAddress = (a: ReservedAddr) => ({
   addressId: a.id,
   addr: a.addr || '',
   uri: a.uri || '',
@@ -31,8 +32,17 @@ export let listAddresses = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -44,6 +54,7 @@ export let listAddresses = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listAddresses({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });

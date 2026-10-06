@@ -15,8 +15,6 @@ import {
   requestToken,
   revokeTokens
 } from './tools';
-import { channelEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     manageQueues,
     manageNamespaces
   ],
-  triggers: [channelEvents]
+  triggers: []
 });

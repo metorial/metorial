@@ -1,210 +1,159 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createAuthenticatedAxios, normalizeOAuthTokenResponse, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { VimeoClient } from './lib/client';
+import { apiFailure, invalid, parse, text } from './lib/native';
 
-let api = createAxios({
-  baseURL: 'https://api.vimeo.com'
+const stateSchema = z.object({
+  token: z.string(),
+  refreshToken: z.string().optional(),
+  expiresAt: z.string().optional()
 });
-
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string(),
-      refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
-    })
+export type AuthState = z.output<typeof stateSchema>;
+function accessToken(value: string) {
+  text(value, 'access token', 8192);
+  if (
+    value.trim() !== value ||
+    [...value].some(c => c.charCodeAt(0) <= 32 || c.charCodeAt(0) === 127)
   )
+    invalid('Provide a valid Vimeo access token without whitespace or control characters.');
+  return value;
+}
+const profile = async (output: AuthState) => {
+  const user = await new VimeoClient(accessToken(output.token)).getMe();
+  return {
+    profile: {
+      id: user.uri.slice('/users/'.length),
+      name: user.name,
+      email: user.email,
+      imageUrl: user.pictures?.sizes.at(-1)?.link
+    }
+  };
+};
+export const auth = SlateAuth.create()
+  .output(stateSchema)
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth',
     key: 'oauth',
-
     scopes: [
       {
         title: 'Public',
-        description: 'Access to public video metadata and user information',
+        description: 'Read public metadata and authenticated identity',
         scope: 'public'
       },
       {
         title: 'Private',
-        description: 'Access to private user data and videos',
+        description: 'Read authorized private videos and library data',
         scope: 'private'
       },
       {
-        title: 'Upload',
-        description: 'Ability to upload videos',
-        scope: 'upload'
-      },
-      {
         title: 'Edit',
-        description: 'Ability to edit video metadata and settings',
+        description: 'Edit existing video and collection metadata',
         scope: 'edit'
       },
       {
         title: 'Delete',
-        description: 'Ability to delete videos',
+        description: 'Delete authorized videos and collections',
         scope: 'delete'
       },
-      {
-        title: 'Interact',
-        description: 'Allows liking, commenting, and following users',
-        scope: 'interact'
-      },
-      {
-        title: 'Purchased',
-        description: 'Access to purchased content',
-        scope: 'purchased'
-      },
+      { title: 'Interact', description: 'Like videos and post comments', scope: 'interact' },
       {
         title: 'Create',
-        description: 'Ability to create resources like albums, channels, etc.',
+        description: 'Create showcases, folders and channels',
         scope: 'create'
       },
       {
         title: 'Video Files',
-        description: 'Access to video file links (may require Pro or higher plan)',
+        description: 'Retrieve native downloadable files with an eligible Vimeo membership',
         scope: 'video_files'
       }
     ],
-
-    getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
-        response_type: 'code',
-        client_id: ctx.clientId,
-        redirect_uri: ctx.redirectUri,
-        state: ctx.state,
-        scope: ctx.scopes.join(' ')
-      });
-
-      return {
-        url: `https://api.vimeo.com/oauth/authorize?${params.toString()}`
-      };
-    },
-
+    getAuthorizationUrl: async ctx => ({
+      url: `https://api.vimeo.com/oauth/authorize?${new URLSearchParams({ response_type: 'code', client_id: text(ctx.clientId, 'client ID'), redirect_uri: ctx.redirectUri, state: ctx.state, scope: ctx.scopes.join(' ') })}`
+    }),
     handleCallback: async ctx => {
-      let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
-
-      let response = await api.post(
-        '/oauth/access_token',
-        {
-          grant_type: 'authorization_code',
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri
-        },
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      let data = response.data;
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
-      }
-
-      let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
-
-      let response = await api.post(
-        '/oauth/access_token',
-        {
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken
-        },
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      let data = response.data;
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let response = await api.get('/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
+      const basic = Buffer.from(
+        `${text(ctx.clientId, 'client ID')}:${text(ctx.clientSecret, 'client secret')}`
+      ).toString('base64');
+      const api = createAuthenticatedAxios({
+        baseURL: 'https://api.vimeo.com',
+        authHeader: { value: `Basic ${basic}` },
+        headers: { Accept: 'application/vnd.vimeo.*+json;version=3.4' },
+        timeout: 30_000,
+        maxRedirects: 0,
+        maxContentLength: 1024 * 1024,
+        errorAdapter: apiFailure
       });
-
-      let user = response.data;
-
+      const response = await api.post<unknown>('/oauth/access_token', {
+        grant_type: 'authorization_code',
+        code: text(ctx.code, 'authorization code'),
+        redirect_uri: ctx.redirectUri
+      });
+      if (response.status !== 200)
+        invalid(
+          'Vimeo did not confirm the authorization-code exchange. Reconnect the account.',
+          'oauth_token_response'
+        );
+      const data = parse(
+        z
+          .object({
+            access_token: z.string().min(1),
+            token_type: z.literal('bearer'),
+            expires_in: z.number().optional(),
+            expires_on: z.string().nullish(),
+            refresh_token: z.string().nullish()
+          })
+          .passthrough(),
+        response.data
+      );
+      const normalized = normalizeOAuthTokenResponse(data, {
+        providerLabel: 'Vimeo',
+        operation: 'authorization-code exchange'
+      });
+      if (
+        data.expires_on !== undefined &&
+        data.expires_on !== null &&
+        !Number.isFinite(Date.parse(data.expires_on))
+      )
+        invalid(
+          'Vimeo returned an invalid token expiration. Reconnect.',
+          'oauth_token_response'
+        );
       return {
-        profile: {
-          id: user.uri?.replace('/users/', ''),
-          name: user.name,
-          email: user.email,
-          imageUrl: user.pictures?.sizes?.[user.pictures.sizes.length - 1]?.link
+        output: {
+          token: accessToken(normalized.token),
+          refreshToken: normalized.refreshToken,
+          expiresAt: data.expires_on ?? normalized.expiresAt
         }
       };
-    }
+    },
+    handleTokenRefresh: async (ctx: { output: AuthState }) => {
+      accessToken(ctx.output.token);
+      if (
+        ctx.output.expiresAt !== undefined &&
+        (!Number.isFinite(Date.parse(ctx.output.expiresAt)) ||
+          Date.parse(ctx.output.expiresAt) <= Date.now())
+      )
+        invalid(
+          'This Vimeo token expired or has an invalid expiration. Vimeo does not currently support refresh tokens; reconnect using OAuth or an authenticated personal access token.',
+          'reauthentication_required'
+        );
+      // Preserve legacy stored fields, but never invent an unsupported refresh-token grant.
+      return { output: ctx.output };
+    },
+    getProfile: async (ctx: { output: AuthState }) => profile(ctx.output)
   })
   .addTokenAuth({
     type: 'auth.token',
     name: 'Personal Access Token',
     key: 'personal_access_token',
-
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Personal Access Token generated from the Vimeo developer portal')
+        .describe(
+          'Authenticated personal access token from the Vimeo developer portal; unauthenticated public-only app tokens cannot access /me or private libraries'
+        )
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let response = await api.get('/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data;
-
-      return {
-        profile: {
-          id: user.uri?.replace('/users/', ''),
-          name: user.name,
-          email: user.email,
-          imageUrl: user.pictures?.sizes?.[user.pictures.sizes.length - 1]?.link
-        }
-      };
-    }
+    getOutput: async ctx => ({ output: { token: accessToken(ctx.input.token) } }),
+    getProfile: async (ctx: { output: AuthState }) => profile(ctx.output)
   });

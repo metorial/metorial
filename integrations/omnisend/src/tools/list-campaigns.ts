@@ -10,10 +10,19 @@ let campaignSchema = z.object({
   type: z.string().optional().describe('Campaign type (standard or abTest)'),
   status: z.string().optional().describe('Campaign status (e.g., draft, sent)'),
   subjectLine: z.string().optional().describe('Email subject line'),
-  startDate: z.string().optional().describe('Scheduled start date'),
+  startDate: z
+    .string()
+    .optional()
+    .describe('Campaign start timestamp: legacy startDate or current startedAt'),
   endDate: z.string().optional().describe('End date'),
   sendStartDate: z.string().optional().describe('Actual send start date'),
   sendEndDate: z.string().optional().describe('Actual send end date'),
+  scheduledAt: z
+    .string()
+    .optional()
+    .describe(
+      'Current API scheduled sending timestamp; separate from actual start timestamps'
+    ),
   createdAt: z.string().optional().describe('Creation timestamp'),
   updatedAt: z.string().optional().describe('Last updated timestamp'),
   tzoEnabled: z.boolean().optional().describe('Time zone optimization enabled')
@@ -30,40 +39,34 @@ export let listCampaigns = SlateTool.create(spec, {
       updatedAfter: z
         .string()
         .optional()
-        .describe('Filter campaigns updated after this date (ISO 8601)')
+        .describe('Filter campaigns updated after this date (ISO 8601)'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Page size, 1-250; requires API version 2026-03-15'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque next-page cursor; requires API version 2026-03-15 and unchanged filters'
+        )
     })
   )
   .output(
     z.object({
-      campaigns: z.array(campaignSchema).describe('List of campaigns')
+      campaigns: z.array(campaignSchema).describe('List of campaigns'),
+      nextCursor: z.string().optional().describe('Provider-issued next-page cursor'),
+      previousCursor: z.string().optional().describe('Provider-issued previous-page cursor'),
+      hasMore: z.boolean().optional().describe('Whether the provider reports another page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OmnisendClient(ctx.auth.token);
-
-    let result = await client.listCampaigns({
-      updatedAtFrom: ctx.input.updatedAfter
+    let client = new OmnisendClient(ctx.auth, ctx.config.apiVersion);
+    let output = await client.listCampaigns({
+      updatedAtFrom: ctx.input.updatedAfter,
+      limit: ctx.input.limit,
+      after: ctx.input.cursor
     });
-
-    let campaigns = (result.campaigns || []).map((c: any) => ({
-      campaignId: c.id,
-      name: c.name,
-      channel: c.channel,
-      type: c.type,
-      status: c.status,
-      subjectLine: c.subjectLine,
-      startDate: c.startDate,
-      endDate: c.endDate,
-      sendStartDate: c.sendStartDate,
-      sendEndDate: c.sendEndDate,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
-      tzoEnabled: c.tzoEnabled
-    }));
-
-    return {
-      output: { campaigns },
-      message: `Retrieved **${campaigns.length}** campaigns.`
-    };
+    return { output, message: 'Retrieved campaigns.' };
   })
   .build();

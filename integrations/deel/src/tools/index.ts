@@ -1,7 +1,9 @@
 export { createContract } from './create-contract';
+export { downloadInvoice, getFileUrl } from './download-invoice';
 export { calculateEorCost, getEorCountryGuide } from './eor-tools';
 export { getContract } from './get-contract';
 export { getPerson } from './get-person';
+export { getCurrentOrganization, getCurrentUser } from './identity';
 export { listContracts } from './list-contracts';
 export { listInvoices } from './list-invoices';
 export { listOrganizationData } from './list-organization-data';

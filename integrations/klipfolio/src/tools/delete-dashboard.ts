@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let deleteDashboard = SlateTool.create(spec, {
@@ -22,6 +23,7 @@ export let deleteDashboard = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
     await client.deleteTab(ctx.input.dashboardId);
 

@@ -1,49 +1,66 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GhostAdminClient } from '../lib/client';
+import { getClient } from '../lib/client';
+import { pagination } from '../lib/schemas';
 import { spec } from '../spec';
 
-let pageSchema = z.object({
-  pageId: z.string().describe('Unique page ID'),
-  uuid: z.string().describe('Page UUID'),
-  title: z.string().describe('Page title'),
-  slug: z.string().describe('URL-friendly slug'),
-  status: z.string().describe('Page status: draft, published, or scheduled'),
-  visibility: z.string().describe('Page visibility level'),
-  featureImage: z.string().nullable().describe('Feature image URL'),
-  publishedAt: z.string().nullable().describe('Publication timestamp'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp'),
-  url: z.string().describe('Full URL of the page'),
-  tags: z
-    .array(
-      z.object({
-        tagId: z.string(),
-        name: z.string(),
-        slug: z.string()
-      })
-    )
-    .optional()
-    .describe('Associated tags'),
-  authors: z
-    .array(
-      z.object({
-        authorId: z.string(),
-        name: z.string(),
-        slug: z.string()
-      })
-    )
-    .optional()
-    .describe('Page authors')
-});
+let pageSchema = z
+  .object({
+    pageId: z.string().describe('Unique page ID'),
+    html: z.string().nullable().optional().describe('Native rendered HTML when requested'),
+    lexical: z
+      .string()
+      .nullable()
+      .optional()
+      .describe('Native Lexical content, available through Admin'),
+    plaintext: z.string().nullable().optional().describe('Native plain text when requested'),
+    uuid: z.string().optional().describe('Page UUID'),
+    title: z.string().optional().describe('Page title'),
+    slug: z.string().optional().describe('URL-friendly slug'),
+    status: z.string().optional().describe('Page status: draft, published, or scheduled'),
+    visibility: z.string().optional().describe('Page visibility level'),
+    featureImage: z.string().nullable().optional().describe('Feature image URL'),
+    publishedAt: z.string().nullable().optional().describe('Publication timestamp'),
+    createdAt: z.string().optional().describe('Creation timestamp'),
+    updatedAt: z.string().optional().describe('Last update timestamp'),
+    url: z.string().optional().describe('Full URL of the page'),
+    tags: z
+      .array(
+        z.object({
+          api: z
+            .enum(['admin', 'content'])
+            .optional()
+            .describe(
+              'Read through Admin or published Content API. Writes require Admin. Defaults to the connection type.'
+            ),
+          tagId: z.string(),
+          name: z.string(),
+          slug: z.string()
+        })
+      )
+      .optional()
+      .describe('Associated tags'),
+    authors: z
+      .array(
+        z.object({
+          authorId: z.string(),
+          name: z.string(),
+          slug: z.string()
+        })
+      )
+      .optional()
+      .describe('Page authors')
+  })
+  .partial()
+  .required({ pageId: true });
 
 let paginationSchema = z.object({
-  page: z.number().describe('Current page'),
-  limit: z.number().describe('Items per page'),
-  pages: z.number().describe('Total pages'),
-  total: z.number().describe('Total items'),
-  next: z.number().nullable().describe('Next page number'),
-  prev: z.number().nullable().describe('Previous page number')
+  page: z.number().optional().describe('Current page'),
+  limit: z.number().optional().describe('Items per page'),
+  pages: z.number().optional().describe('Total pages'),
+  total: z.number().optional().describe('Total items'),
+  next: z.number().nullable().optional().describe('Next page number'),
+  prev: z.number().nullable().optional().describe('Previous page number')
 });
 
 export let browsePages = SlateTool.create(spec, {
@@ -58,6 +75,12 @@ export let browsePages = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      api: z
+        .enum(['admin', 'content'])
+        .optional()
+        .describe(
+          'Select Admin or published Content API. Defaults to the connection credential type.'
+        ),
       filter: z.string().optional().describe('Ghost NQL filter expression'),
       include: z
         .string()
@@ -76,10 +99,7 @@ export let browsePages = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GhostAdminClient({
-      domain: ctx.config.adminDomain,
-      apiKey: ctx.auth.token
-    });
+    let client = getClient(ctx, ctx.input.api);
 
     let result = await client.browsePages({
       filter: ctx.input.filter,
@@ -93,12 +113,15 @@ export let browsePages = SlateTool.create(spec, {
     let pages = (result.pages ?? []).map((p: any) => ({
       pageId: p.id,
       uuid: p.uuid,
+      html: p.html,
+      lexical: p.lexical,
+      plaintext: p.plaintext,
       title: p.title,
       slug: p.slug,
       status: p.status,
       visibility: p.visibility,
-      featureImage: p.feature_image ?? null,
-      publishedAt: p.published_at ?? null,
+      featureImage: p.feature_image,
+      publishedAt: p.published_at,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
       url: p.url,
@@ -114,18 +137,11 @@ export let browsePages = SlateTool.create(spec, {
       }))
     }));
 
-    let pagination = result.meta?.pagination ?? {
-      page: 1,
-      limit: 15,
-      pages: 1,
-      total: pages.length,
-      next: null,
-      prev: null
-    };
+    let pageInfo = pagination(result, pages.length);
 
     return {
-      output: { pages, pagination },
-      message: `Found **${pagination.total}** pages (page ${pagination.page} of ${pagination.pages}).`
+      output: { pages, pagination: pageInfo },
+      message: `Found **${pageInfo.total}** pages (page ${pageInfo.page} of ${pageInfo.pages}).`
     };
   })
   .build();

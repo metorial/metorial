@@ -30,7 +30,11 @@ export let getSandbox = SlateTool.create(spec, {
         .record(z.string(), z.string())
         .optional()
         .describe('Metadata attached to the sandbox.'),
-      state: z.string().optional().describe('Current state of the sandbox (running, paused).')
+      state: z.string().optional().describe('Current state of the sandbox (running, paused).'),
+      volumeMounts: z
+        .array(z.object({ name: z.string(), path: z.string() }))
+        .optional()
+        .describe('Persistent volume names and mount paths configured for the sandbox.')
     })
   )
   .handleInvocation(async ctx => {

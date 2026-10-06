@@ -32,28 +32,37 @@ export let manageTags = SlateTool.create(spec, {
     z.object({
       successfulFileIds: z
         .array(z.string())
-        .describe('File IDs that were successfully updated')
+        .describe('File IDs that were successfully updated'),
+      unconfirmedFileIds: z
+        .array(z.string())
+        .optional()
+        .describe('Requested IDs whose update was not confirmed'),
+      errors: z
+        .array(z.object({ fileId: z.string(), error: z.string() }))
+        .optional()
+        .describe('Per-file failures')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    if (ctx.input.operation === 'add') {
-      await client.addTags(ctx.input.fileIds, ctx.input.tags);
-    } else if (ctx.input.operation === 'remove') {
-      await client.removeTags(ctx.input.fileIds, ctx.input.tags);
-    } else if (ctx.input.operation === 'remove_ai') {
-      await client.removeAITags(ctx.input.fileIds, ctx.input.tags);
-    }
+    const result =
+      ctx.input.operation === 'add'
+        ? await client.addTags(ctx.input.fileIds, ctx.input.tags)
+        : ctx.input.operation === 'remove'
+          ? await client.removeTags(ctx.input.fileIds, ctx.input.tags)
+          : await client.removeAITags(ctx.input.fileIds, ctx.input.tags);
 
     let opLabel = ctx.input.operation === 'add' ? 'Added' : 'Removed';
     let tagType = ctx.input.operation === 'remove_ai' ? 'AI tags' : 'tags';
 
     return {
       output: {
-        successfulFileIds: ctx.input.fileIds
+        successfulFileIds: result.successfulFileIds,
+        unconfirmedFileIds: result.unconfirmedFileIds,
+        errors: result.errors
       },
-      message: `${opLabel} ${tagType} [${ctx.input.tags.join(', ')}] on **${ctx.input.fileIds.length}** file(s).`
+      message: `${opLabel} ${tagType} on **${result.successfulFileIds.length}** file(s); **${result.unconfirmedFileIds.length}** requested file(s) remain unconfirmed.`
     };
   })
   .build();

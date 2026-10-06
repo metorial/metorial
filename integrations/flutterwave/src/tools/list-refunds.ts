@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageFields, pageOutput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listRefunds = SlateTool.create(spec, {
@@ -21,6 +22,7 @@ export let listRefunds = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pageFields,
       refunds: z
         .array(
           z.object({
@@ -38,9 +40,9 @@ export let listRefunds = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
-    if (ctx.input.refundId) {
+    if (ctx.input.refundId !== undefined) {
       let result = await client.getRefund(ctx.input.refundId);
       let r = result.data;
       return {
@@ -80,7 +82,7 @@ export let listRefunds = SlateTool.create(spec, {
     }));
 
     return {
-      output: { refunds },
+      output: { refunds, ...pageOutput(result) },
       message: `Found **${refunds.length}** refunds.`
     };
   })

@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SerpApiClient } from '../lib/client';
+import { receiptMessage, receiptOutput, SerpApiClient } from '../lib/client';
+import { searchMetadataSchema, text } from '../lib/contracts';
+import { searchParams } from '../lib/params';
 import { spec } from '../spec';
 
 let newsResultSchema = z.object({
@@ -50,11 +52,29 @@ export let newsSearchTool = SlateTool.create(spec, {
         .describe('Google News publication token for a specific publication'),
       language: z.string().optional().describe('Language code (e.g., "en")'),
       country: z.string().optional().describe('Country code (e.g., "us")'),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Submit asynchronously and return the native search ID/status. Not compatible with noCache or Ludicrous Speed accounts.'
+        ),
       noCache: z.boolean().optional().describe('Force fresh results')
     })
   )
   .output(
     z.object({
+      isComplete: z
+        .boolean()
+        .describe(
+          'Whether native search status is Success; queued/processing receipts are incomplete.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Native pagination metadata; follow native offsets/tokens without inferring a total.'
+        ),
+      searchMetadata: searchMetadataSchema.optional(),
       newsResults: z.array(newsResultSchema).describe('News article results'),
       menuLinks: z
         .array(
@@ -69,29 +89,22 @@ export let newsSearchTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SerpApiClient({ apiKey: ctx.auth.token });
+    let client = new SerpApiClient({ apiKey: ctx.auth.token, accountId: ctx.auth.accountId });
 
-    let params: Record<string, any> = {
-      engine: ctx.input.engine
-    };
-
-    if (ctx.input.query) params.q = ctx.input.query;
-    if (ctx.input.topicToken) params.topic_token = ctx.input.topicToken;
-    if (ctx.input.storyToken) params.story_token = ctx.input.storyToken;
-    if (ctx.input.publicationToken) params.publication_token = ctx.input.publicationToken;
-    if (ctx.input.language) params.hl = ctx.input.language;
-    if (ctx.input.country) params.gl = ctx.input.country;
-    if (ctx.input.noCache) params.no_cache = ctx.input.noCache;
+    let params = searchParams('news_search', ctx.input);
 
     let data = await client.search(params);
 
-    let newsResults = (data.news_results || data.organic_results || []).map((r: any) => ({
+    const nativeNews = (data.news_results || data.organic_results || []).flatMap((r: any) =>
+      r.stories ? r.stories : [r]
+    );
+    let newsResults = nativeNews.map((r: any) => ({
       position: r.position,
       title: r.title,
       link: r.link,
       snippet: r.snippet,
       date: r.date,
-      sourceName: r.source?.name || r.source,
+      sourceName: text(r.source?.name) ?? text(r.source),
       sourceIcon: r.source?.icon,
       thumbnailUrl: r.thumbnail
     }));
@@ -104,10 +117,14 @@ export let newsSearchTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...receiptOutput(data),
         newsResults,
         menuLinks
       },
-      message: `News search returned **${newsResults.length}** articles${ctx.input.query ? ` for "${ctx.input.query}"` : ''} using ${ctx.input.engine}.`
+      message: receiptMessage(
+        data,
+        `News search returned **${newsResults.length}** articles${ctx.input.query ? ` for "${ctx.input.query}"` : ''} using ${ctx.input.engine}.`
+      )
     };
   })
   .build();

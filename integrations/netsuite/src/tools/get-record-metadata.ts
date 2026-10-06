@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { connection } from '../lib/client';
 import { spec } from '../spec';
 
 export let getRecordMetadata = SlateTool.create(spec, {
   name: 'Get Record Metadata',
   key: 'get_record_metadata',
-  description: `Retrieve the metadata schema for a NetSuite record type. Returns field definitions, types, required fields, sublists, and supported operations.
+  description: `Retrieve the native OpenAPI metadata for a NetSuite record type discovered with list_record_types. Returns field definitions, types, required fields, sublists, and operations exposed to your role.
 Use this to discover available fields before creating or updating records, or to understand the structure of a record type.`,
   tags: {
     readOnly: true
@@ -14,11 +14,7 @@ Use this to discover available fields before creating or updating records, or to
 })
   .input(
     z.object({
-      recordType: z
-        .string()
-        .describe(
-          'NetSuite record type in camelCase (e.g., "customer", "salesOrder", "invoice", "inventoryItem")'
-        )
+      recordType: z.string().describe('Exact native record type from list_record_types')
     })
   )
   .output(
@@ -29,10 +25,7 @@ Use this to discover available fields before creating or updating records, or to
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      ...ctx.auth,
-      accountId: ctx.config.accountId
-    });
+    const client = connection(ctx.auth, ctx.config);
 
     let metadata = await client.getRecordMetadata(ctx.input.recordType);
 

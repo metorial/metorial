@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VonageRestClient } from '../lib/client';
+import { protect } from '../lib/validation';
 import { spec } from '../spec';
 
 export let sendSms = SlateTool.create(spec, {
@@ -61,6 +62,7 @@ Uses API Key/Secret authentication and does not require a Vonage Application.`,
     })
   )
   .handleInvocation(async ctx => {
+    protect(ctx.input, [ctx.auth.apiSecret, ctx.auth.privateKey ?? '']);
     let client = new VonageRestClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret
@@ -76,14 +78,9 @@ Uses API Key/Secret authentication and does not require a Vonage Application.`,
       callbackUrl: ctx.input.callbackUrl
     });
 
-    let firstMsg = result.messages[0];
-    let success = firstMsg?.status === '0';
-
     return {
       output: result,
-      message: success
-        ? `SMS sent to **${ctx.input.to}** in **${result.messageCount}** part(s). Message ID: \`${firstMsg?.messageId}\``
-        : `SMS to **${ctx.input.to}** failed: ${firstMsg?.errorText || 'Unknown error'}`
+      message: `Vonage accepted ${result.messageCount} SMS part(s). Delivery is reported separately; acceptance is not proof of delivery.`
     };
   })
   .build();

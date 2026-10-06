@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { QdrantClient } from '../lib/client';
 import { spec } from '../spec';
@@ -32,8 +32,13 @@ export let discoverPoints = SlateTool.create(spec, {
         )
         .describe('Context pairs that constrain the discovery region'),
       filter: z.any().optional().describe('Filter conditions (Qdrant filter syntax)'),
-      limit: z.number().optional().describe('Maximum number of results (default: 10)'),
-      offset: z.number().optional().describe('Number of results to skip'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum number of results (default: 10)'),
+      offset: z.number().int().nonnegative().optional().describe('Number of results to skip'),
       vectorName: z.string().optional().describe('Named vector space to use'),
       withPayload: z.boolean().optional().describe('Include payloads (default: true)'),
       withVector: z.boolean().optional().describe('Include vectors (default: false)')
@@ -55,8 +60,13 @@ export let discoverPoints = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.target === undefined && ctx.input.context.length === 0) {
+      throw createApiServiceError(
+        'Provide a target or at least one context pair for discovery.'
+      );
+    }
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 

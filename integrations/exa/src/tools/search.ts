@@ -57,8 +57,8 @@ let contentOptionsSchema = z
   .describe('Controls what content to retrieve for each result');
 
 let searchResultSchema = z.object({
-  resultId: z.string().describe('Unique result identifier'),
-  title: z.string().describe('Page title'),
+  resultId: z.string().optional().describe('Unique result identifier'),
+  title: z.string().optional().describe('Page title'),
   url: z.string().describe('Page URL'),
   publishedDate: z.string().optional().describe('Publication date in ISO 8601 format'),
   author: z.string().optional().describe('Content author'),
@@ -75,7 +75,7 @@ Use **categories** to focus on specific content types like companies, people, ne
 Filter results by domains, dates, and text content. Optionally retrieve full text, highlights, and summaries inline.`,
   instructions: [
     'Use type "auto" (default) for general searches. Use "deep" for comprehensive research requiring query expansion.',
-    'The "company" and "people" categories do not support date, text, or domain filters.'
+    'The "company" and "people" categories do not support publication date filters or excludeDomains. Search and content retrieval can consume credits.'
   ],
   tags: {
     readOnly: true
@@ -85,12 +85,13 @@ Filter results by domains, dates, and text content. Optionally retrieve full tex
     z.object({
       query: z.string().describe('The search query'),
       searchType: z
-        .enum(['neural', 'auto', 'fast', 'deep'])
+        .enum(['neural', 'auto', 'fast', 'deep', 'instant', 'deep-lite', 'deep-reasoning'])
         .optional()
         .describe('Search method to use. Default: auto'),
       category: z
         .enum([
           'company',
+          'publication',
           'research paper',
           'news',
           'tweet',
@@ -125,11 +126,11 @@ Filter results by domains, dates, and text content. Optionally retrieve full tex
       startCrawlDate: z
         .string()
         .optional()
-        .describe('Filter results crawled after this ISO 8601 date'),
+        .describe('Legacy crawl date hint; currently deprecated and ignored by Exa'),
       endCrawlDate: z
         .string()
         .optional()
-        .describe('Filter results crawled before this ISO 8601 date'),
+        .describe('Legacy crawl date hint; currently deprecated and ignored by Exa'),
       includeText: z
         .array(z.string())
         .optional()
@@ -140,18 +141,24 @@ Filter results by domains, dates, and text content. Optionally retrieve full tex
         .describe('Exclude results containing these text strings'),
       contents: contentOptionsSchema,
       moderation: z.boolean().optional().describe('Filter out unsafe content'),
-      maxAgeHours: z.number().optional().describe('Maximum age of content in hours')
+      maxAgeHours: z
+        .number()
+        .optional()
+        .describe(
+          'Content freshness in hours (-1 always refresh, 0 live, up to 720); mapped into content retrieval options'
+        )
     })
   )
   .output(
     z.object({
       requestId: z.string().describe('Unique request identifier'),
-      searchType: z.string().optional().describe('Search method that was used'),
+      searchType: z.string().optional().describe('Resolved search method reported by Exa'),
+      costTotal: z.number().optional().describe('Reported cost in USD'),
       results: z.array(searchResultSchema).describe('Search results')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
 
     let response = await client.search({
       query: ctx.input.query,
@@ -185,7 +192,8 @@ Filter results by domains, dates, and text content. Optionally retrieve full tex
     return {
       output: {
         requestId: response.requestId,
-        searchType: response.searchType,
+        searchType: response.resolvedSearchType ?? response.searchType,
+        costTotal: response.costDollars?.total,
         results
       },
       message: `Found **${results.length}** results for "${ctx.input.query}"${ctx.input.searchType ? ` using ${ctx.input.searchType} search` : ''}.`

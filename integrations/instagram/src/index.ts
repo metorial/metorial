@@ -12,8 +12,6 @@ import {
   searchHashtagsTool,
   sendMessageTool
 } from './tools';
-import { newMediaTrigger, webhookEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     getStoriesTool,
     getPublishingLimitTool
   ],
-  triggers: [newMediaTrigger, webhookEventsTrigger]
+  triggers: []
 });

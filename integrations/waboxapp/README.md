@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Waboxapp
 
-Send WhatsApp messages, images, links, and files programmatically through a linked WhatsApp account. Track message delivery and read status via acknowledgement events. Receive inbound messages and media (text, image, video, audio, documents, vcards, locations) through webhooks. Check linked account status including connectivity and device information.
+Send WhatsApp messages, images, links, and files programmatically through a linked WhatsApp account. Track message delivery and read status via acknowledgement events. Check linked account status including connectivity and device information.
 
 ## License
 

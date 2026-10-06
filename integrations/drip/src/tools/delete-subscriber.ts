@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteSubscriber = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let deleteSubscriber = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       subscriberIdOrEmail: z.string().describe('The subscriber ID or email address to delete.')
     })
   )
@@ -24,7 +26,7 @@ export let deleteSubscriber = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 
@@ -32,7 +34,7 @@ export let deleteSubscriber = SlateTool.create(spec, {
 
     return {
       output: { deleted: true },
-      message: `Subscriber **${ctx.input.subscriberIdOrEmail}** has been deleted.`
+      message: 'The selected subscriber has been deleted.'
     };
   })
   .build();

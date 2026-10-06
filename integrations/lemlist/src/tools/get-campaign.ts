@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, campaignOutput, optionalStrings, optionalText, rows } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCampaign = SlateTool.create(spec, {
@@ -38,26 +38,22 @@ export let getCampaign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let c = await client.getCampaign(ctx.input.campaignId);
-
+    const client = new Client({ token: ctx.auth.token }),
+      c = await client.getCampaign(ctx.input.campaignId);
     return {
       output: {
-        campaignId: c._id,
-        name: c.name,
-        status: c.status ?? c.state,
-        createdAt: c.createdAt,
-        hasError: c.hasError,
-        errors: c.errors,
-        labels: c.labels,
-        sequenceId: c.sequenceId,
-        scheduleIds: c.scheduleIds,
-        senders: c.senders?.map((s: any) => ({
-          senderId: s.id,
-          email: s.email
-        }))
+        ...campaignOutput(c),
+        sequenceId: optionalText(c.sequenceId),
+        scheduleIds: optionalStrings(c.scheduleIds),
+        senders:
+          c.senders == null
+            ? undefined
+            : rows(c.senders).map(sender => ({
+                senderId: optionalText(sender.id),
+                email: optionalText(sender.email)
+              }))
       },
-      message: `Retrieved campaign **"${c.name}"** (${c.status ?? c.state ?? 'unknown status'}).`
+      message: `Retrieved campaign \`${ctx.input.campaignId}\`.`
     };
   })
   .build();

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/slite",
-  "description": "Create, read, update, and delete notes (documents) in a team knowledge base. Organize documents in parent-child hierarchies, create from templates, and manage document lifecycle including verification, archiving, and ownership assignment. Ask natural language questions to the AI-powered knowledge base. Index custom external content into the AI search index. Search notes by keyword, update individual content tiles within documents, and manage users and groups. List publicly shared, inactive, or empty notes for content auditing.",
+  "description": "Create, read, update, delete, list, search, and download Slite notes. Manage document verification, archive state, and ownership; update existing tiles; discover users/groups; audit accessible content; ask questions and read retained Ask threads. Read the native current profile. Manage existing custom indexed content where the documented deprecated endpoints remain enabled.",
   "categories": [
     "apis-and-http-requests",
     "email-and-messaging",
@@ -14,8 +14,11 @@
     "verify or flag documents",
     "archive and unarchive notes",
     "update content tiles",
-    "manage users and groups",
+    "find users and groups",
     "audit workspace content",
-    "assign note ownership"
+    "assign note ownership",
+    "download a note",
+    "read existing Ask threads",
+    "read current profile"
   ]
 }

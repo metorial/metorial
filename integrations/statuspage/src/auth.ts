@@ -1,49 +1,26 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
+import { Client } from './lib/client';
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+  .output(z.object({ token: z.string() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Token',
     key: 'api_token',
-
     inputSchema: z.object({
       token: z
         .string()
         .describe(
-          'Your Statuspage API key. Found under Avatar → API info in the Statuspage management interface.'
+          'Statuspage API key from Avatar → API info. Its management API permissions determine accessible pages.'
         )
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.statuspage.io/v1',
-        headers: {
-          Authorization: `OAuth ${ctx.output.token}`
-        }
-      });
-
-      let response = await client.get('/pages');
-      let pages = response.data as Array<{ id: string; name: string }>;
-      let firstPage = pages[0];
-
+    getOutput: async ctx => ({ output: { token: ctx.input.token } }),
+    getProfile: async (ctx: { output: { token: string } }) => {
+      const pages = await new Client({ token: ctx.output.token }).listPages();
       return {
         profile: {
-          id: firstPage?.id,
-          name: firstPage?.name
+          id: pages[0]?.id,
+          name: pages[0]?.name ? `Statuspage: ${pages[0].name}` : 'Statuspage API key'
         }
       };
     }

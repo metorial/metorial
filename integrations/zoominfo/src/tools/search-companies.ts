@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, pagination, records } from '../lib/client';
 import { spec } from '../spec';
 
 export let searchCompanies = SlateTool.create(spec, {
@@ -11,7 +11,9 @@ export let searchCompanies = SlateTool.create(spec, {
     'Searches are free and do not consume credits.',
     'Results include basic firmographic data. Use Enrich Company for full details including technographics and hierarchy.'
   ],
-  constraints: ['Returns up to 100 companies per page (max 10,000 total results).'],
+  constraints: [
+    'Returns up to 100 companies per page (provider request and record limits still apply).'
+  ],
   tags: {
     readOnly: true
   }
@@ -23,7 +25,20 @@ export let searchCompanies = SlateTool.create(spec, {
       companyWebsite: z.string().optional().describe('Company website domain'),
       country: z.string().optional().describe('Country name or code'),
       state: z.string().optional().describe('State or province'),
-      city: z.string().optional().describe('City name'),
+      city: z
+        .string()
+        .optional()
+        .describe(
+          'City filter for legacy Enterprise API connections; current GTM connections use metroRegion.'
+        ),
+      metroRegion: z
+        .string()
+        .optional()
+        .describe('Current GTM metro region value from Lookup Data'),
+      industryCodes: z
+        .string()
+        .optional()
+        .describe('Current GTM industry codes from Lookup Data; comma-separated'),
       zipCode: z.string().optional().describe('ZIP/postal code'),
       revenueMin: z.number().optional().describe('Minimum annual revenue (in thousands USD)'),
       revenueMax: z.number().optional().describe('Maximum annual revenue (in thousands USD)'),
@@ -32,7 +47,7 @@ export let searchCompanies = SlateTool.create(spec, {
       industryKeywords: z
         .array(z.string())
         .optional()
-        .describe('Industry keywords to filter by'),
+        .describe('Industry keywords; current GTM joins multiple entries with OR'),
       companyType: z
         .string()
         .optional()
@@ -54,42 +69,32 @@ export let searchCompanies = SlateTool.create(spec, {
   .output(
     z.object({
       companies: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .describe('Array of company preview records'),
       totalResults: z.number().optional().describe('Total number of matching companies'),
       currentPage: z.number().optional().describe('Current page number'),
-      totalPages: z.number().optional().describe('Total number of pages')
+      totalPages: z.number().optional().describe('Total number of pages'),
+      returnedCount: z.number().optional().describe('Number of records in this response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion
-    });
+    const client = Client.fromContext(ctx);
 
     let { page, pageSize, sort, ...searchParams } = ctx.input;
 
     let result = await client.searchCompanies(searchParams, page, pageSize, sort);
 
-    let companies: any[] = [];
-    let totalResults: number | undefined;
-    let currentPage: number | undefined;
-    let totalPages: number | undefined;
-
-    if (ctx.config.apiVersion === 'new') {
-      companies = result.data || [];
-      totalResults = result.meta?.totalResults;
-      currentPage = result.meta?.page?.number;
-      totalPages = result.meta?.page?.total;
-    } else {
-      companies = result.data || result.result || [];
-      totalResults = result.totalResults;
-      currentPage = result.currentPage;
-      totalPages = result.totalPages;
-    }
+    const companies = records(result);
+    const { totalResults, currentPage, totalPages } = pagination(result);
 
     return {
-      output: { companies, totalResults, currentPage, totalPages },
+      output: {
+        companies,
+        totalResults,
+        currentPage,
+        totalPages,
+        returnedCount: companies.length
+      },
       message: `Found **${totalResults ?? companies.length}** companies${currentPage ? ` (page ${currentPage}${totalPages ? ` of ${totalPages}` : ''})` : ''}.`
     };
   })

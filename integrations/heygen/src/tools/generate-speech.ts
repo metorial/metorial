@@ -19,6 +19,8 @@ export let generateSpeech = SlateTool.create(spec, {
       voiceId: z.string().describe('Voice ID to use for speech generation'),
       speed: z
         .number()
+        .min(0.5)
+        .max(2)
         .optional()
         .describe('Speech speed multiplier (e.g. 1.0 for normal, 1.5 for faster)'),
       title: z.string().optional().describe('Title for the audio')
@@ -30,7 +32,7 @@ export let generateSpeech = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HeyGenClient({ token: ctx.auth.token });
+    let client = new HeyGenClient(ctx.auth);
 
     let result = await client.generateSpeech({
       text: ctx.input.text,
@@ -39,9 +41,15 @@ export let generateSpeech = SlateTool.create(spec, {
       title: ctx.input.title
     });
 
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.audioUrl,
+      mimeType: 'audio/mpeg',
+      filename: `${(ctx.input.title || 'speech').replace(/[<>:"/\\|?*\p{Cc}]/gu, '_').slice(0, 120)}.mp3`
+    });
     return {
       output: result,
-      message: `Speech generated successfully. [Download audio](${result.audioUrl})`
+      message: `Speech generated successfully and is ready to download.`
     };
   })
   .build();

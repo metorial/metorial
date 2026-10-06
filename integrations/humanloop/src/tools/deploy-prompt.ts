@@ -1,20 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectHumanloopOperation } from '../lib/retirement';
 import { spec } from '../spec';
 
 export let deployPrompt = SlateTool.create(spec, {
   name: 'Deploy Prompt',
   key: 'deploy_prompt',
-  description: `Deploy or undeploy a prompt version to a specific environment. Environments control which prompt version is served via the API (e.g. staging, production). Also supports listing prompt versions and viewing current environment deployments.`,
+  description:
+    'DEPRECATED — Humanloop shut down on September 8, 2025. This operation is unavailable; the tool is retained only for compatibility.',
   instructions: [
-    'Use "deploy" to deploy a specific version to an environment.',
-    'Use "undeploy" to remove a deployment from an environment.',
-    'Use "list_versions" to see available versions for a prompt.'
+    'Humanloop is retired. Do not use this tool for new workflows; use data exported before September 8, 2025 with your chosen replacement platform.'
   ],
   tags: {
     destructive: false,
-    readOnly: false
+    readOnly: false,
+    deprecated: true
   }
 })
   .input(
@@ -34,43 +34,5 @@ export let deployPrompt = SlateTool.create(spec, {
       versions: z.array(z.any()).optional().describe('List of prompt versions')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    if (ctx.input.action === 'list_versions') {
-      let result = await client.listPromptVersions(ctx.input.promptId);
-      let versions = result.records || result;
-      return {
-        output: { versions: Array.isArray(versions) ? versions : [versions] },
-        message: `Found **${Array.isArray(versions) ? versions.length : 1}** version(s) for prompt **${ctx.input.promptId}**.`
-      };
-    }
-
-    if (ctx.input.action === 'deploy') {
-      if (!ctx.input.environmentId)
-        throw new Error('environmentId is required for deploy action');
-      if (!ctx.input.versionId) throw new Error('versionId is required for deploy action');
-      let result = await client.deployPromptVersion(
-        ctx.input.promptId,
-        ctx.input.environmentId,
-        ctx.input.versionId
-      );
-      return {
-        output: { deployment: result },
-        message: `Deployed version **${ctx.input.versionId}** to environment **${ctx.input.environmentId}** for prompt **${ctx.input.promptId}**.`
-      };
-    }
-
-    if (ctx.input.action === 'undeploy') {
-      if (!ctx.input.environmentId)
-        throw new Error('environmentId is required for undeploy action');
-      await client.removePromptDeployment(ctx.input.promptId, ctx.input.environmentId);
-      return {
-        output: {},
-        message: `Removed deployment from environment **${ctx.input.environmentId}** for prompt **${ctx.input.promptId}**.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
-  })
+  .handleInvocation(async () => rejectHumanloopOperation())
   .build();

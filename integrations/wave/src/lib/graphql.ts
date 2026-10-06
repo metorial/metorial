@@ -8,7 +8,8 @@ export let BUSINESS_FRAGMENT = `
   isClassicAccounting
   isClassicInvoicing
   isPersonal
-  organizationType
+  organizationalType
+  emailSendEnabled
   type {
     name
     value
@@ -40,6 +41,7 @@ export let BUSINESS_FRAGMENT = `
 `;
 
 export let CUSTOMER_FRAGMENT = `
+  business { id }
   id
   name
   firstName
@@ -83,6 +85,7 @@ export let CUSTOMER_FRAGMENT = `
 `;
 
 export let ACCOUNT_FRAGMENT = `
+  business { id }
   id
   name
   description
@@ -109,11 +112,10 @@ export let ACCOUNT_FRAGMENT = `
   sequence
   balance
   balanceInBusinessCurrency
-  createdAt
-  modifiedAt
 `;
 
 export let PRODUCT_FRAGMENT = `
+  business { id }
   id
   name
   description
@@ -138,6 +140,7 @@ export let PRODUCT_FRAGMENT = `
 `;
 
 export let SALES_TAX_FRAGMENT = `
+  business { id }
   id
   name
   abbreviation
@@ -156,6 +159,7 @@ export let SALES_TAX_FRAGMENT = `
 `;
 
 export let INVOICE_FRAGMENT = `
+  business { id }
   id
   createdAt
   modifiedAt
@@ -224,7 +228,7 @@ export let INVOICE_FRAGMENT = `
     description
     quantity
     unitPrice
-    amount {
+    total {
       value
       currency {
         code
@@ -251,6 +255,7 @@ export let INVOICE_FRAGMENT = `
 `;
 
 export let VENDOR_FRAGMENT = `
+  business { id }
   id
   name
   firstName
@@ -685,3 +690,12 @@ export let CREATE_MONEY_TRANSACTION_MUTATION = `
     }
   }
 `;
+
+export const RESOURCE_QUERIES = {
+  customer: `query($businessId: ID!, $resourceId: ID!) { business(id: $businessId) { id resource: customer(id: $resourceId) { ${CUSTOMER_FRAGMENT} } } }`,
+  account: `query($businessId: ID!, $resourceId: ID!) { business(id: $businessId) { id resource: account(id: $resourceId) { ${ACCOUNT_FRAGMENT} } } }`,
+  product: `query($businessId: ID!, $resourceId: ID!) { business(id: $businessId) { id resource: product(id: $resourceId) { ${PRODUCT_FRAGMENT} } } }`,
+  salesTax: `query($businessId: ID!, $resourceId: ID!) { business(id: $businessId) { id resource: salesTax(id: $resourceId) { ${SALES_TAX_FRAGMENT} } } }`,
+  invoice: `query($businessId: ID!, $resourceId: ID!) { business(id: $businessId) { id resource: invoice(id: $resourceId) { ${INVOICE_FRAGMENT} } } }`,
+  vendor: `query($businessId: ID!, $resourceId: ID!) { business(id: $businessId) { id resource: vendor(id: $resourceId) { ${VENDOR_FRAGMENT} } } }`
+};

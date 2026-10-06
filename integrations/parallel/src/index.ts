@@ -13,8 +13,6 @@ import {
   manageMonitor,
   webSearch
 } from './tools';
-import { monitorEvents, taskRunEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     createMonitor,
     manageMonitor
   ],
-  triggers: [monitorEvents, taskRunEvents]
+  triggers: []
 });

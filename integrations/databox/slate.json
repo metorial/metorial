@@ -1,6 +1,6 @@
 {
   "name": "@metorial/databox",
-  "description": "Push custom KPI and metric data into Databox for visualization and analysis. Create and manage data sources and datasets, ingest structured row-level data, track ingestion events, and configure timezones. Manage accounts, validate API keys, purge or delete datasets, and monitor data ingestion outcomes including rows processed and errors.",
+  "description": "Create and manage Databox custom data sources and datasets, submit structured records and verify ingestion outcomes. Discover the current user, accounts, sources and timezones; read stored dataset rows with API v2.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "push data into datasets",
@@ -11,6 +11,8 @@
     "list account data sources",
     "purge dataset data",
     "configure data source timezone",
-    "retrieve ingestion details"
+    "retrieve ingestion details",
+    "discover current user identity",
+    "read stored dataset records"
   ]
 }

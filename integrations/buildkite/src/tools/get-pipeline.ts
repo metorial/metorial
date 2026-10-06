@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getPipeline = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let getPipeline = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...organizationInput,
       pipelineSlug: z.string().describe('The slug of the pipeline to retrieve')
     })
   )
@@ -36,10 +38,7 @@ export let getPipeline = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     let p = await client.getPipeline(ctx.input.pipelineSlug);
 
@@ -57,7 +56,7 @@ export let getPipeline = SlateTool.create(spec, {
         runningBuildsCount: p.running_builds_count,
         scheduledBuildsCount: p.scheduled_builds_count,
         tags: p.tags ?? [],
-        archived: p.archived_at !== null,
+        archived: p.archived_at != null,
         visibility: p.visibility ?? 'private',
         createdAt: p.created_at
       },

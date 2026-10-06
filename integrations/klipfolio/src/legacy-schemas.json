@@ -1,0 +1,1406 @@
+[
+  {
+    "key": "list_dashboards",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "description": "Filter dashboards by client ID",
+          "type": "string"
+        },
+        "includeDetails": {
+          "description": "Include full details (klip instances, share rights)",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Maximum number of results (max 100)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Index of first result to return",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dashboards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dashboardId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "createdBy": {
+                "type": "string"
+              },
+              "lastUpdated": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "total": {
+          "type": "number"
+        }
+      },
+      "required": ["dashboards"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "get_dashboard",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dashboardId": {
+          "type": "string",
+          "description": "ID of the dashboard to retrieve"
+        },
+        "includeDetails": {
+          "description": "Include klip instances, share rights, and layout",
+          "type": "boolean"
+        }
+      },
+      "required": ["dashboardId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dashboardId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "lastUpdated": {
+          "type": "string"
+        },
+        "klipInstances": {
+          "type": "array",
+          "items": {}
+        },
+        "shareRights": {
+          "type": "array",
+          "items": {}
+        },
+        "layout": {}
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "create_dashboard",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the new dashboard"
+        },
+        "description": {
+          "description": "Description of the dashboard",
+          "type": "string"
+        },
+        "clientId": {
+          "description": "Client ID to assign the dashboard to",
+          "type": "string"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dashboardId": {
+          "description": "ID of the newly created dashboard",
+          "type": "string"
+        },
+        "location": {
+          "description": "Resource location path",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "update_dashboard",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dashboardId": {
+          "type": "string",
+          "description": "ID of the dashboard to update"
+        },
+        "name": {
+          "description": "New name for the dashboard",
+          "type": "string"
+        },
+        "description": {
+          "description": "New description for the dashboard",
+          "type": "string"
+        },
+        "layout": {
+          "description": "Dashboard layout configuration",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "Layout type (e.g., \"100\", \"30_60\")"
+            },
+            "state": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {},
+              "description": "Layout state mapping klip instance IDs to regions"
+            }
+          },
+          "required": ["type", "state"],
+          "additionalProperties": false
+        },
+        "addKlips": {
+          "description": "Klips to add to the dashboard",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "klipId": {
+                "type": "string",
+                "description": "ID of the klip to add"
+              },
+              "region": {
+                "description": "Region number to place the klip",
+                "type": "number"
+              },
+              "position": {
+                "description": "Position within the region",
+                "type": "number"
+              }
+            },
+            "required": ["klipId"],
+            "additionalProperties": false
+          }
+        },
+        "removeKlipInstanceIds": {
+          "description": "Klip instance IDs to remove from the dashboard",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "shareRights": {
+          "description": "Share rights to set for the dashboard",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "groupId": {
+                "type": "string",
+                "description": "Group ID to share with"
+              },
+              "canEdit": {
+                "type": "boolean",
+                "description": "Whether the group can edit"
+              }
+            },
+            "required": ["groupId", "canEdit"],
+            "additionalProperties": false
+          }
+        },
+        "removeShareRightGroupIds": {
+          "description": "Group IDs to remove share rights for",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["dashboardId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "delete_dashboard",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dashboardId": {
+          "type": "string",
+          "description": "ID of the dashboard to delete"
+        }
+      },
+      "required": ["dashboardId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_klips",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "description": "Filter klips by client ID",
+          "type": "string"
+        },
+        "datasourceId": {
+          "description": "Filter klips by data source ID",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of results (max 100)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Index of first result to return",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "klips": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "klipId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "createdBy": {
+                "type": "string"
+              },
+              "dateCreated": {
+                "type": "string"
+              },
+              "lastUpdated": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "total": {
+          "type": "number"
+        }
+      },
+      "required": ["klips"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "get_klip",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "klipId": {
+          "type": "string",
+          "description": "ID of the klip to retrieve"
+        },
+        "includeDetails": {
+          "description": "Include share rights and full details",
+          "type": "boolean"
+        },
+        "includeSchema": {
+          "description": "Include the klip schema definition",
+          "type": "boolean"
+        }
+      },
+      "required": ["klipId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "klipId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "dateCreated": {
+          "type": "string"
+        },
+        "lastUpdated": {
+          "type": "string"
+        },
+        "schema": {},
+        "shareRights": {
+          "type": "array",
+          "items": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_klip",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Operation to perform"
+        },
+        "klipId": {
+          "description": "Klip ID (required for update and delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Klip name (required for create)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Klip description",
+          "type": "string"
+        },
+        "clientId": {
+          "description": "Client ID (for create only)",
+          "type": "string"
+        },
+        "schema": {
+          "description": "Klip schema definition (for create or update)"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "klipId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_datasources",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "description": "Filter data sources by client ID",
+          "type": "string"
+        },
+        "includeDetails": {
+          "description": "Include full details (properties, share rights)",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Maximum number of results (max 100)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Index of first result to return",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "datasources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "datasourceId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "connector": {
+                "type": "string"
+              },
+              "format": {
+                "type": "string"
+              },
+              "refreshInterval": {
+                "type": "number"
+              },
+              "disabled": {
+                "type": "boolean"
+              },
+              "dateCreated": {
+                "type": "string"
+              },
+              "dateLastRefresh": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "total": {
+          "type": "number"
+        }
+      },
+      "required": ["datasources"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "get_datasource",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "datasourceId": {
+          "type": "string",
+          "description": "ID of the data source to retrieve"
+        },
+        "includeProperties": {
+          "description": "Include connector properties",
+          "type": "boolean"
+        },
+        "includeShareRights": {
+          "description": "Include share rights",
+          "type": "boolean"
+        }
+      },
+      "required": ["datasourceId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "datasourceId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "connector": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "refreshInterval": {
+          "type": "number"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "isDynamic": {
+          "type": "boolean"
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "dateCreated": {
+          "type": "string"
+        },
+        "dateLastRefresh": {
+          "type": "string"
+        },
+        "properties": {},
+        "shareRights": {}
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_datasource",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Operation to perform"
+        },
+        "datasourceId": {
+          "description": "Data source ID (required for update and delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Data source name (required for create)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Data source description",
+          "type": "string"
+        },
+        "connector": {
+          "description": "Connector type (required for create, e.g., \"simple_rest\")",
+          "type": "string"
+        },
+        "format": {
+          "description": "Data format (e.g., \"json\", \"xml\", \"csv\")",
+          "type": "string"
+        },
+        "refreshInterval": {
+          "description": "Refresh interval in seconds",
+          "type": "number"
+        },
+        "properties": {
+          "description": "Connector-specific properties",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "clientId": {
+          "description": "Client ID (for create only)",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "datasourceId": {
+          "type": "string"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "refresh_datasource",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "datasourceIds": {
+          "description": "Data source IDs to refresh",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "instanceId": {
+          "description": "Specific data source instance ID to refresh",
+          "type": "string"
+        },
+        "enable": {
+          "description": "Data source ID to enable",
+          "type": "string"
+        },
+        "disable": {
+          "description": "Data source ID to disable",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "get_datasource_instance_data",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "instanceId": {
+          "type": "string",
+          "description": "ID of the data source instance"
+        }
+      },
+      "required": ["instanceId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": {}
+        },
+        "rows": {
+          "type": "array",
+          "items": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_users",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "description": "Filter users by client ID",
+          "type": "string"
+        },
+        "email": {
+          "description": "Filter users by email address",
+          "type": "string"
+        },
+        "includeRoles": {
+          "description": "Include role assignments",
+          "type": "boolean"
+        },
+        "includeGroups": {
+          "description": "Include group memberships",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Maximum number of results (max 100)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Index of first result to return",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "dateLastLogin": {
+                "type": "string"
+              },
+              "dateCreated": {
+                "type": "string"
+              },
+              "isLockedOut": {
+                "type": "boolean"
+              },
+              "roles": {
+                "type": "array",
+                "items": {}
+              },
+              "groups": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "total": {
+          "type": "number"
+        }
+      },
+      "required": ["users"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_user",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Operation to perform"
+        },
+        "userId": {
+          "description": "User ID (required for update and delete)",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "First name (required for create)",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Last name (required for create)",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address (required for create)",
+          "type": "string"
+        },
+        "externalId": {
+          "description": "External identifier",
+          "type": "string"
+        },
+        "roles": {
+          "description": "Role IDs to assign (for create)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "password": {
+          "description": "Password (for create)",
+          "type": "string"
+        },
+        "clientId": {
+          "description": "Client ID (for create)",
+          "type": "string"
+        },
+        "sendEmail": {
+          "description": "Send invitation email (for create)",
+          "type": "boolean"
+        },
+        "addToGroupIds": {
+          "description": "Group IDs to add the user to",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removeFromGroupIds": {
+          "description": "Group IDs to remove the user from",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assignTabIds": {
+          "description": "Dashboard (tab) IDs to assign to the user",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unassignTabInstanceIds": {
+          "description": "Tab instance IDs to remove from the user",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_roles",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "description": "Filter roles by client ID",
+          "type": "string"
+        },
+        "includeDetails": {
+          "description": "Include users, num_users, and permissions",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Maximum number of results (max 100)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Index of first result to return",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "roleId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "total": {
+          "type": "number"
+        }
+      },
+      "required": ["roles"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_role",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete", "get"],
+          "description": "Operation to perform"
+        },
+        "roleId": {
+          "description": "Role ID (required for update, delete, get)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Role name (required for create)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Role description",
+          "type": "string"
+        },
+        "permissions": {
+          "description": "Permission strings to assign to the role",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_clients",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Filter by client status",
+          "type": "string",
+          "enum": ["active", "trial", "setup", "disabled"]
+        },
+        "externalId": {
+          "description": "Filter by external identifier",
+          "type": "string"
+        },
+        "includeDetails": {
+          "description": "Include associations (groups, users, share rights)",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Maximum number of results (max 100)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Index of first result to return",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clients": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "clientId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "seats": {
+                "type": "number"
+              },
+              "lastSignIn": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "total": {
+          "type": "number"
+        }
+      },
+      "required": ["clients"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_client",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Operation to perform"
+        },
+        "clientId": {
+          "description": "Client ID (required for update and delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Client name (required for create)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Client description",
+          "type": "string"
+        },
+        "status": {
+          "description": "Client status (active, trial, setup, disabled)",
+          "type": "string"
+        },
+        "seats": {
+          "description": "Number of seats allocated to the client",
+          "type": "number"
+        },
+        "externalId": {
+          "description": "External identifier for the client",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_group",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "description": "Group ID to manage"
+        },
+        "addUserIds": {
+          "description": "User IDs to add to the group",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removeUserIds": {
+          "description": "User IDs to remove from the group",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "addDefaultTabs": {
+          "description": "Default dashboards to add for the group",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tabId": {
+                "type": "string",
+                "description": "Dashboard (tab) ID"
+              },
+              "canEdit": {
+                "description": "Whether members can edit the dashboard",
+                "type": "boolean"
+              },
+              "visibility": {
+                "description": "Dashboard visibility level",
+                "type": "string",
+                "enum": ["library", "dashboard", "permanent"]
+              },
+              "index": {
+                "description": "Position index for the dashboard",
+                "type": "number"
+              }
+            },
+            "required": ["tabId"],
+            "additionalProperties": false
+          }
+        },
+        "removeDefaultTabIds": {
+          "description": "Default tab IDs to remove",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["groupId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_published_links",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "description": "Filter by client ID",
+          "type": "string"
+        },
+        "dashboardId": {
+          "description": "Filter by dashboard ID",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of results (max 100)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Index of first result to return",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "publishedLinks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "linkId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "dashboardUrl": {
+                "type": "string"
+              },
+              "visibility": {
+                "type": "string"
+              },
+              "dateCreated": {
+                "type": "string"
+              },
+              "dateLastAccessed": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "total": {
+          "type": "number"
+        }
+      },
+      "required": ["publishedLinks"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_published_link",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Operation to perform"
+        },
+        "linkId": {
+          "description": "Published link ID (required for update and delete)",
+          "type": "string"
+        },
+        "dashboardId": {
+          "description": "Dashboard ID to create the published link for (required for create)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name for the published link",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description of the published link",
+          "type": "string"
+        },
+        "password": {
+          "description": "Password to protect the link",
+          "type": "string"
+        },
+        "isPublic": {
+          "description": "Whether the link is publicly searchable",
+          "type": "boolean"
+        },
+        "theme": {
+          "description": "Display theme",
+          "type": "string",
+          "enum": ["light", "dark"]
+        },
+        "logo": {
+          "description": "URL of a custom logo image",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "linkId": {
+          "type": "string"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "get_profile",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "includeDetails": {
+          "description": "Include tab instances, dashboard properties, and permissions",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "companyId": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "dateLastLogin": {
+          "type": "string"
+        },
+        "dateCreated": {
+          "type": "string"
+        },
+        "isLockedOut": {
+          "type": "boolean"
+        },
+        "tabInstances": {
+          "type": "array",
+          "items": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+]

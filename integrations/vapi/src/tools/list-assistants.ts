@@ -16,6 +16,9 @@ export let listAssistants = SlateTool.create(spec, {
     z.object({
       limit: z
         .number()
+        .int()
+        .min(0)
+        .max(1000)
         .optional()
         .describe('Maximum number of assistants to return (default 100)'),
       createdAfter: z
@@ -53,10 +56,10 @@ export let listAssistants = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, ctx.auth.region);
 
     let params: Record<string, any> = {};
-    if (ctx.input.limit) params.limit = ctx.input.limit;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
     if (ctx.input.createdAfter) params.createdAtGt = ctx.input.createdAfter;
     if (ctx.input.createdBefore) params.createdAtLt = ctx.input.createdBefore;
     if (ctx.input.updatedAfter) params.updatedAtGt = ctx.input.updatedAfter;

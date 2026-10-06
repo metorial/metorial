@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'salesloft',
   name: 'SalesLoft',
   description:
-    'Sales engagement platform for managing outreach through cadences, tracking calls and emails, managing contacts and accounts, and leveraging AI-powered workflows.',
+    'Manage people, accounts and notes; discover cadences and memberships; read email, call, task and template activity; and log completed external calls.',
   metadata: {},
   config,
   auth

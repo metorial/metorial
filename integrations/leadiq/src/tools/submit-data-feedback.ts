@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let submitDataFeedback = SlateTool.create(spec, {
   name: 'Submit Data Feedback',
   key: 'submit_data_feedback',
   description: `Submit corrections for person contact data in LeadIQ. Report an email or phone number as correct or invalid, including specific reasons for invalidity.
-Use this to improve data quality by reporting bounced emails, wrong numbers, or confirming accurate contact information.`,
+This writes a persistent data-quality report about the identified contact; no reversal API is documented. Submit only authorized, accurate feedback.`,
   instructions: [
     'Provide enough identifying information (personId, linkedinUrl, or name + company) to locate the person record.',
     'The "value" field should contain the email or phone number being corrected.',
@@ -64,10 +64,32 @@ Use this to improve data quality by reporting bounced emails, wrong numbers, or 
   .output(
     z.object({
       success: z.boolean().describe('Whether the feedback was submitted successfully'),
-      feedbackResult: z.any().optional().describe('Feedback submission result from the API')
+      feedbackResult: z.any().optional().describe('Provider feedback submission ID'),
+      feedbackId: z.string().optional().describe('Confirmed provider feedback submission ID')
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ![ctx.input.personId, ctx.input.linkedinUrl, ctx.input.linkedinId, ctx.input.name].some(
+        value => value?.trim()
+      )
+    )
+      throw createApiServiceError(
+        'Provide a person ID, LinkedIn profile or identifying name for the feedback.',
+        { reason: 'invalid_input' }
+      );
+    if (!ctx.input.value.trim())
+      throw createApiServiceError('Provide the contact value to report.', {
+        reason: 'invalid_input'
+      });
+    if (ctx.input.status === 'Invalid' && !ctx.input.invalidReason)
+      throw createApiServiceError('invalidReason is required when status is Invalid.', {
+        reason: 'invalid_input'
+      });
+    if (ctx.input.status === 'Correct' && ctx.input.invalidReason)
+      throw createApiServiceError('invalidReason is only valid with status Invalid.', {
+        reason: 'invalid_input'
+      });
     let client = new Client({ token: ctx.auth.token });
 
     let input: Record<string, any> = {
@@ -88,12 +110,18 @@ Use this to improve data quality by reporting bounced emails, wrong numbers, or 
 
     let result = await client.submitPersonFeedback(input);
 
+    if (typeof result !== 'string' || !result)
+      throw createApiServiceError(
+        'LeadIQ returned no feedback ID; submission is unconfirmed.',
+        { reason: 'invalid_api_response' }
+      );
     return {
       output: {
         success: true,
-        feedbackResult: result
+        feedbackResult: result,
+        feedbackId: result
       },
-      message: `Data feedback submitted: **${ctx.input.value}** marked as **${ctx.input.status}** (${ctx.input.type}).`
+      message: `Data feedback submitted and confirmed with ID ${result}.`
     };
   })
   .build();

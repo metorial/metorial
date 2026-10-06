@@ -2,6 +2,9 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createDeploy,
+  createOccurrence,
+  deleteOccurrence,
+  getDeploy,
   getItem,
   getMetrics,
   getOccurrence,
@@ -14,6 +17,7 @@ import {
   manageAccessTokens,
   manageNotificationRules,
   manageProject,
+  manageRqlJob,
   manageServiceLinks,
   manageTeam,
   manageTeamMembers,
@@ -21,11 +25,13 @@ import {
   runRqlQuery,
   updateItem
 } from './tools';
-import { deployEvent, itemEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    createOccurrence,
+    deleteOccurrence,
+    getDeploy,
+    manageRqlJob,
     listItems,
     getItem,
     updateItem,
@@ -46,5 +52,5 @@ export let provider = Slate.create({
     listUsers,
     getVersion
   ],
-  triggers: [itemEvent, deployEvent]
+  triggers: []
 });

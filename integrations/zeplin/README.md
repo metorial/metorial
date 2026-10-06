@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/zeplin-logo.png" height="20"> Zeplin
 
-Access and manage design projects, screens, components, and styleguides in Zeplin. Retrieve design specs, assets, code snippets, and design tokens. Create and manage notes and comments on screens. Publish screen versions with PNG/JPEG images. Manage design tokens including colors, text styles, and spacing tokens at project and styleguide levels. Access flow boards, variable collections, and connected components. Invite and remove project and styleguide members. Manage organization members and workspace settings. Receive webhooks for changes to projects, screens, components, notes, styleguides, and organization membership.
+Access and manage design projects, screens, components, and styleguides in Zeplin. Retrieve design specs, assets, code snippets, and design tokens. Create and manage notes and comments on screens. Publish screen versions with PNG/JPEG images. Manage design tokens including colors, text styles, and spacing tokens at project and styleguide levels. Access flow boards, variable collections, and connected components. Invite and remove project and styleguide members. Manage organization members and workspace settings.
 
 ## Tools
 

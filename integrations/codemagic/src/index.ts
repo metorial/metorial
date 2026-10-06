@@ -12,8 +12,6 @@ import {
   manageCaches,
   startBuild
 } from './tools';
-import { buildStatusTrigger, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     manageCaches,
     addVariables
   ],
-  triggers: [inboundWebhook, buildStatusTrigger]
+  triggers: []
 });

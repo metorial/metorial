@@ -1,13 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let summarizeBySegment = SlateTool.create(spec, {
   name: 'Summarize by Segment',
   key: 'summarize_by_segment',
-  description: `Break text or a web page into logical segments and summarize each one individually. Useful for long documents where you need per-section summaries rather than one overall summary.`,
+  description:
+    'DEPRECATED — use `chat_completion` instead. AI21 retired the specialized segment summarization API.',
+  instructions: [
+    'Use chat_completion with task instructions and supplied context, or maestro_run with validation requirements. These APIs do not reproduce the retired response semantics automatically.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true,
     destructive: false
   }
@@ -35,25 +39,9 @@ export let summarizeBySegment = SlateTool.create(spec, {
         .describe('Summarized segments')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.summarizeBySegment({
-      source: ctx.input.source,
-      sourceType: ctx.input.sourceType,
-      focus: ctx.input.focus
-    });
-
-    let segments = (result.segments ?? []).map((s: any) => ({
-      segmentText: s.segment_text ?? s.segmentText ?? '',
-      summary: s.summary ?? '',
-      highlights:
-        s.highlights?.map((h: any) => (typeof h === 'string' ? h : h.text)) ?? undefined
-    }));
-
-    return {
-      output: { segments },
-      message: `Segmented content into **${segments.length}** segments with individual summaries.`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'AI21 retired the specialized segment summarization API. Use chat_completion with explicit task instructions and context, or maestro_run with validation requirements.'
+    );
   })
   .build();

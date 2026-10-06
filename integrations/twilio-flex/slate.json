@@ -1,18 +1,16 @@
 {
   "name": "@twilio/twilio-flex",
-  "description": "Manage a cloud-based contact center across voice, SMS, WhatsApp, Facebook Messenger, and web chat channels. Create and manage customer interactions and conversations, add or remove participants, and transfer conversations between agents. Route tasks to agents using attribute-based rules with TaskRouter, managing workspaces, workers, task queues, and workflows. Configure Flex instance settings including UI appearance and enabled channels. Define messaging channel flows (Flex Flows) to control how inbound messages are routed. Access contact center analytics and insights including agent activity, queue metrics, and custom KPIs. Trigger and manage Studio communication workflows programmatically. Subscribe to interaction, task, and conversation events via webhooks and event streams.",
+  "description": "Discover TaskRouter workspaces, inspect Flex configuration, manage controlled workers, tasks, queues, workflows and activities, and read contact-center statistics. Create asynchronous Flex messaging interactions, inspect channel status, and manage Conversations, participants and messages. Read Studio flows/executions or explicitly start an execution. Documented legacy Flex Flow CRUD remains available with a Programmable Chat end-of-life warning.",
   "categories": ["crm-and-sales-tools", "email-and-messaging", "task-and-project-management"],
   "skills": [
-    "manage omnichannel interactions",
-    "route tasks to agents",
-    "transfer conversations between agents",
-    "configure contact center settings",
-    "track agent activity metrics",
-    "create outbound conversations",
-    "manage messaging channel flows",
-    "trigger communication workflows",
-    "subscribe to interaction events",
-    "generate analytics and reports"
+    "discover routing workspaces",
+    "inspect contact center configuration",
+    "manage task routing resources",
+    "inspect interaction setup status",
+    "manage conversations and participants",
+    "send conversation messages",
+    "inspect contact center statistics",
+    "read Studio execution history"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/twilio.svg"
 }

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/productboard.jpg" height="20"> Productboard
 
-Manage product roadmaps, feedback, and feature prioritization. Create, read, update, and delete features, notes (feedback), releases, objectives, key results, and initiatives. Organize product hierarchy including products, components, and features with custom fields. Collect and manage user feedback and notes from any source. Plan delivery timelines with releases and release groups. Align product work with strategic goals through objectives and initiatives. Manage companies and users associated with feedback. Subscribe to webhooks for feature, note, component, and product change events. Integrate with external tools via plugin integrations for two-way sync workflows.
+Manage product roadmaps, feedback, and feature prioritization. Create, read, update, and delete features, notes (feedback), releases, objectives, key results, and initiatives. Organize product hierarchy including products, components, and features with custom fields. Collect and manage user feedback and notes from any source. Plan delivery timelines with releases and release groups. Align product work with strategic goals through objectives and initiatives. Manage companies and users associated with feedback. Integrate with external tools via plugin integrations for two-way sync workflows.
 
 ## Tools
 

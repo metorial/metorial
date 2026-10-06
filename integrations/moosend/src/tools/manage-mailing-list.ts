@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoosendClient } from '../lib/client';
+import { mapList, optionalNumber, record, records, text } from '../lib/data';
 import { spec } from '../spec';
 
 let mailingListOutputSchema = z.object({
@@ -20,7 +21,7 @@ export let manageMailingList = SlateTool.create(spec, {
   key: 'manage_mailing_list',
   description: `Create, update, or delete mailing lists. Can also retrieve details for a specific list or all lists with optional subscriber statistics.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -48,14 +49,27 @@ export let manageMailingList = SlateTool.create(spec, {
         .default(false)
         .describe('Include subscriber statistics in results (for get/list)'),
       page: z.number().optional().default(1).describe('Page number for listing'),
-      pageSize: z.number().optional().default(100).describe('Items per page for listing')
+      pageSize: z.number().optional().default(100).describe('Items per page for listing'),
+      preferences: z
+        .object({
+          selectType: z.enum(['SingleSelect', 'MultiSelect']),
+          options: z.array(z.string()).max(10),
+          isRequired: z.boolean().optional()
+        })
+        .optional()
+        .describe(
+          'Preference choices for create/update; omitted update preferences are preserved'
+        )
     })
   )
   .output(
     z.object({
       mailingLists: z.array(mailingListOutputSchema).describe('Mailing list(s) returned'),
       action: z.string().describe('Action performed'),
-      success: z.boolean().describe('Whether the action completed successfully')
+      success: z.boolean().describe('Whether the action completed successfully'),
+      totalCount: z.number().optional().describe('Total lists reported by the provider'),
+      currentPage: z.number().optional().describe('Current page'),
+      returnedCount: z.number().optional().describe('Number of lists in this result')
     })
   )
   .handleInvocation(async ctx => {
@@ -64,8 +78,17 @@ export let manageMailingList = SlateTool.create(spec, {
 
     switch (action) {
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required for creating a mailing list');
-        let body: Record<string, unknown> = { Name: ctx.input.name };
+        if (!ctx.input.name)
+          throw createApiServiceError('name is required for creating a mailing list');
+        let body: Record<string, unknown> = { Name: text(ctx.input.name, 'list name') };
+        if (ctx.input.preferences)
+          body.Preferences = {
+            SelectType: ctx.input.preferences.selectType,
+            Options: ctx.input.preferences.options,
+            ...(ctx.input.preferences.isRequired !== undefined
+              ? { IsRequired: ctx.input.preferences.isRequired }
+              : {})
+          };
         if (ctx.input.confirmationPage) body.ConfirmationPage = ctx.input.confirmationPage;
         if (ctx.input.redirectAfterUnsubscribePage)
           body.RedirectAfterUnsubscribePage = ctx.input.redirectAfterUnsubscribePage;
@@ -81,9 +104,17 @@ export let manageMailingList = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.mailingListId)
-          throw new Error('mailingListId is required for updating a mailing list');
+          throw createApiServiceError('mailingListId is required for updating a mailing list');
         let body: Record<string, unknown> = {};
-        if (ctx.input.name) body.Name = ctx.input.name;
+        if (ctx.input.name !== undefined) body.Name = text(ctx.input.name, 'list name');
+        if (ctx.input.preferences)
+          body.Preferences = {
+            SelectType: ctx.input.preferences.selectType,
+            Options: ctx.input.preferences.options,
+            ...(ctx.input.preferences.isRequired !== undefined
+              ? { IsRequired: ctx.input.preferences.isRequired }
+              : {})
+          };
         if (ctx.input.confirmationPage) body.ConfirmationPage = ctx.input.confirmationPage;
         if (ctx.input.redirectAfterUnsubscribePage)
           body.RedirectAfterUnsubscribePage = ctx.input.redirectAfterUnsubscribePage;
@@ -99,7 +130,7 @@ export let manageMailingList = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.mailingListId)
-          throw new Error('mailingListId is required for deleting a mailing list');
+          throw createApiServiceError('mailingListId is required for deleting a mailing list');
         await client.deleteMailingList(ctx.input.mailingListId);
         return {
           output: {
@@ -107,12 +138,14 @@ export let manageMailingList = SlateTool.create(spec, {
             action,
             success: true
           },
-          message: `Permanently deleted mailing list **${ctx.input.mailingListId}**.`
+          message: `Deleted mailing list **${ctx.input.mailingListId}**; retained provider history may remain.`
         };
       }
       case 'get': {
         if (!ctx.input.mailingListId)
-          throw new Error('mailingListId is required for getting mailing list details');
+          throw createApiServiceError(
+            'mailingListId is required for getting mailing list details'
+          );
         let result = await client.getMailingList(
           ctx.input.mailingListId,
           ctx.input.withStatistics
@@ -132,10 +165,16 @@ export let manageMailingList = SlateTool.create(spec, {
           ctx.input.pageSize,
           ctx.input.withStatistics
         );
-        let lists = (result?.MailingLists as Record<string, unknown>[]) ?? [];
+        let lists = records(result.MailingLists, 'mailing lists');
         return {
           output: {
             mailingLists: lists.map(mapList),
+            returnedCount: lists.length,
+            totalCount:
+              result.Paging == null
+                ? undefined
+                : optionalNumber(record(result.Paging).TotalResults),
+            currentPage: ctx.input.page,
             action,
             success: true
           },
@@ -145,15 +184,3 @@ export let manageMailingList = SlateTool.create(spec, {
     }
   })
   .build();
-
-let mapList = (l: Record<string, unknown>) => ({
-  mailingListId: String(l?.ID ?? ''),
-  name: String(l?.Name ?? ''),
-  createdOn: l?.CreatedOn ? String(l.CreatedOn) : undefined,
-  updatedOn: l?.UpdatedOn ? String(l.UpdatedOn) : undefined,
-  status: l?.Status as number | undefined,
-  activeMemberCount: l?.ActiveMemberCount as number | undefined,
-  bouncedMemberCount: l?.BouncedMemberCount as number | undefined,
-  removedMemberCount: l?.RemovedMemberCount as number | undefined,
-  unsubscribedMemberCount: l?.UnsubscribedMemberCount as number | undefined
-});

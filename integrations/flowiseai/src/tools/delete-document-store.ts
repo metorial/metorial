@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteDocumentStore = SlateTool.create(spec, {
   name: 'Delete Document Store',
   key: 'delete_document_store',
-  description: `Permanently delete a document store and its contents from Flowise. This action cannot be undone.`,
+  description: `Permanently delete a document store and its stored chunks and files. External vectors remain; use delete_document_store_vectors first for record-manager-tracked data. This action cannot be undone.`,
   tags: {
     readOnly: false,
     destructive: true

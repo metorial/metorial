@@ -1,27 +1,31 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageDraft = SlateTool.create(spec, {
   name: 'Manage Draft',
   key: 'manage_draft',
-  description: `Create, retrieve, list, or publish drafts. Use **action** to specify the operation:
+  description: `Create, retrieve, list, update, soft-delete, or publish drafts. Publication causes public effects and may retire the original draft. Use **action** to specify the operation:
 - **create**: Create a new draft with Markdown content and optional metadata.
 - **get**: Retrieve a single draft by its ID.
-- **list**: List all drafts in the publication with pagination.
+- **list**: List the authenticated author's drafts in the publication with pagination.
 - **publish**: Publish an existing draft as a live blog post.`,
-  instructions: ['Only the publication owner can access drafts.']
+  instructions: [
+    'Draft access depends on the authenticated author or publication role and Pro entitlement. Removal is soft deletion and does not erase associated history.'
+  ]
 })
   .input(
     z.object({
+      ...selection,
       action: z
-        .enum(['create', 'get', 'list', 'publish'])
+        .enum(['create', 'get', 'list', 'publish', 'update', 'delete'])
         .describe('The operation to perform'),
       draftId: z
         .string()
         .optional()
-        .describe('Draft ID — required for "get" and "publish" actions'),
+        .describe('Draft ID — required for get, update, delete and publish.'),
       title: z.string().optional().describe('Draft title — required for "create"'),
       contentMarkdown: z
         .string()
@@ -42,9 +46,12 @@ export let manageDraft = SlateTool.create(spec, {
       coverImageUrl: z.string().optional().describe('Cover image URL — used with "create"'),
       first: z
         .number()
+        .int()
+        .min(1)
+        .max(50)
         .optional()
         .default(10)
-        .describe('Number of drafts to list — used with "list"'),
+        .describe('Number of drafts to list, at most 50 — used with "list"'),
       after: z.string().optional().describe('Pagination cursor — used with "list"')
     })
   )
@@ -52,6 +59,8 @@ export let manageDraft = SlateTool.create(spec, {
     z.object({
       draft: z
         .object({
+          publicationId: z.string().optional(),
+          authorId: z.string().optional(),
           draftId: z.string().describe('Draft ID'),
           title: z.string().nullable().optional().describe('Draft title'),
           slug: z.string().nullable().optional().describe('Draft slug'),
@@ -99,6 +108,10 @@ export let manageDraft = SlateTool.create(spec, {
         .nullable()
         .optional()
         .describe('Published post — returned by "publish"'),
+      deleted: z
+        .boolean()
+        .optional()
+        .describe('Whether the native soft-deletion mutation accepted this exact draft ID.'),
       hasNextPage: z.boolean().optional().describe('Whether more drafts are available'),
       endCursor: z.string().nullable().optional().describe('Cursor for next page')
     })
@@ -106,14 +119,19 @@ export let manageDraft = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      publicationHost: ctx.config.publicationHost
+      publicationHost:
+        ctx.input.publicationHost ??
+        (ctx.input.publicationId === undefined ? ctx.config.publicationHost : undefined),
+      publicationId: ctx.input.publicationId
     });
 
     let { action } = ctx.input;
 
     if (action === 'create') {
       if (!ctx.input.title || !ctx.input.contentMarkdown) {
-        throw new Error('title and contentMarkdown are required to create a draft');
+        throw createApiServiceError(
+          'title and contentMarkdown are required to create a draft'
+        );
       }
 
       let tags = ctx.input.tags?.map(t => ({ id: t.tagId, name: t.name, slug: t.slug }));
@@ -130,6 +148,8 @@ export let manageDraft = SlateTool.create(spec, {
         output: {
           draft: {
             draftId: draft.id,
+            publicationId: draft.publication?.id,
+            authorId: draft.author?.id,
             title: draft.title,
             slug: draft.slug
           }
@@ -140,22 +160,24 @@ export let manageDraft = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!ctx.input.draftId) {
-        throw new Error('draftId is required to get a draft');
+        throw createApiServiceError('draftId is required to get a draft');
       }
 
       let draft = await client.getDraft(ctx.input.draftId);
-      if (!draft) throw new Error('Draft not found');
+      if (!draft) throw createApiServiceError('Draft not found');
 
       return {
         output: {
           draft: {
             draftId: draft.id,
+            publicationId: draft.publication?.id,
+            authorId: draft.author?.id,
             title: draft.title,
             slug: draft.slug,
             updatedAt: draft.updatedAt,
             contentMarkdown: draft.content?.markdown,
             authorUsername: draft.author?.username,
-            tags: (draft.tags || []).map((t: any) => ({
+            tags: (draft.tags || []).map(t => ({
               tagId: t.id,
               name: t.name,
               slug: t.slug
@@ -168,11 +190,11 @@ export let manageDraft = SlateTool.create(spec, {
 
     if (action === 'list') {
       let result = await client.listDrafts({
-        first: Math.min(ctx.input.first, 20),
+        first: ctx.input.first,
         after: ctx.input.after
       });
 
-      let drafts = result.drafts.map((d: any) => ({
+      let drafts = result.drafts.map(d => ({
         draftId: d.id,
         title: d.title,
         slug: d.slug,
@@ -190,9 +212,43 @@ export let manageDraft = SlateTool.create(spec, {
       };
     }
 
+    if (action === 'update' || action === 'delete') {
+      if (!ctx.input.draftId)
+        throw createApiServiceError('draftId is required for update and delete.');
+      if (action === 'delete') {
+        const draft = await client.deleteDraft(ctx.input.draftId);
+        return {
+          output: { draft: { draftId: draft.id }, deleted: true },
+          message: 'Hashnode accepted soft deletion of the exact draft.'
+        };
+      }
+      const draft = await client.updateDraft(ctx.input.draftId, {
+        title: ctx.input.title,
+        contentMarkdown: ctx.input.contentMarkdown,
+        subtitle: ctx.input.subtitle,
+        slug: ctx.input.slug,
+        tags: ctx.input.tags?.map(t => ({ id: t.tagId, name: t.name, slug: t.slug })),
+        coverImageURL: ctx.input.coverImageUrl
+      });
+      return {
+        output: {
+          draft: {
+            draftId: draft.id,
+            publicationId: draft.publication?.id,
+            authorId: draft.author?.id,
+            title: draft.title,
+            slug: draft.slug,
+            updatedAt: draft.updatedAt,
+            contentMarkdown: draft.content?.markdown
+          }
+        },
+        message: 'Updated the exact draft.'
+      };
+    }
+
     if (action === 'publish') {
       if (!ctx.input.draftId) {
-        throw new Error('draftId is required to publish a draft');
+        throw createApiServiceError('draftId is required to publish a draft');
       }
 
       let post = await client.publishDraft(ctx.input.draftId);
@@ -210,6 +266,6 @@ export let manageDraft = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

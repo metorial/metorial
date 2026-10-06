@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deliverDocuments } from '../lib/files';
 import { spec } from '../spec';
 
 export let getSubmission = SlateTool.create(spec, {
   name: 'Get Submission',
   key: 'get_submission',
-  description: `Retrieve detailed information about a specific submission including all submitters, their statuses, filled field values, signed document URLs, and the audit log. Optionally retrieve and merge all signed documents.`,
+  description: `Retrieve detailed information about a specific submission including all submitters, their statuses, filled field values, signed document URLs, and the audit log. Optionally download merged available PDFs; these are previews until signing completes. Retrieval may generate retained files.`,
   tags: {
     readOnly: true
   }
@@ -39,7 +40,7 @@ export let getSubmission = SlateTool.create(spec, {
         .array(
           z.object({
             submitterId: z.number().describe('Submitter ID'),
-            email: z.string().optional().describe('Submitter email'),
+            email: z.string().nullable().optional().describe('Submitter email'),
             name: z.string().nullable().optional().describe('Submitter name'),
             phone: z.string().nullable().optional().describe('Submitter phone'),
             status: z.string().optional().describe('Submitter status'),
@@ -50,7 +51,7 @@ export let getSubmission = SlateTool.create(spec, {
               .array(
                 z.object({
                   field: z.string().describe('Field name'),
-                  value: z.any().describe('Field value')
+                  value: z.unknown().describe('Field value')
                 })
               )
               .optional()
@@ -96,13 +97,14 @@ export let getSubmission = SlateTool.create(spec, {
     let mergedDocuments: Array<{ name?: string; url?: string }> | undefined;
     if (ctx.input.mergeDocuments) {
       let docs = await client.getSubmissionDocuments(ctx.input.submissionId, true);
-      mergedDocuments = (docs.documents || []).map((d: any) => ({
+      await deliverDocuments(ctx, docs.documents, ctx.auth.token);
+      mergedDocuments = (docs.documents || []).map(d => ({
         name: d.name,
         url: d.url
       }));
     }
 
-    let submitters = (s.submitters || []).map((sub: any) => ({
+    let submitters = (s.submitters || []).map(sub => ({
       submitterId: sub.id,
       email: sub.email,
       name: sub.name,
@@ -112,7 +114,7 @@ export let getSubmission = SlateTool.create(spec, {
       completedAt: sub.completed_at,
       declinedAt: sub.declined_at,
       values: sub.values || [],
-      documents: (sub.documents || []).map((d: any) => ({
+      documents: (sub.documents || []).map(d => ({
         name: d.name,
         url: d.url
       }))

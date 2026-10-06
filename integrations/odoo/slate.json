@@ -1,6 +1,6 @@
 {
   "name": "@metorial/odoo",
-  "description": "Connect to Odoo business data and workflows across installed modules. Discover models and fields, verify the connected user, search and count records with Odoo domains, perform record CRUD, download binary attachments, and run validated Sales, Accounting, Purchase, CRM, and Activity workflows. Supports Odoo 19+ JSON-2 and legacy JSON-RPC. Receive Odoo automation webhook notifications or poll contact record changes.",
+  "description": "Connect to Odoo business data and workflows across installed modules. Discover models and fields, verify the connected user, search and count records with Odoo domains, perform record CRUD, download binary attachments, and run validated Sales, Accounting, Purchase, CRM, and Activity workflows. Supports Odoo 19+ JSON-2 and legacy JSON-RPC.",
   "categories": [
     "crm-and-sales-tools",
     "e-commerce-and-retail",

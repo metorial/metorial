@@ -1,3 +1,4 @@
+export { cancelTransferTool } from './cancel-transfer';
 export { createAssetReportTool } from './create-asset-report';
 export { createLinkTokenTool } from './create-link-token';
 export { createTransferTool } from './create-transfer';
@@ -17,5 +18,7 @@ export { getTransactionsTool } from './get-transactions';
 export { getTransferTool } from './get-transfer';
 export { listTransfersTool } from './list-transfers';
 export { getItemTool, removeItemTool } from './manage-item';
+export { manageTransferAuthorizationTool } from './manage-transfer-authorization';
+export { removeAssetReportTool } from './remove-asset-report';
 export { searchInstitutionsTool } from './search-institutions';
 export { syncTransactionsTool } from './sync-transactions';

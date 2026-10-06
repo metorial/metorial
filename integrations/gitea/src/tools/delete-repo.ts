@@ -16,8 +16,8 @@ export let deleteRepo = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner username or organization name'),
-      repo: z.string().describe('Repository name')
+      owner: z.string().min(1).describe('Repository owner username or organization name'),
+      repo: z.string().min(1).describe('Repository name')
     })
   )
   .output(
@@ -26,7 +26,7 @@ export let deleteRepo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     await client.deleteRepo(ctx.input.owner, ctx.input.repo);
 
     return {

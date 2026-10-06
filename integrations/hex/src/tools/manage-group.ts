@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,6 +7,7 @@ export let manageGroup = SlateTool.create(spec, {
   name: 'Manage Group',
   key: 'manage_group',
   description: `Create a new group or update an existing group's name and membership. When creating, provide a name and optionally initial member user IDs. When updating, provide the group ID and any combination of new name, users to add, and users to remove.`,
+  tags: { destructive: true },
   instructions: [
     'To create a group, provide "name" without "groupId".',
     'To update a group, provide "groupId" with any of "name", "addUserIds", or "removeUserIds".'
@@ -34,9 +35,12 @@ export let manageGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
 
-    if (ctx.input.groupId) {
+    if (ctx.input.groupId !== undefined) {
       let group = await client.editGroup(ctx.input.groupId, {
         name: ctx.input.name,
         addUserIds: ctx.input.addUserIds,
@@ -52,8 +56,12 @@ export let manageGroup = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.name) {
-        throw new Error('Name is required when creating a new group.');
+        throw createApiServiceError('Name is required when creating a new group.');
       }
+      if (ctx.input.removeUserIds !== undefined)
+        throw createApiServiceError(
+          'removeUserIds applies only when updating an existing group.'
+        );
       let group = await client.createGroup(ctx.input.name, ctx.input.addUserIds);
       return {
         output: {

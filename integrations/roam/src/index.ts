@@ -7,7 +7,9 @@ import {
   createPage,
   deleteBlock,
   deletePage,
+  getBlock,
   getPage,
+  listPages,
   moveBlock,
   pullData,
   queryGraph,
@@ -16,14 +18,14 @@ import {
   updatePage
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [
     queryGraph,
     pullData,
     getPage,
+    getBlock,
+    listPages,
     createPage,
     updatePage,
     deletePage,
@@ -35,5 +37,5 @@ export let provider = Slate.create({
     searchBlocks,
     batchActions
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

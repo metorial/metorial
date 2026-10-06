@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SerpApiClient } from '../lib/client';
+import { receiptMessage, receiptOutput, SerpApiClient } from '../lib/client';
+import { number, searchMetadataSchema, text } from '../lib/contracts';
+import { searchParams } from '../lib/params';
 import { spec } from '../spec';
 
 let scholarResultSchema = z.object({
@@ -53,11 +55,29 @@ export let scholarSearchTool = SlateTool.create(spec, {
         .optional()
         .describe('Page number (0-indexed, each page has ~10 results)'),
       sortByDate: z.boolean().optional().describe('Sort results by date instead of relevance'),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Submit asynchronously and return the native search ID/status. Not compatible with noCache or Ludicrous Speed accounts.'
+        ),
       noCache: z.boolean().optional().describe('Force fresh results')
     })
   )
   .output(
     z.object({
+      isComplete: z
+        .boolean()
+        .describe(
+          'Whether native search status is Success; queued/processing receipts are incomplete.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Native pagination metadata; follow native offsets/tokens without inferring a total.'
+        ),
+      searchMetadata: searchMetadataSchema.optional(),
       scholarResults: z.array(scholarResultSchema).describe('Academic paper results'),
       authorProfile: z
         .object({
@@ -80,25 +100,9 @@ export let scholarSearchTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SerpApiClient({ apiKey: ctx.auth.token });
+    let client = new SerpApiClient({ apiKey: ctx.auth.token, accountId: ctx.auth.accountId });
 
-    let params: Record<string, any> = {};
-
-    if (ctx.input.authorId) {
-      params.engine = 'google_scholar_author';
-      params.author_id = ctx.input.authorId;
-    } else {
-      params.engine = 'google_scholar';
-      if (ctx.input.query) params.q = ctx.input.query;
-      if (ctx.input.cites) params.cites = ctx.input.cites;
-    }
-
-    if (ctx.input.yearLow) params.as_ylo = ctx.input.yearLow;
-    if (ctx.input.yearHigh) params.as_yhi = ctx.input.yearHigh;
-    if (ctx.input.language) params.hl = ctx.input.language;
-    if (ctx.input.page !== undefined) params.start = ctx.input.page * 10;
-    if (ctx.input.sortByDate) params.scisbd = '1';
-    if (ctx.input.noCache) params.no_cache = ctx.input.noCache;
+    let params = searchParams('scholar_search', ctx.input);
 
     let data = await client.search(params);
 
@@ -106,18 +110,18 @@ export let scholarSearchTool = SlateTool.create(spec, {
       position: r.position,
       title: r.title,
       link: r.link,
-      resultId: r.result_id,
+      resultId: r.result_id ?? r.citation_id,
       snippet: r.snippet,
-      publicationInfo: r.publication_info?.summary,
+      publicationInfo: r.publication_info?.summary ?? r.publication,
       authors: r.publication_info?.authors?.map((a: any) => ({
         name: a.name,
         authorId: a.author_id,
         link: a.link
       })),
-      citedByCount: r.inline_links?.cited_by?.total,
-      citedByLink: r.inline_links?.cited_by?.link,
-      year: r.year,
-      pdfLink: r.resources?.[0]?.link
+      citedByCount: r.inline_links?.cited_by?.total ?? r.cited_by?.value,
+      citedByLink: r.inline_links?.cited_by?.link ?? r.cited_by?.link,
+      year: text(r.year) ?? (number(r.year) !== undefined ? String(r.year) : undefined),
+      pdfLink: r.resources?.find((resource: any) => resource.file_format === 'PDF')?.link
     }));
 
     let authorProfile = data.author
@@ -141,11 +145,12 @@ export let scholarSearchTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...receiptOutput(data),
         scholarResults,
         authorProfile,
         totalResults
       },
-      message
+      message: receiptMessage(data, message)
     };
   })
   .build();

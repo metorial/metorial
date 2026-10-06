@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HoneybadgerClient } from '../lib/client';
+import { projectIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let queryInsights = SlateTool.create(spec, {
@@ -19,7 +20,7 @@ export let queryInsights = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project ID'),
+      projectId: projectIdSchema,
       query: z
         .string()
         .describe('BadgerQL query string (e.g., "fields @ts, @preview | limit 10")'),
@@ -29,6 +30,12 @@ export let queryInsights = SlateTool.create(spec, {
         .describe(
           'Time range: ISO 8601 duration (e.g., "PT3H", "P7D"), "today", or date range. Defaults to PT3H'
         ),
+      streamIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Optional Insights stream IDs from project details; omitted means all streams'
+        ),
       timezone: z
         .string()
         .optional()
@@ -37,7 +44,7 @@ export let queryInsights = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      results: z.array(z.record(z.string(), z.any())).describe('Query results'),
+      results: z.array(z.record(z.string(), z.unknown())).describe('Query results'),
       fields: z.array(z.string()).optional().describe('Field names in the results'),
       rowCount: z.number().optional().describe('Number of rows returned'),
       totalCount: z.number().optional().describe('Total matching rows'),
@@ -46,10 +53,11 @@ export let queryInsights = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HoneybadgerClient({ token: ctx.auth.token });
+    let client = new HoneybadgerClient(ctx.auth);
     let data = await client.queryInsights(ctx.input.projectId, ctx.input.query, {
       ts: ctx.input.timeRange,
-      timezone: ctx.input.timezone
+      timezone: ctx.input.timezone,
+      streamIds: ctx.input.streamIds
     });
 
     return {
@@ -61,7 +69,7 @@ export let queryInsights = SlateTool.create(spec, {
         startAt: data.meta?.start_at,
         endAt: data.meta?.end_at
       },
-      message: `Query returned **${data.meta?.row_count || 0}** row(s)${data.meta?.total_count ? ` of ${data.meta.total_count} total` : ''}.`
+      message: `Query returned **${data.meta?.row_count ?? data.results.length}** row(s)${data.meta?.total_count ? ` of ${data.meta.total_count} total` : ''}.`
     };
   })
   .build();

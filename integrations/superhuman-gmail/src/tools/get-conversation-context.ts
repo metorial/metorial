@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
+import { GMAIL_FULL, GMAIL_MODIFY, GMAIL_READ } from '../auth';
 import { Client, parseMessage } from '../lib/client';
 import {
   buildReplyHeaders,
@@ -17,6 +18,7 @@ export let getConversationContext = SlateTool.create(spec, {
     'Load a full **thread** with parsed messages (headers, bodies, attachment metadata) plus **reply hints** (In-Reply-To, References, suggested recipients and subject) for the message you are replying to.',
   instructions: [
     'Call after **search_conversations** when you need bodies and headers to decide triage or compose a reply.',
+    'The minimal format has no headers or body and omits replyHints. Use full or metadata when reply headers are needed.',
     'Use **replyHints** with **manage_reply_draft** or **send_reply** so replies stay properly threaded.',
     'Pass **replyToMessageId** to reply to a specific message in the thread; otherwise hints target the chronologically latest message.'
   ],
@@ -24,6 +26,7 @@ export let getConversationContext = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf(GMAIL_FULL, GMAIL_MODIFY, GMAIL_READ))
   .input(
     z.object({
       threadId: z.string().describe('Gmail thread ID.'),
@@ -43,8 +46,8 @@ export let getConversationContext = SlateTool.create(spec, {
   .output(
     z.object({
       threadId: z.string(),
-      snippet: z.string(),
-      historyId: z.string(),
+      snippet: z.string().optional(),
+      historyId: z.string().optional(),
       labelIdsAggregate: z
         .array(z.string())
         .describe('Union of label IDs seen on messages in this thread.'),
@@ -53,8 +56,8 @@ export let getConversationContext = SlateTool.create(spec, {
           messageId: z.string(),
           threadId: z.string(),
           labelIds: z.array(z.string()),
-          snippet: z.string(),
-          internalDate: z.string(),
+          snippet: z.string().optional(),
+          internalDate: z.string().optional(),
           from: z.string().optional(),
           to: z.string().optional(),
           cc: z.string().optional(),
@@ -65,21 +68,24 @@ export let getConversationContext = SlateTool.create(spec, {
           bodyHtml: z.string().optional(),
           attachments: z.array(
             z.object({
-              attachmentId: z.string(),
+              attachmentId: z.string().optional(),
+              partId: z.string().optional(),
               filename: z.string(),
-              mimeType: z.string(),
-              size: z.number()
+              mimeType: z.string().optional(),
+              size: z.number().optional()
             })
           )
         })
       ),
-      replyHints: z.object({
-        replyToMessageId: z.string(),
-        inReplyTo: z.string(),
-        references: z.string(),
-        suggestedTo: z.array(z.string()),
-        suggestedSubject: z.string()
-      })
+      replyHints: z
+        .object({
+          replyToMessageId: z.string(),
+          inReplyTo: z.string(),
+          references: z.string(),
+          suggestedTo: z.array(z.string()),
+          suggestedSubject: z.string()
+        })
+        .optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -100,9 +106,30 @@ export let getConversationContext = SlateTool.create(spec, {
       }
     }
 
-    let targetRaw = pickReplyTarget(rawMessages, ctx.input.replyToMessageId);
-    let { inReplyTo, references } = buildReplyHeaders(targetRaw);
-    let targetParsed = parseMessage(targetRaw);
+    const candidates = rawMessages.filter(message => !message.labelIds?.includes('DRAFT'));
+    const targetRaw =
+      ctx.input.replyToMessageId || candidates.length
+        ? pickReplyTarget(rawMessages, ctx.input.replyToMessageId)
+        : undefined;
+    const targetParsed = targetRaw ? parseMessage(targetRaw) : undefined;
+    let headers: ReturnType<typeof buildReplyHeaders> | undefined;
+    if (targetRaw && targetParsed?.mimeMessageId) {
+      try {
+        headers = buildReplyHeaders(targetRaw);
+      } catch {
+        /* A readable message can have invalid RFC reply headers; omit optional hints. */
+      }
+    }
+    const mailboxEmail = headers ? (await client.getProfile()).emailAddress : undefined;
+    const replyHints =
+      targetRaw && targetParsed && headers
+        ? {
+            replyToMessageId: targetRaw.id,
+            ...headers,
+            suggestedTo: defaultReplyTo(targetParsed, mailboxEmail),
+            suggestedSubject: defaultReplySubject(targetParsed.subject)
+          }
+        : undefined;
 
     return {
       output: {
@@ -126,14 +153,8 @@ export let getConversationContext = SlateTool.create(spec, {
           bodyHtml: m.bodyHtml,
           attachments: m.attachments
         })),
-        replyHints: {
-          replyToMessageId: targetRaw.id,
-          inReplyTo,
-          references,
-          suggestedTo: defaultReplyTo(targetParsed),
-          suggestedSubject: defaultReplySubject(targetParsed.subject)
-        }
+        replyHints
       },
-      message: `Loaded **${sortedParsed.length}** message(s) in thread **${thread.id}** with reply hints for message **${targetRaw.id}**.`
+      message: `Loaded **${sortedParsed.length}** messages in the requested format${replyHints ? ' with reply hints' : ' without reply hints'}.`
     };
   });

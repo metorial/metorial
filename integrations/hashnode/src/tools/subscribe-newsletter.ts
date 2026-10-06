@@ -6,9 +6,10 @@ import { spec } from '../spec';
 export let subscribeNewsletter = SlateTool.create(spec, {
   name: 'Subscribe to Newsletter',
   key: 'subscribe_newsletter',
-  description: `Subscribe an email address to the publication's newsletter. Subscribers receive email notifications when new posts are published.`,
+  description: `Legacy newsletter subscription operation, unavailable through the current public API. Use the publication website or dashboard; this tool sends no request.`,
   tags: {
-    destructive: false
+    destructive: false,
+    deprecated: true
   }
 })
   .input(

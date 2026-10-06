@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let jobSummarySchema = z.object({
@@ -24,8 +25,11 @@ export let getBuild = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pipelineSlug: z.string().describe('Slug of the pipeline'),
-      buildNumber: z.number().describe('Build number to retrieve')
+      ...organizationInput,
+      pipelineSlug: z.string().describe('Pipeline slug from list_pipelines'),
+      buildNumber: z
+        .number()
+        .describe('Pipeline build number from list_builds, not a build UUID')
     })
   )
   .output(
@@ -42,22 +46,23 @@ export let getBuild = SlateTool.create(spec, {
       finishedAt: z.string().nullable().describe('When the build finished'),
       creatorName: z.string().nullable().describe('Name of the user who created the build'),
       env: z.record(z.string(), z.string()).describe('Environment variables set on the build'),
-      metaData: z.record(z.string(), z.string()).describe('Metadata set on the build'),
+      metaData: z
+        .record(z.string(), z.string())
+        .describe(
+          'Metadata set on the build; non-string provider values are represented as JSON strings'
+        ),
       jobs: z.array(jobSummarySchema).describe('Jobs/steps in this build')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     let b = await client.getBuild(ctx.input.pipelineSlug, ctx.input.buildNumber);
 
-    let jobs = (b.jobs ?? []).map((j: any) => ({
+    let jobs = (b.jobs ?? []).map(j => ({
       jobId: j.id,
       type: j.type,
-      name: j.name ?? null,
+      name: j.name ?? j.label ?? null,
       state: j.state,
       exitStatus: j.exit_status ?? null,
       startedAt: j.started_at ?? null,
@@ -79,7 +84,12 @@ export let getBuild = SlateTool.create(spec, {
         finishedAt: b.finished_at ?? null,
         creatorName: b.creator?.name ?? null,
         env: b.env ?? {},
-        metaData: b.meta_data ?? {},
+        metaData: Object.fromEntries(
+          Object.entries(b.meta_data ?? {}).map(([key, value]) => [
+            key,
+            typeof value === 'string' ? value : (JSON.stringify(value) ?? '')
+          ])
+        ),
         jobs
       },
       message: `Build **#${b.number}** is **${b.state}** with ${jobs.length} job(s).`

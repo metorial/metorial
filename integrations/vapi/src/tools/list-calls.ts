@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getCallDuration } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCalls = SlateTool.create(spec, {
@@ -14,7 +14,13 @@ export let listCalls = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Maximum number of calls to return (default 100)'),
+      limit: z
+        .number()
+        .int()
+        .min(0)
+        .max(1000)
+        .optional()
+        .describe('Maximum number of calls to return (default 100)'),
       assistantId: z.string().optional().describe('Filter calls by assistant ID'),
       phoneNumberId: z.string().optional().describe('Filter calls by phone number ID'),
       createdAfter: z
@@ -44,11 +50,13 @@ export let listCalls = SlateTool.create(spec, {
             type: z.string().optional().describe('Call type'),
             status: z.string().optional().describe('Call status'),
             assistantId: z.string().optional().describe('Assistant ID used'),
+            squadId: z.string().optional().describe('Squad ID used'),
             phoneNumberId: z.string().optional().describe('Phone number ID used'),
             startedAt: z.string().optional().describe('Call start timestamp'),
             endedAt: z.string().optional().describe('Call end timestamp'),
             endedReason: z.string().optional().describe('Reason the call ended'),
             duration: z.number().optional().describe('Call duration in seconds'),
+            cost: z.number().optional().describe('Total call cost in USD'),
             createdAt: z.string().optional().describe('Creation timestamp')
           })
         )
@@ -57,10 +65,10 @@ export let listCalls = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, ctx.auth.region);
 
     let params: Record<string, any> = {};
-    if (ctx.input.limit) params.limit = ctx.input.limit;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
     if (ctx.input.assistantId) params.assistantId = ctx.input.assistantId;
     if (ctx.input.phoneNumberId) params.phoneNumberId = ctx.input.phoneNumberId;
     if (ctx.input.createdAfter) params.createdAtGt = ctx.input.createdAfter;
@@ -77,11 +85,13 @@ export let listCalls = SlateTool.create(spec, {
           type: c.type,
           status: c.status,
           assistantId: c.assistantId,
+          squadId: c.squadId,
           phoneNumberId: c.phoneNumberId,
           startedAt: c.startedAt,
           endedAt: c.endedAt,
           endedReason: c.endedReason,
-          duration: c.duration,
+          duration: getCallDuration(c),
+          cost: c.cost,
           createdAt: c.createdAt
         })),
         count: calls.length

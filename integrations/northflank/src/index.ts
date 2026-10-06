@@ -12,8 +12,6 @@ import {
   manageService,
   runTemplate
 } from './tools';
-import { platformEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     runTemplate,
     manageNotificationIntegration
   ],
-  triggers: [platformEvents]
+  triggers: []
 });

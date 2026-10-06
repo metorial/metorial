@@ -1,19 +1,27 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `List users on the n8n instance. Only available to the instance owner.`,
-  constraints: ['Only the instance owner can list users.'],
+  description: `List users on the n8n instance. Requires the applicable API-key scopes and instance/project permissions.`,
+  constraints: [
+    'Requires user:list or user:read and the corresponding instance/project permissions.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      userId: z
+        .string()
+        .optional()
+        .describe(
+          'Read this exact native user ID or documented email locator instead of listing; requires user:read.'
+        ),
       includeRole: z.boolean().optional().describe('Include role information for each user'),
       projectId: z.string().optional().describe('Filter users by project membership'),
       limit: z.number().optional().describe('Maximum number of users to return'),
@@ -36,24 +44,27 @@ export let listUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
-    let result = await client.listUsers({
-      includeRole: ctx.input.includeRole,
-      projectId: ctx.input.projectId,
-      limit: ctx.input.limit,
-      cursor: ctx.input.cursor
-    });
+    let result =
+      ctx.input.userId !== undefined
+        ? {
+            data: [await client.getUser(ctx.input.userId, ctx.input.includeRole)],
+            nextCursor: undefined
+          }
+        : await client.listUsers({
+            includeRole: ctx.input.includeRole,
+            projectId: ctx.input.projectId,
+            limit: ctx.input.limit,
+            cursor: ctx.input.cursor
+          });
 
-    let users = (result.data || []).map((u: any) => ({
+    let users = (result.data || []).map(u => ({
       userId: String(u.id),
       email: u.email,
       firstName: u.firstName,
       lastName: u.lastName,
-      role: u.role || u.globalRole?.name,
+      role: u.role,
       createdAt: u.createdAt
     }));
 

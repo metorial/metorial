@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let searchResources = SlateTool.create(spec, {
@@ -17,45 +18,54 @@ export let searchResources = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe('Organization name (uses default from config if not set)'),
+      organization: organizationInput,
       query: z.string().describe('Search query using Pulumi query syntax'),
       includeProperties: z
         .boolean()
         .optional()
-        .describe('Include resource property data in results')
+        .describe('Include resource property data in results'),
+      page: z.number().optional().describe('Nonnegative page number'),
+      size: z.number().optional().describe('Positive results per page'),
+      cursor: z.string().optional().describe('Provider cursor from the preceding search page')
     })
   )
   .output(
     z.object({
       resources: z.array(z.any()),
-      total: z.number().optional()
+      total: z.number().optional(),
+      returnedCount: z.number().optional(),
+      pagination: z
+        .object({
+          next: z.string().optional(),
+          previous: z.string().optional(),
+          cursor: z.string().optional()
+        })
+        .optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
 
     let result = await client.searchResources(
       org,
       ctx.input.query,
-      ctx.input.includeProperties
+      ctx.input.includeProperties,
+      { page: ctx.input.page, size: ctx.input.size, cursor: ctx.input.cursor }
     );
 
-    let resources = result.resources || [];
+    let resources = result.resources;
 
     return {
       output: {
         resources,
-        total: result.total
+        total: result.total,
+        returnedCount: resources.length,
+        pagination: result.pagination
       },
       message: `Found **${resources.length}** resource(s) matching query \`${ctx.input.query}\` in organization **${org}**`
     };

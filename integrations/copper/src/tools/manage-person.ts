@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageContinuation, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 let emailSchema = z
@@ -119,12 +120,13 @@ export let createPerson = SlateTool.create(spec, {
   )
   .output(personOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'create_person');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = { name: ctx.input.name };
-    if (ctx.input.emails) body.emails = ctx.input.emails;
-    if (ctx.input.phoneNumbers) body.phone_numbers = ctx.input.phoneNumbers;
-    if (ctx.input.address) {
+    if (ctx.input.emails !== undefined) body.emails = ctx.input.emails;
+    if (ctx.input.phoneNumbers !== undefined) body.phone_numbers = ctx.input.phoneNumbers;
+    if (ctx.input.address !== undefined) {
       body.address = {
         street: ctx.input.address.street,
         city: ctx.input.address.city,
@@ -133,15 +135,15 @@ export let createPerson = SlateTool.create(spec, {
         country: ctx.input.address.country
       };
     }
-    if (ctx.input.title) body.title = ctx.input.title;
-    if (ctx.input.companyId) body.company_id = ctx.input.companyId;
-    if (ctx.input.assigneeId) body.assignee_id = ctx.input.assigneeId;
-    if (ctx.input.contactTypeId) body.contact_type_id = ctx.input.contactTypeId;
-    if (ctx.input.details) body.details = ctx.input.details;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.socials) body.socials = ctx.input.socials;
-    if (ctx.input.websites) body.websites = ctx.input.websites;
-    if (ctx.input.customFields) {
+    if (ctx.input.title !== undefined) body.title = ctx.input.title;
+    if (ctx.input.companyId !== undefined) body.company_id = ctx.input.companyId;
+    if (ctx.input.assigneeId !== undefined) body.assignee_id = ctx.input.assigneeId;
+    if (ctx.input.contactTypeId !== undefined) body.contact_type_id = ctx.input.contactTypeId;
+    if (ctx.input.details !== undefined) body.details = ctx.input.details;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.socials !== undefined) body.socials = ctx.input.socials;
+    if (ctx.input.websites !== undefined) body.websites = ctx.input.websites;
+    if (ctx.input.customFields !== undefined) {
       body.custom_fields = ctx.input.customFields.map(cf => ({
         custom_field_definition_id: cf.customFieldDefinitionId,
         value: cf.value
@@ -177,15 +179,16 @@ export let getPerson = SlateTool.create(spec, {
   )
   .output(personOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'get_person');
     let client = new Client(ctx.auth);
 
     let person: any;
-    if (ctx.input.personId) {
+    if (ctx.input.personId !== undefined) {
       person = await client.getPerson(ctx.input.personId);
-    } else if (ctx.input.email) {
+    } else if (ctx.input.email !== undefined) {
       person = await client.lookupPersonByEmail(ctx.input.email);
     } else {
-      throw new Error('Either personId or email must be provided');
+      throw createApiServiceError('Either personId or email must be provided');
     }
 
     return {
@@ -231,6 +234,7 @@ export let updatePerson = SlateTool.create(spec, {
   )
   .output(personOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'update_person');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {};
@@ -289,6 +293,7 @@ export let deletePerson = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'delete_person');
     let client = new Client(ctx.auth);
     await client.deletePerson(ctx.input.personId);
 
@@ -338,35 +343,48 @@ export let searchPeople = SlateTool.create(spec, {
   .output(
     z.object({
       people: z.array(personOutputSchema).describe('Matching person records'),
-      count: z.number().describe('Number of results returned')
+      count: z.number().describe('Number of results returned'),
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('A full page suggests another page may be available'),
+      nextPageNumber: z.number().optional().describe('Next page to request when available'),
+      atSearchLimit: z
+        .boolean()
+        .optional()
+        .describe('Narrow filters when the 100,000-result window is reached')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'search_people');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {
       page_number: ctx.input.pageNumber,
       page_size: ctx.input.pageSize
     };
-    if (ctx.input.sortBy) body.sort_by = ctx.input.sortBy;
-    if (ctx.input.sortDirection) body.sort_direction = ctx.input.sortDirection;
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.emails) body.emails = ctx.input.emails;
-    if (ctx.input.phoneNumber) body.phone_number = ctx.input.phoneNumber;
-    if (ctx.input.companyIds) body.company_ids = ctx.input.companyIds;
-    if (ctx.input.assigneeIds) body.assignee_ids = ctx.input.assigneeIds;
-    if (ctx.input.contactTypeIds) body.contact_type_ids = ctx.input.contactTypeIds;
-    if (ctx.input.city) body.city = ctx.input.city;
-    if (ctx.input.state) body.state = ctx.input.state;
-    if (ctx.input.country) body.country = ctx.input.country;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
+    if (ctx.input.sortBy !== undefined) body.sort_by = ctx.input.sortBy;
+    if (ctx.input.sortDirection !== undefined) body.sort_direction = ctx.input.sortDirection;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.emails !== undefined) body.emails = ctx.input.emails;
+    if (ctx.input.phoneNumber !== undefined)
+      body.phone_number = { value: ctx.input.phoneNumber };
+    if (ctx.input.companyIds !== undefined) body.company_ids = ctx.input.companyIds;
+    if (ctx.input.assigneeIds !== undefined) body.assignee_ids = ctx.input.assigneeIds;
+    if (ctx.input.contactTypeIds !== undefined)
+      body.contact_type_ids = ctx.input.contactTypeIds;
+    if (ctx.input.city !== undefined) body.city = ctx.input.city;
+    if (ctx.input.state !== undefined) body.state = ctx.input.state;
+    if (ctx.input.country !== undefined) body.country = ctx.input.country;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
 
     let people = await client.searchPeople(body);
 
     return {
       output: {
         people: people.map(mapPerson),
-        count: people.length
+        count: people.length,
+        ...pageContinuation(ctx.input, people.length)
       },
       message: `Found **${people.length}** people matching the search criteria.`
     };

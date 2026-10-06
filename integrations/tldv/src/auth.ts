@@ -14,8 +14,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
+        .min(1)
         .describe(
-          'tl;dv API key. Generate one at https://tldv.io/app/settings/personal-settings/api-keys (requires Business Plan or higher).'
+          'tl;dv API key. Generate one at https://tldv.io/app/settings/personal-settings/api-keys. API access requires an eligible Pro, Business or Enterprise plan.'
         )
     }),
     getOutput: async ctx => {

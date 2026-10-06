@@ -15,8 +15,6 @@ import {
   sendBulkEmail,
   sendEmail
 } from './tools';
-import { identityChanges, inboundWebhook, suppressionChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     getEmailAddressInsights,
     getMessageInsights
   ],
-  triggers: [inboundWebhook, suppressionChanges, identityChanges]
+  triggers: []
 });

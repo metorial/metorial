@@ -1,16 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, clientConfig } from '../lib/client';
+import { documentOutput, mapDocument, paginationSchema } from '../lib/schemas';
+import { requireValue } from '../lib/validation';
 import { spec } from '../spec';
-
-export let listDocuments = SlateTool.create(spec, {
+export const listDocuments = SlateTool.create(spec, {
   name: 'List Documents',
   key: 'list_documents',
-  description: `List documents in the workspace, optionally filtered by collection or parent document.
-Can also list draft documents separately.`,
-  tags: {
-    readOnly: true
-  }
+  description:
+    'List one page of documents or your drafts. Native pagination is returned; total counts this page only.',
+  tags: { readOnly: true }
 })
   .input(
     z.object({
@@ -35,73 +34,34 @@ Can also list draft documents separately.`,
       direction: z.enum(['ASC', 'DESC']).optional().default('DESC').describe('Sort direction'),
       limit: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
         .default(25)
         .describe('Maximum number of documents to return'),
-      offset: z.number().optional().default(0).describe('Offset for pagination')
+      offset: z.number().int().min(0).optional().default(0).describe('Offset for pagination')
     })
   )
   .output(
     z.object({
-      documents: z.array(
-        z.object({
-          documentId: z.string(),
-          title: z.string(),
-          emoji: z.string().optional(),
-          collectionId: z.string().optional(),
-          parentDocumentId: z.string().optional(),
-          publishedAt: z.string().optional(),
-          updatedAt: z.string(),
-          createdAt: z.string(),
-          template: z.boolean(),
-          createdBy: z.object({ userId: z.string(), name: z.string() })
-        })
-      ),
-      total: z.number()
+      documents: z.array(documentOutput),
+      total: z.number(),
+      pagination: paginationSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let result = ctx.input.drafts
-      ? await client.listDrafts({
-          collectionId: ctx.input.collectionId,
-          sort: ctx.input.sort,
-          direction: ctx.input.direction,
-          limit: ctx.input.limit,
-          offset: ctx.input.offset
-        })
-      : await client.listDocuments({
-          collectionId: ctx.input.collectionId,
-          parentDocumentId: ctx.input.parentDocumentId,
-          sort: ctx.input.sort,
-          direction: ctx.input.direction,
-          limit: ctx.input.limit,
-          offset: ctx.input.offset
-        });
-
-    let documents = (result.data || []).map(doc => ({
-      documentId: doc.id,
-      title: doc.title,
-      emoji: doc.emoji,
-      collectionId: doc.collectionId,
-      parentDocumentId: doc.parentDocumentId,
-      publishedAt: doc.publishedAt,
-      updatedAt: doc.updatedAt,
-      createdAt: doc.createdAt,
-      template: doc.template,
-      createdBy: { userId: doc.createdBy.id, name: doc.createdBy.name }
-    }));
-
+    const client = new Client(clientConfig(ctx.auth, ctx.config));
+    requireValue(
+      !ctx.input.drafts || !ctx.input.parentDocumentId,
+      'parentDocumentId is not supported by the drafts endpoint. Remove it or list published documents.'
+    );
+    const { drafts, ...input } = ctx.input;
+    const result = drafts ? await client.listDrafts(input) : await client.listDocuments(input);
+    const documents = result.data.map(mapDocument);
     return {
-      output: {
-        documents,
-        total: documents.length
-      },
-      message: `Found **${documents.length}** ${ctx.input.drafts ? 'draft ' : ''}documents.`
+      output: { documents, total: documents.length, pagination: result.pagination },
+      message: `Returned ${documents.length} ${drafts ? 'draft ' : ''}documents on this page.`
     };
   })
   .build();

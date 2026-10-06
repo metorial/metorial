@@ -1,13 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listEnvironments = SlateTool.create(spec, {
   name: 'List Environments',
   key: 'list_environments',
   description: `List all environments (e.g., staging, production) configured in the Retool organization.`,
-  constraints: ['Available on Enterprise Premium plan only.'],
+  constraints: [
+    'Requires the relevant read or write API token scope and support in this deployment.'
+  ],
   tags: {
     readOnly: true
   }
@@ -28,14 +30,14 @@ export let listEnvironments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.listEnvironments();
 
     let environments = result.data.map(e => ({
       environmentId: e.id,
       environmentName: e.name,
-      isDefault: e.is_default,
+      isDefault: e.default,
       createdAt: e.created_at,
       updatedAt: e.updated_at
     }));

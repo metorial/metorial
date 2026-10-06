@@ -17,14 +17,6 @@ import {
   searchSite,
   updateRecord
 } from './tools';
-import {
-  buildEvents,
-  environmentEvents,
-  modelEvents,
-  recordEvents,
-  uploadEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +36,5 @@ export let provider = Slate.create({
     searchSite,
     getSiteInfo
   ],
-  triggers: [recordEvents, modelEvents, uploadEvents, buildEvents, environmentEvents]
+  triggers: []
 });

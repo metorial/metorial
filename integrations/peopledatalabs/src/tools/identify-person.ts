@@ -29,7 +29,10 @@ Returns up to 20 matching profiles sorted by match strength, useful for building
     'Provide at least one identifying attribute such as name, email, phone, company, school, or location.',
     'The more attributes provided, the more accurate the match ranking will be.'
   ],
-  constraints: ['Returns a maximum of 20 matching profiles per request.'],
+  constraints: [
+    'Returns a maximum of 20 matching profiles per request.',
+    'Each production call consumes one Person Identify credit, including no-match responses.'
+  ],
   tags: {
     readOnly: true
   }

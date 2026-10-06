@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapScheduled } from '../lib/models';
+import { budgetInput, deltaInput, milliunits } from '../lib/validation';
 import { spec } from '../spec';
 
 let scheduledTransactionSchema = z.object({
@@ -8,7 +10,7 @@ let scheduledTransactionSchema = z.object({
   dateFirst: z.string().optional().describe('First occurrence date'),
   dateNext: z.string().optional().describe('Next occurrence date'),
   frequency: z.string().optional().describe('Recurrence frequency'),
-  amount: z.number().describe('Amount in milliunits'),
+  amount: milliunits.describe('Amount in milliunits'),
   memo: z.string().nullable().optional().describe('Memo'),
   flagColor: z.string().nullable().optional().describe('Flag color'),
   accountId: z.string().describe('Account ID'),
@@ -31,43 +33,32 @@ export let listScheduledTransactions = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      budgetId: z.string().optional().describe('Budget ID. Defaults to the configured budget.')
+      lastKnowledgeOfServer: deltaInput,
+      budgetId: budgetInput
     })
   )
   .output(
     z.object({
+      serverKnowledge: milliunits
+        .nonnegative()
+        .optional()
+        .describe('Knowledge returned by this endpoint for subsequent delta requests.'),
       scheduledTransactions: z
         .array(scheduledTransactionSchema)
         .describe('List of scheduled transactions')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let budgetId = ctx.input.budgetId ?? ctx.config.budgetId;
-
-    let { scheduledTransactions } = await client.getScheduledTransactions(budgetId);
-
-    let mapped = scheduledTransactions.map((st: any) => ({
-      scheduledTransactionId: st.id,
-      dateFirst: st.date_first,
-      dateNext: st.date_next,
-      frequency: st.frequency,
-      amount: st.amount,
-      memo: st.memo,
-      flagColor: st.flag_color,
-      accountId: st.account_id,
-      accountName: st.account_name,
-      payeeId: st.payee_id,
-      payeeName: st.payee_name,
-      categoryId: st.category_id,
-      categoryName: st.category_name,
-      transferAccountId: st.transfer_account_id,
-      deleted: st.deleted
-    }));
-
+    const data = await new Client({ token: ctx.auth.token }).getScheduledTransactions(
+      ctx.input.budgetId ?? ctx.config.budgetId,
+      ctx.input.lastKnowledgeOfServer
+    );
     return {
-      output: { scheduledTransactions: mapped },
-      message: `Found **${mapped.length}** scheduled transaction(s)`
+      output: {
+        scheduledTransactions: data.scheduledTransactions.map(mapScheduled),
+        serverKnowledge: data.serverKnowledge
+      },
+      message: `Returned ${data.scheduledTransactions.length} scheduled transaction record(s).`
     };
   })
   .build();

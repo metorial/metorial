@@ -26,8 +26,6 @@ import {
   searchCodeTool,
   updateRepositoryTool
 } from './tools';
-import { pullRequestEventsTrigger, repositoryEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -56,5 +54,5 @@ export let provider = Slate.create({
     manageDefaultReviewersTool,
     manageBranchRestrictionsTool
   ],
-  triggers: [repositoryEventsTrigger, pullRequestEventsTrigger]
+  triggers: []
 });

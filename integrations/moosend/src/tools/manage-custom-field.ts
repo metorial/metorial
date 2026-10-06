@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoosendClient } from '../lib/client';
+import { identifier, text } from '../lib/data';
 import { spec } from '../spec';
 
 export let manageCustomField = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let manageCustomField = SlateTool.create(spec, {
   key: 'manage_custom_field',
   description: `Create, update, or delete custom fields on a mailing list. Custom fields store additional subscriber data such as demographics, preferences, or any extra information beyond name and email.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -22,14 +23,33 @@ export let manageCustomField = SlateTool.create(spec, {
         .describe('Custom field ID (required for update and delete)'),
       name: z.string().optional().describe('Custom field name (required for create)'),
       fieldType: z
-        .enum(['Text', 'Decimal', 'DateTime', 'SingleSelectDropdown', 'Integer', 'CheckBox'])
+        .enum([
+          'Text',
+          'Decimal',
+          'DateTime',
+          'SingleSelectDropdown',
+          'Integer',
+          'CheckBox',
+          'Number'
+        ])
         .optional()
         .describe('Data type of the custom field'),
-      options: z.string().optional().describe('Comma-separated values for dropdown fields'),
+      options: z
+        .string()
+        .optional()
+        .describe(
+          'All comma-separated values for dropdown fields; required when updating a dropdown, even when fieldType is omitted'
+        ),
       isRequired: z
         .boolean()
         .optional()
-        .describe('Whether the field is required for subscribers')
+        .describe('Whether the field is required for subscribers'),
+      isHidden: z
+        .boolean()
+        .optional()
+        .describe(
+          'Hide this field from subscriber profile pages; an update requires an explicit value when the current visibility is not reported'
+        )
     })
   )
   .output(
@@ -45,15 +65,24 @@ export let manageCustomField = SlateTool.create(spec, {
 
     switch (action) {
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required for creating a custom field');
-        let body: Record<string, unknown> = { Name: ctx.input.name };
-        if (ctx.input.fieldType) body.CustomFieldType = ctx.input.fieldType;
-        if (ctx.input.options) body.Options = ctx.input.options;
-        if (ctx.input.isRequired !== undefined) body.IsRequired = String(ctx.input.isRequired);
+        if (!ctx.input.name)
+          throw createApiServiceError('name is required for creating a custom field');
+        let body: Record<string, unknown> = {
+          Name: text(ctx.input.name, 'custom field name')
+        };
+        if (ctx.input.fieldType)
+          body.CustomFieldType = ['Decimal', 'Integer'].includes(ctx.input.fieldType)
+            ? 'Number'
+            : ctx.input.fieldType;
+        if (ctx.input.fieldType === 'SingleSelectDropdown' && !ctx.input.options)
+          throw createApiServiceError('Provide comma-separated options for a dropdown field.');
+        if (ctx.input.options !== undefined) body.Options = ctx.input.options;
+        if (ctx.input.isRequired !== undefined) body.IsRequired = ctx.input.isRequired;
+        if (ctx.input.isHidden !== undefined) body.IsHidden = ctx.input.isHidden;
         let result = await client.createCustomField(mailingListId, body);
         return {
           output: {
-            customFieldId: String(result?.ID ?? result ?? ''),
+            customFieldId: identifier(result),
             action,
             success: true
           },
@@ -62,12 +91,19 @@ export let manageCustomField = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.customFieldId)
-          throw new Error('customFieldId is required for updating a custom field');
+          throw createApiServiceError('customFieldId is required for updating a custom field');
         let body: Record<string, unknown> = {};
-        if (ctx.input.name) body.Name = ctx.input.name;
-        if (ctx.input.fieldType) body.CustomFieldType = ctx.input.fieldType;
-        if (ctx.input.options) body.Options = ctx.input.options;
-        if (ctx.input.isRequired !== undefined) body.IsRequired = String(ctx.input.isRequired);
+        if (ctx.input.name !== undefined)
+          body.Name = text(ctx.input.name, 'custom field name');
+        if (ctx.input.fieldType)
+          body.CustomFieldType = ['Decimal', 'Integer'].includes(ctx.input.fieldType)
+            ? 'Number'
+            : ctx.input.fieldType;
+        if (ctx.input.fieldType === 'SingleSelectDropdown' && !ctx.input.options)
+          throw createApiServiceError('Provide comma-separated options for a dropdown field.');
+        if (ctx.input.options !== undefined) body.Options = ctx.input.options;
+        if (ctx.input.isRequired !== undefined) body.IsRequired = ctx.input.isRequired;
+        if (ctx.input.isHidden !== undefined) body.IsHidden = ctx.input.isHidden;
         await client.updateCustomField(mailingListId, ctx.input.customFieldId, body);
         return {
           output: {
@@ -80,7 +116,7 @@ export let manageCustomField = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.customFieldId)
-          throw new Error('customFieldId is required for deleting a custom field');
+          throw createApiServiceError('customFieldId is required for deleting a custom field');
         await client.deleteCustomField(mailingListId, ctx.input.customFieldId);
         return {
           output: {

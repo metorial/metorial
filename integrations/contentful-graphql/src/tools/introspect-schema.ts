@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createGraphQLClient } from '../lib/helpers';
+import { resolveType, scopeFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let typeFieldSchema = z.object({
@@ -8,12 +9,17 @@ let typeFieldSchema = z.object({
   description: z.string().optional().nullable(),
   typeName: z.string().optional(),
   typeKind: z.string().optional(),
+  typeSignature: z
+    .string()
+    .optional()
+    .describe('Native type notation, including list brackets and non-null markers.'),
   args: z
     .array(
       z.object({
         name: z.string(),
         description: z.string().optional().nullable(),
-        typeName: z.string().optional()
+        typeName: z.string().optional(),
+        typeSignature: z.string().optional()
       })
     )
     .optional()
@@ -34,7 +40,8 @@ export let introspectSchema = SlateTool.create(spec, {
 Use this to understand what queries are available before using the **Query Content** or **Preview Content** tools. The schema is auto-generated from your Contentful content model and updates whenever content types change.`,
   instructions: [
     'Run this first to discover available content types and their fields.',
-    'Collection queries follow the naming pattern: `contentTypeCollection` (e.g. `blogPostCollection`).',
+    'Discover offset Collection and native CursorCollection fields and their arguments from the root query type.',
+    'Choose the key-authorized space. Optional list_spaces discovery uses a separate CMA token and does not establish delivery-key access.',
     'Single-entry queries use the content type name directly (e.g. `blogPost(id: "...")`). ',
     'Set `includeSystemTypes` to false to filter out internal GraphQL types and focus only on your content model.'
   ],
@@ -44,6 +51,7 @@ Use this to understand what queries are available before using the **Query Conte
 })
   .input(
     z.object({
+      ...scopeFields,
       includeSystemTypes: z
         .boolean()
         .optional()
@@ -62,54 +70,34 @@ Use this to understand what queries are available before using the **Query Conte
     })
   )
   .handleInvocation(async ctx => {
-    let client = createGraphQLClient(ctx.config, ctx.auth);
-
-    let result = await client.introspect();
-
-    if (result.errors && result.errors.length > 0) {
-      throw new Error(
-        `Schema introspection failed: ${result.errors.map((e: any) => e.message).join(', ')}`
-      );
-    }
-
-    let schema = result.data?.__schema;
-    let queryTypeName = schema?.queryType?.name;
-
-    let resolveTypeName = (type: any): string => {
-      if (!type) return 'unknown';
-      if (type.name) return type.name;
-      if (type.ofType) return resolveTypeName(type.ofType);
-      return type.kind || 'unknown';
-    };
-
-    let types = (schema?.types || [])
-      .filter((t: any) => {
-        if (!ctx.input.includeSystemTypes && t.name?.startsWith('__')) return false;
-        return t.kind === 'OBJECT' || t.kind === 'INTERFACE';
-      })
-      .map((t: any) => ({
-        name: t.name,
-        description: t.description || null,
-        kind: t.kind,
-        fields: (t.fields || []).map((f: any) => ({
-          name: f.name,
-          description: f.description || null,
-          typeName: resolveTypeName(f.type),
-          typeKind: f.type?.kind,
-          args: (f.args || []).map((a: any) => ({
-            name: a.name,
-            description: a.description || null,
-            typeName: resolveTypeName(a.type)
+    let schema = await createGraphQLClient(ctx.config, ctx.auth, ctx.input).introspect();
+    let types = schema.types
+      .filter(
+        type =>
+          (ctx.input.includeSystemTypes || !type.name.startsWith('__')) &&
+          (type.kind === 'OBJECT' || type.kind === 'INTERFACE')
+      )
+      .map(type => ({
+        name: type.name,
+        description: type.description ?? null,
+        kind: type.kind,
+        fields: (type.fields ?? []).map(field => ({
+          name: field.name,
+          description: field.description ?? null,
+          typeName: resolveType(field.type).name,
+          typeKind: field.type.kind,
+          typeSignature: resolveType(field.type).signature,
+          args: field.args.map(arg => ({
+            name: arg.name,
+            description: arg.description ?? null,
+            typeName: resolveType(arg.type).name,
+            typeSignature: resolveType(arg.type).signature
           }))
         }))
       }));
-
     return {
-      output: {
-        queryTypeName,
-        contentTypes: types
-      },
-      message: `Introspection complete. Found **${types.length}** types in the schema.`
+      output: { queryTypeName: schema.queryType.name, contentTypes: types },
+      message: `Introspection complete. Found **${types.length}** object and interface types.`
     };
   })
   .build();

@@ -34,9 +34,9 @@ export let validateAddress = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
-    let result = (await client.validateAddress(ctx.input.addressId)) as Record<string, any>;
+    let result = await client.validateAddress(ctx.input.addressId);
 
     return {
       output: {

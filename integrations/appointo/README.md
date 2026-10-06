@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Appointo
 
-Manage appointment bookings and scheduling for Shopify stores. Create, fetch, reschedule, cancel, and update bookings with support for group and multi-day reservations. Retrieve and configure appointment types, check calendar availability for specific date ranges and team members, and manage appointment settings including duration, capacity, buffer times, reminders, and weekly availability slots. Retrieve bookable products/services and subscription contracts. Receive event notifications when bookings are created, rescheduled, or canceled.
+Manage appointment bookings and scheduling for Shopify stores. Create, fetch, reschedule, cancel, and update bookings with support for group and multi-day reservations. Retrieve and configure appointment types, check calendar availability for specific date ranges and team members, and manage appointment settings including duration, capacity, buffer times, reminders, and weekly availability slots. Retrieve bookable products/services and subscription contracts.
 
 ## License
 

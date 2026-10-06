@@ -7,14 +7,14 @@ export let createResearchTool = SlateTool.create(spec, {
   name: 'Create Research',
   key: 'create_research',
   description: `Start an asynchronous in-depth web research task. Exa explores the web, gathers sources, and synthesizes findings into a structured report with citations.
-Returns a research ID for polling the status. Use the **Get Research Status** tool to check completion and retrieve results.
+Creates a retained, billable task. A failed receipt does not prove the task was not created; inspect before retrying. Returns a research ID for polling the status. Use the **Get Research Status** tool to check completion and retrieve results.
 Optionally provide an output schema for structured JSON results.`,
   instructions: [
     'Research tasks run asynchronously and may take seconds to minutes depending on complexity.',
-    'Use "exa-research-fast" for quicker results, "exa-research" (default) for balanced quality, or "exa-research-pro" for maximum depth.'
+    'Use "exa-research-fast" for quicker results, "exa-research" for balanced quality, or "exa-research-pro" for maximum depth.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -23,7 +23,7 @@ Optionally provide an output schema for structured JSON results.`,
       model: z
         .enum(['exa-research-fast', 'exa-research', 'exa-research-pro'])
         .optional()
-        .describe('Research model to use (default: exa-research)'),
+        .describe('Research model to use (default: exa-research-fast)'),
       outputSchema: z
         .record(z.string(), z.unknown())
         .optional()
@@ -40,7 +40,7 @@ Optionally provide an output schema for structured JSON results.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
 
     let response = await client.createResearch({
       instructions: ctx.input.instructions,
@@ -93,7 +93,7 @@ Returns the current status, and when completed, the full research output with co
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
 
     let response = await client.getResearch(ctx.input.researchId);
 

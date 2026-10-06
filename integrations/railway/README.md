@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/railway.png" height="20"> Railway
 
-Deploy and manage web applications, databases, and infrastructure on Railway's cloud platform. Create and configure projects, services, environments, and deployments. Manage environment variables, custom domains, persistent storage volumes, and database services (PostgreSQL, MySQL, MongoDB, Redis). Trigger deployments from GitHub repos or Docker images, monitor deployment status, roll back services, and receive webhook notifications for deployment changes, volume usage, and resource alerts.
+Deploy and manage web applications, databases, and infrastructure on Railway's cloud platform. Create and configure projects, services, environments, and deployments. Manage environment variables, custom domains, persistent storage volumes, and database services (PostgreSQL, MySQL, MongoDB, Redis).
 
 ## Tools
 

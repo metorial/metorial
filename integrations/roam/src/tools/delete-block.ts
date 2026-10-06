@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteBlock = SlateTool.create(spec, {
   name: 'Delete Block',
   key: 'delete_block',
-  description: `Permanently delete a block from the Roam Research graph. This also removes all child blocks nested under it. This action cannot be undone via the API.`,
+  description: `Permanently delete a block from the Roam Research graph. This also removes all child blocks nested under it. An exact read precedes deletion and independently checks absence afterward. The API does not provide undo or erase history, backups or referenced copies. An already absent target returns success false without another delete.`,
   tags: {
     destructive: true
   }
@@ -18,6 +18,10 @@ export let deleteBlock = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      blockUid: z.string().describe('Exact target UID for independent reads and recovery'),
+      verified: z
+        .boolean()
+        .describe('Whether the requested outcome was confirmed by an exact read'),
       success: z.boolean().describe('Whether the block was deleted successfully')
     })
   )
@@ -30,8 +34,13 @@ export let deleteBlock = SlateTool.create(spec, {
     let result = await client.deleteBlock(ctx.input.blockUid);
 
     return {
-      output: { success: result.success },
-      message: `Block **${ctx.input.blockUid}** deleted from graph **${ctx.config.graphName}**.`
+      output: {
+        success: result.success,
+        blockUid: result.targetUid,
+        verified: result.verified
+      },
+      message:
+        'Read the exact block deletion outcome; retained history or backups are not erased.'
     };
   })
   .build();

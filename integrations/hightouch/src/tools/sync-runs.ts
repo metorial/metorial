@@ -1,31 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { syncRunSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let rowCountsSchema = z.object({
-  addedCount: z.number().describe('Number of rows added'),
-  changedCount: z.number().describe('Number of rows changed'),
-  removedCount: z.number().describe('Number of rows removed')
-});
-
-let syncRunSchema = z.object({
-  runId: z.number().describe('Unique ID of the sync run'),
-  status: z
-    .string()
-    .describe(
-      'Status of the run (e.g. success, failed, aborted, interrupted, warning, queued, processing)'
-    ),
-  completionRatio: z.number().describe('Completion ratio from 0 to 1'),
-  querySize: z.number().describe('Number of rows in the query result'),
-  plannedRows: rowCountsSchema.describe('Rows planned for syncing'),
-  successfulRows: rowCountsSchema.describe('Rows successfully synced'),
-  failedRows: rowCountsSchema.describe('Rows that failed to sync'),
-  error: z.string().nullable().optional().describe('Error message if the run failed'),
-  createdAt: z.string().describe('ISO timestamp when the run was created'),
-  startedAt: z.string().describe('ISO timestamp when the run started'),
-  finishedAt: z.string().describe('ISO timestamp when the run finished')
-});
 
 export let listSyncRuns = SlateTool.create(spec, {
   name: 'List Sync Runs',
@@ -53,7 +30,8 @@ export let listSyncRuns = SlateTool.create(spec, {
   .output(
     z.object({
       runs: z.array(syncRunSchema).describe('List of sync runs'),
-      hasMore: z.boolean().describe('Whether more results are available')
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextOffset: z.number().optional().describe('Offset for the next page, when available')
     })
   )
   .handleInvocation(async ctx => {
@@ -64,7 +42,8 @@ export let listSyncRuns = SlateTool.create(spec, {
     return {
       output: {
         runs: result.data,
-        hasMore: result.hasMore
+        hasMore: result.hasMore,
+        nextOffset: result.nextOffset
       },
       message: `Found **${result.data.length}** sync run(s) for sync ${syncId}.${result.hasMore ? ' More results available.' : ''}`
     };
@@ -89,7 +68,7 @@ export let getSyncSequenceRun = SlateTool.create(spec, {
       sequenceRunId: z.string().describe('ID of the sequence run'),
       status: z.string().describe('Overall status of the sequence run'),
       syncRuns: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .optional()
         .describe('Details of individual sync runs within the sequence')
     })

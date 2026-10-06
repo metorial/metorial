@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listAgentArtifacts = SlateTool.create(spec, {
   name: 'List Agent Artifacts',
   key: 'list_agent_artifacts',
-  description: `List files produced by a Cursor cloud agent. Returns the file paths, sizes, and timestamps. Artifacts are retained for 6 months.`,
+  description: `List files produced by a Cursor cloud agent. Returns the file paths, sizes, and timestamps. Only agents created within the last six months are supported, and at most 100 artifacts are returned.`,
   tags: {
     readOnly: true
   }

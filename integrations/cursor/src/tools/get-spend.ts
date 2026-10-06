@@ -6,8 +6,11 @@ import { spec } from '../spec';
 export let getSpend = SlateTool.create(spec, {
   name: 'Get Team Spend',
   key: 'get_team_spend',
-  description: `Retrieve per-member spend data for the current billing cycle. Shows spend in cents, request counts, and configured spend limits. Requires an Admin API key.`,
+  description:
+    'DEPRECATED — use `get_team_spending` instead. Retrieve team spend using the legacy numeric-ID contract. Current Cursor responses use encoded user IDs and a different response envelope.',
+  instructions: ['Use get_team_spending for current spending data.'],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

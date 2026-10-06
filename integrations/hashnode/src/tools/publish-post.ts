@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let publishPost = SlateTool.create(spec, {
   name: 'Publish Post',
   key: 'publish_post',
-  description: `Publish a new blog post to the configured Hashnode publication. Supports Markdown content, tags, cover images, SEO metadata, and optional series assignment. The post is published immediately unless a custom publishedAt date is provided.`,
+  description: `Publish a new blog post to the configured Hashnode publication. Supports Markdown content, tags, cover images, SEO metadata, and optional series assignment. Publication is immediate; publishedAt only backdates a post. Requires Pro and a publishing role. Newsletter sending is unavailable through this mutation.`,
   instructions: [
     'Tags must include at least a "slug" field. Providing "name" is recommended for clarity.',
     'To add the post to a series, provide the seriesId.'
@@ -17,6 +18,7 @@ export let publishPost = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...selection,
       title: z.string().describe('Title of the blog post'),
       contentMarkdown: z.string().describe('Full post content in Markdown format'),
       subtitle: z.string().optional().describe('Subtitle of the post'),
@@ -27,7 +29,12 @@ export let publishPost = SlateTool.create(spec, {
       tags: z
         .array(
           z.object({
-            tagId: z.string().optional().describe('Existing tag ID'),
+            tagId: z
+              .string()
+              .optional()
+              .describe(
+                'Legacy tag ID, unsupported by current writes. Omit and provide the tag slug.'
+              ),
             name: z.string().optional().describe('Tag display name'),
             slug: z.string().optional().describe('Tag slug identifier')
           })
@@ -45,7 +52,9 @@ export let publishPost = SlateTool.create(spec, {
       sendNewsletter: z
         .boolean()
         .optional()
-        .describe('Send this post as a newsletter to subscribers'),
+        .describe(
+          'Legacy newsletter delivery flag, unavailable on the current mutation. Omit; use the dashboard for newsletter delivery.'
+        ),
       publishedAt: z
         .string()
         .optional()
@@ -63,7 +72,10 @@ export let publishPost = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      publicationHost: ctx.config.publicationHost
+      publicationHost:
+        ctx.input.publicationHost ??
+        (ctx.input.publicationId === undefined ? ctx.config.publicationHost : undefined),
+      publicationId: ctx.input.publicationId
     });
 
     let tags = ctx.input.tags?.map(t => ({

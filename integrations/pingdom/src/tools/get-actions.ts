@@ -21,7 +21,14 @@ export let getActions = SlateTool.create(spec, {
         .describe('Maximum number of actions to return (default 100)'),
       offset: z.number().optional().describe('Offset for pagination'),
       checkIds: z.string().optional().describe('Comma-separated check IDs to filter by'),
-      contactIds: z.string().optional().describe('Comma-separated contact IDs to filter by'),
+      contactIds: z
+        .string()
+        .optional()
+        .describe('Legacy alias for comma-separated alerted user IDs'),
+      userIds: z
+        .string()
+        .optional()
+        .describe('Comma-separated alerted user IDs; takes precedence over contactIds'),
       status: z
         .string()
         .optional()
@@ -55,14 +62,24 @@ export let getActions = SlateTool.create(spec, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       checkids: ctx.input.checkIds,
-      contactids: ctx.input.contactIds,
-      status: ctx.input.status,
-      via: ctx.input.via
+      userids: ctx.input.userIds ?? ctx.input.contactIds,
+      status:
+        ctx.input.status === 'not_delivered'
+          ? 'notdelivered'
+          : ctx.input.status === 'no_credits'
+            ? 'nocredits'
+            : ctx.input.status,
+      via:
+        ctx.input.via === 'iphone'
+          ? 'apns'
+          : ctx.input.via === 'android'
+            ? 'agcm'
+            : ctx.input.via
     });
 
     return {
       output: {
-        actions: result.actions || result
+        actions: result.actions
       },
       message: `Retrieved alert actions.`
     };

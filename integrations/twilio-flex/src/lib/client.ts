@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { createTwilioAxios } from './http';
+import { pathId } from './validation';
 
 export let encodeFormBody = (params: Record<string, string | undefined>): string => {
   let parts: string[] = [];
@@ -11,16 +12,10 @@ export let encodeFormBody = (params: Record<string, string | undefined>): string
 };
 
 export class FlexClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createTwilioAxios>;
 
-  constructor(token: string) {
-    this.axios = createAxios({
-      baseURL: 'https://flex-api.twilio.com/v1',
-      headers: {
-        Authorization: `Basic ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
+  constructor(token: string, accountSid?: string, pageToken?: string) {
+    this.axios = createTwilioAxios('flex', token, accountSid, pageToken);
   }
 
   async getConfiguration(): Promise<any> {
@@ -28,20 +23,15 @@ export class FlexClient {
     return response.data;
   }
 
-  async updateConfiguration(params: Record<string, string | undefined>): Promise<any> {
-    let response = await this.axios.post('/Configuration', encodeFormBody(params));
-    return response.data;
-  }
-
   async listFlexFlows(pageSize?: number): Promise<any> {
     let response = await this.axios.get('/FlexFlows', {
-      params: { PageSize: pageSize || 50 }
+      params: { PageSize: pageSize ?? 50 }
     });
     return response.data;
   }
 
   async getFlexFlow(flexFlowSid: string): Promise<any> {
-    let response = await this.axios.get(`/FlexFlows/${flexFlowSid}`);
+    let response = await this.axios.get(`/FlexFlows/${pathId(flexFlowSid)}`);
     return response.data;
   }
 
@@ -54,12 +44,15 @@ export class FlexClient {
     flexFlowSid: string,
     params: Record<string, string | undefined>
   ): Promise<any> {
-    let response = await this.axios.post(`/FlexFlows/${flexFlowSid}`, encodeFormBody(params));
+    let response = await this.axios.post(
+      `/FlexFlows/${pathId(flexFlowSid)}`,
+      encodeFormBody(params)
+    );
     return response.data;
   }
 
   async deleteFlexFlow(flexFlowSid: string): Promise<void> {
-    await this.axios.delete(`/FlexFlows/${flexFlowSid}`);
+    await this.axios.delete(`/FlexFlows/${pathId(flexFlowSid)}`);
   }
 
   async createInteraction(params: Record<string, string | undefined>): Promise<any> {
@@ -68,18 +61,18 @@ export class FlexClient {
   }
 
   async getInteraction(interactionSid: string): Promise<any> {
-    let response = await this.axios.get(`/Interactions/${interactionSid}`);
+    let response = await this.axios.get(`/Interactions/${pathId(interactionSid)}`);
     return response.data;
   }
 
   async listInteractionChannels(interactionSid: string): Promise<any> {
-    let response = await this.axios.get(`/Interactions/${interactionSid}/Channels`);
+    let response = await this.axios.get(`/Interactions/${pathId(interactionSid)}/Channels`);
     return response.data;
   }
 
   async getInteractionChannel(interactionSid: string, channelSid: string): Promise<any> {
     let response = await this.axios.get(
-      `/Interactions/${interactionSid}/Channels/${channelSid}`
+      `/Interactions/${pathId(interactionSid)}/Channels/${pathId(channelSid)}`
     );
     return response.data;
   }
@@ -90,7 +83,7 @@ export class FlexClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/Interactions/${interactionSid}/Channels/${channelSid}`,
+      `/Interactions/${pathId(interactionSid)}/Channels/${pathId(channelSid)}`,
       encodeFormBody(params)
     );
     return response.data;
@@ -101,7 +94,7 @@ export class FlexClient {
     channelSid: string
   ): Promise<any> {
     let response = await this.axios.get(
-      `/Interactions/${interactionSid}/Channels/${channelSid}/Participants`
+      `/Interactions/${pathId(interactionSid)}/Channels/${pathId(channelSid)}/Participants`
     );
     return response.data;
   }
@@ -112,7 +105,7 @@ export class FlexClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/Interactions/${interactionSid}/Channels/${channelSid}/Participants`,
+      `/Interactions/${pathId(interactionSid)}/Channels/${pathId(channelSid)}/Participants`,
       encodeFormBody(params)
     );
     return response.data;
@@ -125,7 +118,7 @@ export class FlexClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/Interactions/${interactionSid}/Channels/${channelSid}/Participants/${participantSid}`,
+      `/Interactions/${pathId(interactionSid)}/Channels/${pathId(channelSid)}/Participants/${pathId(participantSid)}`,
       encodeFormBody(params)
     );
     return response.data;
@@ -137,7 +130,7 @@ export class FlexClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/Interactions/${interactionSid}/Channels/${channelSid}/Invites`,
+      `/Interactions/${pathId(interactionSid)}/Channels/${pathId(channelSid)}/Invites`,
       encodeFormBody(params)
     );
     return response.data;
@@ -148,7 +141,7 @@ export class FlexClient {
     channelSid: string
   ): Promise<any> {
     let response = await this.axios.get(
-      `/Interactions/${interactionSid}/Channels/${channelSid}/Invites`
+      `/Interactions/${pathId(interactionSid)}/Channels/${pathId(channelSid)}/Invites`
     );
     return response.data;
   }

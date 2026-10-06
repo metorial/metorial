@@ -8,8 +8,6 @@ import {
   updateLicenseUsage,
   verifyLicense
 } from './tools';
-import { paymentTrigger, subscriptionTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -20,5 +18,5 @@ export let provider = Slate.create({
     manageLicense,
     updateLicenseUsage
   ],
-  triggers: [paymentTrigger, subscriptionTrigger]
+  triggers: []
 });

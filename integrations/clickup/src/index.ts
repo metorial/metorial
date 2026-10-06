@@ -49,8 +49,6 @@ import {
   updateTask,
   updateTimeEntry
 } from './tools';
-import { taskEvents, workspaceEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -102,5 +100,5 @@ export let provider = Slate.create({
     getWorkspaces,
     getWorkspaceMembers
   ],
-  triggers: [taskEvents, workspaceEvents]
+  triggers: []
 });

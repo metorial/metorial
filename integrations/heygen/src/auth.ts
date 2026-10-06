@@ -1,10 +1,38 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  normalizeOAuthTokenResponse,
+  SlateAuth,
+  type SlateAuthWithOauth
+} from 'slates';
 import { z } from 'zod';
+import { type HeyGenAuth, HeyGenClient } from './lib/client';
+
+type TokenRefreshContext = Parameters<
+  NonNullable<SlateAuthWithOauth<{ codeVerifier?: string }, HeyGenAuth>['handleTokenRefresh']>
+>[0];
+
+const getHeyGenProfile = async (ctx: { output: HeyGenAuth }) => {
+  const user = await new HeyGenClient(ctx.output).getCurrentUser();
+  return {
+    profile: {
+      id: user.username,
+      name: [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username,
+      email: user.email ?? undefined
+    }
+  };
+};
+
+const tokenResponse = (data: unknown) =>
+  isApiErrorRecord(data) && isApiErrorRecord(data.data) ? data.data : data;
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      authType: z.enum(['api_key', 'oauth']).optional(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional()
     })
@@ -17,17 +45,11 @@ export let auth = SlateAuth.create()
       {
         type: 'docs.auth.oauth',
         name: 'OAuth documentation',
-        url: 'https://docs.heygen.com/docs/connecting-your-app-to-heygen-with-oauth-20'
+        url: 'https://mcp.heygen.com/.well-known/oauth-authorization-server'
       }
     ],
 
-    scopes: [
-      {
-        title: 'Full Access',
-        description: 'Full API access based on account permissions',
-        scope: 'full_access'
-      }
-    ],
+    scopes: [],
 
     getAuthorizationUrl: async ctx => {
       let codeVerifier = generateCodeVerifier();
@@ -43,7 +65,7 @@ export let auth = SlateAuth.create()
       });
 
       return {
-        url: `https://app.heygen.com/oauth/authorize?${params.toString()}`,
+        url: `https://api2.heygen.com/v1/oauth/authorize?${params.toString()}`,
         input: { codeVerifier }
       };
     },
@@ -53,9 +75,23 @@ export let auth = SlateAuth.create()
     }),
 
     handleCallback: async ctx => {
-      let client = createAxios({ baseURL: 'https://api2.heygen.com' });
+      if (!ctx.input.codeVerifier) {
+        throw createApiServiceError(
+          'The OAuth PKCE verifier is missing. Start the HeyGen connection again.'
+        );
+      }
+      let client = createAuthenticatedAxios({
+        baseURL: 'https://api2.heygen.com',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            parent: {},
+            providerLabel: 'HeyGen',
+            reason: 'heygen_api_error',
+            operation: 'OAuth token exchange'
+          })
+      });
 
-      let response = await client.post('/v1/oauth/token', {
+      const body = new URLSearchParams({
         code: ctx.code,
         client_id: ctx.clientId,
         grant_type: 'authorization_code',
@@ -63,78 +99,62 @@ export let auth = SlateAuth.create()
         code_verifier: ctx.input.codeVerifier
       });
 
-      let data = response.data as {
-        data?: {
-          access_token?: string;
-          refresh_token?: string;
-          expires_in?: number;
-        };
-        error?: string;
-      };
-
-      let tokenData = data.data;
-      if (!tokenData?.access_token) {
-        throw new Error(
-          `HeyGen OAuth error: ${data.error || 'Failed to obtain access token'}`
-        );
-      }
-
-      let expiresAt: string | undefined;
-      if (tokenData.expires_in) {
-        expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
-      }
+      if (ctx.clientSecret) body.set('client_secret', ctx.clientSecret);
+      const response = await client.post('/v1/oauth/token', body.toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
 
       return {
         output: {
-          token: tokenData.access_token,
-          refreshToken: tokenData.refresh_token,
-          expiresAt
+          ...normalizeOAuthTokenResponse(tokenResponse(response.data), {
+            providerLabel: 'HeyGen'
+          }),
+          authType: 'oauth' as const
         }
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: TokenRefreshContext) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError(
+          'No refresh token is available. Reconnect your HeyGen account.'
+        );
       }
 
-      let client = createAxios({ baseURL: 'https://api2.heygen.com' });
+      let client = createAuthenticatedAxios({
+        baseURL: 'https://api2.heygen.com',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            parent: {},
+            providerLabel: 'HeyGen',
+            reason: 'heygen_api_error',
+            operation: 'OAuth token refresh'
+          })
+      });
 
-      let response = await client.post('/v1/oauth/refresh_token', {
+      const body = new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: ctx.output.refreshToken,
         client_id: ctx.clientId
       });
 
-      let data = response.data as {
-        data?: {
-          access_token?: string;
-          refresh_token?: string;
-          expires_in?: number;
-        };
-        error?: string;
-      };
-
-      let tokenData = data.data;
-      if (!tokenData?.access_token) {
-        throw new Error(
-          `HeyGen token refresh error: ${data.error || 'Failed to refresh token'}`
-        );
-      }
-
-      let expiresAt: string | undefined;
-      if (tokenData.expires_in) {
-        expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
-      }
+      if (ctx.clientSecret) body.set('client_secret', ctx.clientSecret);
+      const response = await client.post('/v1/oauth/token', body.toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
 
       return {
         output: {
-          token: tokenData.access_token,
-          refreshToken: tokenData.refresh_token || ctx.output.refreshToken,
-          expiresAt
+          ...normalizeOAuthTokenResponse(tokenResponse(response.data), {
+            providerLabel: 'HeyGen',
+            previousRefreshToken: ctx.output.refreshToken,
+            refreshTokenFallbackMode: 'falsy'
+          }),
+          authType: 'oauth' as const
         }
       };
-    }
+    },
+    getProfile: getHeyGenProfile
   })
   .addTokenAuth({
     type: 'auth.token',
@@ -150,30 +170,13 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey,
+          authType: 'api_key' as const
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let client = createAxios({ baseURL: 'https://api.heygen.com' });
-
-      let response = await client.get('/v2/user/remaining_quota', {
-        headers: { 'X-Api-Key': ctx.output.token }
-      });
-
-      let data = response.data as {
-        data?: {
-          remaining_quota?: number;
-        };
-      };
-
-      return {
-        profile: {
-          remainingCredits: data.data?.remaining_quota
-        }
-      };
-    }
+    getProfile: getHeyGenProfile
   });
 
 let generateCodeVerifier = (): string => {

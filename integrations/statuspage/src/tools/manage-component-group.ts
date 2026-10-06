@@ -1,11 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { groupComponentIds } from '../lib/models';
+import { pageIdSchema, paginationFields } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageComponentGroup = SlateTool.create(spec, {
   name: 'Manage Component Group',
   key: 'manage_component_group',
+  tags: { readOnly: false, destructive: true },
   description: `Create, update, or delete component groups on the status page. Component groups organize related components together.
 - To **create**: omit \`groupId\` and provide \`name\` and optionally \`componentIds\`.
 - To **update**: provide \`groupId\` and the fields to change.
@@ -14,6 +17,8 @@ export let manageComponentGroup = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageId: pageIdSchema,
+      ...paginationFields,
       groupId: z
         .string()
         .optional()
@@ -61,8 +66,19 @@ export let manageComponentGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, pageId: ctx.config.pageId });
+    let client = new Client({
+      token: ctx.auth.token,
+      pageId: ctx.input.pageId ?? ctx.config.pageId
+    });
 
+    if (ctx.input.delete && !ctx.input.groupId)
+      throw createApiServiceError('groupId is required to delete a component group.');
+    if (
+      !ctx.input.groupId &&
+      !ctx.input.name &&
+      (ctx.input.description !== undefined || ctx.input.componentIds !== undefined)
+    )
+      throw createApiServiceError('name is required to create a component group.');
     if (ctx.input.delete && ctx.input.groupId) {
       await client.deleteComponentGroup(ctx.input.groupId);
       return {
@@ -72,13 +88,13 @@ export let manageComponentGroup = SlateTool.create(spec, {
     }
 
     if (!ctx.input.groupId && !ctx.input.name) {
-      let raw = await client.listComponentGroups();
-      let groups = raw.map((g: any) => ({
+      let raw = await client.listComponentGroups(ctx.input);
+      let groups = raw.map(g => ({
         groupId: g.id,
         name: g.name,
         description: g.description,
-        componentIds: g.components?.map((c: any) => c.id || c) || g.component_ids,
-        position: g.position,
+        componentIds: groupComponentIds(g),
+        position: g.position === undefined ? undefined : Number(g.position),
         createdAt: g.created_at,
         updatedAt: g.updated_at
       }));
@@ -88,23 +104,20 @@ export let manageComponentGroup = SlateTool.create(spec, {
       };
     }
 
-    let data: Record<string, any> = {};
+    let data: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) data.name = ctx.input.name;
     if (ctx.input.description !== undefined) data.description = ctx.input.description;
-    if (ctx.input.componentIds !== undefined) data.component_ids = ctx.input.componentIds;
+    if (ctx.input.componentIds !== undefined) data.components = ctx.input.componentIds;
 
-    let result: any;
-    if (ctx.input.groupId) {
-      result = await client.updateComponentGroup(ctx.input.groupId, data);
-    } else {
-      result = await client.createComponentGroup(data);
-    }
+    const result = ctx.input.groupId
+      ? await client.updateComponentGroup(ctx.input.groupId, data)
+      : await client.createComponentGroup(data);
 
     let group = {
       groupId: result.id,
       name: result.name,
       description: result.description,
-      componentIds: result.components?.map((c: any) => c.id || c) || result.component_ids,
+      componentIds: groupComponentIds(result),
       createdAt: result.created_at,
       updatedAt: result.updated_at
     };

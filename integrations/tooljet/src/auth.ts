@@ -1,28 +1,23 @@
 import { SlateAuth } from 'slates';
-import { z } from 'zod';
-
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+import { connection, z } from './lib/validation';
+export const auth = SlateAuth.create()
+  .output(z.object({ token: z.string(), baseUrl: z.string().optional() }))
   .addTokenAuth({
     type: 'auth.token',
-    name: 'Access Token',
+    name: 'Configured Access Token',
     key: 'access_token',
     inputSchema: z.object({
       token: z
         .string()
         .describe(
-          'The static access token configured in your ToolJet instance via the EXTERNAL_API_ACCESS_TOKEN environment variable'
+          'Exact EXTERNAL_API_ACCESS_TOKEN value; it is sent as Basic without username/password encoding.'
+        ),
+      baseUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Explicit ToolJet HTTP or HTTPS instance root, including any deployment path and port. Required for new connections.'
         )
     }),
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    }
+    getOutput: async ctx => ({ output: connection(ctx.input, ctx.config) })
   });

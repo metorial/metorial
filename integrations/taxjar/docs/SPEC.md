@@ -1,90 +1,20 @@
-Now let me fetch the full API reference to get details on all features:Now I have comprehensive information to write the specification.
+# TaxJar API capabilities
 
-# Slates Specification for Taxjar
+| Workflow | Tool keys |
+| --- | --- |
+| Calculate order tax and inspect rates | `calculate_tax`, `lookup_rates`, `list_summarized_rates` |
+| Discover product tax codes and configured nexus | `list_categories`, `list_nexus_regions` |
+| Order reporting records | `list_orders`, `get_order`, `create_order`, `update_order`, `delete_order` |
+| Refund reporting records | `list_refunds`, `get_refund`, `create_refund`, `update_refund`, `delete_refund` |
+| Customer exemption records | `list_customers`, `get_customer`, `create_customer`, `update_customer`, `delete_customer` |
+| Standardize supported US addresses | `validate_address` |
 
-## Overview
+Authentication uses a bearer API token and its selected production or sandbox environment. Sandbox requires a separate token. API versions currently supported are 2012-01-01, 2020-08-07 and 2022-01-24. Omit the version to use the account default.
 
-TaxJar is a sales tax automation platform that provides sales tax calculation, reporting, and filing services primarily for US-based businesses. It offers a REST API for real-time tax calculations, transaction management for reporting purposes, customer exemption handling, tax rate lookups, nexus tracking, and address validation.
+A calculation requires shipping plus an amount or line items. US destinations require ZIP and state. Account settings may provide the origin/nexus information. New order/refund records require a transaction date and an ID containing letters, digits, underscores or dashes. Transaction amount includes shipping and excludes tax; calculation amount excludes shipping. Refund records reference a distinct original order ID. TaxJar signs monetary values; the integration preserves the supplied values. These records affect reporting and filing, rather than customer payments.
 
-## Authentication
+Transaction lists accept an exact date or a complete date range, plus an optional provider source. Read/delete selectors default to the API source. The documented endpoints do not expose pagination cursors. Customer listing resolves the returned customer IDs into details. Customer updates preserve omitted required name/exemption fields; refund updates preserve an omitted original-order reference. Customer deletion returns the previous customer details after an acknowledged deletion receipt.
 
-TaxJar uses API keys to allow access to the API. TaxJar does not provide OAuth-based authentication; only token-based authentication is supported.
+Sandbox transaction responses cannot prove persisted create/update/delete state. Sandbox calculations are formatting evidence, not tax accuracy evidence. Address validation needs Professional access and is unsupported in sandbox; ZIP-only matches can omit a street. The API has no documented current-account identity endpoint. Nexus settings are not identity or legal tax-obligation advice.
 
-**Obtaining an API Token:**
-If you're new to TaxJar, you'll need to sign up for an account to get your API key. Otherwise, log in and go to _Account > API Access_ to generate a new API token.
-
-**Using the API Token:**
-TaxJar expects the API key to be included in all API requests to the server via the `Authorization` header in one of two formats:
-
-- `Authorization: Token token="YOUR_API_TOKEN"`
-- `Authorization: Bearer YOUR_API_TOKEN`
-
-**Sandbox Environment:**
-TaxJar provides a sandbox environment for testing at `https://api.sandbox.taxjar.com/v2/`. A separate sandbox API token is required. The sandbox returns stubbed responses for transaction endpoints and approximate rates for calculations.
-
-**API Versioning:**
-TaxJar has introduced API versioning to deliver enhanced validations and features. To take advantage of an API version, `'x-api-version'` must be specified in API call request headers. `'x-api-version'` accepts a date in the form of a string: `'YYYY-MM-DD'`.
-
-## Features
-
-### Sales Tax Calculation
-
-Calculate the exact sales tax that should be collected for a given order. Accepts origin (from) and destination (to) addresses, order amount, shipping, line items with product tax codes, and nexus addresses. Returns the total tax to collect with a detailed breakdown by jurisdiction (state, county, city, special district) and per line item.
-
-- Supports origin-based and destination-based sourcing automatically based on the state.
-- Handles shipping taxability per state rules.
-- Handles product-level exemptions via product tax codes (e.g., clothing, food, software, digital goods).
-- Supports customer-level exemptions via `customer_id` or `exemption_type` (wholesale, government, marketplace, other).
-- Nexus can be provided per-request via `nexus_addresses` or stored in the TaxJar account.
-- TaxJar has limited functionality for international calculations and it is only supported for users who have this feature currently implemented.
-
-### Tax Rate Lookups
-
-Retrieve the combined sales tax rate for a given US location by ZIP code, with optional city, state, and street address for greater accuracy.
-
-- Returns rates broken down by state, county, city, and combined district.
-- Indicates whether freight/shipping is taxable at that location.
-- Does not support nexus determination, sourcing based on a ship from and ship to address, shipping taxability, product exemptions, customer exemptions, or sales tax holidays.
-
-### Summarized Rates
-
-Retrieve minimum and average sales tax rates for all US regions/states, intended as a backup/fallback data source.
-
-### Product Tax Categories
-
-List all supported product tax categories and their corresponding tax codes. Categories cover clothing, food & groceries, supplements, software, digital goods, services, and many more specialized items. These codes are used in tax calculations and transactions to apply correct exemption rules.
-
-### Order Transaction Management
-
-Create, list, show, update, and delete order transactions in TaxJar for sales tax reporting and filing purposes. Each order includes transaction ID, date, shipping addresses, amounts, shipping costs, sales tax collected, and line items.
-
-- Transactions can be filtered by date range.
-- Supports a `provider` parameter for marketplace sources (e.g., Amazon, eBay, Facebook).
-- Only affects API-created transactions; does not modify transactions from other channels.
-- TaxJar API endpoints provide detailed US-based sales tax rates and calculations. They also support extended US-based reporting and filing capabilities for TaxJar users.
-
-### Refund Transaction Management
-
-Create, list, show, update, and delete refund transactions linked to original orders. Refunds use negative monetary amounts and reference the original order's transaction ID.
-
-### Customer Exemption Management
-
-Create, list, show, update, and delete exempt customers (wholesale, government, etc.). Customers can be designated as exempt in specific regions or everywhere. Once created, pass the `customer_id` to tax calculation or transaction endpoints to automatically apply exemptions.
-
-- Exemption types: `wholesale`, `government`, `other`, `non_exempt`.
-- Exempt regions can be specified per country and state.
-
-### Nexus Regions
-
-List all nexus locations (regions where the business has tax obligations) configured in the TaxJar account. Returns country and region codes.
-
-### Address Validation
-
-Validate a US customer address and receive standardized address matches with ZIP+4 precision. Supports full address or ZIP-only validation, and can return multiple address match candidates.
-
-- Requires a TaxJar Professional or higher subscription.
-- Only US addresses are supported.
-
-## Events
-
-The provider does not support webhooks or event subscriptions through its API. TaxJar's API is request/response only, with no built-in mechanism for push-based event notifications.
+Sources: [API reference](https://developers.taxjar.com/api/reference/), [sandbox endpoint support](https://support.taxjar.com/article/677-which-sandbox-endpoints-are-currently-supported).

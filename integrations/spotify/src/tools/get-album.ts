@@ -1,14 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SpotifyClient } from '../lib/client';
+import { paging, pagingOutputSchema } from '../lib/types';
 import { spec } from '../spec';
 
 export let getAlbum = SlateTool.create(spec, {
   name: 'Get Album',
   key: 'get_album',
-  description: `Retrieve detailed information about an album including its metadata, track listing, and artwork. Also supports browsing new album releases.`,
+  description: `Retrieve detailed information about an album including its metadata, one page of tracks, and artwork. Continue using tracksPaging and trackOffset. Also supports browsing new album releases.`,
   instructions: [
-    'Use the "newReleases" action to browse recently released albums instead of looking up a specific album.'
+    'Use the "newReleases" action to browse recently released albums with confirmed legacy endpoint access instead of looking up a specific album.'
   ],
   tags: {
     readOnly: true
@@ -27,6 +28,17 @@ export let getAlbum = SlateTool.create(spec, {
         .max(50)
         .optional()
         .describe('Max results for new releases (default 20)'),
+      trackOffset: z
+        .number()
+        .min(0)
+        .optional()
+        .describe('Offset for album tracks when action is get'),
+      trackLimit: z
+        .number()
+        .min(1)
+        .max(50)
+        .optional()
+        .describe('Page size for album tracks when action is get'),
       offset: z.number().min(0).optional().describe('Offset for pagination')
     })
   )
@@ -39,9 +51,9 @@ export let getAlbum = SlateTool.create(spec, {
           albumType: z.string(),
           totalTracks: z.number(),
           releaseDate: z.string(),
-          label: z.string(),
-          popularity: z.number(),
-          genres: z.array(z.string()),
+          label: z.string().optional(),
+          popularity: z.number().optional(),
+          genres: z.array(z.string()).optional(),
           artists: z.array(
             z.object({
               artistId: z.string(),
@@ -68,7 +80,7 @@ export let getAlbum = SlateTool.create(spec, {
           imageUrl: z.string().nullable(),
           spotifyUrl: z.string(),
           uri: z.string(),
-          copyrights: z.array(z.object({ text: z.string(), type: z.string() }))
+          copyrights: z.array(z.object({ text: z.string(), type: z.string() })).optional()
         })
         .optional(),
       newReleases: z
@@ -90,13 +102,18 @@ export let getAlbum = SlateTool.create(spec, {
           })
         )
         .optional(),
+      paging: pagingOutputSchema.optional(),
+      tracksPaging: pagingOutputSchema.optional(),
       total: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new SpotifyClient({
       token: ctx.auth.token,
-      market: ctx.config.market
+      refreshToken: ctx.auth.refreshToken,
+      input: ctx.input,
+      market: ctx.config.market,
+      endpointCompatibility: ctx.config.endpointCompatibility
     });
 
     if (ctx.input.action === 'newReleases') {
@@ -105,7 +122,7 @@ export let getAlbum = SlateTool.create(spec, {
         offset: ctx.input.offset
       });
 
-      let releases = result.albums.items.map(a => ({
+      let releases = result.items.map(a => ({
         albumId: a.id,
         name: a.name,
         albumType: a.album_type,
@@ -119,19 +136,29 @@ export let getAlbum = SlateTool.create(spec, {
       return {
         output: {
           newReleases: releases,
-          total: result.albums.total
+          total: result.total,
+          paging: paging(result)
         },
-        message: `Found ${releases.length} new releases (${result.albums.total} total).`
+        message: `Found ${releases.length} new releases (${result.total} total).`
       };
     }
 
     if (!ctx.input.albumId) {
-      throw new Error('albumId is required for "get" action');
+      throw createApiServiceError('albumId is required for "get" action');
     }
 
     let album = await client.getAlbum(ctx.input.albumId, ctx.input.market);
 
+    const tracks =
+      ctx.input.trackOffset !== undefined || ctx.input.trackLimit !== undefined
+        ? await client.getAlbumTracks(ctx.input.albumId, {
+            offset: ctx.input.trackOffset,
+            limit: ctx.input.trackLimit,
+            market: ctx.input.market
+          })
+        : album.tracks;
     let output = {
+      tracksPaging: paging(tracks),
       album: {
         albumId: album.id,
         name: album.name,
@@ -142,7 +169,7 @@ export let getAlbum = SlateTool.create(spec, {
         popularity: album.popularity,
         genres: album.genres,
         artists: album.artists.map(a => ({ artistId: a.id, name: a.name })),
-        tracks: album.tracks.items.map(t => ({
+        tracks: tracks.items.map(t => ({
           trackId: t.id,
           name: t.name,
           trackNumber: t.track_number,

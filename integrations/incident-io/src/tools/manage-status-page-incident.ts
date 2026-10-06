@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ let componentStatusSchema = z.object({
   status: z
     .string()
     .describe(
-      'Status to set for the component (e.g., "operational", "degraded_performance", "partial_outage", "major_outage")'
+      'Status to set for the component (e.g., "operational", "degraded_performance", "partial_outage", "full_outage"; "major_outage" is accepted as a legacy alias)'
     )
 });
 
@@ -42,7 +42,9 @@ export let manageStatusPageIncident = SlateTool.create(spec, {
       notifySubscribers: z
         .boolean()
         .optional()
-        .describe('Whether to notify status page subscribers'),
+        .describe(
+          'Whether to notify subscribers; defaults to false. Publishing remains visible on the status page.'
+        ),
       componentStatuses: z
         .array(componentStatusSchema)
         .optional()
@@ -66,12 +68,33 @@ export let manageStatusPageIncident = SlateTool.create(spec, {
 
     let transformedComponents = input.componentStatuses?.map(c => ({
       component_id: c.componentId,
-      status: c.status
+      component_status: c.status === 'major_outage' ? 'full_outage' : c.status
     }));
 
+    if (
+      input.incidentStatus !== undefined &&
+      !['investigating', 'identified', 'monitoring', 'resolved'].includes(input.incidentStatus)
+    )
+      throw createApiServiceError(
+        'Use investigating, identified, monitoring or resolved for incidentStatus.'
+      );
+    for (const component of transformedComponents ?? []) {
+      if (
+        !['operational', 'degraded_performance', 'partial_outage', 'full_outage'].includes(
+          component.component_status
+        )
+      )
+        throw createApiServiceError(
+          'Use operational, degraded_performance, partial_outage or full_outage for component status.'
+        );
+    }
+    if (input.incidentStatus === 'resolved' && transformedComponents !== undefined)
+      throw createApiServiceError(
+        'Omit componentStatuses when resolving an incident; affected components are restored automatically.'
+      );
     if (input.action === 'create') {
       if (!input.statusPageId || !input.name || !input.incidentStatus || !input.message) {
-        throw new Error(
+        throw createApiServiceError(
           'statusPageId, name, incidentStatus, and message are required for creating a status page incident.'
         );
       }
@@ -97,7 +120,7 @@ export let manageStatusPageIncident = SlateTool.create(spec, {
 
     if (input.action === 'update') {
       if (!input.statusPageIncidentId) {
-        throw new Error(
+        throw createApiServiceError(
           'statusPageIncidentId is required for updating a status page incident.'
         );
       }
@@ -105,7 +128,8 @@ export let manageStatusPageIncident = SlateTool.create(spec, {
         name: input.name,
         incidentStatus: input.incidentStatus,
         message: input.message,
-        componentStatuses: transformedComponents
+        componentStatuses: transformedComponents,
+        notifySubscribers: input.notifySubscribers
       });
       let inc = result.status_page_incident;
       return {
@@ -120,24 +144,29 @@ export let manageStatusPageIncident = SlateTool.create(spec, {
 
     if (input.action === 'post_update') {
       if (!input.statusPageIncidentId || !input.message) {
-        throw new Error(
+        throw createApiServiceError(
           'statusPageIncidentId and message are required for posting an update.'
         );
       }
       await client.postStatusPageIncidentUpdate(input.statusPageIncidentId, {
         message: input.message,
         incidentStatus: input.incidentStatus,
-        componentStatuses: transformedComponents
+        componentStatuses: transformedComponents,
+        notifySubscribers: input.notifySubscribers
       });
+      const { status_page_incident: current } = await client.getStatusPageIncident(
+        input.statusPageIncidentId
+      );
       return {
         output: {
-          statusPageIncidentId: input.statusPageIncidentId,
-          incidentStatus: input.incidentStatus || undefined
+          statusPageIncidentId: current.id,
+          name: current.name,
+          incidentStatus: current.incident_status
         },
         message: `Posted update to status page incident ${input.statusPageIncidentId}.`
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

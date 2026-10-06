@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let uploadAudio = SlateTool.create(spec, {
   name: 'Upload Audio',
   key: 'upload_audio',
-  description: `Upload an audio or video file to Gladia's servers by providing its URL. Returns a Gladia-hosted URL that can be used with the **Transcribe Audio** tool. Useful for files that require hosting or when working with temporary/authenticated URLs.`,
+  description: `Upload an audio or video file to Gladia by providing a publicly accessible URL. Returns a reusable Gladia-hosted URL and media metadata for Transcribe Audio.`,
   instructions: [
     'Provide a publicly accessible URL to the audio or video file.',
     'The returned audioUrl can then be passed to the Transcribe Audio tool.'
@@ -24,6 +24,7 @@ export let uploadAudio = SlateTool.create(spec, {
     z.object({
       audioUrl: z
         .string()
+        .url()
         .describe('Publicly accessible URL of the audio or video file to upload')
     })
   )

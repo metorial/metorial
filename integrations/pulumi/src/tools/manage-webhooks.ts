@@ -1,11 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageWebhooks = SlateTool.create(spec, {
   name: 'Manage Webhooks',
   key: 'manage_webhooks',
+  tags: { destructive: true },
   description: `List, create, or delete webhooks in Pulumi Cloud. Supports both organization-level webhooks (receive events for all stacks) and stack-level webhooks (scoped to a single stack).`,
   instructions: [
     'For organization webhooks, omit projectName and stackName.',
@@ -16,10 +18,7 @@ export let manageWebhooks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe('Organization name (uses default from config if not set)'),
+      organization: organizationInput,
       projectName: z.string().optional().describe('Project name (for stack webhooks)'),
       stackName: z.string().optional().describe('Stack name (for stack webhooks)'),
       action: z.enum(['list', 'create', 'delete']).describe('Action to perform'),
@@ -40,7 +39,15 @@ export let manageWebhooks = SlateTool.create(spec, {
       webhookName: z
         .string()
         .optional()
-        .describe('Webhook name/ID to delete (required for delete)')
+        .describe(
+          'Webhook name/ID. Required for delete; optionally assign a unique name during create.'
+        ),
+      active: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether deliveries are enabled when creating; defaults to true. Set false for an inactive webhook.'
+        )
     })
   )
   .output(
@@ -53,18 +60,20 @@ export let manageWebhooks = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
+    if (!!ctx.input.projectName !== !!ctx.input.stackName)
+      throw createApiServiceError(
+        'Provide both projectName and stackName for a stack webhook, or omit both for an organization webhook.'
+      );
 
     let isStackWebhook = !!(ctx.input.projectName && ctx.input.stackName);
 
     switch (ctx.input.action) {
       case 'list': {
-        let webhooks: any[];
+        let webhooks: Awaited<ReturnType<Client['listOrgWebhooks']>>;
         if (isStackWebhook) {
           webhooks = await client.listStackWebhooks(
             org,
@@ -75,26 +84,27 @@ export let manageWebhooks = SlateTool.create(spec, {
           webhooks = await client.listOrgWebhooks(org);
         }
         return {
-          output: { webhooks: webhooks || [] },
-          message: `Found **${(webhooks || []).length}** webhook(s)${isStackWebhook ? ` on stack **${org}/${ctx.input.projectName}/${ctx.input.stackName}**` : ` in organization **${org}**`}`
+          output: { webhooks },
+          message: `Found **${webhooks.length}** webhook(s)${isStackWebhook ? ` on stack **${org}/${ctx.input.projectName}/${ctx.input.stackName}**` : ` in organization **${org}**`}`
         };
       }
       case 'create': {
         if (!ctx.input.displayName)
-          throw new Error('displayName is required when creating a webhook');
+          throw createApiServiceError('displayName is required when creating a webhook');
         if (!ctx.input.payloadUrl)
-          throw new Error('payloadUrl is required when creating a webhook');
+          throw createApiServiceError('payloadUrl is required when creating a webhook');
 
         let body = {
-          active: true,
+          active: ctx.input.active ?? true,
           displayName: ctx.input.displayName,
           payloadUrl: ctx.input.payloadUrl,
           format: ctx.input.format || 'raw',
           filters: ctx.input.filters,
-          secret: ctx.input.secret
+          secret: ctx.input.secret,
+          name: ctx.input.webhookName
         };
 
-        let createdWebhook: any;
+        let createdWebhook: Awaited<ReturnType<Client['createOrgWebhook']>>;
         if (isStackWebhook) {
           createdWebhook = await client.createStackWebhook(
             org,
@@ -113,7 +123,7 @@ export let manageWebhooks = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.webhookName)
-          throw new Error('webhookName is required when deleting a webhook');
+          throw createApiServiceError('webhookName is required when deleting a webhook');
 
         if (isStackWebhook) {
           await client.deleteStackWebhook(

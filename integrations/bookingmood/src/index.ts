@@ -34,17 +34,6 @@ import {
   updateProduct,
   updateTask
 } from './tools';
-import {
-  bookingEvents,
-  calendarEventEvents,
-  calendarEventTaskEvents,
-  contactEvents,
-  invoiceEvents,
-  memberEvents,
-  paymentEvents,
-  productEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -81,14 +70,5 @@ export let provider = Slate.create({
     createReview,
     listMessages
   ],
-  triggers: [
-    bookingEvents,
-    calendarEventEvents,
-    calendarEventTaskEvents,
-    contactEvents,
-    invoiceEvents,
-    paymentEvents,
-    productEvents,
-    memberEvents
-  ]
+  triggers: []
 });

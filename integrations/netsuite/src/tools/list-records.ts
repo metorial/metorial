@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { connection } from '../lib/client';
 import { spec } from '../spec';
 
 export let listRecords = SlateTool.create(spec, {
   name: 'List Records',
   key: 'list_records',
-  description: `Retrieve a paginated list of NetSuite records of a given type. Supports optional filtering using NetSuite's query syntax and field selection.
+  description: `Retrieve a page of NetSuite records of a type discovered with list_record_types. Supports native body-field filtering; collections return IDs and links. Read exact record fields with get_record or query_suiteql.
 Use this for browsing record collections or finding records that match specific criteria.`,
   instructions: [
     'The filter query uses NetSuite REST API query syntax (e.g., "companyName CONTAIN \'Acme\'" or "balance > 1000").',
@@ -18,11 +18,7 @@ Use this for browsing record collections or finding records that match specific 
 })
   .input(
     z.object({
-      recordType: z
-        .string()
-        .describe(
-          'NetSuite record type in camelCase (e.g., "customer", "salesOrder", "invoice")'
-        ),
+      recordType: z.string().describe('Exact native record type from list_record_types'),
       filter: z
         .string()
         .optional()
@@ -32,9 +28,17 @@ Use this for browsing record collections or finding records that match specific 
       fields: z
         .array(z.string())
         .optional()
-        .describe('Specific fields to include in the response'),
-      limit: z.number().optional().describe('Maximum number of records to return per page'),
-      offset: z.number().optional().describe('Number of records to skip for pagination')
+        .describe(
+          'Legacy field selection; nonempty values require get_record or query_suiteql because native collections return IDs and links'
+        ),
+      limit: z
+        .number()
+        .optional()
+        .describe('Integer page size from 1 to 1000; defaults to 1000'),
+      offset: z
+        .number()
+        .optional()
+        .describe('Nonnegative integer offset divisible by limit (default limit 1000)')
     })
   )
   .output(
@@ -49,10 +53,7 @@ Use this for browsing record collections or finding records that match specific 
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      ...ctx.auth,
-      accountId: ctx.config.accountId
-    });
+    const client = connection(ctx.auth, ctx.config);
 
     let result = await client.listRecords(ctx.input.recordType, {
       query: ctx.input.filter,
@@ -63,13 +64,13 @@ Use this for browsing record collections or finding records that match specific 
 
     return {
       output: {
-        records: result.items || [],
-        totalResults: result.totalResults || 0,
-        count: result.count || 0,
-        offset: result.offset || 0,
-        hasMore: result.hasMore || false
+        records: result.items,
+        totalResults: result.totalResults,
+        count: result.count,
+        offset: result.offset,
+        hasMore: result.hasMore
       },
-      message: `Listed **${result.count || 0}** ${ctx.input.recordType} records out of **${result.totalResults || 0}** total.`
+      message: `Listed **${result.count}** ${ctx.input.recordType} records out of **${result.totalResults}** total.`
     };
   })
   .build();

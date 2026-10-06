@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'retool',
   name: 'Retool',
   description:
-    'Programmatically manage a Retool organization including users, groups, apps, permissions, resources, workflows, and infrastructure.',
+    'Read Retool organization, app, resource, and workflow metadata and manage supported users, groups, folders, Spaces, and permissions with a scoped API access token.',
   metadata: {},
   config,
   auth

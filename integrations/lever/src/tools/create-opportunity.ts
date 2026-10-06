@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { id, type Row, stringList, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let createOpportunityTool = SlateTool.create(spec, {
@@ -11,6 +12,12 @@ export let createOpportunityTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      performAsUserId: z
+        .string()
+        .optional()
+        .describe(
+          'Acting user ID required for this write. Call list_users to discover authorized users.'
+        ),
       name: z.string().describe('Full name of the candidate'),
       headline: z.string().optional().describe('Candidate headline or current title'),
       location: z.string().optional().describe('Candidate location'),
@@ -44,32 +51,32 @@ export let createOpportunityTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, environment: ctx.auth.environment });
-
-    let data: Record<string, any> = {
-      name: ctx.input.name
-    };
-    if (ctx.input.headline) data.headline = ctx.input.headline;
-    if (ctx.input.location) data.location = ctx.input.location;
-    if (ctx.input.emails) data.emails = ctx.input.emails;
-    if (ctx.input.phones) data.phones = ctx.input.phones;
-    if (ctx.input.links) data.links = ctx.input.links;
-    if (ctx.input.tags) data.tags = ctx.input.tags;
-    if (ctx.input.sources) data.sources = ctx.input.sources;
-    if (ctx.input.origin) data.origin = ctx.input.origin;
-    if (ctx.input.postingId) data.postings = [ctx.input.postingId];
-    if (ctx.input.stageId) data.stage = ctx.input.stageId;
-    if (ctx.input.ownerId) data.owner = ctx.input.ownerId;
-
-    let result = await client.createOpportunity(data);
-
+    const data: Row = { name: text(ctx.input.name, 'Candidate name') };
+    const actor = id(ctx.input.performAsUserId, 'Acting user ID; discover it with list_users');
+    for (const key of ['headline', 'location'] as const)
+      if (ctx.input[key] !== undefined) data[key] = text(ctx.input[key], key, true);
+    for (const key of ['emails', 'links', 'tags', 'sources'] as const)
+      if (ctx.input[key] !== undefined) data[key] = stringList(ctx.input[key], key);
+    if (ctx.input.phones !== undefined)
+      data.phones = ctx.input.phones.map(phone => ({
+        ...phone,
+        value: text(phone.value, 'Phone number')
+      }));
+    if (ctx.input.origin !== undefined) data.origin = ctx.input.origin;
+    if (ctx.input.postingId !== undefined)
+      data.postings = [id(ctx.input.postingId, 'Posting ID; discover it with list_postings')];
+    if (ctx.input.stageId !== undefined)
+      data.stage = id(ctx.input.stageId, 'Stage ID; discover it with get_pipeline_metadata');
+    if (ctx.input.ownerId !== undefined)
+      data.owner = id(ctx.input.ownerId, 'Owner ID; discover it with list_users');
+    const result = await new Client(ctx.auth).createOpportunity(data, actor);
     return {
       output: {
         opportunityId: result.data.id,
         contactId: result.data.contact,
         opportunity: result.data
       },
-      message: `Created opportunity for **${ctx.input.name}** (ID: ${result.data.id}).`
+      message: `Created opportunity ${result.data.id}.`
     };
   })
   .build();

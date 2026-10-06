@@ -1,0 +1,311 @@
+{
+  "get_report": {
+    "type": "object",
+    "properties": {
+      "reportToken": {
+        "type": "string"
+      }
+    },
+    "required": ["reportToken"],
+    "additionalProperties": false
+  },
+  "list_data_sources": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "list_members": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "list_reports": {
+    "type": "object",
+    "properties": {
+      "collectionToken": {
+        "type": "string"
+      },
+      "dataSourceToken": {
+        "type": "string"
+      },
+      "filter": {
+        "type": "string"
+      },
+      "order": {
+        "type": "string",
+        "enum": ["asc", "desc"]
+      },
+      "orderBy": {
+        "type": "string",
+        "enum": ["created_at", "updated_at"]
+      },
+      "page": {
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "list_collections": {
+    "type": "object",
+    "properties": {
+      "filter": {
+        "type": "string",
+        "enum": ["all", "custom"]
+      },
+      "page": {
+        "type": "number"
+      },
+      "perPage": {
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "manage_collection": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["create", "update", "delete"]
+      },
+      "collectionToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "spaceType": {
+        "type": "string"
+      }
+    },
+    "required": ["action"],
+    "additionalProperties": false
+  },
+  "list_datasets": {
+    "type": "object",
+    "properties": {
+      "collectionToken": {
+        "type": "string"
+      },
+      "dataSourceToken": {
+        "type": "string"
+      },
+      "filter": {
+        "type": "string"
+      },
+      "order": {
+        "type": "string",
+        "enum": ["asc", "desc"]
+      },
+      "orderBy": {
+        "type": "string",
+        "enum": ["created_at", "updated_at"]
+      }
+    },
+    "additionalProperties": false
+  },
+  "manage_dataset": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["update", "delete"]
+      },
+      "datasetToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "collectionToken": {
+        "type": "string"
+      }
+    },
+    "required": ["action", "datasetToken"],
+    "additionalProperties": false
+  },
+  "list_definitions": {
+    "type": "object",
+    "properties": {
+      "tokens": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "manage_definition": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["create", "update", "delete"]
+      },
+      "definitionToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      }
+    },
+    "required": ["action"],
+    "additionalProperties": false
+  },
+  "manage_query": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["create", "update", "list", "delete"]
+      },
+      "reportToken": {
+        "type": "string"
+      },
+      "queryToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "rawQuery": {
+        "type": "string"
+      },
+      "dataSourceId": {
+        "type": "number"
+      }
+    },
+    "required": ["action", "reportToken"],
+    "additionalProperties": false
+  },
+  "manage_report": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["update", "archive", "unarchive", "delete"]
+      },
+      "reportToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "collectionToken": {
+        "type": "string"
+      }
+    },
+    "required": ["action", "reportToken"],
+    "additionalProperties": false
+  },
+  "list_report_schedules": {
+    "type": "object",
+    "properties": {
+      "reportToken": {
+        "type": "string"
+      }
+    },
+    "required": ["reportToken"],
+    "additionalProperties": false
+  },
+  "manage_report_schedule": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["create", "update", "delete"]
+      },
+      "reportToken": {
+        "type": "string"
+      },
+      "scheduleToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "frequency": {
+        "type": "string"
+      },
+      "hour": {
+        "type": "number"
+      },
+      "minute": {
+        "type": "number"
+      },
+      "dayOfWeek": {
+        "type": "number"
+      },
+      "dayOfMonth": {
+        "type": "number"
+      },
+      "timeZone": {
+        "type": "string"
+      },
+      "params": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      },
+      "timeout": {
+        "type": "number"
+      }
+    },
+    "required": ["action", "reportToken"],
+    "additionalProperties": false
+  },
+  "get_report_run": {
+    "type": "object",
+    "properties": {
+      "reportToken": {
+        "type": "string"
+      },
+      "runToken": {
+        "type": "string"
+      },
+      "includeQueryRuns": {
+        "type": "boolean"
+      }
+    },
+    "required": ["reportToken", "runToken"],
+    "additionalProperties": false
+  },
+  "list_report_runs": {
+    "type": "object",
+    "properties": {
+      "reportToken": {
+        "type": "string"
+      },
+      "filter": {
+        "type": "string"
+      },
+      "order": {
+        "type": "string",
+        "enum": ["asc", "desc"]
+      },
+      "orderBy": {
+        "type": "string",
+        "enum": ["created_at", "updated_at"]
+      }
+    },
+    "required": ["reportToken"],
+    "additionalProperties": false
+  },
+  "run_report": {
+    "type": "object",
+    "properties": {
+      "reportToken": {
+        "type": "string"
+      },
+      "parameters": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": ["reportToken"],
+    "additionalProperties": false
+  }
+}

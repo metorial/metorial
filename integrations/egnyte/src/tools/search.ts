@@ -26,7 +26,7 @@ export let searchTool = SlateTool.create(spec, {
         .optional()
         .describe('Only include items modified after this date (ISO 8601)'),
       offset: z.number().optional().describe('Zero-based offset for pagination'),
-      count: z.number().optional().describe('Number of results per page (max 100)')
+      count: z.number().optional().describe('Number of results per page (max 20)')
     })
   )
   .output(
@@ -46,16 +46,16 @@ export let searchTool = SlateTool.create(spec, {
           })
         )
         .describe('Search results'),
-      totalCount: z.number().optional().describe('Total number of matching items'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider count indicator; may be a lower bound when more results exist'),
       offset: z.number().optional(),
       hasMore: z.boolean().optional().describe('Whether more results are available')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.search({
       query: ctx.input.query,
@@ -81,8 +81,8 @@ export let searchTool = SlateTool.create(spec, {
 
     let totalCount = typeof result.total_count === 'number' ? result.total_count : undefined;
     let hasMore =
-      totalCount !== undefined && ctx.input.offset !== undefined
-        ? ctx.input.offset + results.length < totalCount
+      totalCount !== undefined
+        ? (ctx.input.offset ?? 0) + results.length < totalCount
         : undefined;
 
     return {

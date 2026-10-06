@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VonageRestClient } from '../lib/client';
+import { invalid, protect } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageCall = SlateTool.create(spec, {
@@ -73,6 +74,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
     })
   )
   .handleInvocation(async ctx => {
+    protect(ctx.input, [ctx.auth.apiSecret, ctx.auth.privateKey ?? '']);
     let client = new VonageRestClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret,
@@ -89,24 +91,24 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
       case 'unmute':
       case 'earmuff':
       case 'unearmuff':
-        await client.modifyCall(callUuid, { action });
-        responseMessage = `Call ${action} successful`;
+        await client.modifyCall(callUuid, action);
+        responseMessage = `Call ${action} request accepted`;
         break;
 
       case 'transfer':
         if (!ctx.input.transferUrl) {
-          throw new Error('transferUrl is required for the "transfer" action');
+          throw invalid('transferUrl is required for the "transfer" action');
         }
-        await client.modifyCall(callUuid, {
-          action: 'transfer',
-          destination: { type: 'ncco', url: [ctx.input.transferUrl] }
+        await client.modifyCall(callUuid, 'transfer', {
+          type: 'ncco',
+          url: [ctx.input.transferUrl]
         });
         responseMessage = `Call transferred to ${ctx.input.transferUrl}`;
         break;
 
       case 'talk': {
         if (!ctx.input.ttsText) {
-          throw new Error('ttsText is required for the "talk" action');
+          throw invalid('ttsText is required for the "talk" action');
         }
         let ttsResult = await client.playTts(callUuid, ctx.input.ttsText, {
           language: ctx.input.ttsLanguage,
@@ -125,7 +127,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
 
       case 'stream': {
         if (!ctx.input.streamUrl) {
-          throw new Error('streamUrl is required for the "stream" action');
+          throw invalid('streamUrl is required for the "stream" action');
         }
         let streamResult = await client.playStream(callUuid, [ctx.input.streamUrl], {
           loop: ctx.input.loop,
@@ -142,7 +144,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
 
       case 'dtmf': {
         if (!ctx.input.digits) {
-          throw new Error('digits is required for the "dtmf" action');
+          throw invalid('digits is required for the "dtmf" action');
         }
         let dtmfResult = await client.sendDtmf(callUuid, ctx.input.digits);
         responseMessage = dtmfResult.message;
@@ -152,7 +154,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
 
     return {
       output: { success: true, message: responseMessage },
-      message: `**${action}** action performed on call \`${callUuid}\`: ${responseMessage}`
+      message: `**${action}** action accepted for call \`${callUuid}\`: ${responseMessage}`
     };
   })
   .build();

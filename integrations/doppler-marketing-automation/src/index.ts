@@ -15,13 +15,6 @@ import {
   manageLists,
   removeSubscriber
 } from './tools';
-import {
-  campaignStatusChange,
-  inboundWebhook,
-  newSubscriber,
-  newUnsubscribe
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -39,5 +32,5 @@ export let provider = Slate.create({
     getCampaignReport,
     getUnsubscribed
   ],
-  triggers: [inboundWebhook, newSubscriber, newUnsubscribe, campaignStatusChange]
+  triggers: []
 });

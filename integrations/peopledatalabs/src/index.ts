@@ -2,6 +2,8 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   autocomplete,
+  bulkEnrichCompany,
+  bulkEnrichPerson,
   cleanCompany,
   cleanLocation,
   cleanSchool,
@@ -15,8 +17,6 @@ import {
   searchCompany,
   searchPerson
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -33,7 +33,9 @@ export let provider = Slate.create({
     cleanCompany,
     cleanLocation,
     cleanSchool,
-    autocomplete
+    autocomplete,
+    bulkEnrichPerson,
+    bulkEnrichCompany
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

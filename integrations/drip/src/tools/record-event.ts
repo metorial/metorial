@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let recordEvent = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let recordEvent = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       email: z
         .string()
         .optional()
@@ -41,12 +43,12 @@ export let recordEvent = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 
     if (!ctx.input.email && !ctx.input.subscriberId) {
-      throw new Error('Either email or subscriberId must be provided.');
+      throw createApiServiceError('Either email or subscriberId must be provided.');
     }
 
     let event: Record<string, any> = {
@@ -62,7 +64,7 @@ export let recordEvent = SlateTool.create(spec, {
 
     return {
       output: { recorded: true },
-      message: `Event **${ctx.input.action}** recorded for **${ctx.input.email ?? ctx.input.subscriberId}**.`
+      message: 'Drip accepted the event for the selected subscriber.'
     };
   })
   .build();

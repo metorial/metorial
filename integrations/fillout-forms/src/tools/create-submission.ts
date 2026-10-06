@@ -19,7 +19,7 @@ export let createSubmission = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      formId: z.string().describe('Public identifier of the form'),
+      formId: z.string().describe('Form ID. Call list_forms to discover forms.'),
       submissions: z
         .array(
           z.object({
@@ -35,6 +35,10 @@ export let createSubmission = SlateTool.create(spec, {
               .array(
                 z.object({
                   id: z.string().describe('URL parameter ID'),
+                  name: z
+                    .string()
+                    .optional()
+                    .describe('Native URL parameter name, when needed'),
                   value: z.any().describe('URL parameter value')
                 })
               )
@@ -62,7 +66,9 @@ export let createSubmission = SlateTool.create(spec, {
               .describe('Payment field values'),
             login: z
               .object({
-                email: z.string().describe('Verified email address')
+                email: z
+                  .string()
+                  .describe('Imported login email; this operation does not verify a login')
               })
               .optional()
               .describe('Login information')
@@ -75,7 +81,14 @@ export let createSubmission = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      submissions: z.array(submissionSchema).describe('Created submission objects')
+      submissions: z.array(submissionSchema).describe('Native created submission receipts'),
+      requestedCount: z.number().int().describe('Number of requested submissions'),
+      createdCount: z.number().int().describe('Number of returned submission receipts'),
+      complete: z
+        .boolean()
+        .describe(
+          'Whether receipt count matches request count; verify exact submissions before retrying an incomplete response'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -86,11 +99,13 @@ export let createSubmission = SlateTool.create(spec, {
 
     let result = await client.createSubmissions(ctx.input.formId, ctx.input.submissions);
 
-    let submissions = result.submissions ?? result;
+    let submissions = result.submissions;
 
     return {
-      output: { submissions },
-      message: `Created **${submissions.length}** submission(s) for form \`${ctx.input.formId}\`.`
+      output: result,
+      message: result.complete
+        ? `Received **${submissions.length}** created submission receipt(s).`
+        : `Received **${submissions.length}** receipt(s) for **${result.requestedCount}** requested submissions. Inspect the form before retrying; changes may already exist.`
     };
   })
   .build();

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getRunStatus = SlateTool.create(spec, {
   name: 'Get Run Status',
   key: 'get_run_status',
-  description: `Get the current status and details of a specific project run. Returns the run status (PENDING, RUNNING, ERRORED, COMPLETED, KILLED), timestamps, and elapsed time.`,
+  description: `Get the current status and details of a specific project run. PENDING and RUNNING are active; COMPLETED, ERRORED, KILLED and UNABLE_TO_ALLOCATE_KERNEL are terminal. Timing values can be null; elapsed time uses milliseconds.`,
   tags: {
     readOnly: true
   }
@@ -30,7 +30,10 @@ export let getRunStatus = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
     let run = await client.getRunStatus(ctx.input.projectId, ctx.input.runId);
 
     return {

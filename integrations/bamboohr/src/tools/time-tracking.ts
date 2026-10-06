@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid, responseId, unexpected } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getTimesheetEntries = SlateTool.create(spec, {
@@ -14,8 +15,16 @@ export let getTimesheetEntries = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      start: z.string().describe('Start date in YYYY-MM-DD format'),
-      end: z.string().describe('End date in YYYY-MM-DD format'),
+      start: z
+        .string()
+        .describe(
+          'Start date in YYYY-MM-DD format, within the last 365 days in the company timezone'
+        ),
+      end: z
+        .string()
+        .describe(
+          'End date in YYYY-MM-DD format, within the last 365 days in the company timezone'
+        ),
       employeeIds: z
         .array(z.string())
         .optional()
@@ -33,28 +42,19 @@ export let getTimesheetEntries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let employeeIdsStr = ctx.input.employeeIds?.join(',');
 
-    let [timesheetData, clockData] = await Promise.all([
-      client.getTimesheetEntries({
-        start: ctx.input.start,
-        end: ctx.input.end,
-        employeeIds: employeeIdsStr
-      }),
-      client.getClockEntries({
-        start: ctx.input.start,
-        end: ctx.input.end,
-        employeeIds: employeeIdsStr
-      })
-    ]);
-
-    let timesheetEntries = Array.isArray(timesheetData) ? timesheetData : [];
-    let clockEntries = Array.isArray(clockData) ? clockData : [];
+    const entries = await client.getTimesheetEntries({
+      start: ctx.input.start,
+      end: ctx.input.end,
+      employeeIds: employeeIdsStr
+    });
+    for (const entry of entries)
+      if (entry.start !== null && typeof entry.start !== 'string') unexpected();
+    const timesheetEntries = entries.filter(entry => entry.start === null);
+    const clockEntries = entries.filter(entry => typeof entry.start === 'string');
 
     return {
       output: {
@@ -82,12 +82,17 @@ export let clockInOut = SlateTool.create(spec, {
       start: z
         .string()
         .optional()
-        .describe('Start time in ISO 8601 format (required for clock_in)'),
+        .describe(
+          'Optional historical clock-in ISO timestamp with timezone. Omit for current server time; when supplied, timezone is also required.'
+        ),
       timezone: z
         .string()
         .optional()
         .describe('Timezone for the entry (e.g., "America/New_York")'),
-      note: z.string().optional().describe('Optional note for the clock entry'),
+      note: z
+        .string()
+        .optional()
+        .describe('Optional clock-in note; unsupported for clock_out'),
       projectId: z
         .string()
         .optional()
@@ -98,20 +103,16 @@ export let clockInOut = SlateTool.create(spec, {
   .output(
     z.object({
       employeeId: z.string().describe('The employee ID'),
-      action: z.string().describe('The action performed')
+      action: z.string().describe('The action performed'),
+      entryId: z.string().optional().describe('Provider-assigned clock entry ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
+    let result: Record<string, unknown>;
     if (ctx.input.action === 'clock_in') {
-      if (!ctx.input.start) {
-        throw new Error('Start time is required for clock_in action.');
-      }
-      await client.clockIn(ctx.input.employeeId, {
+      result = await client.clockIn(ctx.input.employeeId, {
         start: ctx.input.start,
         timezone: ctx.input.timezone,
         note: ctx.input.note,
@@ -119,7 +120,13 @@ export let clockInOut = SlateTool.create(spec, {
         taskId: ctx.input.taskId
       });
     } else {
-      await client.clockOut(ctx.input.employeeId, {
+      if (
+        ctx.input.start !== undefined ||
+        ctx.input.projectId !== undefined ||
+        ctx.input.taskId !== undefined
+      )
+        invalid('clock_out does not accept start, projectId or taskId.');
+      result = await client.clockOut(ctx.input.employeeId, {
         timezone: ctx.input.timezone,
         note: ctx.input.note
       });
@@ -128,7 +135,8 @@ export let clockInOut = SlateTool.create(spec, {
     return {
       output: {
         employeeId: ctx.input.employeeId,
-        action: ctx.input.action
+        action: ctx.input.action,
+        entryId: responseId(result.id)
       },
       message: `Employee **${ctx.input.employeeId}** has been ${ctx.input.action === 'clock_in' ? 'clocked in' : 'clocked out'}.`
     };
@@ -158,16 +166,14 @@ export let addTimesheetEntry = SlateTool.create(spec, {
     z.object({
       employeeId: z.string().describe('The employee ID'),
       date: z.string().describe('The date of the entry'),
-      hours: z.number().describe('Hours logged')
+      hours: z.number().describe('Hours logged'),
+      entryId: z.string().optional().describe('Provider-assigned hour entry ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
-    await client.addTimesheetEntry(ctx.input.employeeId, {
+    const result = await client.addTimesheetEntry(ctx.input.employeeId, {
       date: ctx.input.date,
       hours: ctx.input.hours,
       note: ctx.input.note,
@@ -179,7 +185,8 @@ export let addTimesheetEntry = SlateTool.create(spec, {
       output: {
         employeeId: ctx.input.employeeId,
         date: ctx.input.date,
-        hours: ctx.input.hours
+        hours: ctx.input.hours,
+        entryId: responseId(result.id)
       },
       message: `Added **${ctx.input.hours}** hours for employee **${ctx.input.employeeId}** on ${ctx.input.date}.`
     };

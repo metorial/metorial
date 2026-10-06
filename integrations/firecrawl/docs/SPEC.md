@@ -47,11 +47,11 @@ Examples:
 
 `parse_file` uploads base64 file content to Firecrawl and returns parsed content and metadata in structured output. It does not download or generate files, so no Slate attachment is returned. Future tools that return generated or downloaded file bytes must return those bytes through Slate attachments rather than inline fields.
 
-## Events
+## Provider Callback Reference
 
-Firecrawl webhook triggers are exposed for asynchronous jobs:
+Firecrawl can send webhook callbacks for asynchronous jobs to an external receiver. This integration does not expose event triggers.
 
-- `crawl_events`: crawl started, page, completed, and failed events.
-- `batch_scrape_events`: batch scrape started, page, completed, and failed events.
-- `extract_events`: extract started, completed, and failed events.
-- `agent_events`: agent started, action, completed, failed, and cancelled events.
+- Crawls: started, page, completed, and failed events.
+- Batch scrapes: started, page, completed, and failed events.
+- Extraction: started, completed, and failed events.
+- Agent jobs: started, action, completed, failed, and cancelled events.

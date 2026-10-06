@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, optionalRow, optionalText, row } from '../lib/client';
 import { spec } from '../spec';
 
 export let enrichPerson = SlateTool.create(spec, {
@@ -40,36 +40,37 @@ export let enrichPerson = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.enrichPerson({
+    const result = await new Client({ token: ctx.auth.token }).enrichPerson({
       email: ctx.input.email,
       linkedinHandle: ctx.input.linkedinHandle
     });
-
-    let data = result.data;
-
+    const data = row(result.data),
+      name = optionalRow(data.name),
+      geo = optionalRow(data.geo),
+      employment = optionalRow(data.employment);
+    const handle = (value: unknown) => optionalText(optionalRow(value).handle) ?? null;
+    const linkedin = handle(data.linkedin);
     return {
       output: {
-        email: data.email ?? null,
-        firstName: data.first_name ?? null,
-        lastName: data.last_name ?? null,
-        fullName: data.full_name ?? null,
-        country: data.country ?? null,
-        city: data.city ?? null,
-        state: data.state ?? null,
-        linkedinUrl: data.linkedin_url ?? null,
-        twitter: data.twitter ?? null,
-        github: data.github ?? null,
-        facebook: data.facebook ?? null,
-        phone: data.phone ?? null,
-        company: data.organization ?? data.company ?? null,
-        companyDomain: data.organization_domain ?? null,
-        position: data.position ?? null
+        email: optionalText(data.email) ?? null,
+        firstName: optionalText(name.givenName) ?? null,
+        lastName: optionalText(name.familyName) ?? null,
+        fullName: optionalText(name.fullName) ?? null,
+        country: optionalText(geo.country) ?? null,
+        city: optionalText(geo.city) ?? null,
+        state: optionalText(geo.state) ?? null,
+        linkedinUrl: linkedin
+          ? `https://www.linkedin.com/in/${encodeURIComponent(linkedin)}`
+          : null,
+        twitter: handle(data.twitter),
+        github: handle(data.github),
+        facebook: handle(data.facebook),
+        phone: optionalText(data.phone) ?? null,
+        company: optionalText(employment.name) ?? null,
+        companyDomain: optionalText(employment.domain) ?? null,
+        position: optionalText(employment.title) ?? null
       },
-      message: data.first_name
-        ? `Found profile for **${data.first_name} ${data.last_name ?? ''}** at ${data.organization ?? 'unknown company'}.`
-        : `No person data found for the given input.`
+      message: 'Retrieved the person enrichment profile.'
     };
   })
   .build();

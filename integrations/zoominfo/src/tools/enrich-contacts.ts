@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, matchedCount, records } from '../lib/client';
 import { spec } from '../spec';
 
 export let enrichContacts = SlateTool.create(spec, {
@@ -17,7 +17,7 @@ export let enrichContacts = SlateTool.create(spec, {
     'Maximum 25 contacts per request.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -52,25 +52,26 @@ export let enrichContacts = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe(
-          'Specific fields to return (e.g., ["firstName", "lastName", "email", "directPhoneNumber", "jobTitle", "companyName"])'
+          'Specific fields to return (e.g., ["firstName", "lastName", "email", "phone", "jobTitle", "companyName"])'
         )
     })
   )
   .output(
     z.object({
       contacts: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .describe('Enriched contact records with full profile data'),
-      matchCount: z.number().describe('Number of successfully matched contacts')
+      matchCount: z.number().describe('Number of successfully matched contacts'),
+      returnedCount: z
+        .number()
+        .optional()
+        .describe('Number of response records, including NoMatch records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion
-    });
+    const client = Client.fromContext(ctx);
 
-    let params: Record<string, any> = {};
+    let params: Record<string, unknown> = {};
 
     if (ctx.input.matchBy === 'personId' && ctx.input.personIds) {
       params.personId = ctx.input.personIds;
@@ -82,14 +83,15 @@ export let enrichContacts = SlateTool.create(spec, {
 
     let result = await client.enrichContacts(params, ctx.input.outputFields);
 
-    let contacts = result.data || result.result || [];
+    const contacts = records(result);
 
     return {
       output: {
         contacts,
-        matchCount: contacts.length
+        matchCount: matchedCount(result, 'contact'),
+        returnedCount: contacts.length
       },
-      message: `Enriched **${contacts.length}** contact(s) successfully.`
+      message: `Matched **${matchedCount(result, 'contact')}** contact(s); returned ${contacts.length} response record(s).`
     };
   })
   .build();

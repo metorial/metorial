@@ -14,7 +14,7 @@ export let getForm = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      formId: z.string().describe('Public identifier of the form (found in the form URL)')
+      formId: z.string().describe('Form ID. Call list_forms to discover forms.')
     })
   )
   .output(formMetadataSchema)

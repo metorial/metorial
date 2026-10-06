@@ -1,6 +1,8 @@
 # Roboflow
 
-Manage computer vision projects, datasets, and models. Upload and annotate images, create dataset versions with preprocessing and augmentation, train object detection and classification models, and run inference via hosted or self-hosted APIs. Organize workspaces and projects, manage annotation jobs and labeler assignments, search images by visual similarity, monitor deployed model performance, and build multi-step workflows with 40+ pre-built blocks. Supports object detection, classification, instance segmentation, semantic segmentation, and keypoint detection. Access foundation models including CLIP, OCR, and YOLO-World, and browse public datasets on Roboflow Universe.
+Manage Roboflow computer vision projects and image datasets. Discover projects and image batches, upload and annotate images, search and tag datasets, generate and export dataset versions, start model training, run hosted object detection inference, and manage annotation jobs.
+
+Use a workspace-scoped private API key. Call `who_am_i` to verify the connected workspace and `list_projects` to discover project IDs. Tools accept project slugs or the full `workspace/project` IDs returned by discovery. Dataset exports produce downloadable ZIP files. Training runs asynchronously and can consume credits; `run_inference` uses a deployed object-detection model.
 
 ## License
 

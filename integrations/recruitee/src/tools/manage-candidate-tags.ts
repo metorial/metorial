@@ -1,32 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RecruiteeClient } from '../lib/client';
+import { fail, integer } from '../lib/validation';
 import { spec } from '../spec';
-
 export let manageCandidateTags = SlateTool.create(spec, {
   name: 'Manage Candidate Tags',
   key: 'manage_candidate_tags',
-  description: `Add tags to a candidate or list all available tags in the company account. Tags help organize and categorize candidates for easier filtering and searching.`,
-  tags: {
-    readOnly: false
-  }
+  description:
+    'List company tags, add named tags to a candidate, or remove explicit tag names. Candidate changes are checked by reading the current profile.',
+  tags: { readOnly: false }
 })
   .input(
     z.object({
-      action: z
-        .enum(['add_to_candidate', 'list_tags'])
-        .describe(
-          '"add_to_candidate" to add tags to a candidate, or "list_tags" to list all available tags'
-        ),
-      candidateId: z
-        .number()
-        .optional()
-        .describe('ID of the candidate to add tags to (required for "add_to_candidate")'),
+      action: z.enum(['add_to_candidate', 'list_tags', 'remove_from_candidate']),
+      candidateId: z.number().optional().describe('Candidate ID for add or remove'),
       tagNames: z
         .array(z.string())
         .optional()
-        .describe('Tag names to add to the candidate (required for "add_to_candidate")'),
-      query: z.string().optional().describe('Search query to filter tags (for "list_tags")')
+        .describe('Explicit tag names for add or remove; no implicit remove-all'),
+      query: z.string().optional().describe('Company tag search for list_tags')
     })
   )
   .output(
@@ -34,53 +26,49 @@ export let manageCandidateTags = SlateTool.create(spec, {
       tags: z
         .array(
           z.object({
-            tagId: z.number().optional().describe('Tag ID'),
-            name: z.string().describe('Tag name'),
-            taggingsCount: z.number().optional().describe('Number of times this tag is used')
+            tagId: z.number().optional(),
+            name: z.string(),
+            taggingsCount: z.number().optional()
           })
         )
-        .optional()
-        .describe('List of tags'),
-      added: z.boolean().optional().describe('Whether tags were successfully added')
+        .optional(),
+      added: z.boolean().optional(),
+      removed: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
-
+    if (ctx.input.action !== 'list_tags') {
+      integer(ctx.input.candidateId, 'Candidate ID');
+      if (!ctx.input.tagNames?.length || ctx.input.tagNames.some(name => !name.trim()))
+        fail('Supply nonempty explicit tag names.');
+    }
+    const client = await RecruiteeClient.forContext(ctx);
     if (ctx.input.action === 'list_tags') {
-      let result = await client.listTags({ query: ctx.input.query });
-      let tagList = result.tags || [];
+      const result = await client.listTags({ query: ctx.input.query });
       return {
         output: {
-          tags: tagList.map((t: any) => ({
+          tags: result.tags.map(t => ({
             tagId: t.id,
             name: t.name,
             taggingsCount: t.taggings_count
           }))
         },
-        message: `Found ${tagList.length} tags.`
+        message: `Returned ${result.tags.length} company tags.`
       };
     }
-
-    if (ctx.input.action === 'add_to_candidate') {
-      if (!ctx.input.candidateId) {
-        throw new Error('candidateId is required for adding tags.');
-      }
-      if (!ctx.input.tagNames || ctx.input.tagNames.length === 0) {
-        throw new Error('tagNames is required for adding tags.');
-      }
-      await client.addTagsToCandidate(ctx.input.candidateId, ctx.input.tagNames);
-      return {
-        output: {
-          added: true
-        },
-        message: `Added tags [${ctx.input.tagNames.join(', ')}] to candidate ${ctx.input.candidateId}.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    const id = integer(ctx.input.candidateId, 'Candidate ID'),
+      tags = ctx.input.tagNames ?? [];
+    if (ctx.input.action === 'add_to_candidate') await client.addTagsToCandidate(id, tags);
+    else await client.removeTagsFromCandidate(id, tags);
+    const actual = (await client.getCandidate(id)).candidate.tags;
+    const added = ctx.input.action === 'add_to_candidate';
+    if (!tags.every(name => actual.includes(name) === added))
+      fail(
+        'Candidate tags did not match the requested change. Read the profile before retrying.'
+      );
+    return {
+      output: added ? { added: true } : { removed: true },
+      message: `Confirmed tag ${added ? 'addition' : 'removal'} on candidate ${id}.`
+    };
   })
   .build();

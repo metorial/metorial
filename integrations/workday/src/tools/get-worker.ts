@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { WorkdayClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { workerIdSchema } from '../lib/contracts';
 import { spec } from '../spec';
 
 let workdayReferenceSchema = z.object({
@@ -12,19 +13,19 @@ let workdayReferenceSchema = z.object({
 export let getWorker = SlateTool.create(spec, {
   name: 'Get Worker',
   key: 'get_worker',
-  description: `Retrieve detailed information about a specific worker by their ID. Returns the full worker profile including personal information, employment details, position, compensation, organizational assignments, and status.`,
+  description: `Retrieve detailed information about a specific worker by their ID. Returns the authorized Common worker profile. Available fields depend on security permissions; compensation and employment status are not guaranteed by this API.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      workerId: z.string().describe('The Workday worker ID')
+      workerId: workerIdSchema
     })
   )
   .output(
     z.object({
-      workerId: z.string().describe('Unique worker ID'),
+      workerId: workerIdSchema,
       displayName: z.string().describe('Worker display name'),
       href: z.string().optional().describe('API href for this worker'),
       primaryWorkEmail: z.string().optional().describe('Primary work email address'),
@@ -44,11 +45,7 @@ export let getWorker = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let worker = await client.getWorker(ctx.input.workerId);
 
@@ -80,7 +77,7 @@ export let getWorker = SlateTool.create(spec, {
         statusDate: workerStatus?.statusDate,
         additionalProperties: Object.keys(rest).length > 0 ? rest : undefined
       },
-      message: `Retrieved worker **${descriptor}** (${id})${businessTitle ? ` — ${businessTitle}` : ''}. Status: ${workerStatus?.active ? 'Active' : workerStatus?.terminated ? 'Terminated' : 'Unknown'}.`
+      message: 'Retrieved the authorized worker profile.'
     };
   })
   .build();

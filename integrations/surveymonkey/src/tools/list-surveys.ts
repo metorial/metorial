@@ -13,8 +13,20 @@ export let listSurveys = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number to return (default: 1)'),
-      perPage: z.number().optional().describe('Number of surveys per page'),
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Page number to return (default: 1)'),
+      perPage: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Number of surveys per page'),
       sortBy: z
         .enum(['title', 'date_modified', 'num_responses'])
         .optional()
@@ -42,7 +54,10 @@ export let listSurveys = SlateTool.create(spec, {
         })
       ),
       page: z.number(),
-      total: z.number()
+      total: z.number(),
+      perPage: z.number(),
+      hasMore: z.boolean(),
+      nextPage: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -63,7 +78,7 @@ export let listSurveys = SlateTool.create(spec, {
       include: 'response_count,date_modified,date_created'
     });
 
-    let surveys = (result.data || []).map((s: any) => ({
+    let surveys = result.data.map(s => ({
       surveyId: s.id,
       title: s.title,
       href: s.href
@@ -72,10 +87,13 @@ export let listSurveys = SlateTool.create(spec, {
     return {
       output: {
         surveys,
-        page: result.page || 1,
-        total: result.total || surveys.length
+        page: result.page,
+        total: result.total,
+        perPage: result.per_page,
+        hasMore: result.nextPage !== undefined,
+        nextPage: result.nextPage
       },
-      message: `Found **${result.total || surveys.length}** surveys (page ${result.page || 1}).`
+      message: `Found **${result.total}** surveys (page ${result.page}).`
     };
   })
   .build();

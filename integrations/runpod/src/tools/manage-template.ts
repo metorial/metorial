@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RunPodClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let manageTemplate = SlateTool.create(spec, {
   name: 'Manage Template',
   key: 'manage_template',
-  description: `Update or delete a template. When updating, any changes will trigger a rolling release for associated endpoints. Templates in use by Pods or endpoints cannot be deleted.`,
+  description: `Update or delete a template. Templates supply their configuration when a Pod or endpoint is created; existing deployments are not updated. Existing deployments retain their resolved configuration after template deletion.`,
   constraints: [
-    'Updating a template triggers a rolling release for associated endpoints.',
-    'Templates in use by Pods or endpoints cannot be deleted. Wait up to 2 minutes after last use.'
+    'Updating a template does not change existing Pods or endpoints.',
+    'Deleting a template removes it from future deployment choices. Existing deployments retain their resolved configuration.'
   ],
   tags: {
     destructive: true
@@ -25,8 +25,18 @@ export let manageTemplate = SlateTool.create(spec, {
         .enum(['NVIDIA', 'AMD', 'CPU'])
         .optional()
         .describe('Updated category (for update)'),
-      containerDiskInGb: z.number().optional().describe('Updated container disk (for update)'),
-      volumeInGb: z.number().optional().describe('Updated volume size (for update)'),
+      containerDiskInGb: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(1)
+        .optional()
+        .describe('Updated container disk (for update)'),
+      volumeInGb: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(10)
+        .optional()
+        .describe('Updated volume size (for update)'),
       volumeMountPath: z.string().optional().describe('Updated mount path (for update)'),
       env: z
         .record(z.string(), z.string())
@@ -40,7 +50,12 @@ export let manageTemplate = SlateTool.create(spec, {
       dockerStartCmd: z.array(z.string()).optional().describe('Updated CMD (for update)'),
       isPublic: z.boolean().optional().describe('Updated public flag (for update)'),
       isServerless: z.boolean().optional().describe('Updated serverless flag (for update)'),
-      readme: z.string().optional().describe('Updated readme (for update)'),
+      readme: z
+        .string()
+        .optional()
+        .describe(
+          'Retained for compatibility. The current REST API does not support readme; omit this field.'
+        ),
       containerRegistryAuthId: z
         .string()
         .optional()
@@ -59,6 +74,8 @@ export let manageTemplate = SlateTool.create(spec, {
     let { templateId, action, ...rest } = ctx.input;
 
     if (action === 'delete') {
+      if (Object.values(rest).some(value => value !== undefined))
+        throw createApiServiceError('Template update fields are not supported for delete.');
       await client.deleteTemplate(templateId);
       return {
         output: { templateId, action: 'delete', name: null },

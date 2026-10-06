@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let reactivatePurchase = SlateTool.create(spec, {
   name: 'Reactivate Purchase',
   key: 'reactivate_purchase',
-  description: `Reactivate a purchase in DPD. This re-enables access to the purchased digital products and optionally re-sends the fulfillment email. This is the only write operation available in the DPD API.`,
+  description: `Reactivate a purchase in DPD. This can restore download access and trigger email or renewed fulfillment. DPD must acknowledge the request and the exact purchase is read back; email delivery and individual download access are not independently verified. Effects cannot be undone through this API.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -28,7 +28,17 @@ export let reactivatePurchase = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      status: z.string().describe('Result status (OK on success)')
+      status: z.string().describe('Provider acknowledgement: OK'),
+      purchaseId: z.number().optional(),
+      purchaseStatus: z.string().optional(),
+      readbackConfirmed: z.boolean().optional(),
+      refulfillRequested: z.boolean().optional(),
+      deliveryVerified: z
+        .boolean()
+        .optional()
+        .describe(
+          'False: the API does not independently verify email or fulfillment delivery.'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -45,7 +55,7 @@ export let reactivatePurchase = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `Purchase **#${ctx.input.purchaseId}** has been reactivated${ctx.input.refulfill ? ' with re-fulfillment' : ''}.`
+      message: `DPD acknowledged reactivation of purchase #${ctx.input.purchaseId}; its exact record was read back. Email and fulfillment delivery are not verified.`
     };
   })
   .build();

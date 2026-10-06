@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageFields, pageOutput } from '../lib/contracts';
 import { spec } from '../spec';
 
 let beneficiarySchema = z.object({
@@ -25,6 +26,11 @@ export let manageBeneficiaries = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      page: z.number().optional().describe('Positive page number for listing beneficiaries'),
+      currency: z
+        .string()
+        .optional()
+        .describe('Beneficiary currency for create; provider defaults to NGN'),
       action: z.enum(['create', 'list', 'get', 'delete']).describe('Action to perform'),
       beneficiaryId: z.number().optional().describe('Beneficiary ID (for get/delete)'),
       accountNumber: z.string().optional().describe('Account number (for create)'),
@@ -34,24 +40,26 @@ export let manageBeneficiaries = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pageFields,
       beneficiaries: z.array(beneficiarySchema).describe('Beneficiary record(s)'),
       deleted: z.boolean().optional().describe('Whether the beneficiary was deleted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
     let { action } = ctx.input;
 
     if (action === 'create') {
       if (!ctx.input.accountNumber || !ctx.input.accountBank || !ctx.input.beneficiaryName) {
-        throw new Error(
+        throw createApiServiceError(
           'accountNumber, accountBank, and beneficiaryName are required to create a beneficiary'
         );
       }
       let result = await client.createBeneficiary({
         accountNumber: ctx.input.accountNumber,
         accountBank: ctx.input.accountBank,
-        beneficiaryName: ctx.input.beneficiaryName
+        beneficiaryName: ctx.input.beneficiaryName,
+        currency: ctx.input.currency
       });
       let b = result.data;
       return {
@@ -72,7 +80,7 @@ export let manageBeneficiaries = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.beneficiaryId) throw new Error('beneficiaryId is required');
+      if (!ctx.input.beneficiaryId) throw createApiServiceError('beneficiaryId is required');
       let result = await client.getBeneficiary(ctx.input.beneficiaryId);
       let b = result.data;
       return {
@@ -93,7 +101,7 @@ export let manageBeneficiaries = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.beneficiaryId) throw new Error('beneficiaryId is required');
+      if (!ctx.input.beneficiaryId) throw createApiServiceError('beneficiaryId is required');
       await client.deleteBeneficiary(ctx.input.beneficiaryId);
       return {
         output: {
@@ -105,7 +113,7 @@ export let manageBeneficiaries = SlateTool.create(spec, {
     }
 
     // list
-    let result = await client.listBeneficiaries();
+    let result = await client.listBeneficiaries(ctx.input.page);
     let beneficiaries = (result.data || []).map((b: any) => ({
       beneficiaryId: b.id,
       accountNumber: b.account_number,
@@ -116,7 +124,7 @@ export let manageBeneficiaries = SlateTool.create(spec, {
     }));
 
     return {
-      output: { beneficiaries },
+      output: { beneficiaries, ...pageOutput(result) },
       message: `Found **${beneficiaries.length}** beneficiaries.`
     };
   })

@@ -23,11 +23,26 @@ export let getPod = SlateTool.create(spec, {
       desiredStatus: z.string().nullable().describe('Current status'),
       imageName: z.string().nullable().describe('Container image'),
       costPerHr: z.number().nullable().describe('Cost per hour in USD'),
-      vcpuCount: z.number().nullable().describe('Number of vCPUs'),
+      vcpuCount: z.number().min(1).nullable().describe('Number of vCPUs'),
       memoryInGb: z.number().nullable().describe('Memory in GB'),
-      containerDiskInGb: z.number().nullable().describe('Container disk in GB'),
-      volumeInGb: z.number().nullable().describe('Persistent volume in GB'),
-      gpuCount: z.number().nullable().describe('Number of GPUs'),
+      containerDiskInGb: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(1)
+        .nullable()
+        .describe('Container disk in GB'),
+      volumeInGb: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(10)
+        .nullable()
+        .describe('Persistent volume in GB'),
+      gpuCount: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(1)
+        .nullable()
+        .describe('Number of GPUs'),
       gpuType: z.string().nullable().describe('GPU model type'),
       publicIp: z.string().nullable().describe('Public IP address'),
       ports: z.array(z.string()).nullable().describe('Exposed port mappings'),

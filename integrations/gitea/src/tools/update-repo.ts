@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -13,8 +13,8 @@ export let updateRepo = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner username or organization name'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner username or organization name'),
+      repo: z.string().min(1).describe('Repository name'),
       name: z.string().optional().describe('New repository name'),
       description: z.string().optional().describe('New description'),
       isPrivate: z.boolean().optional().describe('Set private/public visibility'),
@@ -40,7 +40,15 @@ export let updateRepo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    if (
+      !Object.entries(ctx.input).some(
+        ([key, value]) => !['owner', 'repo'].includes(key) && value !== undefined
+      )
+    )
+      throw createApiServiceError(
+        'Provide at least one repository setting or topics to update.'
+      );
+    let client = new GiteaClient(ctx.auth);
 
     let r = await client.updateRepo(ctx.input.owner, ctx.input.repo, {
       name: ctx.input.name,

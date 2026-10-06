@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, positiveIds, range } from '../lib/client';
+import { customerIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getPostAnalytics = SlateTool.create(spec, {
@@ -23,6 +24,7 @@ export let getPostAnalytics = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      customerId: customerIdSchema,
       profileIds: z
         .array(z.number())
         .describe('Array of customer_profile_id values to get post analytics for.'),
@@ -62,9 +64,11 @@ export let getPostAnalytics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    positiveIds(ctx.input.profileIds, 'profileIds', 100);
+    range(ctx.input.startTime, ctx.input.endTime);
     let client = new Client({
       token: ctx.auth.token,
-      customerId: ctx.config.customerId
+      customerId: ctx.input.customerId ?? ctx.config.customerId
     });
 
     let filters = [
@@ -81,7 +85,7 @@ export let getPostAnalytics = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let posts = result?.data ?? [];
+    let posts = result.data;
     let paging = result?.paging
       ? {
           currentPage: result.paging.current_page,

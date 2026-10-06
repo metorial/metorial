@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TypesApiClient } from '../lib/client';
+import { invalid, protect } from '../lib/contracts';
 import { spec } from '../spec';
 
 let variationSchema = z.object({
@@ -9,9 +10,12 @@ let variationSchema = z.object({
   description: z.string().optional().describe('Variation description'),
   docURL: z.string().optional().describe('Documentation URL'),
   version: z.string().optional().describe('Variation version'),
-  primary: z.record(z.string(), z.any()).optional().describe('Primary zone field definitions'),
+  primary: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Primary zone field definitions'),
   items: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .optional()
     .describe('Repeatable zone field definitions'),
   imageUrl: z.string().optional().describe('Screenshot URL')
@@ -41,12 +45,19 @@ Requires a Write API token.`,
     })
   )
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing shared slices.');
+      invalid('Write API token is required for managing shared slices.');
     }
 
     let client = new TypesApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 
@@ -100,11 +111,11 @@ Requires a Write API token.`,
             docURL: z.string().optional().describe('Documentation URL'),
             version: z.string().optional().describe('Variation version'),
             primary: z
-              .record(z.string(), z.any())
+              .record(z.string(), z.unknown())
               .optional()
               .describe('Primary zone field definitions'),
             items: z
-              .record(z.string(), z.any())
+              .record(z.string(), z.unknown())
               .optional()
               .describe('Repeatable zone field definitions'),
             imageUrl: z.string().optional().describe('Screenshot URL')
@@ -115,12 +126,19 @@ Requires a Write API token.`,
   )
   .output(sharedSliceOutputSchema)
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing shared slices.');
+      invalid('Write API token is required for managing shared slices.');
     }
 
     let client = new TypesApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 
@@ -186,8 +204,8 @@ Requires a Write API token.`,
             description: z.string().optional(),
             docURL: z.string().optional(),
             version: z.string().optional(),
-            primary: z.record(z.string(), z.any()).optional(),
-            items: z.record(z.string(), z.any()).optional(),
+            primary: z.record(z.string(), z.unknown()).optional(),
+            items: z.record(z.string(), z.unknown()).optional(),
             imageUrl: z.string().optional()
           })
         )
@@ -196,12 +214,19 @@ Requires a Write API token.`,
   )
   .output(sharedSliceOutputSchema)
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing shared slices.');
+      invalid('Write API token is required for managing shared slices.');
     }
 
     let client = new TypesApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 
@@ -265,12 +290,19 @@ Requires a Write API token.`,
     })
   )
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing shared slices.');
+      invalid('Write API token is required for managing shared slices.');
     }
 
     let client = new TypesApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 

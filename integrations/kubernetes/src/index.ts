@@ -15,8 +15,6 @@ import {
   manageRbac,
   manageService
 } from './tools';
-import { inboundWebhook, resourceEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     manageAutoscaler,
     manageJob
   ],
-  triggers: [inboundWebhook, resourceEvents]
+  triggers: []
 });

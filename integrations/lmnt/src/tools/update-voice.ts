@@ -6,12 +6,11 @@ import { spec } from '../spec';
 export let updateVoice = SlateTool.create(spec, {
   name: 'Update Voice',
   key: 'update_voice',
-  description: `Updates metadata for an LMNT voice. Change the name, description, gender tag, or starred status. Can also unfreeze a frozen professional voice to upgrade it to the latest model. Only provided fields will be updated.`,
-  instructions: [
-    'Professional voices that are not being used may enter a frozen state. Use **unfreeze** to upgrade them to the latest model.',
-    'Instant voices always use the latest model and are never frozen.'
-  ],
+  description:
+    'DEPRECATED — LMNT has shut down. This tool is retained for existing workflows and cannot perform provider operations.',
+  instructions: ['Choose another speech provider; LMNT no longer operates this service.'],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })

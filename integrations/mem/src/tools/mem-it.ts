@@ -10,7 +10,8 @@ export let memIt = SlateTool.create(spec, {
   constraints: [
     'Input content can be up to ~1,000,000 characters.',
     'This endpoint costs 40 complexity tokens per call (vs. 1 for other endpoints).',
-    'Processing is asynchronous — only a request ID is returned immediately.'
+    'Processing is asynchronous — only a request ID is returned immediately. This does not identify created or changed notes or prove completion.',
+    'No current request-status, cancellation or reversal endpoint is documented. Processing can change retained knowledge and consume quota; inspect Mem before retrying.'
   ],
   tags: {
     readOnly: false,
@@ -46,7 +47,9 @@ export let memIt = SlateTool.create(spec, {
     z.object({
       requestId: z
         .string()
-        .describe('The request ID for tracking the asynchronous processing.')
+        .describe(
+          'The opaque request ID acknowledging submission; it is not a note ID or completion receipt.'
+        )
     })
   )
   .handleInvocation(async ctx => {

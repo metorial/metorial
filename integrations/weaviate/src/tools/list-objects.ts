@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -16,9 +16,11 @@ export let listObjects = SlateTool.create(spec, {
       collectionName: z.string().describe('Name of the collection'),
       limit: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Maximum number of objects to return (default: 25)'),
-      offset: z.number().optional().describe('Number of objects to skip'),
+      offset: z.number().int().nonnegative().optional().describe('Number of objects to skip'),
       after: z
         .string()
         .optional()
@@ -40,12 +42,23 @@ export let listObjects = SlateTool.create(spec, {
             class: z.string().describe('Collection name'),
             properties: z.record(z.string(), z.any()).describe('Object properties'),
             vector: z.array(z.number()).optional().describe('Vector embedding'),
+            vectors: z
+              .record(z.string(), z.any())
+              .optional()
+              .describe('Named vector embeddings if requested'),
+            tenant: z.string().optional().describe('Tenant name'),
             creationTimeUnix: z.number().optional().describe('Creation timestamp'),
             lastUpdateTimeUnix: z.number().optional().describe('Last update timestamp')
           })
         )
         .describe('List of objects'),
-      totalResults: z.number().describe('Number of objects returned')
+      totalResults: z.number().describe('Number of objects returned'),
+      nextCursor: z
+        .string()
+        .optional()
+        .describe(
+          'Last object UUID. Pass as after for the next page; an empty page ends pagination.'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -54,6 +67,11 @@ export let listObjects = SlateTool.create(spec, {
       ctx.input;
 
     let include = includeVector ? 'vector' : undefined;
+    if (after && (offset !== undefined || sort !== undefined || order !== undefined)) {
+      throw createApiServiceError(
+        'Cursor pagination with after cannot be combined with offset, sort, or order.'
+      );
+    }
 
     let result = await client.listObjects({
       class: collectionName,
@@ -71,6 +89,8 @@ export let listObjects = SlateTool.create(spec, {
       class: obj.class,
       properties: obj.properties,
       vector: obj.vector,
+      vectors: obj.vectors,
+      tenant: obj.tenant,
       creationTimeUnix: obj.creationTimeUnix,
       lastUpdateTimeUnix: obj.lastUpdateTimeUnix
     }));
@@ -78,7 +98,11 @@ export let listObjects = SlateTool.create(spec, {
     return {
       output: {
         objects,
-        totalResults: objects.length
+        totalResults: objects.length,
+        nextCursor:
+          offset === undefined && sort === undefined && order === undefined
+            ? objects.at(-1)?.objectId
+            : undefined
       },
       message: `Listed **${objects.length}** object(s) from **${collectionName}**.`
     };

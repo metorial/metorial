@@ -1,12 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DialpadClient } from '../lib/client';
+import { malformed } from '../lib/contracts';
+import { invoke } from '../lib/operations';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  offices: z.array(
+    z.object({
+      officeId: z.string().describe('Office ID'),
+      name: z.string().optional(),
+      companyId: z.string().optional(),
+      timezone: z.string().optional(),
+      country: z.string().optional()
+    })
+  ),
+  nextCursor: z.string().optional()
+});
 
 export let listOfficesTool = SlateTool.create(spec, {
   name: 'List Offices',
   key: 'list_offices',
-  description: `List all offices accessible with your API key. Returns office details including name, location, and associated departments and call centers.`,
+  description: `List all offices accessible with your API key. Returns office details including native office ID, name, timezone and country when available.`,
   tags: {
     readOnly: true
   }
@@ -16,44 +30,11 @@ export let listOfficesTool = SlateTool.create(spec, {
       cursor: z.string().optional().describe('Pagination cursor')
     })
   )
-  .output(
-    z.object({
-      offices: z.array(
-        z.object({
-          officeId: z.string().describe('Office ID'),
-          name: z.string().optional(),
-          companyId: z.string().optional(),
-          timezone: z.string().optional(),
-          country: z.string().optional()
-        })
-      ),
-      nextCursor: z.string().optional()
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new DialpadClient({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment
-    });
-
-    let result = await client.listOffices({
-      cursor: ctx.input.cursor
-    });
-
-    let offices = (result.items || []).map((o: any) => ({
-      officeId: String(o.id),
-      name: o.name,
-      companyId: o.company_id ? String(o.company_id) : undefined,
-      timezone: o.timezone,
-      country: o.country
-    }));
-
-    return {
-      output: {
-        offices,
-        nextCursor: result.cursor || undefined
-      },
-      message: `Found **${offices.length}** office(s)`
-    };
+    const result = await invoke(ctx, 'list_offices');
+    const output = outputSchema.safeParse(result.output);
+    if (!output.success) malformed();
+    return { output: output.data, message: result.message };
   })
   .build();

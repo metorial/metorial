@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listConversations = SlateTool.create(spec, {
@@ -27,10 +27,7 @@ export let listConversations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let result = await client.getConversations(ctx.input.projectId, ctx.input.userId);
 
@@ -68,6 +65,8 @@ export let manageConversation = SlateTool.create(spec, {
         .describe('The action to perform on the conversation'),
       title: z
         .string()
+        .trim()
+        .min(1)
         .optional()
         .describe('New title for the conversation (required for rename action)'),
       archive: z
@@ -88,14 +87,11 @@ export let manageConversation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     if (ctx.input.action === 'rename') {
       if (!ctx.input.title) {
-        throw new Error('Title is required for the rename action');
+        throw createApiServiceError('Title is required for the rename action');
       }
       let conversation = await client.renameConversation(
         ctx.input.projectId,
@@ -159,10 +155,7 @@ export let listUserConversations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let result = await client.getUserConversations(ctx.input.projectId);
 

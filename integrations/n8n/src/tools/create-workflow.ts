@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let createWorkflow = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let createWorkflow = SlateTool.create(spec, {
   key: 'create_workflow',
   description: `Create a new workflow in n8n. Provide the workflow name, nodes, connections, and optional settings. The workflow is created in an inactive state by default.`,
   instructions: [
-    'Nodes must include at least a trigger node. Each node requires a name, type, typeVersion, and position.',
+    'Use node definitions supported by the installed instance. Creating an inactive workflow does not execute its nodes.',
     'Connections define how nodes are linked. The key is the source node name, and the value maps output types to target nodes.'
   ],
   tags: {
@@ -38,10 +38,7 @@ export let createWorkflow = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
     let workflow = await client.createWorkflow({
       name: ctx.input.name,

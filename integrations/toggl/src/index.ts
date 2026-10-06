@@ -20,15 +20,6 @@ import {
   stopTimeEntry,
   updateTimeEntry
 } from './tools';
-import {
-  clientEventsTrigger,
-  projectEventsTrigger,
-  tagEventsTrigger,
-  taskEventsTrigger,
-  timeEntryEventsTrigger,
-  workspaceUserEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -51,12 +42,5 @@ export let provider = Slate.create({
     getMe,
     getReport
   ],
-  triggers: [
-    timeEntryEventsTrigger,
-    projectEventsTrigger,
-    clientEventsTrigger,
-    tagEventsTrigger,
-    taskEventsTrigger,
-    workspaceUserEventsTrigger
-  ]
+  triggers: []
 });

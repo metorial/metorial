@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   createDashboard,
   deleteDashboard,
+  downloadDatasourceInstanceData,
   getDashboard,
   getDatasource,
   getDatasourceInstanceData,
@@ -10,7 +11,9 @@ import {
   getProfile,
   listClients,
   listDashboards,
+  listDatasourceInstances,
   listDatasources,
+  listGroups,
   listKlips,
   listPublishedLinks,
   listRoles,
@@ -25,8 +28,6 @@ import {
   refreshDatasource,
   updateDashboard
 } from './tools';
-import { dashboardChanges, datasourceChanges, inboundWebhook, userChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -43,6 +44,9 @@ export let provider = Slate.create({
     manageDatasource,
     refreshDatasource,
     getDatasourceInstanceData,
+    downloadDatasourceInstanceData,
+    listDatasourceInstances,
+    listGroups,
     listUsers,
     manageUser,
     listRoles,
@@ -54,5 +58,5 @@ export let provider = Slate.create({
     managePublishedLink,
     getProfile
   ],
-  triggers: [inboundWebhook, dashboardChanges, userChanges, datasourceChanges]
+  triggers: []
 });

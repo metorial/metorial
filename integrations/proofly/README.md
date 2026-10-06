@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Proofly
 
-Manage social proof notification campaigns and retrieve lead and conversion data. List, inspect, and toggle campaigns. Retrieve notification performance statistics including impressions, clicks, and leads. Access collected lead data with visitor details and geolocation. Add external conversions to notifications from third-party systems. View account activity logs and user information. Receive webhook events when new leads are collected.
+Manage social proof notification campaigns and retrieve lead and conversion data. List, inspect, and toggle campaigns. Retrieve notification performance statistics including impressions, clicks, and leads. Access collected lead data with visitor details and geolocation. Add external conversions to notifications from third-party systems. View account activity logs and user information.
 
 ## License
 

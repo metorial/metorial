@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import { numericId, records } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageApiEndpointsTool = SlateTool.create(spec, {
@@ -20,12 +21,17 @@ export let manageApiEndpointsTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('API collection ID (for list_endpoints filter)'),
+      page: z
+        .number()
+        .optional()
+        .describe('Native page number for collection/endpoint lists.'),
+      perPage: z.number().optional().describe('Native page size, at most 100.'),
       endpointId: z.string().optional().describe('Endpoint ID (required for enable/disable)')
     })
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
+      success: z.boolean().optional().describe('Whether the operation succeeded'),
       collections: z
         .array(z.record(z.string(), z.unknown()))
         .optional()
@@ -37,41 +43,29 @@ export let manageApiEndpointsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let { action, collectionId, endpointId } = ctx.input;
-
+    const client = createClient(ctx);
+    const { action, collectionId, endpointId } = ctx.input;
     if (action === 'list_collections') {
-      let result = await client.listApiCollections();
-      let items = Array.isArray(result) ? result : (result.items ?? result.data ?? []);
+      const result = await client.listApiCollections(ctx.input);
+      const collections = records(result.items);
       return {
-        output: { success: true, collections: items },
-        message: `Found **${items.length}** API collections.`
+        output: { success: true, collections },
+        message: `Returned ${collections.length} collections from this page.`
       };
     }
-
     if (action === 'list_endpoints') {
-      let result = await client.listApiEndpoints(collectionId);
-      let items = Array.isArray(result) ? result : (result.items ?? result.data ?? []);
+      const result = await client.listApiEndpoints(collectionId, ctx.input);
+      const endpoints = records(result.items);
       return {
-        output: { success: true, endpoints: items },
-        message: `Found **${items.length}** API endpoints.`
+        output: { success: true, endpoints },
+        message: `Returned ${endpoints.length} endpoints from this page.`
       };
     }
-
-    if (!endpointId) throw new Error('Endpoint ID is required for enable/disable');
-
-    if (action === 'enable_endpoint') {
-      await client.enableApiEndpoint(endpointId);
-      return {
-        output: { success: true },
-        message: `Enabled API endpoint **${endpointId}**.`
-      };
-    }
-
-    // disable_endpoint
-    await client.disableApiEndpoint(endpointId);
+    const id = numericId(endpointId, 'endpointId');
+    if (action === 'enable_endpoint') await client.enableApiEndpoint(id);
+    else await client.disableApiEndpoint(id);
     return {
       output: { success: true },
-      message: `Disabled API endpoint **${endpointId}**.`
+      message: `Endpoint ${action} accepted. Existing requests and external effects are retained.`
     };
   });

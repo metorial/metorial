@@ -19,8 +19,6 @@ import {
   manageSsl,
   manageSystemUsers
 } from './tools';
-import { applicationChanges, inboundWebhook, serverChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     listBackups,
     manageSystemUsers
   ],
-  triggers: [inboundWebhook, serverChanges, applicationChanges]
+  triggers: []
 });

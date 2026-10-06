@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/discord.svg" height="20"> Discord
 
-Send, edit, and delete messages in channels. Manage servers (guilds), channels, roles, members, invites, webhooks, threads, scheduled events, auto moderation rules, audit logs, application commands, and custom guild emojis. Add or remove users, assign roles, kick or ban members, and receive supported message, guild, channel, member, and inbound webhook triggers.
+Send, edit, and delete messages in channels. Manage servers (guilds), channels, roles, members, invites, webhooks, threads, scheduled events, auto moderation rules, audit logs, application commands, and custom guild emojis.
 
 ## Tools
 

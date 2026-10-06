@@ -1,16 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectUnavailableDelighted, unavailableMessage } from '../lib/unavailable';
 import { spec } from '../spec';
 
 export let deletePerson = SlateTool.create(spec, {
   name: 'Delete Person',
   key: 'delete_person',
-  description: `Delete a person and all their associated data from Delighted. This permanently removes surveys, responses, properties, Autopilot membership, and all other linked data. Identify the person by ID, email, or phone number.`,
-  constraints: [
-    'This action is irreversible. All associated data will be permanently deleted.'
-  ],
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: true,
     readOnly: false
   }
@@ -30,27 +30,5 @@ export let deletePerson = SlateTool.create(spec, {
       ok: z.boolean().describe('Whether the deletion was accepted')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let identifier: string;
-    if (ctx.input.personId) {
-      identifier = ctx.input.personId;
-    } else if (ctx.input.email) {
-      identifier = `email:${ctx.input.email}`;
-    } else if (ctx.input.phoneNumber) {
-      identifier = `phone_number:${ctx.input.phoneNumber}`;
-    } else {
-      throw new Error(
-        'Provide one of personId, email, or phoneNumber to identify the person to delete.'
-      );
-    }
-
-    let result = await client.deletePerson(identifier);
-
-    return {
-      output: { ok: result.ok },
-      message: `Person **${ctx.input.email || ctx.input.phoneNumber || ctx.input.personId}** and all associated data deleted.`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();

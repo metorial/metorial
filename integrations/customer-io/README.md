@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/customerio-logo.svg" height="20"> Customerio
 
-Track customer behavior and attributes, send targeted messages (email, SMS, push, in-app, Slack), and manage marketing automation workflows. Create and update people profiles, track events and page views, manage segments, trigger transactional messages and broadcasts, manage objects and relationships, handle collections of reusable data, register devices for push notifications, and bulk import/export people data. Receive real-time reporting webhooks for message activity events like sends, opens, clicks, and bounces.
+Track customer behavior and attributes, send targeted messages (email, SMS, push, in-app, Slack), and manage marketing automation workflows. Create and update people profiles, track events and page views, manage segments, trigger transactional messages and broadcasts, manage objects and relationships, handle collections of reusable data, register devices for push notifications, and bulk import/export people data.
 
 ## Tools
 

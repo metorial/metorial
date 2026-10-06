@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageParams, paginationSchema, readRows } from '../lib/response';
 import { spec } from '../spec';
 
 export let listOrganization = SlateTool.create(spec, {
@@ -22,33 +23,24 @@ export let listOrganization = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: paginationSchema.optional(),
       items: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .describe('List of organizational resource records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    const client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
-    let pagination = { page: ctx.input.page, perPage: ctx.input.perPage };
-    let result: any;
-
-    if (ctx.input.resourceType === 'departments') {
-      result = await client.listDepartments(pagination);
-    } else if (ctx.input.resourceType === 'divisions') {
-      result = await client.listDivisions(pagination);
-    } else {
-      result = await client.listLocations(pagination);
-    }
-
-    let items = result?.[ctx.input.resourceType] || [];
-
+    const result = await client.list(
+      ctx.input.resourceType,
+      pageParams(ctx.input, ctx.input.resourceType === 'departments'),
+      ctx.input.resourceType === 'departments'
+    );
+    const items = readRows(result, ctx.input.resourceType);
     return {
-      output: { items },
-      message: `Retrieved **${items.length}** ${ctx.input.resourceType}.`
+      output: { items, pagination: result.pagination },
+      message: `Retrieved **${items.length}** record(s).`
     };
   })
   .build();

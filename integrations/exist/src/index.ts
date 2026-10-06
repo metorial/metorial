@@ -12,8 +12,6 @@ import {
   manageAttributeOwnershipTool,
   updateAttributeValuesTool
 } from './tools';
-import { inboundWebhook, newInsightsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     getInsightsTool,
     getAveragesTool
   ],
-  triggers: [inboundWebhook, newInsightsTrigger]
+  triggers: []
 });

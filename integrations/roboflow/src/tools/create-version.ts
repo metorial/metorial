@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createVersionTool = SlateTool.create(spec, {
@@ -16,7 +17,7 @@ Preprocessing options include auto-orient, resize, grayscale, static crop, and t
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project URL slug'),
+      projectId: projectIdSchema,
       preprocessing: z
         .record(z.string(), z.any())
         .optional()

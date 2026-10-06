@@ -1,7 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PaystackClient } from '../lib/client';
+
+import { exactId, optionalNumericId, record, validateOutput } from '../lib/transport';
 import { spec } from '../spec';
+
+const chargeAuthorizationOutput = z.object({
+  exactTransactionId: z
+    .string()
+    .describe('Exact unsigned 64-bit transaction ID; use this field for durable identifiers'),
+  transactionId: z.number().optional().describe('Transaction ID'),
+  reference: z.string().describe('Transaction reference'),
+  status: z.string().describe('Transaction status'),
+  amount: z.number().describe('Amount charged'),
+  currency: z.string().describe('Currency'),
+  gatewayResponse: z.string().optional().describe('Gateway response message')
+});
 
 export let chargeAuthorization = SlateTool.create(spec, {
   name: 'Charge Authorization',
@@ -31,40 +45,23 @@ Amounts are in the **smallest currency unit**.`,
       metadata: z.record(z.string(), z.any()).optional().describe('Custom metadata')
     })
   )
-  .output(
-    z.object({
-      transactionId: z.number().describe('Transaction ID'),
-      reference: z.string().describe('Transaction reference'),
-      status: z.string().describe('Transaction status'),
-      amount: z.number().describe('Amount charged'),
-      currency: z.string().describe('Currency'),
-      gatewayResponse: z.string().describe('Gateway response message')
-    })
-  )
+  .output(chargeAuthorizationOutput)
   .handleInvocation(async ctx => {
-    let client = new PaystackClient({ token: ctx.auth.token });
-
-    let result = await client.chargeAuthorization({
-      email: ctx.input.email,
-      amount: ctx.input.amount,
-      authorizationCode: ctx.input.authorizationCode,
-      currency: ctx.input.currency,
-      reference: ctx.input.reference,
-      metadata: ctx.input.metadata
-    });
-
-    let tx = result.data;
-
+    const client = new PaystackClient({ token: ctx.auth.token });
+    const result = await client.chargeAuthorization(ctx.input);
+    const tx = record(result.data);
+    const output = {
+      transactionId: optionalNumericId(tx.id),
+      exactTransactionId: exactId(tx.id),
+      reference: tx.reference,
+      status: tx.status,
+      amount: tx.amount,
+      currency: tx.currency,
+      gatewayResponse: tx.gateway_response ?? undefined
+    };
     return {
-      output: {
-        transactionId: tx.id,
-        reference: tx.reference,
-        status: tx.status,
-        amount: tx.amount,
-        currency: tx.currency,
-        gatewayResponse: tx.gateway_response
-      },
-      message: `Charge **${tx.reference}**: status **${tx.status}**. Amount: ${tx.amount} ${tx.currency}. Gateway: ${tx.gateway_response}`
+      output: validateOutput(chargeAuthorizationOutput, output),
+      message: 'Charge response received; review status and reconcile before retrying.'
     };
   })
   .build();

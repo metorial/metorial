@@ -1,0 +1,412 @@
+{
+  "get_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordType": {
+          "type": "string",
+          "description": "NetSuite record type in camelCase (e.g., \"customer\", \"salesOrder\", \"invoice\", \"vendor\", \"inventoryItem\")"
+        },
+        "recordId": {
+          "type": "string",
+          "description": "Internal ID of the record to retrieve"
+        },
+        "expandSubResources": {
+          "description": "Whether to expand sub-resources like line items inline",
+          "type": "boolean"
+        },
+        "fields": {
+          "description": "Specific fields to return (returns all fields if not specified)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["recordType", "recordId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "record": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The full NetSuite record data"
+        }
+      },
+      "required": ["record"],
+      "additionalProperties": false
+    }
+  },
+  "create_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordType": {
+          "type": "string",
+          "description": "NetSuite record type in camelCase (e.g., \"customer\", \"salesOrder\", \"invoice\")"
+        },
+        "fieldValues": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Record field values as key-value pairs. Sublists can be nested objects."
+        }
+      },
+      "required": ["recordType", "fieldValues"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "description": "Internal ID of the newly created record"
+        },
+        "location": {
+          "description": "REST API URL of the created record",
+          "type": "string"
+        }
+      },
+      "required": ["recordId"],
+      "additionalProperties": false
+    }
+  },
+  "update_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordType": {
+          "type": "string",
+          "description": "NetSuite record type in camelCase (e.g., \"customer\", \"salesOrder\", \"invoice\")"
+        },
+        "recordId": {
+          "type": "string",
+          "description": "Internal ID of the record to update"
+        },
+        "fieldValues": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Fields to update as key-value pairs. Only specified fields will be changed."
+        }
+      },
+      "required": ["recordType", "recordId", "fieldValues"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "description": "Internal ID of the updated record"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the update was successful"
+        }
+      },
+      "required": ["recordId", "success"],
+      "additionalProperties": false
+    }
+  },
+  "delete_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordType": {
+          "type": "string",
+          "description": "NetSuite record type in camelCase (e.g., \"customer\", \"salesOrder\", \"invoice\")"
+        },
+        "recordId": {
+          "type": "string",
+          "description": "Internal ID of the record to delete"
+        }
+      },
+      "required": ["recordType", "recordId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        },
+        "recordType": {
+          "type": "string",
+          "description": "The type of record that was deleted"
+        },
+        "recordId": {
+          "type": "string",
+          "description": "The ID of the record that was deleted"
+        }
+      },
+      "required": ["success", "recordType", "recordId"],
+      "additionalProperties": false
+    }
+  },
+  "upsert_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordType": {
+          "type": "string",
+          "description": "NetSuite record type in camelCase (e.g., \"customer\", \"salesOrder\", \"invoice\")"
+        },
+        "externalId": {
+          "type": "string",
+          "description": "External ID value to match against (format varies by configuration)"
+        },
+        "fieldValues": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Record field values as key-value pairs"
+        }
+      },
+      "required": ["recordType", "externalId", "fieldValues"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "description": "Internal ID of the created or updated record"
+        },
+        "location": {
+          "description": "REST API URL of the record",
+          "type": "string"
+        }
+      },
+      "required": ["recordId"],
+      "additionalProperties": false
+    }
+  },
+  "list_records": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordType": {
+          "type": "string",
+          "description": "NetSuite record type in camelCase (e.g., \"customer\", \"salesOrder\", \"invoice\")"
+        },
+        "filter": {
+          "description": "Filter query using NetSuite REST API syntax (e.g., \"companyName CONTAIN 'Acme'\")",
+          "type": "string"
+        },
+        "fields": {
+          "description": "Specific fields to include in the response",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limit": {
+          "description": "Maximum number of records to return per page",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Number of records to skip for pagination",
+          "type": "number"
+        }
+      },
+      "required": ["recordType"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Array of records matching the criteria"
+        },
+        "totalResults": {
+          "type": "number",
+          "description": "Total number of matching records"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of records in this page"
+        },
+        "offset": {
+          "type": "number",
+          "description": "Current offset"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether more records are available"
+        }
+      },
+      "required": ["records", "totalResults", "count", "offset", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  "query_suiteql": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "SuiteQL query string (SQL-92 syntax). Example: \"SELECT id, companyName FROM customer WHERE dateCreated > '2024-01-01'\""
+        },
+        "limit": {
+          "description": "Maximum number of results to return per page (default varies by NetSuite)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Number of results to skip for pagination",
+          "type": "number"
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Array of result rows"
+        },
+        "totalResults": {
+          "type": "number",
+          "description": "Total number of matching results"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of results in this page"
+        },
+        "offset": {
+          "type": "number",
+          "description": "Current offset"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether more results are available"
+        }
+      },
+      "required": ["rows", "totalResults", "count", "offset", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  "transform_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sourceRecordType": {
+          "type": "string",
+          "description": "Source record type in camelCase (e.g., \"salesOrder\", \"purchaseOrder\", \"estimate\")"
+        },
+        "sourceRecordId": {
+          "type": "string",
+          "description": "Internal ID of the source record"
+        },
+        "targetRecordType": {
+          "type": "string",
+          "description": "Target record type in camelCase (e.g., \"invoice\", \"itemFulfillment\", \"vendorBill\")"
+        },
+        "fieldOverrides": {
+          "description": "Optional field values to set or override on the target record",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["sourceRecordType", "sourceRecordId", "targetRecordType"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "description": "Internal ID of the newly created target record"
+        },
+        "targetRecordType": {
+          "type": "string",
+          "description": "The type of the created target record"
+        },
+        "location": {
+          "description": "REST API URL of the created target record",
+          "type": "string"
+        }
+      },
+      "required": ["recordId", "targetRecordType"],
+      "additionalProperties": false
+    }
+  },
+  "get_record_metadata": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordType": {
+          "type": "string",
+          "description": "NetSuite record type in camelCase (e.g., \"customer\", \"salesOrder\", \"invoice\", \"inventoryItem\")"
+        }
+      },
+      "required": ["recordType"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Record type metadata including fields, sublists, and supported operations"
+        }
+      },
+      "required": ["metadata"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -43,8 +43,6 @@ import {
   updateContactStages,
   updateDeal
 } from './tools';
-import { contactChanges, dealChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -90,5 +88,5 @@ export let provider = Slate.create({
     listEmailAccounts,
     getUsageStats
   ],
-  triggers: [inboundWebhook, contactChanges, dealChanges]
+  triggers: []
 });

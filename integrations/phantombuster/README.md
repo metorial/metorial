@@ -1,11 +1,13 @@
-# <img src="logo.png" height="20"> Phantom Buster
+# PhantomBuster
 
-Manage and run cloud-based automation Phantoms for data extraction, lead generation, and social media automation across LinkedIn, Instagram, Facebook, Twitter, and other platforms. Create, launch, update, and delete Phantoms (automation agents). Monitor execution status, retrieve console logs, and download results in CSV or JSON format. Manage a LinkedIn Leads database including fetching, deleting, and organizing leads by list. Upload and manage custom JavaScript automation scripts. Persist state between runs using agent and global JSON objects. Configure webhooks to receive notifications when Phantom executions complete.
+Manage individual Phantoms in an authorized workspace: discover, create, update, delete, queue a launch, stop execution and read execution history/output. Work with the beta LinkedIn Leads and dynamic lead-list APIs, and download accumulated CSV or JSON result files.
+
+Use a workspace API key and a paid plan. An individual Phantom must be fully configured and have succeeded once from the dashboard before an API launch. Workflows/Flows are not supported by these endpoints. Launches may consume paid runtime and perform the external actions configured in the Phantom; inspect its configuration and obtain authorization first.
+
+Creation accepts an exact script name with its owner and branch, or an existing script ID resolved through the script API. Public templates use owner `phantombuster` and branch `master`; custom scripts need their actual owner. Sensitive session and proxy credentials are omitted from configuration/output previews.
+
+Result downloads use existing accumulated `result.csv` or `result.json`, or a configured custom filename. Launch-specific structured results remain available through Get Execution. The API does not provide individual result-file deletion; manage retained files from the dashboard.
 
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>

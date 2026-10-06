@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, getBase64ByteLength, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoosendClient } from '../lib/client';
+import { email, optionalNumber, text } from '../lib/data';
 import { spec } from '../spec';
 
 let recipientSchema = z.object({
@@ -19,25 +20,29 @@ let personalizationSchema = z.object({
 let attachmentSchema = z.object({
   type: z.string().describe('MIME type of the attachment (e.g. "application/pdf")'),
   fileName: z.string().describe('Filename for the attachment'),
-  content: z.string().describe('Base64-encoded file content')
+  content: z.string().describe('Base64-encoded file content'),
+  disposition: z
+    .enum(['attachment', 'inline'])
+    .optional()
+    .describe('Default attachment; inline requires contentId'),
+  contentId: z.string().optional().describe('Content ID used by inline HTML images')
 });
 
 export let sendTransactionalEmail = SlateTool.create(spec, {
   name: 'Send Transactional Email',
   key: 'send_transactional_email',
-  description: `Send transactional emails such as order confirmations, password resets, shipping updates, or appointment reminders. Supports template-based sending with dynamic variable substitution and file attachments. Can send up to 50 personalized emails in a single request.`,
+  description: `Send transactional emails such as order confirmations, password resets, shipping updates, or appointment reminders. Supports template-based sending with dynamic variable substitution and file attachments.`,
   instructions: [
     'Provide either a templateId (existing campaign ID), templateName (to match or create), or inline HTML content.',
     'Use substitutions in personalizations to replace template variables with dynamic values.',
-    'Payload limit is 20MB per request. Up to 50 emails per request via the personalizations array.'
+    'The complete payload must be smaller than 20MB; content is limited to 1MB.'
   ],
   constraints: [
-    'Available on the Moosend+ plan as an add-on.',
-    'Maximum 20MB payload per API call.',
-    'Maximum 50 emails per request via personalizations.'
+    'Requires transactional sending enabled for the account.',
+    'The complete payload must be smaller than 20MB.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -77,24 +82,44 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the emails were sent successfully'),
+      success: z
+        .boolean()
+        .describe(
+          'Whether all requested recipients were accepted; acceptance does not prove delivery'
+        ),
       recipientCount: z
         .number()
-        .describe('Total number of recipients across all personalizations')
+        .describe('Total number of requested recipients across all personalizations'),
+      acceptedCount: z.number().optional().describe('Recipients accepted by the provider'),
+      excludedCount: z.number().optional().describe('Recipients excluded by the provider')
     })
   )
   .handleInvocation(async ctx => {
     let client = new MoosendClient({ token: ctx.auth.token });
 
+    if (
+      !ctx.input.templateId &&
+      !ctx.input.templateName &&
+      !ctx.input.htmlContent &&
+      !ctx.input.webLocation
+    )
+      throw createApiServiceError('Provide a template or inline/web content.');
+    if (ctx.input.htmlContent && ctx.input.webLocation)
+      throw createApiServiceError('Provide only one content source.');
+    if (
+      ctx.input.htmlContent !== undefined &&
+      Buffer.byteLength(ctx.input.htmlContent, 'utf8') > 1_000_000
+    )
+      throw createApiServiceError('HTML content must not exceed 1MB.');
     let body: Record<string, unknown> = {
       From: {
-        Email: ctx.input.fromEmail,
+        Email: email(ctx.input.fromEmail, 'verified sender email'),
         ...(ctx.input.fromName ? { Name: ctx.input.fromName } : {})
       },
-      Subject: ctx.input.subject,
+      Subject: text(ctx.input.subject, 'subject'),
       Personalizations: ctx.input.personalizations.map(p => ({
         To: p.to.map(r => ({
-          Email: r.email,
+          Email: email(r.email, 'recipient email'),
           ...(r.name ? { Name: r.name } : {})
         })),
         ...(p.substitutions ? { Substitutions: p.substitutions } : {})
@@ -103,7 +128,7 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
 
     if (ctx.input.replyToEmail) {
       body.ReplyTo = {
-        Email: ctx.input.replyToEmail,
+        Email: email(ctx.input.replyToEmail, 'reply-to email'),
         ...(ctx.input.replyToName ? { Name: ctx.input.replyToName } : {})
       };
     }
@@ -122,27 +147,58 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
     }
 
     if (ctx.input.attachments) {
-      body.Attachments = ctx.input.attachments.map(a => ({
-        Type: a.type,
-        FileName: a.fileName,
-        Content: a.content
-      }));
+      body.Attachments = ctx.input.attachments.map(a => {
+        if (
+          !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+            a.content
+          ) ||
+          getBase64ByteLength(a.content) === 0
+        )
+          throw createApiServiceError('Provide valid non-empty base64 file content.');
+        if (a.disposition === 'inline' && !a.contentId)
+          throw createApiServiceError('Inline files require contentId.');
+        return {
+          Type: text(a.type, 'file MIME type'),
+          FileName: text(a.fileName, 'filename'),
+          Content: a.content,
+          Disposition: a.disposition ?? 'attachment',
+          ...(a.contentId !== undefined ? { ContentId: text(a.contentId, 'content ID') } : {})
+        };
+      });
     }
 
-    if (ctx.input.bypassUnsubscribeManagement) {
-      body.MailSettings = { BypassUnsubscribeManagement: true };
-    }
+    body.MailSettings = {
+      BypassUnsubscribeManagement: { Enable: ctx.input.bypassUnsubscribeManagement ?? false }
+    };
+    if (Buffer.byteLength(JSON.stringify(body), 'utf8') >= 20_000_000)
+      throw createApiServiceError('The complete request must be smaller than 20MB.');
 
-    await client.sendTransactionalEmail(body);
+    const receipt = await client.sendTransactionalEmail(body);
+    const acceptedCount = optionalNumber(receipt.TotalAccepted);
+    const excludedCount = optionalNumber(receipt.TotalExcluded);
+    if (
+      acceptedCount === undefined ||
+      excludedCount === undefined ||
+      !Number.isSafeInteger(acceptedCount) ||
+      !Number.isSafeInteger(excludedCount) ||
+      acceptedCount < 0 ||
+      excludedCount < 0
+    )
+      throw createApiServiceError(
+        'Moosend returned an incomplete send receipt. Verify provider state before retrying; the request was not repeated.',
+        { reason: 'moosend_send_receipt_invalid' }
+      );
 
     let recipientCount = ctx.input.personalizations.reduce((sum, p) => sum + p.to.length, 0);
 
     return {
       output: {
-        success: true,
+        success: excludedCount === 0 && acceptedCount === recipientCount,
+        acceptedCount,
+        excludedCount,
         recipientCount
       },
-      message: `Sent transactional email to **${recipientCount}** recipient(s) with subject "${ctx.input.subject}".`
+      message: `Moosend accepted **${acceptedCount}** recipient(s) and excluded **${excludedCount}**. This confirms acceptance, not delivery; inspect the result before retrying.`
     };
   })
   .build();

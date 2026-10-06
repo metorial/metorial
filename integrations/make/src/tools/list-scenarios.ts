@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MakeClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { paging, scenarioOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listScenarios = SlateTool.create(spec, {
@@ -13,8 +14,14 @@ export let listScenarios = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.number().optional().describe('Filter scenarios by team ID'),
-      organizationId: z.number().optional().describe('Filter scenarios by organization ID'),
+      teamId: z
+        .number()
+        .optional()
+        .describe('Team ID from list_teams; provide exactly one teamId or organizationId'),
+      organizationId: z
+        .number()
+        .optional()
+        .describe('Organization ID from list_organizations; provide exactly one container'),
       folderId: z.number().optional().describe('Filter scenarios by folder ID'),
       isActive: z.boolean().optional().describe('Filter by active/inactive status'),
       limit: z.number().optional().describe('Maximum number of scenarios to return'),
@@ -39,42 +46,17 @@ export let listScenarios = SlateTool.create(spec, {
           description: z.string().optional().describe('Scenario description')
         })
       ),
+      page: paging.optional(),
       total: z.number().optional().describe('Total number of matching scenarios')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MakeClient({
-      token: ctx.auth.token,
-      zoneUrl: ctx.config.zoneUrl
-    });
-
-    let result = await client.listScenarios({
-      teamId: ctx.input.teamId,
-      organizationId: ctx.input.organizationId,
-      folderId: ctx.input.folderId,
-      isActive: ctx.input.isActive,
-      limit: ctx.input.limit,
-      offset: ctx.input.offset
-    });
-
-    let scenarios = (result.scenarios ?? result ?? []).map((s: any) => ({
-      scenarioId: s.id,
-      name: s.name,
-      teamId: s.teamId,
-      isActive: s.islinked ?? s.isActive,
-      isPaused: s.isPaused,
-      createdAt: s.created,
-      updatedAt: s.updated,
-      nextExec: s.nextExec,
-      description: s.description
-    }));
-
+    const client = clientFor(ctx);
+    const result = await client.listScenarios(ctx.input);
+    const scenarios = result.scenarios.map(scenarioOutput);
     return {
-      output: {
-        scenarios,
-        total: result.pg?.total
-      },
-      message: `Found **${scenarios.length}** scenario(s)${ctx.input.teamId ? ` in team ${ctx.input.teamId}` : ''}.`
+      output: { scenarios, page: result.pg },
+      message: `Returned ${scenarios.length} scenarios in this page.`
     };
   })
   .build();

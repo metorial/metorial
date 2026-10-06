@@ -10,17 +10,18 @@ import {
   deleteResponse,
   deleteSurvey,
   getAccountInfo,
+  getContact,
+  getResponse,
   getSurvey,
   listActionClasses,
   listAttributeClasses,
+  listContactAttributeKeys,
   listContacts,
   listResponses,
   listSurveys,
   updateResponse,
   updateSurvey
 } from './tools';
-import { responseEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,7 +41,10 @@ export let provider = Slate.create({
     deleteActionClass,
     listAttributeClasses,
     createAttributeClass,
-    deleteAttributeClass
+    deleteAttributeClass,
+    getResponse,
+    getContact,
+    listContactAttributeKeys
   ],
-  triggers: [responseEvent]
+  triggers: []
 });

@@ -8,6 +8,7 @@ export let deletePhantom = SlateTool.create(spec, {
   key: 'delete_phantom',
   description: `Permanently delete a Phantom from your workspace. This action cannot be undone.`,
   tags: {
+    readOnly: false,
     destructive: true
   }
 })

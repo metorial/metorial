@@ -6,15 +6,15 @@ export let config = SlateConfig.create(
     serverUrl: z
       .string()
       .url()
-      .default('https://api.honeyhive.ai')
+      .default('https://api.dp1.us.honeyhive.ai')
       .describe(
-        'Base URL for the HoneyHive API. Use the default for managed cloud, or provide a custom URL for self-hosted deployments.'
+        'HoneyHive data-plane URL. Use the managed-cloud default or your dedicated/self-hosted data-plane URL. Stored legacy managed-cloud URLs are migrated automatically.'
       ),
     project: z
       .string()
       .optional()
       .describe(
-        'Default project name to use across tools. Can be overridden per tool invocation.'
+        'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
       )
   })
 );

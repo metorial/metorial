@@ -4,7 +4,7 @@ import { z } from 'zod';
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string().min(1)
     })
   )
   .addTokenAuth({
@@ -14,8 +14,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .min(1)
         .describe(
-          'RunPod API key (starts with rpa_). Generated in the RunPod console under Settings > API Keys.'
+          'Runpod API key. Generated in the Runpod console under Credentials > API Keys.'
         )
     }),
     getOutput: async ctx => {

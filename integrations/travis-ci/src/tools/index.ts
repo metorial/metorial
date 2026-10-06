@@ -1,4 +1,6 @@
 export * from './get-build';
+export * from './get-build-request';
+export * from './get-current-user';
 export * from './get-job-log';
 export * from './get-repository';
 export * from './lint-travis-yml';
@@ -11,4 +13,6 @@ export * from './manage-caches';
 export * from './manage-crons';
 export * from './manage-env-vars';
 export * from './manage-job';
+export * from './manage-job-log';
+export * from './manage-repository-settings';
 export * from './trigger-build';

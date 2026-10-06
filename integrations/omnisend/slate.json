@@ -1,6 +1,6 @@
 {
   "name": "@metorial/omnisend",
-  "description": "Manage ecommerce marketing automation across email, SMS, and push notifications. Create, update, and list contacts with subscription statuses and custom properties. Manage product catalogs and categories. Track customer behavior events including cart actions, order lifecycle, and product views. Send custom events to trigger automation workflows such as abandoned cart, order confirmation, and browse abandonment. List and view campaigns and automations. Retrieve brand information. Export analytics data including campaign performance, engagement metrics, revenue attribution, and audience growth.",
+  "description": "Manage Omnisend contacts, products and categories; discover campaigns, automations and current brand identity; submit customer events and replace complete catalog products. Explicit API-version selection preserves legacy behavior and documents current tag replacement and irreversible automation effects.",
   "categories": ["crm-and-sales-tools", "e-commerce-and-retail", "email-and-messaging"],
   "skills": [
     "manage contacts and subscribers",
@@ -10,9 +10,9 @@
     "list marketing campaigns",
     "track order lifecycle events",
     "send custom events",
-    "export campaign analytics",
     "manage subscription statuses",
-    "retrieve brand information"
+    "retrieve brand information",
+    "replace complete catalog products"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/omnisend.svg"
 }

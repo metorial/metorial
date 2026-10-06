@@ -24,8 +24,6 @@ import {
   runJob,
   searchRuns
 } from './tools';
-import { jobRunsTrigger, modelRegistryTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -52,5 +50,5 @@ export let provider = Slate.create({
     manageFiles,
     manageVectorSearch
   ],
-  triggers: [modelRegistryTrigger, jobRunsTrigger]
+  triggers: []
 });

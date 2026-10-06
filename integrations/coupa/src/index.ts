@@ -12,6 +12,7 @@ import {
   createUser,
   getInvoice,
   getPurchaseOrder,
+  getResource,
   processApproval,
   searchAccounts,
   searchApprovals,
@@ -27,18 +28,10 @@ import {
   updateSupplier,
   updateUser
 } from './tools';
-import {
-  expenseReportChanges,
-  inboundWebhook,
-  invoiceChanges,
-  purchaseOrderChanges,
-  requisitionChanges,
-  supplierChanges
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getResource,
     searchPurchaseOrders,
     getPurchaseOrder,
     createPurchaseOrder,
@@ -65,12 +58,5 @@ export let provider = Slate.create({
     searchReceipts,
     createReceipt
   ],
-  triggers: [
-    inboundWebhook,
-    purchaseOrderChanges,
-    invoiceChanges,
-    requisitionChanges,
-    expenseReportChanges,
-    supplierChanges
-  ]
+  triggers: []
 });

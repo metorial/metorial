@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { StoryblokClient } from '../lib/client';
+import { pagingOutput, resolveSpace, spaceIdInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listAssets = SlateTool.create(spec, {
@@ -13,15 +14,22 @@ export let listAssets = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      spaceId: spaceIdInput,
       page: z.number().optional().describe('Page number (default: 1)'),
       perPage: z.number().optional().describe('Assets per page (default: 25)'),
       search: z.string().optional().describe('Search term to filter assets by filename'),
-      inFolder: z.number().optional().describe('Filter by asset folder ID'),
+      inFolder: z
+        .number()
+        .optional()
+        .describe(
+          'Filter by asset folder ID; -1 lists deleted assets, 0 is retained as supplied'
+        ),
       isPrivate: z.boolean().optional().describe('Filter by privacy status')
     })
   )
   .output(
     z.object({
+      ...pagingOutput,
       assets: z
         .array(
           z.object({
@@ -41,9 +49,12 @@ export let listAssets = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new StoryblokClient({
-      token: ctx.auth.token,
-      region: ctx.auth.region,
-      spaceId: ctx.config.spaceId
+      ...ctx.auth,
+      spaceId: resolveSpace(
+        ctx.input.spaceId,
+        ctx.config.spaceId,
+        ctx.auth.mode === 'oauth' ? ctx.auth.spaceId : undefined
+      )
     });
 
     let result = await client.listAssets({
@@ -60,14 +71,14 @@ export let listAssets = SlateTool.create(spec, {
       name: a.name,
       contentType: a.content_type,
       contentLength: a.content_length,
-      alt: a.alt,
-      title: a.title,
+      alt: typeof a.meta_data?.alt === 'string' ? a.meta_data.alt : a.alt,
+      title: typeof a.meta_data?.title === 'string' ? a.meta_data.title : a.title,
       isPrivate: a.is_private,
       createdAt: a.created_at
     }));
 
     return {
-      output: { assets },
+      output: { ...result, assets },
       message: `Found **${assets.length}** assets.`
     };
   })

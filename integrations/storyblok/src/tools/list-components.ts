@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { StoryblokClient } from '../lib/client';
+import { resolveSpace, spaceIdInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listComponents = SlateTool.create(spec, {
@@ -11,7 +12,7 @@ export let listComponents = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ spaceId: spaceIdInput }))
   .output(
     z.object({
       components: z
@@ -22,7 +23,7 @@ export let listComponents = SlateTool.create(spec, {
             displayName: z.string().optional().describe('Display name'),
             isRoot: z.boolean().optional().describe('Whether this is a content type'),
             isNestable: z.boolean().optional().describe('Whether this is nestable'),
-            schema: z.record(z.string(), z.any()).optional().describe('Field schema')
+            schema: z.record(z.string(), z.unknown()).optional().describe('Field schema')
           })
         )
         .describe('List of components')
@@ -30,9 +31,12 @@ export let listComponents = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new StoryblokClient({
-      token: ctx.auth.token,
-      region: ctx.auth.region,
-      spaceId: ctx.config.spaceId
+      ...ctx.auth,
+      spaceId: resolveSpace(
+        ctx.input.spaceId,
+        ctx.config.spaceId,
+        ctx.auth.mode === 'oauth' ? ctx.auth.spaceId : undefined
+      )
     });
 
     let components = await client.listComponents();

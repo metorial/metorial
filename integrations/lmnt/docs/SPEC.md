@@ -1,60 +1,42 @@
-Now let me check for the voice conversion endpoint and account info endpoint I saw mentioned:# Slates Specification for LMNT
+# LMNT integration specification
 
-## Overview
+## Status
 
-LMNT is an AI-powered text-to-speech and voice cloning platform. With its API, users can create voice clones with just 5 seconds of audio and generate lifelike speech in real-time. The API supports models like "aurora" and "blizzard" and multiple languages including English, Spanish, Portuguese, French, German, Chinese, Korean, Hindi, Japanese, Russian, Italian, and Turkish.
+LMNT has shut down its speech generation service. On 2026-10-04, the
+[official website](https://www.lmnt.com/) and
+[official API documentation](https://docs.lmnt.com/) both displayed the shutdown
+notice. The notice does not give a shutdown date.
 
-## Authentication
+This integration is retired. Provider operations and new connections are
+unavailable. Choose another speech provider.
 
-LMNT uses API key authentication. Get your API key by going to your account page at app.lmnt.com. If you are not signed in yet, you will be prompted to sign in. In the Your Account section, you can see details about your account. Scroll down to see the section titled API Keys. The string of numbers and letters is your API key. Click it to copy it to your clipboard.
+## Compatibility
 
-The API key is passed via the `X-API-Key` header in REST API requests. The authorization header is `X-API-Key` and is required for all requests.
+The existing API-key method (`api_key`), stored auth output (`token`), and six
+tool keys retain their input and output schemas. Every tool, authentication
+attempt, and profile lookup reports the provider shutdown without contacting
+LMNT. All tools are marked deprecated.
 
-Example:
+| Tool | Historical endpoint |
+| --- | --- |
+| `generate_speech` | `POST /v1/ai/speech/bytes` |
+| `list_voices` | `GET /v1/ai/voice/list` |
+| `get_voice` | `GET /v1/ai/voice/{id}` |
+| `update_voice` | `PUT /v1/ai/voice/{id}` |
+| `delete_voice` | `DELETE /v1/ai/voice/{id}` |
+| `get_account` | `GET /v1/account` |
 
-```
-X-API-Key: your_api_key_here
-```
+The [official SDK API index](https://github.com/lmnt-com/lmnt-node/blob/master/api.md)
+records these historical operations. The
+[speech resource](https://github.com/lmnt-com/lmnt-node/blob/master/src/resources/speech.ts)
+also records the binary synthesis endpoint. The SDK's presence does not establish a currently
+operating service. No new voice-cloning, streaming, conversion, or identity
+tools are added to this retired integration.
 
-When using SDKs, the API key can be provided as a constructor argument (`api_key`) or set as the `LMNT_API_KEY` environment variable.
+## Events and files
 
-## Features
+There are no triggers or event subscriptions. The unsupported generic inbound
+webhook was removed; no replacement was introduced.
 
-### Text-to-Speech Generation
-
-Converts text into synthesized speech audio. Generates speech from text and streams the audio as binary data chunks in real-time as they are generated.
-
-- **Voice**: Select from a library of pre-built voices or custom cloned voices using a voice ID.
-- **Model**: Choose between models such as "aurora" and "blizzard".
-- **Language**: Specify the desired language using a two-letter ISO 639-1 code. Defaults to auto language detection, but specifying the language is recommended for faster generation.
-- **Output format**: Options include aac, mp3, mulaw, raw, and wav.
-- **Sample rate**: Output sample rate in Hz, defaulting to 24000.
-- **Temperature**: Influences how expressive and emotionally varied the speech becomes. Lower values create more neutral, consistent speaking styles.
-- **Top-p**: Controls the stability of the generated speech. A lower value produces more consistent, reliable speech, while a higher value gives more flexibility.
-- **Speed and length**: Control the speaking rate or target a specific duration for the output.
-- Max 5000 characters per request (including spaces).
-
-### Real-Time Streaming via WebSocket
-
-Stream text to LMNT's servers and receive synthesized audio in real-time at low latency with the WebSocket API. This is suited for conversational applications, virtual agents, and interactive experiences. The WebSocket endpoint also supports streaming timestamps along with speech.
-
-### Voice Cloning
-
-Create custom voices from audio samples. For Instant Voices, as little as 30 seconds of source audio gets you an instant clone. Professional voices require at least 5 minutes of source audio to train from.
-
-- **Voice type**: Choose between "instant" (default) and "professional" voice types.
-- **Audio input**: One or more input audio files in wav, mp3, mp4, m4a, or webm format.
-- **Enhance**: For unclean audio with background noise, applies processing to attempt to improve quality. Default is false as this can also degrade quality in some circumstances.
-- **Metadata**: Add a name, description, and gender tag to the voice.
-
-### Voice Management
-
-List, retrieve, update, and delete voices. Returns details of a specific voice including ID, name, owner, state, description, gender, type (instant or professional), and a preview audio URL. Professional voices that are not being used will not be upgraded automatically and will enter a frozen state. You can unfreeze a voice to upgrade it to the latest model. Instant voices always use the latest model and are never frozen. Voices can be starred for quick access.
-
-### Account Information
-
-Retrieve account details and usage information via the Account info endpoint.
-
-## Events
-
-The provider does not support events. LMNT's API is a request-response and WebSocket-based service with no webhook or event subscription mechanism.
+The historical speech output schema is retained for compatibility. Speech
+generation stops with the shutdown error before producing audio or files.

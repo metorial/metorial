@@ -1,22 +1,22 @@
 {
   "name": "@metorial/bolna",
-  "description": "Create, configure, and manage conversational Voice AI agents that make and receive phone calls. Initiate outbound calls with dynamic context variables, handle inbound calls with caller identification, and automate batch calling campaigns via CSV uploads with scheduling and auto-retry. Upload PDF documents and URLs as knowledge bases for RAG-powered conversations. Configure function calling tools for live call transfers, calendar booking, and custom API integrations. Retrieve call execution history including transcripts, recordings, cost breakdowns, and extracted data. Purchase and manage phone numbers, import or clone custom voices, and connect external LLM, TTS, ASR, and telephony providers.",
+  "description": "Create and manage Voice AI agents, place and cancel queued calls, manage CSV calling batches, and ingest public URLs into knowledge bases. Inspect execution transcripts, costs, logs, and downloadable recordings. Discover phone numbers, configure inbound assignments, list voice providers and models, and check account balance and concurrency.",
   "categories": [
     "apis-and-http-requests",
     "email-and-messaging",
     "speech-recognition-and-synthesis"
   ],
   "skills": [
-    "create voice AI agents",
+    "manage voice AI agents",
     "initiate outbound calls",
-    "handle inbound calls",
-    "run batch calling campaigns",
-    "manage knowledge bases",
-    "retrieve call transcripts",
-    "configure function calling tools",
-    "purchase phone numbers",
-    "import and clone voices",
-    "extract post-call data"
+    "configure inbound calls",
+    "manage calling batches",
+    "manage URL knowledge bases",
+    "retrieve call transcripts and logs",
+    "download call recordings",
+    "discover phone numbers",
+    "discover voices and models",
+    "check account balance"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/bolna.png"
 }

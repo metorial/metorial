@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CloudAgentsClient } from '../lib/client';
+import { CurrentAgentsClient, cloudModelSchema } from '../lib/current-client';
 import { spec } from '../spec';
 
 export let listModels = SlateTool.create(spec, {
@@ -14,18 +14,23 @@ export let listModels = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      models: z.array(z.string().describe('Model identifier'))
+      models: z.array(z.string().describe('Model identifier')),
+      modelDetails: z
+        .array(cloudModelSchema)
+        .optional()
+        .describe('Current model names, aliases, supported parameters, and variants')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CloudAgentsClient({ token: ctx.auth.token });
+    let client = new CurrentAgentsClient({ token: ctx.auth.token });
     let result = await client.listModels();
 
     return {
       output: {
-        models: result.models
+        models: result.items.map(model => model.id),
+        modelDetails: result.items
       },
-      message: `Found **${result.models.length}** available model(s): ${result.models.join(', ')}.`
+      message: `Found **${result.items.length}** available model(s): ${result.items.map(model => model.id).join(', ')}.`
     };
   })
   .build();

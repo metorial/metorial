@@ -1,6 +1,6 @@
 {
   "name": "@metorial/webflow",
-  "description": "Manage Webflow sites, CMS content, ecommerce, and more programmatically. Create, read, update, and delete CMS collection items and collections. Manage ecommerce products, orders, and inventory. Publish sites, manage pages and components, upload and organize assets, retrieve form submissions, manage user accounts and access groups, and add custom code to sites and pages. Receive webhooks for form submissions, site publishes, page changes, ecommerce events, user account changes, and CMS item updates.",
+  "description": "Manage Webflow sites, CMS content, ecommerce, and more programmatically. Create, read, update, and delete CMS collection items and collections. Manage ecommerce products, orders, and inventory. Publish sites, manage pages and components, upload and organize assets, retrieve form submissions, manage user accounts and access groups, and add custom code to sites and pages.",
   "categories": ["document-processing", "e-commerce-and-retail"],
   "skills": [
     "manage CMS collection items",

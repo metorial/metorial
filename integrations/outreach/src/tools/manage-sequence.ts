@@ -1,11 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import {
   buildRelationship,
   cleanAttributes,
   flattenResource,
-  mergeRelationships
+  mergeRelationships,
+  validateInput
 } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -29,7 +30,12 @@ Sequences are multi-step campaigns that automate prospect engagement through ema
         .enum(['interval', 'date'])
         .optional()
         .describe('Type: "interval" (days between steps) or "date" (specific dates)'),
-      enabled: z.boolean().optional().describe('Whether the sequence is enabled'),
+      enabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Activate or deactivate the sequence through its supported lifecycle action. Activation may start automation for enrolled prospects.'
+        ),
       tags: z.array(z.string()).optional().describe('Tags'),
       ownerId: z.string().optional().describe('User ID of the sequence owner')
     })
@@ -45,20 +51,28 @@ Sequences are multi-step campaigns that automate prospect engagement through ema
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     let attributes = cleanAttributes({
       name: ctx.input.name,
       description: ctx.input.description,
       sequenceType: ctx.input.sequenceType,
-      enabled: ctx.input.enabled,
       tags: ctx.input.tags
     });
 
     let relationships = mergeRelationships(buildRelationship('owner', ctx.input.ownerId));
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.name?.trim())
+        throw createApiServiceError('Name is required for sequence creation.');
       let resource = await client.createSequence(attributes, relationships);
+      if (ctx.input.enabled !== undefined && resource.attributes.enabled !== ctx.input.enabled)
+        resource = await client.action(
+          'sequences',
+          resource.id,
+          ctx.input.enabled ? 'activate' : 'deactivate'
+        );
       let flat = flattenResource(resource);
       return {
         output: {
@@ -69,16 +83,24 @@ Sequences are multi-step campaigns that automate prospect engagement through ema
           createdAt: flat.createdAt,
           updatedAt: flat.updatedAt
         },
-        message: `Sequence **${flat.name}** created with ID ${flat.id}.`
+        message: `Sequence **${flat.name ?? flat.id}** created with ID ${flat.id}.`
       };
     }
 
-    if (!ctx.input.sequenceId) throw new Error('sequenceId is required for update');
-    let resource = await client.updateSequence(
-      ctx.input.sequenceId,
-      attributes,
-      relationships
-    );
+    if (!ctx.input.sequenceId)
+      throw createApiServiceError('sequenceId is required for update');
+    if (!Object.keys(attributes).length && !relationships && ctx.input.enabled === undefined)
+      throw createApiServiceError('Provide at least one field to update.');
+    let resource =
+      Object.keys(attributes).length || relationships
+        ? await client.updateSequence(ctx.input.sequenceId, attributes, relationships)
+        : await client.getSequence(ctx.input.sequenceId);
+    if (ctx.input.enabled !== undefined && resource.attributes.enabled !== ctx.input.enabled)
+      resource = await client.action(
+        'sequences',
+        resource.id,
+        ctx.input.enabled ? 'activate' : 'deactivate'
+      );
     let flat = flattenResource(resource);
     return {
       output: {
@@ -89,7 +111,7 @@ Sequences are multi-step campaigns that automate prospect engagement through ema
         createdAt: flat.createdAt,
         updatedAt: flat.updatedAt
       },
-      message: `Sequence **${flat.name}** (${flat.id}) updated successfully.`
+      message: `Sequence **${flat.name ?? flat.id}** (${flat.id}) updated successfully.`
     };
   })
   .build();

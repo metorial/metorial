@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let checkHealth = SlateTool.create(spec, {
@@ -11,7 +11,16 @@ export let checkHealth = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      instanceUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Instance origin for unauthenticated requests; must match a connected session when present.'
+        )
+    })
+  )
   .output(
     z.object({
       isHealthy: z.boolean().describe('Whether the Appsmith instance is operational.'),
@@ -19,10 +28,7 @@ export let checkHealth = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token ?? ''
-    });
+    const client = clientFor(ctx, ctx.input.instanceUrl);
 
     let result = await client.checkHealth();
 

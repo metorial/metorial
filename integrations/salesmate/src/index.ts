@@ -40,14 +40,6 @@ import {
   updateTicket
 } from './tools';
 
-import {
-  activityEvents,
-  companyEvents,
-  contactEvents,
-  dealEvents,
-  inboundWebhook
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -88,5 +80,5 @@ export let provider = Slate.create({
     listUsers,
     getUser
   ],
-  triggers: [inboundWebhook, contactEvents, companyEvents, dealEvents, activityEvents]
+  triggers: []
 });

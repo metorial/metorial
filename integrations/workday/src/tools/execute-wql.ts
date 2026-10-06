@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { WorkdayClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let executeWql = SlateTool.create(spec, {
@@ -36,11 +36,7 @@ export let executeWql = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let result = await client.executeWql(ctx.input.query, {
       limit: ctx.input.limit,

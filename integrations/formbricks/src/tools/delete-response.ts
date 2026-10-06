@@ -24,7 +24,8 @@ export let deleteResponse = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     await client.deleteResponse(ctx.input.responseId);

@@ -22,11 +22,11 @@ export let getCheckResults = SlateTool.create(spec, {
       status: z
         .string()
         .optional()
-        .describe('Filter by status: "up", "down", or "unconfirmed_down"'),
+        .describe('Filter by status: "up", "down", or "unconfirmed"'),
       limit: z
         .number()
         .optional()
-        .describe('Maximum number of results to return (default 100)'),
+        .describe('Maximum number of results to return (default 1000)'),
       offset: z.number().optional().describe('Offset for pagination'),
       probes: z.string().optional().describe('Comma-separated probe IDs to filter by'),
       includeAnalysis: z
@@ -37,6 +37,7 @@ export let getCheckResults = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of records returned in this response'),
       results: z
         .array(
           z.object({
@@ -64,14 +65,14 @@ export let getCheckResults = SlateTool.create(spec, {
     let result = await client.getCheckResults(ctx.input.checkId, {
       from: ctx.input.from,
       to: ctx.input.to,
-      status: ctx.input.status,
+      status: ctx.input.status === 'unconfirmed_down' ? 'unconfirmed' : ctx.input.status,
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       probes: ctx.input.probes,
       includeanalysis: ctx.input.includeAnalysis
     });
 
-    let results = (result.results || []).map((r: any) => ({
+    let results = result.results.map(r => ({
       probeId: r.probeid,
       time: r.time,
       status: r.status,
@@ -83,6 +84,7 @@ export let getCheckResults = SlateTool.create(spec, {
     return {
       output: {
         results,
+        returnedCount: results.length,
         activeProbes: result.activeprobes
       },
       message: `Retrieved **${results.length}** result(s) for check ${ctx.input.checkId}.`

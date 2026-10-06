@@ -1,6 +1,6 @@
 {
   "name": "@metorial/attio",
-  "description": "Manage a customizable CRM workspace including records, lists, notes, tasks, and comments. Create, read, update, delete, and search records across standard and custom objects (people, companies, deals). Upsert records using unique attributes to avoid duplicates. Organize records into lists (e.g., sales pipelines) and manage list entries. Create and manage notes attached to records, assign and complete tasks, and handle threaded comments. Configure the data model by defining custom objects and attributes. Access workspace member information, meeting data, and call recording transcripts. Subscribe to real-time webhook events for records, lists, notes, tasks, comments, and more.",
+  "description": "Manage a customizable CRM workspace including records, lists, notes, tasks, and comments. Create, read, update, delete, and search records across standard and custom objects (people, companies, deals). Upsert records using unique attributes to avoid duplicates. Organize records into lists (e.g., sales pipelines) and manage list entries. Create and manage notes attached to records, assign and complete tasks, and handle threaded comments. Configure the data model by defining custom objects and attributes. Access workspace member information, meeting data, and call recording transcripts.",
   "categories": ["crm-and-sales-tools", "task-and-project-management"],
   "skills": [
     "create and manage records",
@@ -10,7 +10,6 @@
     "assign and complete tasks",
     "manage threaded comments",
     "configure objects and attributes",
-    "subscribe to webhook events",
     "access call recordings",
     "manage workspace members"
   ],

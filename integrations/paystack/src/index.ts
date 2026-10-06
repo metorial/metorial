@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  archivePaymentRequest,
   chargeAuthorization,
   createCustomer,
   createDedicatedVirtualAccount,
@@ -11,8 +12,10 @@ import {
   createSubaccount,
   createSubscription,
   createTransferRecipient,
+  deleteTransferRecipient,
   disableSubscription,
   enableSubscription,
+  getBalance,
   getCustomer,
   getSubscription,
   initializeTransaction,
@@ -29,6 +32,7 @@ import {
   listSubaccounts,
   listSubscriptions,
   listTransactions,
+  listTransferRecipients,
   listTransfers,
   resolveCardBin,
   resolveDispute,
@@ -36,19 +40,9 @@ import {
   updatePaymentPage,
   updatePlan,
   verifyBankAccount,
-  verifyTransaction
+  verifyTransaction,
+  verifyTransfer
 } from './tools';
-import {
-  customerIdentificationEvents,
-  dedicatedVirtualAccountEvents,
-  disputeEvents,
-  invoiceEvents,
-  refundEvents,
-  subscriptionEvents,
-  transactionEvents,
-  transferEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -87,16 +81,12 @@ export let provider = Slate.create({
     resolveDispute,
     verifyBankAccount,
     listBanks,
-    resolveCardBin
+    resolveCardBin,
+    getBalance,
+    verifyTransfer,
+    listTransferRecipients,
+    deleteTransferRecipient,
+    archivePaymentRequest
   ],
-  triggers: [
-    transactionEvents,
-    transferEvents,
-    subscriptionEvents,
-    invoiceEvents,
-    refundEvents,
-    disputeEvents,
-    customerIdentificationEvents,
-    dedicatedVirtualAccountEvents
-  ]
+  triggers: []
 });

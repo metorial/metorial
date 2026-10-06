@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SerpApiClient } from '../lib/client';
+import { receiptMessage, receiptOutput, SerpApiClient } from '../lib/client';
+import { searchParams } from '../lib/params';
 import { spec } from '../spec';
 
 let organicResultSchema = z.object({
@@ -82,11 +83,38 @@ export let webSearchTool = SlateTool.create(spec, {
         .describe(
           'Date range filter (e.g., "d" for past day, "w" for past week, "m" for past month, "y" for past year)'
         ),
+      startOffset: z
+        .number()
+        .optional()
+        .describe(
+          'Exact native result offset for Google, Bing, DuckDuckGo, Yahoo or Baidu; mutually exclusive with page. Bing/Yahoo start at 1, others at 0.'
+        ),
+      regionId: z
+        .string()
+        .optional()
+        .describe('Native Yandex lr region ID; not an ISO country code.'),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Submit asynchronously and return the native search ID/status. Not compatible with noCache or Ludicrous Speed accounts.'
+        ),
       noCache: z.boolean().optional().describe('Force fresh results instead of cached')
     })
   )
   .output(
     z.object({
+      isComplete: z
+        .boolean()
+        .describe(
+          'Whether native search status is Success; queued/processing receipts are incomplete.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Native pagination metadata; follow native offsets/tokens without inferring a total.'
+        ),
       searchMetadata: z
         .object({
           searchId: z.string().optional().describe('Unique search identifier'),
@@ -112,30 +140,9 @@ export let webSearchTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SerpApiClient({ apiKey: ctx.auth.token });
+    let client = new SerpApiClient({ apiKey: ctx.auth.token, accountId: ctx.auth.accountId });
 
-    let params: Record<string, any> = {
-      engine: ctx.input.engine,
-      q: ctx.input.query
-    };
-
-    if (ctx.input.location) params.location = ctx.input.location;
-    if (ctx.input.language) params.hl = ctx.input.language;
-    if (ctx.input.country) params.gl = ctx.input.country;
-    if (ctx.input.numResults) params.num = ctx.input.numResults;
-    if (ctx.input.device) params.device = ctx.input.device;
-    if (ctx.input.noCache) params.no_cache = ctx.input.noCache;
-    if (ctx.input.safeSearch !== undefined)
-      params.safe = ctx.input.safeSearch ? 'active' : 'off';
-    if (ctx.input.dateRange) params.as_qdr = ctx.input.dateRange;
-
-    if (ctx.input.page !== undefined) {
-      if (ctx.input.engine === 'google') {
-        params.start = ctx.input.page * (ctx.input.numResults || 10);
-      } else if (ctx.input.engine === 'bing') {
-        params.first = ctx.input.page * 10;
-      }
-    }
+    let params = searchParams('web_search', ctx.input);
 
     let data = await client.search(params);
 
@@ -185,6 +192,7 @@ export let webSearchTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...receiptOutput(data),
         searchMetadata: {
           searchId: data.search_metadata?.id,
           status: data.search_metadata?.status,
@@ -197,7 +205,10 @@ export let webSearchTool = SlateTool.create(spec, {
         relatedSearches,
         relatedQuestions
       },
-      message: `Web search for "${ctx.input.query}" on ${ctx.input.engine} returned **${organicResults.length}** organic results${totalResults ? ` (out of ~${totalResults} total)` : ''}.${answerBox ? ' An answer box was found.' : ''}${knowledgeGraph ? ` Knowledge graph: "${knowledgeGraph.title}".` : ''}`
+      message: receiptMessage(
+        data,
+        `Web search for "${ctx.input.query}" on ${ctx.input.engine} returned **${organicResults.length}** organic results${totalResults ? ` (out of ~${totalResults} total)` : ''}.${answerBox ? ' An answer box was found.' : ''}${knowledgeGraph ? ` Knowledge graph: "${knowledgeGraph.title}".` : ''}`
+      )
     };
   })
   .build();

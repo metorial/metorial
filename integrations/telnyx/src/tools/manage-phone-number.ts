@@ -36,9 +36,9 @@ export let managePhoneNumber = SlateTool.create(spec, {
   .output(
     z.object({
       phoneNumberId: z.string().describe('Unique ID of the phone number'),
-      phoneNumber: z.string().optional().describe('Phone number in E.164 format'),
-      status: z.string().optional().describe('Current status'),
-      connectionId: z.string().optional().describe('Associated connection ID'),
+      phoneNumber: z.string().nullish().describe('Phone number in E.164 format'),
+      status: z.string().nullish().describe('Current status'),
+      connectionId: z.string().nullish().describe('Associated connection ID'),
       tags: z.array(z.string()).optional().describe('Tags on the number'),
       deleted: z.boolean().optional().describe('Whether the number was deleted')
     })

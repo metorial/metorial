@@ -1,6 +1,10 @@
 # Cody
 
-Create and manage custom AI bots trained on your own knowledge base. Upload documents (text, HTML, files, or web URLs), organize them into folders, and build conversations with AI bots that generate responses based on uploaded knowledge. Manage conversations with focus mode to restrict responses to specific documents. Send messages and receive AI-generated answers via standard responses or real-time SSE streaming.
+Use Cody business AI assistants with your knowledge base. Discover configured bots, organize documents in folders, import text, files, and webpages, and download documents as HTML. Create conversations with optional document focus, inspect response sources and usage, and receive AI answers directly or through streaming.
+
+Cody API access requires an eligible account. Create bots and API keys in the Cody dashboard. The public API supports folder creation and renaming, but does not expose folder deletion or bot management.
+
+Official API documentation: https://developers.meetcody.ai/
 
 ## License
 

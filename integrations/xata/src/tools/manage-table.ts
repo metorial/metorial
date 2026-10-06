@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let listTables = SlateTool.create(spec, {
   name: 'List Tables',
   key: 'list_tables',
-  description: `List all tables in a database branch. Returns table names and optionally their column schemas.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: List all tables in a database branch. Returns table names and optionally their column schemas.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -52,8 +56,12 @@ export let listTables = SlateTool.create(spec, {
 export let createTable = SlateTool.create(spec, {
   name: 'Create Table',
   key: 'create_table',
-  description: `Create a new table in a database branch.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Create a new table in a database branch.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })
@@ -94,8 +102,12 @@ export let createTable = SlateTool.create(spec, {
 export let deleteTable = SlateTool.create(spec, {
   name: 'Delete Table',
   key: 'delete_table',
-  description: `Delete a table and all its records from a database branch. This action cannot be undone.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Delete a table and all its records from a database branch. This action cannot be undone.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     destructive: true
   }
 })
@@ -132,8 +144,12 @@ export let deleteTable = SlateTool.create(spec, {
 export let getTableSchema = SlateTool.create(spec, {
   name: 'Get Table Schema',
   key: 'get_table_schema',
-  description: `Get the schema (column definitions) of a specific table. Useful for understanding the structure of a table before querying or inserting data.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Get the schema (column definitions) of a specific table. Useful for understanding the structure of a table before querying or inserting data.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -209,8 +225,12 @@ export let getTableSchema = SlateTool.create(spec, {
 export let addTableColumn = SlateTool.create(spec, {
   name: 'Add Table Column',
   key: 'add_table_column',
-  description: `Add a new column to an existing table. Supports all Xata column types including string, int, float, bool, text, email, datetime, vector, link, file, and json.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Add a new column to an existing table. Supports all Xata column types including string, int, float, bool, text, email, datetime, vector, link, file, and json.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })

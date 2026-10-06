@@ -67,8 +67,6 @@ import {
   updateTicket,
   updateTicketConversation
 } from './tools';
-import { changeUpdates, inboundWebhook, ticketUpdates } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -138,5 +136,5 @@ export let provider = Slate.create({
     getTicketActivities,
     listFormFields
   ],
-  triggers: [inboundWebhook, ticketUpdates, changeUpdates]
+  triggers: []
 });

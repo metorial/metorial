@@ -1,120 +1,17 @@
-Now let me get some more details on the Developer API resources and the data center base URLs.Now I have comprehensive information to write the specification. Let me compile it.
+# Workato
 
-# Slates Specification for Workato
+Use a Developer API client Bearer token with endpoint privileges, project scope, and the workspace's data center. The API is available only on supported plans. Legacy email/API-key authorization is no longer accepted by Workato. Stored token connections retain their previous configuration region fallback; reconnect to bind the region explicitly. Public hosts cover US, EU, JP, SG, AU, IL, CN, KR, UK, and Trial. Private workspaces need separate provider guidance.
 
-## Overview
+Twenty tools cover recipes and versions, connections, job history and exact jobs, projects/folders, deployments, export packages, lookup-table rows, data tables/records, event topics/messages, properties, API endpoint state, and authenticated workspace context. Workspace context is the account returned by `/users/me`, not a verified individual API-client identity. That endpoint needs Get details privilege and DEV environment access when environments are enabled.
 
-Workato is a cloud-based integration platform as a service (iPaaS) that enables organizations to connect applications, automate workflows, and manage APIs without extensive coding. It offers a Developer API for programmatic management of workspace resources like recipes, connections, jobs, and deployments, as well as an API Platform for building and exposing APIs. The platform supports over 1,000 pre-built connectors to SaaS apps, databases, and on-premises systems.
+Discover project/folder IDs first. Recipe create/copy and connection create require non-Home folder IDs from May 7, 2026. Data-table create requires a folder and columns with explicit `optional` booleans. Recipe updates require the recipe to be stopped. Optional false booleans, empty descriptions and string record values are preserved. Unknown omitted metadata is omitted from outputs.
 
-## Authentication
+Page-based lists return one native page; keep filters unchanged and increment the page. Connection lists are natively unpaged. Job history uses `offsetJobId` and `prev` for direction. Data-table queries retain native continuation tokens and map the matrix into separate `metadata` and `fields` objects. Repeat the exact query with the continuation token. Table management and records use the documented dedicated regional data-tables host; event-topic management uses the Developer API and message publish/consume use the regional event-streams host. Consume batch size is a maximum and cannot prove the topic is drained.
 
-Workato uses **Bearer Token (API Client Token)** authentication for its Developer API.
+`export_package` defaults to creating a manifest without auto-running it and initiating exactly one export. Use `action=status` or `download` with the returned `packageId` to avoid another export. Downloads require an exact completed export receipt and use the authenticated package-download endpoint to provide a ZIP file. Token rotation, redirect handling, file bytes, and deployed delivery remain live-unverified. Export manifests/package archives are retained, and export privilege grants visibility into included assets. Deployment submission can be pending or fail; read exact native status with `list_deployments` and `deploymentId`.
 
-**How to authenticate:**
+Starting or resetting recipes, authenticating connections, publishing events, enabling endpoints, and deploying can create irreversible external effects, jobs, scheduling, messages, or charges. Deleting a resource does not undo these. Folder force deletion removes all contents. Properties and newly created lookup tables have no deletion branch in these tools. No API-client/admin, rerun/resume/cancel job, import, AI-agent, user, or file-column tooling is provided.
 
-1. Sign in to your Workato workspace with the root email or an account with the Environment admin role (or a custom role with the "API clients" privilege).
-2. Navigate to **Workspace admin > API clients**.
-3. Create a **Client Role** that defines which API endpoints the client can access.
-4. Create an **API Client**, assign it a client role and project scopes.
-5. Upon creation, Workato generates a one-time-viewable API token. Store it securely.
+The active private suite has controlled mutation gates and native independent readbacks. Missing local credentials are a setup failure, not a suite-level skip. Current verification is offline/static only; no real jobs, deployments, connections, messages, exports, provider resources, or charges have been generated.
 
-**Using the token:**
-
-Include the token as a Bearer token in the `Authorization` header:
-
-```
-Authorization: Bearer <api_token>
-```
-
-**Base URLs** vary by data center:
-
-- United States: `https://www.workato.com/api/`
-- Europe: `https://app.eu.workato.com/api/`
-- Japan: `https://app.jp.workato.com/api/`
-- Singapore: `https://app.sg.workato.com/api/`
-- Australia: `https://app.au.workato.com/api/`
-
-**Scoping:** API client access is scoped at two levels — the client role defines which API endpoint categories are accessible (e.g., Recipes, Connections, Jobs), and project scopes define which projects within the workspace the client can interact with.
-
-**Note:** Legacy API key authentication (using `x-user-token` and `x-user-email` headers) has been fully deprecated as of July 2025.
-
-**For the API Platform (exposing APIs built on Workato):** Workato supports additional authentication methods for API consumers including Auth tokens, OAuth 2.0 (Client Credentials grant), JSON Web Tokens (JWT), and OpenID Connect. These are configured per API client/access profile and are relevant when consuming APIs built on the Workato API Platform, not the Developer API itself.
-
-## Features
-
-### Recipe Management
-
-Create, read, update, delete, start, stop, and copy automation recipes programmatically. You can also reset recipe triggers, update connections for stopped recipes, activate polling triggers, and manage recipe versions. Recipe health analysis is available (private beta) to retrieve optimization reports.
-
-### Connection Management
-
-List, create, update, disconnect, and delete connections to third-party applications. Connections represent authenticated links between Workato and external services.
-
-### Job Management
-
-View job execution history for recipes, including aggregated job counts (succeeded, failed) and individual job metadata such as status, timestamps, and error details.
-
-### Project and Folder Organization
-
-Manage the organizational structure of a workspace by creating, updating, and deleting projects and folders. Projects serve as top-level containers for recipes, connections, and other assets.
-
-### Project Deployment and Lifecycle
-
-Build projects and deploy them across environments (development, test, production). Supports a review workflow with the ability to assign reviewers, submit for review, approve, reject, and re-open deployments.
-
-### Recipe Lifecycle Management (Export/Import)
-
-Create export manifests to package workspace assets, export packages based on manifests, and import packages into target folders. Useful for CI/CD workflows and migrating recipes between workspaces.
-
-### API Platform Management
-
-Programmatically manage the API Platform: create and manage API collections, endpoints, API clients, and API keys. Enable or disable endpoints, and configure access profiles with different authentication methods.
-
-### Data Tables
-
-Create and manage structured data tables within Workato. Supports full CRUD operations on both tables and individual records, including querying records with filters and file upload/download capabilities. Record manipulation uses a separate base URL (`https://data-tables.workato.com`).
-
-### Lookup Tables
-
-Manage lookup tables for reference data used in recipes. Supports creating tables, adding/updating/deleting rows, and looking up rows by key values.
-
-### Event Streams (Pub/Sub)
-
-Create and manage event topics for publish/subscribe messaging between recipes and external systems. Publish individual or batch messages to topics and consume messages with cursor-based retrieval. Supports long polling for real-time consumption.
-
-- Event stream public APIs use a separate base URL: `https://event-streams.workato.com`
-
-### Agent Studio (Agentic AI)
-
-Manage AI agents ("Genies"), including creating, updating, starting, and stopping them. Assign skills and knowledge bases to agents, and manage user group access.
-
-### Workspace and Collaborator Management
-
-Invite collaborators to a workspace, manage their roles and project-level privileges, and organize collaborators into groups. Supports environment roles and project roles for granular access control.
-
-### Environment Management
-
-Manage workspace-level configuration including environment properties (key-value pairs), tags for organizing assets, audit log retrieval, and secrets management cache operations.
-
-### Custom Connectors and OAuth Profiles
-
-List custom connectors and generate schemas from JSON/CSV samples. Manage custom OAuth profiles for connector authentication.
-
-### Test Automation
-
-Run test cases for recipes and retrieve test results programmatically.
-
-## Events
-
-Workato does not expose a traditional webhook subscription API for external consumers to subscribe to platform-level events. However, it provides the following event mechanisms:
-
-### Webhook Gateway (Inbound)
-
-Workato can receive inbound webhooks from external systems through its Webhooks connector. Each webhook trigger generates a unique URL that external applications can send HTTP POST requests to. Events received at these URLs trigger recipe executions in real-time. Supports JSON, form-encoded, XML, raw binary, and Unicode text payloads. Webhook signature verification can be configured for security.
-
-### Event Streams (Pub/Sub)
-
-Workato Event Streams provides an event-driven messaging system with topics. External systems can publish messages to topics via the public API and consume messages from topics using cursor-based polling (with long-polling support). This enables decoupled, asynchronous communication between publishers and subscribers with guaranteed and persistent delivery.
-
-- **Publish:** Send individual or batch messages to a named topic.
-- **Consume:** Retrieve messages from a topic after a specific message ID or timestamp, with configurable long-polling timeout.
+Official references: [Developer API](https://docs.workato.com/workato-api.html), [recipes](https://docs.workato.com/workato-api/recipes.html), [connections](https://docs.workato.com/workato-api/connections.html), [jobs](https://docs.workato.com/workato-api/jobs.html), [folders](https://docs.workato.com/workato-api/folders.html), [deployments](https://docs.workato.com/en/workato-api/projects), [package lifecycle](https://docs.workato.com/workato-api/recipe-lifecycle-management.html), [lookup tables](https://docs.workato.com/workato-api/lookup-tables.html), [data tables](https://docs.workato.com/workato-api/data-tables.html), [event topics](https://docs.workato.com/workato-api/event-streams.html), [messages](https://docs.workato.com/en/workato-api/pubsub), [properties](https://docs.workato.com/en/workato-api/account-properties), [API endpoints](https://docs.workato.com/workato-api/api-platform.html), and [workspace details](https://docs.workato.com/workato-api/users.html).

@@ -31,13 +31,30 @@ export let listMeetings = SlateTool.create(spec, {
       participated: z
         .boolean()
         .optional()
-        .describe('Filter by whether the authenticated user participated in the meeting.'),
+        .describe(
+          'When true, only include meetings the authenticated user participated in. False includes all accessible meetings.'
+        ),
       meetingType: z
         .enum(['internal', 'external'])
         .optional()
         .describe('Filter by meeting type.'),
-      page: z.number().optional().describe('Page number for pagination (starts at 0).'),
-      limit: z.number().optional().describe('Maximum number of meetings to return per page.')
+      page: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          'Page number, starting at 1 (default 1). The legacy value 0 also requests the first page.'
+        ),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe(
+          'Results per page, from 1 to 100 (default 50). Refine the date range for more than 10,000 results.'
+        )
     })
   )
   .output(
@@ -58,7 +75,15 @@ export let listMeetings = SlateTool.create(spec, {
           })
         )
         .describe('List of meetings matching the filters.'),
-      hasMore: z.boolean().describe('Whether more results are available on the next page.')
+      hasMore: z.boolean().describe('Whether more results are available on the next page.'),
+      page: z.number().describe('Current page number.'),
+      pages: z.number().describe('Total number of pages.'),
+      total: z.number().describe('Total number of matching meetings.'),
+      pageSize: z.number().describe('Provider-reported page size.'),
+      nextPage: z
+        .number()
+        .optional()
+        .describe('Page to request next when more results are available.')
     })
   )
   .handleInvocation(async ctx => {
@@ -85,12 +110,18 @@ export let listMeetings = SlateTool.create(spec, {
       inviteeCount: m.invitees?.length ?? 0
     }));
 
+    let hasMore = result.page < result.pages;
     return {
       output: {
         meetings,
-        hasMore: result.hasMore ?? false
+        hasMore,
+        page: result.page,
+        pages: result.pages,
+        total: result.total,
+        pageSize: result.pageSize,
+        nextPage: hasMore ? result.page + 1 : undefined
       },
-      message: `Found **${meetings.length}** meeting(s).${result.hasMore ? ' More results are available on the next page.' : ''}`
+      message: `Found **${meetings.length}** meeting(s).${hasMore ? ' More results are available on the next page.' : ''}`
     };
   })
   .build();

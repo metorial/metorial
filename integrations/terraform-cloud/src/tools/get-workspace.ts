@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { organizationNameSchema } from '../lib/contracts';
 import { createClient } from '../lib/helpers';
 import { mapWorkspace } from '../lib/mappers';
 import { spec } from '../spec';
@@ -7,17 +8,20 @@ import { spec } from '../spec';
 export let getWorkspaceTool = SlateTool.create(spec, {
   name: 'Get Workspace',
   key: 'get_workspace',
-  description: `Get detailed information about a specific workspace by its ID or name. Returns full workspace configuration including execution mode, Terraform version, VCS settings, lock status, and resource count.`,
+  description: `Call list_organizations to select an organization or use the optional configured default. Get detailed information about a specific workspace by its ID or name. Returns full workspace configuration including execution mode, Terraform version, VCS settings, lock status, and resource count.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       workspaceId: z
         .string()
         .optional()
-        .describe('The workspace ID (e.g., ws-xxxxx). Provide either this or workspaceName.'),
+        .describe(
+          'Workspace ID (e.g., ws-xxxxx); takes precedence when workspaceName is also provided.'
+        ),
       workspaceName: z
         .string()
         .optional()
@@ -43,15 +47,14 @@ export let getWorkspaceTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let response: any;
-
-    if (ctx.input.workspaceId) {
-      response = await client.getWorkspace(ctx.input.workspaceId);
-    } else if (ctx.input.workspaceName) {
-      response = await client.getWorkspaceByName(ctx.input.workspaceName);
-    } else {
-      throw new Error('Either workspaceId or workspaceName must be provided');
+    if (!ctx.input.workspaceId && !ctx.input.workspaceName) {
+      throw createApiServiceError(
+        'Either workspaceId or workspaceName must be provided. Call list_workspaces for IDs and names.'
+      );
     }
+    const response = ctx.input.workspaceId
+      ? await client.getWorkspace(ctx.input.workspaceId)
+      : await client.getWorkspaceByName(ctx.input.workspaceName ?? '');
 
     let workspace = mapWorkspace(response.data);
 

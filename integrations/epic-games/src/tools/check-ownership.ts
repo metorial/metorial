@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EosAccountServicesClient } from '../lib/client';
+import { accountClient, resolvedSandbox } from '../lib/client';
 import { spec } from '../spec';
 
 let ownershipItemSchema = z.object({
@@ -29,7 +29,7 @@ Requires OAuth authentication with the account to verify.`,
         .string()
         .optional()
         .describe(
-          'Sandbox ID to list all owned items in. Uses the configured sandboxId if not provided.'
+          'Sandbox ID to list all owned items in. Uses the auth-observed or validated legacy sandbox only when available.'
         )
     })
   )
@@ -41,24 +41,18 @@ Requires OAuth authentication with the account to verify.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EosAccountServicesClient({
-      token: ctx.auth.token,
-      accountId: ctx.auth.accountId
-    });
-
-    let sandboxId = ctx.input.sandboxId ?? ctx.config.sandboxId;
-    let data = await client.checkOwnership(
+    const sandboxId = ctx.input.sandboxId ?? ctx.auth.sandboxId ?? ctx.config.sandboxId;
+    const resolved =
+      sandboxId !== undefined ? resolvedSandbox(ctx, ctx.input.sandboxId) : undefined;
+    const ownership = await accountClient(ctx).checkOwnership(
       ctx.input.accountId,
       ctx.input.catalogItemIds,
-      sandboxId
+      resolved
     );
-    let ownership = Array.isArray(data) ? data : [];
-
-    let ownedCount = ownership.filter((item: any) => item.owned).length;
-
     return {
       output: { ownership },
-      message: `Player owns **${ownedCount}** out of **${ownership.length}** checked item(s).`
+      message:
+        'Returned native durable-item ownership decisions; ownership is distinct from individual transaction entitlements.'
     };
   })
   .build();

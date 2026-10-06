@@ -1,6 +1,6 @@
 {
   "name": "@metorial/rev-ai",
-  "description": "Transcribe audio and video files to text using asynchronous or real-time streaming speech-to-text. Submit media via URL or file upload and retrieve transcripts in JSON, plain text, SRT, or VTT formats. Identify speakers with diarization, translate transcripts to other languages, generate summaries, extract topics, and analyze sentiment. Identify spoken languages in audio, perform forced alignment for precise word-level timestamps, and manage custom vocabularies to improve transcription accuracy. Supports 58+ languages, profanity filtering, verbatim mode, and webhook notifications for job completion.",
+  "description": "Transcribe recorded audio and video from a media URL. Retrieve plain text and timestamped transcripts, download SRT or VTT subtitles, translate transcripts, generate summaries, analyze sentiment, extract topics, identify spoken languages, and manage custom vocabularies. List and delete completed processing jobs, and inspect account credit balances.",
   "categories": [
     "apis-and-http-requests",
     "language-translation",
@@ -8,15 +8,13 @@
   ],
   "skills": [
     "transcribe audio to text",
-    "stream real-time transcription",
     "translate transcripts",
     "extract topics from text",
     "analyze transcript sentiment",
     "identify spoken language",
     "generate transcript summaries",
     "create custom vocabularies",
-    "generate captions SRT/VTT",
-    "align words with timestamps"
+    "generate captions SRT/VTT"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/rev_ai-logo.png"
 }

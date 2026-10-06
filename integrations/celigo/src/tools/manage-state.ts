@@ -1,16 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  keys: z.array(z.string()).optional().describe('List of state keys (for list_keys action)'),
+  stateValue: z.any().optional().describe('The state value (for get action)'),
+  updated: z.boolean().optional().describe('Whether the state was updated (for set action)'),
+  deleted: z.boolean().optional().describe('Whether the state was deleted (for delete action)')
+});
 
 export let manageState = SlateTool.create(spec, {
   name: 'Manage State',
   key: 'manage_state',
   description: `Read, write, or delete state data in Celigo. State is an API-only resource that stores arbitrary JSON data associated with a custom key.
-Supports both **global** state (account-level) and **resource-specific** state (scoped to a flow, export, import, etc.). Commonly used to persist flow execution data between runs.`,
+Supports both **global** state (account-level) and **resource-specific** state (scoped to exports, imports, or integrations). Commonly used to persist flow execution data between runs.`,
   instructions: [
     'For global state, omit resourceType and resourceId.',
-    'For resource-specific state, provide both resourceType (e.g., "flows", "exports", "imports") and resourceId.'
+    'For resource-specific state, provide both resourceType (e.g., "exports", "imports", "integrations") and resourceId.'
   ]
 })
   .input(
@@ -27,7 +35,7 @@ Supports both **global** state (account-level) and **resource-specific** state (
         .string()
         .optional()
         .describe(
-          'Resource type for resource-specific state (e.g., "flows", "exports", "imports"). Omit for global state.'
+          'Resource type for resource-specific state (e.g., "exports", "imports", "integrations"). Omit for global state.'
         ),
       resourceId: z
         .string()
@@ -35,84 +43,14 @@ Supports both **global** state (account-level) and **resource-specific** state (
         .describe('Resource ID for resource-specific state. Omit for global state.')
     })
   )
-  .output(
-    z.object({
-      keys: z
-        .array(z.string())
-        .optional()
-        .describe('List of state keys (for list_keys action)'),
-      stateValue: z.any().optional().describe('The state value (for get action)'),
-      updated: z
-        .boolean()
-        .optional()
-        .describe('Whether the state was updated (for set action)'),
-      deleted: z
-        .boolean()
-        .optional()
-        .describe('Whether the state was deleted (for delete action)')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let { action, key, stateValue, resourceType, resourceId } = ctx.input;
-    let isResourceScoped = resourceType && resourceId;
-
-    switch (action) {
-      case 'list_keys': {
-        let result: any;
-        if (isResourceScoped) {
-          result = await client.listResourceStateKeys(resourceType!, resourceId!);
-        } else {
-          result = await client.listGlobalStateKeys();
-        }
-        let keys = result.keys || [];
-        return {
-          output: { keys },
-          message: `Found **${keys.length}** state key(s)${isResourceScoped ? ` for ${resourceType}/${resourceId}` : ' (global)'}.`
-        };
-      }
-      case 'get': {
-        if (!key) throw new Error('key is required for get');
-        let result: any;
-        if (isResourceScoped) {
-          result = await client.getResourceState(resourceType!, resourceId!, key);
-        } else {
-          result = await client.getGlobalState(key);
-        }
-        return {
-          output: { stateValue: result },
-          message: `Retrieved state for key **${key}**${isResourceScoped ? ` (${resourceType}/${resourceId})` : ' (global)'}.`
-        };
-      }
-      case 'set': {
-        if (!key) throw new Error('key is required for set');
-        if (!stateValue) throw new Error('stateValue is required for set');
-        if (isResourceScoped) {
-          await client.setResourceState(resourceType!, resourceId!, key, stateValue);
-        } else {
-          await client.setGlobalState(key, stateValue);
-        }
-        return {
-          output: { updated: true },
-          message: `Updated state for key **${key}**${isResourceScoped ? ` (${resourceType}/${resourceId})` : ' (global)'}.`
-        };
-      }
-      case 'delete': {
-        if (!key) throw new Error('key is required for delete');
-        if (isResourceScoped) {
-          await client.deleteResourceState(resourceType!, resourceId!, key);
-        } else {
-          await client.deleteGlobalState(key);
-        }
-        return {
-          output: { deleted: true },
-          message: `Deleted state for key **${key}**${isResourceScoped ? ` (${resourceType}/${resourceId})` : ' (global)'}.`
-        };
-      }
-    }
+    const result = await invoke('manage_state', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

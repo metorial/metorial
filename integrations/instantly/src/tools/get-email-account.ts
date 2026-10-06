@@ -44,21 +44,21 @@ export let getEmailAccount = SlateTool.create(spec, {
     return {
       output: {
         email: a.email,
-        firstName: a.first_name,
-        lastName: a.last_name,
+        firstName: a.first_name ?? undefined,
+        lastName: a.last_name ?? undefined,
         status: a.status,
-        dailyLimit: a.daily_limit,
-        sendingGap: a.sending_gap,
-        warmupScore: a.stat_warmup_score,
+        dailyLimit: a.daily_limit ?? undefined,
+        sendingGap: typeof a.sending_gap === 'number' ? a.sending_gap * 60 : undefined,
+        warmupScore: a.stat_warmup_score ?? undefined,
         providerCode: a.provider_code,
-        trackingDomainName: a.tracking_domain_name,
-        trackingDomainStatus: a.tracking_domain_status,
+        trackingDomainName: a.tracking_domain_name ?? undefined,
+        trackingDomainStatus: a.tracking_domain_status ?? undefined,
         setupPending: a.setup_pending,
         isManagedAccount: a.is_managed_account,
-        enableSlowRamp: a.enable_slow_ramp,
+        enableSlowRamp: a.enable_slow_ramp ?? undefined,
         warmup: a.warmup,
         timestampCreated: a.timestamp_created,
-        timestampUpdated: a.timestamp_updated
+        timestampUpdated: a.timestamp_updated ?? undefined
       },
       message: `Retrieved email account **${a.email}** (status: ${a.status}).`
     };

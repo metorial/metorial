@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, records } from '../lib/client';
 import { spec } from '../spec';
 
 export let websightsLookup = SlateTool.create(spec, {
   name: 'WebSights IP Lookup',
   key: 'websights_lookup',
-  description: `Resolve IP addresses to company-level data using ZoomInfo WebSights. Identifies anonymous website visitors by mapping their IP addresses to firmographic details, enabling account-based marketing plays and alerting sales to engaged accounts. Supports both IPv4 and IPv6.`,
+  description: `Legacy Enterprise API capability, absent from the published current GTM Data API. Confirm route availability and separate entitlement with ZoomInfo before use. Resolve IP addresses to company-level data using ZoomInfo WebSights. Identifies anonymous website visitors by mapping their IP addresses to firmographic details, enabling account-based marketing plays and alerting sales to engaged accounts. Supports both IPv4 and IPv6.`,
   constraints: ['Requires separate WebSights subscription/entitlement.'],
   tags: {
     readOnly: true
@@ -23,21 +23,18 @@ export let websightsLookup = SlateTool.create(spec, {
   .output(
     z.object({
       results: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .describe(
           'Resolved company profiles, ISP information, and IP geolocation details for each IP address'
         )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion
-    });
+    const client = Client.fromContext(ctx);
 
     let result = await client.lookupWebSights(ctx.input.ipAddresses);
 
-    let results = result.data || result.result || [];
+    const results = records(result);
 
     return {
       output: { results },

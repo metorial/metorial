@@ -1,7 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  exportId: z.string().optional().describe('ID of the affected export'),
+  name: z.string().optional().describe('Name of the export'),
+  type: z.string().optional().describe('Type of the export'),
+  deleted: z.boolean().optional().describe('Whether the export was deleted'),
+  rawResult: z.any().optional().describe('Credential-filtered native API response')
+});
 
 export let manageExport = SlateTool.create(spec, {
   name: 'Manage Export',
@@ -14,6 +23,18 @@ Use **action** to specify the operation. For "create" and "update", provide the 
 })
   .input(
     z.object({
+      replaceAll: z
+        .boolean()
+        .optional()
+        .describe(
+          'Required true for full-replace updates. Provide the complete writable configuration; omitted settings may be cleared.'
+        ),
+      cloneOptions: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Documented clone request; flow clones require _integrationId and connectionMap. Integration clones require connectionMap.'
+        ),
       action: z
         .enum(['get', 'create', 'update', 'clone', 'delete'])
         .describe('The operation to perform'),
@@ -27,73 +48,14 @@ Use **action** to specify the operation. For "create" and "update", provide the 
         .describe('Export configuration data (required for create and update)')
     })
   )
-  .output(
-    z.object({
-      exportId: z.string().optional().describe('ID of the affected export'),
-      name: z.string().optional().describe('Name of the export'),
-      type: z.string().optional().describe('Type of the export'),
-      deleted: z.boolean().optional().describe('Whether the export was deleted'),
-      rawResult: z.any().optional().describe('Full API response')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let { action, exportId, exportData } = ctx.input;
-
-    if (action !== 'create' && !exportId) {
-      throw new Error('exportId is required for this action');
-    }
-
-    let result: any;
-    let message: string;
-
-    switch (action) {
-      case 'get': {
-        result = await client.getExport(exportId!);
-        message = `Retrieved export **${result.name || result._id}**.`;
-        break;
-      }
-      case 'create': {
-        if (!exportData) throw new Error('exportData is required for create');
-        result = await client.createExport(exportData);
-        message = `Created export **${result.name || result._id}**.`;
-        break;
-      }
-      case 'update': {
-        if (!exportData) throw new Error('exportData is required for update');
-        result = await client.updateExport(exportId!, exportData);
-        message = `Updated export **${result.name || result._id}**.`;
-        break;
-      }
-      case 'clone': {
-        result = await client.cloneExport(exportId!);
-        message = `Cloned export **${exportId}** → new export **${result._id}**.`;
-        break;
-      }
-      case 'delete': {
-        await client.deleteExport(exportId!);
-        return {
-          output: {
-            exportId: exportId!,
-            deleted: true
-          },
-          message: `Deleted export **${exportId}**.`
-        };
-      }
-    }
-
-    return {
-      output: {
-        exportId: result?._id || exportId,
-        name: result?.name,
-        type: result?.type,
-        rawResult: result
-      },
-      message
-    };
+    const result = await invoke('manage_export', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

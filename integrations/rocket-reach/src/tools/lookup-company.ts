@@ -14,9 +14,12 @@ Use this for **company enrichment** — get comprehensive metadata about any bus
     'Domain lookup (e.g., "tesla.com") is the most reliable method.',
     'Company lookups do not return employee contact information — use Search People to find contacts at a company.'
   ],
-  constraints: ['Company lookups require a separate purchase of Company Exports.'],
+  constraints: [
+    'Company enrichment may consume Company Export credits. Check Get Account and your plan access before running it; usage and lookup history cannot be rolled back by these tools.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -85,18 +88,28 @@ Use this for **company enrichment** — get comprehensive metadata about any bus
       domain: result.email_domain ?? result.domain,
       websiteUrl: result.website_url,
       tickerSymbol: result.ticker_symbol,
-      industry: result.industry_str ?? result.industry,
+      industry:
+        result.industry_str ??
+        (typeof result.industry === 'string' ? result.industry : undefined),
       employeeCount: result.num_employees ?? result.employee_count,
       revenue: result.revenue,
       city: result.city,
       region: result.region,
       countryCode: result.country_code,
       description: result.description,
-      founded: result.founded,
-      linkedinUrl: result.linkedin_url,
-      facebookUrl: result.facebook_url,
-      twitterUrl: result.twitter_url,
-      crunchbaseUrl: result.crunchbase_url,
+      founded: result.founded ?? result.year_founded,
+      linkedinUrl:
+        result.linkedin_url ??
+        (typeof result.links?.linkedin === 'string' ? result.links.linkedin : undefined),
+      facebookUrl:
+        result.facebook_url ??
+        (typeof result.links?.facebook === 'string' ? result.links.facebook : undefined),
+      twitterUrl:
+        result.twitter_url ??
+        (typeof result.links?.twitter === 'string' ? result.links.twitter : undefined),
+      crunchbaseUrl:
+        result.crunchbase_url ??
+        (typeof result.links?.crunchbase === 'string' ? result.links.crunchbase : undefined),
       phone: result.phone,
       fax: result.fax,
       totalFunding: result.total_funding,
@@ -109,7 +122,7 @@ Use this for **company enrichment** — get comprehensive metadata about any bus
 
     return {
       output,
-      message: `Retrieved firmographic data for **${result.name || ctx.input.domain || ctx.input.name || 'the requested company'}**${result.industry_str ? ` (${result.industry_str})` : ''}.`
+      message: `Retrieved firmographic data for **${result.name || result.email_domain || result.domain || 'the requested company'}**${result.industry_str ? ` (${result.industry_str})` : ''}.`
     };
   })
   .build();

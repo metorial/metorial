@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, optionalBoolean, optionalNumber, optionalText, text } from '../lib/client';
 import { spec } from '../spec';
 
 export let getActivities = SlateTool.create(spec, {
@@ -55,36 +55,27 @@ export let getActivities = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let data = await client.getActivities({
-      type: ctx.input.type,
-      campaignId: ctx.input.campaignId,
-      leadId: ctx.input.leadId,
-      isFirst: ctx.input.isFirst,
-      offset: ctx.input.offset,
-      limit: ctx.input.limit
-    });
-
-    let activities = (Array.isArray(data) ? data : []).map((a: any) => ({
-      activityId: a._id,
-      type: a.type,
-      leadId: a.leadId,
-      campaignId: a.campaignId,
-      campaignName: a.campaignName,
-      createdAt: a.createdAt,
-      leadEmail: a.leadEmail,
-      leadFirstName: a.leadFirstName,
-      leadLastName: a.leadLastName,
-      leadCompanyName: a.leadCompanyName,
-      sequenceStep: a.sequenceStep,
-      userName: a.userName,
-      isFirst: a.isFirst,
-      errorMessage: a.errorMessage
+    const client = new Client({ token: ctx.auth.token });
+    const data = await client.getActivities(ctx.input);
+    const activities = data.map(a => ({
+      activityId: text(a._id),
+      type: text(a.type, 'activity type'),
+      leadId: optionalText(a.leadId),
+      campaignId: optionalText(a.campaignId),
+      campaignName: optionalText(a.campaignName),
+      createdAt: optionalText(a.createdAt),
+      leadEmail: optionalText(a.leadEmail),
+      leadFirstName: optionalText(a.leadFirstName),
+      leadLastName: optionalText(a.leadLastName),
+      leadCompanyName: optionalText(a.leadCompanyName),
+      sequenceStep: optionalNumber(a.sequenceStep),
+      userName: optionalText(a.userName),
+      isFirst: optionalBoolean(a.isFirst),
+      errorMessage: optionalText(a.errorMessage)
     }));
-
     return {
       output: { activities },
-      message: `Retrieved **${activities.length}** activit${activities.length === 1 ? 'y' : 'ies'}${ctx.input.type ? ` of type "${ctx.input.type}"` : ''}.`
+      message: `Retrieved **${activities.length}** activities in this page.`
     };
   })
   .build();

@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubActionsClient } from '../lib/client';
+import type { PublicKey, Secret } from '../lib/types';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let secretSchema = z.object({
@@ -25,7 +27,8 @@ export let manageSecrets = SlateTool.create(spec, {
   ],
   constraints: ['Secret values cannot be read through the API, only metadata is returned.'],
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -83,23 +86,29 @@ export let manageSecrets = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
+    if (ctx.input.visibility === 'selected' && ctx.input.selectedRepositoryIds === undefined)
+      throw createApiServiceError(
+        'selectedRepositoryIds is required for selected visibility.'
+      );
     let client = new GitHubActionsClient(ctx.auth.token);
     let { scope, action, owner, repo, org, environmentName, secretName, perPage, page } =
       ctx.input;
 
     if (action === 'get_public_key') {
-      let key: any;
+      let key: PublicKey;
       if (scope === 'org') {
-        if (!org) throw new Error('org is required for org scope.');
+        if (!org) throw createApiServiceError('org is required for org scope.');
         key = await client.getOrgPublicKey(org);
       } else if (scope === 'environment') {
         if (!owner || !repo || !environmentName)
-          throw new Error(
+          throw createApiServiceError(
             'owner, repo, and environmentName are required for environment scope.'
           );
         key = await client.getEnvironmentPublicKey(owner, repo, environmentName);
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required for repo scope.');
+        if (!owner || !repo)
+          throw createApiServiceError('owner and repo are required for repo scope.');
         key = await client.getRepoPublicKey(owner, repo);
       }
       return {
@@ -109,22 +118,23 @@ export let manageSecrets = SlateTool.create(spec, {
     }
 
     if (action === 'list') {
-      let data: any;
+      let data: { total_count: number; secrets: Secret[] };
       if (scope === 'org') {
-        if (!org) throw new Error('org is required for org scope.');
+        if (!org) throw createApiServiceError('org is required for org scope.');
         data = await client.listOrgSecrets(org, { perPage, page });
       } else if (scope === 'environment') {
         if (!owner || !repo || !environmentName)
-          throw new Error('owner, repo, and environmentName are required.');
+          throw createApiServiceError('owner, repo, and environmentName are required.');
         data = await client.listEnvironmentSecrets(owner, repo, environmentName, {
           perPage,
           page
         });
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required for repo scope.');
+        if (!owner || !repo)
+          throw createApiServiceError('owner and repo are required for repo scope.');
         data = await client.listRepoSecrets(owner, repo, { perPage, page });
       }
-      let secrets = (data.secrets ?? []).map((s: any) => ({
+      let secrets = (data.secrets ?? []).map(s => ({
         secretName: s.name,
         createdAt: s.created_at,
         updatedAt: s.updated_at,
@@ -137,13 +147,19 @@ export let manageSecrets = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!secretName) throw new Error('secretName is required.');
-      let secret: any;
+      if (!secretName) throw createApiServiceError('secretName is required.');
+      let secret: Secret;
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         secret = await client.getOrgSecret(org, secretName);
+      } else if (scope === 'environment') {
+        if (!owner || !repo || !environmentName)
+          throw createApiServiceError(
+            'owner, repo, and environmentName are required for environment scope.'
+          );
+        secret = await client.getEnvironmentSecret(owner, repo, environmentName, secretName);
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         secret = await client.getRepoSecret(owner, repo, secretName);
       }
       return {
@@ -161,12 +177,12 @@ export let manageSecrets = SlateTool.create(spec, {
 
     if (action === 'create_or_update') {
       if (!secretName || !ctx.input.encryptedValue || !ctx.input.keyId) {
-        throw new Error(
+        throw createApiServiceError(
           'secretName, encryptedValue, and keyId are required for create_or_update.'
         );
       }
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         await client.createOrUpdateOrgSecret(org, secretName, {
           encryptedValue: ctx.input.encryptedValue,
           keyId: ctx.input.keyId,
@@ -175,7 +191,7 @@ export let manageSecrets = SlateTool.create(spec, {
         });
       } else if (scope === 'environment') {
         if (!owner || !repo || !environmentName)
-          throw new Error('owner, repo, and environmentName are required.');
+          throw createApiServiceError('owner, repo, and environmentName are required.');
         await client.createOrUpdateEnvironmentSecret(
           owner,
           repo,
@@ -185,7 +201,7 @@ export let manageSecrets = SlateTool.create(spec, {
           ctx.input.keyId
         );
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         await client.createOrUpdateRepoSecret(
           owner,
           repo,
@@ -201,16 +217,16 @@ export let manageSecrets = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!secretName) throw new Error('secretName is required.');
+      if (!secretName) throw createApiServiceError('secretName is required.');
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         await client.deleteOrgSecret(org, secretName);
       } else if (scope === 'environment') {
         if (!owner || !repo || !environmentName)
-          throw new Error('owner, repo, and environmentName are required.');
+          throw createApiServiceError('owner, repo, and environmentName are required.');
         await client.deleteEnvironmentSecret(owner, repo, environmentName, secretName);
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         await client.deleteRepoSecret(owner, repo, secretName);
       }
       return {
@@ -219,6 +235,6 @@ export let manageSecrets = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -3,9 +3,15 @@ import { spec } from './spec';
 import {
   createIncident,
   createScheduleOverride,
+  deleteScheduleOverride,
   editIncident,
+  getCatalogEntry,
+  getIdentity,
   getIncident,
+  getSchedule,
   getScheduleEntries,
+  getStatusPageIncident,
+  listAlertSources,
   listAlerts,
   listCatalogEntries,
   listCatalogTypes,
@@ -14,22 +20,23 @@ import {
   listIncidents,
   listSchedules,
   listSeveritiesAndStatuses,
+  listStatusPages,
   listUsers,
   listWorkflows,
   manageCatalogEntry,
   manageStatusPageIncident,
   sendAlertEvent
 } from './tools';
-import {
-  alertEvents,
-  followUpEvents,
-  incidentEvents,
-  incidentMembershipEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getIdentity,
+    getSchedule,
+    deleteScheduleOverride,
+    getCatalogEntry,
+    listStatusPages,
+    getStatusPageIncident,
+    listAlertSources,
     listIncidents,
     getIncident,
     createIncident,
@@ -49,5 +56,5 @@ export let provider = Slate.create({
     listUsers,
     listWorkflows
   ],
-  triggers: [incidentEvents, followUpEvents, alertEvents, incidentMembershipEvents]
+  triggers: []
 });

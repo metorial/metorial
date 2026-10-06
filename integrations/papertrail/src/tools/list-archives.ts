@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { archiveUrl } from '../lib/schemas';
 import { spec } from '../spec';
 
 let archiveSchema = z.object({
@@ -14,7 +15,7 @@ let archiveSchema = z.object({
 export let listArchives = SlateTool.create(spec, {
   name: 'List Archives',
   key: 'list_archives',
-  description: `List all available log archive files. Archives are hourly gzipped TSV files containing permanent log records. Returns download URLs for each archive.`,
+  description: `List all available log archive files. Archives are hourly or daily gzipped TSV files containing permanent log records. Returns download URLs for each archive.`,
   tags: {
     readOnly: true
   }
@@ -29,12 +30,12 @@ export let listArchives = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let data = await client.listArchives();
 
-    let archives = (Array.isArray(data) ? data : []).map((a: any) => ({
-      startAt: a.start || a.start_at || '',
-      endAt: a.end || a.end_at || '',
-      filename: a.filename || '',
-      filesize: a.filesize || 0,
-      downloadUrl: a._links?.download?.href || a.download_url || ''
+    let archives = data.map(a => ({
+      startAt: a.start,
+      endAt: a.end,
+      filename: a.filename,
+      filesize: a.filesize,
+      downloadUrl: archiveUrl(a._links.download.href)
     }));
 
     return {

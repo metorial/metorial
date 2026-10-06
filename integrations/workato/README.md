@@ -1,89 +1,17 @@
-# <img src="https://provider-logos.metorial-cdn.com/workato.png" height="20"> Workato
+# Workato
 
-Manage automation recipes, connections, and deployments on the Workato iPaaS platform. Create, start, stop, and copy recipes. Create and manage connections to third-party applications. View job execution history and error details. Organize assets into projects and folders. Build and deploy projects across environments with review workflows. Export and import recipe packages for CI/CD migrations. Manage the API Platform including API collections, endpoints, and client access profiles. Perform CRUD operations on data tables and lookup tables. Publish and consume messages via event stream topics for pub/sub messaging. Manage AI agents with skills and knowledge bases. Invite and manage workspace collaborators with role-based access control. Configure environment properties, tags, audit logs, and secrets. Run test cases for recipes and retrieve results. Generate connector schemas from JSON/CSV samples.
+Use a Developer API client Bearer token with endpoint privileges, project scope, and the workspace's data center. The API is available only on supported plans. Legacy email/API-key authorization is no longer accepted by Workato. Stored token connections retain their previous configuration region fallback; reconnect to bind the region explicitly. Public hosts cover US, EU, JP, SG, AU, IL, CN, KR, UK, and Trial. Private workspaces need separate provider guidance.
 
-## Tools
+Twenty tools cover recipes and versions, connections, job history and exact jobs, projects/folders, deployments, export packages, lookup-table rows, data tables/records, event topics/messages, properties, API endpoint state, and authenticated workspace context. Workspace context is the account returned by `/users/me`, not a verified individual API-client identity. That endpoint needs Get details privilege and DEV environment access when environments are enabled.
 
-### Deploy Project
+Discover project/folder IDs first. Recipe create/copy and connection create require non-Home folder IDs from May 7, 2026. Data-table create requires a folder and columns with explicit `optional` booleans. Recipe updates require the recipe to be stopped. Optional false booleans, empty descriptions and string record values are preserved. Unknown omitted metadata is omitted from outputs.
 
-Build and deploy a Workato project to a target environment. This performs a one-step build-and-deploy operation. Use to promote project changes across environments (sandbox, test, stage, uat, preprod, prod).
+Page-based lists return one native page; keep filters unchanged and increment the page. Connection lists are natively unpaged. Job history uses `offsetJobId` and `prev` for direction. Data-table queries retain native continuation tokens and map the matrix into separate `metadata` and `fields` objects. Repeat the exact query with the continuation token. Table management and records use the documented dedicated regional data-tables host; event-topic management uses the Developer API and message publish/consume use the regional event-streams host. Consume batch size is a maximum and cannot prove the topic is drained.
 
-### Export Package
+`export_package` defaults to creating a manifest without auto-running it and initiating exactly one export. Use `action=status` or `download` with the returned `packageId` to avoid another export. Downloads require an exact completed export receipt and use the authenticated package-download endpoint to provide a ZIP file. Token rotation, redirect handling, file bytes, and deployed delivery remain live-unverified. Export manifests/package archives are retained, and export privilege grants visibility into included assets. Deployment submission can be pending or fail; read exact native status with `list_deployments` and `deploymentId`.
 
-Create an export manifest and export a package of workspace assets from a folder. Useful for CI/CD pipelines and migrating recipes between workspaces. Automatically generates the manifest and initiates the export.
+Starting or resetting recipes, authenticating connections, publishing events, enabling endpoints, and deploying can create irreversible external effects, jobs, scheduling, messages, or charges. Deleting a resource does not undo these. Folder force deletion removes all contents. Properties and newly created lookup tables have no deletion branch in these tools. No API-client/admin, rerun/resume/cancel job, import, AI-agent, user, or file-column tooling is provided.
 
-### Get Recipe Versions
+The active private suite has controlled mutation gates and native independent readbacks. Missing local credentials are a setup failure, not a suite-level skip. Current verification is offline/static only; no real jobs, deployments, connections, messages, exports, provider resources, or charges have been generated.
 
-List all versions of a specific recipe. Each version includes the author, comment, version number, and timestamps. Useful for auditing recipe changes.
-
-### Get Recipe
-
-Retrieve detailed information about a specific Workato recipe including its code, configuration, connected applications, job counts, and version info.
-
-### Get Workspace Info
-
-Retrieve information about the current Workato workspace, including the workspace name, plan, recipe counts, billing period, and root folder ID.
-
-### List Connections
-
-List connections to third-party applications in the Workato workspace. Filter by folder, project, or update time. Returns connection metadata including authorization status.
-
-### List Deployments
-
-List project deployments in the Workato workspace. Filter by project, environment type, or deployment state. Returns deployment metadata and status.
-
-### List Jobs
-
-Retrieve job execution history for a specific recipe. Filter by status to see only succeeded, failed, or pending jobs. Returns aggregated counts and individual job metadata.
-
-### List Projects
-
-List all projects in the Workato workspace. Projects are top-level containers for organizing recipes, connections, and other assets.
-
-### List Recipes
-
-List automation recipes in the Workato workspace. Filter by folder, running state, or connected applications. Returns recipe metadata including name, status, trigger/action apps, and job counts.
-
-### Manage API Endpoints
-
-List API collections and endpoints in the Workato API Platform. Enable or disable individual API endpoints. Use to manage the lifecycle of APIs built on Workato.
-
-### Manage Connection
-
-Create, disconnect, or delete a connection to a third-party application. When creating, specify the provider name and optional credential inputs. Connections can be disconnected (revoked) or permanently deleted.
-
-### Manage Data Table
-
-List, create, or delete structured data tables in Workato. Also supports querying records, creating records, updating records, and deleting records within a data table.
-
-### Manage Environment Properties
-
-List or upsert workspace environment properties (key-value pairs). Properties are used for storing configuration values accessible across recipes, such as API URLs, feature flags, and environment-specific settings.
-
-### Manage Event Topic
-
-Create, update, list, or delete event stream topics. Topics are channels for pub/sub messaging between recipes and external systems. Also supports publishing and consuming messages.
-
-### Manage Folder
-
-Create, update, or delete folders within a Workato workspace. Folders organize recipes and connections within projects. Also supports listing folders within a parent.
-
-### Manage Lookup Table
-
-List lookup tables, create new ones, or manage rows within a lookup table. Lookup tables store reference data used in recipes (e.g. status code mappings, region configurations).
-
-### Manage Recipe
-
-Create, update, or delete a Workato recipe. When creating, provide a name and optionally recipe code and folder. When updating, provide the recipe ID and the fields to change. The recipe must be stopped to update it.
-
-### Start/Stop Recipe
-
-Start or stop a Workato recipe. Also supports copying a recipe to a different folder, resetting the trigger cursor, or updating a recipe's connection.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Official references: [Developer API](https://docs.workato.com/workato-api.html), [recipes](https://docs.workato.com/workato-api/recipes.html), [connections](https://docs.workato.com/workato-api/connections.html), [jobs](https://docs.workato.com/workato-api/jobs.html), [folders](https://docs.workato.com/workato-api/folders.html), [deployments](https://docs.workato.com/en/workato-api/projects), [package lifecycle](https://docs.workato.com/workato-api/recipe-lifecycle-management.html), [lookup tables](https://docs.workato.com/workato-api/lookup-tables.html), [data tables](https://docs.workato.com/workato-api/data-tables.html), [event topics](https://docs.workato.com/workato-api/event-streams.html), [messages](https://docs.workato.com/en/workato-api/pubsub), [properties](https://docs.workato.com/en/workato-api/account-properties), [API endpoints](https://docs.workato.com/workato-api/api-platform.html), and [workspace details](https://docs.workato.com/workato-api/users.html).

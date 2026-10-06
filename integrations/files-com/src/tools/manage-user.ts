@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { nativeId, optionalText, reject, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageUser = SlateTool.create(spec, {
@@ -71,15 +72,12 @@ export let manageUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let { action, userId } = ctx.input;
 
     if (action === 'delete') {
-      if (!userId) throw new Error('userId is required for delete');
+      if (!userId) reject('userId is required for delete');
       await client.deleteUser(userId);
       return {
         output: { userId, deleted: true },
@@ -116,14 +114,14 @@ export let manageUser = SlateTool.create(spec, {
       data.authenticate_until = ctx.input.authenticateUntil;
 
     if (action === 'create') {
-      if (!ctx.input.username) throw new Error('username is required for create');
+      if (!ctx.input.username) reject('username is required for create');
       let result = await client.createUser(data);
       return {
         output: {
-          userId: Number(result.id),
-          username: String(result.username ?? ''),
-          email: result.email ? String(result.email) : undefined,
-          name: result.name ? String(result.name) : undefined,
+          userId: nativeId(result.id),
+          username: text(result.username),
+          email: optionalText(result.email),
+          name: optionalText(result.name),
           siteAdmin: typeof result.site_admin === 'boolean' ? result.site_admin : undefined
         },
         message: `Created user **${result.username}** (ID: ${result.id})`
@@ -131,14 +129,14 @@ export let manageUser = SlateTool.create(spec, {
     }
 
     // update
-    if (!userId) throw new Error('userId is required for update');
+    if (!userId) reject('userId is required for update');
     let result = await client.updateUser(userId, data);
     return {
       output: {
-        userId: Number(result.id),
-        username: String(result.username ?? ''),
-        email: result.email ? String(result.email) : undefined,
-        name: result.name ? String(result.name) : undefined,
+        userId: nativeId(result.id),
+        username: text(result.username),
+        email: optionalText(result.email),
+        name: optionalText(result.name),
         siteAdmin: typeof result.site_admin === 'boolean' ? result.site_admin : undefined
       },
       message: `Updated user **${result.username}** (ID: ${result.id})`

@@ -44,6 +44,13 @@ export let enrollMfaFactor = SlateTool.create(spec, {
         .nullable()
         .optional()
         .describe('Display name of the factor type'),
+      factorData: z
+        .record(z.string(), z.unknown())
+        .nullable()
+        .optional()
+        .describe(
+          'Native setup data including verification token or TOTP setup URL when returned; keep it private'
+        ),
       expiresAt: z
         .string()
         .nullable()
@@ -52,12 +59,9 @@ export let enrollMfaFactor = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       factor_id: ctx.input.factorId,
       display_name: ctx.input.displayName
     };
@@ -66,7 +70,7 @@ export let enrollMfaFactor = SlateTool.create(spec, {
     if (ctx.input.customMessage) body.custom_message = ctx.input.customMessage;
 
     let result = await client.enrollFactor(ctx.input.userId, body);
-    let enrollment = Array.isArray(result) ? result[0] : result;
+    let enrollment = result;
 
     return {
       output: {
@@ -74,7 +78,8 @@ export let enrollMfaFactor = SlateTool.create(spec, {
         status: enrollment.status,
         authFactorName: enrollment.auth_factor_name,
         typeDisplayName: enrollment.type_display_name,
-        expiresAt: enrollment.expires_at
+        expiresAt: enrollment.expires_at,
+        factorData: enrollment.factor_data
       },
       message: `Enrolled MFA factor **${enrollment.auth_factor_name || enrollment.type_display_name}** for user ${ctx.input.userId}. Status: **${enrollment.status}**. Registration ID: \`${enrollment.id}\``
     };

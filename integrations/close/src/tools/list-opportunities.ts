@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapOpportunity } from '../lib/models';
 import { spec } from '../spec';
 
 export let listOpportunities = SlateTool.create(spec, {
@@ -31,61 +32,38 @@ Returns a paginated list of opportunities along with total results and whether m
   )
   .output(
     z.object({
+      nextSkip: z.number().optional().describe('Offset for the next page, when available.'),
       opportunities: z.array(
         z.object({
           opportunityId: z.string().describe('Opportunity ID'),
           leadId: z.string().describe('Associated lead ID'),
           statusId: z.string().describe('Status ID'),
-          statusLabel: z.string().describe('Human-readable status label'),
-          statusType: z.string().describe('Status type (active, won, or lost)'),
+          statusLabel: z.string().optional().describe('Human-readable status label'),
+          statusType: z.string().optional().describe('Status type (active, won, or lost)'),
           confidence: z.number().describe('Confidence percentage'),
-          value: z.number().describe('Monetary value in cents'),
+          value: z.number().optional().describe('Monetary value in cents'),
           valuePeriod: z.string().describe('Value period (one_time, monthly, or annual)'),
           dateCreated: z.string().describe('Creation timestamp'),
           dateUpdated: z.string().describe('Last update timestamp')
         })
       ),
-      totalResults: z.number().describe('Total number of matching opportunities'),
+      totalResults: z.number().optional().describe('Total number of matching opportunities'),
       hasMore: z
         .boolean()
         .describe('Whether more results are available beyond the current page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-    let response = await client.listOpportunities({
-      leadId: ctx.input.leadId,
-      userId: ctx.input.userId,
-      statusId: ctx.input.statusId,
-      statusType: ctx.input.statusType,
-      query: ctx.input.query,
-      limit: ctx.input.limit ?? 100,
-      skip: ctx.input.skip
-    });
-
-    let opportunities = (response.data ?? []).map((o: any) => ({
-      opportunityId: o.id,
-      leadId: o.lead_id,
-      statusId: o.status_id,
-      statusLabel: o.status_label ?? '',
-      statusType: o.status_type ?? '',
-      confidence: o.confidence ?? 0,
-      value: o.value ?? 0,
-      valuePeriod: o.value_period ?? 'one_time',
-      dateCreated: o.date_created,
-      dateUpdated: o.date_updated
-    }));
-
-    let totalResults = response.total_results ?? opportunities.length;
-    let hasMore = (ctx.input.skip ?? 0) + opportunities.length < totalResults;
-
+    const result = await new Client(ctx.auth).listOpportunities(ctx.input);
+    const opportunities = result.data.map(mapOpportunity);
     return {
       output: {
         opportunities,
-        totalResults,
-        hasMore
+        totalResults: result.total_results ?? undefined,
+        hasMore: result.has_more,
+        nextSkip: result.has_more ? (ctx.input.skip ?? 0) + opportunities.length : undefined
       },
-      message: `Found **${totalResults}** opportunities${ctx.input.leadId ? ` for lead **${ctx.input.leadId}**` : ''}${ctx.input.statusType ? ` (status: ${ctx.input.statusType})` : ''} — returning ${opportunities.length} results.`
+      message: `Returned ${opportunities.length} opportunity record(s)${result.has_more ? '; more available' : ''}.`
     };
   })
   .build();

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteContact = SlateTool.create(spec, {
   name: 'Delete Contact',
   key: 'delete_contact',
-  description: `Permanently delete a contact from Salesflare.`,
+  description: `Delete a contact from Salesflare's active CRM. Contact history may remain and the contact may be restored; this does not permanently erase its history.`,
   tags: {
     destructive: true
   }
@@ -27,7 +27,7 @@ export let deleteContact = SlateTool.create(spec, {
 
     return {
       output: { success: true },
-      message: `Deleted contact **${ctx.input.contactId}**.`
+      message: `Deleted contact **${ctx.input.contactId}** from the active CRM. Contact history may remain.`
     };
   })
   .build();

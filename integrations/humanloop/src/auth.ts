@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { rejectHumanloopOperation } from './lib/retirement';
 
 export let auth = SlateAuth.create()
   .output(
@@ -9,18 +10,14 @@ export let auth = SlateAuth.create()
   )
   .addTokenAuth({
     type: 'auth.token',
-    name: 'API Key',
+    name: 'API Key (retired)',
     key: 'api_key',
     inputSchema: z.object({
       apiKey: z
         .string()
-        .describe("Your Humanloop API key. Create one from your Organization's API Keys page.")
+        .describe(
+          'Legacy Humanloop API key. Humanloop retired on September 8, 2025; new connections are unavailable.'
+        )
     }),
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.apiKey
-        }
-      };
-    }
+    getOutput: async () => rejectHumanloopOperation()
   });

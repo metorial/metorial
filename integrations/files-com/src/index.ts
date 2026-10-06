@@ -14,8 +14,12 @@ import {
   manageUser,
   searchHistory
 } from './tools';
-import { actionLog, fileActivity } from './triggers';
-
+import {
+  downloadFile,
+  getCurrentUser,
+  getFileOperation,
+  uploadFile
+} from './tools/file-transfer';
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,7 +34,11 @@ export let provider = Slate.create({
     manageShareLink,
     manageAutomation,
     manageNotification,
-    searchHistory
+    searchHistory,
+    downloadFile,
+    uploadFile,
+    getFileOperation,
+    getCurrentUser
   ],
-  triggers: [fileActivity, actionLog]
+  triggers: []
 });

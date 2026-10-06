@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapVendor } from '../lib/schemas';
 import { spec } from '../spec';
 
 let vendorSchema = z.object({
@@ -8,7 +9,7 @@ let vendorSchema = z.object({
   companyName: z.string().nullable().optional().describe('Company name of the vendor'),
   email: z.string().nullable().optional().describe('Contact email'),
   phone: z.string().nullable().optional().describe('Contact phone'),
-  status: z.string().optional().describe('Vendor status')
+  status: z.string().nullish().describe('Vendor status')
 });
 
 export let listVendors = SlateTool.create(spec, {
@@ -32,27 +33,14 @@ export let listVendors = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.listVendors({
+    const result = await new Client({ token: ctx.auth.token }).listVendors({
       cursor: ctx.input.cursor,
       limit: ctx.input.limit
     });
-
-    let vendors = result.items.map((v: any) => ({
-      vendorId: v.id,
-      companyName: v.company_name ?? null,
-      email: v.email ?? null,
-      phone: v.phone ?? null,
-      status: v.status
-    }));
-
+    const vendors = result.items.map(mapVendor);
     return {
-      output: {
-        vendors,
-        nextCursor: result.next_cursor
-      },
-      message: `Found **${vendors.length}** vendor(s).${result.next_cursor ? ' More results available.' : ''}`
+      output: { vendors, nextCursor: result.next_cursor },
+      message: `Returned ${vendors.length} vendors.`
     };
   })
   .build();

@@ -1,7 +1,49 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { V0Client } from '../lib/client';
 import { spec } from '../spec';
+
+const balanceSchema = z.object({ remaining: z.number(), total: z.number() });
+const cycleSchema = z.object({ start: z.number(), end: z.number() });
+const planSchema = z.object({
+  object: z.string(),
+  plan: z.string(),
+  billingCycle: cycleSchema,
+  balance: balanceSchema
+});
+const billingSchema = z.object({
+  billingType: z.string(),
+  data: z.object({
+    plan: z.string().optional(),
+    billingMode: z.string().optional(),
+    role: z.string().optional(),
+    billingCycle: cycleSchema.optional(),
+    balance: balanceSchema.optional(),
+    onDemand: z
+      .object({
+        balance: z.number(),
+        blocks: z
+          .array(
+            z.object({
+              expirationDate: z.number().optional(),
+              effectiveDate: z.number(),
+              originalBalance: z.number(),
+              currentBalance: z.number()
+            })
+          )
+          .optional()
+      })
+      .optional(),
+    remaining: z.number().optional(),
+    reset: z.number().optional(),
+    limit: z.number().optional()
+  })
+});
+const safeAccountData = <T>(schema: z.ZodType<T>, value: unknown): T => {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw createApiServiceError('v0 returned unexpected account data.');
+  return parsed.data;
+};
 
 export let getAccountInfoTool = SlateTool.create(spec, {
   name: 'Get Account Info',
@@ -32,14 +74,14 @@ export let getAccountInfoTool = SlateTool.create(spec, {
     let client = new V0Client(ctx.auth.token);
     let user = await client.getUser();
 
-    let billing: any;
-    let plan: any;
+    let billing: Record<string, unknown> | undefined;
+    let plan: Record<string, unknown> | undefined;
 
     if (ctx.input.includeBilling) {
-      billing = await client.getBilling();
+      billing = safeAccountData(billingSchema, await client.getBilling());
     }
     if (ctx.input.includePlan) {
-      plan = await client.getPlan();
+      plan = safeAccountData(planSchema, await client.getPlan());
     }
 
     return {

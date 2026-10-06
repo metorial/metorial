@@ -1,12 +1,12 @@
 import { SlateConfig } from 'slates';
 import { z } from 'zod';
-
 export let config = SlateConfig.create(
   z.object({
     pageId: z
       .string()
+      .optional()
       .describe(
-        'The Page ID found on the Statuspage API info page. Most API operations are scoped to this page.'
+        'Optional default Page ID. Use list_pages to discover accessible pages; each page-scoped tool accepts an override.'
       )
   })
-);
+).getDefaultConfig(() => ({}));

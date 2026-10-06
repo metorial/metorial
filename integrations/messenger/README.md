@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/meta.jpg" height="20"> Messenger
 
-Send and receive messages between Facebook Pages and users through Messenger. Create rich message templates including carousels, buttons, receipts, and media. Upload reusable media attachments for later sends. Manage Messenger profile settings such as greeting text, persistent menus, get started buttons, account linking, and ice breakers. Retrieve user profile information. Display typing indicators and read receipts. Handle and inspect conversation handover between bots and live agents. Subscribe to real-time webhook events for messages, postbacks, referrals, reactions, deliveries, and read receipts. Supports a 24-hour messaging window with message tags for follow-up communications.
+Send and receive messages between Facebook Pages and users through Messenger. Create rich message templates including carousels, buttons, receipts, and media. Upload reusable media attachments for later sends. Manage Messenger profile settings such as greeting text, persistent menus, get started buttons, account linking, and ice breakers. Retrieve user profile information. Display typing indicators and read receipts. Handle and inspect conversation handover between bots and live agents. Supports a 24-hour messaging window with message tags for follow-up communications.
 
 ## Tools
 

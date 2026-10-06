@@ -1,233 +1,222 @@
-import { createAxios } from 'slates';
+import {
+  AuthConfigSecretRedactor,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  requestAxios,
+  requestAxiosData
+} from 'slates';
+import { deelError } from './errors';
+import { parseDeelResponse } from './json';
+import { requireText } from './response';
 
 export interface ClientConfig {
   token: string;
+  refreshToken?: string;
   clientId?: string;
   environment: 'production' | 'sandbox';
 }
-
+export type DeelParameters = Record<string, string | number | boolean | string[] | undefined>;
 export class Client {
   private http;
-
+  private redactor: AuthConfigSecretRedactor;
   constructor(config: ClientConfig) {
-    let baseURL =
-      config.environment === 'sandbox'
-        ? 'https://api-sandbox.demo.deel.com/rest/v2'
-        : 'https://api.letsdeel.com/rest/v2';
-
-    let headers: Record<string, string> = {
-      Authorization: `Bearer ${config.token}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
-    };
-
-    if (config.clientId) {
-      headers['x-client-id'] = config.clientId;
-    }
-
-    this.http = createAxios({ baseURL, headers });
-  }
-
-  // --- Contracts ---
-
-  async listContracts(params?: Record<string, any>) {
-    let response = await this.http.get('/contracts', { params });
-    return response.data;
-  }
-
-  async getContract(contractId: string) {
-    let response = await this.http.get(`/contracts/${contractId}`);
-    return response.data;
-  }
-
-  async createContract(data: Record<string, any>) {
-    let response = await this.http.post('/contracts', { data });
-    return response.data;
-  }
-
-  async amendContract(contractId: string, data: Record<string, any>) {
-    let response = await this.http.post(`/contracts/${contractId}/amendments`, { data });
-    return response.data;
-  }
-
-  async signContract(contractId: string) {
-    let response = await this.http.post(`/contracts/${contractId}/signatures`);
-    return response.data;
-  }
-
-  async terminateContract(contractId: string, data: Record<string, any>) {
-    let response = await this.http.post(`/contracts/${contractId}/terminations`, { data });
-    return response.data;
-  }
-
-  // --- People ---
-
-  async listPeople(params?: Record<string, any>) {
-    let response = await this.http.get('/people', { params });
-    return response.data;
-  }
-
-  async getPerson(personId: string) {
-    let response = await this.http.get(`/people/${personId}`);
-    return response.data;
-  }
-
-  // --- Timesheets ---
-
-  async listTimesheets(contractId: string, params?: Record<string, any>) {
-    let response = await this.http.get(`/contracts/${contractId}/timesheets`, { params });
-    return response.data;
-  }
-
-  async createTimesheet(data: Record<string, any>) {
-    let response = await this.http.post('/timesheets', { data });
-    return response.data;
-  }
-
-  async reviewTimesheet(timesheetId: string, data: { status: string; reason?: string }) {
-    let response = await this.http.post(`/timesheets/${timesheetId}/reviews`, { data });
-    return response.data;
-  }
-
-  async reviewTimesheetsBatch(data: {
-    timesheets: Array<{ id: string; status: string; reason?: string }>;
-  }) {
-    let response = await this.http.post('/timesheets/many/reviews', { data });
-    return response.data;
-  }
-
-  // --- Time Off ---
-
-  async listTimeOffs(profileId: string, params?: Record<string, any>) {
-    let response = await this.http.get(`/time_offs/profile/${profileId}`, { params });
-    return response.data;
-  }
-
-  async createTimeOff(data: Record<string, any>) {
-    let response = await this.http.post('/time_offs', { data });
-    return response.data;
-  }
-
-  async updateTimeOff(timeOffId: string, data: Record<string, any>) {
-    let response = await this.http.patch(`/time_offs/${timeOffId}`, { data });
-    return response.data;
-  }
-
-  async deleteTimeOff(timeOffId: string) {
-    let response = await this.http.delete(`/time_offs/${timeOffId}`);
-    return response.data;
-  }
-
-  // --- Invoice Adjustments ---
-
-  async listInvoiceAdjustments(params?: Record<string, any>) {
-    let response = await this.http.get('/invoice-adjustments', { params });
-    return response.data;
-  }
-
-  async listContractInvoiceAdjustments(contractId: string, params?: Record<string, any>) {
-    let response = await this.http.get(`/contracts/${contractId}/invoice-adjustments`, {
-      params
+    requireText(config.token, 'Deel token');
+    if (config.clientId !== undefined) requireText(config.clientId, 'OAuth client ID');
+    if (!['production', 'sandbox'].includes(config.environment))
+      throw createApiServiceError('Select a valid Deel environment.');
+    this.redactor = new AuthConfigSecretRedactor({
+      token: config.token,
+      refreshToken: config.refreshToken
     });
-    return response.data;
+    this.http = createAuthenticatedAxios({
+      baseURL:
+        config.environment === 'sandbox'
+          ? 'https://api-sandbox.demo.deel.com/rest'
+          : 'https://api.letsdeel.com/rest',
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 30000,
+      maxRedirects: 0,
+      transformResponse: [parseDeelResponse],
+      headers: {
+        Accept: 'application/json',
+        'X-Version': '2026-01-01',
+        ...(config.clientId ? { 'x-client-id': config.clientId } : {})
+      },
+      paramsSerializer: { indexes: null }
+    });
   }
-
-  async createInvoiceAdjustment(data: Record<string, any>) {
-    let response = await this.http.post('/invoice-adjustments', { data });
-    return response.data;
-  }
-
-  async reviewInvoiceAdjustment(
-    adjustmentId: string,
-    data: { status: string; reason?: string }
+  private async request(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    url: string,
+    data?: Record<string, unknown>,
+    params?: DeelParameters
   ) {
-    let response = await this.http.post(`/invoice-adjustments/${adjustmentId}/reviews`, {
-      data
-    });
-    return response.data;
+    let result = await requestAxiosData<unknown>(
+      `${method} request`,
+      () =>
+        this.http.request({
+          method,
+          url,
+          params,
+          ...(data === undefined ? {} : { data: { data } })
+        }),
+      deelError
+    );
+    const reflectedKey = (value: unknown): boolean => {
+      if (Array.isArray(value)) return value.some(reflectedKey);
+      return (
+        isApiErrorRecord(value) &&
+        Object.entries(value).some(
+          ([key, nested]) => this.redactor.redactEmbedded(key) !== key || reflectedKey(nested)
+        )
+      );
+    };
+    if (
+      reflectedKey(result) ||
+      JSON.stringify(this.redactor.redactEmbedded(result)) !== JSON.stringify(result)
+    )
+      throw createApiServiceError(
+        'Deel reflected a credential in resource data. Review the connection before retrying; a requested write may have completed.',
+        { reason: 'unsafe_response', parent: {} }
+      );
+    return result;
   }
-
-  // --- Accounting / Invoices ---
-
-  async listInvoices(params?: Record<string, any>) {
-    let response = await this.http.get('/invoices', { params });
-    return response.data;
+  listContracts(params?: DeelParameters) {
+    return this.request('GET', '/contracts', undefined, params);
   }
-
-  // --- Payments ---
-
-  async listPayments(params?: Record<string, any>) {
-    let response = await this.http.get('/payments', { params });
-    return response.data;
+  listPeople(params?: DeelParameters) {
+    return this.request('GET', '/people', undefined, params);
   }
-
-  // --- Organizations ---
-
-  async listLegalEntities(params?: Record<string, any>) {
-    let response = await this.http.get('/legal-entities', { params });
-    return response.data;
+  listInvoiceAdjustments(params?: DeelParameters) {
+    return this.request('GET', '/invoice-adjustments', undefined, params);
   }
-
-  async listGroups(params?: Record<string, any>) {
-    let response = await this.http.get('/teams', { params });
-    return response.data;
+  listInvoices(params?: DeelParameters) {
+    return this.request('GET', '/invoices', undefined, params);
   }
-
-  async listDepartments(params?: Record<string, any>) {
-    let response = await this.http.get('/departments', { params });
-    return response.data;
+  listPayments(params?: DeelParameters) {
+    return this.request('GET', '/payments', undefined, params);
   }
-
-  // --- EOR ---
-
-  async createEorContract(data: Record<string, any>) {
-    let response = await this.http.post('/eor', { data });
-    return response.data;
+  listLegalEntities(params?: DeelParameters) {
+    return this.request('GET', '/legal-entities', undefined, params);
   }
-
-  async getEorCountryGuide(countryCode: string) {
-    let response = await this.http.get(`/eor/validations/${countryCode}`);
-    return response.data;
+  listGroups(params?: DeelParameters) {
+    return this.request('GET', '/teams', undefined, params);
   }
-
-  async getEorCostCalculation(data: Record<string, any>) {
-    let response = await this.http.post('/eor/employment_cost', { data });
-    return response.data;
+  listDepartments(params?: DeelParameters) {
+    return this.request('GET', '/departments', undefined, params);
   }
-
-  // --- Webhooks ---
-
-  async listWebhookEventTypes() {
-    let response = await this.http.get('/webhooks/events/types');
-    return response.data;
+  getContract(contractId: string) {
+    let id = encodeURIComponent(requireText(contractId, 'contractId'));
+    return this.request('GET', `/contracts/${id}`);
   }
-
-  async createWebhook(data: {
-    name: string;
-    description?: string;
-    url: string;
-    events: string[];
-    status?: string;
-    api_version?: string;
-  }) {
-    let response = await this.http.post('/webhooks', {
-      name: data.name,
-      description: data.description,
-      url: data.url,
-      events: data.events,
-      status: data.status ?? 'enabled',
-      api_version: data.api_version ?? 'v2'
-    });
-    return response.data;
+  getPerson(personId: string) {
+    let id = encodeURIComponent(requireText(personId, 'personId'));
+    return this.request('GET', `/people/${id}/personal`);
   }
-
-  async deleteWebhook(webhookId: string) {
-    let response = await this.http.delete(`/webhooks/${webhookId}`);
-    return response.data;
+  getEorCountryGuide(countryCode: string) {
+    let id = encodeURIComponent(requireText(countryCode, 'countryCode'));
+    return this.request('GET', `/eor/validations/${id}`);
   }
-
-  async listWebhooks() {
-    let response = await this.http.get('/webhooks');
-    return response.data;
+  getInvoiceDownload(invoiceId: string) {
+    let id = encodeURIComponent(requireText(invoiceId, 'invoiceId'));
+    return this.request('GET', `/invoices/${id}/download`);
+  }
+  listTimesheets(contractId: string, params?: DeelParameters) {
+    let id = encodeURIComponent(requireText(contractId, 'contractId'));
+    return this.request('GET', `/contracts/${id}/timesheets`, undefined, params);
+  }
+  listTimeOffs(profileId: string, params?: DeelParameters) {
+    let id = encodeURIComponent(requireText(profileId, 'profileId'));
+    return this.request('GET', `/time_offs/profile/${id}`, undefined, params);
+  }
+  listContractInvoiceAdjustments(contractId: string, params?: DeelParameters) {
+    let id = encodeURIComponent(requireText(contractId, 'contractId'));
+    return this.request('GET', `/contracts/${id}/invoice-adjustments`, undefined, params);
+  }
+  createContract(data: Record<string, unknown>) {
+    return this.request('POST', '/contracts', data);
+  }
+  createTimesheet(data: Record<string, unknown>) {
+    return this.request('POST', '/timesheets', data);
+  }
+  createTimeOff(data: Record<string, unknown>) {
+    return this.request('POST', '/time_offs', data);
+  }
+  getEorCostCalculation(data: Record<string, unknown>) {
+    return this.request('POST', '/eor/employment_cost', data);
+  }
+  amendContract(contractId: string, data: Record<string, unknown>) {
+    let id = encodeURIComponent(requireText(contractId, 'contractId'));
+    return this.request('POST', `/contracts/${id}/amendments`, data);
+  }
+  signContract(contractId: string, data: Record<string, unknown>) {
+    let id = encodeURIComponent(requireText(contractId, 'contractId'));
+    return this.request('POST', `/contracts/${id}/signatures`, data);
+  }
+  terminateContract(contractId: string, data: Record<string, unknown>) {
+    let id = encodeURIComponent(requireText(contractId, 'contractId'));
+    return this.request('POST', `/contracts/${id}/terminations`, data);
+  }
+  reviewTimesheet(timesheetId: string, data: Record<string, unknown>) {
+    let id = encodeURIComponent(requireText(timesheetId, 'timesheetId'));
+    return this.request('POST', `/timesheets/${id}/reviews`, data);
+  }
+  reviewInvoiceAdjustment(adjustmentId: string, data: Record<string, unknown>) {
+    let id = encodeURIComponent(requireText(adjustmentId, 'adjustmentId'));
+    return this.request('POST', `/invoice-adjustments/${id}/reviews`, data);
+  }
+  updateTimeOff(timeOffId: string, data: Record<string, unknown>) {
+    let id = encodeURIComponent(requireText(timeOffId, 'timeOffId'));
+    return this.request('PATCH', `/time_offs/${id}`, data);
+  }
+  createInvoiceAdjustment(data: Record<string, unknown>, recurring?: boolean) {
+    return this.request(
+      'POST',
+      '/invoice-adjustments',
+      data,
+      recurring === undefined ? undefined : { recurring: String(recurring) }
+    );
+  }
+  listOrganizationTimeOffs(params?: DeelParameters) {
+    return this.request('GET', '/time_offs', undefined, params);
+  }
+  getCurrentUser() {
+    return this.request('GET', '/people/me');
+  }
+  getCurrentOrganization() {
+    return this.request('GET', '/organizations');
+  }
+  listTimeOffPolicies(profileId: string) {
+    let id = encodeURIComponent(requireText(profileId, 'profileId'));
+    return this.request('GET', `/time_offs/profile/${id}/policies`);
+  }
+  getTimesheet(timesheetId: string) {
+    let id = encodeURIComponent(requireText(timesheetId, 'timesheetId'));
+    return this.request('GET', `/timesheets/${id}`);
+  }
+  deleteTimesheet(timesheetId: string) {
+    let id = encodeURIComponent(requireText(timesheetId, 'timesheetId'));
+    return this.request('DELETE', `/timesheets/${id}`);
+  }
+  getInvoiceAdjustment(adjustmentId: string) {
+    let id = encodeURIComponent(requireText(adjustmentId, 'adjustmentId'));
+    return this.request('GET', `/invoice-adjustments/${id}`);
+  }
+  deleteInvoiceAdjustment(adjustmentId: string) {
+    let id = encodeURIComponent(requireText(adjustmentId, 'adjustmentId'));
+    return this.request('DELETE', `/invoice-adjustments/${id}`);
+  }
+  async deleteTimeOff(timeOffId: string) {
+    let id = encodeURIComponent(requireText(timeOffId, 'timeOffId'));
+    let response = await requestAxios(
+      'cancel time off',
+      () => this.http.delete(`/time_offs/${id}`),
+      deelError
+    );
+    if (response.status !== 204)
+      throw createApiServiceError(
+        'Deel did not acknowledge time-off cancellation. Verify the request before retrying.'
+      );
   }
 }

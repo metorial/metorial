@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/datocms.png" height="20"> Datocms
 
-Create, update, publish, unpublish, and delete structured content records in a headless CMS. Manage content models, fields, and schemas programmatically. Upload, organize, and deliver media assets with optimization and tagging. Query content via a GraphQL Content Delivery API with support for drafts, localization, and real-time updates. Manage sandbox and primary environments, fork and promote environments for safe migrations. Configure build triggers to deploy to hosting providers like Vercel and Netlify. Manage roles, API tokens, collaborators, and permissions. Search published website content via built-in site search. Receive webhook notifications for record, model, upload, deployment, and environment events.
+Create, update, publish, unpublish, and delete structured content records in a headless CMS. Manage content models, fields, and schemas programmatically. Upload, organize, and deliver media assets with optimization and tagging. Query content via a GraphQL Content Delivery API with support for drafts, localization, and real-time updates. Manage sandbox and primary environments, fork and promote environments for safe migrations. Configure build triggers to deploy to hosting providers like Vercel and Netlify. Manage roles, API tokens, collaborators, and permissions. Search published website content via built-in site search.
 
 ## Tools
 

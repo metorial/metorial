@@ -1,13 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let paraphrase = SlateTool.create(spec, {
   name: 'Paraphrase Text',
   key: 'paraphrase',
-  description: `Generate alternative phrasings of input text. Choose from different styles like casual, formal, short, long, or general. Optionally paraphrase only a subsection of the text using start and end indices.`,
+  description:
+    'DEPRECATED — use `chat_completion` instead. AI21 retired the specialized paraphrasing API.',
+  instructions: [
+    'Use chat_completion with task instructions and supplied context, or maestro_run with validation requirements. These APIs do not reproduce the retired response semantics automatically.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true,
     destructive: false
   }
@@ -42,23 +46,9 @@ export let paraphrase = SlateTool.create(spec, {
         .describe('List of paraphrase suggestions')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.paraphrase({
-      text: ctx.input.text,
-      style: ctx.input.style,
-      startIndex: ctx.input.startIndex,
-      endIndex: ctx.input.endIndex
-    });
-
-    let suggestions = (result.suggestions ?? []).map((s: any) => ({
-      text: s.text ?? s
-    }));
-
-    return {
-      output: { suggestions },
-      message: `Generated **${suggestions.length}** paraphrase suggestion(s)${ctx.input.style ? ` in **${ctx.input.style}** style` : ''}.`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'AI21 retired the specialized paraphrasing API. Use chat_completion with explicit task instructions and context, or maestro_run with validation requirements.'
+    );
   })
   .build();

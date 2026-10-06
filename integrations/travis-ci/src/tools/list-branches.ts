@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, pagination, TravisCIClient } from '../lib/client';
+import type { Branch } from '../lib/types';
 import { spec } from '../spec';
 
 export let listBranches = SlateTool.create(spec, {
@@ -67,6 +68,9 @@ export let listBranches = SlateTool.create(spec, {
         )
         .optional()
         .describe('List of branches'),
+      hasMore: z.boolean().optional().describe('Whether another page is available'),
+      nextOffset: z.number().optional().describe('Offset for the next page'),
+      totalCount: z.number().optional().describe('Total branch count'),
       branch: z
         .object({
           name: z.string().describe('Branch name'),
@@ -101,10 +105,10 @@ export let listBranches = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
-    let mapBranch = (branch: any) => ({
+    let mapBranch = (branch: Branch) => ({
       name: branch.name,
       isDefault: branch.default_branch,
       existsOnGithub: branch.exists_on_github,
@@ -135,7 +139,7 @@ export let listBranches = SlateTool.create(spec, {
     let branches = (result.branches || []).map(mapBranch);
 
     return {
-      output: { branches },
+      output: { branches, ...pagination(result) },
       message: `Found **${branches.length}** branches for **${ctx.input.repoSlugOrId}**.`
     };
   })

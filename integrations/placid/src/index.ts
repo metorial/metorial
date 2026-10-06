@@ -10,8 +10,6 @@ import {
   mergePdfs,
   uploadMedia
 } from './tools';
-import { generationCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     mergePdfs,
     getGenerationStatus
   ],
-  triggers: [generationCompleted]
+  triggers: []
 });

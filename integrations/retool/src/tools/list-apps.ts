@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listApps = SlateTool.create(spec, {
@@ -41,7 +41,7 @@ export let listApps = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.listApps({
       limit: ctx.input.limit,

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/workspace.png" height="20"> Word Online
 
-Manage Word documents stored in OneDrive and SharePoint via Microsoft Graph. Upload, download, create, copy, move, rename, and delete Word documents. Convert documents to PDF. Share documents with view or edit permissions via links or user invitations. Retrieve version history and restore previous versions. Check in and check out documents to control editing access. Search for documents by name, content, or metadata. Generate document previews and thumbnails. Subscribe to webhook-based change notifications for file updates in drive folders.
+Manage Word documents stored in OneDrive and SharePoint via Microsoft Graph. Upload, download, create, copy, move, rename, and delete Word documents. Convert documents to PDF. Share documents with view or edit permissions via links or user invitations. Retrieve version history and restore previous versions. Check in and check out documents to control editing access. Search for documents by name, content, or metadata. Generate document previews and thumbnails.
 
 ## Tools
 

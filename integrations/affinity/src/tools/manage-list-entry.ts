@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let addListEntry = SlateTool.create(spec, {
   name: 'Add List Entry',
   key: 'add_list_entry',
-  description: `Add an entity (person, organization, or opportunity) to an Affinity list. This creates a new list entry linking the entity to the list.`,
+  description: `Add a person or organization to an Affinity list. Use get_lists to discover list IDs. Opportunity entries are created by create_opportunity. Adding an entry can activate configured list automations.`,
   tags: {
     destructive: false
   }
@@ -16,7 +16,9 @@ export let addListEntry = SlateTool.create(spec, {
       listId: z.number().describe('ID of the list to add the entity to'),
       entityId: z
         .number()
-        .describe('ID of the entity (person, organization, or opportunity) to add'),
+        .describe(
+          'ID of the person or organization to add; use create_opportunity for opportunities'
+        ),
       creatorId: z.number().optional().describe('ID of the user to attribute this addition to')
     })
   )
@@ -53,7 +55,7 @@ export let addListEntry = SlateTool.create(spec, {
 export let removeListEntry = SlateTool.create(spec, {
   name: 'Remove List Entry',
   key: 'remove_list_entry',
-  description: `Remove an entity from an Affinity list by deleting its list entry. This does not delete the entity itself.`,
+  description: `Remove a list entry. Person and organization records remain; deleting an opportunity entry also deletes its opportunity. This may activate configured list automations.`,
   tags: {
     destructive: true
   }

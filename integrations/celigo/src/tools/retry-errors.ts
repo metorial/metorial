@@ -1,14 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  jobId: z.string().optional(),
+  retried: z.boolean().describe('Whether a native retry job was queued'),
+  rawResult: z.any().optional().describe('API response')
+});
 
 export let retryErrors = SlateTool.create(spec, {
   name: 'Retry Errors',
   key: 'retry_errors',
   description: `Retry one or more flow errors. Provide the retryDataKeys from the error objects returned by the Get Flow Errors tool.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -20,30 +27,14 @@ export let retryErrors = SlateTool.create(spec, {
         .describe('List of retryDataKey values from the error objects to retry')
     })
   )
-  .output(
-    z.object({
-      retried: z.boolean().describe('Whether the retry was successfully initiated'),
-      rawResult: z.any().optional().describe('API response')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let result = await client.retryErrors(
-      ctx.input.flowId,
-      ctx.input.processorId,
-      ctx.input.retryDataKeys
-    );
-
-    return {
-      output: {
-        retried: true,
-        rawResult: result
-      },
-      message: `Retried **${ctx.input.retryDataKeys.length}** error(s) for flow **${ctx.input.flowId}** / processor **${ctx.input.processorId}**.`
-    };
+    const result = await invoke('retry_errors', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

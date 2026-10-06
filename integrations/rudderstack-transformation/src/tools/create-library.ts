@@ -13,7 +13,7 @@ export let createLibrary = SlateTool.create(spec, {
   ],
   tags: {
     readOnly: false,
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -24,8 +24,14 @@ export let createLibrary = SlateTool.create(spec, {
       code: z.string().describe('Library code with exported functions'),
       language: z
         .enum(['javascript', 'pythonfaas'])
-        .describe('Programming language: "javascript" or "pythonfaas" (Python 3.11)'),
-      description: z.string().optional().describe('Description of the library')
+        .describe('Programming language: "javascript" or "pythonfaas" (Python)'),
+      description: z.string().optional().describe('Description of the library'),
+      publish: z
+        .boolean()
+        .optional()
+        .describe(
+          'Publish this new library revision. Defaults to false; publishing can affect transformations that import this library.'
+        )
     })
   )
   .output(
@@ -56,7 +62,8 @@ export let createLibrary = SlateTool.create(spec, {
       name: ctx.input.name,
       code: ctx.input.code,
       language: ctx.input.language,
-      description: ctx.input.description
+      description: ctx.input.description,
+      publish: ctx.input.publish
     });
 
     return {

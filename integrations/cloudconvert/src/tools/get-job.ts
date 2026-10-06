@@ -1,85 +1,37 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { jobMessage, readAndDeliver, taskSummary } from '../lib/jobs';
+import { resourceId, taskOutput } from '../lib/schemas';
 import { spec } from '../spec';
-
-let taskSchema = z.object({
-  taskId: z.string().describe('ID of the task'),
-  operation: z.string().describe('Task operation type'),
-  status: z.string().describe('Task status'),
-  message: z.string().optional().describe('Task status message or error message'),
-  progress: z.number().optional().describe('Task progress percentage (0-100)'),
-  createdAt: z.string().optional().describe('Task creation timestamp'),
-  endedAt: z.string().optional().describe('Task completion timestamp'),
-  resultFiles: z
-    .array(
-      z.object({
-        url: z.string().optional().describe('Temporary download URL'),
-        filename: z.string().describe('Filename of the result')
-      })
-    )
-    .optional()
-    .describe('Output files produced by the task')
-});
-
-export let getJob = SlateTool.create(spec, {
+export const getJob = SlateTool.create(spec, {
   name: 'Get Job',
   key: 'get_job',
-  description: `Retrieve the details and status of a CloudConvert job including all its tasks and results.
-
-Use this to check the progress of an ongoing job or to retrieve download URLs for completed jobs. Can also wait for a job to complete.`,
-  tags: {
-    destructive: false,
-    readOnly: true
-  }
+  description:
+    'Read an existing job with all task states and provide any finished export/url files. Pending and failed states remain explicit. Ended jobs and their data normally expire after 24 hours.',
+  tags: { destructive: false, readOnly: true }
 })
   .input(
     z.object({
-      jobId: z.string().describe('ID of the job to retrieve'),
+      jobId: resourceId,
       waitForCompletion: z
         .boolean()
         .optional()
         .default(false)
-        .describe('Wait for the job to finish before returning')
+        .describe('Wait up to 60 seconds; the same job ID can be read again after a timeout.')
     })
   )
   .output(
     z.object({
-      jobId: z.string().describe('ID of the job'),
-      status: z.string().describe('Job status (waiting, processing, finished, error)'),
-      tag: z.string().optional().describe('Job tag'),
-      createdAt: z.string().optional().describe('Job creation timestamp'),
-      endedAt: z.string().optional().describe('Job completion timestamp'),
-      tasks: z.array(taskSchema).describe('Tasks within the job')
+      jobId: z.string(),
+      status: z.string(),
+      tag: z.string().optional(),
+      createdAt: z.string().optional(),
+      endedAt: z.string().optional(),
+      tasks: z.array(taskOutput)
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let job: any;
-    if (ctx.input.waitForCompletion) {
-      job = await client.waitForJob(ctx.input.jobId);
-    } else {
-      job = await client.getJob(ctx.input.jobId);
-    }
-
-    let tasks = (job.tasks ?? []).map((t: any) => ({
-      taskId: t.id,
-      operation: t.operation,
-      status: t.status,
-      message: t.message,
-      progress: t.percent,
-      createdAt: t.created_at,
-      endedAt: t.ended_at,
-      resultFiles: t.result?.files?.map((f: any) => ({
-        url: f.url,
-        filename: f.filename
-      }))
-    }));
-
+    const job = await readAndDeliver(ctx, ctx.input.jobId, ctx.input.waitForCompletion);
     return {
       output: {
         jobId: job.id,
@@ -87,9 +39,9 @@ Use this to check the progress of an ongoing job or to retrieve download URLs fo
         tag: job.tag,
         createdAt: job.created_at,
         endedAt: job.ended_at,
-        tasks
+        tasks: job.tasks.map(taskSummary)
       },
-      message: `Job **${job.id}** is **${job.status}**. Contains ${tasks.length} task(s).`
+      message: jobMessage(job, 'Processing')
     };
   })
   .build();

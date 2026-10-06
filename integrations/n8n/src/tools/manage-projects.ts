@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid } from '../lib/connection';
 import { spec } from '../spec';
 
 export let manageProjects = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let manageProjects = SlateTool.create(spec, {
   key: 'manage_projects',
   description: `Create, update, delete, or list projects in n8n. Projects group workflows and credentials for access control. Also supports managing project members.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -27,7 +28,9 @@ export let manageProjects = SlateTool.create(spec, {
       projectId: z
         .string()
         .optional()
-        .describe('Project ID (required for update, delete, and member operations)'),
+        .describe(
+          'Project ID from manage_projects list; required for update, delete and member operations. For create, optionally choose a documented unused ID.'
+        ),
       name: z.string().optional().describe('Project name (required for create and update)'),
       userId: z.string().optional().describe('User ID (required for remove_member)'),
       members: z
@@ -75,17 +78,18 @@ export let manageProjects = SlateTool.create(spec, {
         )
         .optional()
         .describe('Project members'),
+      accepted: z
+        .boolean()
+        .optional()
+        .describe('Native request acceptance; no state observation is implied'),
       deleted: z.boolean().optional().describe('Whether deletion was successful'),
       nextCursor: z.string().optional().describe('Cursor for next page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
-    let mapProject = (p: any) => ({
+    let mapProject = (p: Awaited<ReturnType<typeof client.createProject>>) => ({
       projectId: String(p.id),
       name: p.name || '',
       createdAt: p.createdAt,
@@ -105,8 +109,8 @@ export let manageProjects = SlateTool.create(spec, {
         };
       }
       case 'create': {
-        if (!ctx.input.name) throw new Error('Name is required for creating a project');
-        let project = await client.createProject(ctx.input.name);
+        if (!ctx.input.name) throw invalid('Name is required for creating a project');
+        let project = await client.createProject(ctx.input.name, ctx.input.projectId);
         return {
           output: { project: mapProject(project) },
           message: `Created project **"${ctx.input.name}"** (ID: ${project.id}).`
@@ -114,19 +118,19 @@ export let manageProjects = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.projectId)
-          throw new Error('projectId is required for updating a project');
-        if (!ctx.input.name) throw new Error('Name is required for updating a project');
-        let project = await client.updateProject(ctx.input.projectId, {
+          throw invalid('projectId is required for updating a project');
+        if (!ctx.input.name) throw invalid('Name is required for updating a project');
+        await client.updateProject(ctx.input.projectId, {
           name: ctx.input.name
         });
         return {
-          output: { project: mapProject(project) },
-          message: `Updated project **${ctx.input.projectId}** to **"${ctx.input.name}"**.`
+          output: { accepted: true },
+          message: `Update accepted for project **${ctx.input.projectId}** to **"${ctx.input.name}"**.`
         };
       }
       case 'delete': {
         if (!ctx.input.projectId)
-          throw new Error('projectId is required for deleting a project');
+          throw invalid('projectId is required for deleting a project');
         await client.deleteProject(ctx.input.projectId);
         return {
           output: { deleted: true },
@@ -134,13 +138,13 @@ export let manageProjects = SlateTool.create(spec, {
         };
       }
       case 'list_members': {
-        if (!ctx.input.projectId) throw new Error('projectId is required for listing members');
+        if (!ctx.input.projectId) throw invalid('projectId is required for listing members');
         let result = await client.listProjectMembers(ctx.input.projectId, {
           limit: ctx.input.limit,
           cursor: ctx.input.cursor
         });
-        let members = (result.data || []).map((m: any) => ({
-          userId: String(m.id || m.userId),
+        let members = (result.data || []).map(m => ({
+          userId: m.id,
           email: m.email,
           role: m.role
         }));
@@ -150,9 +154,9 @@ export let manageProjects = SlateTool.create(spec, {
         };
       }
       case 'add_members': {
-        if (!ctx.input.projectId) throw new Error('projectId is required for adding members');
+        if (!ctx.input.projectId) throw invalid('projectId is required for adding members');
         if (!ctx.input.members || ctx.input.members.length === 0)
-          throw new Error('members array is required');
+          throw invalid('members array is required');
         await client.addProjectMembers(ctx.input.projectId, ctx.input.members);
         return {
           output: {},
@@ -160,9 +164,8 @@ export let manageProjects = SlateTool.create(spec, {
         };
       }
       case 'remove_member': {
-        if (!ctx.input.projectId)
-          throw new Error('projectId is required for removing a member');
-        if (!ctx.input.userId) throw new Error('userId is required for removing a member');
+        if (!ctx.input.projectId) throw invalid('projectId is required for removing a member');
+        if (!ctx.input.userId) throw invalid('userId is required for removing a member');
         await client.removeProjectMember(ctx.input.projectId, ctx.input.userId);
         return {
           output: { deleted: true },

@@ -1,0 +1,808 @@
+{
+  "get_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Unique identifier for the user"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user"
+        },
+        "avatar": {
+          "type": "string",
+          "description": "URL of the user avatar"
+        },
+        "plan": {
+          "type": "string",
+          "description": "Current Buffer plan"
+        },
+        "timezone": {
+          "type": "string",
+          "description": "User timezone setting"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Account creation timestamp"
+        }
+      },
+      "required": ["userId", "name", "email", "avatar", "plan", "timezone", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "get_profiles": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "description": "Optional profile ID to retrieve a specific profile. If omitted, returns all profiles.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "profileId": {
+                "type": "string",
+                "description": "Unique identifier for the profile"
+              },
+              "service": {
+                "type": "string",
+                "description": "Social network service name (e.g. twitter, facebook, linkedin)"
+              },
+              "serviceUsername": {
+                "type": "string",
+                "description": "Username on the social network"
+              },
+              "formattedService": {
+                "type": "string",
+                "description": "Human-readable service name"
+              },
+              "formattedUsername": {
+                "type": "string",
+                "description": "Human-readable username"
+              },
+              "avatar": {
+                "type": "string",
+                "description": "URL of the profile avatar"
+              },
+              "isDefault": {
+                "type": "boolean",
+                "description": "Whether this is the default profile"
+              },
+              "sentCount": {
+                "type": "number",
+                "description": "Number of sent updates"
+              },
+              "pendingCount": {
+                "type": "number",
+                "description": "Number of pending updates"
+              },
+              "draftsCount": {
+                "type": "number",
+                "description": "Number of draft updates"
+              }
+            },
+            "required": [
+              "profileId",
+              "service",
+              "serviceUsername",
+              "formattedService",
+              "formattedUsername",
+              "avatar",
+              "isDefault",
+              "sentCount",
+              "pendingCount",
+              "draftsCount"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of social media profiles"
+        }
+      },
+      "required": ["profiles"],
+      "additionalProperties": false
+    }
+  },
+  "create_update": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The text content of the update"
+        },
+        "profileIds": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of profile IDs to post the update to"
+        },
+        "scheduledAt": {
+          "description": "ISO 8601 timestamp to schedule the update for a specific time",
+          "type": "string"
+        },
+        "now": {
+          "description": "Set to true to share the update immediately",
+          "type": "boolean"
+        },
+        "top": {
+          "description": "Set to true to add the update to the top of the queue",
+          "type": "boolean"
+        },
+        "shorten": {
+          "description": "Set to true to automatically shorten URLs in the text",
+          "type": "boolean"
+        },
+        "media": {
+          "description": "Media attachments for the update",
+          "type": "object",
+          "properties": {
+            "link": {
+              "description": "URL of a link attachment",
+              "type": "string"
+            },
+            "title": {
+              "description": "Title for the link attachment",
+              "type": "string"
+            },
+            "description": {
+              "description": "Description for the link attachment",
+              "type": "string"
+            },
+            "picture": {
+              "description": "URL of a preview image for the link",
+              "type": "string"
+            },
+            "photo": {
+              "description": "URL of a photo to attach",
+              "type": "string"
+            },
+            "thumbnail": {
+              "description": "URL of a thumbnail image",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["text", "profileIds"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the update was created successfully"
+        },
+        "updates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "updateId": {
+                "type": "string",
+                "description": "Unique identifier of the created update"
+              },
+              "profileId": {
+                "type": "string",
+                "description": "Profile ID the update was created for"
+              },
+              "status": {
+                "type": "string",
+                "description": "Status of the update (e.g. buffer, sent)"
+              },
+              "text": {
+                "type": "string",
+                "description": "Text content of the update"
+              },
+              "dueAt": {
+                "type": "number",
+                "description": "Unix timestamp when the update is due"
+              },
+              "createdAt": {
+                "type": "number",
+                "description": "Unix timestamp when the update was created"
+              }
+            },
+            "required": ["updateId", "profileId", "status", "text", "dueAt", "createdAt"],
+            "additionalProperties": false
+          },
+          "description": "Created updates (one per profile)"
+        },
+        "bufferCount": {
+          "type": "number",
+          "description": "Total number of updates in the buffer after creation"
+        },
+        "bufferPercentage": {
+          "type": "number",
+          "description": "Percentage of buffer capacity used"
+        }
+      },
+      "required": ["success", "updates", "bufferCount", "bufferPercentage"],
+      "additionalProperties": false
+    }
+  },
+  "edit_update": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "updateId": {
+          "type": "string",
+          "description": "ID of the update to edit"
+        },
+        "text": {
+          "description": "New text content for the update",
+          "type": "string"
+        },
+        "scheduledAt": {
+          "description": "New ISO 8601 timestamp for scheduling",
+          "type": "string"
+        },
+        "now": {
+          "description": "Set to true to share the update immediately after editing",
+          "type": "boolean"
+        },
+        "utc": {
+          "description": "Set to true if scheduledAt is in UTC",
+          "type": "boolean"
+        },
+        "media": {
+          "description": "Updated media attachments",
+          "type": "object",
+          "properties": {
+            "link": {
+              "description": "URL of a link attachment",
+              "type": "string"
+            },
+            "title": {
+              "description": "Title for the link attachment",
+              "type": "string"
+            },
+            "description": {
+              "description": "Description for the link attachment",
+              "type": "string"
+            },
+            "picture": {
+              "description": "URL of a preview image for the link",
+              "type": "string"
+            },
+            "photo": {
+              "description": "URL of a photo to attach",
+              "type": "string"
+            },
+            "thumbnail": {
+              "description": "URL of a thumbnail image",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["updateId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the update was edited successfully"
+        },
+        "updateId": {
+          "type": "string",
+          "description": "ID of the edited update"
+        },
+        "text": {
+          "type": "string",
+          "description": "Updated text content"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the update"
+        },
+        "dueAt": {
+          "type": "number",
+          "description": "Unix timestamp when the update is due"
+        }
+      },
+      "required": ["success", "updateId", "text", "status", "dueAt"],
+      "additionalProperties": false
+    }
+  },
+  "delete_update": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "updateId": {
+          "type": "string",
+          "description": "ID of the update to delete"
+        }
+      },
+      "required": ["updateId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the update was deleted successfully"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "share_update": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "updateId": {
+          "type": "string",
+          "description": "ID of the pending update to share immediately"
+        }
+      },
+      "required": ["updateId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the update was shared successfully"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "get_updates": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "description": "Profile ID to retrieve updates for. Required when fetching pending or sent updates.",
+          "type": "string"
+        },
+        "updateId": {
+          "description": "Specific update ID to retrieve. When provided, profileId and status are ignored.",
+          "type": "string"
+        },
+        "status": {
+          "default": "pending",
+          "description": "Which updates to retrieve: pending (queued) or sent (published)",
+          "type": "string",
+          "enum": ["pending", "sent"]
+        },
+        "page": {
+          "description": "Page number for pagination (starts at 1)",
+          "type": "number"
+        },
+        "count": {
+          "description": "Number of updates to return per page",
+          "type": "number"
+        },
+        "since": {
+          "description": "Unix timestamp or ISO date to filter updates since this time",
+          "type": "string"
+        },
+        "utc": {
+          "description": "Set to true to return times in UTC",
+          "type": "boolean"
+        }
+      },
+      "required": ["status"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "number",
+          "description": "Total number of updates matching the query"
+        },
+        "updates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "updateId": {
+                "type": "string",
+                "description": "Unique identifier for the update"
+              },
+              "text": {
+                "type": "string",
+                "description": "Text content of the update"
+              },
+              "status": {
+                "type": "string",
+                "description": "Status of the update (e.g. buffer, sent)"
+              },
+              "profileId": {
+                "type": "string",
+                "description": "Profile ID this update belongs to"
+              },
+              "profileService": {
+                "type": "string",
+                "description": "Social network service name"
+              },
+              "createdAt": {
+                "type": "number",
+                "description": "Unix timestamp when the update was created"
+              },
+              "dueAt": {
+                "type": "number",
+                "description": "Unix timestamp when the update is/was due"
+              },
+              "sentAt": {
+                "type": "number",
+                "description": "Unix timestamp when the update was sent (0 if pending)"
+              },
+              "day": {
+                "type": "string",
+                "description": "Day the update is scheduled for"
+              },
+              "dueTime": {
+                "type": "string",
+                "description": "Time the update is due"
+              },
+              "serviceUpdateId": {
+                "type": "string",
+                "description": "ID of the update on the social network"
+              },
+              "statistics": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "description": "Engagement statistics (reach, clicks, retweets, favorites, mentions)"
+              },
+              "media": {
+                "description": "Attached media",
+                "type": "object",
+                "properties": {
+                  "link": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "picture": {
+                    "type": "string"
+                  },
+                  "photo": {
+                    "type": "string"
+                  },
+                  "thumbnail": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "updateId",
+              "text",
+              "status",
+              "profileId",
+              "profileService",
+              "createdAt",
+              "dueAt",
+              "sentAt",
+              "day",
+              "dueTime",
+              "serviceUpdateId",
+              "statistics"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of updates"
+        }
+      },
+      "required": ["total", "updates"],
+      "additionalProperties": false
+    }
+  },
+  "manage_queue": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["reorder", "shuffle", "move_to_top"],
+          "description": "Queue management action to perform"
+        },
+        "profileId": {
+          "description": "Profile ID. Required for reorder and shuffle actions.",
+          "type": "string"
+        },
+        "updateId": {
+          "description": "Update ID. Required for move_to_top action.",
+          "type": "string"
+        },
+        "order": {
+          "description": "Ordered array of update IDs for the reorder action",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "offset": {
+          "description": "Offset for reorder pagination",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action completed successfully"
+        },
+        "updatedUpdateIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IDs of updates in the resulting queue order"
+        }
+      },
+      "required": ["success", "updatedUpdateIds"],
+      "additionalProperties": false
+    }
+  },
+  "manage_schedule": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "description": "Profile ID to view or update the schedule for"
+        },
+        "schedules": {
+          "description": "New schedules to set. If omitted, the current schedule is returned.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Days of the week (e.g. [\"mon\", \"tue\", \"wed\"])"
+              },
+              "times": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Times of day in 24h format (e.g. [\"09:00\", \"12:30\", \"17:00\"])"
+              }
+            },
+            "required": ["days", "times"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["profileId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "schedules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Days of the week (e.g. [\"mon\", \"tue\", \"wed\"])"
+              },
+              "times": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Times of day in 24h format (e.g. [\"09:00\", \"12:30\", \"17:00\"])"
+              }
+            },
+            "required": ["days", "times"],
+            "additionalProperties": false
+          },
+          "description": "The current (or updated) posting schedules"
+        }
+      },
+      "required": ["schedules"],
+      "additionalProperties": false
+    }
+  },
+  "get_interactions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "updateId": {
+          "type": "string",
+          "description": "ID of the sent update to get interactions for"
+        },
+        "event": {
+          "type": "string",
+          "description": "Type of interaction to retrieve (e.g. \"retweet\", \"favorite\", \"mention\", \"comment\", \"like\", \"reshare\")"
+        },
+        "page": {
+          "description": "Page number for pagination",
+          "type": "number"
+        },
+        "count": {
+          "description": "Number of interactions to return per page",
+          "type": "number"
+        }
+      },
+      "required": ["updateId", "event"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "number",
+          "description": "Total number of interactions of this type"
+        },
+        "interactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "interactionId": {
+                "type": "string",
+                "description": "Unique ID of the interaction"
+              },
+              "event": {
+                "type": "string",
+                "description": "Type of interaction"
+              },
+              "createdAt": {
+                "type": "number",
+                "description": "Unix timestamp of the interaction"
+              },
+              "username": {
+                "type": "string",
+                "description": "Username of the person who interacted"
+              },
+              "avatar": {
+                "type": "string",
+                "description": "Avatar URL of the person who interacted"
+              },
+              "followers": {
+                "type": "number",
+                "description": "Follower count of the person who interacted"
+              }
+            },
+            "required": [
+              "interactionId",
+              "event",
+              "createdAt",
+              "username",
+              "avatar",
+              "followers"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of interactions"
+        }
+      },
+      "required": ["total", "interactions"],
+      "additionalProperties": false
+    }
+  },
+  "get_link_shares": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "The URL to check sharing statistics for"
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "The URL that was checked"
+        },
+        "shares": {
+          "type": "number",
+          "description": "Number of times the URL has been shared via Buffer"
+        }
+      },
+      "required": ["url", "shares"],
+      "additionalProperties": false
+    }
+  },
+  "get_configuration": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "services": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Configuration for each supported social network service, including character limits, schedule limits, icons, and URLs"
+        }
+      },
+      "required": ["services"],
+      "additionalProperties": false
+    }
+  }
+}

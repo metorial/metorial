@@ -5,8 +5,10 @@ import {
   getProspect,
   listAccounts,
   listMailings,
+  listMetadata,
   listOpportunities,
   listProspects,
+  listSequenceStates,
   listSequences,
   listTasks,
   listUsers,
@@ -19,17 +21,6 @@ import {
   manageTask,
   manageTemplate
 } from './tools';
-import {
-  accountEvents,
-  callEvents,
-  mailingEvents,
-  opportunityEvents,
-  prospectEvents,
-  sequenceEvents,
-  sequenceStateEvents,
-  taskEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,8 +31,10 @@ export let provider = Slate.create({
     listAccounts,
     manageSequence,
     listSequences,
+    listSequenceStates,
     manageSequenceState,
     listMailings,
+    listMetadata,
     manageTask,
     listTasks,
     manageOpportunity,
@@ -51,14 +44,5 @@ export let provider = Slate.create({
     createCall,
     listUsers
   ],
-  triggers: [
-    prospectEvents,
-    accountEvents,
-    mailingEvents,
-    sequenceEvents,
-    sequenceStateEvents,
-    taskEvents,
-    opportunityEvents,
-    callEvents
-  ]
+  triggers: []
 });

@@ -16,8 +16,6 @@ import {
   updateRecord,
   upsertRecord
 } from './tools';
-import { inboundWebhook, newRecord, recordChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     getUserInfo,
     manageChatter
   ],
-  triggers: [inboundWebhook, recordChanges, newRecord]
+  triggers: []
 });

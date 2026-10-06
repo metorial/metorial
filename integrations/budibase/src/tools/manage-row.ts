@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageRow = SlateTool.create(spec, {
@@ -10,10 +11,11 @@ export let manageRow = SlateTool.create(spec, {
   instructions: [
     'For "create", provide the tableId and fields as key-value pairs.',
     'For "update", provide the tableId, rowId, and the fields to change.',
-    'Field names must match the column names defined in the table schema.'
+    'Field names must match the column names defined in the table schema.',
+    'Updates retain the existing row before applying supplied fields. Coordinate concurrent edits; this read-modify-write operation is not atomic.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -25,7 +27,7 @@ export let manageRow = SlateTool.create(spec, {
         .describe('The operation to perform'),
       rowId: z.string().optional().describe('Row ID (required for get, update, delete)'),
       fields: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Row field values as key-value pairs (for create and update)')
     })
@@ -33,18 +35,14 @@ export let manageRow = SlateTool.create(spec, {
   .output(
     z.object({
       row: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('The row data (not returned for delete)'),
       deleted: z.boolean().optional().describe('Whether the row was successfully deleted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      appId: ctx.input.appId
-    });
+    let client = Client.fromContext(ctx, ctx.input.appId);
     let { action, tableId, rowId, fields } = ctx.input;
 
     if (action === 'create') {
@@ -55,7 +53,7 @@ export let manageRow = SlateTool.create(spec, {
       };
     }
 
-    if (!rowId) throw new Error('rowId is required for get, update, and delete actions');
+    if (!rowId) invalid('rowId is required for get, update, and delete actions');
 
     if (action === 'get') {
       let row = await client.getRow(tableId, rowId);
@@ -66,7 +64,8 @@ export let manageRow = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      let row = await client.updateRow(tableId, rowId, fields || {});
+      if (!fields) invalid('Provide fields to update the row.');
+      let row = await client.updateRow(tableId, rowId, fields);
       return {
         output: { row },
         message: `Updated row **${rowId}** in table ${tableId}.`

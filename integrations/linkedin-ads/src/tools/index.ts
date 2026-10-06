@@ -1,3 +1,4 @@
+export * from './discovery';
 export * from './get-ad-account';
 export * from './get-ad-analytics';
 export * from './list-ad-accounts';

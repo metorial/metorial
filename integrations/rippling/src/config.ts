@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .enum(['v2', 'platform_v1'])
       .default('platform_v1')
       .describe(
-        'API version to use. "platform_v1" uses api.rippling.com/platform/api/, "v2" uses rest.ripplingapis.com/'
+        'Retained tools require platform_v1 credentials and endpoints. v2 is preserved as a legacy setting but rejected; the newer API has different resource contracts.'
       )
   })
 );

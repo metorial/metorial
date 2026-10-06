@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/hotjar.png" height="20"> Hotjar
 
-Export survey response data and manage user data for privacy compliance. List surveys for a site, retrieve survey responses, perform user lookups by email or user ID, and submit deletion requests for GDPR compliance. Receive real-time webhook notifications when new survey responses are created or new recordings matching a segment are captured.
+Export survey response data and manage user data for privacy compliance. List surveys for a site, retrieve survey responses, perform user lookups by email or user ID, and submit deletion requests for GDPR compliance.
 
 ## Tools
 

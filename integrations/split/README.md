@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/split.png" height="20"> Split
 
-Manage feature flags, segments, and experimentation for software releases. Create, update, kill, restore, and delete feature flags with targeting rules, percentage-based rollouts, and multiple treatments. Organize flags into flag sets and manage user segments for targeting. Run A/B experiments and measure feature impact on metrics via events. Manage environments, projects, traffic types, and change request approval workflows. Administer users, groups, and permissions. Receive webhooks for audit logs, impressions, and metric alerts.
+Manage feature flags, segments, and experimentation for software releases. Create, update, kill, restore, and delete feature flags with targeting rules, percentage-based rollouts, and multiple treatments. Organize flags into flag sets and manage user segments for targeting. Run A/B experiments and measure feature impact on metrics via events. Manage environments, projects, traffic types, and change request approval workflows. Administer users, groups, and permissions.
 
 ## Tools
 

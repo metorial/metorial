@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createProjectTool = SlateTool.create(spec, {
@@ -20,22 +21,33 @@ export let createProjectTool = SlateTool.create(spec, {
           'single-label-classification',
           'multi-label-classification',
           'instance-segmentation',
-          'semantic-segmentation'
+          'semantic-segmentation',
+          'keypoint-detection'
         ])
         .describe('Type of computer vision task'),
       annotationGroup: z
         .string()
         .optional()
-        .describe('Annotation group name for organizing related projects'),
+        .describe(
+          'Noun describing the labels, such as objects or defects. Defaults to objects.'
+        ),
       license: z
-        .enum(['Public Domain', 'MIT', 'CC BY 4.0', 'BY-NC-SA 4.0', 'OdBL v1.0', 'Private'])
+        .enum([
+          'Public Domain',
+          'MIT',
+          'CC BY 4.0',
+          'BY-NC-SA 4.0',
+          'OdBL v1.0',
+          'OBdL v1.0',
+          'Private'
+        ])
         .optional()
         .describe('License for the project dataset')
     })
   )
   .output(
     z.object({
-      projectId: z.string().describe('Unique project identifier'),
+      projectId: projectIdSchema,
       name: z.string().describe('Name of the created project'),
       type: z.string().describe('Project type')
     })
@@ -47,13 +59,19 @@ export let createProjectTool = SlateTool.create(spec, {
     let result = await client.createProject(workspaceId, {
       name: ctx.input.name,
       type: ctx.input.type,
-      annotation: ctx.input.annotationGroup,
-      license: ctx.input.license
+      annotation: ctx.input.annotationGroup ?? 'objects',
+      license: ctx.input.license === 'OdBL v1.0' ? 'OBdL v1.0' : ctx.input.license
     });
+
+    if (typeof result.id !== 'string' || !result.id) {
+      throw createApiServiceError(
+        'Roboflow created the project without returning a usable ID. Check list_projects before retrying.'
+      );
+    }
 
     return {
       output: {
-        projectId: result.id || result.url || ctx.input.name,
+        projectId: result.id,
         name: result.name || ctx.input.name,
         type: result.type || ctx.input.type
       },

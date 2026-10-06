@@ -17,8 +17,6 @@ import {
   retryEvents,
   retryRequests
 } from './tools';
-import { eventSuccessful, issueNotification } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     manageIssueTriggers,
     retryRequests
   ],
-  triggers: [issueNotification, eventSuccessful]
+  triggers: []
 });

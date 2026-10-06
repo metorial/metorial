@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getSystem = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let getSystem = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       systemId: z.string().describe('JumpCloud system ID')
     })
   )
@@ -41,34 +43,34 @@ export let getSystem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      let system = await client.getSystem(ctx.input.systemId);
 
-    let system = await client.getSystem(ctx.input.systemId);
-
-    return {
-      output: {
-        systemId: system._id,
-        displayName: system.displayName,
-        hostname: system.hostname,
-        os: system.os,
-        osFamily: system.osFamily,
-        version: system.version,
-        arch: system.arch,
-        agentVersion: system.agentVersion,
-        active: system.active,
-        remoteIP: system.remoteIP,
-        serialNumber: system.serialNumber,
-        lastContact: system.lastContact,
-        created: system.created,
-        allowMultiFactorAuthentication: system.allowMultiFactorAuthentication,
-        allowPublicKeyAuthentication: system.allowPublicKeyAuthentication,
-        allowSshPasswordAuthentication: system.allowSshPasswordAuthentication,
-        allowSshRootLogin: system.allowSshRootLogin
-      },
-      message: `Retrieved system **${system.displayName ?? system.hostname}** — ${system.os} ${system.version ?? ''}, agent v${system.agentVersion ?? 'unknown'}`
-    };
+      return {
+        output: {
+          systemId: system._id,
+          displayName: system.displayName,
+          hostname: system.hostname,
+          os: system.os,
+          osFamily: system.osFamily,
+          version: system.version,
+          arch: system.arch,
+          agentVersion: system.agentVersion,
+          active: system.active,
+          remoteIP: system.remoteIP,
+          serialNumber: system.serialNumber,
+          lastContact: system.lastContact,
+          created: system.created,
+          allowMultiFactorAuthentication: system.allowMultiFactorAuthentication,
+          allowPublicKeyAuthentication: system.allowPublicKeyAuthentication,
+          allowSshPasswordAuthentication: system.allowSshPasswordAuthentication,
+          allowSshRootLogin: system.allowSshRootLogin
+        },
+        message: `Retrieved system **${system.displayName ?? system.hostname}** — ${system.os} ${system.version ?? ''}, agent v${system.agentVersion ?? 'unknown'}`
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
+    }
   })
   .build();

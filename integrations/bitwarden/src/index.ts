@@ -4,8 +4,10 @@ import {
   createGroup,
   deleteCollection,
   deleteGroup,
+  getCollection,
   getGroup,
   getMember,
+  getPolicy,
   importOrganization,
   inviteMember,
   listCollections,
@@ -21,8 +23,6 @@ import {
   updateMember,
   updatePolicy
 } from './tools';
-import { inboundWebhook, organizationEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -39,12 +39,14 @@ export let provider = Slate.create({
     updateGroup,
     deleteGroup,
     listCollections,
+    getCollection,
     updateCollection,
     deleteCollection,
     listPolicies,
+    getPolicy,
     updatePolicy,
     queryEvents,
     importOrganization
   ],
-  triggers: [inboundWebhook, organizationEvents]
+  triggers: []
 });

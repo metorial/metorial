@@ -26,7 +26,7 @@ export let getMaintenanceWindow = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.getMaintenanceWindow(ctx.input.windowId);
-    let window = result?.data ?? result;
+    let window = result.data;
 
     return {
       output: { window },

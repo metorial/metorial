@@ -1,15 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, clientConfig } from '../lib/client';
+import { mapUser, paginationSchema, userOutput } from '../lib/schemas';
 import { spec } from '../spec';
-
-export let listUsers = SlateTool.create(spec, {
+export const listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `List workspace members with optional filtering by name, role, or status.`,
-  tags: {
-    readOnly: true
-  }
+  description:
+    'List one page of authorized workspace members by name, role or status. total counts this page only.',
+  tags: { readOnly: true }
 })
   .input(
     z.object({
@@ -19,60 +18,31 @@ export let listUsers = SlateTool.create(spec, {
         .enum(['all', 'invited', 'active', 'suspended'])
         .optional()
         .describe('Filter by account status'),
-      limit: z.number().optional().default(25).describe('Maximum number of users to return'),
-      offset: z.number().optional().default(0).describe('Offset for pagination')
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .default(25)
+        .describe('Maximum number of users to return'),
+      offset: z.number().int().min(0).optional().default(0).describe('Offset for pagination')
     })
   )
   .output(
     z.object({
-      users: z.array(
-        z.object({
-          userId: z.string(),
-          name: z.string(),
-          email: z.string().optional(),
-          avatarUrl: z.string().optional(),
-          role: z.string(),
-          isSuspended: z.boolean(),
-          isAdmin: z.boolean(),
-          lastActiveAt: z.string().optional(),
-          createdAt: z.string()
-        })
-      ),
-      total: z.number()
+      users: z.array(userOutput),
+      total: z.number().describe('Number of records on this page'),
+      pagination: paginationSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let result = await client.listUsers({
-      query: ctx.input.query,
-      role: ctx.input.role,
-      filter: ctx.input.filter,
-      limit: ctx.input.limit,
-      offset: ctx.input.offset
-    });
-
-    let users = (result.data || []).map(u => ({
-      userId: u.id,
-      name: u.name,
-      email: u.email,
-      avatarUrl: u.avatarUrl,
-      role: u.role,
-      isSuspended: u.isSuspended,
-      isAdmin: u.isAdmin,
-      lastActiveAt: u.lastActiveAt,
-      createdAt: u.createdAt
-    }));
-
+    const client = new Client(clientConfig(ctx.auth, ctx.config));
+    const result = await client.listUsers(ctx.input);
+    const users = result.data.map(mapUser);
     return {
-      output: {
-        users,
-        total: users.length
-      },
-      message: `Found **${users.length}** users.`
+      output: { users, total: users.length, pagination: result.pagination },
+      message: `Returned ${users.length} users on this page.`
     };
   })
   .build();

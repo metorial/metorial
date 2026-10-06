@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ControlPlaneClient } from '../lib/client';
+import { ControlPlaneClient, stringField } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageLibrary = SlateTool.create(spec, {
@@ -13,7 +13,7 @@ Supports creating new libraries, updating code/description, publishing, and dele
     'The programming language of a library cannot be changed after creation.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -41,62 +41,40 @@ Supports creating new libraries, updating code/description, publishing, and dele
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ControlPlaneClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
+    let client = new ControlPlaneClient({ token: ctx.auth.token, region: ctx.config.region });
     let { action, libraryId, name, code, language, description, publish } = ctx.input;
-
-    if (action === 'create') {
-      if (!name) throw new Error('Name is required when creating a library.');
-      if (!code) throw new Error('Code is required when creating a library.');
-
-      let result = await client.createLibrary({ name, code, language, description, publish });
-      let library = result.library || result;
-
-      return {
-        output: {
-          libraryId: library.id,
-          name: library.name,
-          versionId: library.versionId,
-          published: !!publish
-        },
-        message: `Created library **${library.name}**${publish ? ' and published it' : ''}.`
-      };
-    }
-
-    if (action === 'update') {
-      if (!libraryId) throw new Error('Library ID is required for update.');
-
-      let result = await client.updateLibrary(libraryId, { code, description, publish });
-      let library = result.library || result;
-
-      return {
-        output: {
-          libraryId: library.id || libraryId,
-          name: library.name,
-          versionId: library.versionId,
-          published: !!publish
-        },
-        message: `Updated library \`${libraryId}\`${publish ? ' and published it' : ''}.`
-      };
-    }
-
     if (action === 'delete') {
-      if (!libraryId) throw new Error('Library ID is required for delete.');
-
+      if (!libraryId) throw createApiServiceError('Library ID is required for delete.');
       await client.deleteLibrary(libraryId);
-
       return {
-        output: {
-          libraryId,
-          deleted: true
-        },
-        message: `Deleted library \`${libraryId}\`.`
+        output: { libraryId, deleted: true },
+        message: 'Deleted the library. Revision history may remain retained by RudderStack.'
       };
     }
-
-    throw new Error(`Unknown action: ${action}`);
+    if (action === 'create' && (!name?.trim() || !code?.trim()))
+      throw createApiServiceError('Name and code are required for create.');
+    if (action === 'update' && !libraryId)
+      throw createApiServiceError('Library ID is required for update.');
+    let resource =
+      action === 'create'
+        ? await client.createLibrary({ name, code, language, description, publish })
+        : await client.updateLibrary(libraryId!, {
+            name,
+            code,
+            language,
+            description,
+            publish
+          });
+    return {
+      output: {
+        libraryId: stringField(resource.id, 'the resource ID'),
+        name: typeof resource.name === 'string' ? resource.name : undefined,
+        versionId: stringField(resource.versionId, 'the revision ID'),
+        published:
+          typeof resource.isPublished === 'boolean' ? resource.isPublished : (publish ?? false)
+      },
+      message:
+        action === 'create' ? 'Created the library revision.' : 'Updated the library revision.'
+    };
   })
   .build();

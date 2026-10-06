@@ -9,21 +9,38 @@ let podSchema = z.object({
   desiredStatus: z
     .string()
     .nullable()
-    .describe('Current desired status: RUNNING, EXITED, or TERMINATED'),
+    .describe(
+      'Current lifecycle status, including provisioning, running, stopped, or error states.'
+    ),
   imageName: z.string().nullable().describe('Container image used by the Pod'),
   costPerHr: z.number().nullable().describe('Cost per hour in USD'),
-  vcpuCount: z.number().nullable().describe('Number of vCPUs allocated'),
+  vcpuCount: z.number().min(1).nullable().describe('Number of vCPUs allocated'),
   memoryInGb: z.number().nullable().describe('Memory allocated in GB'),
-  containerDiskInGb: z.number().nullable().describe('Container disk size in GB'),
-  volumeInGb: z.number().nullable().describe('Persistent volume size in GB'),
-  gpuCount: z.number().nullable().describe('Number of GPUs allocated'),
+  containerDiskInGb: z
+    .number()
+    .refine(Number.isInteger, 'Must be an integer.')
+    .min(1)
+    .nullable()
+    .describe('Container disk size in GB'),
+  volumeInGb: z
+    .number()
+    .refine(Number.isInteger, 'Must be an integer.')
+    .min(10)
+    .nullable()
+    .describe('Persistent volume size in GB'),
+  gpuCount: z
+    .number()
+    .refine(Number.isInteger, 'Must be an integer.')
+    .min(1)
+    .nullable()
+    .describe('Number of GPUs allocated'),
   gpuType: z.string().nullable().describe('Type of GPU allocated')
 });
 
 export let listPods = SlateTool.create(spec, {
   name: 'List Pods',
   key: 'list_pods',
-  description: `List all GPU/CPU Pods in your RunPod account. Filter by compute type, status, GPU type, name, or attached network volume to find specific Pods. Returns Pod details including configuration, pricing, and status.`,
+  description: `List all standalone GPU/CPU Pods in your Runpod account. Filter by compute type, status, name, or attached network volume. Returns configuration, pricing, and status.`,
   tags: {
     readOnly: true
   }

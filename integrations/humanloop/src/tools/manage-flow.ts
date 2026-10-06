@@ -1,15 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectHumanloopOperation } from '../lib/retirement';
 import { spec } from '../spec';
 
 export let manageFlow = SlateTool.create(spec, {
   name: 'Manage Flow',
   key: 'manage_flow',
-  description: `Create, update, retrieve, or delete flows. Flows are orchestrations of Prompts, Tools, and other code — enabling evaluation and improvement of complete multi-step AI pipelines. Each flow version is identified by its attributes.`,
+  description:
+    'DEPRECATED — Humanloop shut down on September 8, 2025. This operation is unavailable; the tool is retained only for compatibility.',
+  instructions: [
+    'Humanloop is retired. Do not use this tool for new workflows; use data exported before September 8, 2025 with your chosen replacement platform.'
+  ],
   tags: {
     destructive: false,
-    readOnly: false
+    readOnly: false,
+    deprecated: true
   }
 })
   .input(
@@ -40,66 +45,5 @@ export let manageFlow = SlateTool.create(spec, {
       total: z.number().optional().describe('Total count')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    if (ctx.input.action === 'list') {
-      let result = await client.listFlows({
-        page: ctx.input.page,
-        size: ctx.input.size
-      });
-      return {
-        output: { flows: result.records, total: result.total },
-        message: `Found **${result.total}** flows.`
-      };
-    }
-
-    if (ctx.input.action === 'get') {
-      if (!ctx.input.flowId) throw new Error('flowId is required for get action');
-      let flow = await client.getFlow(ctx.input.flowId);
-      return {
-        output: { flow },
-        message: `Retrieved flow **${flow.name || flow.path}**.`
-      };
-    }
-
-    if (ctx.input.action === 'create') {
-      let body: Record<string, any> = {};
-      if (ctx.input.path) body.path = ctx.input.path;
-      if (ctx.input.flowId) body.id = ctx.input.flowId;
-      if (ctx.input.attributes) body.attributes = ctx.input.attributes;
-      if (ctx.input.versionName) body.version_name = ctx.input.versionName;
-      if (ctx.input.versionDescription)
-        body.version_description = ctx.input.versionDescription;
-
-      let flow = await client.upsertFlow(body);
-      return {
-        output: { flow },
-        message: `Created/updated flow **${flow.name || flow.path}**.`
-      };
-    }
-
-    if (ctx.input.action === 'update') {
-      if (!ctx.input.flowId) throw new Error('flowId is required for update action');
-      let body: Record<string, any> = {};
-      if (ctx.input.path) body.path = ctx.input.path;
-      if (ctx.input.name) body.name = ctx.input.name;
-      let flow = await client.updateFlow(ctx.input.flowId, body);
-      return {
-        output: { flow },
-        message: `Updated flow **${flow.name || flow.path}**.`
-      };
-    }
-
-    if (ctx.input.action === 'delete') {
-      if (!ctx.input.flowId) throw new Error('flowId is required for delete action');
-      await client.deleteFlow(ctx.input.flowId);
-      return {
-        output: {},
-        message: `Deleted flow **${ctx.input.flowId}**.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
-  })
+  .handleInvocation(async () => rejectHumanloopOperation())
   .build();

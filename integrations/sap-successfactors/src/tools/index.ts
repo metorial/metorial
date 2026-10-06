@@ -1,4 +1,6 @@
+export { getApiMetadata } from './get-api-metadata';
 export { getCompensation } from './get-compensation';
+export { getCurrentContext } from './get-current-context';
 export { getEmployee } from './get-employee';
 export { getGoals } from './get-goals';
 export { getJobApplication } from './get-job-application';

@@ -1,120 +1,332 @@
-import { SlateTool } from 'slates';
+import { anyOf, createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
+import {
+  dataList,
+  objectList,
+  objectResponse,
+  requireDate,
+  requireText,
+  resourceSchema
+} from '../lib/response';
 import { createClient } from '../lib/utils';
 import { spec } from '../spec';
 
+let dailySchema = z.object({
+  date: z.string(),
+  dayType: z.enum(['HALF_DAY', 'FULL_DAY', 'PERCENTAGE', 'HOURLY']),
+  hours: z.number().optional(),
+  amount: z.number().optional()
+});
 export let manageTimeOff = SlateTool.create(spec, {
   name: 'Manage Time Off',
   key: 'manage_time_off',
-  description: `Create, list, update, or delete time-off requests for workers. Use action "list" to see requests for a profile, "create" to submit a new request, "update" to modify, or "delete" to cancel a request.`,
+  description:
+    'List time-off requests or assigned policies, create or update requests, or cancel a request. Cancellation retains a CANCELED record and cannot be reversed.',
   instructions: [
-    'For "list": provide the profileId of the worker.',
-    'For "create": provide the required time-off details such as start/end dates and type.',
-    'For "update": provide the timeOffId and the fields to update.',
-    'For "delete": provide the timeOffId to cancel the request.'
-  ]
+    'Use list_people to discover an HRIS profile ID, then action policies to discover assigned policy/type IDs.',
+    'For create, supply profileId,startDate,endDate and policyId or timeOffTypeId. The default request status is REQUESTED.',
+    'For update, supply timeOffId and changed fields. Required profile/date context is read from the existing request when omitted.',
+    'The legacy delete action cancels a request and verifies the retained CANCELED state.'
+  ],
+  tags: { destructive: true }
 })
+  .scopes(anyOf('time-off:read', 'time-off:write', 'worker:write'))
   .input(
     z.object({
-      action: z.enum(['list', 'create', 'update', 'delete']).describe('Action to perform'),
+      action: z
+        .enum(['list', 'create', 'update', 'delete', 'policies'])
+        .describe('Action to perform'),
       profileId: z
         .string()
         .optional()
-        .describe('Worker HRIS profile ID (required for "list")'),
-      timeOffId: z
-        .string()
-        .optional()
-        .describe('Time-off request ID (required for "update" and "delete")'),
-      contractId: z.string().optional().describe('For "create": the contract ID'),
+        .describe('HRIS profile ID from list_people; required for list, policies and create'),
+      timeOffId: z.string().optional().describe('Request ID required for update or delete'),
+      contractId: z.string().optional().describe('For create: related contract ID'),
       startDate: z
         .string()
         .optional()
-        .describe('For "create"/"update": start date (YYYY-MM-DD)'),
-      endDate: z.string().optional().describe('For "create"/"update": end date (YYYY-MM-DD)'),
+        .describe('For create/update: first requested date YYYY-MM-DD'),
+      endDate: z
+        .string()
+        .optional()
+        .describe('For create/update: last requested date YYYY-MM-DD'),
       type: z
         .string()
         .optional()
-        .describe('For "create": time-off type (e.g. "vacation", "sick_leave")'),
-      reason: z.string().optional().describe('For "create"/"update": reason for the time-off'),
+        .describe(
+          'Legacy field; use explicit policyId or timeOffTypeId discovered with policies'
+        ),
+      reason: z.string().optional().describe('For create/update: reason'),
       halfDay: z
         .boolean()
         .optional()
-        .describe('For "create"/"update": whether this is a half-day request')
+        .describe(
+          'For create/update: single-date half-day request; use dates for an explicit breakdown'
+        ),
+      policyId: z.string().optional().describe('Assigned policy ID from the policies action'),
+      timeOffTypeId: z
+        .string()
+        .optional()
+        .describe('Assigned time-off type ID from the policies action'),
+      status: z
+        .enum(['REQUESTED', 'APPROVED'])
+        .optional()
+        .describe('For create: request status; defaults to REQUESTED'),
+      description: z
+        .string()
+        .optional()
+        .describe('For create/update: description; some policies require it'),
+      dates: z
+        .array(dailySchema)
+        .optional()
+        .describe(
+          'For create/update: explicit daily breakdown; all entries must use the same dayType'
+        ),
+      pageSize: z.number().optional().describe('For list: page size 5–200'),
+      next: z.string().optional().describe('For list: next cursor returned by the prior page'),
+      timeOffIds: z
+        .array(z.string())
+        .optional()
+        .describe('For list: filter to these exact request IDs')
     })
   )
   .output(
     z.object({
       timeOffs: z
-        .array(z.record(z.string(), z.any()))
+        .array(resourceSchema)
         .optional()
-        .describe('List of time-off requests (for "list")'),
-      timeOff: z
-        .record(z.string(), z.any())
+        .describe('Listed or created requests; creation can produce multiple records'),
+      timeOff: resourceSchema
         .optional()
-        .describe('Created, updated, or deleted time-off request')
+        .describe('Single created, updated or cancelled request'),
+      policies: z.array(resourceSchema).optional(),
+      next: z.string().nullable().optional(),
+      hasNextPage: z.boolean().optional(),
+      count: z.number().optional(),
+      cancelled: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-
-    switch (ctx.input.action) {
-      case 'list': {
-        if (!ctx.input.profileId)
-          throw new Error('profileId is required for listing time-off requests');
-        let result = await client.listTimeOffs(ctx.input.profileId);
-        let timeOffs = result?.data ?? [];
-        return {
-          output: { timeOffs },
-          message: `Found ${timeOffs.length} time-off request(s) for profile **${ctx.input.profileId}**.`
-        };
-      }
-
-      case 'create': {
-        let data: Record<string, any> = {};
-        if (ctx.input.contractId) data.contract_id = ctx.input.contractId;
-        if (ctx.input.startDate) data.start_date = ctx.input.startDate;
-        if (ctx.input.endDate) data.end_date = ctx.input.endDate;
-        if (ctx.input.type) data.type = ctx.input.type;
-        if (ctx.input.reason) data.reason = ctx.input.reason;
-        if (ctx.input.halfDay !== undefined) data.half_day = ctx.input.halfDay;
-
-        let result = await client.createTimeOff(data);
-        let timeOff = result?.data ?? result;
-        return {
-          output: { timeOff },
-          message: `Created time-off request from **${ctx.input.startDate}** to **${ctx.input.endDate}**.`
-        };
-      }
-
-      case 'update': {
-        if (!ctx.input.timeOffId)
-          throw new Error('timeOffId is required for updating a time-off request');
-
-        let data: Record<string, any> = {};
-        if (ctx.input.startDate) data.start_date = ctx.input.startDate;
-        if (ctx.input.endDate) data.end_date = ctx.input.endDate;
-        if (ctx.input.reason) data.reason = ctx.input.reason;
-        if (ctx.input.halfDay !== undefined) data.half_day = ctx.input.halfDay;
-
-        let result = await client.updateTimeOff(ctx.input.timeOffId, data);
-        let timeOff = result?.data ?? result;
-        return {
-          output: { timeOff },
-          message: `Updated time-off request **${ctx.input.timeOffId}**.`
-        };
-      }
-
-      case 'delete': {
-        if (!ctx.input.timeOffId)
-          throw new Error('timeOffId is required for deleting a time-off request');
-
-        let result = await client.deleteTimeOff(ctx.input.timeOffId);
-        let timeOff = result?.data ?? result;
-        return {
-          output: { timeOff },
-          message: `Deleted time-off request **${ctx.input.timeOffId}**.`
-        };
+    let input = ctx.input;
+    if (input.action === 'policies') {
+      let profileId = requireText(input.profileId, 'profileId');
+      let policies = objectList(
+        objectResponse(await client.listTimeOffPolicies(profileId), 'policies').policies,
+        'policies'
+      );
+      return {
+        output: { policies },
+        message: `Found ${policies.length} assigned time-off policy/policies.`
+      };
+    }
+    if (input.action === 'list') {
+      let profileId = requireText(input.profileId, 'profileId');
+      if (
+        input.pageSize !== undefined &&
+        (!Number.isSafeInteger(input.pageSize) || input.pageSize < 5 || input.pageSize > 200)
+      )
+        throw createApiServiceError('pageSize must be an integer between 5 and 200.');
+      let result = objectResponse(
+        await client.listTimeOffs(profileId, {
+          page_size: input.pageSize,
+          next: input.next,
+          time_off_ids: input.timeOffIds
+        }),
+        'time off'
+      );
+      let timeOffs = dataList(result, 'time off');
+      let paging = z
+        .object({
+          next: z.string().nullable().optional(),
+          has_next_page: z.boolean(),
+          count: z.number().optional()
+        })
+        .safeParse(result);
+      if (!paging.success)
+        throw createApiServiceError('Deel returned invalid time-off pagination metadata.');
+      return {
+        output: {
+          timeOffs,
+          next: paging.data.next,
+          hasNextPage: paging.data.has_next_page,
+          count: paging.data.count
+        },
+        message: `Found ${timeOffs.length} time-off request(s).`
+      };
+    }
+    if (input.action === 'delete') {
+      let id = requireText(input.timeOffId, 'timeOffId');
+      let before = dataList(
+        await client.listOrganizationTimeOffs({
+          time_off_ids: [id],
+          include_deleted_time_offs: true
+        }),
+        'time off'
+      ).find(item => item.id === id);
+      if (!before)
+        throw createApiServiceError(
+          'The requested time-off record could not be found; cancellation was not attempted.'
+        );
+      if (before.status !== 'CANCELED') await client.deleteTimeOff(id);
+      let after = dataList(
+        await client.listOrganizationTimeOffs({
+          time_off_ids: [id],
+          include_deleted_time_offs: true
+        }),
+        'time off'
+      ).find(item => item.id === id);
+      if (!after || after.status !== 'CANCELED')
+        throw createApiServiceError(
+          'Time-off cancellation could not be verified. Check the retained request before retrying.'
+        );
+      return {
+        output: { timeOff: after, cancelled: true },
+        message: `Confirmed time-off request **${id}** is CANCELED. The record remains in its history.`
+      };
+    }
+    if (input.type !== undefined)
+      throw createApiServiceError(
+        'Use policyId or timeOffTypeId from the policies action; Deel does not accept a free-text time-off type.'
+      );
+    if (input.policyId && input.timeOffTypeId)
+      throw createApiServiceError('Choose policyId or timeOffTypeId, not both.');
+    if (input.action === 'update' && input.status !== undefined)
+      throw createApiServiceError(
+        'status applies only to create; time-off approval is a separate workflow.'
+      );
+    let existing: Record<string, unknown> | undefined;
+    if (input.action === 'update') {
+      let id = requireText(input.timeOffId, 'timeOffId');
+      if (
+        ![
+          input.profileId,
+          input.startDate,
+          input.endDate,
+          input.policyId,
+          input.timeOffTypeId,
+          input.reason,
+          input.description,
+          input.halfDay,
+          input.dates
+        ].some(value => value !== undefined)
+      )
+        throw createApiServiceError('Provide at least one time-off field to update.');
+      existing = dataList(
+        await client.listOrganizationTimeOffs({
+          time_off_ids: [id],
+          include_deleted_time_offs: true
+        }),
+        'time off'
+      ).find(item => item.id === id);
+      if (!existing)
+        throw createApiServiceError(
+          'The requested time-off record could not be found; update was not attempted.'
+        );
+      if (['CANCELED', 'DELETED'].includes(String(existing.status)))
+        throw createApiServiceError(
+          'A cancelled or deleted time-off request cannot be edited.'
+        );
+    }
+    let recipient = existing?.recipient_profile
+      ? objectResponse(existing.recipient_profile, 'recipient profile')
+      : undefined;
+    let profileId = requireText(input.profileId ?? recipient?.hris_profile_id, 'profileId');
+    let startDate = requireDate(input.startDate ?? existing?.start_date, 'startDate');
+    let endDate = requireDate(input.endDate ?? existing?.end_date, 'endDate');
+    if (startDate > endDate) throw createApiServiceError('endDate cannot precede startDate.');
+    let policyId = input.policyId;
+    let typeId =
+      input.timeOffTypeId ??
+      (!policyId && typeof existing?.time_off_type_id === 'string'
+        ? existing.time_off_type_id
+        : undefined);
+    if (!policyId && !typeId)
+      throw createApiServiceError(
+        'policyId or timeOffTypeId is required. Discover assigned IDs with the policies action.'
+      );
+    let policy = policyId ?? typeId;
+    if (!z.uuid().safeParse(policy).success || !z.uuid().safeParse(profileId).success)
+      throw createApiServiceError(
+        'profileId and policy/type IDs must be valid UUIDs from the discovery tools.'
+      );
+    let dates = input.dates;
+    if (input.halfDay !== undefined) {
+      if (dates !== undefined || startDate !== endDate)
+        throw createApiServiceError(
+          'halfDay applies to one date only. Use an explicit dates breakdown for ranges.'
+        );
+      dates = [{ date: startDate, dayType: input.halfDay ? 'HALF_DAY' : 'FULL_DAY' }];
+    }
+    if (dates) {
+      if (
+        !dates.length ||
+        new Set(dates.map(day => day.date)).size !== dates.length ||
+        new Set(dates.map(day => day.dayType)).size !== 1
+      )
+        throw createApiServiceError('Provide unique dates with one consistent dayType.');
+      for (let day of dates) {
+        requireDate(day.date, 'dates.date');
+        if (day.date < startDate || day.date > endDate)
+          throw createApiServiceError(
+            'Every daily breakdown date must be inside the requested range.'
+          );
+        if (
+          (day.hours !== undefined && (!Number.isFinite(day.hours) || day.hours <= 0)) ||
+          (day.amount !== undefined && (!Number.isFinite(day.amount) || day.amount <= 0))
+        )
+          throw createApiServiceError(
+            'Daily hours and amount must be positive finite numbers.'
+          );
       }
     }
+    let data = pickDefined({
+      recipient_profile_id: profileId,
+      start_date: startDate,
+      end_date: endDate,
+      policy_id: policyId,
+      time_off_type_id: typeId,
+      contract_oid: input.contractId,
+      reason: input.reason,
+      description: input.description,
+      dates: dates?.map(day =>
+        pickDefined({
+          date: day.date,
+          day_type: day.dayType,
+          hours: day.hours,
+          amount: day.amount
+        })
+      ),
+      ...(input.action === 'create' ? { status: input.status ?? 'REQUESTED' } : {})
+    });
+    if (input.action === 'create') {
+      let timeOffs = objectList(
+        objectResponse(await client.createTimeOff(data), 'created time off').time_offs,
+        'created time off'
+      );
+      if (!timeOffs.length)
+        throw createApiServiceError(
+          'Deel did not return any created time-off requests. Check before retrying.'
+        );
+      return {
+        output: { timeOffs, ...(timeOffs.length === 1 ? { timeOff: timeOffs[0] } : {}) },
+        message: `Created ${timeOffs.length} time-off request(s).`
+      };
+    }
+    let timeOff = objectResponse(
+      objectResponse(
+        await client.updateTimeOff(requireText(input.timeOffId, 'timeOffId'), data),
+        'updated time off'
+      ).time_off,
+      'updated time off'
+    );
+    if (timeOff.id !== input.timeOffId)
+      throw createApiServiceError(
+        'Deel returned a different request after the update. Verify the requested record.'
+      );
+    return {
+      output: { timeOff },
+      message: `Updated time-off request **${input.timeOffId}**.`
+    };
   })
   .build();

@@ -1,4 +1,4 @@
-# Slates Specification for Papertrail
+# Papertrail API capabilities
 
 ## Overview
 
@@ -46,7 +46,7 @@ Invite new members when a new employee joins the team. Users can be managed via 
 
 ### Log Archives
 
-Archive files can be retrieved using the HTTP API. The URL format is `https://papertrailapp.com/api/v1/archives/YYYY-MM-DD-HH/download`. All archive files are hourly. You can list available archives and download them as gzipped TSV files.
+Archive files can be retrieved using the HTTP API. The URL format is `https://papertrailapp.com/api/v1/archives/YYYY-MM-DD-HH/download`. Current archives are hourly; older available archives may cover UTC days. You can list available archives and download them as gzipped TSV files.
 
 ### Account Usage
 
@@ -54,17 +54,13 @@ Retrieve account usage information, such as log volume consumed.
 
 ### Log Destinations
 
-Manage log destinations, which define where systems should send their logs. Destinations can accept logs via HTTPS using a provided token for authentication and can accept single or newline-delimited events in plaintext or JSON.
+Inspect log destinations and their syslog hostname, port, description, and filter. Creating or updating destinations through the settings API is not supported; use Papertrail account settings.
 
-## Events
 
-Papertrail supports outbound webhooks triggered by saved search alerts.
+## Supported operations
 
-### Saved Search Alerts (Webhooks)
+The integration implements the documented systems, groups, saved-search, membership, log-destination read, usage, archive-list and event-search routes. It adds single-resource reads and authenticated archive downloads. It does not configure alerts or outbound webhooks.
 
-When Papertrail receives new log events that match one of your saved searches, it can notify a HTTP URL that you provide (webhook).
+The usage API returns transfer bytes, limits and percentage, not account ID, account name or plan name. `get_usage` exposes these documented values. The original `get_account_usage` contract remains registered and deprecated, and reports an explanatory error instead of inventing account identity.
 
-- **Configuration:** Define your webhook URL and callback frequency (minute, hour, or day). If the webhook only needs a count of matching logs, not all raw logs, enable the "Send only counts" option.
-- The callback is a POST request. The POST body contains a single parameter called `payload`, which contains a JSON hash. The most important key in this hash is `events`: an array of log event hashes.
-- **Trigger modes:** Alerts can trigger when matching events are found, or when there are no matching events within the chosen time period (inactivity alerts).
-- **Minimum threshold:** You can choose how many matching events must occur in the time interval. The default is 1, meaning the alert fires whenever at least one matching message has occurred.
+Official sources: [HTTP API](https://www.papertrail.com/help/http-api/), [settings API](https://www.papertrail.com/help/settings-api/), [search API](https://www.papertrail.com/help/search-api/), [archives](https://www.papertrail.com/help/permanent-log-archives/).

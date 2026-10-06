@@ -1,7 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getApiMetadata,
   getCompensation,
+  getCurrentContext,
   getEmployee,
   getGoals,
   getJobApplication,
@@ -16,11 +18,11 @@ import {
   searchEmployees,
   searchJobRequisitions
 } from './tools';
-import { employeeLifecycle, recruitingEvent, timeOffEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentContext,
+    getApiMetadata,
     getEmployee,
     searchEmployees,
     manageEmployee,
@@ -36,5 +38,5 @@ export let provider = Slate.create({
     getSuccessionPlanning,
     queryOdataEntity
   ],
-  triggers: [employeeLifecycle, recruitingEvent, timeOffEvent]
+  triggers: []
 });

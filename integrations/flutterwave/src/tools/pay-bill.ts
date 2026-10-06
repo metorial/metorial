@@ -11,6 +11,9 @@ export let payBill = SlateTool.create(spec, {
     'First use "List Bill Categories" to find the billerCode and itemCode.',
     'The customer field is the identifier for the bill (phone number for airtime, meter number for power, smartcard number for cable, etc.).'
   ],
+  constraints: [
+    'The current bill payment API supports Nigerian billers only. Use country NG.'
+  ],
   tags: {
     destructive: true
   }
@@ -19,16 +22,22 @@ export let payBill = SlateTool.create(spec, {
     z.object({
       billerCode: z.string().describe('Biller code (e.g. BIL099 for MTN Nigeria)'),
       itemCode: z.string().describe('Bill item code (e.g. AT099 for MTN Airtime)'),
-      country: z.string().describe('Country code (e.g. NG, GH, KE)'),
+      country: z
+        .string()
+        .describe('Country code NG for the currently supported Nigerian billers'),
       customer: z
         .string()
         .describe('Customer identifier (phone number, meter number, smartcard number, etc.)'),
       amount: z.number().describe('Bill amount to pay'),
-      type: z.string().describe('Bill type (AIRTIME, DATA, DSTV, GOTV, PHCN, etc.)'),
+      type: z
+        .string()
+        .describe(
+          'Legacy descriptive product label; billerCode and itemCode select the actual bill product'
+        ),
       recurrence: z
         .enum(['ONCE', 'HOURLY', 'DAILY', 'WEEKLY', 'MONTHLY'])
         .optional()
-        .describe('Payment recurrence schedule'),
+        .describe('Legacy schedule: only ONCE is supported by the current bill-item endpoint'),
       reference: z.string().optional().describe('Your unique reference for the payment')
     })
   )
@@ -40,7 +49,7 @@ export let payBill = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
     let result = await client.createBillPayment(ctx.input.billerCode, ctx.input.itemCode, {
       country: ctx.input.country,
@@ -53,11 +62,11 @@ export let payBill = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status,
+        status: result.data?.status ?? 'accepted',
         message: result.message,
-        reference: result.data?.reference || result.data?.tx_ref
+        reference: result.data?.tx_ref || result.data?.reference
       },
-      message: `Bill payment of **${ctx.input.amount}** for **${ctx.input.type}** to ${ctx.input.customer}: **${result.status}**.`
+      message: `Bill payment of **${ctx.input.amount}** for **${ctx.input.type}** to ${ctx.input.customer}: **accepted**. Use get_bill_payment with the returned transaction reference to check processing; request acceptance does not prove delivery.`
     };
   })
   .build();

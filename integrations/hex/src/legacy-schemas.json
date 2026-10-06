@@ -1,0 +1,1347 @@
+{
+  "run_project": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "inputParams": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "viewId": {
+          "type": "string"
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "updateCache": {
+          "type": "boolean"
+        },
+        "updatePublishedResults": {
+          "type": "boolean"
+        },
+        "useCachedSqlResults": {
+          "type": "boolean"
+        },
+        "notifications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "target": {}
+            },
+            "required": ["type", "target"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["projectId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "string"
+        },
+        "runUrl": {
+          "type": "string"
+        },
+        "runStatusUrl": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": ["projectId", "runId", "runUrl"],
+      "additionalProperties": false
+    }
+  },
+  "create_embedding_url": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "hexUserAttributes": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "scope": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "inputParameters": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "expiresIn": {
+          "type": "number"
+        },
+        "theme": {
+          "type": "string"
+        },
+        "showPadding": {
+          "type": "boolean"
+        },
+        "showHeader": {
+          "type": "boolean"
+        },
+        "testMode": {
+          "type": "boolean"
+        }
+      },
+      "required": ["projectId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "embeddingUrl": {
+          "type": "string"
+        }
+      },
+      "required": ["embeddingUrl"],
+      "additionalProperties": false
+    }
+  },
+  "create_project": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": ["title"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["projectId", "title", "description", "status", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "list_groups": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "after": {
+          "type": "string"
+        },
+        "sortBy": {
+          "type": "string",
+          "enum": ["CREATED_AT", "NAME"]
+        },
+        "sortDirection": {
+          "type": "string",
+          "enum": ["ASC", "DESC"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "groupId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              }
+            },
+            "required": ["groupId", "name", "createdAt"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      },
+      "required": ["groups"],
+      "additionalProperties": false
+    }
+  },
+  "deactivate_user": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      },
+      "required": ["userId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "deactivated": {
+          "type": "boolean"
+        }
+      },
+      "required": ["deactivated"],
+      "additionalProperties": false
+    }
+  },
+  "list_collections": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "after": {
+          "type": "string"
+        },
+        "sortBy": {
+          "type": "string",
+          "enum": ["CREATED_AT", "NAME"]
+        },
+        "sortDirection": {
+          "type": "string",
+          "enum": ["ASC", "DESC"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "collections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "collectionId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": ["collectionId", "name", "description", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      },
+      "required": ["collections"],
+      "additionalProperties": false
+    }
+  },
+  "manage_project_sharing": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string"
+              },
+              "accessLevel": {
+                "type": "string",
+                "enum": ["NONE", "APP_ONLY", "CAN_VIEW", "CAN_EDIT", "FULL_ACCESS"]
+              }
+            },
+            "required": ["userId", "accessLevel"],
+            "additionalProperties": false
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "groupId": {
+                "type": "string"
+              },
+              "accessLevel": {
+                "type": "string",
+                "enum": ["NONE", "APP_ONLY", "CAN_VIEW", "CAN_EDIT", "FULL_ACCESS"]
+              }
+            },
+            "required": ["groupId", "accessLevel"],
+            "additionalProperties": false
+          }
+        },
+        "collections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "collectionId": {
+                "type": "string"
+              },
+              "accessLevel": {
+                "type": "string",
+                "enum": ["NONE", "APP_ONLY", "CAN_VIEW", "CAN_EDIT", "FULL_ACCESS"]
+              }
+            },
+            "required": ["collectionId", "accessLevel"],
+            "additionalProperties": false
+          }
+        },
+        "workspace": {
+          "type": "string",
+          "enum": ["NONE", "APP_ONLY", "CAN_VIEW", "CAN_EDIT", "FULL_ACCESS"]
+        },
+        "publicWeb": {
+          "type": "string",
+          "enum": ["NONE", "APP_ONLY", "CAN_VIEW", "CAN_EDIT", "FULL_ACCESS"]
+        }
+      },
+      "required": ["projectId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "updatedSharing": {
+          "type": "object",
+          "properties": {
+            "usersUpdated": {
+              "type": "boolean"
+            },
+            "groupsUpdated": {
+              "type": "boolean"
+            },
+            "collectionsUpdated": {
+              "type": "boolean"
+            },
+            "workspaceUpdated": {
+              "type": "boolean"
+            },
+            "publicWebUpdated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "usersUpdated",
+            "groupsUpdated",
+            "collectionsUpdated",
+            "workspaceUpdated",
+            "publicWebUpdated"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["projectId", "title", "updatedSharing"],
+      "additionalProperties": false
+    }
+  },
+  "cancel_run": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "string"
+        }
+      },
+      "required": ["projectId", "runId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "cancelled": {
+          "type": "boolean"
+        }
+      },
+      "required": ["cancelled"],
+      "additionalProperties": false
+    }
+  },
+  "manage_group": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "addUserIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removeUserIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": ["groupId", "name", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "list_projects": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "after": {
+          "type": "string"
+        },
+        "sortBy": {
+          "type": "string"
+        },
+        "sortDirection": {
+          "type": "string",
+          "enum": ["ASC", "DESC"]
+        },
+        "statuses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "creatorEmail": {
+          "type": "string"
+        },
+        "ownerEmail": {
+          "type": "string"
+        },
+        "collectionId": {
+          "type": "string"
+        },
+        "includeArchived": {
+          "type": "boolean"
+        },
+        "includeTrashed": {
+          "type": "boolean"
+        },
+        "includeSharing": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "projectId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "categories": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "creator": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "userId": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["userId", "email", "name"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "owner": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "userId": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["userId", "email", "name"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "projectId",
+              "title",
+              "description",
+              "status",
+              "categories",
+              "creator",
+              "owner",
+              "createdAt",
+              "updatedAt",
+              "publishedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      },
+      "required": ["projects"],
+      "additionalProperties": false
+    }
+  },
+  "list_data_connections": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "after": {
+          "type": "string"
+        },
+        "sortBy": {
+          "type": "string",
+          "enum": ["CREATED_AT", "NAME"]
+        },
+        "sortDirection": {
+          "type": "string",
+          "enum": ["ASC", "DESC"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "connections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dataConnectionId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "dataConnectionId",
+              "name",
+              "type",
+              "description",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      },
+      "required": ["connections"],
+      "additionalProperties": false
+    }
+  },
+  "list_project_runs": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "offset": {
+          "type": "number"
+        },
+        "statusFilter": {
+          "type": "string",
+          "enum": [
+            "PENDING",
+            "RUNNING",
+            "ERRORED",
+            "COMPLETED",
+            "KILLED",
+            "UNABLE_TO_ALLOCATE_KERNEL"
+          ]
+        }
+      },
+      "required": ["projectId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "projectId": {
+                "type": "string"
+              },
+              "runId": {
+                "type": "string"
+              },
+              "runUrl": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "startTime": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "endTime": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "elapsedTime": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "traceId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "projectId",
+              "runId",
+              "runUrl",
+              "status",
+              "startTime",
+              "endTime",
+              "elapsedTime",
+              "traceId"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["runs"],
+      "additionalProperties": false
+    }
+  },
+  "delete_group": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string"
+        }
+      },
+      "required": ["groupId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "get_run_status": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "string"
+        }
+      },
+      "required": ["projectId", "runId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "string"
+        },
+        "runUrl": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "startTime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endTime": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "elapsedTime": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "traceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "projectId",
+        "runId",
+        "runUrl",
+        "status",
+        "startTime",
+        "endTime",
+        "elapsedTime",
+        "traceId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "list_users": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "after": {
+          "type": "string"
+        },
+        "sortBy": {
+          "type": "string",
+          "enum": ["CREATED_AT", "NAME"]
+        },
+        "sortDirection": {
+          "type": "string",
+          "enum": ["ASC", "DESC"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "lastLoginAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              }
+            },
+            "required": ["userId", "name", "email", "role", "lastLoginAt", "createdAt"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      },
+      "required": ["users"],
+      "additionalProperties": false
+    }
+  },
+  "update_project_status": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["projectId", "status"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["projectId", "title", "status", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "get_project": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "includeSharing": {
+          "type": "boolean"
+        }
+      },
+      "required": ["projectId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "creator": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": ["userId", "email", "name"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": ["userId", "email", "name"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "publishedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sharing": {
+          "type": "object",
+          "properties": {
+            "workspace": {
+              "type": "string"
+            },
+            "publicWeb": {
+              "type": "string"
+            },
+            "users": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string"
+                  },
+                  "accessLevel": {
+                    "type": "string"
+                  }
+                },
+                "required": ["userId", "accessLevel"],
+                "additionalProperties": false
+              }
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "groupId": {
+                    "type": "string"
+                  },
+                  "accessLevel": {
+                    "type": "string"
+                  }
+                },
+                "required": ["groupId", "accessLevel"],
+                "additionalProperties": false
+              }
+            },
+            "collections": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "collectionId": {
+                    "type": "string"
+                  },
+                  "accessLevel": {
+                    "type": "string"
+                  }
+                },
+                "required": ["collectionId", "accessLevel"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "projectId",
+        "title",
+        "description",
+        "status",
+        "categories",
+        "creator",
+        "owner",
+        "createdAt",
+        "updatedAt",
+        "publishedAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "get_queried_tables": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "after": {
+          "type": "string"
+        }
+      },
+      "required": ["projectId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "tables": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dataConnectionId": {
+                "type": "string"
+              },
+              "dataConnectionName": {
+                "type": "string"
+              },
+              "tableName": {
+                "type": "string"
+              }
+            },
+            "required": ["dataConnectionId", "dataConnectionName", "tableName"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      },
+      "required": ["tables"],
+      "additionalProperties": false
+    }
+  },
+  "manage_collection": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "collectionId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "collectionId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["collectionId", "name", "description", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "get_data_connection": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "dataConnectionId": {
+          "type": "string"
+        }
+      },
+      "required": ["dataConnectionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "dataConnectionId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "dataConnectionId",
+        "name",
+        "type",
+        "description",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

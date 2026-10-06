@@ -4,8 +4,9 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'docuseal',
-  name: 'Docu Seal',
-  description: undefined,
+  name: 'DocuSeal',
+  description:
+    'Manage document templates, signature requests, signer state and downloadable PDFs.',
   metadata: {},
   config,
   auth

@@ -53,14 +53,11 @@ export let trackShipment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
-    let result = (await client.getTrackingStatus(
-      ctx.input.carrier,
-      ctx.input.trackingNumber
-    )) as Record<string, any>;
+    let result = await client.getTrackingStatus(ctx.input.carrier, ctx.input.trackingNumber);
 
-    let mapEvent = (event: any) => ({
+    let mapEvent = (event: NonNullable<typeof result.tracking_status>) => ({
       status: event?.status,
       statusDetails: event?.status_details,
       statusDate: event?.status_date,

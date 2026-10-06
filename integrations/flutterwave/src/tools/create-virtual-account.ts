@@ -8,12 +8,12 @@ export let createVirtualAccount = SlateTool.create(spec, {
   key: 'create_virtual_account',
   description: `Generate a virtual bank account number for receiving payments via bank transfer. Supports dynamic (temporary, single-use) and static (permanent) accounts. Currently available for NGN and GHS.`,
   instructions: [
-    'For static (permanent) accounts, set isPermanent to true. BVN is required for live static accounts.',
+    'For static accounts, set isPermanent to true. Static NGN accounts require the customer BVN or NIN.',
     'For dynamic (one-time) accounts, provide the amount expected.'
   ],
   constraints: [
     'Virtual accounts are only available for NGN and GHS currencies.',
-    'BVN is required for permanent accounts in production.'
+    'Static NGN accounts require the customer BVN or NIN and provider approval.'
   ]
 })
   .input(
@@ -29,10 +29,20 @@ export let createVirtualAccount = SlateTool.create(spec, {
         .optional()
         .describe('Expected payment amount (required for dynamic accounts)'),
       currency: z.enum(['NGN', 'GHS']).optional().describe('Currency (NGN or GHS)'),
+      nin: z
+        .string()
+        .optional()
+        .describe(
+          'Customer National Identification Number, accepted instead of BVN for static NGN accounts'
+        ),
+      expires: z
+        .number()
+        .optional()
+        .describe('Dynamic-account lifetime in seconds: NGN 60–5270401; GHS 60–172800'),
       bvn: z
         .string()
         .optional()
-        .describe('Bank Verification Number (required for permanent accounts in production)'),
+        .describe('Bank Verification Number, or supply nin instead for static NGN accounts'),
       firstname: z.string().optional().describe('Customer first name'),
       lastname: z.string().optional().describe('Customer last name'),
       phonenumber: z.string().optional().describe('Customer phone number'),
@@ -52,7 +62,7 @@ export let createVirtualAccount = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
     let result = await client.createVirtualAccount({
       email: ctx.input.email,
@@ -61,6 +71,8 @@ export let createVirtualAccount = SlateTool.create(spec, {
       amount: ctx.input.amount,
       currency: ctx.input.currency,
       bvn: ctx.input.bvn,
+      nin: ctx.input.nin,
+      expires: ctx.input.expires,
       firstname: ctx.input.firstname,
       lastname: ctx.input.lastname,
       phonenumber: ctx.input.phonenumber,
@@ -77,7 +89,7 @@ export let createVirtualAccount = SlateTool.create(spec, {
         amount: d.amount,
         expiryDate: d.expiry_date
       },
-      message: `Virtual account created: **${d.account_number}** at **${d.bank_name}**${d.expiry_date ? ` (expires ${d.expiry_date})` : ' (permanent)'}.`
+      message: `Virtual account created: **${d.account_number}** at **${d.bank_name}**${d.expiry_date ? ` (expires ${d.expiry_date})` : ' (expiry not returned)'}.`
     };
   })
   .build();

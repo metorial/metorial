@@ -6,12 +6,12 @@ import { spec } from '../spec';
 export let listEntries = SlateTool.create(spec, {
   name: 'List Entries',
   key: 'list_entries',
-  description: `Retrieve a paginated list of entries from any Strapi content type. Supports filtering by field values, sorting, field selection, relation population, locale, and draft/published status.`,
+  description: `Retrieve a paginated list of entries from an authorized Strapi content type. Supports filtering by field values, sorting, field selection, relation population, locale, and draft/published status.`,
   instructions: [
     'The contentType must be the plural API ID of the content type (e.g., "articles", "restaurants").',
     'Use filters with Strapi filter operators like $eq, $contains, $gt, etc. nested under the field name.',
     'Use sort with field names and optional :asc or :desc suffix (e.g., "createdAt:desc").',
-    'Set populate to "*" to populate all relations, or specify individual relation names.'
+    'Set populate to "*" for permitted first-level relations. Deeper population and custom fields depend on your schema and permissions.'
   ],
   tags: {
     readOnly: true
@@ -29,7 +29,9 @@ export let listEntries = SlateTool.create(spec, {
       populate: z
         .union([z.string(), z.record(z.string(), z.any())])
         .optional()
-        .describe('Relations to populate. Use "*" for all, or an object for granular control'),
+        .describe(
+          'Relations to populate. Use "*" for permitted first-level fields, or an object for granular control'
+        ),
       filters: z
         .record(z.string(), z.any())
         .optional()
@@ -64,10 +66,7 @@ export let listEntries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listEntries(ctx.input.contentType, {
       fields: ctx.input.fields,

@@ -1,13 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DialpadClient } from '../lib/client';
+import { malformed } from '../lib/contracts';
+import { invoke } from '../lib/operations';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  success: z
+    .boolean()
+    .describe('True only for the native success status; pending is not delivery.'),
+  accepted: z.boolean(),
+  messageId: z.string(),
+  status: z.enum(['pending', 'failed', 'success']),
+  deliveryResult: z.string().optional()
+});
 
 export let sendSmsTool = SlateTool.create(spec, {
   name: 'Send SMS',
   key: 'send_sms',
   description: `Send an SMS message to one or more phone numbers through Dialpad. Optionally specify a sender user or group.`,
-  constraints: ['Rate limited to 100-800 per minute depending on tier.']
+  constraints: [
+    'Sending SMS can incur charges and retains message history. Explicitly verify the destination before sending.'
+  ]
 })
   .input(
     z.object({
@@ -27,31 +40,11 @@ export let sendSmsTool = SlateTool.create(spec, {
         .describe('Whether to infer country code from phone numbers')
     })
   )
-  .output(
-    z.object({
-      success: z.boolean().describe('Whether the SMS was sent successfully')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new DialpadClient({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment
-    });
-
-    await client.sendSms({
-      to_numbers: ctx.input.toNumbers,
-      text: ctx.input.text,
-      user_id: ctx.input.senderId,
-      sender_group_type: ctx.input.senderGroupType,
-      sender_group_id: ctx.input.senderGroupId,
-      infer_country_code: ctx.input.inferCountryCode
-    });
-
-    return {
-      output: {
-        success: true
-      },
-      message: `Sent SMS to **${ctx.input.toNumbers.length}** recipient(s)`
-    };
+    const result = await invoke(ctx, 'send_sms');
+    const output = outputSchema.safeParse(result.output);
+    if (!output.success) malformed();
+    return { output: output.data, message: result.message };
   })
   .build();

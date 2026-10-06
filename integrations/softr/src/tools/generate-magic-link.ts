@@ -1,50 +1,25 @@
 import { SlateTool } from 'slates';
-import { z } from 'zod';
 import { StudioClient } from '../lib/client';
+import { appConnection, email, magicLink, studioAccepted, z } from '../lib/validation';
 import { spec } from '../spec';
-
-export let generateMagicLink = SlateTool.create(spec, {
+export const generateMagicLink = SlateTool.create(spec, {
   name: 'Generate Magic Link',
   key: 'generate_magic_link',
-  description: `Generate a magic link for a user in a Softr application, enabling passwordless authentication. The user must already exist in the app.
-
-Requires the **domain** to be configured in the integration settings.`,
-  tags: {
-    destructive: false,
-    readOnly: false
-  }
+  description:
+    'Request a native magic sign-in link for an exact user in the selected published app. The link grants login and is sensitive; share it only with the intended user. No expiry or renewal is invented. Generating another link can have retained authentication effects, so reconcile an uncertain response before retrying.',
+  tags: { readOnly: false }
 })
-  .input(
-    z.object({
-      email: z.string().describe('Email address of the user to generate a magic link for')
-    })
-  )
-  .output(
-    z.object({
-      email: z.string().describe('Email of the user'),
-      magicLink: z.string().describe('Generated magic link URL')
-    })
-  )
+  .input(z.object({ email: z.string() }))
+  .output(z.object({ email: z.string(), magicLink: z.string() }))
   .handleInvocation(async ctx => {
-    if (!ctx.config.domain) {
-      throw new Error(
-        'The "domain" config is required for user management. Set it to your Softr app domain (e.g., yourapp.softr.app).'
-      );
-    }
-
-    let client = new StudioClient({
-      token: ctx.auth.token,
-      domain: ctx.config.domain
-    });
-
-    let result = await client.generateMagicLink(ctx.input.email);
-
+    const c = appConnection(ctx.auth, ctx.config),
+      target = email(ctx.input.email),
+      r = await new StudioClient(c).generateMagicLink(target);
+    studioAccepted(r);
     return {
-      output: {
-        email: ctx.input.email,
-        magicLink: result?.magic_link ?? result?.magicLink ?? result?.data?.magic_link ?? ''
-      },
-      message: `Magic link generated for **${ctx.input.email}**.`
+      output: { email: target, magicLink: magicLink(r.data, c.domain) },
+      message:
+        'Returned the sensitive native sign-in link for the requested app user. Share it only with that user.'
     };
   })
   .build();

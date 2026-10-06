@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import type { personSchema } from '../lib/api-schemas';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -27,7 +28,7 @@ let personOutputSchema = z.object({
   updatedAt: z.string().nullable().optional().describe('Last update timestamp')
 });
 
-let mapPerson = (raw: any) => ({
+let mapPerson = (raw: z.output<typeof personSchema>) => ({
   personId: raw.id,
   firstName: raw.first_name,
   lastName: raw.last_name,
@@ -99,25 +100,27 @@ export let createPerson = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let body: Record<string, any> = {};
-    if (ctx.input.emailAddress) body.email_address = ctx.input.emailAddress;
-    if (ctx.input.firstName) body.first_name = ctx.input.firstName;
-    if (ctx.input.lastName) body.last_name = ctx.input.lastName;
-    if (ctx.input.phone) body.phone = ctx.input.phone;
-    if (ctx.input.phoneExtension) body.phone_extension = ctx.input.phoneExtension;
-    if (ctx.input.mobilePhone) body.mobile_phone = ctx.input.mobilePhone;
-    if (ctx.input.homePhone) body.home_phone = ctx.input.homePhone;
-    if (ctx.input.title) body.title = ctx.input.title;
-    if (ctx.input.city) body.city = ctx.input.city;
-    if (ctx.input.state) body.state = ctx.input.state;
-    if (ctx.input.country) body.country = ctx.input.country;
-    if (ctx.input.linkedinUrl) body.linkedin_url = ctx.input.linkedinUrl;
-    if (ctx.input.personalWebsite) body.personal_website = ctx.input.personalWebsite;
-    if (ctx.input.jobSeniority) body.job_seniority = ctx.input.jobSeniority;
-    if (ctx.input.accountId) body.account_id = ctx.input.accountId;
-    if (ctx.input.ownerId) body.owner_id = ctx.input.ownerId;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.customFields) body.custom_fields = ctx.input.customFields;
+    let body: Record<string, unknown> = {};
+    if (ctx.input.emailAddress !== undefined) body.email_address = ctx.input.emailAddress;
+    if (ctx.input.firstName !== undefined) body.first_name = ctx.input.firstName;
+    if (ctx.input.lastName !== undefined) body.last_name = ctx.input.lastName;
+    if (ctx.input.phone !== undefined) body.phone = ctx.input.phone;
+    if (ctx.input.phoneExtension !== undefined)
+      body.phone_extension = ctx.input.phoneExtension;
+    if (ctx.input.mobilePhone !== undefined) body.mobile_phone = ctx.input.mobilePhone;
+    if (ctx.input.homePhone !== undefined) body.home_phone = ctx.input.homePhone;
+    if (ctx.input.title !== undefined) body.title = ctx.input.title;
+    if (ctx.input.city !== undefined) body.city = ctx.input.city;
+    if (ctx.input.state !== undefined) body.state = ctx.input.state;
+    if (ctx.input.country !== undefined) body.country = ctx.input.country;
+    if (ctx.input.linkedinUrl !== undefined) body.linkedin_url = ctx.input.linkedinUrl;
+    if (ctx.input.personalWebsite !== undefined)
+      body.personal_website = ctx.input.personalWebsite;
+    if (ctx.input.jobSeniority !== undefined) body.job_seniority = ctx.input.jobSeniority;
+    if (ctx.input.accountId !== undefined) body.account_id = ctx.input.accountId;
+    if (ctx.input.ownerId !== undefined) body.owner_id = ctx.input.ownerId;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.customFields !== undefined) body.custom_fields = ctx.input.customFields;
     if (ctx.input.doNotContact !== undefined) body.do_not_contact = ctx.input.doNotContact;
 
     let person = await client.createPerson(body);
@@ -164,7 +167,7 @@ export let updatePerson = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (ctx.input.emailAddress !== undefined) body.email_address = ctx.input.emailAddress;
     if (ctx.input.firstName !== undefined) body.first_name = ctx.input.firstName;
     if (ctx.input.lastName !== undefined) body.last_name = ctx.input.lastName;
@@ -221,7 +224,7 @@ export let getPerson = SlateTool.create(spec, {
 export let deletePerson = SlateTool.create(spec, {
   name: 'Delete Person',
   key: 'delete_person',
-  description: `Permanently delete a person (contact) from SalesLoft. This action is irreversible.`,
+  description: `Delete a person (contact) from Salesloft. Restoration requires contacting Salesloft support; this does not promise erasure of retained CRM or activity history.`,
   tags: {
     destructive: true,
     readOnly: false

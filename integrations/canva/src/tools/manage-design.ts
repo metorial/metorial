@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listDesigns = SlateTool.create(spec, {
@@ -59,7 +60,7 @@ export let listDesigns = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let result = await client.listDesigns({
       query: ctx.input.query,
       ownership: ctx.input.ownership,
@@ -103,7 +104,7 @@ export let getDesign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let design = await client.getDesign(ctx.input.designId);
 
     return {
@@ -121,7 +122,9 @@ export let createDesign = SlateTool.create(spec, {
     'Blank designs are automatically deleted if not edited within 7 days.',
     'Temporary edit/view URLs in the response expire after 30 days.'
   ],
-  constraints: ['Custom dimensions must be between 40 and 8000 pixels.']
+  constraints: [
+    'Each custom dimension must be an integer from 40 to 8000 pixels; total area cannot exceed 25,000,000 square pixels.'
+  ]
 })
   .input(
     z.object({
@@ -158,19 +161,26 @@ export let createDesign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
 
     let designType:
       | { type: 'preset'; name: string }
-      | { type: 'custom'; width: number; height: number };
+      | { type: 'custom'; width: number; height: number }
+      | undefined;
 
-    if (ctx.input.presetType) {
+    if (
+      ctx.input.presetType !== undefined &&
+      (ctx.input.width !== undefined || ctx.input.height !== undefined)
+    )
+      fail('Use a preset or custom dimensions, not both.');
+    if ((ctx.input.width === undefined) !== (ctx.input.height === undefined))
+      fail('Provide both custom dimensions.');
+    if (ctx.input.presetType !== undefined) {
       designType = { type: 'preset', name: ctx.input.presetType };
-    } else if (ctx.input.width && ctx.input.height) {
+    } else if (ctx.input.width !== undefined && ctx.input.height !== undefined) {
       designType = { type: 'custom', width: ctx.input.width, height: ctx.input.height };
-    } else {
-      throw new Error('Either presetType or both width and height must be provided.');
-    }
+    } else if (ctx.input.assetId === undefined)
+      fail('Provide a preset, both custom dimensions, or an initial image asset.');
 
     let design = await client.createDesign({
       designType,

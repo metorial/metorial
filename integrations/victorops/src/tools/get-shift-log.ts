@@ -17,7 +17,12 @@ export let getShiftLog = SlateTool.create(spec, {
       teamSlug: z.string().describe('Team slug to get shift log for'),
       start: z.string().optional().describe('Start of the time range in ISO8601 format'),
       end: z.string().optional().describe('End of the time range in ISO8601 format'),
-      username: z.string().optional().describe('Filter shifts by a specific user')
+      username: z
+        .string()
+        .optional()
+        .describe(
+          'Provider user identifier for filtering shifts (the reporting API names this userName)'
+        )
     })
   )
   .output(

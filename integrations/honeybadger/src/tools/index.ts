@@ -1,4 +1,5 @@
 export * from './get-error-details';
+export * from './list-accounts';
 export * from './list-outages';
 export * from './list-projects';
 export * from './manage-checkins';

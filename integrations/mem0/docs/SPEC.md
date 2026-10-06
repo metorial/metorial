@@ -1,98 +1,63 @@
-Now let me get the specific webhook event types:Now let me check the memory export and organization features:I now have enough information to write the specification.
+# Mem0 integration
 
-# Slates Specification for Mem0
+This integration connects to the hosted Mem0 Platform at `https://api.mem0.ai`.
+It uses API key authentication with `Authorization: Token <api-key>` and validates
+keys through `GET /v1/ping/`, which identifies the key owner, organization, and
+project. The key determines the project used by memory operations; setup does
+not require resource IDs. Old stored scope settings are accepted only when they
+match the key's current organization and project. A mismatch requires
+reconnecting with an API key for the intended project.
 
-## Overview
+## Supported operations
 
-Mem0 is a memory layer for AI applications that enables persistent storage, retrieval, and management of contextual memories across users, agents, and sessions. It provides a REST API for integrating memory capabilities, allowing creation, search, update, and management of memories across users, agents, and custom entities. Mem0 is available as both a managed cloud platform and a self-hosted open-source solution.
+| Tool | Hosted API | Behavior |
+| --- | --- | --- |
+| `get_current_user` | `GET /v1/ping/` | Validate the key and inspect its identity/project. |
+| `add_memory` | `POST /v3/memories/add/` | Store conversation facts asynchronously, or store messages verbatim with `infer: false`. Supports graph extraction, per-request instructions, metadata, and expiration. |
+| `get_event` | `GET /v1/event/{event_id}/` | Inspect processing status, mutation results, and failures. |
+| `get_memory` | `GET /v1/memories/{memory_id}/` and optional `/history/` | Read memory content and history, preserving session identifiers. |
+| `list_memories` | `POST /v3/memories/` | List one page with entity and metadata filters, provider totals, and pagination indicators. |
+| `search_memories` | `POST /v3/memories/search/` | Hybrid search with entity/metadata filters and optional reranking. |
+| `update_memory` | `PUT /v1/memories/{memory_id}/` | Change text, metadata, or expiration; null clears expiration. |
+| `delete_memories` | `DELETE /v1/memories/{memory_id}/` or `/v1/memories/` | Delete one memory synchronously or queue explicitly scoped bulk deletion. |
+| `list_entities` | `GET /v1/entities/` | Page through users, agents, apps, and runs; type filtering applies to each page. |
+| `delete_entity` | `DELETE /v2/entities/{entity_type}/{entity_id}/` | Queue deletion of an entity by its name and its associated memories. |
 
-## Authentication
+## Input and output contracts
 
-All API requests require Token-based authentication. All requests must include an Authorization header with the format `Token <api-key>`.
+- Adding, listing, and searching require an entity scope: user, agent, app, or run.
+  Convenience scope inputs are merged with advanced filters using `AND`.
+- Entity filters accept bare IDs, explicit `eq`, or `in` lists. Nest `OR` inside
+  `AND` instead of placing both operators at the same level; the hosted API can
+  otherwise discard the `OR` branch, so these ambiguous filters are rejected.
+- Listing uses query parameters `page` and `page_size` (1-200 memories per page).
+  Preserve `totalMemories`, `next`, and `previous` when advancing pages.
+- Search scores use the range 0-1. `topK` accepts 1-1000 and `threshold` defaults
+  to the provider's 0.1. Requested search fields always retain ID and content.
+- Inferred additions return processing status and `eventId`; `events` may remain
+  empty until processing completes. Poll `get_event` until `SUCCEEDED` or `FAILED`.
+- Bulk memory and entity deletion report `deleted: false` while pending. Check
+  `eventId` with `get_event` before claiming completion. A single memory deletion
+  completes synchronously.
+- Bulk deletion requires explicit entity IDs and rejects wildcard scopes. A
+  single memory ID cannot be combined with bulk scope filters.
+- Entity list `entityId` is an internal ID; pass its `name` as `delete_entity`
+  input `entityId`, consistent with the hosted SDK.
+- The hosted V3 API does not document `memory_type`. The retained legacy
+  `memoryType` field returns a clear unsupported-option error when supplied.
 
-Get your API key from the Mem0 Dashboard at app.mem0.ai and include it in the Authorization header.
+## Scope
 
-Example header:
+Only the operations listed above are exposed. Exports, organization/project
+administration, feedback, and user profile generation are outside this
+integration's current tool surface.
 
-```
-Authorization: Token m0-your_api_key_here
-```
+## Official sources
 
-The authentication process validates the API key and returns user context including `org_id`, `project_id`, and `user_email`.
-
-When working with multi-tenant setups, you can also specify `org_id` and `project_id` when initializing the client to scope operations to a specific organization and project.
-
-No OAuth or other authentication methods are supported — only API key-based token authentication.
-
-## Features
-
-### Memory Management
-
-The core API provides CRUD operations for memory storage and retrieval. You can add memories from conversations (in OpenAI chat message format), retrieve them by ID, update existing memories, and delete them individually or in bulk.
-
-- Memories can be scoped to a `user_id`, `agent_id`, `app_id`, or `run_id` to isolate context per entity or session.
-- The add operation supports two modes: an inference mode (default) that uses an LLM to extract facts and decide what to store, and a direct mode that stores messages as-is without extraction.
-- Procedural memories (how-to/step-by-step knowledge) can be stored by setting `memory_type="procedural_memory"`, but only when an `agent_id` is provided.
-- Memories are timestamped and versioned, and their full change history can be retrieved.
-
-### Semantic Memory Search
-
-Memories can be searched using natural language queries with semantic similarity matching.
-
-- Supports advanced filtering with AND, OR, IN, gte, lte, gt, lt, ne, and icontains operators.
-- Criteria-based retrieval allows defining custom weighted criteria (e.g., sentiment, emotion) at the project level; supported only in search v2.
-- If a reranker is configured, search results are reranked for relevance.
-
-### Graph Memory
-
-Graph Memory extends Mem0 by persisting nodes and edges alongside embeddings, extracting entities and relationships from every memory write and storing them in a graph backend.
-
-- Enables relationship traversal, entity disambiguation, multi-hop reasoning, and temporal tracking of changing relationships.
-- Can be toggled on or off per request via an `enable_graph` flag.
-- Supports isolation through `user_id`, `agent_id`, and `run_id` filters for multi-tenant deployments.
-
-### Custom Instructions and Categories
-
-Custom instructions are natural language guidelines that define what Mem0 should include or exclude when creating memories, giving precise control over information extraction.
-
-- Configured at the project level.
-- Custom categories can be defined to organize memories; by default, Mem0 uses generic categories like food, travel, and hobbies.
-
-### Multimodal Memory
-
-Mem0 supports storing and retrieving memories that include various content types beyond text, including images, PDFs, and markdown files.
-
-### Entity Management
-
-The Entities API manages users, agents, apps, and runs (sessions) within the platform. Supported entity types are: user, agent, app, and run.
-
-- You can list all users/entities and delete entities and their associated memories.
-
-### Memory Export
-
-The Exports API enables structured data export with custom schemas for analytics and data processing.
-
-### Organizations and Projects
-
-The platform offers organizations, projects, and team management features for multi-tenant isolation and access control.
-
-- Organizations can have multiple projects, each with their own memory space and configuration.
-- Members can be added to organizations and projects.
-
-### Feedback
-
-The API supports submitting feedback on memory operations, enabling the memory system to improve over time.
-
-## Events
-
-Mem0 supports webhooks for real-time notifications about memory events. Webhooks are configured at the project level, meaning each webhook is tied to a specific project and receives events solely from that project.
-
-### Memory Events
-
-Mem0 supports three webhook event types:
-
-- **`memory_add`**: Triggered when a new memory is created.
-- **`memory_update`**: Triggered when an existing memory is modified.
-- **`memory_delete`**: Triggered when a memory is removed.
-
-When creating a webhook, you specify a destination URL, a name, the `project_id`, and which `event_types` to subscribe to. When a memory event occurs, Mem0 sends an HTTP POST request to the webhook URL with a payload containing the event details, including the memory ID, data, and event type.
+- [Hosted API overview](https://docs.mem0.ai/api-reference)
+- [Add memories](https://docs.mem0.ai/api-reference/memory/add-memories)
+- [List memories](https://docs.mem0.ai/api-reference/memory/get-memories)
+- [Search memories](https://docs.mem0.ai/api-reference/memory/search-memories)
+- [Memory filters](https://docs.mem0.ai/platform/features/v2-memory-filters)
+- [Official API schema](https://github.com/mem0ai/mem0/blob/main/docs/openapi.json)
+- [Official TypeScript client](https://github.com/mem0ai/mem0/blob/main/mem0-ts/src/client/mem0.ts)

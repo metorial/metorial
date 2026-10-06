@@ -20,6 +20,12 @@ export let getSuccessionPlanning = SlateTool.create(spec, {
       select: z.string().optional().describe('Comma-separated fields to return'),
       expand: z.string().optional().describe('Navigation properties to expand'),
       top: z.number().optional().describe('Maximum records to return').default(100),
+      nextPage: z
+        .string()
+        .optional()
+        .describe(
+          'Exact nextLink from the preceding result. Keep the entity and original query unchanged; do not combine with skip.'
+        ),
       skip: z.number().optional().describe('Number of records to skip')
     })
   )
@@ -28,6 +34,13 @@ export let getSuccessionPlanning = SlateTool.create(spec, {
       records: z
         .array(z.record(z.string(), z.unknown()))
         .describe('List of succession nominees or talent pool records'),
+      nextLink: z
+        .string()
+        .optional()
+        .describe(
+          'Exact provider continuation URL; pass it as nextPage to retrieve the next page.'
+        ),
+      hasMore: z.boolean().optional().describe('Whether SAP returned another page.'),
       totalCount: z.number().optional().describe('Total count of matching records')
     })
   )
@@ -45,6 +58,7 @@ export let getSuccessionPlanning = SlateTool.create(spec, {
             expand: ctx.input.expand,
             top: ctx.input.top,
             skip: ctx.input.skip,
+            nextPage: ctx.input.nextPage,
             inlineCount: true
           })
         : await client.queryTalentPools({
@@ -53,6 +67,7 @@ export let getSuccessionPlanning = SlateTool.create(spec, {
             expand: ctx.input.expand,
             top: ctx.input.top,
             skip: ctx.input.skip,
+            nextPage: ctx.input.nextPage,
             inlineCount: true
           });
 
@@ -61,7 +76,9 @@ export let getSuccessionPlanning = SlateTool.create(spec, {
     return {
       output: {
         records: result.results,
-        totalCount: result.count
+        totalCount: result.count,
+        nextLink: result.nextLink,
+        hasMore: result.hasMore
       },
       message: `Retrieved **${result.results.length}** ${label}`
     };

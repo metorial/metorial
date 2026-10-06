@@ -1,77 +1,57 @@
-# Slates Specification for Textcortex
+# TextCortex integration specification
 
-## Overview
+TextCortex exposes an OpenAI-compatible API at `https://api.textcortex.com/v1`.
+The current official [API reference](https://docs.textcortex.com/) and
+[OpenAPI export](https://api.textcortex.com/v1/openapi.json) document five operations:
 
-TextCortex is an AI-powered text generation and content creation platform. It is an enterprise-ready business software designed for companies aiming to integrate AI with their own data and knowledge, providing features for content creation, data analysis, and knowledge management. It supports more than 25 languages and offers access to multiple AI models through its API (known as HemingwAI).
+- `GET /models`: discover current model IDs.
+- `GET /models/{model_id}`: retrieve model and deployment metadata.
+- `GET /balance`: retrieve remaining API credits and their currency.
+- `POST /chat/completions`: generate chat completions, including multiple outputs.
+- `POST /responses`: generate responses; stored responses are unsupported.
 
 ## Authentication
 
-TextCortex uses **API Key** authentication.
+Create an API key in TextCortex API Settings and supply it as
+`Authorization: Bearer <api_key>`. See the official
+[API onboarding guide](https://help.textcortex.com/hc/en-us/articles/25546707607185-TextCortex-API-Deploy-AI-on-your-platform).
+API credit billing is separate from product subscriptions. No OAuth refresh,
+workspace configuration, or account identity endpoint is documented.
 
-- To generate an API key, log in to TextCortex and go to the API Key page at `https://app.textcortex.com/user/dashboard/settings/api-key`.
-- Provide your bearer token in the `Authorization` header when making requests to protected resources.
-- The API key is passed as a Bearer token in the `Authorization` header: `Authorization: Bearer <YOUR_API_KEY>`
-- The base URL for the API is `https://api.textcortex.com/v1/`
-- The API isn't included in any subscription plans; users receive initial API credits upon sign-up and need to top up credits when those are exhausted.
+## Supported workflows
 
-## Features
+The integration preserves its text, blog, product description, ad copy, email,
+social post, rewrite, summary, translation, and code generation tools. Each
+workflow submits task-specific system instructions and the supplied content to
+`POST /chat/completions`. Source and target languages are expressed as
+instructions, not unsupported provider request fields. Completion text,
+provider completion ID, selected model, token usage when available, and the
+balance read after generation are returned. If the balance request fails, the
+generated content is still returned with a warning; `remainingCredits` is
+optional in that case. This optional balance lookup has a ten-second deadline
+so it does not hold up delivery of completed content. Call `get_balance` to
+retry the credit lookup.
 
-### Text Generation & Autocomplete
+Call `list_models` before choosing a model. Model IDs are not frozen to the
+retired Velox, Alta, or Sophos model families. If omitted, the integration uses
+`gpt-4o-mini` when advertised by the current catalog, otherwise its first model.
+Optional temperature is passed only when supplied; otherwise the model's
+provider default applies. Maximum tokens and output count must be positive
+integers. The model catalog does not have pagination.
 
-Expands, continues, and completes instructed sentences. Useful for general-purpose text generation from a given prompt. Configurable parameters include `prompt`, `temperature` (creativity, 0–1, default 0.7), `word_count`, `source_language`, and `n_gen` (number of generations).
+`get_model` returns advertised deployment jurisdiction and country metadata;
+`get_balance` checks credit availability without generating content.
 
-### Blog Article Generation
+## Limits
 
-Generates blog articles on selected blog titles and keywords. Accepts parameters such as topic, title, blog categories, and target tone.
+The current API does not document the old `/texts/*` operations, a file lookup,
+knowledge-base management, embeddings, or an account profile endpoint. The
+legacy `fileId` and `embeddings` summarization inputs remain visible for
+existing callers but report actionable errors. Supply raw text with
+`mode: "default"`. No unsupported endpoint is called.
 
-### Product Description Generation
-
-Generates product descriptions given product name, category, brand, and features. Supports 72 languages via source language codes, with an `auto` option for automatic language detection.
-
-### Ad Copy Generation
-
-Generates ads based on the product being sold. The model is instructed with a product and a target segment for generating texts.
-
-### Email Generation
-
-Generates email bodies based on the email subject, and generates email subjects based on given keywords.
-
-### Social Media Content Generation
-
-Creates social media posts for various platforms with given keywords. Includes Instagram captions and other platform-specific content. Target audience can be specified as a parameter.
-
-### Text Rewriting / Paraphrasing
-
-Rewrites given text without changing its meaning. Supports different rewriting modes (e.g., `voice_passive`). Available at the `/v1/texts/rewritings` endpoint.
-
-### Text Summarization
-
-Summarizes given text, which can be provided as a string or as a file ID.
-
-### Translation
-
-Translates given text into another language. Supports a wide range of languages.
-
-### Code & SQL Generation
-
-Generates code for a given programming language and generates SQL queries given table descriptions.
-
-### Text Classification & Entity Extraction
-
-Extracts core information out of text and classifies data on a large scale. Allows labeling text to specific instructions.
-
-### Text Similarity
-
-Captures text similarities between texts, useful for finding similar entities within text data.
-
-### Knowledge Bases
-
-A knowledge base lets you work with multiple files simultaneously, retrieving information and gaining insights across all your documents at once. The AI agent provides relevant answers with sources from your centralized data. Knowledge bases can be integrated with platforms such as Google Drive, SharePoint, Microsoft OneDrive, and Notion.
-
-### Model Selection
-
-Within the NeoCortex system there are 4 model categories: Velox (fastest), Alta (most powerful), and Sophos (fine-tuned expert models for specialized workflows).
-
-## Events
-
-The provider does not support events. TextCortex's API is request-response based and does not offer webhooks, event subscriptions, or purpose-built polling mechanisms.
+The separate Responses operation is not exposed because the writing tools
+already cover generation through chat completions. Streaming and model-side
+tool execution are outside these writing workflows. Text results are ordinary
+content; the API does not generate downloadable files for these operations.
+There are no triggers.

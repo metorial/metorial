@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createPod = SlateTool.create(spec, {
   name: 'Create Pod',
   key: 'create_pod',
-  description: `Create a new GPU or CPU Pod on RunPod. Specify the container image, GPU type, disk sizes, ports, and environment variables. Supports both on-demand and spot (interruptible) instances.`,
+  description: `Create a new GPU or CPU Pod on Runpod. Specify the container image, GPU type, disk sizes, ports, and environment variables. Creates on-demand instances. Spot deployment is currently available through the Runpod console.`,
   instructions: [
     'Common GPU types include: "NVIDIA A100-SXM4-80GB", "NVIDIA H100 80GB HBM3", "NVIDIA RTX A6000", "NVIDIA GeForce RTX 4090".',
     'Port format is "port/protocol", e.g. "8888/http" or "22/tcp".',
@@ -18,7 +18,7 @@ export let createPod = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().optional().describe('Name for the Pod (max 191 characters)'),
+      name: z.string().min(1).optional().describe('Name for the Pod'),
       imageName: z
         .string()
         .describe(
@@ -35,17 +35,67 @@ export let createPod = SlateTool.create(spec, {
       gpuTypeIds: z
         .array(z.string())
         .optional()
-        .describe('Acceptable GPU model IDs, e.g. ["NVIDIA A100-SXM4-80GB"]'),
-      gpuCount: z.number().optional().describe('Number of GPUs (default: 1)'),
-      cpuFlavorIds: z.array(z.string()).optional().describe('CPU flavor IDs for CPU pods'),
-      vcpuCount: z.number().optional().describe('Number of vCPUs for CPU pods'),
+        .describe('Exactly one GPU ID. Call list_compute_types to discover GPU IDs.'),
+      gpuCount: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(1)
+        .optional()
+        .describe('Number of GPUs (default: 1)'),
+      cpuFlavorIds: z
+        .array(z.string())
+        .optional()
+        .describe('Exactly one CPU ID for CPU Pods. Call list_compute_types to discover IDs.'),
+      vcpuCount: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(2)
+        .optional()
+        .describe('Number of vCPUs for CPU pods'),
       containerDiskInGb: z
         .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(1)
         .optional()
-        .describe('Container disk size in GB (default: 50)'),
-      volumeInGb: z.number().optional().describe('Persistent volume size in GB (default: 20)'),
-      minRAMPerGPU: z.number().optional().describe('Minimum RAM per GPU in GB'),
-      minVCPUPerGPU: z.number().optional().describe('Minimum vCPUs per GPU'),
+        .describe('Container disk size in GB'),
+      volumeInGb: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(10)
+        .optional()
+        .describe('Host-local persistent volume size in GB. Available for GPU Pods only.'),
+      volumeMountPath: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('Volume mount path (default: /workspace)'),
+      dockerEntrypoint: z
+        .array(z.string())
+        .optional()
+        .describe('Override the image entrypoint in exec form.'),
+      dockerStartCmd: z
+        .array(z.string())
+        .optional()
+        .describe('Container command or entrypoint arguments in exec form.'),
+      containerRegistryAuthId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          'Registry credential ID for a private image. Call list_container_registry_auths to discover IDs.'
+        ),
+      minRAMPerGPU: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(1)
+        .optional()
+        .describe('Minimum RAM per GPU in GB'),
+      minVCPUPerGPU: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(1)
+        .optional()
+        .describe('Minimum vCPUs per GPU'),
       ports: z
         .array(z.string())
         .optional()
@@ -57,8 +107,13 @@ export let createPod = SlateTool.create(spec, {
       interruptible: z
         .boolean()
         .optional()
-        .describe('Use spot/interruptible pricing (default: false)'),
-      dataCenterIds: z.array(z.string()).optional().describe('Preferred data center IDs'),
+        .describe(
+          'Retained for compatibility. The current REST API rejects true; use the console for spot deployment.'
+        ),
+      dataCenterIds: z
+        .array(z.string())
+        .optional()
+        .describe('Preferred data center IDs. Call list_data_centers to discover locations.'),
       networkVolumeId: z.string().optional().describe('Network volume ID to attach')
     })
   )
@@ -69,7 +124,12 @@ export let createPod = SlateTool.create(spec, {
       desiredStatus: z.string().nullable().describe('Current status'),
       imageName: z.string().nullable().describe('Container image'),
       costPerHr: z.number().nullable().describe('Cost per hour in USD'),
-      gpuCount: z.number().nullable().describe('Number of GPUs'),
+      gpuCount: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(1)
+        .nullable()
+        .describe('Number of GPUs'),
       gpuType: z.string().nullable().describe('GPU model type')
     })
   )
@@ -87,6 +147,10 @@ export let createPod = SlateTool.create(spec, {
       vcpuCount: ctx.input.vcpuCount,
       containerDiskInGb: ctx.input.containerDiskInGb,
       volumeInGb: ctx.input.volumeInGb,
+      volumeMountPath: ctx.input.volumeMountPath,
+      dockerEntrypoint: ctx.input.dockerEntrypoint,
+      dockerStartCmd: ctx.input.dockerStartCmd,
+      containerRegistryAuthId: ctx.input.containerRegistryAuthId,
       minRAMPerGPU: ctx.input.minRAMPerGPU,
       minVCPUPerGPU: ctx.input.minVCPUPerGPU,
       ports: ctx.input.ports,

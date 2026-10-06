@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { nativeId, optionalText, reject, stringArray } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageShareLink = SlateTool.create(spec, {
@@ -94,10 +95,7 @@ export let manageShareLink = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let { action, bundleId } = ctx.input;
 
@@ -108,19 +106,19 @@ export let manageShareLink = SlateTool.create(spec, {
       });
 
       let bundles = result.bundles.map((b: Record<string, unknown>) => ({
-        bundleId: Number(b.id),
-        url: b.url ? String(b.url) : undefined,
-        code: b.code ? String(b.code) : undefined,
-        description: b.description ? String(b.description) : undefined,
-        expiresAt: b.expires_at ? String(b.expires_at) : undefined,
+        bundleId: nativeId(b.id),
+        url: optionalText(b.url),
+        code: optionalText(b.code),
+        description: optionalText(b.description),
+        expiresAt: optionalText(b.expires_at),
         maxUses: typeof b.max_uses === 'number' ? b.max_uses : undefined,
         passwordProtected:
           typeof b.password_protected === 'boolean' ? b.password_protected : undefined,
         requireRegistration:
           typeof b.require_registration === 'boolean' ? b.require_registration : undefined,
-        permissions: b.permissions ? String(b.permissions) : undefined,
-        createdAt: b.created_at ? String(b.created_at) : undefined,
-        username: b.username ? String(b.username) : undefined
+        permissions: optionalText(b.permissions),
+        createdAt: optionalText(b.created_at),
+        username: optionalText(b.username)
       }));
 
       return {
@@ -130,25 +128,25 @@ export let manageShareLink = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!bundleId) throw new Error('bundleId is required for get');
+      if (!bundleId) reject('bundleId is required for get');
       let b = await client.getBundle(bundleId);
-      let paths = Array.isArray(b.paths) ? b.paths.map(String) : undefined;
+      let paths = stringArray(b.paths);
       return {
         output: {
           bundle: {
-            bundleId: Number(b.id),
-            url: b.url ? String(b.url) : undefined,
-            code: b.code ? String(b.code) : undefined,
-            description: b.description ? String(b.description) : undefined,
+            bundleId: nativeId(b.id),
+            url: optionalText(b.url),
+            code: optionalText(b.code),
+            description: optionalText(b.description),
             paths,
-            expiresAt: b.expires_at ? String(b.expires_at) : undefined,
+            expiresAt: optionalText(b.expires_at),
             maxUses: typeof b.max_uses === 'number' ? b.max_uses : undefined,
             passwordProtected:
               typeof b.password_protected === 'boolean' ? b.password_protected : undefined,
             requireRegistration:
               typeof b.require_registration === 'boolean' ? b.require_registration : undefined,
-            permissions: b.permissions ? String(b.permissions) : undefined,
-            createdAt: b.created_at ? String(b.created_at) : undefined
+            permissions: optionalText(b.permissions),
+            createdAt: optionalText(b.created_at)
           }
         },
         message: `Retrieved share link **${bundleId}**${b.url ? ` (${b.url})` : ''}`
@@ -156,7 +154,7 @@ export let manageShareLink = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!bundleId) throw new Error('bundleId is required for delete');
+      if (!bundleId) reject('bundleId is required for delete');
       await client.deleteBundle(bundleId);
       return {
         output: { deleted: true },
@@ -183,24 +181,24 @@ export let manageShareLink = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.paths || ctx.input.paths.length === 0)
-        throw new Error('paths is required for create');
+        reject('paths is required for create');
       let b = await client.createBundle(data);
       return {
         output: {
           bundle: {
-            bundleId: Number(b.id),
-            url: b.url ? String(b.url) : undefined,
-            code: b.code ? String(b.code) : undefined,
-            description: b.description ? String(b.description) : undefined,
+            bundleId: nativeId(b.id),
+            url: optionalText(b.url),
+            code: optionalText(b.code),
+            description: optionalText(b.description),
             paths: ctx.input.paths,
-            expiresAt: b.expires_at ? String(b.expires_at) : undefined,
+            expiresAt: optionalText(b.expires_at),
             maxUses: typeof b.max_uses === 'number' ? b.max_uses : undefined,
             passwordProtected:
               typeof b.password_protected === 'boolean' ? b.password_protected : undefined,
             requireRegistration:
               typeof b.require_registration === 'boolean' ? b.require_registration : undefined,
-            permissions: b.permissions ? String(b.permissions) : undefined,
-            createdAt: b.created_at ? String(b.created_at) : undefined
+            permissions: optionalText(b.permissions),
+            createdAt: optionalText(b.created_at)
           }
         },
         message: `Created share link${b.url ? `: ${b.url}` : ` (ID: ${b.id})`}`
@@ -208,23 +206,23 @@ export let manageShareLink = SlateTool.create(spec, {
     }
 
     // update
-    if (!bundleId) throw new Error('bundleId is required for update');
+    if (!bundleId) reject('bundleId is required for update');
     let b = await client.updateBundle(bundleId, data);
     return {
       output: {
         bundle: {
-          bundleId: Number(b.id),
-          url: b.url ? String(b.url) : undefined,
-          code: b.code ? String(b.code) : undefined,
-          description: b.description ? String(b.description) : undefined,
-          expiresAt: b.expires_at ? String(b.expires_at) : undefined,
+          bundleId: nativeId(b.id),
+          url: optionalText(b.url),
+          code: optionalText(b.code),
+          description: optionalText(b.description),
+          expiresAt: optionalText(b.expires_at),
           maxUses: typeof b.max_uses === 'number' ? b.max_uses : undefined,
           passwordProtected:
             typeof b.password_protected === 'boolean' ? b.password_protected : undefined,
           requireRegistration:
             typeof b.require_registration === 'boolean' ? b.require_registration : undefined,
-          permissions: b.permissions ? String(b.permissions) : undefined,
-          createdAt: b.created_at ? String(b.created_at) : undefined
+          permissions: optionalText(b.permissions),
+          createdAt: optionalText(b.created_at)
         }
       },
       message: `Updated share link **${bundleId}**`

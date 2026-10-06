@@ -20,9 +20,10 @@ let maintenanceWindowSchema = z.object({
 export let listMaintenanceWindows = SlateTool.create(spec, {
   name: 'List Maintenance Windows',
   key: 'list_maintenance_windows',
-  description: `Retrieve maintenance windows from your UptimeRobot account. Maintenance windows define scheduled downtime periods during which monitoring alerts are suppressed. Supports filtering by ID and pagination.`,
+  description: `Use a Legacy API Key connection (API v2). Retrieve maintenance windows from your UptimeRobot account. Maintenance windows define scheduled downtime periods during which monitoring alerts are suppressed. Supports filtering by ID and pagination.`,
   tags: {
-    readOnly: true
+    readOnly: true,
+    destructive: false
   }
 })
   .input(
@@ -38,11 +39,18 @@ export let listMaintenanceWindows = SlateTool.create(spec, {
   .output(
     z.object({
       maintenanceWindows: z.array(maintenanceWindowSchema),
+      offset: z.number().optional().describe('Current pagination offset'),
+      limit: z.number().optional().describe('Current pagination limit'),
+      nextOffset: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Offset for the next page, or null when complete'),
       total: z.number().describe('Total number of maintenance windows')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.getMWindows({
       mwindows: ctx.input.windowIds?.join('-'),
@@ -50,7 +58,7 @@ export let listMaintenanceWindows = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let windows = result.maintenanceWindows.map((w: any) => ({
+    let windows = result.maintenanceWindows.map(w => ({
       windowId: w.id,
       friendlyName: w.friendly_name,
       type: w.type,
@@ -60,10 +68,19 @@ export let listMaintenanceWindows = SlateTool.create(spec, {
       status: w.status
     }));
 
-    let total = result.pagination?.total ?? windows.length;
+    let total = result.pagination.total;
 
     return {
-      output: { maintenanceWindows: windows, total },
+      output: {
+        maintenanceWindows: windows,
+        total,
+        offset: result.pagination.offset,
+        limit: result.pagination.limit,
+        nextOffset:
+          result.pagination.offset + windows.length < total
+            ? result.pagination.offset + windows.length
+            : null
+      },
       message: `Found **${total}** maintenance window(s).`
     };
   })

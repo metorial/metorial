@@ -1,18 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { connection } from '../lib/client';
 import { spec } from '../spec';
 
 export let transformRecord = SlateTool.create(spec, {
   name: 'Transform Record',
   key: 'transform_record',
-  description: `Transform a NetSuite record from one type to another. Common transformations include converting a sales order to an invoice, a purchase order to a vendor bill, or an estimate to a sales order.
+  description: `Transform a NetSuite record into a new record of another type. Discover available types with list_record_types and verify the transformation in get_record_metadata for your role.
 NetSuite automatically populates the target record with data from the source record during transformation.`,
   instructions: [
     'Common transformations: salesOrder -> invoice, salesOrder -> itemFulfillment, purchaseOrder -> vendorBill, purchaseOrder -> itemReceipt, estimate -> salesOrder, returnAuthorization -> creditMemo.',
     'You can override or add field values on the target record using the fieldOverrides parameter.'
   ],
   tags: {
+    readOnly: false,
     destructive: false
   }
 })
@@ -21,13 +22,15 @@ NetSuite automatically populates the target record with data from the source rec
       sourceRecordType: z
         .string()
         .describe(
-          'Source record type in camelCase (e.g., "salesOrder", "purchaseOrder", "estimate")'
+          'Exact source type from list_record_types; verify transformation support with get_record_metadata'
         ),
-      sourceRecordId: z.string().describe('Internal ID of the source record'),
+      sourceRecordId: z
+        .string()
+        .describe('Exact internal ID or eid:<externalId> of the source record'),
       targetRecordType: z
         .string()
         .describe(
-          'Target record type in camelCase (e.g., "invoice", "itemFulfillment", "vendorBill")'
+          'Exact target type from list_record_types supported by the source record transformation metadata'
         ),
       fieldOverrides: z
         .record(z.string(), z.any())
@@ -43,10 +46,7 @@ NetSuite automatically populates the target record with data from the source rec
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      ...ctx.auth,
-      accountId: ctx.config.accountId
-    });
+    const client = connection(ctx.auth, ctx.config);
 
     let result = await client.transformRecord(
       ctx.input.sourceRecordType,
@@ -57,11 +57,11 @@ NetSuite automatically populates the target record with data from the source rec
 
     return {
       output: {
-        recordId: result.recordId || result.id || '',
+        recordId: result.recordId,
         targetRecordType: ctx.input.targetRecordType,
         location: result.location
       },
-      message: `Transformed **${ctx.input.sourceRecordType}** \`${ctx.input.sourceRecordId}\` into **${ctx.input.targetRecordType}** \`${result.recordId || result.id}\`.`
+      message: `Transformed **${ctx.input.sourceRecordType}** \`${ctx.input.sourceRecordId}\` into **${ctx.input.targetRecordType}** \`${result.recordId}\`.`
     };
   })
   .build();

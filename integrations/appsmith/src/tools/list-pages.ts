@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listPages = SlateTool.create(spec, {
@@ -38,16 +38,13 @@ export let listPages = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
     let pages = await client.listPages(ctx.input.applicationId);
 
-    let mapped = pages.map((p: any) => ({
-      pageId: p.id ?? '',
-      name: p.name ?? '',
+    let mapped = pages.map(p => ({
+      pageId: p.id,
+      name: p.name,
       slug: p.slug,
       isDefault: p.isDefault,
       isHidden: p.isHidden

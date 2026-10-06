@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, TravisCIClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let lintTravisYml = SlateTool.create(spec, {
@@ -35,12 +35,12 @@ export let lintTravisYml = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
     let result = await client.lintTravisYml(ctx.input.content);
 
-    let warnings = (result.warnings || []).map((w: any) => ({
+    let warnings = (result.warnings || []).map(w => ({
       key: w.key,
       message: w.message
     }));

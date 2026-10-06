@@ -6,13 +6,12 @@ import {
   getRecord,
   getRecordMetadata,
   listRecords,
+  listRecordTypes,
   querySuiteQL,
   transformRecord,
   updateRecord,
   upsertRecord
 } from './tools';
-import { inboundWebhook, recordChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,9 +21,10 @@ export let provider = Slate.create({
     deleteRecord,
     upsertRecord,
     listRecords,
+    listRecordTypes,
     querySuiteQL,
     transformRecord,
     getRecordMetadata
   ],
-  triggers: [inboundWebhook, recordChanges]
+  triggers: []
 });

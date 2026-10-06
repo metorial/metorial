@@ -1,49 +1,32 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
-import { spec } from '../spec';
-
-export let validateTaxId = SlateTool.create(spec, {
+import { tool } from '../lib/tool';
+import { countryInput, object, stringValue, textInput } from '../lib/validation';
+export const validateTaxId = tool({
   name: 'Validate Tax ID',
   key: 'validate_tax_id',
-  description: `Validate a tax identification number (VAT number, GST number, etc.) against official registries such as EU VIES. Returns whether the tax ID is valid along with associated details.`,
-  tags: {
-    readOnly: true
-  }
-})
-  .input(
-    z.object({
-      country: z.string().describe('Two-letter ISO country code (e.g., "DE", "FR", "GB")'),
-      taxId: z.string().describe('Tax identification number to validate')
-    })
-  )
-  .output(
-    z.object({
-      valid: z.boolean().describe('Whether the tax ID is valid'),
-      companyName: z
-        .string()
-        .optional()
-        .describe('Registered company name associated with the tax ID'),
-      companyAddress: z.string().optional().describe('Registered company address')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-
-    let result = await client.validateTaxId({
-      country: ctx.input.country,
-      tax_id: ctx.input.taxId
-    });
-
+  description:
+    'Ask the provider to validate a supported tax ID. A null result means the external validation service is unavailable and does not establish that the ID is invalid.',
+  readOnly: true,
+  input: { country: countryInput, taxId: textInput },
+  output: {
+    valid: z.boolean().nullable(),
+    companyName: z.string().optional(),
+    companyAddress: z.string().optional(),
+    validationStatus: z.enum(['valid', 'invalid', 'unavailable'])
+  },
+  run: async (input, client) => {
+    const r = object(
+      await client.request('GET', 'tax_ids/validate', undefined, {
+        country: input.country,
+        tax_id: input.taxId
+      })
+    );
     return {
-      output: {
-        valid: result.valid,
-        companyName: result.company_name,
-        companyAddress: result.company_address
-      },
-      message: result.valid
-        ? `Tax ID **${ctx.input.taxId}** is **valid**${result.company_name ? ` (${result.company_name})` : ''}`
-        : `Tax ID **${ctx.input.taxId}** is **invalid**`
+      valid: r.valid,
+      companyName: stringValue(r.company_name),
+      companyAddress: stringValue(r.company_address),
+      validationStatus:
+        r.valid === null ? 'unavailable' : r.valid === true ? 'valid' : 'invalid'
     };
-  })
-  .build();
+  }
+});

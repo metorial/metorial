@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getCompressionCount = SlateTool.create(spec, {
   name: 'Get Compression Count',
   key: 'get_compression_count',
-  description: `Retrieve the number of compressions performed during the current calendar month. Useful for monitoring API usage against the monthly limit (500 free compressions per month).`,
+  description: `Retrieve the number of compressions performed during the current calendar month. Uses the documented empty validation request without submitting an image. It does not identify the account owner or guarantee remaining quota.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -29,7 +29,7 @@ export let getCompressionCount = SlateTool.create(spec, {
       output: {
         compressionCount
       },
-      message: `Monthly compression count: **${compressionCount}** / 500 free.`
+      message: `Monthly compression count: **${compressionCount}**.`
     };
   })
   .build();

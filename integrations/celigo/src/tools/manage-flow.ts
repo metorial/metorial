@@ -1,7 +1,25 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  partialFailure: z
+    .boolean()
+    .optional()
+    .describe(
+      'Some run entries failed while returned job IDs were queued; reconcile before repeating.'
+    ),
+  jobId: z.string().optional(),
+  jobIds: z.array(z.string()).optional(),
+  queued: z.boolean().optional(),
+  flowId: z.string().optional().describe('ID of the affected flow'),
+  name: z.string().optional().describe('Name of the flow'),
+  disabled: z.boolean().optional().describe('Whether the flow is disabled'),
+  deleted: z.boolean().optional().describe('Whether the flow was deleted'),
+  rawResult: z.any().optional().describe('Credential-filtered native API response')
+});
 
 export let manageFlow = SlateTool.create(spec, {
   name: 'Manage Flow',
@@ -10,11 +28,23 @@ export let manageFlow = SlateTool.create(spec, {
 For "create" and "update", provide the flow configuration in **flowData**. For "enable", "disable", "run", "clone", and "delete", only the **flowId** is needed.`,
   instructions: [
     'Running a flow via API places it in the invocation queue — it does not guarantee immediate execution.',
-    'Cloning a flow creates a full duplicate including its exports and imports.'
+    'Cloning creates a resource manifest and can share connections. Provide cloneOptions._integrationId and connectionMap; copied dependencies and past external effects require separate reconciliation.'
   ]
 })
   .input(
     z.object({
+      replaceAll: z
+        .boolean()
+        .optional()
+        .describe(
+          'Required true for full-replace updates. Provide the complete writable configuration; omitted settings may be cleared.'
+        ),
+      cloneOptions: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Documented clone request; flow clones require _integrationId and connectionMap. Integration clones require connectionMap.'
+        ),
       action: z
         .enum(['create', 'update', 'enable', 'disable', 'run', 'clone', 'delete'])
         .describe('The operation to perform on the flow'),
@@ -28,83 +58,14 @@ For "create" and "update", provide the flow configuration in **flowData**. For "
         .describe('Flow configuration data (required for "create" and "update")')
     })
   )
-  .output(
-    z.object({
-      flowId: z.string().optional().describe('ID of the affected flow'),
-      name: z.string().optional().describe('Name of the flow'),
-      disabled: z.boolean().optional().describe('Whether the flow is disabled'),
-      deleted: z.boolean().optional().describe('Whether the flow was deleted'),
-      rawResult: z.any().optional().describe('Full API response')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let { action, flowId, flowData } = ctx.input;
-
-    if (action !== 'create' && !flowId) {
-      throw new Error('flowId is required for this action');
-    }
-
-    let result: any;
-    let message: string;
-
-    switch (action) {
-      case 'create': {
-        if (!flowData) throw new Error('flowData is required for create');
-        result = await client.createFlow(flowData);
-        message = `Created flow **${result.name || result._id}**.`;
-        break;
-      }
-      case 'update': {
-        if (!flowData) throw new Error('flowData is required for update');
-        result = await client.updateFlow(flowId!, flowData);
-        message = `Updated flow **${result.name || result._id}**.`;
-        break;
-      }
-      case 'enable': {
-        result = await client.enableFlow(flowId!);
-        message = `Enabled flow **${result.name || flowId}**.`;
-        break;
-      }
-      case 'disable': {
-        result = await client.disableFlow(flowId!);
-        message = `Disabled flow **${result.name || flowId}**.`;
-        break;
-      }
-      case 'run': {
-        result = await client.runFlow(flowId!);
-        message = `Triggered run for flow **${flowId}**. The flow has been added to the invocation queue.`;
-        break;
-      }
-      case 'clone': {
-        result = await client.cloneFlow(flowId!);
-        message = `Cloned flow **${flowId}** → new flow **${result._id}**.`;
-        break;
-      }
-      case 'delete': {
-        await client.deleteFlow(flowId!);
-        return {
-          output: {
-            flowId: flowId!,
-            deleted: true
-          },
-          message: `Deleted flow **${flowId}**.`
-        };
-      }
-    }
-
-    return {
-      output: {
-        flowId: result?._id || flowId,
-        name: result?.name,
-        disabled: result?.disabled,
-        rawResult: result
-      },
-      message
-    };
+    const result = await invoke('manage_flow', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

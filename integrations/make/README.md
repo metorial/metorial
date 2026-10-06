@@ -1,73 +1,19 @@
-# <img src="https://provider-logos.metorial-cdn.com/make.png" height="20"> Make
+# Make
 
-Manage no-code automation workflows (scenarios) on the Make platform. Create, run, activate, deactivate, clone, and delete scenarios. Manage scenario blueprints, execution logs, and consumption statistics. Create and verify app connections. Manage data stores and their records, define data structures, and handle webhooks. Organize teams, users, and organizations with role-based access. Build and manage custom app integrations via the SDK. Access analytics, audit logs, and incomplete executions for debugging. Manage AI agents, encryption keys, devices, and notification preferences.
+Manage existing Make automation resources in one documented regional API zone. The integration has 19 tools: the 15 existing scenario, connection, data store, record, hook, organization, team, user, log and usage tools, plus connected-user identity, data structure discovery, exact execution status and blueprint downloads.
 
-## Tools
+Choose your regional host when connecting. API tokens use Token authentication; new OAuth connections use Bearer authentication and native expiring-token refresh. Previously stored region settings remain a fallback, including when reconnecting without a new host. Conflicting saved, requested or legacy hosts are refused before a request; use matching regional settings. Discover organization IDs with `list_organizations`, then team IDs with `list_teams`. List results represent bounded pages; native paging metadata is returned without inventing totals. Hook paging selects locally from the complete native collection, with a local safety bound of 1,000 hooks; larger collections are refused.
 
-### Create Scenario
+Scenario creation requires blueprint JSON text and an explicit scheduling object, even though those existing fields remain optional in the input schema for compatibility. Scheduling objects are serialized to the native JSON-string format. A supplied name is applied through a documented exact-ID rename if creation returned another name; an uncertain rename identifies the created scenario and must not trigger another creation. Clone requires `organizationId`, `targetTeamId`, `cloneName` and an explicit `cloneStates`; cross-team references must use documented mappings. Native confirmation is only sent when explicitly supplied.
 
-Create a new automation scenario in a Make team. Optionally provide a blueprint JSON definition, scheduling configuration, and folder assignment.
+Running a scenario returns an asynchronous execution ID. Use `get_execution_status` to inspect that existing execution; RUNNING and PAUSED are incomplete. Activation can immediately execute interval schedules. Execution, scheduling and webhook changes can cause external actions and charges. An uncertain request must be reconciled through exact resources or execution history before retrying. Deactivation/stop does not undo completed actions. With scenario trash enabled, deletion retains a recoverable entry for 30 days; history and prior external effects remain.
 
-### Get Scenario Logs
+`manage_data_store_records` retains its exact-key get action using documented collection reads, capped at 1,000 records. A missing key is reported only when native count and paging prove a complete scan. Otherwise the lookup reports incomplete search. Record update replaces the entire record; deletion sends only the exact native key list. Native store size strings are preserved as `exactSize` and `exactMaxSize`, with numeric companions only when exact safe integers. Usage remains in native centicredits and byte units. Log status strings preserve native numeric codes, with numeric companions; parked lifecycle events may have no status.
 
-Retrieve execution logs for a specific scenario. Shows recent execution history including timestamps, statuses, and operations consumed. Useful for debugging and monitoring scenario performance.
+Hook ping reads availability metadata without sending a payload or testing network reachability. Connection verification can contact the linked third-party API. Connection, hook and store deletion can break dependent workflows; prior external effects are retained.
 
-### Get Usage
+`download_blueprint` delivers an existing blueprint as a JSON file capped at 8 MiB. This can contain private workflow configuration. It does not run a scenario or export a whole organization, and has no invented expiring URL or renewal operation.
 
-Retrieve usage statistics for an organization or team. Returns daily operations count, data transfer, and centicredits usage for the past 30 days.
+OAuth requests only the 13 scopes used by these workflows, including `udts:read` for the new data structure discovery. Existing stored grants remain usable; add the missing grant or reconnect when a tool lacks authorization. The API is permission and plan dependent; the integration does not bypass account limits or confirmations. Administrative account provisioning, app creation, variables, payments and replay are outside this tool set. No triggers are registered.
 
-### List Connections
-
-Retrieve all connections for a given team. Connections represent authenticated links to external services used in scenarios.
-
-### List Data Stores
-
-Retrieve all data stores for a team. Data stores persist structured data across scenario executions and enable data sharing between scenarios.
-
-### List Webhooks
-
-Retrieve all webhooks (hooks) for a team. Hooks are incoming trigger endpoints that receive data from external services and can initiate scenario executions. Filter by type or assignment status.
-
-### List Organizations
-
-Retrieve all organizations that the authenticated user is a member of. Returns organization IDs, names, and zone information.
-
-### List Scenarios
-
-Retrieve a list of automation scenarios from Make. Filter by team, organization, folder, or active status. Returns scenario names, IDs, scheduling details, and current state.
-
-### List Teams
-
-Retrieve all teams belonging to an organization. Teams are the primary container for scenarios, connections, and other Make resources.
-
-### List Users
-
-Retrieve all users for a team or organization. Returns user profiles including name, email, and last login information.
-
-### Manage Connection
-
-Get details, rename, verify, or delete a connection. Use "verify" to test whether stored credentials are still valid with the external service.
-
-### Manage Data Store Records
-
-List, get, create, update, or delete records within a Make data store. Use this to interact with individual records stored in a data store.
-
-### Manage Data Store
-
-Get details, create, update, or delete a data store. Data stores persist structured data between scenario runs and enable data sharing across scenarios.
-
-### Manage Webhook
-
-Get details, create, rename, enable, disable, ping, or delete a webhook (hook). Use "ping" to check if the hook endpoint is responsive. Use "enable"/"disable" to control whether the hook accepts incoming data.
-
-### Manage Scenario
-
-Get details, update, activate, deactivate, run, clone, or delete an automation scenario. Supports one-off execution, cloning to another team, and retrieving blueprint or usage information.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Official references: [Authentication](https://developers.make.com/api-documentation/authentication), [OAuth flow](https://developers.make.com/api-documentation/authentication/oauth-flow/authorization-code-flow-with-refresh-token-confidential-clients), [Scenarios](https://developers.make.com/api-documentation/api-reference/scenarios), [Execution logs and status](https://developers.make.com/api-documentation/api-reference/scenarios/logs), [Blueprints](https://developers.make.com/api-documentation/api-reference/scenarios/blueprints), [Data records](https://developers.make.com/api-documentation/api-reference/data-stores/data).

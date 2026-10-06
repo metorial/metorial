@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let refreshDatasource = SlateTool.create(spec, {
@@ -9,7 +10,7 @@ export let refreshDatasource = SlateTool.create(spec, {
   description: `Trigger an on-demand refresh for one or more data sources, or refresh a specific data source instance. Also supports enabling/disabling data sources.`,
   instructions: [
     'Provide datasource IDs to refresh them, or a single instance ID to refresh a specific instance.',
-    'Use enable/disable to control whether a data source is actively refreshing.'
+    'Use enable/disable to control whether a data source is actively refreshing. Refresh is queued; read the instance refresh time to verify completion.'
   ]
 })
   .input(
@@ -29,17 +30,33 @@ export let refreshDatasource = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
+    if (
+      !ctx.input.datasourceIds?.length &&
+      !ctx.input.instanceId &&
+      !ctx.input.enable &&
+      !ctx.input.disable
+    )
+      throw createApiServiceError(
+        'Provide at least one refresh, enable or disable operation.',
+        { reason: 'invalid_input' }
+      );
+    if (ctx.input.enable && ctx.input.enable === ctx.input.disable)
+      throw createApiServiceError(
+        'The same data source cannot be enabled and disabled in one request.',
+        { reason: 'invalid_input' }
+      );
     let client = new Client({ token: ctx.auth.token });
     let actions: string[] = [];
 
     if (ctx.input.datasourceIds && ctx.input.datasourceIds.length > 0) {
       await client.refreshDatasources(ctx.input.datasourceIds);
-      actions.push(`refreshed ${ctx.input.datasourceIds.length} data source(s)`);
+      actions.push(`queued refresh for ${ctx.input.datasourceIds.length} data source(s)`);
     }
 
     if (ctx.input.instanceId) {
       await client.refreshDatasourceInstance(ctx.input.instanceId);
-      actions.push(`refreshed instance \`${ctx.input.instanceId}\``);
+      actions.push(`queued refresh for instance \`${ctx.input.instanceId}\``);
     }
 
     if (ctx.input.enable) {

@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MakeClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid, paging } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageDataStoreRecords = SlateTool.create(spec, {
   name: 'Manage Data Store Records',
   key: 'manage_data_store_records',
-  description: `List, get, create, update, or delete records within a Make data store. Use this to interact with individual records stored in a data store.`,
+  description: `List, get, create, update, or delete records within a Make data store. Get performs an exact-key scan capped at 1000 records and refuses incomplete absence. Update replaces the entire record. Delete acknowledges the exact native key receipt.`,
   instructions: [
     'For "list", only dataStoreId is required.',
     'For "get", "update", or "delete", provide dataStoreId and recordKey.',
@@ -40,85 +41,49 @@ export let manageDataStoreRecords = SlateTool.create(spec, {
       record: z.record(z.string(), z.any()).optional().describe('Single record data'),
       recordKey: z.string().optional().describe('Key of the affected record'),
       deleted: z.boolean().optional().describe('Whether the record was deleted'),
+      page: paging.optional(),
       total: z.number().optional().describe('Total number of records (for list)')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MakeClient({
-      token: ctx.auth.token,
-      zoneUrl: ctx.config.zoneUrl
-    });
-
-    let { dataStoreId, action } = ctx.input;
-
+    const client = clientFor(ctx);
+    const { action, dataStoreId } = ctx.input;
     if (action === 'list') {
-      let result = await client.listDataStoreRecords(dataStoreId, {
-        limit: ctx.input.limit,
-        offset: ctx.input.offset
-      });
-      let records = result.records ?? result ?? [];
+      const result = await client.listDataStoreRecords(dataStoreId, ctx.input);
       return {
-        output: {
-          records: Array.isArray(records) ? records : [],
-          total: result.pg?.total
-        },
-        message: `Found **${Array.isArray(records) ? records.length : 0}** record(s) in data store ${dataStoreId}.`
+        output: { records: result.records, total: result.count, page: result.pg },
+        message: `Returned ${result.records.length} native records in this page.`
       };
     }
-
-    if (action === 'get') {
-      if (!ctx.input.recordKey) throw new Error('recordKey is required for get action');
-      let result = await client.getDataStoreRecord(dataStoreId, ctx.input.recordKey);
-      return {
-        output: {
-          record: result,
-          recordKey: ctx.input.recordKey
-        },
-        message: `Retrieved record with key **${ctx.input.recordKey}** from data store ${dataStoreId}.`
-      };
-    }
-
-    if (action === 'create') {
-      if (!ctx.input.recordData) throw new Error('recordData is required for create action');
-      let result = await client.createDataStoreRecord(dataStoreId, ctx.input.recordData);
-      return {
-        output: {
-          record: result,
-          recordKey: result.key ?? result.id
-        },
-        message: `Created record in data store ${dataStoreId}.`
-      };
-    }
-
-    if (action === 'update') {
-      if (!ctx.input.recordKey) throw new Error('recordKey is required for update action');
-      if (!ctx.input.recordData) throw new Error('recordData is required for update action');
-      let result = await client.updateDataStoreRecord(
-        dataStoreId,
-        ctx.input.recordKey,
-        ctx.input.recordData
-      );
-      return {
-        output: {
-          record: result,
-          recordKey: ctx.input.recordKey
-        },
-        message: `Updated record **${ctx.input.recordKey}** in data store ${dataStoreId}.`
-      };
-    }
-
     if (action === 'delete') {
-      if (!ctx.input.recordKey) throw new Error('recordKey is required for delete action');
-      await client.deleteDataStoreRecord(dataStoreId, ctx.input.recordKey);
+      await client.deleteDataStoreRecord(dataStoreId, ctx.input.recordKey!);
       return {
-        output: {
-          recordKey: ctx.input.recordKey,
-          deleted: true
-        },
-        message: `Deleted record **${ctx.input.recordKey}** from data store ${dataStoreId}.`
+        output: { recordKey: ctx.input.recordKey, deleted: true },
+        message:
+          'Make acknowledged deletion of the exact record key; previous scenario effects and history remain.'
       };
     }
-
-    throw new Error(`Unknown action: ${action}`);
+    if (action !== 'get' && ctx.input.recordData === undefined)
+      throw invalid(
+        'recordData is required for create or update. Update replaces the entire record.'
+      );
+    const result =
+      action === 'get'
+        ? await client.getDataStoreRecord(dataStoreId, ctx.input.recordKey!)
+        : action === 'create'
+          ? await client.createDataStoreRecord(
+              dataStoreId,
+              ctx.input.recordData!,
+              ctx.input.recordKey
+            )
+          : await client.updateDataStoreRecord(
+              dataStoreId,
+              ctx.input.recordKey!,
+              ctx.input.recordData!
+            );
+    return {
+      output: { record: result, recordKey: result.key },
+      message: `Confirmed the exact native ${action} record receipt.`
+    };
   })
   .build();

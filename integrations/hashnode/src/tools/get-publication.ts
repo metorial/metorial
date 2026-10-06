@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getPublication = SlateTool.create(spec, {
@@ -11,7 +12,7 @@ export let getPublication = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ ...selection }))
   .output(
     z.object({
       publicationId: z.string().describe('Unique identifier of the publication'),
@@ -33,11 +34,14 @@ export let getPublication = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      publicationHost: ctx.config.publicationHost
+      publicationHost:
+        ctx.input.publicationHost ??
+        (ctx.input.publicationId === undefined ? ctx.config.publicationHost : undefined),
+      publicationId: ctx.input.publicationId
     });
 
     let pub = await client.getPublication();
-    if (!pub) throw new Error('Publication not found');
+    if (!pub) throw createApiServiceError('Publication not found');
 
     return {
       output: {

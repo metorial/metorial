@@ -26,11 +26,13 @@ export let getAuditLogs = SlateTool.create(spec, {
       eventTypes: z
         .string()
         .optional()
-        .describe('Comma-separated event types to filter (e.g. "login,logout,member_added")'),
+        .describe('Comma-separated event types to filter (e.g. "login,logout,add_user")'),
       search: z.string().optional().describe('Search term to filter events'),
-      page: z.number().optional().describe('Page number (default 1)'),
+      page: z.number().int().min(1).optional().describe('Page number (default 1)'),
       pageSize: z
         .number()
+        .int()
+        .min(1)
         .max(500)
         .optional()
         .describe('Results per page (default 100, max 500)'),
@@ -49,6 +51,10 @@ export let getAuditLogs = SlateTool.create(spec, {
           ipAddress: z.string().describe('IP address of the event source'),
           userEmail: z.string().describe('Email of the user who triggered the event'),
           eventType: z.string().describe('Type of audit event'),
+          applicationType: z
+            .string()
+            .optional()
+            .describe('cursor, grok_bot, or empty when unavailable'),
           eventData: z
             .record(z.string(), z.unknown())
             .describe('Additional event-specific data')
@@ -79,6 +85,7 @@ export let getAuditLogs = SlateTool.create(spec, {
           ipAddress: e.ip_address,
           userEmail: e.user_email,
           eventType: e.event_type,
+          applicationType: e.application_type,
           eventData: e.event_data
         })),
         totalCount: result.pagination.totalCount,

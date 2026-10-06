@@ -37,11 +37,13 @@ export let createLinkTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Whether to notify the link creator when the link is accessed'),
-      expiryDate: z.string().optional().describe('Expiry date for the link (ISO 8601 format)'),
+      expiryDate: z.string().optional().describe('Expiry date for the link (YYYY-MM-DD)'),
       expiryClicks: z
         .number()
         .optional()
-        .describe('Number of clicks after which the link expires'),
+        .describe(
+          'Number of clicks after which the link expires (1–10, mutually exclusive with date expiry)'
+        ),
       password: z.string().optional().describe('Password for password-protected links'),
       linkToCurrent: z
         .boolean()
@@ -62,10 +64,7 @@ export let createLinkTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.createLink({
       path: ctx.input.path,
@@ -81,9 +80,7 @@ export let createLinkTool = SlateTool.create(spec, {
       linkToCurrent: ctx.input.linkToCurrent
     })) as Record<string, unknown>;
 
-    let links = Array.isArray(result.links)
-      ? (result.links[0] as Record<string, unknown>)
-      : result;
+    let links = { ...result, ...(result.links as Record<string, unknown>[])[0] };
 
     return {
       output: {
@@ -111,7 +108,7 @@ export let listLinksTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      path: z.string().optional().describe('Filter links by path prefix'),
+      path: z.string().optional().describe('Filter links by exact resource path'),
       username: z.string().optional().describe('Filter by link creator username'),
       createdBefore: z
         .string()
@@ -121,7 +118,10 @@ export let listLinksTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter links created after this date (ISO 8601)'),
-      type: z.enum(['file', 'folder', 'upload']).optional().describe('Filter by link type'),
+      type: z
+        .enum(['file', 'folder', 'upload'])
+        .optional()
+        .describe('Filter by file or folder; upload is unsupported by this listing endpoint'),
       accessibility: z
         .enum(['anyone', 'password', 'domain', 'recipients'])
         .optional()
@@ -151,10 +151,7 @@ export let listLinksTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.listLinks({
       path: ctx.input.path,
@@ -210,10 +207,7 @@ export let deleteLinkTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     await client.deleteLink(ctx.input.linkId);
 

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 let nexusAddressSchema = z.object({
@@ -14,11 +14,13 @@ let nexusAddressSchema = z.object({
 
 let lineItemSchema = z.object({
   lineItemId: z.string().optional().describe('Unique identifier for the line item'),
-  quantity: z.number().optional().describe('Quantity of the item'),
+  quantity: z.number().optional().describe('Whole-number quantity of the item'),
   productTaxCode: z
     .string()
     .optional()
-    .describe('Product tax code for exemption rules (e.g. 31000 for digital goods)'),
+    .describe(
+      'Product tax code for exemption rules. Call list_categories for supported codes.'
+    ),
   unitPrice: z.number().optional().describe('Unit price of the item'),
   discount: z.number().optional().describe('Total discount amount for the line item')
 });
@@ -45,15 +47,16 @@ let breakdownLineItemSchema = z.object({
 export let calculateTax = SlateTool.create(spec, {
   name: 'Calculate Sales Tax',
   key: 'calculate_tax',
-  description: `Calculate the exact sales tax for a given order based on origin/destination addresses, order amount, shipping, and line items. Returns total tax to collect with a detailed breakdown by jurisdiction (state, county, city, special district) and per line item. Supports product-level exemptions via tax codes and customer-level exemptions.`,
+  description: `Calculate sales tax for an order using origin and destination addresses, order amount, shipping, line items, nexus settings and exemptions. Returns the tax to collect and available jurisdiction and line item breakdowns.`,
   instructions: [
-    'Provide at minimum a destination address (toCountry, toState) and shipping amount.',
+    'Provide destination country and state, ZIP for US destinations, shipping, and either amount or nonempty lineItems.',
     'Use nexusAddresses to specify nexus locations per-request, or rely on your TaxJar account settings.',
     'Use productTaxCode on line items for product-specific exemptions (e.g. clothing, food, software).',
     'Use customerId or exemptionType for customer-level exemptions.'
   ],
   constraints: [
-    'International calculations have limited support and only work for accounts with this feature enabled.'
+    'International calculations have limited support and only work for accounts with this feature enabled.',
+    'Calculations count toward API usage. Sandbox results verify formatting and must not be used as tax accuracy evidence.'
   ],
   tags: {
     readOnly: true
@@ -101,14 +104,18 @@ export let calculateTax = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      orderTotalAmount: z.number().describe('Total order amount including shipping'),
-      shipping: z.number().describe('Shipping amount'),
+      orderTotalAmount: z
+        .number()
+        .optional()
+        .describe('Total order amount including shipping, when returned'),
+      shipping: z.number().optional().describe('Shipping amount, when returned'),
       taxableAmount: z.number().describe('Amount of the order subject to tax'),
       amountToCollect: z.number().describe('Total sales tax to collect'),
       rate: z.number().describe('Combined tax rate applied'),
       hasNexus: z.boolean().describe('Whether nexus exists for this order'),
       freightTaxable: z.boolean().describe('Whether shipping is taxable at this location'),
       taxSource: z.string().optional().describe('Tax sourcing method: origin or destination'),
+      exemptionType: z.string().optional().describe('Applied exemption type, when returned'),
       jurisdictions: z
         .object({
           country: z.string().optional(),
@@ -142,11 +149,7 @@ export let calculateTax = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let result = await client.calculateTax({
       from_country: ctx.input.fromCountry,
@@ -189,6 +192,7 @@ export let calculateTax = SlateTool.create(spec, {
       hasNexus: result.has_nexus,
       freightTaxable: result.freight_taxable,
       taxSource: result.tax_source,
+      exemptionType: result.exemption_type,
       jurisdictions: result.jurisdictions
         ? {
             country: result.jurisdictions.country,
@@ -238,7 +242,7 @@ export let calculateTax = SlateTool.create(spec, {
 
     return {
       output,
-      message: `Tax calculated: **$${result.amount_to_collect.toFixed(2)}** to collect on a $${result.order_total_amount.toFixed(2)} order (rate: ${(result.rate * 100).toFixed(2)}%). Nexus: ${result.has_nexus ? 'Yes' : 'No'}, freight taxable: ${result.freight_taxable ? 'Yes' : 'No'}.`
+      message: `Tax calculated: **$${result.amount_to_collect.toFixed(2)}** to collect (rate: ${(result.rate * 100).toFixed(2)}%). Nexus: ${result.has_nexus ? 'Yes' : 'No'}, freight taxable: ${result.freight_taxable ? 'Yes' : 'No'}.`
     };
   })
   .build();

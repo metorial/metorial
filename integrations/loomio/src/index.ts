@@ -9,8 +9,6 @@ import {
   listPolls,
   manageMemberships
 } from './tools';
-import { inboundWebhook, newDiscussions, newPolls } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     listPolls,
     manageMemberships
   ],
-  triggers: [inboundWebhook, newDiscussions, newPolls]
+  triggers: []
 });

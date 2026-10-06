@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/miro.svg" height="20"> Miro
 
-Create, manage, and organize collaborative whiteboard boards. Add and update board items including sticky notes, shapes, cards, text, images, documents, embeds, and frames. Connect items with configurable connectors, group items together, and categorize with tags. Share boards and manage board members with role-based permissions. Create mind maps and flowcharts (experimental). Subscribe to webhooks for board item change notifications. Enterprise features include project management, organization and team administration, audit logs, data classification, eDiscovery, and SCIM user provisioning.
+Create, manage, and organize collaborative whiteboard boards. Add and update board items including sticky notes, shapes, cards, text, images, documents, embeds, and frames. Connect items with configurable connectors, group items together, and categorize with tags. Share boards and manage board members with role-based permissions. Create mind maps and flowcharts (experimental). Enterprise features include project management, organization and team administration, audit logs, data classification, eDiscovery, and SCIM user provisioning.
 
 ## Tools
 

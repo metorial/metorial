@@ -1,18 +1,25 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientForContext } from '../lib/client';
 import { spec } from '../spec';
 
 export let invalidateDatabaseTokens = SlateTool.create(spec, {
   name: 'Invalidate Database Tokens',
   key: 'invalidate_database_tokens',
-  description: `Rotate tokens for a database, invalidating all existing database auth tokens. Any clients using old tokens will need to obtain new ones.`,
+  description: `Choose an organization with list_organizations. Rotate tokens for a database, invalidating all existing database auth tokens. Any clients using old tokens will need to obtain new ones.`,
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
   .input(
     z.object({
+      organizationSlug: z
+        .string()
+        .optional()
+        .describe(
+          'Organization slug. Call list_organizations to discover authorized organizations; older connections may use their saved organization.'
+        ),
       databaseName: z.string().describe('Name of the database to rotate tokens for')
     })
   )
@@ -22,10 +29,7 @@ export let invalidateDatabaseTokens = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    const client = clientForContext(ctx);
 
     await client.invalidateDatabaseTokens(ctx.input.databaseName);
 

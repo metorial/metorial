@@ -1,26 +1,27 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RedditAdsClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { accountInput, invalid } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageAudienceUsers = SlateTool.create(spec, {
   name: 'Manage Audience Users',
   key: 'manage_audience_users',
-  description: `Add or remove users from a custom audience. Users are identified by SHA256-hashed email addresses or mobile advertising IDs (MAIDs). Supports batch operations for updating audience membership.`,
+  description:
+    'Submit hashed user rows for a selected customer-list audience. A 204 response acknowledges the request; it does not supply a processed-user count or prove completed matching.',
   instructions: [
     'Email addresses and MAIDs must be SHA256-hashed and lowercased before submission.',
     'For email-only lists, set identifierType to EMAIL_SHA256. For MAID-only lists, use MAID_SHA256. For both, use BOTH.',
     'The audience ID is typically in the format "ca.xxxxxxxxxxx".'
   ],
-  constraints: [
-    'Audiences created in Ads Manager are limited to 1 million users; the API supports larger audiences.'
-  ],
+  constraints: ['Maximum 2500 rows; all selected hash columns must be present.'],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
+      accountId: accountInput,
       audienceId: z.string().describe('Custom audience ID (e.g., "ca.xxxxxxxxxxx")'),
       action: z.enum(['ADD', 'REMOVE']).describe('Whether to add or remove users'),
       identifierType: z
@@ -41,51 +42,47 @@ export let manageAudienceUsers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      usersSubmitted: z.number(),
+      acknowledged: z.boolean(),
+      processingVerified: z.boolean(),
       audienceId: z.string(),
       action: z.string(),
-      usersProcessed: z.number(),
+      usersProcessed: z.number().optional(),
       raw: z.any().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RedditAdsClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
-    });
-
-    let columnOrder: string[] = [];
-    if (ctx.input.identifierType === 'EMAIL_SHA256') {
-      columnOrder = ['EMAIL_SHA256'];
-    } else if (ctx.input.identifierType === 'MAID_SHA256') {
-      columnOrder = ['MAID_SHA256'];
-    } else {
-      columnOrder = ['EMAIL_SHA256', 'MAID_SHA256'];
-    }
-
-    let userData = ctx.input.users.map(user => {
-      if (ctx.input.identifierType === 'EMAIL_SHA256') {
-        return [user.emailSha256 || ''];
-      } else if (ctx.input.identifierType === 'MAID_SHA256') {
-        return [user.maidSha256 || ''];
-      } else {
-        return [user.emailSha256 || '', user.maidSha256 || ''];
-      }
-    });
-
-    let result = await client.manageAudienceUsers(ctx.input.audienceId, {
+    if (ctx.input.users.length < 1 || ctx.input.users.length > 2500)
+      invalid('Provide 1–2500 audience users.');
+    const columns =
+      ctx.input.identifierType === 'BOTH'
+        ? ['EMAIL_SHA256', 'MAID_SHA256']
+        : [ctx.input.identifierType];
+    const userData = ctx.input.users.map(user =>
+      columns.map(column => {
+        const value = column === 'EMAIL_SHA256' ? user.emailSha256 : user.maidSha256;
+        if (typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value))
+          invalid(
+            'Every selected audience column requires a 64-character lowercase SHA-256 hash.'
+          );
+        return value;
+      })
+    );
+    await createClient(ctx).audienceUsers(ctx.input.audienceId, {
       action_type: ctx.input.action,
-      column_order: columnOrder,
+      column_order: columns,
       user_data: userData
     });
-
     return {
       output: {
         audienceId: ctx.input.audienceId,
         action: ctx.input.action,
-        usersProcessed: ctx.input.users.length,
-        raw: result
+        usersSubmitted: ctx.input.users.length,
+        acknowledged: true,
+        processingVerified: false
       },
-      message: `**${ctx.input.action === 'ADD' ? 'Added' : 'Removed'}** ${ctx.input.users.length} user(s) ${ctx.input.action === 'ADD' ? 'to' : 'from'} audience **${ctx.input.audienceId}**.`
+      message:
+        'Reddit acknowledged the membership request with no content. No processed-user count or completed audience matching is asserted.'
     };
   })
   .build();

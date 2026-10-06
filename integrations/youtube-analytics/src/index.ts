@@ -9,8 +9,6 @@ import {
   manageReportingJobs,
   queryAnalytics
 } from './tools';
-import { inboundWebhook, newBulkReports } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     listReportTypes,
     downloadBulkReport
   ],
-  triggers: [inboundWebhook, newBulkReports]
+  triggers: []
 });

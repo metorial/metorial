@@ -14,6 +14,7 @@ import {
   deleteTransformation,
   deleteUser,
   deleteWebhook,
+  getAccount,
   getConnection,
   getConnectionSchema,
   getConnectorType,
@@ -22,11 +23,13 @@ import {
   getTeam,
   getTransformation,
   getUser,
+  getWebhook,
   inviteUser,
   listConnections,
   listConnectorTypes,
   listDestinations,
   listGroups,
+  listRoles,
   listTeams,
   listTransformations,
   listUsers,
@@ -44,11 +47,12 @@ import {
   updateUser,
   updateWebhook
 } from './tools';
-import { fivetranEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getAccount,
+    listRoles,
+    getWebhook,
     listGroups,
     getGroup,
     createGroup,
@@ -92,5 +96,5 @@ export let provider = Slate.create({
     updateWebhook,
     deleteWebhook
   ],
-  triggers: [fivetranEvents]
+  triggers: []
 });

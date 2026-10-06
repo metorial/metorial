@@ -10,8 +10,6 @@ import {
   speechToText,
   textToSpeech
 } from './tools';
-import { responseEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     generateVideo,
     listModels
   ],
-  triggers: [responseEvent]
+  triggers: []
 });

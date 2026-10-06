@@ -26,15 +26,30 @@ export let getMember = SlateTool.create(spec, {
       twoFactorEnabled: z.boolean().describe('Whether 2FA is enabled'),
       status: z
         .number()
-        .describe('Member status: 0=Invited, 1=Accepted, 2=Confirmed, -1=Revoked'),
-      type: z.number().describe('Role: 0=Owner, 1=Admin, 2=User, 3=Manager'),
-      accessAll: z.boolean().describe('Whether the member has access to all collections'),
+        .describe('Member status: 0=Invited, 1=Accepted, 2=Confirmed, 3=Staged, -1=Revoked'),
+      type: z
+        .number()
+        .describe('Role: 0=Owner, 1=Admin, 2=User, 4=Custom; legacy role 3 is unsupported'),
+      accessAll: z
+        .boolean()
+        .nullable()
+        .describe(
+          'Legacy accessAll response, null when the current Public API does not expose this flag; collection assignments govern access'
+        ),
       externalId: z.string().nullable().describe('External ID for directory sync'),
+      collectionsAvailable: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the provider exposed this association field; false means the array does not establish current assignments.'
+        ),
       collections: z
         .array(
           z.object({
             collectionId: z.string().describe('Collection ID'),
-            readOnly: z.boolean().describe('Whether access is read-only')
+            readOnly: z.boolean().describe('Whether access is read-only'),
+            hidePasswords: z.boolean().nullable().optional(),
+            manage: z.boolean().nullable().optional()
           })
         )
         .describe('Assigned collections'),
@@ -43,8 +58,7 @@ export let getMember = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.auth.serverUrl
+      ...ctx.auth
     });
 
     let member = await client.getMember(ctx.input.memberId);
@@ -60,9 +74,12 @@ export let getMember = SlateTool.create(spec, {
       type: member.type,
       accessAll: member.accessAll,
       externalId: member.externalId,
-      collections: member.collections.map(c => ({
+      collectionsAvailable: member.collections !== undefined,
+      collections: (member.collections ?? []).map(c => ({
         collectionId: c.id,
-        readOnly: c.readOnly
+        readOnly: c.readOnly,
+        hidePasswords: c.hidePasswords,
+        manage: c.manage
       })),
       groupIds
     };

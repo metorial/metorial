@@ -36,8 +36,8 @@ export let getUserInfoTool = SlateTool.create(spec, {
     let me = await client.getMe();
     let orgs = await client.getMyOrganizations();
 
-    let organizations = (orgs || []).map((org: any) => ({
-      organizationId: String(org.id),
+    let organizations = orgs.map(org => ({
+      organizationId: org.id,
       name: org.name
     }));
 
@@ -51,7 +51,7 @@ export let getUserInfoTool = SlateTool.create(spec, {
         companyName: me.companyName,
         organizations
       },
-      message: `Authenticated as **${me.fullName || me.email}** (ID: ${me.id}) with access to **${organizations.length}** organization(s).`
+      message: `Authenticated as **${me.fullName || me.email || `Member ${me.id}`}** (ID: ${me.id}) with access to **${organizations.length}** organization(s).`
     };
   })
   .build();

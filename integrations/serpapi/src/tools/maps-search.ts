@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SerpApiClient } from '../lib/client';
+import { receiptMessage, receiptOutput, SerpApiClient } from '../lib/client';
+import { searchMetadataSchema } from '../lib/contracts';
+import { searchParams } from '../lib/params';
 import { spec } from '../spec';
 
 let localResultSchema = z.object({
@@ -62,11 +64,29 @@ export let mapsSearchTool = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Page number for pagination (0-indexed, increments of 20)'),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Submit asynchronously and return the native search ID/status. Not compatible with noCache or Ludicrous Speed accounts.'
+        ),
       noCache: z.boolean().optional().describe('Force fresh results')
     })
   )
   .output(
     z.object({
+      isComplete: z
+        .boolean()
+        .describe(
+          'Whether native search status is Success; queued/processing receipts are incomplete.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Native pagination metadata; follow native offsets/tokens without inferring a total.'
+        ),
+      searchMetadata: searchMetadataSchema.optional(),
       localResults: z.array(localResultSchema).describe('Local business/place results'),
       placeDetails: z
         .object({
@@ -85,25 +105,9 @@ export let mapsSearchTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SerpApiClient({ apiKey: ctx.auth.token });
+    let client = new SerpApiClient({ apiKey: ctx.auth.token, accountId: ctx.auth.accountId });
 
-    let params: Record<string, any> = {
-      engine: 'google_maps'
-    };
-
-    if (ctx.input.dataCid) {
-      params.data_cid = ctx.input.dataCid;
-      params.type = 'place';
-    } else {
-      params.q = ctx.input.query;
-      params.type = 'search';
-    }
-
-    if (ctx.input.coordinates) params.ll = ctx.input.coordinates;
-    if (ctx.input.language) params.hl = ctx.input.language;
-    if (ctx.input.country) params.gl = ctx.input.country;
-    if (ctx.input.page !== undefined) params.start = ctx.input.page * 20;
-    if (ctx.input.noCache) params.no_cache = ctx.input.noCache;
+    let params = searchParams('maps_search', ctx.input);
 
     let data = await client.search(params);
 
@@ -156,10 +160,11 @@ export let mapsSearchTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...receiptOutput(data),
         localResults,
         placeDetails
       },
-      message
+      message: receiptMessage(data, message)
     };
   })
   .build();

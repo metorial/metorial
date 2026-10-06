@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import type { APIKey } from '../lib/models';
 import { spec } from '../spec';
 
 let apiKeyOutputSchema = z.object({
@@ -14,16 +15,16 @@ let apiKeyOutputSchema = z.object({
     .optional()
     .nullable()
     .describe('API key token value (only available at creation time)'),
-  ownerId: z.string().describe('Owner user or bot user ID')
+  ownerId: z.string().describe('Owner user or service user ID')
 });
 
-let mapApiKey = (k: any) => ({
+let mapApiKey = (k: APIKey, includeToken = false) => ({
   apiKeyId: k.id,
   uri: k.uri || '',
   createdAt: k.created_at || '',
   description: k.description || '',
   metadata: k.metadata || '',
-  apiKeyToken: k.token || null,
+  apiKeyToken: includeToken ? (k.token ?? null) : null,
   ownerId: k.owner_id || ''
 });
 
@@ -35,8 +36,17 @@ export let listApiKeys = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -48,10 +58,11 @@ export let listApiKeys = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listApiKeys({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
-    let apiKeys = (result.keys || []).map(mapApiKey);
+    let apiKeys = (result.keys || []).map(value => mapApiKey(value));
     return {
       output: { apiKeys, nextPageUri: result.next_page_uri || null },
       message: `Found **${apiKeys.length}** API key(s).`
@@ -92,7 +103,7 @@ export let createApiKey = SlateTool.create(spec, {
     z.object({
       description: z.string().optional().describe('Description (max 255 bytes)'),
       metadata: z.string().optional().describe('Metadata (max 4096 bytes)'),
-      ownerId: z.string().optional().describe('Owner user ID or bot user ID')
+      ownerId: z.string().optional().describe('Owner user or service user ID')
     })
   )
   .output(apiKeyOutputSchema)
@@ -104,7 +115,7 @@ export let createApiKey = SlateTool.create(spec, {
       ownerId: ctx.input.ownerId
     });
     return {
-      output: mapApiKey(k),
+      output: mapApiKey(k, true),
       message: `Created API key **${k.id}**. ⚠️ Save the token now — it won't be shown again.`
     };
   })

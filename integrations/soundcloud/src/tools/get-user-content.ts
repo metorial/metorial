@@ -12,6 +12,12 @@ export let getUserTracks = SlateTool.create(spec, {
   .input(
     z.object({
       userId: z.string().describe('User ID or URN'),
+      nextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact continuation URL returned by this list; keep the same resource and filters'
+        ),
       limit: z
         .number()
         .optional()
@@ -25,28 +31,34 @@ export let getUserTracks = SlateTool.create(spec, {
           z.object({
             trackId: z.string().describe('Track URN'),
             title: z.string().describe('Track title'),
-            permalinkUrl: z.string().describe('Track URL'),
-            duration: z.number().describe('Duration in milliseconds'),
-            genre: z.string().nullable().describe('Genre'),
-            playbackCount: z.number().describe('Number of plays'),
-            likesCount: z.number().describe('Number of likes'),
-            access: z.string().describe('Access level'),
-            createdAt: z.string().describe('Creation date')
+            permalinkUrl: z.string().nullable().optional().describe('Track URL'),
+            duration: z.number().nullable().optional().describe('Duration in milliseconds'),
+            genre: z.string().nullable().optional().describe('Genre'),
+            playbackCount: z.number().nullable().optional().describe('Number of plays'),
+            likesCount: z.number().nullable().optional().describe('Number of likes'),
+            access: z.string().nullable().optional().describe('Access level'),
+            createdAt: z.string().nullable().optional().describe('Creation date')
           })
         )
         .describe('List of tracks'),
+      nextHref: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native next page URL, when supplied'),
       hasMore: z.boolean().describe('Whether more tracks are available')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.getUserTracks(ctx.input.userId, {
-      limit: ctx.input.limit || 20
+      nextHref: ctx.input.nextHref,
+      limit: ctx.input.limit ?? 20
     });
 
     let tracks = result.collection.map(t => ({
-      trackId: t.urn || String(t.id),
+      trackId: t.urn,
       title: t.title,
       permalinkUrl: t.permalink_url,
       duration: t.duration,
@@ -58,7 +70,7 @@ export let getUserTracks = SlateTool.create(spec, {
     }));
 
     return {
-      output: { tracks, hasMore: !!result.next_href },
+      output: { tracks, hasMore: !!result.next_href, nextHref: result.next_href },
       message: `Retrieved **${tracks.length}** tracks for user ${ctx.input.userId}.`
     };
   })
@@ -73,6 +85,12 @@ export let getUserPlaylists = SlateTool.create(spec, {
   .input(
     z.object({
       userId: z.string().describe('User ID or URN'),
+      nextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact continuation URL returned by this list; keep the same resource and filters'
+        ),
       limit: z
         .number()
         .optional()
@@ -86,27 +104,37 @@ export let getUserPlaylists = SlateTool.create(spec, {
           z.object({
             playlistId: z.string().describe('Playlist URN'),
             title: z.string().describe('Playlist title'),
-            permalinkUrl: z.string().describe('Playlist URL'),
-            trackCount: z.number().describe('Number of tracks'),
-            duration: z.number().describe('Total duration in milliseconds'),
-            likesCount: z.number().describe('Number of likes'),
-            isAlbum: z.boolean().describe('Whether marked as an album'),
-            createdAt: z.string().describe('Creation date')
+            permalinkUrl: z.string().nullable().optional().describe('Playlist URL'),
+            trackCount: z.number().nullable().optional().describe('Number of tracks'),
+            duration: z
+              .number()
+              .nullable()
+              .optional()
+              .describe('Total duration in milliseconds'),
+            likesCount: z.number().nullable().optional().describe('Number of likes'),
+            isAlbum: z.boolean().optional().describe('Whether marked as an album'),
+            createdAt: z.string().nullable().optional().describe('Creation date')
           })
         )
         .describe('List of playlists'),
+      nextHref: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native next page URL, when supplied'),
       hasMore: z.boolean().describe('Whether more playlists are available')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.getUserPlaylists(ctx.input.userId, {
-      limit: ctx.input.limit || 20
+      nextHref: ctx.input.nextHref,
+      limit: ctx.input.limit ?? 20
     });
 
     let playlists = result.collection.map(p => ({
-      playlistId: p.urn || String(p.id),
+      playlistId: p.urn,
       title: p.title,
       permalinkUrl: p.permalink_url,
       trackCount: p.track_count,
@@ -117,7 +145,7 @@ export let getUserPlaylists = SlateTool.create(spec, {
     }));
 
     return {
-      output: { playlists, hasMore: !!result.next_href },
+      output: { playlists, hasMore: !!result.next_href, nextHref: result.next_href },
       message: `Retrieved **${playlists.length}** playlists for user ${ctx.input.userId}.`
     };
   })
@@ -132,6 +160,12 @@ export let getUserFollowers = SlateTool.create(spec, {
   .input(
     z.object({
       userId: z.string().describe('User ID or URN'),
+      nextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact continuation URL returned by this list; keep the same resource and filters'
+        ),
       limit: z
         .number()
         .optional()
@@ -143,28 +177,34 @@ export let getUserFollowers = SlateTool.create(spec, {
       followers: z
         .array(
           z.object({
-            userId: z.string().describe('Follower URN'),
-            username: z.string().describe('Username'),
-            fullName: z.string().describe('Full name'),
-            permalinkUrl: z.string().describe('Profile URL'),
-            avatarUrl: z.string().describe('Avatar URL'),
-            followersCount: z.number().describe('Number of followers'),
-            trackCount: z.number().describe('Number of tracks')
+            userId: z.string().optional().describe('Follower URN'),
+            username: z.string().optional().describe('Username'),
+            fullName: z.string().nullable().optional().describe('Full name'),
+            permalinkUrl: z.string().nullable().optional().describe('Profile URL'),
+            avatarUrl: z.string().nullable().optional().describe('Avatar URL'),
+            followersCount: z.number().nullable().optional().describe('Number of followers'),
+            trackCount: z.number().nullable().optional().describe('Number of tracks')
           })
         )
         .describe('List of followers'),
+      nextHref: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native next page URL, when supplied'),
       hasMore: z.boolean().describe('Whether more followers are available')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.getUserFollowers(ctx.input.userId, {
-      limit: ctx.input.limit || 20
+      nextHref: ctx.input.nextHref,
+      limit: ctx.input.limit ?? 20
     });
 
     let followers = result.collection.map(u => ({
-      userId: u.urn || String(u.id),
+      userId: u.urn,
       username: u.username,
       fullName: u.full_name,
       permalinkUrl: u.permalink_url,
@@ -174,7 +214,7 @@ export let getUserFollowers = SlateTool.create(spec, {
     }));
 
     return {
-      output: { followers, hasMore: !!result.next_href },
+      output: { followers, hasMore: !!result.next_href, nextHref: result.next_href },
       message: `Retrieved **${followers.length}** followers for user ${ctx.input.userId}.`
     };
   })
@@ -189,6 +229,12 @@ export let getUserFollowings = SlateTool.create(spec, {
   .input(
     z.object({
       userId: z.string().describe('User ID or URN'),
+      nextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact continuation URL returned by this list; keep the same resource and filters'
+        ),
       limit: z
         .number()
         .optional()
@@ -200,28 +246,34 @@ export let getUserFollowings = SlateTool.create(spec, {
       followings: z
         .array(
           z.object({
-            userId: z.string().describe('User URN'),
-            username: z.string().describe('Username'),
-            fullName: z.string().describe('Full name'),
-            permalinkUrl: z.string().describe('Profile URL'),
-            avatarUrl: z.string().describe('Avatar URL'),
-            followersCount: z.number().describe('Number of followers'),
-            trackCount: z.number().describe('Number of tracks')
+            userId: z.string().optional().describe('User URN'),
+            username: z.string().optional().describe('Username'),
+            fullName: z.string().nullable().optional().describe('Full name'),
+            permalinkUrl: z.string().nullable().optional().describe('Profile URL'),
+            avatarUrl: z.string().nullable().optional().describe('Avatar URL'),
+            followersCount: z.number().nullable().optional().describe('Number of followers'),
+            trackCount: z.number().nullable().optional().describe('Number of tracks')
           })
         )
         .describe('List of followings'),
+      nextHref: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native next page URL, when supplied'),
       hasMore: z.boolean().describe('Whether more followings are available')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.getUserFollowings(ctx.input.userId, {
-      limit: ctx.input.limit || 20
+      nextHref: ctx.input.nextHref,
+      limit: ctx.input.limit ?? 20
     });
 
     let followings = result.collection.map(u => ({
-      userId: u.urn || String(u.id),
+      userId: u.urn,
       username: u.username,
       fullName: u.full_name,
       permalinkUrl: u.permalink_url,
@@ -231,7 +283,7 @@ export let getUserFollowings = SlateTool.create(spec, {
     }));
 
     return {
-      output: { followings, hasMore: !!result.next_href },
+      output: { followings, hasMore: !!result.next_href, nextHref: result.next_href },
       message: `Retrieved **${followings.length}** followings for user ${ctx.input.userId}.`
     };
   })

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/googleads.png" height="20"> Google Ads
 
-Create, manage, and optimize advertising campaigns across Google Search, Display Network, YouTube, and Shopping. Configure ad groups, keywords, bidding strategies, audience targeting, and geographic targeting. Track and import conversions including offline and enhanced conversions. Generate reporting and analytics using Google Ads Query Language (GAQL). Plan keywords with historical metrics and forecasts. Manage account hierarchies and multi-account operations. Receive lead form webhook data from campaigns.
+Create, manage, and optimize advertising campaigns across Google Search, Display Network, YouTube, and Shopping. Configure ad groups, keywords, bidding strategies, audience targeting, and geographic targeting. Track and import conversions including offline and enhanced conversions. Generate reporting and analytics using Google Ads Query Language (GAQL). Plan keywords with historical metrics and forecasts. Manage account hierarchies and multi-account operations.
 
 ## Setup
 

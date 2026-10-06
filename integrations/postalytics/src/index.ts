@@ -12,8 +12,6 @@ import {
   manageWebhooks,
   sendMail
 } from './tools';
-import { mailEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     manageSuppressionLists,
     createLoginLink
   ],
-  triggers: [mailEvent]
+  triggers: []
 });

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let releaseOutputSchema = z.object({
@@ -38,10 +39,10 @@ export let listReleases = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page')
     })
   )
   .output(
@@ -50,7 +51,7 @@ export let listReleases = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let releases = await client.listReleases(ctx.input.owner, ctx.input.repo, {
       page: ctx.input.page,
       limit: ctx.input.limit
@@ -94,8 +95,8 @@ export let createRelease = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       tagName: z
         .string()
         .describe('Git tag name for the release (will be created if it does not exist)'),
@@ -111,7 +112,7 @@ export let createRelease = SlateTool.create(spec, {
   )
   .output(releaseOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let r = await client.createRelease(ctx.input.owner, ctx.input.repo, {
       tagName: ctx.input.tagName,
       name: ctx.input.name,
@@ -157,9 +158,9 @@ export let updateRelease = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      releaseId: z.number().describe('Release ID to update'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      releaseId: integerInput(1).describe('Release ID to update'),
       tagName: z.string().optional().describe('New tag name'),
       name: z.string().optional().describe('New release title'),
       body: z.string().optional().describe('New release notes'),
@@ -169,7 +170,13 @@ export let updateRelease = SlateTool.create(spec, {
   )
   .output(releaseOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    if (
+      !Object.entries(ctx.input).some(
+        ([key, value]) => !['owner', 'repo', 'releaseId'].includes(key) && value !== undefined
+      )
+    )
+      throw createApiServiceError('Provide a release field to update.');
+    let client = new GiteaClient(ctx.auth);
     let r = await client.updateRelease(ctx.input.owner, ctx.input.repo, ctx.input.releaseId, {
       tagName: ctx.input.tagName,
       name: ctx.input.name,
@@ -214,9 +221,9 @@ export let deleteRelease = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      releaseId: z.number().describe('Release ID to delete')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      releaseId: integerInput(1).describe('Release ID to delete')
     })
   )
   .output(
@@ -225,7 +232,7 @@ export let deleteRelease = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     await client.deleteRelease(ctx.input.owner, ctx.input.repo, ctx.input.releaseId);
 
     return {

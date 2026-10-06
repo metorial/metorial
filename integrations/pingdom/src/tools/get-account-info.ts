@@ -14,6 +14,9 @@ export let getAccountInfo = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      checkLimit: z.number().optional().describe('Total check slots'),
+      usedDefaultChecks: z.number().optional().describe('Used uptime check slots'),
+      usedTransactionChecks: z.number().optional().describe('Used transaction check slots'),
       availableChecks: z
         .number()
         .optional()
@@ -30,11 +33,16 @@ export let getAccountInfo = SlateTool.create(spec, {
         .optional()
         .describe('Auto-refill triggers when credits fall below this'),
       maxSmsOverage: z.number().optional().describe('Maximum SMS overage allowed'),
-      availableDefaultChecks: z.number().optional().describe('Available default checks'),
+      availableDefaultChecks: z
+        .number()
+        .optional()
+        .describe('Legacy field; Pingdom does not provide separate remaining uptime capacity'),
       availableTransactionChecks: z
         .number()
         .optional()
-        .describe('Available transaction check slots')
+        .describe(
+          'Legacy field; Pingdom does not provide separate remaining transaction capacity'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -44,21 +52,24 @@ export let getAccountInfo = SlateTool.create(spec, {
     });
 
     let result = await client.getCredits();
-    let credits = result.credits || result;
+    let credits = result.credits;
 
     return {
       output: {
+        checkLimit: credits.checklimit,
+        usedDefaultChecks: credits.useddefault,
+        usedTransactionChecks: credits.usedtransaction,
         availableChecks: credits.availablechecks,
-        availableSmsCredits: credits.availablesmscredits,
+        availableSmsCredits: credits.availablesms,
         availableSmsTests: credits.availablesmstests,
         autoRefillSms: credits.autofillsms,
         autoRefillSmsAmount: credits.autofillsms_amount,
         autoRefillSmsWhenLeft: credits.autofillsms_when_left,
         maxSmsOverage: credits.max_sms_overage,
-        availableDefaultChecks: credits.availabledefaultchecks,
-        availableTransactionChecks: credits.availabletransactionchecks
+        availableDefaultChecks: undefined,
+        availableTransactionChecks: undefined
       },
-      message: `Account has **${credits.availablechecks ?? 'unknown'}** available check(s) and **${credits.availablesmscredits ?? 'unknown'}** SMS credit(s).`
+      message: `Account has **${credits.availablechecks ?? 'unknown'}** available check(s) and **${credits.availablesms ?? 'unknown'}** SMS credit(s).`
     };
   })
   .build();

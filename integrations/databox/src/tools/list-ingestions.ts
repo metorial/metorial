@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdInput, pageInput, pageSizeInput } from '../lib/models';
 import { spec } from '../spec';
 
 export let listIngestions = SlateTool.create(spec, {
@@ -13,9 +14,14 @@ export let listIngestions = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      datasetId: z.string().describe('UUID of the dataset to list ingestions for'),
-      page: z.number().optional().describe('Page number (1-indexed). Defaults to 1'),
-      pageSize: z.number().optional().describe('Number of results per page. Defaults to 100')
+      accountId: accountIdInput,
+      datasetId: z
+        .string()
+        .describe(
+          'Identifier of the dataset (v1 UUID or v2 decimal ID encoded as text) to list ingestions for'
+        ),
+      page: pageInput,
+      pageSize: pageSizeInput
     })
   )
   .output(
@@ -24,7 +30,8 @@ export let listIngestions = SlateTool.create(spec, {
         .array(
           z.object({
             ingestionId: z.string().describe('Unique ingestion event identifier'),
-            timestamp: z.string().describe('ISO 8601 timestamp of the ingestion event')
+            timestamp: z.string().describe('ISO 8601 timestamp of the ingestion event'),
+            status: z.string().optional().describe('Provider processing status when available')
           })
         )
         .describe('List of ingestion events'),
@@ -34,8 +41,9 @@ export let listIngestions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, apiVersion: ctx.config.apiVersion });
     let result = await client.listIngestions(ctx.input.datasetId, {
+      accountId: ctx.input.accountId,
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
     });
@@ -44,7 +52,8 @@ export let listIngestions = SlateTool.create(spec, {
       output: {
         ingestions: result.ingestions.map(i => ({
           ingestionId: i.ingestionId,
-          timestamp: i.timestamp
+          timestamp: i.timestamp,
+          status: i.status
         })),
         currentPage: result.pagination.page,
         pageSize: result.pagination.pageSize,

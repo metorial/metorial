@@ -1,59 +1,44 @@
-Let me get more details from the API documentation page.# Slates Specification for Tldv
+# tl;dv API capabilities
 
-## Overview
-
-tl;dv is an AI meeting notetaker that records, transcribes, and summarizes video calls on Zoom, Google Meet, and Microsoft Teams. It provides an API to retrieve meeting data, transcripts, and AI-generated highlights, as well as import external recordings.
+Verified against the [official API reference](https://doc.tldv.io/index.html) and
+[API access guide](https://intercom.help/tldv/en/articles/11583137-api).
 
 ## Authentication
 
-tl;dv uses API key authentication. To obtain an API key, navigate to https://tldv.io/app/settings/personal-settings/api-keys (requires being logged in) and generate a new API key.
+Requests use HTTPS, base URL `https://pasta.tldv.io/v1alpha1` and the `x-api-key`
+header. Generate the key in Personal Settings → API Keys. Eligible Pro, Business
+and Enterprise plans provide access; API export permission also depends on the
+meeting organizer's plan. The API has no documented current-user endpoint or
+sandbox. API keys do not use OAuth token refresh.
 
-Once you have the API key, include it in the header of all API requests using the `x-api-key` header:
+## Tools
 
-```
-x-api-key: YOUR_API_KEY
-```
+| Tool | Provider operation | Behavior |
+| --- | --- | --- |
+| `list_meetings` | `GET /meetings` | Keyword, date, participation and internal/external filters. Dates map to `from` and `to`; participation maps to `onlyParticipated`. Pagination starts at 1, accepts up to 100 results per page and is limited to 10,000 total results. The legacy tool input `page: 0` also requests page 1. |
+| `get_meeting` | `GET /meetings/{meetingId}` | Metadata, organizer, invitees, template, conference ID, optional phone number and custom correlation metadata. |
+| `get_transcript` | `GET /meetings/{meetingId}/transcript` | Completed transcript with speaker, text and start/end timestamps. |
+| `get_notes` | `GET /meetings/{meetingId}/notes` | Structured segments, ordered topics and Markdown notes. |
+| `get_highlights` | `GET /meetings/{meetingId}/highlights` | Deprecated provider endpoint preserved for existing callers. Prefer `get_notes`. |
+| `download_recording` | `GET /meetings/{meetingId}/download` | Downloadable recording. The API returns a 302 redirect to a signed URL valid for six hours. |
+| `import_meeting` | `POST /meetings/import` | Public recording URL and name, with optional date, participants, phone number and flat correlation metadata. Returns acceptance, job ID and provider status text. `dryRun: true` validates without saving or processing a recording. |
 
-All API requests must be made over HTTPS. Requests made over plain HTTP will be rejected.
+Imports support mp3, mp4, wav, m4a, mkv, mov, avi, wma, flac. The `name`
+input is optional for compatibility and defaults to `Imported recording`.
+Import results do not contain a completed meeting ID or meeting permalink;
+the legacy `meetingId` and `url` output fields are optional. Use the returned
+`jobId` as a processing identifier and discover the completed meeting with
+`list_meetings`. The provider has no documented job-status endpoint.
 
-**Base URL:** `https://pasta.tldv.io`
+Metadata accepts at most 20 keys. Each key is 1–64 letters, digits, underscores
+or hyphens. Values are strings up to 256 characters, numbers or booleans.
+Unpopulated phone numbers and metadata are omitted from meeting results. Import
+timestamps are converted to UTC with fractional seconds before submission.
 
-The API key is available to users on the Business Plan or higher. The API follows the same underlying permission model as the web application, with additional plan-based constraints applied to automation and export capabilities. Meetings organized by Free plan users are not accessible via the API, even if shared.
+## Provider limitations
 
-## Features
-
-### Meeting Retrieval
-
-Retrieve a list of your recorded meetings or get details for a specific meeting. Meetings include metadata such as name, date, duration, organizer, invitees, conference ID, and the applied note template. Meetings can be filtered by query, date range, participation status, and type (internal/external).
-
-### Recording Download
-
-Download meeting recording files via a signed, expiring download URL. The signed URL expires 6 hours after issuance.
-
-### Transcripts
-
-Retrieve the full transcript of a meeting in a structured format. Transcripts include speaker identification, text content, and timestamps (start/end time) for each segment. Transcripts are only available once processing is complete.
-
-### Highlights / Notes
-
-Retrieve AI-generated highlights (notes) for a meeting. Each highlight includes the text, a start time, the source (manual or AI-generated), and an associated topic with a title and summary. Highlights are only available after the transcript is complete.
-
-### Meeting Import
-
-Import a meeting, recording, or other media from a URL. The URL must be publicly accessible, and the media must be in a supported format. This allows ingesting external recordings into tl;dv for transcription and analysis.
-
-## Events
-
-Webhooks allow you to receive real-time notifications from tl;dv when key events occur in your workspace.
-
-Webhooks are configured in the tl;dv account under Settings > Webhooks, by specifying an Event Action and an HTTPS Endpoint URL. Optionally, you can configure custom headers (e.g., auth tokens) to be included in the webhook request.
-
-Webhooks can be configured at different levels, depending on your needs: User level (only events for that individual user), Team level (events for all users in a specific team), or Organization level (all events across the entire organization).
-
-### MeetingReady
-
-Fires when a meeting has finished processing and is ready to be consumed. The payload includes meeting metadata such as ID, name, date, organizer, invitees, URL, template, and duration.
-
-### TranscriptReady
-
-Fires when a meeting transcript has been generated and is available. The payload includes the full transcript data with speaker segments, timestamps, and text content.
+The API has no documented meeting update/delete, participant management or
+identity endpoint. Recording uploads are an opt-in beta requiring provider
+operation enablement and are outside this tool set. The authenticated health
+endpoint does not provide user identity. Webhook subscriptions are not exposed
+here.

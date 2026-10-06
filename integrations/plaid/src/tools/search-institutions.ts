@@ -55,11 +55,11 @@ export let searchInstitutionsTool = SlateTool.create(spec, {
       ctx.input.products
     );
 
-    let institutions = (result.institutions || []).map((i: any) => ({
+    let institutions = result.institutions.map(i => ({
       institutionId: i.institution_id,
       name: i.name,
-      products: i.products || [],
-      countryCodes: i.country_codes || [],
+      products: i.products,
+      countryCodes: i.country_codes,
       oauth: i.oauth,
       url: i.url ?? null,
       primaryColor: i.primary_color ?? null,

@@ -1,24 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deliverFiles } from '../lib/files';
+import { buildFileSource, fileSourceSchema } from '../lib/validation';
 import { spec } from '../spec';
-
-let fileSourceSchema = z
-  .object({
-    url: z.string().optional().describe('Public URL of the PDF file'),
-    fileId: z.string().optional().describe('ConvertAPI file ID of a previously uploaded PDF'),
-    base64Data: z.string().optional().describe('Base64-encoded PDF content'),
-    fileName: z.string().optional().describe('File name (required when using base64Data)')
-  })
-  .describe(
-    'PDF file source — provide exactly one of: url, fileId, or base64Data (with fileName)'
-  );
 
 export let protectPdf = SlateTool.create(spec, {
   name: 'Protect PDF',
   key: 'protect_pdf',
   description: `Encrypt and password-protect a PDF document with AES 256-bit encryption.
-Set user and owner passwords, and control permissions for printing, copying, and editing.`,
+Set user and owner passwords, and control permissions for printing and copying.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -44,7 +35,10 @@ Set user and owner passwords, and control permissions for printing, copying, and
   .output(
     z.object({
       conversionCost: z.number().describe('Number of conversion credits consumed'),
-      conversionTime: z.number().describe('Encryption duration in seconds'),
+      conversionTime: z
+        .number()
+        .optional()
+        .describe('Provider-reported legacy duration, when present'),
       fileName: z.string().describe('Name of the encrypted PDF'),
       fileSize: z.number().describe('Size of the encrypted PDF in bytes'),
       fileId: z.string().nullable().describe('ConvertAPI file ID'),
@@ -54,32 +48,34 @@ Set user and owner passwords, and control permissions for printing, copying, and
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
+      masterToken: ctx.auth.masterToken,
       region: ctx.config.region
     });
 
     let fileSource = buildFileSource(ctx.input.file);
-    let parameters: Record<string, string> = {};
+    let parameters: Record<string, string> = { EncryptionAlgorithm: 'Aes256Bit' };
 
-    if (ctx.input.userPassword) {
+    if (ctx.input.userPassword !== undefined) {
       parameters.UserPassword = ctx.input.userPassword;
     }
-    if (ctx.input.ownerPassword) {
+    if (ctx.input.ownerPassword !== undefined) {
       parameters.OwnerPassword = ctx.input.ownerPassword;
     }
     if (ctx.input.allowPrinting !== undefined) {
-      parameters.AllowPrint = ctx.input.allowPrinting ? 'true' : 'false';
+      parameters.PrintDocument = ctx.input.allowPrinting ? 'true' : 'false';
     }
     if (ctx.input.allowCopying !== undefined) {
-      parameters.AllowCopy = ctx.input.allowCopying ? 'true' : 'false';
+      parameters.CopyContents = ctx.input.allowCopying ? 'true' : 'false';
     }
 
-    let result = await client.convert({
+    let rawResult = await client.convert({
       sourceFormat: 'pdf',
-      destinationFormat: 'encrypt',
+      destinationFormat: 'protect',
       files: [fileSource],
       storeFile: ctx.input.storeFile,
       parameters
     });
+    let result = await deliverFiles(ctx, rawResult);
 
     let encrypted = result.files[0]!;
     return {
@@ -91,31 +87,7 @@ Set user and owner passwords, and control permissions for printing, copying, and
         fileId: encrypted.fileId,
         url: encrypted.url
       },
-      message: `Encrypted PDF as \`${encrypted.fileName}\` (${formatBytes(encrypted.fileSize)}) in ${result.conversionTime}s.`
+      message: `Encrypted PDF as \`${encrypted.fileName}\` (${encrypted.fileSize} bytes).`
     };
   })
   .build();
-
-function buildFileSource(file: {
-  url?: string;
-  fileId?: string;
-  base64Data?: string;
-  fileName?: string;
-}) {
-  if (file.url) {
-    return { type: 'url' as const, url: file.url };
-  }
-  if (file.fileId) {
-    return { type: 'fileId' as const, fileId: file.fileId };
-  }
-  if (file.base64Data && file.fileName) {
-    return { type: 'base64' as const, fileName: file.fileName, data: file.base64Data };
-  }
-  throw new Error('Provide exactly one of: url, fileId, or base64Data (with fileName)');
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}

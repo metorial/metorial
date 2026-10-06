@@ -1,13 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapBudget } from '../lib/schemas';
 import { spec } from '../spec';
 
 let budgetSchema = z.object({
   budgetId: z.string().describe('Unique identifier of the budget'),
   name: z.string().nullable().optional().describe('Budget name'),
   description: z.string().nullable().optional().describe('Budget description'),
-  status: z.string().optional().describe('Budget status'),
+  status: z.string().nullish().describe('Budget status'),
   periodType: z
     .string()
     .optional()
@@ -33,13 +34,19 @@ let budgetSchema = z.object({
 export let listBudgets = SlateTool.create(spec, {
   name: 'List Budgets',
   key: 'list_budgets',
-  description: `List budgets in your Brex account. Returns budget details including name, status, spend limits, and remaining balances for the current period.`,
+  description: `List budgets or spend limits in your Brex account. Returns names, current status and the documented planned-spend or authorization amount.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      resourceType: z
+        .enum(['budget', 'spend_limit'])
+        .optional()
+        .describe(
+          'Budgets track planned spend; spend limits enforce member spending controls. Defaults to budget.'
+        ),
       cursor: z.string().optional().describe('Pagination cursor for fetching next page'),
       limit: z.number().optional().describe('Maximum number of results per page (max 1000)')
     })
@@ -51,34 +58,13 @@ export let listBudgets = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.listBudgets({
-      cursor: ctx.input.cursor,
-      limit: ctx.input.limit
-    });
-
-    let budgets = result.items.map((b: any) => ({
-      budgetId: b.id,
-      name: b.name ?? null,
-      description: b.description ?? null,
-      status: b.budget_status ?? b.status,
-      periodType: b.period_type,
-      limit: b.limit ? { amount: b.limit.amount, currency: b.limit.currency } : null,
-      currentPeriodBalance: b.current_period_balance
-        ? {
-            amount: b.current_period_balance.amount,
-            currency: b.current_period_balance.currency
-          }
-        : null
-    }));
-
+    const result = await new Client({ token: ctx.auth.token }).listBudgets(
+      { cursor: ctx.input.cursor, limit: ctx.input.limit },
+      ctx.input.resourceType
+    );
     return {
-      output: {
-        budgets,
-        nextCursor: result.next_cursor
-      },
-      message: `Found **${budgets.length}** budget(s).${result.next_cursor ? ' More results available.' : ''}`
+      output: { budgets: result.items.map(mapBudget), nextCursor: result.next_cursor },
+      message: `Returned ${result.items.length} spending resources.`
     };
   })
   .build();

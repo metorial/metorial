@@ -1,188 +1,44 @@
-Now let me get the full list of webhook events and scopes:Let me fetch the webhooks page and scopes page for more details:# Slates Specification for FreshBooks
+# FreshBooks integration contract
 
-## Overview
+The released scope is 23 tools: all 20 original tool keys plus `get_identity`, `get_resource` and `list_resources`. Legacy field types, requiredness and enum choices remain serialized in `src/legacy-schemas.json` and covered by schema contracts. There are no triggers or webhook-registration tools.
 
-FreshBooks is a cloud-based accounting software designed for small businesses and freelancers. It provides APIs for invoicing, accounting, expenses, and time tracking. The API is a JSON-based REST interface for accessing and managing FreshBooks data.
+## Authorization and selection
 
-## Authentication
+[OAuth authentication](https://www.freshbooks.com/api/authentication) uses authorization-code and refresh grants at `/auth/oauth/token`. Token requests include the original redirect URI; access/refresh tokens and positive expiry are validated before saving. Refresh tokens rotate and are single-use. Connections missing the saved redirect URI must reconnect.
 
-FreshBooks APIs use the OAuth 2.0 protocol for authentication and authorization. Only the **Authorization Code** grant type is supported; client_credentials grant type is not supported.
+Consent includes profile read and read/write for clients, invoices, payments, estimates, expenses, time entries, projects, taxes, billable items and credit notes. Unused bills/vendors/reports/admin scopes are removed. The [credits reference](https://www.freshbooks.com/api/credits) labels access as client scopes while the [scope catalog](https://www.freshbooks.com/api/scopes) also defines credit-note scopes; both resource families are used by this surface.
 
-### Setup
+`GET /auth/api/v1/users/me` provides minimal identity and the exact business/account memberships. [Identity documentation](https://www.freshbooks.com/api/identity_model) distinguishes business IDs from membership IDs and describes users without an accounting account. Tools require an explicit account/business selection, with stored legacy values only as fallback. Selection must match one authorized membership; accounting tools refuse businesses without an accounting account. Matching business resolution is exact, never first-membership selection.
 
-1. Create a FreshBooks account and navigate to the Developer Portal.
-2. Register a new application with a unique name and a redirect URI. The redirect URI is the endpoint that will receive the authorization code and exchange it for tokens.
-3. After saving, you receive a **Client ID** and **Client Secret**.
+## Capability and route map
 
-### OAuth2 Flow
+| Resource | Existing tools | API family |
+| --- | --- | --- |
+| Clients | manage, list, get | `/accounting/account/{accountId}/users/clients` — [clients](https://www.freshbooks.com/api/clients) |
+| Invoices | manage, list, get | `/accounting/account/{accountId}/invoices/invoices` — [invoices](https://www.freshbooks.com/api/invoices) |
+| Payments | manage, list | `/accounting/account/{accountId}/payments/payments` — [payments](https://www.freshbooks.com/api/payments) |
+| Estimates | manage | `/accounting/account/{accountId}/estimates/estimates` — [estimates](https://www.freshbooks.com/api/estimates) |
+| Expenses | manage, list | `/accounting/account/{accountId}/expenses/expenses` — [expenses](https://www.freshbooks.com/api/expenses) |
+| Time entries | manage, list | `/timetracking/business/{businessId}/time_entries` — [time entries](https://www.freshbooks.com/api/time_entries) |
+| Projects | manage, list | `/projects/business/{businessId}/project` for single resources; `/projects` for lists — [projects](https://www.freshbooks.com/api/project) |
+| Taxes | manage, list | `/accounting/account/{accountId}/taxes/taxes` — [taxes](https://www.freshbooks.com/api/taxes) |
+| Items | manage, list | `/accounting/account/{accountId}/items/items` — [items](https://www.freshbooks.com/api/items) |
+| Credit notes | manage | `/accounting/account/{accountId}/credit_notes/credit_notes` — [credits](https://www.freshbooks.com/api/credits) |
 
-1. A user visits your authorization link, is sent to a FreshBooks-hosted authorization page, logs in, reviews the scopes, clicks 'Authorize', and is redirected back to your redirect URI with a `code` parameter.
+`get_resource` supports documented exact GETs for payments, expenses, estimates, projects, time entries, taxes and items. `list_resources` supports estimates, credit notes and [expense categories](https://www.freshbooks.com/api/expense_categories); category writes are unsupported and are not added. Credit-note single-detail examples contradict their method/name, so no public detail route is invented. Credit updates/removal prove the ID through the documented collection, bounded to 50 pages. Credit writes use `clientid`, `credit_type: goodwill` for new notes and the `credit_notes` response array.
 
-   Authorization URL format:
+## Validation and response behavior
 
-   ```
-   https://auth.freshbooks.com/oauth/authorize/?response_type=code&redirect_uri=<REDIRECT_URL>&client_id=<CLIENT_ID>
-   ```
+IDs are safe positive integers, account path components are validated, dates must be real calendar dates, and time timestamps have explicit ISO/10-digit seconds/13-digit milliseconds units. Money remains decimal text. Currency is explicit or proven from the existing resource/client/invoice, without a hard-coded USD fallback. Updates retain false, zero and empty clear values. Line replacement sends the complete replacement collection.
 
-2. Your app must exchange the authorization code (valid for 5 minutes) for tokens by POSTing to the token endpoint with your client_id, client_secret, code, and redirect_uri.
+[Paging](https://www.freshbooks.com/api/parameters) accepts bounded integers, with `per_page` at most 100. Lists validate arrays, duplicate IDs, exact resource/account identities and provider totals/page metadata; missing metadata fails instead of becoming fabricated zero/one values. Client names use documented `fname_like`/`lname_like`; invoices use `statusid`, including zero. Time GETs and project GETs omit Content-Type. The inherited time-entry `projectId` selector remains forwarded as `project_id`, but the current time reference does not list it among filters; live filter behavior remains unverified.
 
-   Token endpoint: `POST https://api.freshbooks.com/auth/oauth/token`
+Upstream failures become conservative ServiceErrors retaining only a validated numeric HTTP status, without transport parent graphs or provider messages. Decoded strings and keys are checked for current auth secrets; credential fields are omitted from safe provider data. Output schemas are validated before return, and mapped outputs expose exact IDs plus safe raw resource state where available.
 
-3. Bearer tokens (access tokens) are not long-lived — they last for 12 hours.
+## Lifecycle limits
 
-4. Refresh tokens live forever but are one-time-use. A new refresh token is issued every time a bearer token is generated, invalidating all previous refresh tokens.
+FreshBooks [visibility states](https://www.freshbooks.com/api/active_deleted) distinguish inactive/deleted `1` from archived/hidden `2`. Accounting delete actions use `1` and retain history. Project/time/tax deletion follows documented DELETE requests. Exact documented empty acknowledgments are accepted without inventing a returned resource; output exposes the previously read record and `readbackRequired`. Cleanup completion requires independent readback.
 
-### Scopes
+Invoice send uses documented `action_email` and recipients; mark-as-sent uses `action_mark_as_sent`. Both activate accounting recognition, and email cannot be recalled. Lifecycle requests reject unrelated update fields because FreshBooks silently prioritizes action phases. Estimate-send's original enum remains, but the tool refuses the unverified modern email request and directs users to the provider interface.
 
-Scope is a mechanism in OAuth 2.0 that limits an application's access to a user's account. An application can request one or more scopes, which are presented to the user in the consent screen.
-
-FreshBooks uses scopes in the format `entity:object:action` (e.g., `user:clients:read`, `user:invoices:write`).
-
-Available scope objects: `bill_payments`, `bill_vendors`, `billable_items`, `bills`, `business`, `clients`, `credit_notes`, `estimates`, `expenses`, `invoices`, `journal_entries`, `notifications`, `online_payments`, `other_income`, `payments`, `profile`, `projects`, `reports`, `retainers`, `taxes`, `teams`, `time_entries`.
-
-Actions are either `read` or `write`.
-
-The scope `user:profile:read` is added to all new apps by default as it's needed for all basic calls.
-
-### API Requests
-
-All authenticated requests must include:
-
-- `Authorization: Bearer <access_token>` header
-- `Api-Version` header
-
-API calls are scoped to either an `account_id` (accounting resources) or a `business_id` (projects/time tracking resources).
-
-## Features
-
-### Client Management
-
-Create, read, update, and delete client records. Clients include contact details, organization info, billing address, currency preference, and language settings. Secondary contacts can be associated with a client profile.
-
-### Invoicing
-
-Create and manage invoices including line items, discounts, taxes, and due dates. Invoices are created in a "Draft" status and must be marked as sent or sent by email before they are recognized by accounting reports. Invoices can be sent via email directly through the API. Invoice profiles and presentation/attachment customization are also supported.
-
-### Payments
-
-Record and manage payments against invoices. Supports online payment gateway configuration on invoices (e.g., credit card, ACH). Other income not tied to invoices can also be tracked.
-
-### Estimates
-
-Create, update, delete, and send estimates to clients. Estimates can be sent via email through the API.
-
-### Expenses and Bills
-
-Track expenses with categories, attachments (receipt images), and vendor associations. Manage bills from vendors and record bill payments. Expense categories can be customized.
-
-### Time Tracking
-
-Log time entries against projects and clients. Time entries can be marked as billed or unbilled and filtered by date ranges.
-
-### Projects and Services
-
-Create and manage projects associated with clients. Services represent things your business offers to clients, are added to projects, and allow tracking of time entries by type of work with hourly rates.
-
-### Team Management
-
-Manage team members and staff within the FreshBooks account, including roles and permissions.
-
-### Taxes
-
-Create and manage tax configurations that can be applied to invoices and line items.
-
-### Accounting
-
-Manage the chart of accounts and create journal entries for double-entry bookkeeping.
-
-### Credit Notes
-
-Create, update, and manage credit notes for client refunds or adjustments.
-
-### Reports
-
-Generate financial reports including:
-
-- General Ledger
-- Expense Details
-- Chart of Accounts
-- Cash Flow
-- Balance Sheet
-- Account Aging
-- Profit & Loss, Tax Summary, and other reports
-
-### Items (Billable Items)
-
-Manage reusable billable items (products/services) with names, descriptions, and rates that can be added to invoices.
-
-### Settings
-
-Configure payment gateways and system-level settings for the account.
-
-## Events
-
-FreshBooks supports webhooks — a mechanism for sending notifications via HTTP POST callbacks when certain events occur. Webhooks require a verification step: upon registration, FreshBooks sends a verification code to your URI, which must be confirmed via a PUT request before events are delivered.
-
-Events are identified by a combination of a noun and a verb (e.g., `invoice.create`). You can also subscribe to all events for a noun by using only the noun part (e.g., `invoice`).
-
-The following event categories are supported:
-
-### Invoice Events
-
-Triggered on `create`, `update`, `delete`, and `sendByEmail` actions on invoices. Requires `user:invoices:read` scope.
-
-### Estimate Events
-
-Triggered on `create`, `update`, `delete`, and `sendByEmail` actions on estimates. Requires `user:estimates:read` scope.
-
-### Client Events
-
-Triggered on `create`, `update`, and `delete` actions on clients. Requires `user:clients:read` scope.
-
-### Expense Events
-
-Triggered on `create`, `update`, and `delete` actions on expenses. Requires `user:expenses:read` scope.
-
-### Payment Events
-
-Triggered on `create`, `update`, and `delete` actions on payments. Requires `user:payments:read` scope.
-
-### Project Events
-
-Triggered on `create`, `update`, and `delete` actions on projects. Requires `user:projects:read` scope.
-
-### Time Entry Events
-
-Triggered on `create`, `update`, and `delete` actions on time entries. Requires `user:time_entries:read` scope.
-
-### Bill Events
-
-Triggered on `create`, `update`, and `delete` actions on bills. Requires `user:bills:read` scope.
-
-### Bill Vendor Events
-
-Triggered on `create`, `update`, and `delete` actions on bill vendors. Requires `user:bill_vendors:read` scope.
-
-### Credit Note Events
-
-Triggered on `create`, `update`, and `delete` actions on credit notes. Requires `user:credit_notes:read` scope.
-
-### Recurring Invoice Events
-
-Triggered on `create`, `update`, and `delete` actions on recurring invoice profiles. Requires `user:invoices:read` scope.
-
-### Item Events
-
-Triggered on `create`, `update`, and `delete` actions on billable items. Requires `user:billable_items:read` scope.
-
-### Service Events
-
-Triggered on `create`, `update`, and `delete` actions on services. Requires `user:billable_items:read` scope.
-
-### Tax Events
-
-Triggered on `create`, `update`, and `delete` actions on taxes. Requires `user:taxes:read` scope.
-
-### Expense Category Events
-
-Triggered on `create`, `update`, and `delete` actions on expense categories. Requires `user:expenses:read` scope.
+There are no bill/vendor CRUD, report/export, PDF, notification/admin, online payment gateway, or webhook claims. The active private suite covers the released surface with identity checks, independent reads, controlled retained-effect gates and exact ownership-based cleanup. Static checks do not establish provider acceptance.

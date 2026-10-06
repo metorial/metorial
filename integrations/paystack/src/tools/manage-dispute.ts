@@ -1,7 +1,47 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PaystackClient } from '../lib/client';
+
+import {
+  exactId,
+  optionalNumericId,
+  optionalRecord,
+  pagination,
+  record,
+  records,
+  validateOutput
+} from '../lib/transport';
 import { spec } from '../spec';
+
+const listDisputesOutput = z.object({
+  disputes: z.array(
+    z.object({
+      disputeId: z.number().optional().describe('Dispute ID'),
+      exactDisputeId: z
+        .string()
+        .describe(
+          'Exact provider resource ID; legacy numeric ID is omitted outside its safe range'
+        ),
+      status: z.string().describe('Dispute status'),
+      amount: z.number().describe('Disputed amount'),
+      currency: z.string().describe('Currency'),
+      transactionReference: z.string().describe('Transaction reference'),
+      category: z.string().nullable().describe('Dispute category'),
+      dueDate: z.string().nullable().describe('Response due date'),
+      createdAt: z.string().describe('Creation timestamp')
+    })
+  ),
+  totalCount: z.number().optional().describe('Total disputes'),
+  currentPage: z.number().optional().describe('Current page'),
+  totalPages: z.number().optional().describe('Total pages'),
+  nextCursor: z.string().nullable().optional().describe('Provider next cursor, when returned'),
+  previousCursor: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Provider previous cursor, when returned'),
+  perPage: z.number().optional().describe('Observed provider page size')
+});
 
 export let listDisputes = SlateTool.create(spec, {
   name: 'List Disputes',
@@ -13,6 +53,9 @@ export let listDisputes = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      useCursor: z.boolean().optional().describe('Use cursor pagination; omit page when true'),
+      next: z.string().optional().describe('Next cursor from the prior response'),
+      previous: z.string().optional().describe('Previous cursor from the prior response'),
       perPage: z.number().optional().describe('Records per page'),
       page: z.number().optional().describe('Page number'),
       status: z
@@ -24,61 +67,42 @@ export let listDisputes = SlateTool.create(spec, {
       to: z.string().optional().describe('End date (ISO 8601)')
     })
   )
-  .output(
-    z.object({
-      disputes: z.array(
-        z.object({
-          disputeId: z.number().describe('Dispute ID'),
-          status: z.string().describe('Dispute status'),
-          amount: z.number().describe('Disputed amount'),
-          currency: z.string().describe('Currency'),
-          transactionReference: z.string().describe('Transaction reference'),
-          category: z.string().nullable().describe('Dispute category'),
-          dueDate: z.string().nullable().describe('Response due date'),
-          createdAt: z.string().describe('Creation timestamp')
-        })
-      ),
-      totalCount: z.number().describe('Total disputes'),
-      currentPage: z.number().describe('Current page'),
-      totalPages: z.number().describe('Total pages')
-    })
-  )
+  .output(listDisputesOutput)
   .handleInvocation(async ctx => {
-    let client = new PaystackClient({ token: ctx.auth.token });
-
-    let result = await client.listDisputes({
-      perPage: ctx.input.perPage,
-      page: ctx.input.page,
-      status: ctx.input.status,
-      transaction: ctx.input.transaction,
-      from: ctx.input.from,
-      to: ctx.input.to
-    });
-
-    let disputes = (result.data ?? []).map((d: any) => ({
-      disputeId: d.id,
-      status: d.status,
-      amount: d.amount ?? 0,
-      currency: d.currency ?? '',
-      transactionReference: d.transaction?.reference ?? '',
-      category: d.category ?? null,
-      dueDate: d.due_date ?? null,
-      createdAt: d.created_at ?? d.createdAt
-    }));
-
-    let meta = result.meta ?? {};
-
+    const client = new PaystackClient({ token: ctx.auth.token });
+    const result = await client.listDisputes(ctx.input);
+    const output = {
+      disputes: records(result.data).map(item => ({
+        disputeId: optionalNumericId(item.id),
+        exactDisputeId: exactId(item.id),
+        status: item.status,
+        amount: item.amount ?? optionalRecord(item.transaction).amount,
+        currency: item.currency ?? optionalRecord(item.transaction).currency,
+        transactionReference:
+          item.transaction_reference ?? optionalRecord(item.transaction).reference,
+        category: item.category ?? null,
+        dueDate: item.dueAt ?? item.due_date ?? null,
+        createdAt: item.created_at ?? item.createdAt
+      })),
+      ...pagination(result.meta)
+    };
     return {
-      output: {
-        disputes,
-        totalCount: meta.total ?? 0,
-        currentPage: meta.page ?? 1,
-        totalPages: meta.pageCount ?? 1
-      },
-      message: `Found **${meta.total ?? disputes.length}** disputes.`
+      output: validateOutput(listDisputesOutput, output),
+      message:
+        'Retrieved the requested page; continuation and counts are included only when returned by Paystack.'
     };
   })
   .build();
+const resolveDisputeOutput = z.object({
+  disputeId: z.number().optional().describe('Dispute ID'),
+  exactDisputeId: z
+    .string()
+    .describe(
+      'Exact provider resource ID; legacy numeric ID is omitted outside its safe range'
+    ),
+  status: z.string().describe('Updated dispute status'),
+  message: z.string().describe('Resolution message')
+});
 
 export let resolveDispute = SlateTool.create(spec, {
   name: 'Resolve Dispute',
@@ -105,32 +129,24 @@ export let resolveDispute = SlateTool.create(spec, {
       uploadedFilename: z.string().optional().describe('Filename of uploaded evidence')
     })
   )
-  .output(
-    z.object({
-      disputeId: z.number().describe('Dispute ID'),
-      status: z.string().describe('Updated dispute status'),
-      message: z.string().describe('Resolution message')
-    })
-  )
+  .output(resolveDisputeOutput)
   .handleInvocation(async ctx => {
-    let client = new PaystackClient({ token: ctx.auth.token });
-
-    let result = await client.resolveDispute(ctx.input.disputeId, {
-      resolution: ctx.input.resolution,
-      message: ctx.input.message,
-      refundAmount: ctx.input.refundAmount,
-      uploadedFilename: ctx.input.uploadedFilename
-    });
-
-    let dispute = result.data;
-
+    const client = new PaystackClient({ token: ctx.auth.token });
+    const result = await client.resolveDispute(ctx.input.disputeId, ctx.input);
+    const dispute = record(result.data);
+    const output = {
+      disputeId: optionalNumericId(dispute.id),
+      exactDisputeId: exactId(dispute.id),
+      status: dispute.status,
+      message:
+        typeof dispute.message === 'string'
+          ? dispute.message
+          : optionalRecord(dispute.message).body
+    };
     return {
-      output: {
-        disputeId: dispute.id,
-        status: dispute.status,
-        message: dispute.message ?? ctx.input.message
-      },
-      message: `Dispute **${dispute.id}** resolved with status **${dispute.status}**.`
+      output: validateOutput(resolveDisputeOutput, output),
+      message:
+        'Dispute resolution response received; review the returned state. Funds or final dispute state may be affected.'
     };
   })
   .build();

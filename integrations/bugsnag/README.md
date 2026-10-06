@@ -1,6 +1,8 @@
 # Bugsnag
 
-Monitor and manage application errors, crashes, and performance data. Access and update error details, statuses, and assignments. Track releases and builds across projects. View error trends, pivots, and stability metrics. Manage feature flags and their error impact. Send and retrieve OpenTelemetry span data for performance monitoring. Configure integrations and webhooks for error notifications. Manage collaborators, teams, and permissions within organizations. Create saved searches for filtered error views. Handle GDPR/CCPA data requests for user data export and deletion. Provision users via SCIM. Report error events and sessions from applications.
+Read and manage Bugsnag errors and projects. Search errors and events, update severity and workflow status, inspect diagnostics, trends, pivots, releases, and stability, and manage collaborators, comments, and saved searches.
+
+Use a personal auth token and select the Data Access endpoint matching your dashboard. The project notifier API key is a separate credential used by application SDKs to report events. List tools return a page and, where available, a provider next-page URL.
 
 ## License
 

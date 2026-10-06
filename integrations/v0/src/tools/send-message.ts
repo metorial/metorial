@@ -6,16 +6,21 @@ import { spec } from '../spec';
 export let sendMessageTool = SlateTool.create(spec, {
   name: 'Send Message',
   key: 'send_message',
-  description: `Send a follow-up message to an existing V0 chat to refine or iterate on generated code. The AI will process the message and produce a new version of the code. Use this for iterative development within a chat session.`,
+  description: `DEPRECATED — use \`send_current_message\` instead. This tool uses API v1. Send a follow-up message to an existing V0 chat to refine or iterate on generated code. The AI will process the message and produce a new version of the code. Use this for iterative development within a chat session.`,
   instructions: [
+    'Use send_current_message for current API v2 chats. This tool operates only on API v1 chats; v1 IDs cannot be used with v2.',
     'The chatId must reference an existing chat created via "Create Chat" or "Initialize Chat".',
     'Each message generates a new version of the code, accessible via the demoUrl.'
-  ]
+  ],
+  tags: { deprecated: true }
 })
   .input(
     z.object({
-      chatId: z.string().describe('The chat to send the message to'),
-      message: z.string().describe('The prompt or instruction to refine the generated code'),
+      chatId: z.string().min(1).describe('The chat to send the message to'),
+      message: z
+        .string()
+        .min(1)
+        .describe('The prompt or instruction to refine the generated code'),
       system: z.string().optional().describe('System-level context for this message'),
       responseMode: z
         .enum(['sync', 'async'])

@@ -1,12 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let entityAnnotationSchema = z.object({
   entity: z.string().describe('Entity name (e.g., "wit$datetime" or a custom entity name)'),
-  start: z.number().describe('Start character position in the utterance text'),
-  end: z.number().describe('End character position in the utterance text'),
+  start: z.number().int().min(0).describe('Start character position in the utterance text'),
+  end: z.number().int().min(1).describe('End character position in the utterance text'),
   body: z.string().describe('The matched text segment'),
   entities: z.array(z.any()).optional().describe('Sub-entity annotations')
 });
@@ -35,9 +35,20 @@ export let listUtterances = SlateTool.create(spec, {
     z.object({
       limit: z
         .number()
+        .int()
+        .min(1)
         .optional()
         .describe('Maximum number of utterances to return (default: 10)'),
-      offset: z.number().optional().describe('Number of utterances to skip for pagination')
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Number of utterances to skip for pagination'),
+      intents: z
+        .array(z.string())
+        .optional()
+        .describe('Intent names to filter the training utterances')
     })
   )
   .output(
@@ -51,7 +62,11 @@ export let listUtterances = SlateTool.create(spec, {
       apiVersion: ctx.config.apiVersion
     });
 
-    let utterances = await client.listUtterances(ctx.input.limit, ctx.input.offset);
+    let utterances = await client.listUtterances(
+      ctx.input.limit,
+      ctx.input.offset,
+      ctx.input.intents
+    );
 
     return {
       output: {
@@ -109,7 +124,21 @@ export let trainUtterances = SlateTool.create(spec, {
       apiVersion: ctx.config.apiVersion
     });
 
-    await client.trainUtterances(ctx.input.utterances);
+    if (!ctx.input.utterances.length) {
+      throw createApiServiceError('Provide at least one training utterance.');
+    }
+    for (let utterance of ctx.input.utterances) {
+      for (let entity of utterance.entities ?? []) {
+        if (entity.end <= entity.start || entity.end > Array.from(utterance.text).length) {
+          throw createApiServiceError(
+            'Entity annotations must refer to a nonempty range within the utterance text.'
+          );
+        }
+      }
+    }
+    let result = await client.trainUtterances(ctx.input.utterances);
+    if (result.sent !== true)
+      throw createApiServiceError('Wit.ai did not confirm the training submission.');
 
     return {
       output: {
@@ -146,7 +175,11 @@ export let deleteUtterances = SlateTool.create(spec, {
       apiVersion: ctx.config.apiVersion
     });
 
-    await client.deleteUtterances(ctx.input.texts);
+    if (!ctx.input.texts.length)
+      throw createApiServiceError('Provide at least one utterance text to delete.');
+    let result = await client.deleteUtterances(ctx.input.texts);
+    if (result.sent !== true)
+      throw createApiServiceError('Wit.ai did not confirm the utterance deletion.');
 
     return {
       output: {

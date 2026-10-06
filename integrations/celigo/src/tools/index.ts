@@ -1,5 +1,6 @@
 export * from './create-connection';
 export * from './delete-connection';
+export { downloadJobFile, getFileUrl } from './download-job-file';
 export * from './get-connection';
 export * from './get-flow';
 export * from './get-flow-errors';

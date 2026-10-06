@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TrayRestClient } from '../lib/client';
+import { clientConfig, TrayRestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listConnectors = SlateTool.create(spec, {
@@ -22,17 +22,28 @@ export let listConnectors = SlateTool.create(spec, {
               .describe('Programmatic name of the connector (e.g., "salesforce", "slack")'),
             version: z.string().describe('Connector version (e.g., "8.1")'),
             title: z.string().describe('Human-readable connector name'),
-            description: z.string().describe('Description of the connector')
+            description: z.string().describe('Description of the connector'),
+            serviceId: z
+              .string()
+              .optional()
+              .describe('Native service ID needed for credential import'),
+            serviceName: z
+              .string()
+              .optional()
+              .describe('Native service name; can differ from the connector name'),
+            serviceVersion: z
+              .number()
+              .optional()
+              .describe(
+                'Native integer service version; can differ from the connector version'
+              )
           })
         )
         .describe('List of available connectors')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TrayRestClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = new TrayRestClient(clientConfig(ctx));
 
     let connectors = await client.listConnectors();
 

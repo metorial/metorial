@@ -41,7 +41,12 @@ export let updateContact = SlateTool.create(spec, {
         })
         .optional()
         .describe('Updated mailing address'),
-      title: z.string().optional().describe('Updated job title'),
+      title: z
+        .string()
+        .optional()
+        .describe(
+          'Updated Job Title custom field; discover available fields with list_custom_fields'
+        ),
       description: z.string().optional().describe('Updated description'),
       customFields: z
         .record(z.string(), z.any())
@@ -68,7 +73,7 @@ export let updateContact = SlateTool.create(spec, {
       rev = String(existing.rev);
     }
 
-    let contactData: Record<string, any> = {};
+    let contactData: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) contactData.name = ctx.input.name;
     if (ctx.input.emails !== undefined) contactData.email = ctx.input.emails;
     if (ctx.input.phones !== undefined) contactData.phone = ctx.input.phones;

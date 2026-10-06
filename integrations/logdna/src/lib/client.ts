@@ -1,545 +1,646 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getApiErrorStatus,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
+import {
+  type AlertRequest,
+  type ArchiveConfig,
+  alertSchema,
+  archiveSchema,
+  type BoardRequest,
+  boardSchema,
+  type ChannelConfig,
+  categorySchema,
+  type ExclusionRuleRequest,
+  type ExportOptions,
+  exclusionSchema,
+  type IngestOptions,
+  type LogLine,
+  type ViewRequest,
+  viewSchema
+} from './types';
 
-export interface LogLine {
-  timestamp?: number;
-  line: string;
-  app?: string;
-  level?: string;
-  env?: string;
-  meta?: Record<string, any>;
-  file?: string;
-}
+export type { ArchiveConfig, ChannelConfig, ExportOptions } from './types';
 
-export interface IngestOptions {
-  hostname: string;
-  tags?: string;
-  ip?: string;
-  mac?: string;
-  now?: number;
-}
-
-export interface ExportOptions {
-  from: number;
-  to: number;
-  query?: string;
-  hosts?: string;
-  apps?: string;
-  levels?: string;
-  tags?: string;
-  prefer?: string;
-  size?: number;
-  paginationId?: string;
-}
-
-export interface ViewRequest {
-  name: string;
-  query?: string;
-  apps?: string[];
-  hosts?: string[];
-  levels?: string[];
-  tags?: string[];
-  category?: string[];
-  channels?: ChannelConfig[];
-  presetId?: string;
-}
-
-export interface ChannelConfig {
-  integration: string;
-  emails?: string[];
-  url?: string;
-  method?: string;
-  headers?: Record<string, any>;
-  bodyTemplate?: string;
-  key?: string;
-  triggerlimit?: number;
-  triggerinterval?: string;
-  operator?: string;
-  immediate?: boolean;
-  terminal?: boolean;
-  timezone?: string;
-  autoresolve?: boolean;
-  autoresolveinterval?: string;
-  autoresolvelimit?: number;
-}
-
-export interface AlertRequest {
-  name: string;
-  channels: ChannelConfig[];
-}
-
-export interface CategoryRequest {
-  name: string;
-}
-
-export interface ExclusionRuleRequest {
-  title: string;
-  active?: boolean;
-  apps?: string[];
-  hosts?: string[];
-  query?: string;
-  indexonly?: boolean;
-}
-
-export interface ArchiveConfig {
-  integration: string;
-  bucket?: string;
-  endpoint?: string;
-  apikey?: string;
-  resourceinstanceid?: string;
-  accountname?: string;
-  accountkey?: string;
-  projectid?: string;
-  space?: string;
-  accesskey?: string;
-  secretkey?: string;
-  authurl?: string;
-  expires?: string;
-  username?: string;
-  password?: string;
-  tenantname?: string;
-}
-
-export interface BoardRequest {
-  title: string;
-  widgets?: BoardWidget[];
-}
-
-export interface BoardWidget {
-  title?: string;
-  query?: string;
-  type?: string;
-  description?: string;
-}
+export const apiEndpoints = ['https://api.logdna.com', 'https://api.mezmo.com'] as const;
+export type ClientOptions = {
+  serviceKey: string;
+  ingestionKey?: string;
+  authType?: 'service_key' | 'access_token';
+  apiEndpoint?: (typeof apiEndpoints)[number];
+};
+export const requireValue = (value: string | undefined, label: string) => {
+  if (!value?.trim())
+    throw createApiServiceError(`${label} is required.`, { reason: 'invalid_input' });
+  return value;
+};
+const segment = (value: string) => {
+  requireValue(value, 'Resource ID');
+  if (value === '.' || value === '..')
+    throw createApiServiceError('Resource ID cannot be a dot path segment.', {
+      reason: 'invalid_input'
+    });
+  try {
+    return encodeURIComponent(value);
+  } catch {
+    throw createApiServiceError('Resource ID must contain valid Unicode.', {
+      reason: 'invalid_input'
+    });
+  }
+};
+const parse = <T>(schema: z.ZodType<T>, value: unknown): T => {
+  const result = schema.safeParse(value);
+  if (!result.success)
+    throw createApiServiceError('LogDNA returned an invalid response.', {
+      reason: 'invalid_response'
+    });
+  return result.data;
+};
+const wireId = (...ids: (string | undefined)[]) => {
+  const id = ids.find(value => value?.trim());
+  if (!id)
+    throw createApiServiceError('LogDNA returned a resource without its identifier.', {
+      reason: 'invalid_response'
+    });
+  return id;
+};
+const normalizeView = (value: unknown) => {
+  const view = parse(viewSchema, value);
+  return {
+    ...view,
+    viewID: wireId(view.viewID, view.viewid, view.id),
+    presetIds: view.presetids ?? view.presetIds
+  };
+};
+const normalizeAlert = (value: unknown) => {
+  const alert = parse(alertSchema, value);
+  return { ...alert, presetID: wireId(alert.presetid, alert.presetID, alert.id) };
+};
+const normalizeBoard = (value: unknown) => {
+  const board = parse(boardSchema, value);
+  return {
+    ...board,
+    boardID: wireId(board.boardid, board.boardID, board.id),
+    widgets: board.graphs ?? board.widgets
+  };
+};
+const normalizeCategory = (value: unknown) => {
+  const category = parse(categorySchema, value);
+  return { ...category, id: wireId(category.id, category.Id) };
+};
+const normalizeExclusion = (value: unknown) => {
+  const rule = parse(exclusionSchema, value);
+  return { ...rule, id: wireId(rule.id, rule.ID) };
+};
+export const safeChannels = (channels: z.infer<typeof viewSchema>['channels']) =>
+  channels?.map(channel =>
+    pickDefined({
+      integration: channel.integration,
+      emails: channel.emails,
+      immediate: channel.immediate,
+      operator: channel.operator,
+      terminal: channel.terminal,
+      timezone: channel.timezone,
+      triggerinterval: channel.triggerinterval,
+      triggerlimit: channel.triggerlimit,
+      autoresolve: channel.autoresolve,
+      autoresolveinterval: channel.autoresolveinterval,
+      autoresolvelimit: channel.autoresolvelimit
+    })
+  );
 
 export class Client {
-  private api: ReturnType<typeof createAxios>;
-  private ingestionApi: ReturnType<typeof createAxios>;
+  private api;
+  private ingestionApi;
+  private adaptError;
+  private sensitiveValues = new Set<string>();
+  readonly endpoint: string;
+  readonly downloadHeaders: Record<string, string>;
 
-  constructor(
-    private options: {
-      serviceKey: string;
-      ingestionKey?: string;
+  constructor(private options: ClientOptions) {
+    requireValue(
+      options.serviceKey,
+      options.authType === 'access_token' ? 'Access token' : 'Service key'
+    );
+    this.rememberSecrets(options.serviceKey, options.ingestionKey);
+    this.endpoint =
+      options.apiEndpoint ??
+      (options.authType === 'access_token' ? apiEndpoints[1] : apiEndpoints[0]);
+    if (!apiEndpoints.some(endpoint => endpoint === this.endpoint))
+      throw createApiServiceError('Select a documented LogDNA or Mezmo API host.', {
+        reason: 'invalid_input'
+      });
+    this.downloadHeaders =
+      options.authType === 'access_token'
+        ? { Authorization: `Token ${options.serviceKey}` }
+        : { servicekey: options.serviceKey };
+    const adapter = (failure: unknown) =>
+      buildApiServiceError(failure, {
+        providerLabel: 'LogDNA',
+        reason: 'upstream_error',
+        extractMessage: (error, helpers) =>
+          [...this.sensitiveValues]
+            .sort((a, b) => b.length - a.length)
+            .reduce<string>(
+              (message, secret) => message.split(secret).join('[redacted]'),
+              helpers.extractMessage(error) ?? 'Provider request failed.'
+            ),
+        // Upstream parents may retain credential-bearing response bodies.
+        parent: createApiServiceError('LogDNA upstream request failed.', {
+          reason: 'upstream_error',
+          upstreamStatus: getApiErrorStatus(failure)
+        })
+      });
+    this.adaptError = adapter;
+    this.api = createAuthenticatedAxios({
+      baseURL: this.endpoint,
+      headers: this.downloadHeaders,
+      timeout: 30_000,
+      maxRedirects: 0,
+      errorAdapter: adapter
+    });
+    this.ingestionApi = createAuthenticatedAxios({
+      baseURL:
+        this.endpoint === apiEndpoints[1]
+          ? 'https://logs.mezmo.com'
+          : 'https://logs.logdna.com',
+      headers: options.ingestionKey ? { apikey: options.ingestionKey } : {},
+      timeout: 30_000,
+      maxRedirects: 0,
+      errorAdapter: adapter
+    });
+  }
+  private rememberSecrets(...values: (string | undefined)[]) {
+    for (const value of values) {
+      if (!value) continue;
+      this.sensitiveValues.add(value);
+      this.sensitiveValues.add(JSON.stringify(value).slice(1, -1));
     }
+  }
+  private async request(
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+    path: string,
+    data?: unknown,
+    params?: Record<string, unknown>
   ) {
-    this.api = createAxios({
-      baseURL: 'https://api.logdna.com'
+    const response = await this.api.request<unknown>({ method, url: path, data, params });
+    if (
+      isApiErrorRecord(response.data) &&
+      (response.data.error ||
+        response.data.success === false ||
+        /^(error|failed|failure)$/i.test(String(response.data.status ?? '')))
+    )
+      throw this.adaptError({ response });
+    return response.data;
+  }
+  private list<T>(value: unknown, normalize: (item: unknown) => T) {
+    return parse(z.array(z.unknown()), value).map(normalize);
+  }
+  private checkId(actual: string, expected: string) {
+    if (actual !== expected)
+      throw createApiServiceError('LogDNA returned a different resource than requested.', {
+        reason: 'invalid_response'
+      });
+  }
+  private nonemptyUpdate(value: Record<string, unknown>) {
+    const updates = pickDefined(value);
+    if (!Object.keys(updates).length)
+      throw createApiServiceError('Supply at least one field to update.', {
+        reason: 'invalid_input'
+      });
+    return updates;
+  }
+  private channels(channels: ChannelConfig[] | undefined) {
+    return channels?.map(channel => {
+      this.rememberSecrets(channel.key, channel.url, ...Object.values(channel.headers ?? {}));
+      if (!['email', 'webhook', 'slack', 'pagerduty'].includes(channel.integration))
+        throw createApiServiceError(
+          'Use an email, webhook, slack, or pagerduty alert integration.',
+          { reason: 'invalid_input' }
+        );
+      if (
+        channel.triggerlimit !== undefined &&
+        (!Number.isInteger(channel.triggerlimit) || channel.triggerlimit < 1)
+      )
+        throw createApiServiceError('Alert triggerlimit must be a positive integer.', {
+          reason: 'invalid_input'
+        });
+      if (channel.integration === 'email' && !channel.emails?.length)
+        throw createApiServiceError('Email alert channels require recipients.', {
+          reason: 'invalid_input'
+        });
+      if (['webhook', 'slack'].includes(channel.integration))
+        requireValue(channel.url, 'Notification URL');
+      if (channel.integration === 'pagerduty') requireValue(channel.key, 'PagerDuty key');
+      return pickDefined({
+        ...channel,
+        triggerlimit:
+          channel.triggerlimit === undefined ? undefined : String(channel.triggerlimit)
+      });
     });
-
-    this.ingestionApi = createAxios({
-      baseURL: 'https://logs.logdna.com'
+  }
+  async ingestLogs(lines: LogLine[], options: IngestOptions) {
+    requireValue(this.options.ingestionKey, 'Separate ingestion key');
+    requireValue(options.hostname, 'Hostname');
+    if (!lines.length) throw createApiServiceError('Supply at least one log line.');
+    for (const line of lines) {
+      requireValue(line.line, 'Log message');
+      if (line.file !== undefined)
+        throw createApiServiceError(
+          'The public ingestion API does not document a file field. Put the file path in meta.file instead.'
+        );
+      if (
+        line.timestamp !== undefined &&
+        (!Number.isSafeInteger(line.timestamp) || line.timestamp < 0)
+      )
+        throw createApiServiceError(
+          'Log timestamps must be nonnegative integer milliseconds.'
+        );
+    }
+    const body = { lines };
+    if (new TextEncoder().encode(JSON.stringify(body)).length > 10 * 1024 * 1024)
+      throw createApiServiceError(
+        'The log ingestion body exceeds 10 MB. Send smaller batches.'
+      );
+    const response = await this.ingestionApi.post<unknown>('/logs/ingest', body, {
+      params: pickDefined({ ...options, now: options.now ?? Date.now() })
+    });
+    if (response.status === 207)
+      throw createApiServiceError(
+        'LogDNA accepted only part of this batch. Some lines may already be stored; inspect the line format before sending a corrected batch.',
+        { reason: 'partial_success', upstreamStatus: 207 }
+      );
+    if (
+      isApiErrorRecord(response.data) &&
+      (response.data.error ||
+        response.data.success === false ||
+        /^(error|failed|failure)$/i.test(String(response.data.status ?? '')))
+    )
+      throw this.adaptError({ response });
+    return { status: 'accepted' };
+  }
+  exportParams(options: ExportOptions) {
+    for (const value of [options.from, options.to])
+      if (!Number.isSafeInteger(value) || value < 0)
+        throw createApiServiceError(
+          'Export timestamps must be nonnegative integer seconds or milliseconds.'
+        );
+    if (options.from && options.to && options.from > options.to)
+      throw createApiServiceError('Export from must not be after to.');
+    if (
+      options.size !== undefined &&
+      (!Number.isInteger(options.size) || options.size < 1 || options.size > 10_000)
+    )
+      throw createApiServiceError('Export size must be an integer from 1 to 10000.');
+    if (options.prefer !== undefined && !['head', 'tail'].includes(options.prefer))
+      throw createApiServiceError('Export prefer must be head or tail.');
+    if (options.tags !== undefined)
+      throw createApiServiceError(
+        'The current export API does not support a tags parameter. Use a tag condition in query instead.'
+      );
+    return pickDefined({
+      from: options.from,
+      to: options.to,
+      query: options.query,
+      hosts: options.hosts,
+      apps: options.apps,
+      levels: options.levels,
+      prefer: options.prefer,
+      size: options.size,
+      pagination_id: options.paginationId
     });
   }
-
-  private serviceHeaders() {
-    return { servicekey: this.options.serviceKey };
-  }
-
-  private ingestionHeaders() {
-    let key = this.options.ingestionKey || this.options.serviceKey;
-    return { apikey: key };
-  }
-
-  // ---- Log Ingestion ----
-
-  async ingestLogs(lines: LogLine[], opts: IngestOptions): Promise<any> {
-    let params: Record<string, any> = {
-      hostname: opts.hostname,
-      now: opts.now || Date.now()
-    };
-    if (opts.tags) params.tags = opts.tags;
-    if (opts.ip) params.ip = opts.ip;
-    if (opts.mac) params.mac = opts.mac;
-
-    let response = await this.ingestionApi.post(
-      '/logs/ingest',
-      { lines },
-      {
-        params,
-        headers: {
-          ...this.ingestionHeaders(),
-          'Content-Type': 'application/json'
-        }
-      }
+  async exportLogsV2(options: ExportOptions) {
+    const value = parse(
+      z.object({ lines: z.array(z.unknown()), pagination_id: z.string().nullish() }),
+      await this.request('GET', '/v2/export', undefined, this.exportParams(options))
     );
-    return response.data;
-  }
-
-  // ---- Log Export ----
-
-  async exportLogs(opts: ExportOptions): Promise<string> {
-    let params: Record<string, any> = {
-      from: opts.from,
-      to: opts.to
-    };
-    if (opts.query) params.query = opts.query;
-    if (opts.hosts) params.hosts = opts.hosts;
-    if (opts.apps) params.apps = opts.apps;
-    if (opts.levels) params.levels = opts.levels;
-    if (opts.tags) params.tags = opts.tags;
-    if (opts.prefer) params.prefer = opts.prefer;
-    if (opts.size) params.size = opts.size;
-
-    let response = await this.api.get('/v1/export', {
-      params,
-      headers: this.serviceHeaders()
-    });
-    return response.data;
-  }
-
-  async exportLogsV2(opts: ExportOptions): Promise<{ lines: string; paginationId?: string }> {
-    let params: Record<string, any> = {
-      from: opts.from,
-      to: opts.to
-    };
-    if (opts.query) params.query = opts.query;
-    if (opts.hosts) params.hosts = opts.hosts;
-    if (opts.apps) params.apps = opts.apps;
-    if (opts.levels) params.levels = opts.levels;
-    if (opts.tags) params.tags = opts.tags;
-    if (opts.prefer) params.prefer = opts.prefer;
-    if (opts.size) params.size = opts.size;
-    if (opts.paginationId) params.pagination_id = opts.paginationId;
-
-    let response = await this.api.get('/v2/export', {
-      params,
-      headers: this.serviceHeaders()
-    });
     return {
-      lines: response.data,
-      paginationId: response.headers?.pagination_id || undefined
+      lines: value.lines.map(line => JSON.stringify(line)).join('\n'),
+      paginationId: value.pagination_id ?? undefined,
+      lineCount: value.lines.length
     };
   }
-
-  // ---- Views ----
-
-  async listViews(): Promise<any[]> {
-    let response = await this.api.get('/v1/config/view', {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
+  async listViews() {
+    return this.list(await this.request('GET', '/v1/config/view'), normalizeView);
   }
-
-  async getView(viewId: string): Promise<any> {
-    let response = await this.api.get(`/v1/config/view/${viewId}`, {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
+  async getView(id: string) {
+    const view = normalizeView(await this.request('GET', `/v1/config/view/${segment(id)}`));
+    this.checkId(view.viewID, id);
+    return view;
   }
-
-  async createView(view: ViewRequest): Promise<any> {
-    let response = await this.api.post('/v1/config/view', view, {
-      headers: {
-        ...this.serviceHeaders(),
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  }
-
-  async updateView(viewId: string, view: Partial<ViewRequest>): Promise<any> {
-    let response = await this.api.put(`/v1/config/view/${viewId}`, view, {
-      headers: {
-        ...this.serviceHeaders(),
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  }
-
-  async deleteView(viewId: string): Promise<void> {
-    await this.api.delete(`/v1/config/view/${viewId}`, {
-      headers: this.serviceHeaders()
-    });
-  }
-
-  // ---- Preset Alerts ----
-
-  async listPresetAlerts(): Promise<any[]> {
-    let response = await this.api.get('/v1/config/presetalert', {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
-  }
-
-  async getPresetAlert(alertId: string): Promise<any> {
-    let response = await this.api.get(`/v1/config/presetalert/${alertId}`, {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
-  }
-
-  async createPresetAlert(alert: AlertRequest): Promise<any> {
-    let response = await this.api.post('/v1/config/presetalert', alert, {
-      headers: {
-        ...this.serviceHeaders(),
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  }
-
-  async updatePresetAlert(alertId: string, alert: Partial<AlertRequest>): Promise<any> {
-    let response = await this.api.put(`/v1/config/presetalert/${alertId}`, alert, {
-      headers: {
-        ...this.serviceHeaders(),
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  }
-
-  async deletePresetAlert(alertId: string): Promise<void> {
-    await this.api.delete(`/v1/config/presetalert/${alertId}`, {
-      headers: this.serviceHeaders()
-    });
-  }
-
-  // ---- Categories ----
-
-  async listCategories(type: string): Promise<any[]> {
-    let response = await this.api.get(`/v1/config/categories/${type}`, {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
-  }
-
-  async getCategory(type: string, categoryId: string): Promise<any> {
-    let response = await this.api.get(`/v1/config/categories/${type}/${categoryId}`, {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
-  }
-
-  async createCategory(type: string, category: CategoryRequest): Promise<any> {
-    let response = await this.api.post(`/v1/config/categories/${type}`, category, {
-      headers: {
-        ...this.serviceHeaders(),
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  }
-
-  async updateCategory(
-    type: string,
-    categoryId: string,
-    category: CategoryRequest
-  ): Promise<any> {
-    let response = await this.api.put(
-      `/v1/config/categories/${type}/${categoryId}`,
-      category,
-      {
-        headers: {
-          ...this.serviceHeaders(),
-          'Content-Type': 'application/json'
-        }
-      }
+  async createView(view: ViewRequest) {
+    requireValue(view.name, 'View name');
+    const { presetId, channels, ...fields } = view;
+    const created = normalizeView(
+      await this.request(
+        'POST',
+        '/v1/config/view',
+        pickDefined({ ...fields, presetid: presetId, channels: this.channels(channels) })
+      )
     );
-    return response.data;
+    return this.getView(created.viewID);
   }
-
-  async deleteCategory(type: string, categoryId: string): Promise<void> {
-    await this.api.delete(`/v1/config/categories/${type}/${categoryId}`, {
-      headers: this.serviceHeaders()
-    });
-  }
-
-  // ---- Boards ----
-
-  async listBoards(): Promise<any[]> {
-    let response = await this.api.get('/v1/config/boards', {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
-  }
-
-  async getBoard(boardId: string): Promise<any> {
-    let response = await this.api.get(`/v1/config/boards/${boardId}`, {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
-  }
-
-  async createBoard(board: BoardRequest): Promise<any> {
-    let response = await this.api.post('/v1/config/boards', board, {
-      headers: {
-        ...this.serviceHeaders(),
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  }
-
-  async deleteBoard(boardId: string): Promise<void> {
-    await this.api.delete(`/v1/config/boards/${boardId}`, {
-      headers: this.serviceHeaders()
-    });
-  }
-
-  // ---- Exclusion Rules ----
-
-  async listExclusionRules(): Promise<any[]> {
-    let response = await this.api.get('/v1/config/ingestion/exclusions', {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
-  }
-
-  async getExclusionRule(ruleId: string): Promise<any> {
-    let response = await this.api.get(`/v1/config/ingestion/exclusions/${ruleId}`, {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
-  }
-
-  async createExclusionRule(rule: ExclusionRuleRequest): Promise<any> {
-    let response = await this.api.post('/v1/config/ingestion/exclusions', rule, {
-      headers: {
-        ...this.serviceHeaders(),
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  }
-
-  async updateExclusionRule(
-    ruleId: string,
-    rule: Partial<ExclusionRuleRequest>
-  ): Promise<any> {
-    let response = await this.api.patch(`/v1/config/ingestion/exclusions/${ruleId}`, rule, {
-      headers: {
-        ...this.serviceHeaders(),
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  }
-
-  async deleteExclusionRule(ruleId: string): Promise<void> {
-    await this.api.delete(`/v1/config/ingestion/exclusions/${ruleId}`, {
-      headers: this.serviceHeaders()
-    });
-  }
-
-  // ---- Archiving ----
-
-  async getArchiveConfig(): Promise<any> {
-    let response = await this.api.get('/v1/config/archiving', {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
-  }
-
-  async createArchiveConfig(archive: ArchiveConfig): Promise<any> {
-    let response = await this.api.post('/v1/config/archiving', archive, {
-      headers: {
-        ...this.serviceHeaders(),
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  }
-
-  async updateArchiveConfig(archive: ArchiveConfig): Promise<any> {
-    let response = await this.api.put('/v1/config/archiving', archive, {
-      headers: {
-        ...this.serviceHeaders(),
-        'Content-Type': 'application/json'
-      }
-    });
-    return response.data;
-  }
-
-  async deleteArchiveConfig(): Promise<void> {
-    await this.api.delete('/v1/config/archiving', {
-      headers: this.serviceHeaders()
-    });
-  }
-
-  // ---- Ingestion Control ----
-
-  async getIngestionStatus(): Promise<any> {
-    let response = await this.api.get('/v1/config/ingestion', {
-      headers: this.serviceHeaders()
-    });
-    return response.data;
-  }
-
-  async suspendIngestion(): Promise<any> {
-    let response = await this.api.post(
-      '/v1/config/ingestion/suspend',
-      {},
-      {
-        headers: this.serviceHeaders()
-      }
+  async updateView(id: string, view: Partial<ViewRequest>) {
+    if (view.name !== undefined) requireValue(view.name, 'View name');
+    const { presetId, channels, ...fields } = view;
+    await this.request(
+      'PUT',
+      `/v1/config/view/${segment(id)}`,
+      this.nonemptyUpdate({ ...fields, presetid: presetId, channels: this.channels(channels) })
     );
-    return response.data;
+    return this.getView(id);
   }
-
-  async confirmSuspendIngestion(suspendToken: string): Promise<any> {
-    let response = await this.api.post(
-      '/v1/config/ingestion/suspend/confirm',
-      { token: suspendToken },
-      {
-        headers: {
-          ...this.serviceHeaders(),
-          'Content-Type': 'application/json'
-        }
-      }
+  async deleteView(id: string) {
+    await this.request('DELETE', `/v1/config/view/${segment(id)}`);
+  }
+  async listPresetAlerts() {
+    return this.list(await this.request('GET', '/v1/config/presetalert'), normalizeAlert);
+  }
+  async getPresetAlert(id: string) {
+    const alert = normalizeAlert(
+      await this.request('GET', `/v1/config/presetalert/${segment(id)}`)
     );
-    return response.data;
+    this.checkId(alert.presetID, id);
+    return alert;
   }
-
-  async resumeIngestion(): Promise<any> {
-    let response = await this.api.post(
-      '/v1/config/ingestion/resume',
-      {},
-      {
-        headers: this.serviceHeaders()
-      }
+  async createPresetAlert(alert: AlertRequest) {
+    requireValue(alert.name, 'Alert name');
+    if (!alert.channels.length)
+      throw createApiServiceError('Provide at least one notification channel.');
+    const created = normalizeAlert(
+      await this.request('POST', '/v1/config/presetalert', {
+        ...alert,
+        channels: this.channels(alert.channels)
+      })
     );
-    return response.data;
+    return this.getPresetAlert(created.presetID);
   }
-
-  // ---- Usage ----
-
-  async getUsage(from: number, to: number): Promise<any> {
-    let response = await this.api.get('/v1/usage', {
-      params: { from, to },
-      headers: this.serviceHeaders()
-    });
-    return response.data;
+  async updatePresetAlert(id: string, alert: Partial<AlertRequest>) {
+    if (alert.name !== undefined) requireValue(alert.name, 'Alert name');
+    if (alert.channels && !alert.channels.length)
+      throw createApiServiceError(
+        'A preset alert requires at least one notification channel.'
+      );
+    await this.request(
+      'PUT',
+      `/v1/config/presetalert/${segment(id)}`,
+      this.nonemptyUpdate({ ...alert, channels: this.channels(alert.channels) })
+    );
+    return this.getPresetAlert(id);
   }
-
-  async getUsageByApps(from: number, to: number): Promise<any> {
-    let response = await this.api.get('/v1/usage/apps', {
-      params: { from, to },
-      headers: this.serviceHeaders()
-    });
-    return response.data;
+  async deletePresetAlert(id: string) {
+    await this.request('DELETE', `/v1/config/presetalert/${segment(id)}`);
   }
-
-  async getUsageByHosts(from: number, to: number): Promise<any> {
-    let response = await this.api.get('/v1/usage/hosts', {
-      params: { from, to },
-      headers: this.serviceHeaders()
-    });
-    return response.data;
+  private categoryType(type: string) {
+    if (!['views', 'boards', 'screens'].includes(type))
+      throw createApiServiceError('Category type must be views, boards, or screens.');
+    return type;
   }
-
-  async getUsageByTags(from: number, to: number): Promise<any> {
-    let response = await this.api.get('/v1/usage/tags', {
-      params: { from, to },
-      headers: this.serviceHeaders()
-    });
-    return response.data;
+  async listCategories(type: string) {
+    return this.list(
+      await this.request('GET', `/v1/config/categories/${this.categoryType(type)}`),
+      normalizeCategory
+    );
   }
-
-  async getUsageForApp(appName: string, from: number, to: number): Promise<any> {
-    let response = await this.api.get(`/v1/usage/apps/${encodeURIComponent(appName)}`, {
-      params: { from, to },
-      headers: this.serviceHeaders()
-    });
-    return response.data;
+  async getCategory(type: string, id: string) {
+    const category = normalizeCategory(
+      await this.request(
+        'GET',
+        `/v1/config/categories/${this.categoryType(type)}/${segment(id)}`
+      )
+    );
+    this.checkId(category.id, id);
+    return category;
+  }
+  async createCategory(type: string, category: { name: string }) {
+    requireValue(category.name, 'Category name');
+    const created = normalizeCategory(
+      await this.request('POST', `/v1/config/categories/${this.categoryType(type)}`, category)
+    );
+    return this.getCategory(type, created.id);
+  }
+  async updateCategory(type: string, id: string, category: { name: string }) {
+    requireValue(category.name, 'Category name');
+    await this.request(
+      'PUT',
+      `/v1/config/categories/${this.categoryType(type)}/${segment(id)}`,
+      category
+    );
+    return this.getCategory(type, id);
+  }
+  async deleteCategory(type: string, id: string) {
+    await this.request(
+      'DELETE',
+      `/v1/config/categories/${this.categoryType(type)}/${segment(id)}`
+    );
+  }
+  async listBoards() {
+    return this.list(await this.request('GET', '/v1/config/board'), normalizeBoard);
+  }
+  async getBoard(id: string) {
+    const board = normalizeBoard(await this.request('GET', `/v1/config/board/${segment(id)}`));
+    this.checkId(board.boardID, id);
+    return board;
+  }
+  async createBoard(board: BoardRequest) {
+    requireValue(board.title, 'Board title');
+    if (board.widgets !== undefined)
+      throw createApiServiceError(
+        'The current Board create API does not accept widgets. Create an empty board and configure graphs in the dashboard.'
+      );
+    const created = normalizeBoard(
+      await this.request('POST', '/v1/config/board', pickDefined(board))
+    );
+    return this.getBoard(created.boardID);
+  }
+  async deleteBoard(id: string) {
+    await this.request('DELETE', `/v1/config/board/${segment(id)}`);
+  }
+  async listExclusionRules() {
+    return this.list(
+      await this.request('GET', '/v1/config/ingestion/exclusions'),
+      normalizeExclusion
+    );
+  }
+  async getExclusionRule(id: string) {
+    const value = await this.request('GET', `/v1/config/ingestion/exclusions/${segment(id)}`);
+    const rules = Array.isArray(value)
+      ? value.map(normalizeExclusion)
+      : [normalizeExclusion(value)];
+    const matching = rules.filter(rule => rule.id === id);
+    const match = matching[0];
+    if (!match || matching.length !== 1)
+      throw createApiServiceError(
+        'LogDNA did not return exactly the requested exclusion rule.',
+        { reason: 'invalid_response' }
+      );
+    return match;
+  }
+  async createExclusionRule(rule: ExclusionRuleRequest) {
+    requireValue(rule.title, 'Rule title');
+    const created = normalizeExclusion(
+      await this.request('POST', '/v1/config/ingestion/exclusions', pickDefined(rule))
+    );
+    return this.getExclusionRule(created.id);
+  }
+  async updateExclusionRule(id: string, rule: Partial<ExclusionRuleRequest>) {
+    if (rule.title !== undefined) requireValue(rule.title, 'Rule title');
+    await this.request(
+      'PATCH',
+      `/v1/config/ingestion/exclusions/${segment(id)}`,
+      this.nonemptyUpdate(rule)
+    );
+    return this.getExclusionRule(id);
+  }
+  async deleteExclusionRule(id: string) {
+    await this.request('DELETE', `/v1/config/ingestion/exclusions/${segment(id)}`);
+  }
+  async getArchiveConfig() {
+    const archive = parse(archiveSchema, await this.request('GET', '/v1/config/archiving'));
+    if (!archive.integration?.trim())
+      throw createApiServiceError('LogDNA returned an archive without its storage provider.', {
+        reason: 'invalid_response'
+      });
+    return archive;
+  }
+  private validateArchive(archive: ArchiveConfig) {
+    this.rememberSecrets(
+      archive.apikey,
+      archive.accountkey,
+      archive.accesskey,
+      archive.secretkey,
+      archive.password,
+      archive.authurl
+    );
+    const required: Record<string, string[]> = {
+      ibm: ['bucket', 'endpoint', 'apikey', 'resourceinstanceid'],
+      s3: ['bucket'],
+      azblob: ['accountname', 'accountkey'],
+      gcs: ['bucket', 'projectid'],
+      dos: ['space', 'endpoint', 'accesskey', 'secretkey'],
+      swift: ['authurl', 'username', 'password', 'tenantname']
+    };
+    for (const field of required[archive.integration] ?? [])
+      requireValue(archive[field as keyof ArchiveConfig], `Archive ${field}`);
+    if ((archive.accesskey === undefined) !== (archive.secretkey === undefined))
+      throw createApiServiceError('Provide both archive access and secret keys together.');
+    return pickDefined(archive);
+  }
+  private async writeArchive(method: 'POST' | 'PUT', archive: ArchiveConfig) {
+    await this.request(method, '/v1/config/archiving', this.validateArchive(archive));
+    const actual = await this.getArchiveConfig();
+    for (const field of [
+      'integration',
+      'bucket',
+      'endpoint',
+      'accountname',
+      'projectid',
+      'space',
+      'resourceinstanceid'
+    ] as const)
+      if (archive[field] !== undefined && actual[field] !== archive[field])
+        throw createApiServiceError(
+          'The saved archive configuration does not match the requested destination.',
+          { reason: 'invalid_response' }
+        );
+    return actual;
+  }
+  createArchiveConfig(archive: ArchiveConfig) {
+    return this.writeArchive('POST', archive);
+  }
+  updateArchiveConfig(archive: ArchiveConfig) {
+    return this.writeArchive('PUT', archive);
+  }
+  async deleteArchiveConfig() {
+    await this.request('DELETE', '/v1/config/archiving');
+  }
+  async getIngestionStatus() {
+    return parse(
+      z.object({ isIngesting: z.boolean() }),
+      await this.request('GET', '/v1/config/ingestion/status')
+    );
+  }
+  async suspendIngestion() {
+    return parse(
+      z.object({ token: z.string().min(1) }),
+      await this.request('POST', '/v1/config/ingestion/suspend')
+    );
+  }
+  async confirmSuspendIngestion(token: string) {
+    requireValue(token, 'Suspend confirmation token');
+    const result = parse(
+      z.object({ status: z.literal('OK') }),
+      await this.request('POST', '/v1/config/ingestion/suspend/confirm', { token })
+    );
+    if ((await this.getIngestionStatus()).isIngesting)
+      throw createApiServiceError('Ingestion is still active after suspension.');
+    return result;
+  }
+  async resumeIngestion() {
+    const result = parse(
+      z.object({ status: z.literal('OK') }),
+      await this.request('POST', '/v1/config/ingestion/resume')
+    );
+    if (!(await this.getIngestionStatus()).isIngesting)
+      throw createApiServiceError('Ingestion is still suspended after resume.');
+    return result;
+  }
+  private usageDates(from: number, to: number) {
+    if (
+      ![from, to].every(
+        value =>
+          Number.isSafeInteger(value) && value >= 0 && value * 1000 <= 8_640_000_000_000_000
+      ) ||
+      from > to
+    )
+      throw createApiServiceError(
+        'Usage from/to must be valid integer Unix seconds with from no later than to.'
+      );
+    return {
+      from: new Date(from * 1000).toISOString(),
+      to: new Date(to * 1000).toISOString()
+    };
+  }
+  async getUsage(
+    from: number,
+    to: number,
+    dimension?: 'apps' | 'hosts' | 'tags',
+    name?: string
+  ) {
+    const path = `/v2/usage${dimension ? `/${dimension}` : ''}${name ? `/${segment(name)}` : ''}`;
+    return parse(
+      z.object({
+        from: z.string(),
+        to: z.string(),
+        results: z.union([z.record(z.string(), z.unknown()), z.array(z.unknown())])
+      }),
+      await this.request('GET', path, undefined, this.usageDates(from, to))
+    );
+  }
+  getUsageByApps(from: number, to: number) {
+    return this.getUsage(from, to, 'apps');
+  }
+  getUsageByHosts(from: number, to: number) {
+    return this.getUsage(from, to, 'hosts');
+  }
+  getUsageByTags(from: number, to: number) {
+    return this.getUsage(from, to, 'tags');
+  }
+  getUsageForApp(name: string, from: number, to: number) {
+    return this.getUsage(from, to, 'apps', requireValue(name, 'App name'));
   }
 }
+export const archiveMissing = (failure: unknown) => {
+  const status =
+    getApiErrorStatus(failure) ??
+    (isApiErrorRecord(failure) && isApiErrorRecord(failure.data)
+      ? failure.data.upstreamStatus
+      : undefined);
+  return status === 404 || status === '404';
+};

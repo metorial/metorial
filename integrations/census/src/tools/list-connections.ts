@@ -1,114 +1,78 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { workspaceClient } from '../lib/client';
+import { allPages, pageMetadata, paginationOutput, workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
-let connectionSchema = z.object({
-  connectionId: z.number().describe('Unique identifier of the connection.'),
-  name: z.string().describe('Service name or identifier (e.g., "snowflake", "hubspot").'),
-  label: z.string().nullable().describe('User-defined label for the connection.'),
-  type: z.string().describe('Type of connection.'),
-  createdAt: z.string().describe('When the connection was created.'),
-  updatedAt: z.string().describe('When the connection was last updated.')
+const connectionSchema = z.object({
+  connectionId: z.number(),
+  name: z.string().optional(),
+  label: z.string().nullish(),
+  type: z.string().optional(),
+  createdAt: z.string().nullish(),
+  updatedAt: z.string().nullish(),
+  lastTestSucceeded: z.boolean().nullish()
 });
-
-export let listConnections = SlateTool.create(spec, {
+export const listConnections = SlateTool.create(spec, {
   name: 'List Connections',
   key: 'list_connections',
-  description: `Lists source connections (data warehouses like Snowflake, BigQuery, Redshift) and/or destination connections (SaaS tools like Salesforce, HubSpot, Braze). Specify the connection type to filter, or retrieve both.`,
-  tags: {
-    readOnly: true
-  }
+  description:
+    'Lists a page of source and/or destination connections without credentials or connection configuration. Set allPages to follow the complete documented pagination chain.',
+  tags: { readOnly: true }
 })
   .input(
     z.object({
-      connectionType: z
-        .enum(['sources', 'destinations', 'both'])
-        .optional()
-        .default('both')
-        .describe('Which type of connections to list.'),
-      page: z.number().optional().describe('Page number (starts at 1).'),
-      perPage: z.number().optional().describe('Results per page (max 100).')
+      workspaceId,
+      allPages,
+      connectionType: z.enum(['sources', 'destinations', 'both']).optional().default('both'),
+      page: z.number().optional().describe('Page number; 0 selects page 1.'),
+      perPage: z.number().optional().describe('Results per page, 1–100.')
     })
   )
   .output(
     z.object({
-      sources: z
-        .array(connectionSchema)
-        .optional()
-        .describe('Source connections (data warehouses).'),
-      destinations: z
-        .array(connectionSchema)
-        .optional()
-        .describe('Destination connections (SaaS tools).')
+      sources: z.array(connectionSchema).optional(),
+      destinations: z.array(connectionSchema).optional(),
+      sourcesPagination: z.object(paginationOutput).optional(),
+      destinationsPagination: z.object(paginationOutput).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let paginationParams = {
+    const client = await workspaceClient(ctx);
+    const params = {
       page: ctx.input.page,
-      perPage: ctx.input.perPage
+      perPage: ctx.input.perPage,
+      allPages: ctx.input.allPages
     };
-
-    let sources:
-      | Array<{
-          connectionId: number;
-          name: string;
-          label: string | null;
-          type: string;
-          createdAt: string;
-          updatedAt: string;
-        }>
-      | undefined;
-    let destinations:
-      | Array<{
-          connectionId: number;
-          name: string;
-          label: string | null;
-          type: string;
-          createdAt: string;
-          updatedAt: string;
-        }>
-      | undefined;
-
-    if (ctx.input.connectionType === 'sources' || ctx.input.connectionType === 'both') {
-      let result = await client.listSources(paginationParams);
-      sources = result.sources.map(s => ({
-        connectionId: s.id,
-        name: s.name,
-        label: s.label,
-        type: s.type,
-        createdAt: s.createdAt,
-        updatedAt: s.updatedAt
-      }));
-    }
-
-    if (ctx.input.connectionType === 'destinations' || ctx.input.connectionType === 'both') {
-      let result = await client.listDestinations(paginationParams);
-      destinations = result.destinations.map(d => ({
-        connectionId: d.id,
-        name: d.name,
-        label: d.label,
-        type: d.type,
-        createdAt: d.createdAt,
-        updatedAt: d.updatedAt
-      }));
-    }
-
-    let parts: string[] = [];
-    if (sources) parts.push(`**${sources.length}** source(s)`);
-    if (destinations) parts.push(`**${destinations.length}** destination(s)`);
-
+    const source =
+      ctx.input.connectionType !== 'destinations'
+        ? await client.listSources(params)
+        : undefined;
+    const destination =
+      ctx.input.connectionType !== 'sources'
+        ? await client.listDestinations(params)
+        : undefined;
+    const map = (row: NonNullable<typeof source>['sources'][number]) => ({
+      connectionId: row.id,
+      name: row.name,
+      label: row.label,
+      type: row.type,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      lastTestSucceeded: row.lastTestSucceeded
+    });
     return {
       output: {
-        sources,
-        destinations
+        sources: source?.sources.map(map),
+        destinations: destination?.destinations.map(map),
+        sourcesPagination: source
+          ? pageMetadata(source.sources.length, source.pagination)
+          : undefined,
+        destinationsPagination: destination
+          ? pageMetadata(destination.destinations.length, destination.pagination)
+          : undefined
       },
-      message: `Found ${parts.join(' and ')}.`
+      message: 'Retrieved connection metadata.'
     };
   })
   .build();

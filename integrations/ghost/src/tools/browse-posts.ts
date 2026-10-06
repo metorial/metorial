@@ -1,53 +1,70 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GhostAdminClient } from '../lib/client';
+import { getClient } from '../lib/client';
+import { pagination } from '../lib/schemas';
 import { spec } from '../spec';
 
-let postSchema = z.object({
-  postId: z.string().describe('Unique post ID'),
-  uuid: z.string().describe('Post UUID'),
-  title: z.string().describe('Post title'),
-  slug: z.string().describe('URL-friendly slug'),
-  status: z.string().describe('Post status: draft, published, or scheduled'),
-  visibility: z.string().describe('Post visibility level'),
-  featured: z.boolean().describe('Whether the post is featured'),
-  excerpt: z.string().nullable().describe('Auto-generated excerpt'),
-  customExcerpt: z.string().nullable().describe('Custom excerpt'),
-  featureImage: z.string().nullable().describe('Feature image URL'),
-  publishedAt: z.string().nullable().describe('Publication timestamp'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp'),
-  url: z.string().describe('Full URL of the post'),
-  tags: z
-    .array(
-      z.object({
-        tagId: z.string(),
-        name: z.string(),
-        slug: z.string()
-      })
-    )
-    .optional()
-    .describe('Associated tags'),
-  authors: z
-    .array(
-      z.object({
-        authorId: z.string(),
-        name: z.string(),
-        slug: z.string(),
-        email: z.string().optional()
-      })
-    )
-    .optional()
-    .describe('Post authors')
-});
+let postSchema = z
+  .object({
+    postId: z.string().describe('Unique post ID'),
+    html: z.string().nullable().optional().describe('Native rendered HTML when requested'),
+    lexical: z
+      .string()
+      .nullable()
+      .optional()
+      .describe('Native Lexical content, available through Admin'),
+    plaintext: z.string().nullable().optional().describe('Native plain text when requested'),
+    uuid: z.string().optional().describe('Post UUID'),
+    title: z.string().optional().describe('Post title'),
+    slug: z.string().optional().describe('URL-friendly slug'),
+    status: z.string().optional().describe('Post status: draft, published, or scheduled'),
+    visibility: z.string().optional().describe('Post visibility level'),
+    featured: z.boolean().optional().describe('Whether the post is featured'),
+    excerpt: z.string().nullable().optional().describe('Auto-generated excerpt'),
+    customExcerpt: z.string().nullable().optional().describe('Custom excerpt'),
+    featureImage: z.string().nullable().optional().describe('Feature image URL'),
+    publishedAt: z.string().nullable().optional().describe('Publication timestamp'),
+    createdAt: z.string().optional().describe('Creation timestamp'),
+    updatedAt: z.string().optional().describe('Last update timestamp'),
+    url: z.string().optional().describe('Full URL of the post'),
+    tags: z
+      .array(
+        z.object({
+          api: z
+            .enum(['admin', 'content'])
+            .optional()
+            .describe(
+              'Read through Admin or published Content API. Writes require Admin. Defaults to the connection type.'
+            ),
+          tagId: z.string(),
+          name: z.string(),
+          slug: z.string()
+        })
+      )
+      .optional()
+      .describe('Associated tags'),
+    authors: z
+      .array(
+        z.object({
+          authorId: z.string(),
+          name: z.string(),
+          slug: z.string(),
+          email: z.string().optional()
+        })
+      )
+      .optional()
+      .describe('Post authors')
+  })
+  .partial()
+  .required({ postId: true });
 
 let paginationSchema = z.object({
-  page: z.number().describe('Current page'),
-  limit: z.number().describe('Items per page'),
-  pages: z.number().describe('Total pages'),
-  total: z.number().describe('Total items'),
-  next: z.number().nullable().describe('Next page number'),
-  prev: z.number().nullable().describe('Previous page number')
+  page: z.number().optional().describe('Current page'),
+  limit: z.number().optional().describe('Items per page'),
+  pages: z.number().optional().describe('Total pages'),
+  total: z.number().optional().describe('Total items'),
+  next: z.number().nullable().optional().describe('Next page number'),
+  prev: z.number().nullable().optional().describe('Previous page number')
 });
 
 export let browsePosts = SlateTool.create(spec, {
@@ -63,6 +80,12 @@ export let browsePosts = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      api: z
+        .enum(['admin', 'content'])
+        .optional()
+        .describe(
+          'Select Admin or published Content API. Defaults to the connection credential type.'
+        ),
       filter: z
         .string()
         .optional()
@@ -98,10 +121,7 @@ export let browsePosts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GhostAdminClient({
-      domain: ctx.config.adminDomain,
-      apiKey: ctx.auth.token
-    });
+    let client = getClient(ctx, ctx.input.api);
 
     let result = await client.browsePosts({
       filter: ctx.input.filter,
@@ -116,15 +136,18 @@ export let browsePosts = SlateTool.create(spec, {
     let posts = (result.posts ?? []).map((p: any) => ({
       postId: p.id,
       uuid: p.uuid,
+      html: p.html,
+      lexical: p.lexical,
+      plaintext: p.plaintext,
       title: p.title,
       slug: p.slug,
       status: p.status,
       visibility: p.visibility,
-      featured: p.featured ?? false,
-      excerpt: p.excerpt ?? null,
-      customExcerpt: p.custom_excerpt ?? null,
-      featureImage: p.feature_image ?? null,
-      publishedAt: p.published_at ?? null,
+      featured: p.featured,
+      excerpt: p.excerpt,
+      customExcerpt: p.custom_excerpt,
+      featureImage: p.feature_image,
+      publishedAt: p.published_at,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
       url: p.url,
@@ -141,18 +164,11 @@ export let browsePosts = SlateTool.create(spec, {
       }))
     }));
 
-    let pagination = result.meta?.pagination ?? {
-      page: 1,
-      limit: 15,
-      pages: 1,
-      total: posts.length,
-      next: null,
-      prev: null
-    };
+    let pageInfo = pagination(result, posts.length);
 
     return {
-      output: { posts, pagination },
-      message: `Found **${pagination.total}** posts (page ${pagination.page} of ${pagination.pages}).`
+      output: { posts, pagination: pageInfo },
+      message: `Found **${pageInfo.total}** posts (page ${pageInfo.page} of ${pageInfo.pages}).`
     };
   })
   .build();

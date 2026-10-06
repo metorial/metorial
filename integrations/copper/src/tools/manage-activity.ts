@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageContinuation, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 let activityOutputSchema = z.object({
@@ -71,6 +72,7 @@ export let logActivity = SlateTool.create(spec, {
   )
   .output(activityOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'log_activity');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {
@@ -84,7 +86,7 @@ export let logActivity = SlateTool.create(spec, {
       },
       details: ctx.input.details
     };
-    if (ctx.input.activityDate) body.activity_date = ctx.input.activityDate;
+    if (ctx.input.activityDate !== undefined) body.activity_date = ctx.input.activityDate;
 
     let activity = await client.createActivity(body);
 
@@ -130,10 +132,20 @@ export let searchActivities = SlateTool.create(spec, {
   .output(
     z.object({
       activities: z.array(activityOutputSchema).describe('Matching activity records'),
-      count: z.number().describe('Number of results returned')
+      count: z.number().describe('Number of results returned'),
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('A full page suggests another page may be available'),
+      nextPageNumber: z.number().optional().describe('Next page to request when available'),
+      atSearchLimit: z
+        .boolean()
+        .optional()
+        .describe('Narrow filters when the 100,000-result window is reached')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'search_activities');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {
@@ -143,15 +155,15 @@ export let searchActivities = SlateTool.create(spec, {
     if (ctx.input.parentType && ctx.input.parentId) {
       body.parent = { type: ctx.input.parentType, id: ctx.input.parentId };
     }
-    if (ctx.input.activityTypes) {
+    if (ctx.input.activityTypes !== undefined) {
       body.activity_types = ctx.input.activityTypes.map(at => ({
         id: at.activityTypeId,
         category: at.activityTypeCategory
       }));
     }
-    if (ctx.input.minimumActivityDate)
+    if (ctx.input.minimumActivityDate !== undefined)
       body.minimum_activity_date = ctx.input.minimumActivityDate;
-    if (ctx.input.maximumActivityDate)
+    if (ctx.input.maximumActivityDate !== undefined)
       body.maximum_activity_date = ctx.input.maximumActivityDate;
 
     let activities = await client.searchActivities(body);
@@ -159,7 +171,8 @@ export let searchActivities = SlateTool.create(spec, {
     return {
       output: {
         activities: activities.map(mapActivity),
-        count: activities.length
+        count: activities.length,
+        ...pageContinuation(ctx.input, activities.length)
       },
       message: `Found **${activities.length}** activities matching the search criteria.`
     };
@@ -179,6 +192,7 @@ export let listActivityTypes = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'list_activity_types');
     let client = new Client(ctx.auth);
     let types = await client.listActivityTypes();
 

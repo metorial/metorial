@@ -15,8 +15,6 @@ import {
   manageUserPool,
   manageUserPoolDomain
 } from './tools';
-import { groupChanges, inboundWebhook, userChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     manageResourceServer,
     manageUserPoolDomain
   ],
-  triggers: [inboundWebhook, userChanges, groupChanges]
+  triggers: []
 });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubActionsClient } from '../lib/client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let artifactSchema = z.object({
@@ -42,6 +43,7 @@ export let listArtifacts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new GitHubActionsClient(ctx.auth.token);
     let { owner, repo, runId, name, perPage, page } = ctx.input;
 
@@ -49,7 +51,7 @@ export let listArtifacts = SlateTool.create(spec, {
       ? await client.listArtifactsForRun(owner, repo, runId, { perPage, page, name })
       : await client.listArtifactsForRepo(owner, repo, { perPage, page, name });
 
-    let artifacts = (data.artifacts ?? []).map((a: any) => ({
+    let artifacts = (data.artifacts ?? []).map(a => ({
       artifactId: a.id,
       name: a.name,
       sizeInBytes: a.size_in_bytes,

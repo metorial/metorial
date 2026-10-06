@@ -1,7 +1,38 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseResponse, validateTurns } from '../lib/schemas';
 import { spec } from '../spec';
+
+const usageSchema = z.object({
+  prompt_tokens: z.number(),
+  completion_tokens: z.number(),
+  total_tokens: z.number()
+});
+const ragResponseSchema = z.object({
+  id: z.string().min(1),
+  choices: z
+    .array(
+      z.object({
+        content: z.string().optional(),
+        message: z.object({ content: z.string() }).optional()
+      })
+    )
+    .min(1),
+  answer_in_context: z.boolean(),
+  context_retrieved: z.boolean(),
+  search_queries: z.array(z.string()).nullish(),
+  sources: z.array(
+    z.object({
+      file_id: z.string(),
+      file_name: z.string(),
+      text: z.string(),
+      score: z.number(),
+      public_url: z.string().nullish()
+    })
+  ),
+  usage: usageSchema.optional()
+});
 
 export let conversationalRag = SlateTool.create(spec, {
   name: 'Conversational RAG',
@@ -25,6 +56,7 @@ export let conversationalRag = SlateTool.create(spec, {
             content: z.string().describe('Message content')
           })
         )
+        .min(1)
         .describe('Conversation messages, alternating user/assistant starting with user'),
       labels: z
         .array(z.string())
@@ -39,6 +71,7 @@ export let conversationalRag = SlateTool.create(spec, {
       maxSegments: z
         .number()
         .int()
+        .min(1)
         .optional()
         .describe('Maximum number of document segments to retrieve'),
       retrievalSimilarityThreshold: z
@@ -50,6 +83,7 @@ export let conversationalRag = SlateTool.create(spec, {
       maxNeighbors: z
         .number()
         .int()
+        .min(0)
         .optional()
         .describe('Number of neighbor segments per candidate (with add_neighbors strategy)'),
       hybridSearchAlpha: z
@@ -88,32 +122,46 @@ export let conversationalRag = SlateTool.create(spec, {
           completionTokens: z.number().describe('Number of completion tokens'),
           totalTokens: z.number().describe('Total tokens used')
         })
-        .describe('Token usage')
+        .describe('Provider token counts, or legacy zero values when usage is not reported'),
+      usageReported: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the provider reported token usage; false distinguishes unavailable counts from measured zeros'
+        )
     })
   )
   .handleInvocation(async ctx => {
+    validateTurns(ctx.input.messages);
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.conversationalRag({
-      messages: ctx.input.messages,
-      labels: ctx.input.labels,
-      fileIds: ctx.input.fileIds,
-      path: ctx.input.path,
-      retrievalStrategy: ctx.input.retrievalStrategy,
-      maxSegments: ctx.input.maxSegments,
-      retrievalSimilarityThreshold: ctx.input.retrievalSimilarityThreshold,
-      maxNeighbors: ctx.input.maxNeighbors,
-      hybridSearchAlpha: ctx.input.hybridSearchAlpha
-    });
+    let result = parseResponse(
+      ragResponseSchema,
+      await client.conversationalRag({
+        messages: ctx.input.messages,
+        labels: ctx.input.labels,
+        fileIds: ctx.input.fileIds,
+        path: ctx.input.path,
+        retrievalStrategy: ctx.input.retrievalStrategy,
+        maxSegments: ctx.input.maxSegments,
+        retrievalSimilarityThreshold: ctx.input.retrievalSimilarityThreshold,
+        maxNeighbors: ctx.input.maxNeighbors,
+        hybridSearchAlpha: ctx.input.hybridSearchAlpha
+      }),
+      'conversational RAG'
+    );
 
-    let answerText = result.choices?.[0]?.message?.content ?? '';
+    let answerText = result.choices[0]?.content ?? result.choices[0]?.message?.content;
+    if (answerText === undefined) {
+      throw createApiServiceError('AI21 Studio did not return a RAG answer.');
+    }
 
-    let sources = result.sources?.map((s: any) => ({
+    let sources = result.sources.map(s => ({
       fileId: s.file_id,
       fileName: s.file_name,
       text: s.text,
       score: s.score,
-      publicUrl: s.public_url
+      publicUrl: s.public_url ?? undefined
     }));
 
     let output = {
@@ -127,7 +175,8 @@ export let conversationalRag = SlateTool.create(spec, {
         promptTokens: result.usage?.prompt_tokens ?? 0,
         completionTokens: result.usage?.completion_tokens ?? 0,
         totalTokens: result.usage?.total_tokens ?? 0
-      }
+      },
+      usageReported: result.usage !== undefined
     };
 
     let sourceCount = sources?.length ?? 0;

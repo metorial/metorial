@@ -1,13 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  type AddressInput,
+  type CreateShipmentRequest,
+  createClient,
+  type ShipmentResponse
+} from '../lib/client';
 import { spec } from '../spec';
 
 let addressSchema = z.object({
   name: z.string().optional().describe('Name of the person'),
   companyName: z.string().optional().describe('Company name'),
   phone: z.string().optional().describe('Phone number'),
-  addressLine1: z.string().describe('Street address line 1'),
+  addressLine1: z.string().min(1).describe('Street address line 1'),
   addressLine2: z.string().optional().describe('Street address line 2'),
   cityLocality: z.string().optional().describe('City or locality'),
   stateProvince: z.string().optional().describe('State or province'),
@@ -17,14 +22,14 @@ let addressSchema = z.object({
 
 let packageSchema = z.object({
   weight: z.object({
-    value: z.number().describe('Weight value'),
+    value: z.number().finite().nonnegative().describe('Weight value in the selected unit'),
     unit: z.enum(['pound', 'ounce', 'gram', 'kilogram']).describe('Weight unit')
   }),
   dimensions: z
     .object({
-      length: z.number().describe('Length'),
-      width: z.number().describe('Width'),
-      height: z.number().describe('Height'),
+      length: z.number().finite().nonnegative().describe('Length'),
+      width: z.number().finite().nonnegative().describe('Width'),
+      height: z.number().finite().nonnegative().describe('Height'),
       unit: z.enum(['inch', 'centimeter']).describe('Dimension unit')
     })
     .optional(),
@@ -33,12 +38,12 @@ let packageSchema = z.object({
 
 let shipmentOutputSchema = z.object({
   shipmentId: z.string().describe('Shipment ID'),
-  carrierId: z.string().describe('Carrier ID'),
-  serviceCode: z.string().describe('Service code'),
+  carrierId: z.string().optional().describe('Carrier ID'),
+  serviceCode: z.string().optional().describe('Service code'),
   externalShipmentId: z.string().optional().describe('External reference ID'),
   shipDate: z.string().describe('Ship date'),
   createdAt: z.string().describe('Creation timestamp'),
-  modifiedAt: z.string().describe('Last modification timestamp'),
+  modifiedAt: z.string().optional().describe('Last modification timestamp'),
   shipmentStatus: z.string().describe('Shipment status'),
   shipTo: addressSchema.describe('Destination address'),
   shipFrom: addressSchema.describe('Origin address'),
@@ -75,10 +80,7 @@ export let createShipment = SlateTool.create(spec, {
   )
   .output(shipmentOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
     let result = await client.createShipments([
       {
@@ -99,7 +101,11 @@ export let createShipment = SlateTool.create(spec, {
       }
     ]);
 
-    let shipment = result.shipments[0]!;
+    let shipment = result.shipments[0];
+    if (!shipment)
+      throw createApiServiceError(
+        'The shipment was not confirmed. Check the provider before retrying.'
+      );
 
     return {
       output: mapShipmentOutput(shipment),
@@ -124,20 +130,17 @@ export let updateShipment = SlateTool.create(spec, {
       serviceCode: z.string().optional().describe('New service code'),
       shipFrom: addressSchema.optional().describe('Updated origin address'),
       shipTo: addressSchema.optional().describe('Updated destination address'),
-      packages: z.array(packageSchema).optional().describe('Updated packages'),
+      packages: z.array(packageSchema).min(1).optional().describe('Updated packages'),
       shipDate: z.string().optional().describe('Updated ship date')
     })
   )
   .output(shipmentOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
-    let update: any = {};
-    if (ctx.input.carrierId) update.carrier_id = ctx.input.carrierId;
-    if (ctx.input.serviceCode) update.service_code = ctx.input.serviceCode;
+    let update: Partial<CreateShipmentRequest> = {};
+    if (ctx.input.carrierId !== undefined) update.carrier_id = ctx.input.carrierId;
+    if (ctx.input.serviceCode !== undefined) update.service_code = ctx.input.serviceCode;
     if (ctx.input.shipFrom) update.ship_from = mapAddressToApi(ctx.input.shipFrom);
     if (ctx.input.shipTo) update.ship_to = mapAddressToApi(ctx.input.shipTo);
     if (ctx.input.packages)
@@ -146,7 +149,7 @@ export let updateShipment = SlateTool.create(spec, {
         dimensions: p.dimensions,
         package_code: p.packageCode
       }));
-    if (ctx.input.shipDate) update.ship_date = ctx.input.shipDate;
+    if (ctx.input.shipDate !== undefined) update.ship_date = ctx.input.shipDate;
 
     let shipment = await client.updateShipment(ctx.input.shipmentId, update);
 
@@ -160,7 +163,7 @@ export let updateShipment = SlateTool.create(spec, {
 export let cancelShipment = SlateTool.create(spec, {
   name: 'Cancel Shipment',
   key: 'cancel_shipment',
-  description: `Cancel an existing shipment by its ID. This removes the shipment from ShipEngine.`,
+  description: `Cancel an existing shipment by its ID. The record is retained with cancelled status. Void any associated purchased label first.`,
   tags: {
     readOnly: false,
     destructive: true
@@ -177,10 +180,7 @@ export let cancelShipment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
     await client.cancelShipment(ctx.input.shipmentId);
 
@@ -191,7 +191,7 @@ export let cancelShipment = SlateTool.create(spec, {
   })
   .build();
 
-let mapAddressToApi = (addr: any) => ({
+let mapAddressToApi = (addr: z.infer<typeof addressSchema>) => ({
   name: addr.name,
   company_name: addr.companyName,
   phone: addr.phone,
@@ -203,22 +203,22 @@ let mapAddressToApi = (addr: any) => ({
   country_code: addr.countryCode
 });
 
-let mapAddressFromApi = (addr: any) => ({
+let mapAddressFromApi = (addr: AddressInput) => ({
   name: addr?.name,
   companyName: addr?.company_name,
   phone: addr?.phone,
-  addressLine1: addr?.address_line1 ?? '',
+  addressLine1: addr.address_line1,
   addressLine2: addr?.address_line2,
   cityLocality: addr?.city_locality,
   stateProvince: addr?.state_province,
   postalCode: addr?.postal_code,
-  countryCode: addr?.country_code ?? ''
+  countryCode: addr.country_code
 });
 
-let mapShipmentOutput = (s: any) => ({
+let mapShipmentOutput = (s: ShipmentResponse) => ({
   shipmentId: s.shipment_id,
-  carrierId: s.carrier_id ?? '',
-  serviceCode: s.service_code ?? '',
+  carrierId: s.carrier_id,
+  serviceCode: s.service_code,
   externalShipmentId: s.external_shipment_id,
   shipDate: s.ship_date,
   createdAt: s.created_at,
@@ -228,5 +228,5 @@ let mapShipmentOutput = (s: any) => ({
   shipFrom: mapAddressFromApi(s.ship_from),
   warehouseId: s.warehouse_id,
   confirmation: s.confirmation,
-  tags: (s.tags || []).map((t: any) => t.name)
+  tags: (s.tags || []).map((t: { name: string }) => t.name)
 });

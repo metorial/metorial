@@ -12,16 +12,6 @@ import {
   listTasks,
   listTaskTemplates
 } from './tools';
-import {
-  contractEvents,
-  dealUpdated,
-  eventScheduled,
-  formSubmitted,
-  invoiceEvents,
-  proposalEvents,
-  taskUpdated
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,13 +26,5 @@ export let provider = Slate.create({
     listDeals,
     listTaskTemplates
   ],
-  triggers: [
-    proposalEvents,
-    contractEvents,
-    invoiceEvents,
-    dealUpdated,
-    taskUpdated,
-    eventScheduled,
-    formSubmitted
-  ]
+  triggers: []
 });

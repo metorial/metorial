@@ -1,17 +1,14 @@
 {
   "name": "@metorial/xata",
-  "description": "Manage serverless PostgreSQL databases with branching, schema migrations, and record CRUD operations. Create, query, update, and delete records across tables with support for filtering, sorting, and pagination. Perform free-text search, vector similarity search, and aggregations across database content. Ask AI-powered natural language questions about your data. Create and manage database branches using copy-on-write for dev environments and experimentation. Execute zero-downtime, reversible schema migrations. Manage file attachments with CDN delivery. Summarize and aggregate data with grouping and statistical operations. Manage workspaces, projects, databases, and members. Set up replication and data streaming from external PostgreSQL sources. Configure webhooks for event notifications.",
+  "description": "Discover current Xata organizations and projects, inspect Postgres branch status, provision child branches from an explicit parent, update names and hibernation or scale-to-zero settings, and permanently delete branches. Historical Xata Lite operations remain deprecated after its retirement.",
   "categories": ["apis-and-http-requests"],
   "skills": [
-    "manage database records",
-    "query and filter data",
-    "free-text search",
-    "vector similarity search",
-    "aggregate and summarize data",
-    "ask AI questions",
-    "manage database branches",
-    "execute schema migrations",
-    "manage file attachments",
-    "manage workspaces and projects"
+    "discover organizations and projects",
+    "inspect Postgres branch status",
+    "provision child branches",
+    "rename database branches",
+    "hibernate and wake branches",
+    "configure branch scale-to-zero",
+    "delete disposable branches"
   ]
 }

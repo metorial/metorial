@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, leadOutput } from '../lib/client';
 import { spec } from '../spec';
 
 export let getLead = SlateTool.create(spec, {
@@ -39,29 +39,12 @@ export let getLead = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let data = await client.getLeadByEmail(ctx.input.email);
-
-    let leads = (Array.isArray(data) ? data : [data]).filter(Boolean).map((l: any) => ({
-      leadId: l._id,
-      email: l.email,
-      firstName: l.firstName,
-      lastName: l.lastName,
-      companyName: l.companyName,
-      isPaused: l.isPaused,
-      state: l.state,
-      status: l.status,
-      contactId: l.contactId,
-      campaignId: l.campaign?.id ?? l.campaignId,
-      campaignName: l.campaign?.name ?? l.campaignName,
-      campaignStatus: l.campaign?.status,
-      updatedAt: l.updatedAt,
-      variables: l.variables
-    }));
-
+    const leads = (
+      await new Client({ token: ctx.auth.token }).getLeadByEmail(ctx.input.email)
+    ).map(leadOutput);
     return {
       output: { leads },
-      message: `Found **${leads.length}** lead record(s) for "${ctx.input.email}".`
+      message: `Found **${leads.length}** campaign enrollment(s) for the requested email.`
     };
   })
   .build();

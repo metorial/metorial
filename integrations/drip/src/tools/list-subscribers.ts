@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listSubscribers = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let listSubscribers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       status: z
         .enum(['all', 'active', 'unsubscribed', 'active_or_unsubscribed', 'undeliverable'])
         .optional()
@@ -57,7 +59,7 @@ export let listSubscribers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 

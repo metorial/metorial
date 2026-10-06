@@ -16,7 +16,23 @@ Returns computed answers, image URLs, and links back to the Wolfram Alpha websit
     z.object({
       query: z.string().describe('Natural language query to compute'),
       maxChars: z.number().optional().describe('Maximum number of characters in the response'),
-      units: z.enum(['metric', 'imperial']).optional().describe('Unit system for the result')
+      units: z.enum(['metric', 'imperial']).optional().describe('Unit system for the result'),
+      assumptions: z
+        .union([z.string(), z.array(z.string())])
+        .optional()
+        .describe('Assumption input tokens from a previous full_results_query response'),
+      location: z
+        .string()
+        .optional()
+        .describe('Location context; use only one of location, ip, or latLong'),
+      ip: z
+        .string()
+        .optional()
+        .describe('IP address context; use only one of location, ip, or latLong'),
+      latLong: z
+        .string()
+        .optional()
+        .describe('Latitude,longitude context; use only one of location, ip, or latLong')
     })
   )
   .output(
@@ -32,7 +48,11 @@ Returns computed answers, image URLs, and links back to the Wolfram Alpha websit
     let llmResponse = await client.llmQuery({
       input: ctx.input.query,
       maxchars: ctx.input.maxChars,
-      units: ctx.input.units ?? ctx.config.unitSystem
+      units: ctx.input.units ?? ctx.config.unitSystem,
+      assumption: ctx.input.assumptions,
+      location: ctx.input.location,
+      ip: ctx.input.ip,
+      latLong: ctx.input.latLong
     });
 
     let responseText = String(llmResponse);

@@ -8,10 +8,8 @@ import {
   listOrders
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [createOrder, listOrders, getOrderDetails, getCompanyDetails, getDevicePrices],
-  triggers: [inboundWebhook]
+  triggers: []
 });

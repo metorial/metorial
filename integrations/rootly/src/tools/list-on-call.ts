@@ -7,7 +7,7 @@ export let listOnCall = SlateTool.create(spec, {
   name: 'List On-Call',
   key: 'list_on_call',
   description: `List who is currently on call. Returns active on-call assignments across schedules and escalation policies.
-Use this to find who is responsible for responding to incidents right now.`,
+Use this to find who is responsible for responding to incidents right now. Pagination slices the current assignments locally; the API returns the full collection.`,
   tags: {
     readOnly: true
   }
@@ -20,6 +20,17 @@ Use this to find who is responsible for responding to incidents right now.`,
   )
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of records returned in this response'),
+      currentPage: z.number().optional().describe('Provider page number, when supplied'),
+      totalPages: z.number().optional().describe('Provider page count, when supplied'),
+      nextCursor: z
+        .string()
+        .optional()
+        .describe('Provider continuation cursor, when supplied'),
+      included: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Requested related resources'),
       onCalls: z
         .array(z.record(z.string(), z.any()))
         .describe('List of current on-call assignments'),
@@ -38,6 +49,11 @@ Use this to find who is responsible for responding to incidents right now.`,
 
     return {
       output: {
+        returnedCount: onCalls.length,
+        currentPage: result.meta?.current_page,
+        totalPages: result.meta?.total_pages,
+        nextCursor: result.meta?.next_cursor,
+        included: result.included ? flattenResources(result.included) : undefined,
         onCalls,
         totalCount: result.meta?.total_count
       },

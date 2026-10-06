@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createCandidate = SlateTool.create(spec, {
   name: 'Create Candidate',
   key: 'create_candidate',
-  description: `Create a new candidate in Recruitee. Optionally assign the candidate to one or more job offers or talent pools during creation. Supports setting contact details, social links, cover letter, and a remote CV URL.`,
+  description: `Create a new candidate in Recruitee. Optionally assign the candidate to job offers during creation. Use Manage Pipeline for an explicit talent-pool assignment. Manual candidate creation does not send an application confirmation email. Supports setting contact details, social links, cover letter, and a remote CV URL.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -34,7 +34,7 @@ export let createCandidate = SlateTool.create(spec, {
       offerIds: z
         .array(z.number())
         .optional()
-        .describe('IDs of job offers or talent pools to assign the candidate to')
+        .describe('IDs of job offers to assign the candidate to')
     })
   )
   .output(
@@ -48,10 +48,7 @@ export let createCandidate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
+    let client = await RecruiteeClient.forContext(ctx);
 
     let result = await client.createCandidate(
       {

@@ -12,6 +12,7 @@ export let getIngestionStatus = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      isIngesting: z.boolean().describe('Whether Mezmo is currently ingesting logs'),
       status: z.string().describe('Current ingestion status (e.g., "active", "suspended")')
     })
   )
@@ -20,8 +21,11 @@ export let getIngestionStatus = SlateTool.create(spec, {
     let result = await client.getIngestionStatus();
 
     return {
-      output: { status: result.status },
-      message: `Ingestion status: **${result.status}**.`
+      output: {
+        status: result.isIngesting ? 'active' : 'suspended',
+        isIngesting: result.isIngesting
+      },
+      message: `Ingestion status: **${result.isIngesting ? 'active' : 'suspended'}**.`
     };
   })
   .build();
@@ -60,8 +64,8 @@ export let suspendIngestion = SlateTool.create(spec, {
     await client.confirmSuspendIngestion(suspendResult.token);
 
     return {
-      output: { suspended: true },
-      message: 'Ingestion has been **suspended**. Use "Resume Ingestion" to re-enable it.'
+      output: { suspended: !(await client.getIngestionStatus()).isIngesting },
+      message: 'Mezmo accepted the suspension. The output reports the current ingestion state.'
     };
   })
   .build();
@@ -70,7 +74,7 @@ export let resumeIngestion = SlateTool.create(spec, {
   name: 'Resume Ingestion',
   key: 'resume_ingestion',
   description: `Resume log ingestion after it has been suspended. Logs will begin being ingested again immediately.`,
-  tags: { readOnly: false, destructive: false }
+  tags: { readOnly: false, destructive: true }
 })
   .input(z.object({}))
   .output(
@@ -83,8 +87,9 @@ export let resumeIngestion = SlateTool.create(spec, {
     await client.resumeIngestion();
 
     return {
-      output: { resumed: true },
-      message: 'Ingestion has been **resumed**. Logs are being ingested again.'
+      output: { resumed: (await client.getIngestionStatus()).isIngesting },
+      message:
+        'Mezmo accepted the resume request. The output reports the current ingestion state.'
     };
   })
   .build();

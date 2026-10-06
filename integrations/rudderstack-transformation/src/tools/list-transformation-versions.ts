@@ -11,13 +11,17 @@ let versionSchema = z.object({
   codeVersion: z.string().nullable().describe('Code version number'),
   language: z.string().describe('Programming language'),
   createdAt: z.string().describe('When this version was created'),
-  updatedAt: z.string().describe('When this version was last updated')
+  updatedAt: z.string().describe('When this version was last updated'),
+  isPublished: z
+    .boolean()
+    .optional()
+    .describe('Whether this revision is published, when reported by the provider.')
 });
 
 export let listTransformationVersions = SlateTool.create(spec, {
   name: 'List Transformation Versions',
   key: 'list_transformation_versions',
-  description: `List all version revisions of a specific transformation. Each update to a transformation creates a new revision. Use this to view version history and find a specific version ID for rollback via the **Publish** tool.`,
+  description: `List version revisions of a specific transformation. Each update to a transformation creates a new revision. Use this to view version history and find a specific version ID for rollback via the **Publish** tool.`,
   tags: {
     readOnly: true,
     destructive: false
@@ -26,11 +30,16 @@ export let listTransformationVersions = SlateTool.create(spec, {
   .input(
     z.object({
       transformationId: z.string().describe('ID of the transformation'),
-      count: z.number().optional().describe('Number of versions to return (default: 5)'),
+      count: z
+        .number()
+        .optional()
+        .describe('Positive whole number of versions to return (default: 5)'),
       orderBy: z
         .enum(['asc', 'desc'])
         .optional()
-        .describe('Sort order by creation date (default: asc)')
+        .describe(
+          'Sort order by creation date (default: asc). count limits results; this API does not document an offset or cursor.'
+        )
     })
   )
   .output(
@@ -49,16 +58,16 @@ export let listTransformationVersions = SlateTool.create(spec, {
       orderBy: ctx.input.orderBy
     });
 
-    let versions = result.versions ?? result ?? [];
-    let items = (Array.isArray(versions) ? versions : []).map((v: any) => ({
-      versionId: v.versionId ?? v.id,
+    let items = result.map(v => ({
+      versionId: v.versionId,
       name: v.name ?? null,
       description: v.description ?? null,
       code: v.code,
       codeVersion: v.codeVersion ?? null,
       language: v.language,
       createdAt: v.createdAt,
-      updatedAt: v.updatedAt
+      updatedAt: v.updatedAt,
+      isPublished: v.isPublished
     }));
 
     return {

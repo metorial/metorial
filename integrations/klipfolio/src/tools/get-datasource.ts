@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getDatasource = SlateTool.create(spec, {
@@ -14,7 +15,12 @@ export let getDatasource = SlateTool.create(spec, {
   .input(
     z.object({
       datasourceId: z.string().describe('ID of the data source to retrieve'),
-      includeProperties: z.boolean().optional().describe('Include connector properties'),
+      includeProperties: z
+        .boolean()
+        .optional()
+        .describe(
+          'Include connector property names; all values are concealed because connector settings can contain credentials'
+        ),
       includeShareRights: z.boolean().optional().describe('Include share rights')
     })
   )
@@ -36,6 +42,7 @@ export let getDatasource = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     let ds = await client.getDatasource(ctx.input.datasourceId, true);

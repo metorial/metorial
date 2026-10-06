@@ -34,15 +34,18 @@ let reportEntrySchema = z
 export let getPerformanceReportTool = SlateTool.create(spec, {
   name: 'Get Performance Report',
   key: 'get_performance_report',
-  description: `Retrieve detailed campaign performance analytics from Later Influence. Returns metrics including content totals, impressions, engagements, affiliate clicks, conversions, and conversion value. Data is broken down by social network and content type. Can report on a single campaign or a reporting group, and can be filtered by date range and grouped by time period.`,
+  description:
+    'DEPRECATED — use `get_analytics` instead. Legacy Reporting API v1 campaign or reporting-group analytics.',
   instructions: [
+    'Use get_analytics with Reporting API v2 credentials for current reporting.',
     'Provide either a campaignId or a reportingGroupId, not both.',
     'Use groupBy to aggregate data by time period (year, quarter, month, week_monday, week_sunday, or day).',
     'Dates should be in ISO 8601 format (YYYY-MM-DD).'
   ],
   constraints: ['Either campaignId or reportingGroupId must be provided.'],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(
@@ -70,7 +73,7 @@ export let getPerformanceReportTool = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let report = await client.getPerformanceReport({
       campaignId: ctx.input.campaignId,
@@ -80,20 +83,9 @@ export let getPerformanceReportTool = SlateTool.create(spec, {
       groupBy: ctx.input.groupBy
     });
 
-    let target = ctx.input.campaignId
-      ? `campaign **${ctx.input.campaignId}**`
-      : `reporting group **${ctx.input.reportingGroupId}**`;
-
-    let dateRange =
-      ctx.input.startDate && ctx.input.endDate
-        ? ` from ${ctx.input.startDate} to ${ctx.input.endDate}`
-        : '';
-
-    let grouping = ctx.input.groupBy ? ` grouped by ${ctx.input.groupBy}` : '';
-
     return {
-      output: report as any,
-      message: `Retrieved performance report for ${target}${dateRange}${grouping}. Found **${(report.entries || []).length}** data entries.`
+      output: report,
+      message: `Retrieved ${report.entries.length} legacy performance entries.`
     };
   })
   .build();

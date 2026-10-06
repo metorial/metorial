@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { generationMetadata, modelInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let generateSocialMediaPost = SlateTool.create(spec, {
@@ -13,29 +14,29 @@ export let generateSocialMediaPost = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      context: z.string().describe('Context or topic for the social media post'),
+      context: z.string().min(1).describe('Context or topic for the social media post'),
       keywords: z.array(z.string()).optional().describe('Keywords to include in the post'),
       platform: z
         .enum(['twitter', 'linkedin', 'instagram', 'facebook'])
         .optional()
         .describe('Target social media platform (default: "twitter")'),
       targetAudience: z.string().optional().describe('Target audience for the post'),
-      model: z
-        .enum(['velox-1', 'alta-1', 'sophos-1', 'chat-sophos-1'])
-        .optional()
-        .describe('AI model to use'),
+      model: modelInput,
       maxTokens: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Maximum number of tokens to generate (default: 512)'),
       temperature: z
         .number()
         .min(0)
-        .max(1)
+        .max(2)
         .optional()
-        .describe('Creativity level from 0 to 1. Default: 0.7'),
+        .describe("Creativity level from 0 to 2. Omit to use the model's default"),
       generationCount: z
         .number()
+        .int()
         .min(1)
         .max(10)
         .optional()
@@ -49,12 +50,16 @@ export let generateSocialMediaPost = SlateTool.create(spec, {
       posts: z
         .array(
           z.object({
-            text: z.string().describe('Generated social media post content'),
+            text: z.string().min(1).describe('Generated social media post content'),
             index: z.number().describe('Index of this generation')
           })
         )
         .describe('Array of generated social media posts'),
-      remainingCredits: z.number().describe('Remaining API credits')
+      ...generationMetadata,
+      remainingCredits: z
+        .number()
+        .optional()
+        .describe('Remaining API credits when the balance can be retrieved')
     })
   )
   .handleInvocation(async ctx => {
@@ -78,9 +83,13 @@ export let generateSocialMediaPost = SlateTool.create(spec, {
     return {
       output: {
         posts: outputs.map(o => ({ text: o.text, index: o.index })),
+        balanceWarning: result.balanceWarning,
+        completionId: result.completionId,
+        model: result.model,
+        usage: result.usage,
         remainingCredits: result.data.remaining_credits
       },
-      message: `Generated **${outputs.length}** ${ctx.input.platform || 'twitter'} post(s). Remaining credits: ${result.data.remaining_credits}.`
+      message: `Generated **${outputs.length}** ${ctx.input.platform || 'twitter'} post(s). ${result.balanceWarning ?? `Remaining credits: ${result.data.remaining_credits}.`}`
     };
   })
   .build();

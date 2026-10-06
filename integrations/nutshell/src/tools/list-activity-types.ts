@@ -42,7 +42,7 @@ export let listActivityTypes = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let activityTypes = results.map((t: any) => ({
+    let activityTypes = results.map(t => ({
       activityTypeId: t.id,
       name: t.name,
       entityType: t.entityType

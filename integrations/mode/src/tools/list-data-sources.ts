@@ -18,6 +18,10 @@ export let listDataSources = SlateTool.create(spec, {
       dataSources: z.array(
         z.object({
           dataSourceToken: z.string().describe('Unique token of the data source'),
+          dataSourceId: z
+            .number()
+            .optional()
+            .describe('Numeric ID used when creating SQL queries or definitions'),
           name: z.string().describe('Name of the data source'),
           description: z.string().describe('Description of the data source'),
           adapter: z
@@ -33,11 +37,7 @@ export let listDataSources = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let data = await client.listDataSources();
     let dataSources = getEmbedded(data, 'data_sources').map(normalizeDataSource);

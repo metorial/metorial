@@ -20,8 +20,6 @@ import {
   translateAudio,
   uploadFile
 } from './tools';
-import { batchStatus, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     listBatches,
     cancelBatch
   ],
-  triggers: [inboundWebhook, batchStatus]
+  triggers: []
 });

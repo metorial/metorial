@@ -20,6 +20,14 @@ Use this to transition incidents through their lifecycle (e.g., triage → mitig
     z.object({
       incidentId: z.string().describe('Incident ID or slug to update'),
       title: z.string().optional().describe('Updated incident title'),
+      scheduledFor: z
+        .string()
+        .optional()
+        .describe('Scheduled maintenance start in ISO 8601 format'),
+      scheduledUntil: z
+        .string()
+        .optional()
+        .describe('Scheduled maintenance end in ISO 8601 format'),
       summary: z.string().optional().describe('Updated incident summary'),
       status: z
         .enum([
@@ -30,7 +38,10 @@ Use this to transition incidents through their lifecycle (e.g., triage → mitig
           'mitigated',
           'resolved',
           'closed',
-          'cancelled'
+          'cancelled',
+          'scheduled',
+          'in_progress',
+          'completed'
         ])
         .optional()
         .describe('New status'),
@@ -67,6 +78,8 @@ Use this to transition incidents through their lifecycle (e.g., triage → mitig
     let result = await client.updateIncident(ctx.input.incidentId, {
       title: ctx.input.title,
       summary: ctx.input.summary,
+      scheduledFor: ctx.input.scheduledFor,
+      scheduledUntil: ctx.input.scheduledUntil,
       status: ctx.input.status,
       severityId: ctx.input.severityId,
       private: ctx.input.isPrivate,

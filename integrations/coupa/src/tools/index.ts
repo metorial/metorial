@@ -2,6 +2,7 @@ export * from './create-invoice';
 export * from './create-purchase-order';
 export * from './get-invoice';
 export * from './get-purchase-order';
+export * from './get-resource';
 export * from './manage-accounts';
 export * from './manage-approvals';
 export * from './manage-contracts';

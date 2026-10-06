@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/jira.svg" height="20"> Jira
 
-Create, read, update, and delete issues across projects. Search issues using JQL queries. Manage projects, boards, sprints, and epics for agile workflows. Log work time, add comments and attachments, and transition issues through workflow statuses. Create and manage project versions/releases, issue links, filters, and dashboards. Query users, groups, and permissions. Receive webhooks for issue, comment, sprint, project, board, user, and configuration change events.
+Create, read, update, and delete issues across projects. Search issues using JQL queries. Manage projects, boards, sprints, and epics for agile workflows. Log work time, add comments and attachments, and transition issues through workflow statuses. Create and manage project versions/releases, issue links, filters, and dashboards. Query users, groups, and permissions.
 
 ## Tools
 

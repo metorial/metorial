@@ -31,6 +31,12 @@ export let listRecordings = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Native next-page URL returned by this tool. Use alone; do not add filters.'
+        ),
       meetingId: z.string().optional().describe('Filter by meeting ID'),
       from: z.string().optional().describe('Start of date range (ISO 8601)'),
       to: z.string().optional().describe('End of date range (ISO 8601)'),
@@ -41,6 +47,7 @@ export let listRecordings = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: z.string().optional().describe('URL for the next native page, if present'),
       recordings: z.array(recordingSchema).describe('List of recordings')
     })
   )
@@ -53,11 +60,12 @@ export let listRecordings = SlateTool.create(spec, {
       to: ctx.input.to,
       hostEmail: ctx.input.hostEmail,
       siteUrl: ctx.input.siteUrl,
-      max: ctx.input.max
+      max: ctx.input.max,
+      nextPageUrl: ctx.input.nextPageUrl
     });
 
     let items = result.items || [];
-    let recordings = items.map((r: any) => ({
+    let recordings = items.map(r => ({
       recordingId: r.id,
       meetingId: r.meetingId,
       scheduledMeetingId: r.scheduledMeetingId,
@@ -76,7 +84,7 @@ export let listRecordings = SlateTool.create(spec, {
     }));
 
     return {
-      output: { recordings },
+      output: { recordings, nextPageUrl: result.nextPageUrl },
       message: `Found **${recordings.length}** recording(s).`
     };
   })

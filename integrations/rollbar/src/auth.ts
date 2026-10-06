@@ -1,73 +1,57 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
 
-let http = createAxios({
-  baseURL: 'https://api.rollbar.com/api/1'
-});
-
+const postServerToken = z
+  .string()
+  .optional()
+  .describe(
+    'Optional separate project token with post_server_item scope for reporting occurrences and deploys. It must belong to the project you intend to report to. Ingestion scopes cannot be combined with read/write scopes.'
+  );
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      tokenType: z.enum(['project', 'account']).optional(),
+      postServerToken: z.string().optional()
     })
   )
   .addTokenAuth({
     type: 'auth.token',
     name: 'Project Access Token',
     key: 'project_access_token',
-
     inputSchema: z.object({
       token: z
         .string()
         .describe(
-          'Rollbar project access token. Found in Project → Settings → Project Access Tokens.'
-        )
+          'Project access token from Project Settings → Project Access Tokens. Read tools require read scope; management tools require write scope.'
+        ),
+      postServerToken
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await http.get('/user', {
-        headers: {
-          'X-Rollbar-Access-Token': ctx.output.token
-        }
-      });
-
-      let user = response.data?.result;
-
-      return {
-        profile: {
-          id: user?.id?.toString(),
-          email: user?.email,
-          name: user?.username
-        }
-      };
-    }
+    getOutput: async ctx => ({
+      output: {
+        token: ctx.input.token,
+        tokenType: 'project' as const,
+        postServerToken: ctx.input.postServerToken
+      }
+    })
   })
   .addTokenAuth({
     type: 'auth.token',
     name: 'Account Access Token',
     key: 'account_access_token',
-
     inputSchema: z.object({
       token: z
         .string()
         .describe(
-          'Rollbar account access token. Found in Account Settings → Account Access Tokens.'
-        )
+          'Account access token from Account Settings → Account Access Tokens. Use read/write scopes as needed and provide projectId for project-scoped tools.'
+        ),
+      postServerToken
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    }
+    getOutput: async ctx => ({
+      output: {
+        token: ctx.input.token,
+        tokenType: 'account' as const,
+        postServerToken: ctx.input.postServerToken
+      }
+    })
   });

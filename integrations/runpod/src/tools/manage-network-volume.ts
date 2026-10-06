@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RunPodClient } from '../lib/client';
 import { spec } from '../spec';
@@ -20,7 +20,13 @@ export let manageNetworkVolume = SlateTool.create(spec, {
       networkVolumeId: z.string().describe('ID of the network volume'),
       action: z.enum(['update', 'delete']).describe('Action to perform'),
       name: z.string().optional().describe('New name (for update action)'),
-      size: z.number().optional().describe('New size in GB (for update action)')
+      size: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(10)
+        .max(4096)
+        .optional()
+        .describe('New size in GB (10-4096, cannot shrink; for update action)')
     })
   )
   .output(
@@ -28,7 +34,13 @@ export let manageNetworkVolume = SlateTool.create(spec, {
       networkVolumeId: z.string().describe('ID of the affected volume'),
       action: z.string().describe('Action performed'),
       name: z.string().nullable().describe('Volume name'),
-      size: z.number().nullable().describe('Volume size in GB')
+      size: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(10)
+        .max(4096)
+        .nullable()
+        .describe('Volume size in GB')
     })
   )
   .handleInvocation(async ctx => {
@@ -36,6 +48,8 @@ export let manageNetworkVolume = SlateTool.create(spec, {
     let { networkVolumeId, action } = ctx.input;
 
     if (action === 'delete') {
+      if (ctx.input.name !== undefined || ctx.input.size !== undefined)
+        throw createApiServiceError('name and size are only supported for update.');
       await client.deleteNetworkVolume(networkVolumeId);
       return {
         output: {

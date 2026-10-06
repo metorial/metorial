@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { type ApiResource, nextUrlSchema, teamNameSchema } from '../lib/api';
 import { UptimeClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -26,10 +27,12 @@ export let listIncidents = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamName: teamNameSchema,
+      nextUrl: nextUrlSchema,
       page: z.number().optional().describe('Page number (default: 1)'),
-      perPage: z.number().optional().describe('Results per page (default: 20, max: 50)'),
-      from: z.string().optional().describe('Start date filter (ISO 8601)'),
-      to: z.string().optional().describe('End date filter (ISO 8601)'),
+      perPage: z.number().optional().describe('Results per page (default: 10, max: 50)'),
+      from: z.string().optional().describe('Start date filter (YYYY-MM-DD)'),
+      to: z.string().optional().describe('End date filter (YYYY-MM-DD)'),
       monitorId: z.string().optional().describe('Filter by monitor ID'),
       heartbeatId: z.string().optional().describe('Filter by heartbeat ID'),
       resolved: z.boolean().optional().describe('Filter by resolved status'),
@@ -39,16 +42,19 @@ export let listIncidents = SlateTool.create(spec, {
   .output(
     z.object({
       incidents: z.array(incidentSchema).describe('List of incidents'),
+      nextUrl: z.string().optional().describe('Next-page URL, when available'),
       hasMore: z.boolean().describe('Whether more results are available')
     })
   )
   .handleInvocation(async ctx => {
     let client = new UptimeClient({
       token: ctx.auth.token,
-      teamName: ctx.config.teamName
+      tokenType: ctx.auth.tokenType,
+      teamName: ctx.input.teamName ?? ctx.config.teamName
     });
 
     let result = await client.listIncidents({
+      nextUrl: ctx.input.nextUrl,
       page: ctx.input.page,
       perPage: ctx.input.perPage,
       from: ctx.input.from,
@@ -59,8 +65,8 @@ export let listIncidents = SlateTool.create(spec, {
       acknowledged: ctx.input.acknowledged
     });
 
-    let incidents = (result.data || []).map((item: any) => {
-      let attrs = item.attributes || item;
+    let incidents = (result.data || []).map((item: ApiResource) => {
+      let attrs = item.attributes;
       return {
         incidentId: String(item.id),
         name: attrs.name || null,
@@ -80,7 +86,7 @@ export let listIncidents = SlateTool.create(spec, {
     let hasMore = !!result.pagination?.next;
 
     return {
-      output: { incidents, hasMore },
+      output: { incidents, hasMore, nextUrl: result.pagination?.next ?? undefined },
       message: `Found **${incidents.length}** incident(s)${hasMore ? ' (more available)' : ''}.`
     };
   })

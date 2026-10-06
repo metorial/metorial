@@ -17,8 +17,6 @@ import {
   updateTask,
   updateWorkflowRun
 } from './tools';
-import { dataSetEvents, workflowRunEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     manageDataSetRecords,
     listUsers
   ],
-  triggers: [workflowRunEvents, dataSetEvents]
+  triggers: []
 });

@@ -1,11 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTransaction } from '../lib/schemas';
+import { fail, required } from '../lib/validation';
 import { spec } from '../spec';
 
 let transactionSchema = z.object({
   transactionId: z.string().describe('Unique identifier of the transaction'),
-  type: z.string().optional().describe('Transaction type'),
+  type: z.string().nullish().describe('Transaction type'),
   amount: z
     .object({
       amount: z.number().describe('Amount in cents'),
@@ -42,7 +44,7 @@ Only settled transactions are returned; pending transactions are not available.`
   instructions: [
     "For card transactions, optionally filter by userIds to see a specific employee's activity.",
     'For cash transactions, provide the cashAccountId of the cash account to query.',
-    'Use postedAtStart to fetch transactions after a specific date.'
+    'Use postedAtStart to fetch transactions after a specific date. When syncing, overlap requests by a few days and deduplicate by transactionId because posting can be delayed.'
   ],
   tags: {
     readOnly: true
@@ -71,46 +73,27 @@ Only settled transactions are returned; pending transactions are not available.`
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result: any;
-
-    if (ctx.input.source === 'card') {
-      result = await client.listCardTransactions({
-        cursor: ctx.input.cursor,
-        limit: ctx.input.limit,
-        user_ids: ctx.input.userIds,
-        posted_at_start: ctx.input.postedAtStart
-      });
-    } else {
-      if (!ctx.input.cashAccountId) {
-        throw new Error('cashAccountId is required when source is "cash"');
-      }
-      result = await client.listCashTransactions(ctx.input.cashAccountId, {
-        cursor: ctx.input.cursor,
-        limit: ctx.input.limit,
-        posted_at_start: ctx.input.postedAtStart
-      });
-    }
-
-    let transactions = result.items.map((t: any) => ({
-      transactionId: t.id,
-      type: t.type ?? t.card_metadata?.type,
-      amount: t.amount ? { amount: t.amount.amount, currency: t.amount.currency } : undefined,
-      merchantName:
-        t.merchant?.raw_descriptor ?? t.card_metadata?.merchant?.raw_descriptor ?? null,
-      description: t.description,
-      postedAt: t.posted_at,
-      cardId: t.card_id ?? t.card_metadata?.card_id,
-      userId: t.user_id,
-      initiatedBy: t.initiated_by_id
-    }));
-
+    const client = new Client({ token: ctx.auth.token });
+    if (ctx.input.source === 'cash' && ctx.input.userIds !== undefined)
+      fail('userIds filters card transactions only.');
+    const params = {
+      cursor: ctx.input.cursor,
+      limit: ctx.input.limit,
+      posted_at_start: ctx.input.postedAtStart
+    };
+    const result =
+      ctx.input.source === 'card'
+        ? await client.listCardTransactions({ ...params, user_ids: ctx.input.userIds })
+        : await client.listCashTransactions(
+            required(ctx.input.cashAccountId, 'cashAccountId'),
+            params
+          );
     return {
       output: {
-        transactions,
+        transactions: result.items.map(mapTransaction),
         nextCursor: result.next_cursor
       },
-      message: `Found **${transactions.length}** ${ctx.input.source} transaction(s).${result.next_cursor ? ' More results available.' : ''}`
+      message: `Returned ${result.items.length} transactions.`
     };
   })
   .build();

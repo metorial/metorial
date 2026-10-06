@@ -1,16 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, isMissing, optionalText, text } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageUnsubscribes = SlateTool.create(spec, {
   name: 'Manage Unsubscribes',
   key: 'manage_unsubscribes',
-  description: `Add or remove emails from the global unsubscribe list, check the unsubscribe status of a specific email, or list all unsubscribed contacts. Used for maintaining compliance and managing opt-outs.`,
+  description: `DEPRECATED — use \`manage_subscriptions\` instead. These legacy routes stop working on November 1, 2026. Add or remove emails from the global unsubscribe list, check the unsubscribe status of a specific email, or list all unsubscribed contacts. Used for maintaining compliance and managing opt-outs.`,
   instructions: [
     'Use action "add" to unsubscribe an email, "remove" to re-subscribe, "check" to verify status, or "list" to get all unsubscribes.',
-    'The "email" field is required for add, remove, and check actions.'
-  ]
+    'The "email" field is required for add, remove, and check actions.',
+    'Use manage_subscriptions for current variable/contact opt-outs and re-subscription. Removing an opt-out can enable outreach; never remove protected or unintended opt-outs.'
+  ],
+  tags: { deprecated: true, readOnly: false, destructive: true }
 })
   .input(
     z.object({
@@ -43,72 +45,59 @@ export let manageUnsubscribes = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let { action, email } = ctx.input;
-
+    const client = new Client({ token: ctx.auth.token }),
+      { action, email } = ctx.input;
     if (action === 'list') {
-      let data = await client.listUnsubscribes({
-        offset: ctx.input.offset,
-        limit: ctx.input.limit
-      });
-
-      let unsubscribes = (Array.isArray(data) ? data : []).map((u: any) => ({
-        email: u.email ?? u.value,
-        campaignId: u.campaignId,
-        campaignName: u.campaignName,
-        unsubscribedAt: u.unsubscribedAt ?? u.createdAt,
-        scope: u.scope
+      const unsubscribes = (
+        await client.listUnsubscribes({ offset: ctx.input.offset, limit: ctx.input.limit })
+      ).map(u => ({
+        email: optionalText(u.value ?? u.email),
+        campaignId: optionalText(u.campaignId),
+        campaignName: optionalText(u.campaignName),
+        unsubscribedAt: optionalText(u.createdAt ?? u.unsubscribedAt),
+        scope: optionalText(u.scope)
       }));
-
       return {
         output: { unsubscribes },
-        message: `Found **${unsubscribes.length}** unsubscribed contact(s).`
+        message: `Retrieved **${unsubscribes.length}** legacy unsubscribe entries in this page.`
       };
     }
-
-    if (!email) {
-      throw new Error('Email is required for add, remove, and check actions.');
-    }
-
+    if (!email?.trim())
+      throw createApiServiceError('Email is required for add, remove, and check actions.');
     if (action === 'check') {
       try {
-        let data = await client.getUnsubscribeStatus(email);
+        const data = await client.getUnsubscribeStatus(email);
+        if (text(data.value, 'unsubscribe value') !== email)
+          throw createApiServiceError('Lemlist returned a different unsubscribe value.');
         return {
           output: {
-            email: data.value ?? email,
+            email: text(data.value),
             unsubscribed: true,
-            source: data.source,
-            createdAt: data.createdAt
+            source: optionalText(data.source),
+            createdAt: optionalText(data.createdAt)
           },
-          message: `**${email}** is unsubscribed (source: ${data.source ?? 'unknown'}).`
+          message: 'The requested value is unsubscribed.'
         };
-      } catch (e: any) {
-        if (e?.response?.status === 404 || e?.status === 404) {
-          return {
-            output: {
-              email,
-              unsubscribed: false
-            },
-            message: `**${email}** is **not** unsubscribed.`
-          };
-        }
-        throw e;
+      } catch (error) {
+        if (!isMissing(error)) throw error;
+        return {
+          output: { email, unsubscribed: false },
+          message: 'The requested value is not in the legacy unsubscribe list.'
+        };
       }
     }
-
-    if (action === 'add') {
-      await client.addUnsubscribe(email);
-      return {
-        output: { email, unsubscribed: true },
-        message: `**${email}** has been added to the unsubscribe list.`
-      };
-    }
-
-    // action === 'remove'
-    await client.removeUnsubscribe(email);
+    const data =
+      action === 'add'
+        ? await client.addUnsubscribe(email)
+        : await client.removeUnsubscribe(email);
+    if (text(data.value, 'unsubscribe value') !== email)
+      throw createApiServiceError('Lemlist returned a different unsubscribe value.');
     return {
-      output: { email, unsubscribed: false },
-      message: `**${email}** has been removed from the unsubscribe list.`
+      output: { email, unsubscribed: action === 'add' },
+      message:
+        action === 'add'
+          ? 'The provider accepted the legacy opt-out.'
+          : 'The provider accepted the legacy re-subscription.'
     };
   })
   .build();

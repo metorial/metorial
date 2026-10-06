@@ -18,8 +18,6 @@ import {
   suggestCompany
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -39,5 +37,5 @@ export let provider = Slate.create({
     getAccountInfo,
     lookupAddress
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

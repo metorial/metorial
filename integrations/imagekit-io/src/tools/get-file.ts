@@ -30,7 +30,7 @@ export let getFile = SlateTool.create(spec, {
       height: z.number().optional().nullable().describe('Height in pixels'),
       width: z.number().optional().nullable().describe('Width in pixels'),
       tags: z.array(z.string()).optional().nullable().describe('Tags'),
-      aiTags: z.array(z.any()).optional().nullable().describe('AI-generated tags'),
+      aiTags: z.array(z.unknown()).optional().nullable().describe('AI-generated tags'),
       isPrivateFile: z.boolean().optional().describe('Whether the file is private'),
       customCoordinates: z
         .string()
@@ -38,13 +38,13 @@ export let getFile = SlateTool.create(spec, {
         .nullable()
         .describe('Custom focus area coordinates'),
       customMetadata: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .nullable()
         .describe('Custom metadata'),
       isPublished: z.boolean().optional().describe('Whether the file is published'),
       extensionStatus: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .nullable()
         .describe('Status of applied extensions'),
@@ -70,7 +70,7 @@ export let getFile = SlateTool.create(spec, {
         name: f.name,
         filePath: f.filePath,
         url: f.url,
-        thumbnailUrl: f.thumbnailUrl,
+        thumbnailUrl: f.thumbnail,
         fileType: f.fileType,
         mime: f.mime,
         size: f.size,

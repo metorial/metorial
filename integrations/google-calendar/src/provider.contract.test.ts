@@ -32,7 +32,7 @@ describe('google-calendar provider contract', () => {
         'get_colors',
         'get_settings'
       ],
-      triggerIds: ['event_changes', 'calendar_list_changes'],
+      triggerIds: [],
       authMethodIds: ['oauth'],
       tools: [
         { id: 'create_event', readOnly: false, destructive: false },
@@ -52,13 +52,10 @@ describe('google-calendar provider contract', () => {
         { id: 'get_colors', readOnly: true, destructive: false },
         { id: 'get_settings', readOnly: true, destructive: false }
       ],
-      triggers: [
-        { id: 'event_changes', invocationType: 'webhook' },
-        { id: 'calendar_list_changes', invocationType: 'webhook' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(18);
+    expect(contract.actions).toHaveLength(16);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -77,9 +74,7 @@ describe('google-calendar provider contract', () => {
       list_calendar_sharing: googleCalendarActionScopes.listCalendarSharing,
       manage_sharing: googleCalendarActionScopes.manageSharing,
       get_colors: googleCalendarActionScopes.getColors,
-      get_settings: googleCalendarActionScopes.getSettings,
-      event_changes: googleCalendarActionScopes.eventChanges,
-      calendar_list_changes: googleCalendarActionScopes.calendarListChanges
+      get_settings: googleCalendarActionScopes.getSettings
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

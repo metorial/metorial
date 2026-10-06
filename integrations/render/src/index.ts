@@ -28,8 +28,6 @@ import {
   scaleService,
   updateService
 } from './tools';
-import { databaseEvents, deploymentEvents, diskEvents, serviceEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -60,5 +58,5 @@ export let provider = Slate.create({
     manageMaintenance,
     listWorkspaces
   ],
-  triggers: [deploymentEvents, serviceEvents, databaseEvents, diskEvents]
+  triggers: []
 });

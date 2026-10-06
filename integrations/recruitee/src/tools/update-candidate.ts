@@ -43,24 +43,20 @@ export let updateCandidate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
+    let client = await RecruiteeClient.forContext(ctx);
 
-    // Update CV separately if provided
-    if (ctx.input.remoteCvUrl) {
-      await client.updateCandidateCv(ctx.input.candidateId, ctx.input.remoteCvUrl);
-    }
-
-    let result = await client.updateCandidate(ctx.input.candidateId, {
-      name: ctx.input.name,
-      emails: ctx.input.emails,
-      phones: ctx.input.phones,
-      socialLinks: ctx.input.socialLinks,
-      links: ctx.input.links,
-      coverLetter: ctx.input.coverLetter
-    });
+    let result = await client.updateCandidateWithCv(
+      ctx.input.candidateId,
+      {
+        name: ctx.input.name,
+        emails: ctx.input.emails,
+        phones: ctx.input.phones,
+        socialLinks: ctx.input.socialLinks,
+        links: ctx.input.links,
+        coverLetter: ctx.input.coverLetter
+      },
+      ctx.input.remoteCvUrl
+    );
 
     let c = result.candidate;
 

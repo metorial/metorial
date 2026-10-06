@@ -9,16 +9,16 @@ import {
   getRecords,
   listDatabases,
   listTables,
+  listTableViews,
   manageDatabase,
   manageTable,
   manageTableField,
+  manageUserLifecycle,
   searchRecords,
   syncUsers,
   updateRecord,
   validateToken
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -31,6 +31,8 @@ export let provider = Slate.create({
     listDatabases,
     manageDatabase,
     listTables,
+    listTableViews,
+    manageUserLifecycle,
     manageTable,
     manageTableField,
     getRecords,
@@ -39,5 +41,5 @@ export let provider = Slate.create({
     deleteRecord,
     searchRecords
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

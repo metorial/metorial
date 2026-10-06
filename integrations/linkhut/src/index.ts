@@ -12,8 +12,6 @@ import {
   listTags,
   manageTag
 } from './tools';
-import { bookmarkUpdated, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     checkForUpdates,
     getBookmarkDates
   ],
-  triggers: [inboundWebhook, bookmarkUpdated]
+  triggers: []
 });

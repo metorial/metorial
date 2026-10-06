@@ -10,8 +10,7 @@
     "configure bucket policies",
     "set lifecycle rules",
     "tag objects and buckets",
-    "copy objects",
-    "poll for object changes"
+    "copy objects"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/amazon.svg"
 }

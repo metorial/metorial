@@ -36,13 +36,7 @@ describe('google-meet provider contract', () => {
         'get_transcript_entry',
         'list_transcript_entries'
       ],
-      triggerIds: [
-        'inbound_webhook',
-        'conference_events',
-        'participant_events',
-        'recording_events',
-        'transcript_events'
-      ],
+      triggerIds: [],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'create_space', readOnly: false, destructive: false },
@@ -68,16 +62,10 @@ describe('google-meet provider contract', () => {
         { id: 'get_transcript_entry', readOnly: true, destructive: false },
         { id: 'list_transcript_entries', readOnly: true, destructive: false }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'conference_events', invocationType: 'polling' },
-        { id: 'participant_events', invocationType: 'polling' },
-        { id: 'recording_events', invocationType: 'polling' },
-        { id: 'transcript_events', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(27);
+    expect(contract.actions).toHaveLength(22);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -102,12 +90,7 @@ describe('google-meet provider contract', () => {
       list_transcripts: googleMeetActionScopes.listTranscripts,
       get_transcript: googleMeetActionScopes.getTranscript,
       get_transcript_entry: googleMeetActionScopes.getTranscriptEntry,
-      list_transcript_entries: googleMeetActionScopes.listTranscriptEntries,
-      inbound_webhook: googleMeetActionScopes.inboundWebhook,
-      conference_events: googleMeetActionScopes.conferenceEvents,
-      participant_events: googleMeetActionScopes.participantEvents,
-      recording_events: googleMeetActionScopes.recordingEvents,
-      transcript_events: googleMeetActionScopes.transcriptEvents
+      list_transcript_entries: googleMeetActionScopes.listTranscriptEntries
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

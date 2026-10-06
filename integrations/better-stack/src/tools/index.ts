@@ -1,3 +1,4 @@
+export { exportDashboard } from './export-dashboard';
 export { listDashboards } from './list-dashboards';
 export { listIncidents } from './list-incidents';
 export { listMonitors } from './list-monitors';

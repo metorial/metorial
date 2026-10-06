@@ -6,7 +6,11 @@ import { spec } from '../spec';
 let smartViewSchema = z.object({
   smartViewId: z.string().describe('Unique identifier for the Smart View'),
   name: z.string().describe('Name of the Smart View'),
-  query: z.record(z.string(), z.any()).describe('The saved search query object'),
+  query: z.record(z.string(), z.any()).optional().describe('The saved search query object'),
+  legacyQuery: z
+    .string()
+    .optional()
+    .describe('Legacy textual query when no structured saved query is available.'),
   type: z.string().optional().describe('Type of Smart View (e.g., "lead", "contact")'),
   isShared: z
     .boolean()
@@ -29,6 +33,8 @@ export let listSmartViews = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      limit: z.number().optional().describe('Page size (default 100).'),
+      skip: z.number().optional().describe('Offset for the page.'),
       viewType: z
         .enum(['lead', 'contact'])
         .optional()
@@ -37,31 +43,34 @@ export let listSmartViews = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      hasMore: z.boolean().optional().describe('Whether another page exists.'),
+      nextSkip: z.number().optional().describe('Offset for the next page.'),
       smartViews: z.array(smartViewSchema).describe('List of Smart Views')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-
-    let result = await client.listSmartViews({
-      type: ctx.input.viewType
+    const result = await new Client(ctx.auth).listSmartViews({
+      type: ctx.input.viewType,
+      limit: ctx.input.limit,
+      skip: ctx.input.skip
     });
-
-    let views = (result.data ?? []).map((v: any) => ({
+    const views = result.data.map(v => ({
       smartViewId: v.id,
       name: v.name,
-      query: v.query ?? v.s_query ?? {},
+      query: v.s_query ?? (typeof v.query === 'object' ? (v.query ?? undefined) : undefined),
+      legacyQuery: typeof v.query === 'string' ? v.query : undefined,
       type: v.type,
       isShared: v.is_shared,
-      userId: v.user_id,
+      userId: v.user_id ?? undefined,
       dateCreated: v.date_created
     }));
-
     return {
       output: {
-        smartViews: views
+        smartViews: views,
+        hasMore: result.has_more,
+        nextSkip: result.has_more ? (ctx.input.skip ?? 0) + views.length : undefined
       },
-      message: `Found **${views.length}** Smart View(s)${ctx.input.viewType ? ` of type "${ctx.input.viewType}"` : ''}.`
+      message: `Returned ${views.length} Smart View(s)${result.has_more ? '; more available' : ''}.`
     };
   })
   .build();

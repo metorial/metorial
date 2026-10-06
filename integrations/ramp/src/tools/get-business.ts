@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { recordSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getBusiness = SlateTool.create(spec, {
@@ -21,18 +22,15 @@ export let getBusiness = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      business: z.any().describe('Business information'),
-      balance: z.any().optional().describe('Business balance (if requested)')
+      business: recordSchema.describe('Business information'),
+      balance: recordSchema.optional().describe('Business balance (if requested)')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = clientFor(ctx);
 
     let business = await client.getBusiness();
-    let balance: any;
+    let balance: Record<string, unknown> | undefined;
 
     if (ctx.input.includeBalance) {
       balance = await client.getBusinessBalance();

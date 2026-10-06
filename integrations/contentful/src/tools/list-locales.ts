@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, pageInfo } from '../lib/helpers';
+import { limitSchema, pageOutput, selection, skipSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listLocales = SlateTool.create(spec, {
@@ -11,9 +12,22 @@ export let listLocales = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      ...selection,
+      api: z
+        .enum(['management', 'delivery', 'preview'])
+        .optional()
+        .describe(
+          'API for legacy token-only connections. Must match the credential type; reconnect if unknown.'
+        ),
+      limit: limitSchema,
+      skip: skipSchema
+    })
+  )
   .output(
     z.object({
+      ...pageOutput,
       locales: z
         .array(
           z.object({
@@ -40,22 +54,22 @@ export let listLocales = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
-    let result = await client.getLocales();
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
+    let result = await client.getLocales({ limit: ctx.input.limit, skip: ctx.input.skip });
 
-    let locales = (result.items || []).map((l: any) => ({
+    let locales = result.items.map((l: any) => ({
       localeId: l.sys?.id,
       name: l.name,
       code: l.code,
-      fallbackCode: l.fallbackCode || undefined,
-      isDefault: l.default || false,
+      fallbackCode: l.fallbackCode ?? undefined,
+      isDefault: l.default,
       optional: l.optional,
       contentDeliveryApi: l.contentDeliveryApi,
       contentManagementApi: l.contentManagementApi
     }));
 
     return {
-      output: { locales },
+      output: { ...pageInfo(result), locales },
       message: `Found **${locales.length}** locales.`
     };
   })

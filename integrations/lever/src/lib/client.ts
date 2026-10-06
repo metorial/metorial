@@ -1,377 +1,501 @@
-import { createAxios } from 'slates';
+import { createAuthenticatedAxios, pickDefined, requestAxios } from 'slates';
+import {
+  authorization,
+  baseUrl,
+  canonical,
+  ensureNoSecrets,
+  id,
+  integer,
+  invalid,
+  type LeverAuth,
+  pathId,
+  type Resource,
+  type Row,
+  resource,
+  row,
+  safeApiError,
+  text,
+  unexpected,
+  writable
+} from './contracts';
 
-export interface ClientConfig {
-  token: string;
-  environment?: 'production' | 'sandbox';
-}
+export type ClientConfig = LeverAuth;
+export const userFields = [
+  'name',
+  'email',
+  'accessRole',
+  'externalDirectoryId',
+  'jobTitle',
+  'managerId'
+] as const;
+export const requisitionFields = [
+  'name',
+  'headcountTotal',
+  'requisitionCode',
+  'backfill',
+  'compensationBand',
+  'createdAt',
+  'customFields',
+  'employmentStatus',
+  'hiringManager',
+  'internalNotes',
+  'location',
+  'owner',
+  'status',
+  'team',
+  'postingIds',
+  'timeToFillStartAt',
+  'timeToFillEndAt'
+] as const;
+export const interviewFields = [
+  'panel',
+  'subject',
+  'note',
+  'interviewers',
+  'date',
+  'duration',
+  'location',
+  'feedbackTemplate',
+  'feedbackReminder',
+  'conferenceData'
+] as const;
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
-
-  constructor(config: ClientConfig) {
-    let baseURL =
-      config.environment === 'sandbox'
-        ? 'https://api.sandbox.lever.co/v1'
-        : 'https://api.lever.co/v1';
-
-    this.http = createAxios({
-      baseURL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+  private http: ReturnType<typeof createAuthenticatedAxios>;
+  constructor(private auth: ClientConfig) {
+    this.http = createAuthenticatedAxios({
+      baseURL: baseUrl(auth),
+      authHeader: { value: authorization(auth) },
+      timeout: 30000,
+      maxRedirects: 0
     });
   }
-
-  // ─── Opportunities ───
-
-  async listOpportunities(params?: Record<string, any>): Promise<any> {
-    let response = await this.http.get('/opportunities', { params });
+  private async request(
+    method: 'get' | 'post' | 'put' | 'delete',
+    path: string,
+    data?: Row,
+    params?: Row
+  ): Promise<unknown> {
+    const response = await requestAxios(
+      `API ${method.toUpperCase()}`,
+      () => this.http.request<unknown>({ method, url: path, data, params }),
+      safeApiError
+    );
+    const expected = method === 'get' ? [200] : method === 'delete' ? [200, 204] : [200, 201];
+    if (!expected.includes(response.status)) unexpected();
+    ensureNoSecrets(response.data, this.auth);
     return response.data;
   }
-
-  async getOpportunity(opportunityId: string, params?: Record<string, any>): Promise<any> {
-    let response = await this.http.get(`/opportunities/${opportunityId}`, { params });
-    return response.data;
+  private async read(
+    path: string,
+    expectedId: string,
+    params?: Row
+  ): Promise<{ data: Resource }> {
+    return { data: resource(await this.request('get', path, undefined, params), expectedId) };
   }
-
-  async createOpportunity(data: Record<string, any>): Promise<any> {
-    let response = await this.http.post('/opportunities', data);
-    return response.data;
+  private async write(
+    method: 'post' | 'put',
+    path: string,
+    data: Row,
+    params?: Row,
+    expectedId?: string
+  ) {
+    return { data: resource(await this.request(method, path, data, params), expectedId) };
   }
-
-  async updateOpportunity(opportunityId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.put(`/opportunities/${opportunityId}`, data);
-    return response.data;
+  private actor(value: string | undefined): Row {
+    return { perform_as: id(value, 'Acting user ID; discover it with list_users') };
   }
-
-  async updateOpportunityStage(opportunityId: string, stageId: string): Promise<any> {
-    let response = await this.http.put(`/opportunities/${opportunityId}/stage`, {
-      stage: stageId
-    });
-    return response.data;
-  }
-
-  async updateOpportunityArchived(opportunityId: string, reasonId?: string): Promise<any> {
-    let body: Record<string, any> = {};
-    if (reasonId) {
-      body.reason = reasonId;
+  private combine(before: Row, changes: Row): Row {
+    const result = { ...before };
+    for (const [key, value] of Object.entries(changes)) {
+      const prior = before[key];
+      result[key] =
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        prior &&
+        typeof prior === 'object' &&
+        !Array.isArray(prior)
+          ? this.combine(row(prior), row(value))
+          : value;
     }
-    let response = await this.http.put(`/opportunities/${opportunityId}/archived`, body);
-    return response.data;
+    return result;
   }
-
-  async deleteOpportunityArchived(opportunityId: string): Promise<any> {
-    let response = await this.http.delete(`/opportunities/${opportunityId}/archived`);
-    return response.data;
+  private async merge(
+    path: string,
+    expectedId: string,
+    fields: readonly string[],
+    changes: Row
+  ): Promise<Row> {
+    const before = (await this.read(path, expectedId)).data;
+    const body = { ...writable(before, fields), ...pickDefined(changes) };
+    if (fields === interviewFields) {
+      if (
+        Array.isArray(before.conferences) &&
+        before.conferences.length &&
+        changes.conferenceData === undefined
+      )
+        invalid(
+          'This interview has conference details that cannot be safely preserved from readback. Update it in Lever.'
+        );
+      if (!Array.isArray(body.interviewers) || !body.interviewers.length) unexpected();
+      body.interviewers = body.interviewers.map(value => {
+        const interviewer = row(value);
+        return pickDefined({
+          id: id(interviewer.id, 'Returned interviewer ID'),
+          feedbackTemplate: interviewer.feedbackTemplate
+        });
+      });
+    }
+    for (const key of ['compensationBand', 'customFields'])
+      if (changes[key] !== undefined && before[key] !== undefined)
+        body[key] = this.combine(row(before[key]), row(changes[key]));
+    if (fields === userFields) {
+      text(body.name, 'Returned user name');
+      text(body.email, 'Returned user email');
+      if (
+        ![
+          'super admin',
+          'admin',
+          'team member',
+          'limited team member',
+          'interviewer'
+        ].includes(String(body.accessRole))
+      )
+        unexpected();
+    }
+    if (fields === requisitionFields) {
+      text(body.name, 'Returned requisition name');
+      text(body.requisitionCode, 'Returned requisition code');
+      if (body.headcountTotal !== 'unlimited')
+        integer(body.headcountTotal, 'Returned requisition headcount', 0);
+    }
+    if (fields === interviewFields) {
+      id(body.panel, 'Returned interview panel');
+      integer(body.date, 'Returned interview timestamp', 0);
+      integer(body.duration, 'Returned interview duration', 1);
+    }
+    const current = (await this.read(path, expectedId)).data;
+    if (canonical(writable(current, fields)) !== canonical(writable(before, fields)))
+      invalid('The exact resource changed during readback. Read it again before updating.');
+    return body;
   }
-
-  async addOpportunityTags(opportunityId: string, tags: string[]): Promise<any> {
-    let response = await this.http.post(`/opportunities/${opportunityId}/addTags`, { tags });
-    return response.data;
+  listOpportunities(params?: Row) {
+    return this.request('get', '/opportunities', undefined, params);
   }
-
-  async removeOpportunityTags(opportunityId: string, tags: string[]): Promise<any> {
-    let response = await this.http.post(`/opportunities/${opportunityId}/removeTags`, {
-      tags
+  getOpportunity(opportunityId: string, params?: Row) {
+    return this.read(`/opportunities/${pathId(opportunityId)}`, id(opportunityId), params);
+  }
+  async createOpportunity(data: Row, actor?: string) {
+    const result = await this.write('post', '/opportunities', data, this.actor(actor));
+    return {
+      data: { ...result.data, contact: id(result.data.contact, 'Returned contact ID') }
+    };
+  }
+  async updateOpportunityStage(opportunityId: string, stageId: string) {
+    await this.request('put', `/opportunities/${pathId(opportunityId)}/stage`, {
+      stage: id(stageId)
     });
-    return response.data;
   }
-
-  async addOpportunityLinks(opportunityId: string, links: string[]): Promise<any> {
-    let response = await this.http.post(`/opportunities/${opportunityId}/addLinks`, { links });
-    return response.data;
+  async updateOpportunityArchived(opportunityId: string, reasonId?: string) {
+    await this.request('put', `/opportunities/${pathId(opportunityId)}/archived`, {
+      reason: id(reasonId, 'Archive reason ID; discover it with get_pipeline_metadata')
+    });
   }
-
-  async removeOpportunityLinks(opportunityId: string, links: string[]): Promise<any> {
-    let response = await this.http.post(`/opportunities/${opportunityId}/removeLinks`, {
+  async deleteOpportunityArchived(opportunityId: string) {
+    await this.request('put', `/opportunities/${pathId(opportunityId)}/archived`, {
+      reason: null
+    });
+  }
+  async addOpportunityTags(opportunityId: string, tags: string[]) {
+    await this.request('post', `/opportunities/${pathId(opportunityId)}/addTags`, { tags });
+  }
+  async removeOpportunityTags(opportunityId: string, tags: string[]) {
+    await this.request('post', `/opportunities/${pathId(opportunityId)}/removeTags`, { tags });
+  }
+  async addOpportunityLinks(opportunityId: string, links: string[]) {
+    await this.request('post', `/opportunities/${pathId(opportunityId)}/addLinks`, { links });
+  }
+  async removeOpportunityLinks(opportunityId: string, links: string[]) {
+    await this.request('post', `/opportunities/${pathId(opportunityId)}/removeLinks`, {
       links
     });
-    return response.data;
   }
-
-  async addOpportunitySources(opportunityId: string, sources: string[]): Promise<any> {
-    let response = await this.http.post(`/opportunities/${opportunityId}/addSources`, {
+  async addOpportunitySources(opportunityId: string, sources: string[]) {
+    await this.request('post', `/opportunities/${pathId(opportunityId)}/addSources`, {
       sources
     });
-    return response.data;
   }
-
-  async removeOpportunitySources(opportunityId: string, sources: string[]): Promise<any> {
-    let response = await this.http.post(`/opportunities/${opportunityId}/removeSources`, {
+  async removeOpportunitySources(opportunityId: string, sources: string[]) {
+    await this.request('post', `/opportunities/${pathId(opportunityId)}/removeSources`, {
       sources
     });
-    return response.data;
   }
-
-  // ─── Applications ───
-
-  async listOpportunityApplications(opportunityId: string): Promise<any> {
-    let response = await this.http.get(`/opportunities/${opportunityId}/applications`);
-    return response.data;
+  listOpportunityApplications(opportunityId: string, params?: Row) {
+    return this.request(
+      'get',
+      `/opportunities/${pathId(opportunityId)}/applications`,
+      undefined,
+      params
+    );
   }
-
-  // ─── Contacts ───
-
-  async getContact(contactId: string): Promise<any> {
-    let response = await this.http.get(`/contacts/${contactId}`);
-    return response.data;
+  getContact(contactId: string) {
+    return this.read(`/contacts/${pathId(contactId)}`, id(contactId));
   }
-
-  async updateContact(contactId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.put(`/contacts/${contactId}`, data);
-    return response.data;
-  }
-
-  // ─── Postings ───
-
-  async listPostings(params?: Record<string, any>): Promise<any> {
-    let response = await this.http.get('/postings', { params });
-    return response.data;
-  }
-
-  async getPosting(postingId: string): Promise<any> {
-    let response = await this.http.get(`/postings/${postingId}`);
-    return response.data;
-  }
-
-  async createPosting(data: Record<string, any>): Promise<any> {
-    let response = await this.http.post('/postings', data);
-    return response.data;
-  }
-
-  async updatePosting(postingId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.put(`/postings/${postingId}`, data);
-    return response.data;
-  }
-
-  async getPostingApplyQuestions(postingId: string): Promise<any> {
-    let response = await this.http.get(`/postings/${postingId}/apply`);
-    return response.data;
-  }
-
-  async submitPostingApplication(postingId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.post(`/postings/${postingId}/apply`, data);
-    return response.data;
-  }
-
-  // ─── Interviews & Panels ───
-
-  async listOpportunityInterviews(opportunityId: string): Promise<any> {
-    let response = await this.http.get(`/opportunities/${opportunityId}/interviews`);
-    return response.data;
-  }
-
-  async getInterview(interviewId: string): Promise<any> {
-    let response = await this.http.get(`/interviews/${interviewId}`);
-    return response.data;
-  }
-
-  async createInterview(
-    opportunityId: string,
-    panelId: string,
-    data: Record<string, any>
-  ): Promise<any> {
-    let response = await this.http.post(
-      `/opportunities/${opportunityId}/panels/${panelId}/interviews`,
+  async updateContact(contactId: string, data: Row) {
+    const path = `/contacts/${pathId(contactId)}`;
+    const body = await this.merge(
+      path,
+      id(contactId),
+      ['name', 'headline', 'location', 'emails', 'phones'],
       data
     );
-    return response.data;
+    if (data.location === undefined && body.location && typeof body.location === 'object') {
+      const location = row(body.location);
+      // Free-text locations read back as {name}; writable objects require a country.
+      if (Object.keys(location).length === 1 && typeof location.name === 'string')
+        body.location = text(location.name, 'Returned contact location', true);
+      else if (typeof location.country !== 'string' || !/^[A-Za-z]{2}$/.test(location.country))
+        invalid(
+          'The current contact location cannot be safely preserved. Provide a complete free-text location or update the contact in Lever.'
+        );
+    }
+    return this.write('put', path, body, undefined, id(contactId));
   }
-
-  async updateInterview(interviewId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.put(`/interviews/${interviewId}`, data);
-    return response.data;
+  listPostings(params?: Row) {
+    return this.request('get', '/postings', undefined, params);
   }
-
-  async deleteInterview(interviewId: string): Promise<any> {
-    let response = await this.http.delete(`/interviews/${interviewId}`);
-    return response.data;
+  getPosting(postingId: string) {
+    return this.read(`/postings/${pathId(postingId)}`, id(postingId));
   }
-
-  async listOpportunityPanels(opportunityId: string): Promise<any> {
-    let response = await this.http.get(`/opportunities/${opportunityId}/panels`);
-    return response.data;
+  createPosting(data: Row, actor?: string) {
+    return this.write('post', '/postings', data, this.actor(actor));
   }
-
-  async createPanel(opportunityId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.post(`/opportunities/${opportunityId}/panels`, data);
-    return response.data;
+  async updatePosting(postingId: string, data: Row, actor?: string, before?: Row) {
+    const current = (await this.getPosting(postingId)).data;
+    const nested = ['categories', 'content'].filter(key => data[key] !== undefined);
+    if (before && canonical(writable(current, nested)) !== canonical(writable(before, nested)))
+      invalid(
+        'Posting content or categories changed during readback. Read it again before updating.'
+      );
+    return this.write(
+      'post',
+      `/postings/${pathId(postingId)}`,
+      data,
+      this.actor(actor),
+      id(postingId)
+    );
   }
-
-  async updatePanel(panelId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.put(`/panels/${panelId}`, data);
-    return response.data;
+  listOpportunityInterviews(opportunityId: string, params?: Row) {
+    return this.request(
+      'get',
+      `/opportunities/${pathId(opportunityId)}/interviews`,
+      undefined,
+      params
+    );
   }
-
-  async deletePanel(panelId: string): Promise<any> {
-    let response = await this.http.delete(`/panels/${panelId}`);
-    return response.data;
+  getInterview(opportunityId: string, interviewId: string) {
+    return this.read(
+      `/opportunities/${pathId(opportunityId)}/interviews/${pathId(interviewId)}`,
+      id(interviewId)
+    );
   }
-
-  // ─── Feedback ───
-
-  async listOpportunityFeedback(opportunityId: string): Promise<any> {
-    let response = await this.http.get(`/opportunities/${opportunityId}/feedback`);
-    return response.data;
+  async createInterview(opportunityId: string, panelId: string, data: Row, actor?: string) {
+    const panel = (await this.getPanel(opportunityId, panelId)).data;
+    if (panel.externallyManaged !== true)
+      invalid('Only an externally managed panel can receive API-created interviews.');
+    return this.write(
+      'post',
+      `/opportunities/${pathId(opportunityId)}/interviews`,
+      { ...data, panel: id(panelId) },
+      this.actor(actor)
+    );
   }
-
-  async createFeedback(opportunityId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.post(`/opportunities/${opportunityId}/feedback`, data);
-    return response.data;
+  async updateInterview(
+    opportunityId: string,
+    interviewId: string,
+    data: Row,
+    actor?: string
+  ) {
+    const path = `/opportunities/${pathId(opportunityId)}/interviews/${pathId(interviewId)}`;
+    const body = await this.merge(path, id(interviewId), interviewFields, data);
+    const panel = (await this.getPanel(opportunityId, id(body.panel, 'Interview panel ID')))
+      .data;
+    if (panel.externallyManaged !== true)
+      invalid('Only interviews in externally managed panels can be updated.');
+    // Read responses expose conferences rather than writable conferenceData. A replacement PUT must not silently erase them.
+    return this.write('put', path, body, this.actor(actor), id(interviewId));
   }
-
-  // ─── Notes ───
-
-  async listOpportunityNotes(opportunityId: string): Promise<any> {
-    let response = await this.http.get(`/opportunities/${opportunityId}/notes`);
-    return response.data;
+  async deleteInterview(opportunityId: string, interviewId: string, actor?: string) {
+    const before = (await this.getInterview(opportunityId, interviewId)).data;
+    const panel = (await this.getPanel(opportunityId, id(before.panel, 'Interview panel ID')))
+      .data;
+    if (panel.externallyManaged !== true)
+      invalid('Only interviews in externally managed panels can be deleted.');
+    await this.request(
+      'delete',
+      `/opportunities/${pathId(opportunityId)}/interviews/${pathId(interviewId)}`,
+      undefined,
+      this.actor(actor)
+    );
   }
-
-  async createNote(opportunityId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.post(`/opportunities/${opportunityId}/notes`, data);
-    return response.data;
+  listOpportunityPanels(opportunityId: string, params?: Row) {
+    return this.request(
+      'get',
+      `/opportunities/${pathId(opportunityId)}/panels`,
+      undefined,
+      params
+    );
   }
-
-  // ─── Offers ───
-
-  async listOpportunityOffers(opportunityId: string): Promise<any> {
-    let response = await this.http.get(`/opportunities/${opportunityId}/offers`);
-    return response.data;
+  getPanel(opportunityId: string, panelId: string) {
+    return this.read(
+      `/opportunities/${pathId(opportunityId)}/panels/${pathId(panelId)}`,
+      id(panelId)
+    );
   }
-
-  async getOffer(offerId: string): Promise<any> {
-    let response = await this.http.get(`/offers/${offerId}`);
-    return response.data;
+  listOpportunityFeedback(opportunityId: string, params?: Row) {
+    return this.request(
+      'get',
+      `/opportunities/${pathId(opportunityId)}/feedback`,
+      undefined,
+      params
+    );
   }
-
-  // ─── Resumes ───
-
-  async listOpportunityResumes(opportunityId: string): Promise<any> {
-    let response = await this.http.get(`/opportunities/${opportunityId}/resumes`);
-    return response.data;
+  listOpportunityNotes(opportunityId: string, params?: Row) {
+    return this.request(
+      'get',
+      `/opportunities/${pathId(opportunityId)}/notes`,
+      undefined,
+      params
+    );
   }
-
-  // ─── Files ───
-
-  async listOpportunityFiles(opportunityId: string): Promise<any> {
-    let response = await this.http.get(`/opportunities/${opportunityId}/files`);
-    return response.data;
+  getNote(opportunityId: string, noteId: string) {
+    return this.read(
+      `/opportunities/${pathId(opportunityId)}/notes/${pathId(noteId)}`,
+      id(noteId)
+    );
   }
-
-  // ─── Referrals ───
-
-  async listOpportunityReferrals(opportunityId: string): Promise<any> {
-    let response = await this.http.get(`/opportunities/${opportunityId}/referrals`);
-    return response.data;
+  async createNote(opportunityId: string, data: Row) {
+    const envelope = row(
+      await this.request('post', `/opportunities/${pathId(opportunityId)}/notes`, data)
+    );
+    const receipt = row(envelope.data);
+    const noteId = id(receipt.noteId ?? receipt.id, 'Returned note ID');
+    return this.getNote(opportunityId, noteId);
   }
-
-  // ─── Users ───
-
-  async listUsers(params?: Record<string, any>): Promise<any> {
-    let response = await this.http.get('/users', { params });
-    return response.data;
+  listOpportunityOffers(opportunityId: string, params?: Row) {
+    return this.request(
+      'get',
+      `/opportunities/${pathId(opportunityId)}/offers`,
+      undefined,
+      params
+    );
   }
-
-  async getUser(userId: string): Promise<any> {
-    let response = await this.http.get(`/users/${userId}`);
-    return response.data;
+  listOpportunityResumes(opportunityId: string, params?: Row) {
+    return this.request(
+      'get',
+      `/opportunities/${pathId(opportunityId)}/resumes`,
+      undefined,
+      params
+    );
   }
-
-  async createUser(data: Record<string, any>): Promise<any> {
-    let response = await this.http.post('/users', data);
-    return response.data;
+  listOpportunityFiles(opportunityId: string, params?: Row) {
+    return this.request(
+      'get',
+      `/opportunities/${pathId(opportunityId)}/files`,
+      undefined,
+      params
+    );
   }
-
-  async updateUser(userId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.put(`/users/${userId}`, data);
-    return response.data;
+  getFile(opportunityId: string, fileId: string, kind: 'files' | 'resumes') {
+    return this.read(
+      `/opportunities/${pathId(opportunityId)}/${kind}/${pathId(fileId)}`,
+      id(fileId)
+    );
   }
-
-  async deactivateUser(userId: string): Promise<any> {
-    let response = await this.http.put(`/users/${userId}/deactivate`);
-    return response.data;
+  listOpportunityReferrals(opportunityId: string, params?: Row) {
+    return this.request(
+      'get',
+      `/opportunities/${pathId(opportunityId)}/referrals`,
+      undefined,
+      params
+    );
   }
-
-  async reactivateUser(userId: string): Promise<any> {
-    let response = await this.http.put(`/users/${userId}/reactivate`);
-    return response.data;
+  listUsers(params?: Row) {
+    return this.request('get', '/users', undefined, params);
   }
-
-  // ─── Stages ───
-
-  async listStages(): Promise<any> {
-    let response = await this.http.get('/stages');
-    return response.data;
+  getUser(userId: string) {
+    return this.read(`/users/${pathId(userId)}`, id(userId));
   }
-
-  // ─── Archive Reasons ───
-
-  async listArchiveReasons(): Promise<any> {
-    let response = await this.http.get('/archive_reasons');
-    return response.data;
+  createUser(data: Row) {
+    return this.write('post', '/users', data);
   }
-
-  // ─── Sources ───
-
-  async listSources(): Promise<any> {
-    let response = await this.http.get('/sources');
-    return response.data;
+  async updateUser(userId: string, data: Row) {
+    const path = `/users/${pathId(userId)}`;
+    return this.write(
+      'put',
+      path,
+      await this.merge(path, id(userId), userFields, data),
+      undefined,
+      id(userId)
+    );
   }
-
-  // ─── Tags ───
-
-  async listTags(): Promise<any> {
-    let response = await this.http.get('/tags');
-    return response.data;
+  async deactivateUser(userId: string) {
+    await this.getUser(userId);
+    return this.write(
+      'post',
+      `/users/${pathId(userId)}/deactivate`,
+      {},
+      undefined,
+      id(userId)
+    );
   }
-
-  // ─── Requisitions ───
-
-  async listRequisitions(params?: Record<string, any>): Promise<any> {
-    let response = await this.http.get('/requisitions', { params });
-    return response.data;
+  async reactivateUser(userId: string) {
+    await this.getUser(userId);
+    return this.write(
+      'post',
+      `/users/${pathId(userId)}/reactivate`,
+      {},
+      undefined,
+      id(userId)
+    );
   }
-
-  async getRequisition(requisitionId: string): Promise<any> {
-    let response = await this.http.get(`/requisitions/${requisitionId}`);
-    return response.data;
+  listStages(params?: Row) {
+    return this.request('get', '/stages', undefined, params);
   }
-
-  async createRequisition(data: Record<string, any>): Promise<any> {
-    let response = await this.http.post('/requisitions', data);
-    return response.data;
+  listArchiveReasons(params?: Row) {
+    return this.request('get', '/archive_reasons', undefined, params);
   }
-
-  async updateRequisition(requisitionId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.put(`/requisitions/${requisitionId}`, data);
-    return response.data;
+  listSources(params?: Row) {
+    return this.request('get', '/sources', undefined, params);
   }
-
-  async deleteRequisition(requisitionId: string): Promise<any> {
-    let response = await this.http.delete(`/requisitions/${requisitionId}`);
-    return response.data;
+  listTags(params?: Row) {
+    return this.request('get', '/tags', undefined, params);
   }
-
-  // ─── Webhooks ───
-
-  async listWebhooks(): Promise<any> {
-    let response = await this.http.get('/webhooks');
-    return response.data;
+  listFeedbackTemplates(params?: Row) {
+    return this.request('get', '/feedback_templates', undefined, params);
   }
-
-  async createWebhook(data: Record<string, any>): Promise<any> {
-    let response = await this.http.post('/webhooks', data);
-    return response.data;
+  listRequisitions(params?: Row) {
+    return this.request('get', '/requisitions', undefined, params);
   }
-
-  async deleteWebhook(webhookId: string): Promise<any> {
-    let response = await this.http.delete(`/webhooks/${webhookId}`);
-    return response.data;
+  getRequisition(requisitionId: string) {
+    return this.read(`/requisitions/${pathId(requisitionId)}`, id(requisitionId));
   }
-
-  async getWebhook(webhookId: string): Promise<any> {
-    let response = await this.http.get(`/webhooks/${webhookId}`);
-    return response.data;
+  createRequisition(data: Row) {
+    return this.write('post', '/requisitions', data);
+  }
+  async updateRequisition(requisitionId: string, data: Row) {
+    const path = `/requisitions/${pathId(requisitionId)}`;
+    return this.write(
+      'put',
+      path,
+      await this.merge(path, id(requisitionId), requisitionFields, data),
+      undefined,
+      id(requisitionId)
+    );
+  }
+  async deleteRequisition(requisitionId: string) {
+    await this.getRequisition(requisitionId);
+    await this.request('delete', `/requisitions/${pathId(requisitionId)}`);
   }
 }

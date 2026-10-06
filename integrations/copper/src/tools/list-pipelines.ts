@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listPipelines = SlateTool.create(spec, {
@@ -43,6 +44,7 @@ export let listPipelines = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'list_pipelines');
     let client = new Client(ctx.auth);
 
     let pipelines = await client.listPipelines();
@@ -59,7 +61,7 @@ export let listPipelines = SlateTool.create(spec, {
         stages: stages.map((s: any) => ({
           stageId: s.id,
           name: s.name,
-          winProbability: s.win_probability
+          winProbability: s.win_probability ?? undefined
         }))
       });
     }

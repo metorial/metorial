@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,27 +45,22 @@ export let updateSurvey = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     let { surveyId, ...updateData } = ctx.input;
 
-    // Filter out undefined values
-    let filtered: Record<string, any> = {};
-    for (let [key, value] of Object.entries(updateData)) {
-      if (value !== undefined) {
-        filtered[key] = value;
-      }
-    }
+    const filtered = pickDefined(updateData);
 
     let survey = await client.updateSurvey(surveyId, filtered);
 
     return {
       output: {
         surveyId: survey.id,
-        name: survey.name ?? '',
-        status: survey.status ?? '',
-        updatedAt: survey.updatedAt ?? ''
+        name: survey.name,
+        status: survey.status,
+        updatedAt: survey.updatedAt
       },
       message: `Updated survey **${survey.name}** (status: ${survey.status}).`
     };

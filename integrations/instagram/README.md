@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/instagram.svg" height="20"> Instagram
 
-Publish photos, videos, Reels, Stories, and carousels to Instagram. Retrieve and manage media with metadata such as captions, timestamps, and permalinks. Moderate comments by creating, replying, deleting, hiding, or disabling them. Access account and media-level insights including reach, views, saves, likes, comments, shares, and audience demographics. Search public posts by hashtag. Discover and retrieve mentions of your brand and other business/creator account profiles. Send and receive direct messages including text, media, and story replies within the 24-hour messaging window. Receive real-time webhook notifications for new comments, mentions, story insights, and incoming messages.
+Publish photos, videos, Reels, Stories, and carousels to Instagram. Retrieve and manage media with metadata such as captions, timestamps, and permalinks. Moderate comments by creating, replying, deleting, hiding, or disabling them. Access account and media-level insights including reach, views, saves, likes, comments, shares, and audience demographics. Search public posts by hashtag. Discover and retrieve mentions of your brand and other business/creator account profiles. Send and receive direct messages including text, media, and story replies within the 24-hour messaging window.
 
 ## Tools
 

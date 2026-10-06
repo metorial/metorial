@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteStack = SlateTool.create(spec, {
@@ -16,10 +17,7 @@ export let deleteStack = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe('Organization name (uses default from config if not set)'),
+      organization: organizationInput,
       projectName: z.string().describe('Project name'),
       stackName: z.string().describe('Stack name to delete'),
       force: z
@@ -36,12 +34,10 @@ export let deleteStack = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
 
     await client.deleteStack(org, ctx.input.projectName, ctx.input.stackName, ctx.input.force);
 

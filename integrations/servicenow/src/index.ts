@@ -17,8 +17,6 @@ import {
   queryRecords,
   updateRecord
 } from './tools';
-import { inboundWebhook, incidentUpdates, recordChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     manageAttachment,
     importData
   ],
-  triggers: [inboundWebhook, recordChanges, incidentUpdates]
+  triggers: []
 });

@@ -52,11 +52,13 @@ export let listChecks = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of records returned in this response'),
       checks: z.array(checkSchema).describe('List of uptime checks'),
       counts: z
         .object({
           total: z.number(),
-          filtered: z.number()
+          filtered: z.number(),
+          limited: z.number().optional()
         })
         .optional()
     })
@@ -75,12 +77,12 @@ export let listChecks = SlateTool.create(spec, {
       include_severity: true
     });
 
-    let checks = (result.checks || []).map((c: any) => ({
+    let checks = result.checks.map(c => ({
       checkId: c.id,
       name: c.name,
       hostname: c.hostname,
       status: c.status,
-      type: c.type,
+      type: typeof c.type === 'string' ? c.type : c.type?.name,
       resolution: c.resolution,
       lastErrorTime: c.lasterrortime,
       lastTestTime: c.lasttesttime,
@@ -92,12 +94,15 @@ export let listChecks = SlateTool.create(spec, {
     return {
       output: {
         checks,
-        counts: result.counts
-          ? {
-              total: result.counts.total,
-              filtered: result.counts.filtered
-            }
-          : undefined
+        returnedCount: checks.length,
+        counts:
+          result.counts?.total !== undefined && result.counts.filtered !== undefined
+            ? {
+                total: result.counts.total,
+                filtered: result.counts.filtered,
+                limited: result.counts.limited
+              }
+            : undefined
       },
       message: `Found **${checks.length}** uptime check(s).`
     };

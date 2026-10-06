@@ -22,8 +22,6 @@ import { amplitudeDeveloperTools } from './tools/developer-tools';
 import { amplitudeExperimentTools } from './tools/experiment-tools';
 import { amplitudeProjectAnalyticsTools } from './tools/project-analytics';
 import { queryExperimentTool } from './tools/query-experiment';
-import { eventWebhookTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     ...amplitudeReportTools,
     ...amplitudeProjectAnalyticsTools
   ],
-  triggers: [eventWebhookTrigger]
+  triggers: []
 });

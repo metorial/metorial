@@ -17,10 +17,14 @@ import {
   deleteBranch,
   deleteComment,
   deleteFile,
+  deleteOrganization,
   deleteRelease,
   deleteRepo,
+  deleteTeam,
   deleteWikiPage,
+  downloadFile,
   forkRepo,
+  getCurrentUser,
   getFileContent,
   getIssue,
   getOrganization,
@@ -52,18 +56,13 @@ import {
   updateRepo,
   updateWikiPage
 } from './tools';
-import {
-  issueEvents,
-  pullRequestEvents,
-  pushEvents,
-  releaseEvents,
-  repositoryEvents,
-  wikiEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    downloadFile,
+    deleteOrganization,
+    deleteTeam,
     searchRepos,
     getRepo,
     createRepo,
@@ -115,12 +114,5 @@ export let provider = Slate.create({
     manageCollaborator,
     listCommits
   ],
-  triggers: [
-    pushEvents,
-    issueEvents,
-    pullRequestEvents,
-    repositoryEvents,
-    releaseEvents,
-    wikiEvents
-  ]
+  triggers: []
 });

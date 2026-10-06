@@ -7,13 +7,21 @@ import {
   createTemplate,
   deleteEndpoint,
   getBilling,
+  getCurrentUser,
   getEndpoint,
   getJobStatus,
+  getJobStream,
+  getNetworkVolume,
   getPod,
+  getTemplate,
+  listComputeTypes,
+  listContainerRegistryAuths,
+  listDataCenters,
   listEndpoints,
   listNetworkVolumes,
   listPods,
   listTemplates,
+  manageContainerRegistryAuth,
   manageJob,
   manageNetworkVolume,
   managePod,
@@ -22,7 +30,6 @@ import {
   updateEndpoint,
   updatePod
 } from './tools';
-import { serverlessJobCompleted } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -46,7 +53,15 @@ export let provider = Slate.create({
     listTemplates,
     createTemplate,
     manageTemplate,
-    getBilling
+    getBilling,
+    getCurrentUser,
+    getJobStream,
+    getTemplate,
+    getNetworkVolume,
+    listComputeTypes,
+    listDataCenters,
+    listContainerRegistryAuths,
+    manageContainerRegistryAuth
   ],
-  triggers: [serverlessJobCompleted]
+  triggers: []
 });

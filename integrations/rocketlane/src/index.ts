@@ -38,8 +38,6 @@ import {
   updateTask,
   updateTimeEntry
 } from './tools';
-import { taskEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -80,5 +78,5 @@ export let provider = Slate.create({
     listResourceAllocations,
     searchInvoices
   ],
-  triggers: [taskEvents]
+  triggers: []
 });

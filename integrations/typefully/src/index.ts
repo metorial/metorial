@@ -10,8 +10,6 @@ import {
   updateDraft,
   uploadMedia
 } from './tools';
-import { draftEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     manageTags,
     uploadMedia
   ],
-  triggers: [draftEvents]
+  triggers: []
 });

@@ -13,8 +13,6 @@ import {
   updatePlayerSettings,
   updateVideoSource
 } from './tools';
-import { videoWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     listWhitelistedDomains,
     addWhitelistedDomain
   ],
-  triggers: [videoWebhook]
+  triggers: []
 });

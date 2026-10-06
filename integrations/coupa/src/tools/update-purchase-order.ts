@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoupaClient } from '../lib/client';
+import { customFields, decimal } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let updatePurchaseOrder = SlateTool.create(spec, {
@@ -33,12 +34,30 @@ export let updatePurchaseOrder = SlateTool.create(spec, {
             orderLineId: z.number().optional().describe('Existing line ID (for updates)'),
             description: z.string().optional().describe('Line description'),
             quantity: z.number().optional().describe('Updated quantity'),
+            quantityDecimal: z
+              .string()
+              .optional()
+              .describe(
+                'Exact plain decimal quantity; omit the numeric alias for high precision'
+              ),
             price: z.number().optional().describe('Updated price'),
+            priceDecimal: z
+              .string()
+              .optional()
+              .describe(
+                'Exact plain decimal price; omit the numeric alias for high precision'
+              ),
             needByDate: z.string().optional().describe('Updated need-by date')
           })
         )
         .optional()
         .describe('Order lines to update — include line ID for existing lines'),
+      customFieldsGlobalNamespace: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use true for existing global custom fields (legacy default); false places fields under the modern custom-fields namespace'
+        ),
       customFields: z
         .record(z.string(), z.any())
         .optional()
@@ -50,14 +69,14 @@ export let updatePurchaseOrder = SlateTool.create(spec, {
       purchaseOrderId: z.number().describe('Updated PO ID'),
       poNumber: z.string().nullable().optional().describe('PO number'),
       status: z.string().nullable().optional().describe('Current PO status'),
-      rawData: z.any().optional().describe('Complete raw PO data')
+      rawData: z
+        .any()
+        .optional()
+        .describe('Native data with documented credential fields omitted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let payload: any = {};
 
@@ -72,18 +91,20 @@ export let updatePurchaseOrder = SlateTool.create(spec, {
         let ol: any = {};
         if (line.orderLineId) ol.id = line.orderLineId;
         if (line.description) ol.description = line.description;
-        if (line.quantity !== undefined) ol.quantity = String(line.quantity);
-        if (line.price !== undefined) ol.price = String(line.price);
+        if (line.quantity !== undefined || line.quantityDecimal !== undefined)
+          ol.quantity = decimal(line.quantity, line.quantityDecimal, 'quantity');
+        if (line.price !== undefined || line.priceDecimal !== undefined)
+          ol.price = decimal(line.price, line.priceDecimal, 'price');
         if (line.needByDate) ol['need-by-date'] = line.needByDate;
         return ol;
       });
     }
 
-    if (ctx.input.customFields) {
-      for (let [key, value] of Object.entries(ctx.input.customFields)) {
-        payload[key] = value;
-      }
-    }
+    customFields(
+      payload,
+      ctx.input.customFields,
+      ctx.input.customFieldsGlobalNamespace ?? true
+    );
 
     let result = await client.updatePurchaseOrder(ctx.input.purchaseOrderId, payload);
 

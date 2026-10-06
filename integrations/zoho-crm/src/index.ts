@@ -17,8 +17,6 @@ import {
   sendEmail,
   updateRecord
 } from './tools';
-import { recordChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     sendEmail,
     getOrganization
   ],
-  triggers: [recordChanges]
+  triggers: []
 });

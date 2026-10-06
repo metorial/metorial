@@ -21,7 +21,7 @@ describe('google-search-console provider contract', () => {
         'manage_sitemap',
         'inspect_url'
       ],
-      triggerIds: ['inbound_webhook'],
+      triggerIds: [],
       authMethodIds: ['oauth'],
       tools: [
         { id: 'query_search_analytics', readOnly: true, destructive: false },
@@ -30,10 +30,10 @@ describe('google-search-console provider contract', () => {
         { id: 'manage_sitemap', readOnly: false, destructive: true },
         { id: 'inspect_url', readOnly: true, destructive: false }
       ],
-      triggers: [{ id: 'inbound_webhook', invocationType: 'webhook' }]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(6);
+    expect(contract.actions).toHaveLength(5);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -41,8 +41,7 @@ describe('google-search-console provider contract', () => {
       list_sites: googleSearchConsoleActionScopes.listSites,
       manage_site: googleSearchConsoleActionScopes.manageSite,
       manage_sitemap: googleSearchConsoleActionScopes.manageSitemap,
-      inspect_url: googleSearchConsoleActionScopes.inspectUrl,
-      inbound_webhook: googleSearchConsoleActionScopes.inboundWebhook
+      inspect_url: googleSearchConsoleActionScopes.inspectUrl
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

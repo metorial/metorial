@@ -12,6 +12,9 @@ export let generateFromTemplate = SlateTool.create(spec, {
     'Use "get_template" to see which variables a template requires.',
     'Variable names use double curly braces in the template (e.g. {{name}}) — pass them without braces as keys in the variables object.'
   ],
+  constraints: [
+    'Legacy test mode uses v2 compatibility, which HeyGen retires after October 31, 2026. Use current typed variables without test mode for v3 rendering.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -21,13 +24,15 @@ export let generateFromTemplate = SlateTool.create(spec, {
     z.object({
       templateId: z.string().describe('ID of the template to generate from'),
       variables: z
-        .record(z.string(), z.any())
-        .describe('Key-value map of template variable names to their values'),
+        .record(z.string(), z.unknown())
+        .describe(
+          'Typed variable map from get_template. For text use {type: "text", content: "Hello"}; media and avatar variables use their documented typed objects.'
+        ),
       title: z.string().optional().describe('Title for the generated video'),
       test: z
         .boolean()
         .optional()
-        .describe('If true, generates a free watermarked test video'),
+        .describe('If true, requests a watermarked video through legacy test mode'),
       callbackId: z
         .string()
         .optional()
@@ -40,7 +45,7 @@ export let generateFromTemplate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HeyGenClient({ token: ctx.auth.token });
+    let client = new HeyGenClient(ctx.auth);
 
     let result = await client.generateFromTemplate({
       templateId: ctx.input.templateId,

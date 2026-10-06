@@ -1,140 +1,141 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, type Token } from '../lib/client';
 import { spec } from '../spec';
 
+const accessTokenSchema = z.object({
+  name: z.string().describe('Token name'),
+  tokenValue: z
+    .string()
+    .optional()
+    .describe(
+      'Token secret when returned by the provider. Encrypted token secrets are shown only at creation; save them securely.'
+    ),
+  publicId: z
+    .string()
+    .optional()
+    .describe(
+      'Public token identifier for rate-limit updates and deletion; cannot authenticate API calls'
+    ),
+  tokenType: z.string().optional().describe('Token format'),
+  scopes: z.array(z.string()).optional().describe('Token scopes'),
+  status: z.string().optional().describe('Token status'),
+  rateLimitWindowSize: z.number().optional().describe('Rate limit window size'),
+  rateLimitWindowCount: z.number().optional().describe('Rate limit window count')
+});
+const mapToken = (token: Token) => ({
+  name: token.name,
+  tokenValue: token.access_token,
+  publicId: token.public_id,
+  tokenType: token.token_type,
+  scopes: token.scopes,
+  status: token.status,
+  rateLimitWindowSize: token.rate_limit_window_size,
+  rateLimitWindowCount: token.rate_limit_window_count
+});
 export let manageAccessTokens = SlateTool.create(spec, {
   name: 'Manage Project Access Tokens',
   key: 'manage_access_tokens',
-  description: `List, create, update rate limits, or delete project access tokens in Rollbar.
-Requires an **account-level** access token or a project token with write scope.`,
+  description:
+    'List, create, update rate limits, or delete project access tokens. Requires an account token with read scope for listing/readback and write scope for mutations. New tokens use encrypted v2 format; token secrets are available only at creation.',
   instructions: [
-    'Use action "list" with projectId to see all tokens for a project.',
-    'Use action "create" with projectId, name, and scopes to create a new token.',
-    'Use action "update" with projectId and tokenValue to update rate limits.',
-    'Use action "delete" with projectId and tokenValue to delete a token.'
+    'Use tokenPublicId from list/create for updates and deletion. tokenValue supports legacy token secrets.',
+    'Use separate ingestion and read/write tokens. post_server_item and post_client_item cannot be combined with read or write.',
+    'Deleting or rate-limiting a token can interrupt applications. Select only the intended token.'
   ],
-  tags: {
-    destructive: false
-  }
+  tags: { destructive: true }
 })
   .input(
     z.object({
-      action: z.enum(['list', 'create', 'update', 'delete']).describe('Operation to perform'),
-      projectId: z.number().describe('Project ID'),
+      action: z.enum(['list', 'create', 'update', 'delete']).describe('Operation'),
+      projectId: z.number().describe('Project ID from manage_project'),
       tokenValue: z
         .string()
         .optional()
-        .describe('Access token string value (required for "update" and "delete" actions)'),
-      name: z.string().optional().describe('Token name (required for "create" action)'),
+        .describe('Legacy token secret for update/delete; do not combine with tokenPublicId'),
+      tokenPublicId: z
+        .string()
+        .optional()
+        .describe('Public token identifier for update/delete; preferred for encrypted tokens'),
+      name: z.string().optional().describe('Token name, required for create'),
       scopes: z
         .array(z.enum(['post_server_item', 'post_client_item', 'read', 'write']))
         .optional()
-        .describe('Token scopes (required for "create" action)'),
+        .describe('Scopes, required for create'),
       rateLimitWindowSize: z
         .number()
         .optional()
-        .describe('Rate limit window size in seconds (for "create" and "update")'),
+        .describe('Rate-limit window seconds; positive for create, nonnegative for update'),
       rateLimitWindowCount: z
         .number()
         .optional()
         .describe(
-          'Maximum number of calls in the rate limit window (for "create" and "update")'
+          'Calls per window; positive for create, zero disables an existing token’s limit'
         )
     })
   )
   .output(
     z.object({
-      accessToken: z
-        .object({
-          name: z.string().describe('Token name'),
-          tokenValue: z.string().describe('Token string value'),
-          scopes: z.array(z.string()).optional().describe('Token scopes'),
-          status: z.string().optional().describe('Token status'),
-          rateLimitWindowSize: z.number().optional().describe('Rate limit window size'),
-          rateLimitWindowCount: z.number().optional().describe('Rate limit window count')
-        })
-        .optional()
-        .describe('Single access token (for create/update)'),
-      accessTokens: z
-        .array(
-          z.object({
-            name: z.string().describe('Token name'),
-            tokenValue: z.string().describe('Token string value'),
-            scopes: z.array(z.string()).optional().describe('Token scopes'),
-            status: z.string().optional().describe('Token status'),
-            rateLimitWindowSize: z.number().optional().describe('Rate limit window size'),
-            rateLimitWindowCount: z.number().optional().describe('Rate limit window count')
-          })
-        )
-        .optional()
-        .describe('List of access tokens'),
-      deleted: z.boolean().optional().describe('Whether the token was deleted')
+      accessToken: accessTokenSchema.optional().describe('Created or updated token'),
+      accessTokens: z.array(accessTokenSchema).optional().describe('Project tokens'),
+      deleted: z.boolean().optional().describe('Whether deletion was accepted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let mapToken = (t: any) => ({
-      name: t.name,
-      tokenValue: t.access_token,
-      scopes: t.scopes,
-      status: t.status,
-      rateLimitWindowSize: t.rate_limit_window_size,
-      rateLimitWindowCount: t.rate_limit_window_count
-    });
-
+    const client = createClient(ctx);
     if (ctx.input.action === 'list') {
-      let result = await client.listProjectAccessTokens(ctx.input.projectId);
-      let tokens = (result?.result || []).map(mapToken);
+      const tokens = (await client.listProjectAccessTokens(ctx.input.projectId)).result.map(
+        mapToken
+      );
       return {
         output: { accessTokens: tokens },
-        message: `Found **${tokens.length}** access tokens for project ${ctx.input.projectId}.`
+        message: `Found ${tokens.length} project tokens.`
       };
     }
-
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for "create" action');
-      if (!ctx.input.scopes) throw new Error('scopes are required for "create" action');
-      let result = await client.createProjectAccessToken(ctx.input.projectId, {
-        name: ctx.input.name,
-        scopes: ctx.input.scopes,
-        rate_limit_window_size: ctx.input.rateLimitWindowSize,
-        rate_limit_window_count: ctx.input.rateLimitWindowCount
-      });
-      let token = mapToken(result?.result);
-      return {
-        output: { accessToken: token },
-        message: `Created access token **${token.name}** with scopes: ${token.scopes?.join(', ')}.`
-      };
-    }
-
-    if (ctx.input.action === 'update') {
-      if (!ctx.input.tokenValue) throw new Error('tokenValue is required for "update" action');
-      let result = await client.updateProjectAccessToken(
-        ctx.input.projectId,
-        ctx.input.tokenValue,
-        {
-          rate_limit_window_size: ctx.input.rateLimitWindowSize,
-          rate_limit_window_count: ctx.input.rateLimitWindowCount
-        }
+      if (!ctx.input.name || !ctx.input.scopes)
+        throw createApiServiceError('name and scopes are required for create.');
+      const token = mapToken(
+        (
+          await client.createProjectAccessToken(ctx.input.projectId, {
+            name: ctx.input.name,
+            scopes: ctx.input.scopes,
+            rate_limit_window_size: ctx.input.rateLimitWindowSize,
+            rate_limit_window_count: ctx.input.rateLimitWindowCount
+          })
+        ).result
       );
-      let token = mapToken(result?.result);
       return {
         output: { accessToken: token },
-        message: `Updated rate limits for access token **${token.name}**.`
+        message: `Created token ${token.name}. Save its secret securely; it may not be shown again.`
       };
     }
-
-    if (ctx.input.action === 'delete') {
-      if (!ctx.input.tokenValue) throw new Error('tokenValue is required for "delete" action');
-      await client.deleteProjectAccessToken(ctx.input.projectId, ctx.input.tokenValue);
+    if (
+      (!ctx.input.tokenValue && !ctx.input.tokenPublicId) ||
+      (ctx.input.tokenValue !== undefined && ctx.input.tokenPublicId !== undefined)
+    )
+      throw createApiServiceError(
+        'Provide exactly one tokenPublicId or legacy tokenValue for update/delete.'
+      );
+    const identifier = {
+      public_id: ctx.input.tokenPublicId,
+      project_access_token: ctx.input.tokenValue
+    };
+    if (ctx.input.action === 'update') {
+      const token = mapToken(
+        (
+          await client.updateProjectAccessToken(ctx.input.projectId, identifier, {
+            rate_limit_window_size: ctx.input.rateLimitWindowSize,
+            rate_limit_window_count: ctx.input.rateLimitWindowCount
+          })
+        ).result
+      );
       return {
-        output: { deleted: true },
-        message: `Deleted access token from project **${ctx.input.projectId}**.`
+        output: { accessToken: token },
+        message: `Updated rate limits for token ${token.name}.`
       };
     }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    await client.deleteProjectAccessToken(ctx.input.projectId, identifier);
+    return { output: { deleted: true }, message: 'Deleted the selected project token.' };
   })
   .build();

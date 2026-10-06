@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PrismaClient } from '../lib/client';
+import { mapConnection, mapDatabase, PrismaClient } from '../lib/client';
+import { projectIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createDatabase = SlateTool.create(spec, {
@@ -9,7 +10,7 @@ export let createDatabase = SlateTool.create(spec, {
   description: `Create a new Prisma Postgres database within an existing project. The database will be provisioned in the specified region and connection details will be returned.`,
   instructions: [
     'A project must exist before creating a database. Use "Create Project" if needed.',
-    'Common regions include "us-east-1", "eu-west-1", "ap-southeast-1".'
+    'Call list_regions to choose an available region. Provisioning may incur charges.'
   ],
   tags: {
     destructive: false
@@ -17,9 +18,13 @@ export let createDatabase = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to create the database in'),
+      projectId: projectIdInput,
       name: z.string().describe('Name for the new database'),
-      region: z.string().describe('AWS region for the database (e.g., "us-east-1")'),
+      region: z
+        .string()
+        .describe(
+          'Region ID from list_regions, or inherit to use the project default region.'
+        ),
       isDefault: z
         .boolean()
         .optional()
@@ -48,23 +53,22 @@ export let createDatabase = SlateTool.create(spec, {
       isDefault: ctx.input.isDefault
     });
 
-    let firstKey = db.apiKeys?.[0];
-    let firstConn = db.connections?.[0];
+    const connection = db.connections?.[0] ?? db.apiKeys?.[0];
+    const credentials = connection ? mapConnection(connection) : undefined;
+    const mapped = mapDatabase(db);
 
     return {
       output: {
-        databaseId: db.id,
-        databaseName: db.name,
-        region: db.region,
-        status: db.status,
-        connectionString: db.connectionString ?? firstKey?.connectionString,
-        directHost: firstKey?.ppgDirectConnection?.host ?? firstConn?.directConnection?.host,
-        directPort: firstKey?.ppgDirectConnection?.port ?? firstConn?.directConnection?.port,
-        directUser: firstKey?.ppgDirectConnection?.user ?? firstConn?.directConnection?.user,
+        ...mapped,
+        directHost: credentials?.directHost ?? db.directConnection?.host,
+        directPort: credentials?.directPort ?? db.directConnection?.port,
+        directUser: credentials?.directUser ?? db.directConnection?.user,
         directPassword:
-          firstKey?.ppgDirectConnection?.password ?? firstConn?.directConnection?.password
+          credentials?.directPassword ??
+          db.directConnection?.pass ??
+          db.directConnection?.password
       },
-      message: `Created database **${db.name}** in region **${db.region ?? ctx.input.region}** with status **${db.status ?? 'provisioning'}**.`
+      message: `Created database **${db.name}** in region **${mapped.region ?? ctx.input.region}** with status **${db.status ?? 'provisioning'}**.`
     };
   })
   .build();

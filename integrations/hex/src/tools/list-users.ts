@@ -20,7 +20,16 @@ export let listUsers = SlateTool.create(spec, {
         .optional()
         .describe('Number of results per page (1-100)'),
       after: z.string().optional().describe('Pagination cursor for the next page'),
-      sortBy: z.enum(['CREATED_AT', 'NAME']).optional().describe('Field to sort by'),
+      before: z
+        .string()
+        .optional()
+        .describe('Previous-page cursor; do not combine with after'),
+      sortBy: z
+        .enum(['CREATED_AT', 'NAME', 'EMAIL'])
+        .optional()
+        .describe(
+          'NAME or EMAIL. The retained CREATED_AT value is not supported by the current user API and fails with remediation.'
+        ),
       sortDirection: z.enum(['ASC', 'DESC']).optional().describe('Sort direction')
     })
   )
@@ -29,32 +38,40 @@ export let listUsers = SlateTool.create(spec, {
       users: z.array(
         z.object({
           userId: z.string(),
-          name: z.string(),
+          name: z.string().nullable(),
           email: z.string(),
           role: z.string(),
           lastLoginAt: z.string().nullable(),
-          createdAt: z.string()
+          createdAt: z.string().optional()
         })
       ),
+      returnedCount: z.number().optional(),
+      previousCursor: z.string().optional(),
       nextCursor: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
 
     let result = await client.listUsers({
       limit: ctx.input.limit,
       after: ctx.input.after,
+      before: ctx.input.before,
       sortBy: ctx.input.sortBy,
       sortDirection: ctx.input.sortDirection
     });
 
-    let users = result.values ?? [];
+    let users = result.values;
 
     return {
       output: {
         users,
-        nextCursor: result.pagination?.after
+        returnedCount: result.values.length,
+        previousCursor: result.pagination.before,
+        nextCursor: result.pagination.after
       },
       message: `Found **${users.length}** user(s).${result.pagination?.after ? ' More results available.' : ''}`
     };

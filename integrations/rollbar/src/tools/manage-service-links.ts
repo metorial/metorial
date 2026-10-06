@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageServiceLinks = SlateTool.create(spec, {
@@ -8,17 +8,22 @@ export let manageServiceLinks = SlateTool.create(spec, {
   key: 'manage_service_links',
   description: `Create, list, update, or delete service links in a Rollbar project. Service links are templated URLs that provide quick navigation from Rollbar items to external tools and services.`,
   instructions: [
+    'Partial updates require read and write scopes because the existing link is read before replacement.',
     'Use action "list" to see all service links.',
     'Use action "create" with name and template to create a new service link.',
     'Use action "update" with serviceLinkId to update a service link.',
     'Use action "delete" with serviceLinkId to delete a service link.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
+      projectId: z
+        .number()
+        .optional()
+        .describe('Project ID from manage_project; required with an account token.'),
       action: z.enum(['list', 'create', 'update', 'delete']).describe('Operation to perform'),
       serviceLinkId: z
         .number()
@@ -58,9 +63,9 @@ export let manageServiceLinks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
-    let mapLink = (l: any) => ({
+    let mapLink = (l: { id: number; name: string; template: string }) => ({
       serviceLinkId: l.id,
       name: l.name,
       template: l.template
@@ -76,8 +81,9 @@ export let manageServiceLinks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for "create" action');
-      if (!ctx.input.template) throw new Error('template is required for "create" action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for "create" action');
+      if (!ctx.input.template)
+        throw createApiServiceError('template is required for "create" action');
       let result = await client.createServiceLink({
         name: ctx.input.name,
         template: ctx.input.template
@@ -91,7 +97,7 @@ export let manageServiceLinks = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.serviceLinkId)
-        throw new Error('serviceLinkId is required for "update" action');
+        throw createApiServiceError('serviceLinkId is required for "update" action');
       let result = await client.updateServiceLink(ctx.input.serviceLinkId, {
         name: ctx.input.name,
         template: ctx.input.template
@@ -105,7 +111,7 @@ export let manageServiceLinks = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.serviceLinkId)
-        throw new Error('serviceLinkId is required for "delete" action');
+        throw createApiServiceError('serviceLinkId is required for "delete" action');
       await client.deleteServiceLink(ctx.input.serviceLinkId);
       return {
         output: { deleted: true },
@@ -113,6 +119,6 @@ export let manageServiceLinks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

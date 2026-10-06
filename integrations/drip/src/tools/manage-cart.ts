@@ -1,10 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema, queuedShape } from '../lib/schemas';
 import { spec } from '../spec';
 
 let cartItemSchema = z.object({
   productId: z.string().describe('Product ID.'),
+  productVariantId: z
+    .string()
+    .optional()
+    .describe('Product variant ID; use productId for a product with one variant.'),
   name: z.string().describe('Product name.'),
   price: z.number().describe('Item price.'),
   quantity: z.number().optional().describe('Quantity.'),
@@ -28,13 +33,23 @@ export let manageCart = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
+      initialStatus: z
+        .enum(['active', 'unsubscribed'])
+        .optional()
+        .describe(
+          'Initial subscriber status. If omitted, shopper activity can subscribe a person and trigger automations.'
+        ),
       email: z.string().describe('Subscriber email address.'),
       provider: z
         .string()
         .describe('Ecommerce provider identifier (e.g. "shopify", "my_custom_platform").'),
       action: z.enum(['created', 'updated']).describe('Cart action.'),
       cartId: z.string().describe('Unique cart identifier.'),
-      cartUrl: z.string().optional().describe('URL to the cart page.'),
+      cartUrl: z
+        .string()
+        .optional()
+        .describe('URL to the cart page. Required by the current Cart Activity API.'),
       grandTotal: z.number().optional().describe('Cart total.'),
       totalDiscounts: z.number().optional().describe('Total discounts.'),
       currencyCode: z.string().optional().describe('ISO 4217 currency code.'),
@@ -44,16 +59,23 @@ export let manageCart = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      recorded: z.boolean().describe('Whether the cart was recorded.')
+      recorded: z
+        .boolean()
+        .describe('False when processing is only accepted and not independently confirmed.'),
+      ...queuedShape
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 
+    if (!ctx.input.cartUrl)
+      throw createApiServiceError('cartUrl is required by the current Cart Activity API.', {
+        reason: 'invalid_input'
+      });
     let cart: Record<string, any> = {
       email: ctx.input.email,
       provider: ctx.input.provider,
@@ -61,15 +83,17 @@ export let manageCart = SlateTool.create(spec, {
       cart_id: ctx.input.cartId
     };
 
+    if (ctx.input.initialStatus !== undefined) cart.initial_status = ctx.input.initialStatus;
     if (ctx.input.cartUrl) cart.cart_url = ctx.input.cartUrl;
     if (ctx.input.grandTotal !== undefined) cart.grand_total = ctx.input.grandTotal;
     if (ctx.input.totalDiscounts !== undefined)
       cart.total_discounts = ctx.input.totalDiscounts;
-    if (ctx.input.currencyCode) cart.currency_code = ctx.input.currencyCode;
+    if (ctx.input.currencyCode) cart.currency = ctx.input.currencyCode;
     if (ctx.input.occurredAt) cart.occurred_at = ctx.input.occurredAt;
 
     cart.items = ctx.input.items.map(item => ({
       product_id: item.productId,
+      product_variant_id: item.productVariantId ?? item.productId,
       name: item.name,
       price: item.price,
       quantity: item.quantity,
@@ -79,11 +103,18 @@ export let manageCart = SlateTool.create(spec, {
       product_url: item.productUrl
     }));
 
-    await client.createOrUpdateCart(cart);
+    const result = await client.createOrUpdateCart(cart);
 
     return {
-      output: { recorded: true },
-      message: `Cart **${ctx.input.cartId}** (${ctx.input.action}) recorded for **${ctx.input.email}**.`
+      output: {
+        recorded: false,
+        accepted: true,
+        completed: false,
+        requestIds: result.request_ids,
+        partialErrors: result.errors
+      },
+      message:
+        'Drip accepted the cart activity for background processing; completion is unconfirmed.'
     };
   })
   .build();

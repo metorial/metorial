@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTemplates = SlateTool.create(spec, {
   name: 'List Templates',
   key: 'list_templates',
-  description: `List document templates from your DocuSeal account. Filter by name, folder, external ID, or archived status. Returns template details including fields, submitter roles, and documents. Supports pagination for large result sets.`,
+  description: `List document templates from your DocuSeal account. Filter by name, folder, external ID, or archived status. Returns template summaries; use get_template for fields, roles and documents. Supports pagination for large result sets.`,
   tags: {
     readOnly: true
   }
@@ -33,6 +34,9 @@ export let listTemplates = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: paginationSchema.describe(
+        'Native page count and ID cursors; use next as after to continue.'
+      ),
       templates: z
         .array(
           z.object({
@@ -65,7 +69,7 @@ export let listTemplates = SlateTool.create(spec, {
       before: ctx.input.before
     });
 
-    let templates = (Array.isArray(data) ? data : data.data || []).map((t: any) => ({
+    let templates = data.data.map(t => ({
       templateId: t.id,
       name: t.name,
       slug: t.slug,
@@ -77,7 +81,7 @@ export let listTemplates = SlateTool.create(spec, {
     }));
 
     return {
-      output: { templates },
+      output: { templates, pagination: data.pagination },
       message: `Found **${templates.length}** template(s).`
     };
   })

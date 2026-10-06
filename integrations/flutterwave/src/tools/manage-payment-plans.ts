@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageFields, pageOutput } from '../lib/contracts';
 import { spec } from '../spec';
 
 let paymentPlanSchema = z.object({
@@ -31,6 +32,7 @@ export let managePaymentPlans = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      page: z.number().optional().describe('Positive page number for listing'),
       action: z.enum(['create', 'list', 'get', 'update']).describe('Action to perform'),
       planId: z.number().optional().describe('Plan ID (required for get/update)'),
       name: z.string().optional().describe('Plan name (for create)'),
@@ -52,16 +54,19 @@ export let managePaymentPlans = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pageFields,
       plans: z.array(paymentPlanSchema).describe('Payment plan(s) returned')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
     let { action } = ctx.input;
 
     if (action === 'create') {
       if (!ctx.input.name || !ctx.input.amount || !ctx.input.interval) {
-        throw new Error('name, amount, and interval are required to create a payment plan');
+        throw createApiServiceError(
+          'name, amount, and interval are required to create a payment plan'
+        );
       }
       let result = await client.createPaymentPlan({
         amount: ctx.input.amount,
@@ -91,7 +96,8 @@ export let managePaymentPlans = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.planId) throw new Error('planId is required to get a payment plan');
+      if (!ctx.input.planId)
+        throw createApiServiceError('planId is required to get a payment plan');
       let result = await client.getPaymentPlan(ctx.input.planId);
       let p = result.data;
       return {
@@ -115,7 +121,8 @@ export let managePaymentPlans = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.planId) throw new Error('planId is required to update a payment plan');
+      if (!ctx.input.planId)
+        throw createApiServiceError('planId is required to update a payment plan');
       let result = await client.updatePaymentPlan(ctx.input.planId, {
         name: ctx.input.updateName,
         status: ctx.input.updateStatus
@@ -142,7 +149,7 @@ export let managePaymentPlans = SlateTool.create(spec, {
     }
 
     // list
-    let result = await client.listPaymentPlans();
+    let result = await client.listPaymentPlans({ page: ctx.input.page });
     let plans = (result.data || []).map((p: any) => ({
       planId: p.id,
       name: p.name,
@@ -156,7 +163,7 @@ export let managePaymentPlans = SlateTool.create(spec, {
     }));
 
     return {
-      output: { plans },
+      output: { plans, ...pageOutput(result) },
       message: `Found **${plans.length}** payment plans.`
     };
   })

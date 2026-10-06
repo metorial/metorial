@@ -1,75 +1,22 @@
-Now I have comprehensive information. Let me compile the specification.
+# LeadIQ API capabilities
 
-# Slates Specification for LeadIQ
+The integration uses the current public GraphQL API at `https://api.leadiq.com/graphql`. Paste the Secret Base64 API key from Settings > API Keys; it is sent directly as `Authorization: Basic <encoded-key>` and must not be encoded again. GraphQL errors are checked even when HTTP status is 200.
 
-## Overview
+The five original tools remain available: contact lookup, company lookup, advanced flat/grouped search, account credit plans and contact-data feedback. Contact lookup exposes provider person IDs and forwards the past-company option in `company.searchInPastCompanies`. Phone quality maps to `qualityFilter.phone`. Company and contact results retain their original output field names. Nullable provider fields are omitted when unavailable; funding round counts are converted to numbers only when safely numeric, with the native text retained as `fundingRoundsText`.
 
-LeadIQ is a B2B sales prospecting and data enrichment platform that provides access to professional contact and company information. Its API allows querying verified email addresses, phone numbers, job positions, company firmographics, technographics, and funding data for millions of contacts and accounts. The API uses GraphQL and is credit-based.
+Advanced search supports both offset and opaque cursor paging. Keep filters/sorting identical and pass `after` unchanged. Offset `skip + limit` cannot exceed 10,000. Original location arrays are expanded into current structured city/state/country filters; ISO country codes become English country names. Original date strings become Unix milliseconds, range min/max becomes start/end, industry-code strings become code objects, and total funding bounds map to `totalFundingRange`. Legacy description, funding-round-count and funding-type filter fields remain in the schema but fail with current supported-filter guidance because their equivalents are not documented; this is not a provider/API retirement claim. Optional legacy advanced contact arrays and employee range fields remain in output contracts but are not fabricated when the current advanced schema does not expose them. Use contact lookup for email/phone enrichment.
 
-## Authentication
+Three additional tools discover saved company lists, get a list with independently paginated entries, and manage its create/update/delete/add/remove lifecycle. Manual company saves are not enriched and are documented as free. Updates preserve omitted fields; explicit empty description clears it. Saved entry IDs differ from data-company IDs. Partial batch failures remain visible. Company-list deletion is permanent, owner-restricted and rejected for lists containing prospects; no prospect list deletion or external CRM export is introduced.
 
-Authentication is performed via HTTP Basic authentication. Provide your API key as the username value. You do not need to provide a password.
+The current account operation exposes plans and available/used credits for DataHub and Universal plans. It does not document a stable current-user or organization ID, so no fabricated identity endpoint is exposed. Actual API costs, visibility, quota and rates depend on the account; the integration does not assume MCP pricing applies to direct GraphQL calls. Standard documented rate limit is 60 requests/minute, subject to custom agreements. Search and feedback history is not assumed reversible.
 
-**Getting your API key:**
-You'll need an API key, which can be found within your LeadIQ account in Settings > API Keys. Choose the Secret Base64 API key.
+Feedback is a mutation returning a submission ID. The tool reports accepted submission only after that ID is present. No feedback readback/delete/reversal operation is documented. It requires identifying input, a contact value, and an invalid reason for Invalid reports.
 
-**GraphQL Endpoint:**
-`https://api.leadiq.com/graphql`
+The legacy inbound webhook trigger was removed. No replacement event handlers or trigger groups were added. Prospect-list/CRM exports, workato credentials and email-verification MCP-only capabilities are outside this bounded refresh.
 
-**Example:**
+Official references:
 
-```
-curl -X POST https://api.leadiq.com/graphql \
-  -u YOUR_API_KEY: \
-  -H "Content-Type: application/json" \
-  -d '{"query": "{ account { plans { name status } } }"}'
-```
-
-Note the trailing colon after the API key (empty password field in Basic auth).
-
-**Access tiers:**
-
-- Users across all plans can make up to 50 one-off, non-recurring calls to test the API.
-- Beyond the free tier, API access requires a direct sales discussion for enterprise-level agreements.
-
-## Features
-
-### Contact Search
-
-Find a single person based on identifying information such as person name and current (or past) companies, LinkedIn profile, or work/personal email. Additional search inputs include phone number, hashed email (SHA256), and LeadIQ person ID.
-
-- Results include current and past positions with associated work emails and phones, personal emails and phones, LinkedIn profile, other social profiles, education history, and location.
-- Each email and phone includes a verification status (Verified, VerifiedLikely, Unverified, Invalid, Suppressed).
-- You can filter results to only include contacts with verified work emails, specific email statuses, or specific contact info types (e.g., `HasVerifiedWorkPhone`, `HasPersonalEmail`).
-- A `minConfidence` parameter (0–100) allows filtering by match confidence.
-- A `qualityFilter` option lets you control phone number quality levels (AllPhones, HigherQualityPhones, HighestQualityPhones).
-
-### Company Search
-
-Find a single company based on name, domain, country, or LinkedIn URL.
-
-- Returns detailed company information including alternative names, description, industry, employee count/range, location details, logo, technologies used, revenue range, funding info (rounds, total funding, last funding details), SIC/NAICS codes, social URLs, founded year, company hierarchy (parent/ultimate parent), and department function trends over time.
-
-### Advanced People Search
-
-Find a list of people based on broad search criteria such as job title, seniority, role, company size, location, etc.
-
-- Two response formats available:
-  - **Grouped search**: results are grouped by company.
-  - **Flat search**: results returned as a flat list.
-- **Contact filters**: filter by name, title, LinkedIn ID/URL, seniority level (VP, Manager, Director, Executive, SeniorIndividualContributor), role, location, email verification status, update date range, new hire date, and new promotion date.
-- **Company filters**: filter by company name, domain, LinkedIn ID, industry, employee size range, location, description, technologies, technology categories, revenue ranges, funding info, and NAICS/SIC codes.
-- Both contact and company filters support exclusion filters to omit specific results.
-- Results can be sorted by various fields (name, title, seniority, role, updated date, etc.).
-
-### Account & Credit Management
-
-You can make utility calls like viewing your API credits. The account query returns plan details including plan name, product type, status, next billing period, available credits, used credits, and per-data-point cost breakdowns.
-
-### Data Feedback
-
-Submit corrections to person contact data. You can report an email or phone as correct or invalid, specify the invalid reason (e.g., specific email bounce codes, wrong person), and provide the type of contact info being corrected.
-
-## Events
-
-The provider does not support events. LeadIQ's API is a query-only GraphQL API focused on data retrieval and does not offer webhooks or event subscription mechanisms.
+- https://developer.leadiq.com/
+- https://leadiqhelp.zendesk.com/hc/en-us/articles/29375289152795-LeadIQ-Public-API-Guide
+- https://leadiqhelp.zendesk.com/hc/en-us/articles/35509840045083-LeadIQ-Public-API-Overview
+- https://github.com/leadiq/api-samples

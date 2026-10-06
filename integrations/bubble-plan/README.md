@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Project Bubble
 
-Manage projects, tasks, and subtasks for team collaboration. Create and update projects, organize task lists, track time and budgets, manage calendar events, and handle file sharing. Supports client management, comments on tasks, and user/team organization. Receive webhook notifications for new projects, tasks, subtasks, events, and clients.
+Manage projects, tasks, and subtasks for team collaboration. Create and update projects, organize task lists, track time and budgets, manage calendar events, and handle file sharing. Supports client management, comments on tasks, and user/team organization.
 
 ## License
 

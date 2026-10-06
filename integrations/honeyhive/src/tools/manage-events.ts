@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,9 @@ export let logEvent = SlateTool.create(spec, {
       project: z
         .string()
         .optional()
-        .describe('Project name. Falls back to the configured default project.'),
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        ),
       eventType: z.enum(['model', 'tool', 'chain']).describe('Type of event'),
       eventName: z.string().describe('Name identifying this event'),
       source: z.string().default('production').describe('Source environment'),
@@ -24,7 +26,8 @@ export let logEvent = SlateTool.create(spec, {
         .record(z.string(), z.any())
         .describe('Configuration for the event (model params, tool config, etc.)'),
       inputs: z.record(z.string(), z.any()).describe('Input data for the event'),
-      duration: z.number().describe('Duration of the event in milliseconds'),
+      duration: z.number().nonnegative().describe('Duration of the event in milliseconds'),
+      eventId: z.string().optional().describe('Optional caller-generated event ID'),
       sessionId: z.string().optional().describe('Session ID to attach this event to'),
       parentId: z.string().optional().describe('Parent event ID for nesting'),
       outputs: z.record(z.string(), z.any()).optional().describe('Output data from the event'),
@@ -50,11 +53,6 @@ export let logEvent = SlateTool.create(spec, {
     });
 
     let project = ctx.input.project || ctx.config.project;
-    if (!project) {
-      throw new Error(
-        'Project name is required. Provide it in the input or set a default in the configuration.'
-      );
-    }
 
     let data = await client.createEvent({
       project,
@@ -64,6 +62,7 @@ export let logEvent = SlateTool.create(spec, {
       config: ctx.input.eventConfig,
       inputs: ctx.input.inputs,
       duration: ctx.input.duration,
+      event_id: ctx.input.eventId,
       session_id: ctx.input.sessionId,
       parent_id: ctx.input.parentId,
       outputs: ctx.input.outputs,
@@ -106,7 +105,11 @@ export let updateEvent = SlateTool.create(spec, {
         .record(z.string(), z.any())
         .optional()
         .describe('Updated user properties'),
-      duration: z.number().optional().describe('Updated duration in milliseconds')
+      duration: z
+        .number()
+        .nonnegative()
+        .optional()
+        .describe('Updated duration in milliseconds')
     })
   )
   .output(
@@ -152,13 +155,15 @@ export let logEventBatch = SlateTool.create(spec, {
             project: z
               .string()
               .optional()
-              .describe('Project name (can be omitted if all events share the same project)'),
+              .describe(
+                'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+              ),
             eventType: z.enum(['model', 'tool', 'chain']).describe('Type of event'),
             eventName: z.string().describe('Name of the event'),
             source: z.string().default('production').describe('Source environment'),
             eventConfig: z.record(z.string(), z.any()).describe('Event configuration'),
             inputs: z.record(z.string(), z.any()).describe('Input data'),
-            duration: z.number().describe('Duration in milliseconds'),
+            duration: z.number().nonnegative().describe('Duration in milliseconds'),
             sessionId: z.string().optional().describe('Session ID'),
             parentId: z.string().optional().describe('Parent event ID'),
             outputs: z.record(z.string(), z.any()).optional().describe('Output data'),
@@ -171,7 +176,12 @@ export let logEventBatch = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('If true, all events share one session'),
-      project: z.string().optional().describe('Default project name for all events')
+      project: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        )
     })
   )
   .output(
@@ -189,6 +199,18 @@ export let logEventBatch = SlateTool.create(spec, {
 
     let defaultProject = ctx.input.project || ctx.config.project;
 
+    if (ctx.input.events.length === 0)
+      throw createApiServiceError('Provide at least one event.');
+    let projects = ctx.input.events.map(e => e.project || defaultProject);
+    if (new Set(projects.filter(Boolean)).size > 1)
+      throw createApiServiceError('All events in a batch must belong to the same project.');
+    if (
+      ctx.input.isSingleSession &&
+      new Set(ctx.input.events.map(event => event.sessionId).filter(Boolean)).size > 1
+    )
+      throw createApiServiceError(
+        'A single-session batch cannot contain different session IDs.'
+      );
     let events = ctx.input.events.map(e => ({
       project: e.project || defaultProject,
       event_type: e.eventType,
@@ -233,7 +255,9 @@ export let queryEvents = SlateTool.create(spec, {
       project: z
         .string()
         .optional()
-        .describe('Project name. Falls back to the configured default project.'),
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        ),
       filters: z
         .array(
           z.object({
@@ -248,7 +272,9 @@ export let queryEvents = SlateTool.create(spec, {
               ),
             type: z
               .string()
-              .describe('Value type: "string", "number", "boolean", or "datetime"')
+              .describe(
+                'Value type: string, number, boolean, or datetime. Legacy id is mapped to string.'
+              )
           })
         )
         .optional()
@@ -262,10 +288,19 @@ export let queryEvents = SlateTool.create(spec, {
         .describe('Date range to filter events'),
       limit: z
         .number()
+        .int()
+        .min(1)
+        .max(7500)
         .optional()
         .default(100)
         .describe('Maximum number of events to return (max 7500)'),
-      page: z.number().optional().default(1).describe('Page number for pagination')
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .default(1)
+        .describe('Page number for pagination')
     })
   )
   .output(
@@ -281,11 +316,6 @@ export let queryEvents = SlateTool.create(spec, {
     });
 
     let project = ctx.input.project || ctx.config.project;
-    if (!project) {
-      throw new Error(
-        'Project name is required. Provide it in the input or set a default in the configuration.'
-      );
-    }
 
     let dateRange: { $gte?: string; $lte?: string } | undefined;
     if (ctx.input.dateRange) {
@@ -307,9 +337,9 @@ export let queryEvents = SlateTool.create(spec, {
     return {
       output: {
         events,
-        totalEvents: data.totalEvents
+        totalEvents: data.count
       },
-      message: `Found **${events.length}** events (total: ${data.totalEvents ?? 'unknown'}).`
+      message: `Found **${events.length}** events (total: ${data.count ?? 'unknown'}).`
     };
   })
   .build();
@@ -317,14 +347,20 @@ export let queryEvents = SlateTool.create(spec, {
 export let getEvent = SlateTool.create(spec, {
   name: 'Get Event',
   key: 'get_event',
-  description: `Retrieve a single event by its ID, including all nested child events.`,
+  description: `Retrieve a single event by its ID, including its trace fields and child event IDs. The connection API key selects the project.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      eventId: z.string().describe('ID of the event to retrieve')
+      eventId: z.string().describe('ID of the event to retrieve'),
+      project: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        )
     })
   )
   .output(
@@ -333,6 +369,7 @@ export let getEvent = SlateTool.create(spec, {
       eventType: z.string().optional().describe('Type of event'),
       eventName: z.string().optional().describe('Name of the event'),
       project: z.string().optional().describe('Project name'),
+      projectId: z.string().optional().describe('Project ID returned by the provider'),
       sessionId: z.string().optional().describe('Session ID'),
       inputs: z.record(z.string(), z.any()).optional().describe('Event inputs'),
       outputs: z.record(z.string(), z.any()).optional().describe('Event outputs'),
@@ -350,7 +387,8 @@ export let getEvent = SlateTool.create(spec, {
       serverUrl: ctx.config.serverUrl
     });
 
-    let data = await client.getEvent(ctx.input.eventId);
+    let project = ctx.input.project || ctx.config.project;
+    let data = await client.getEvent(ctx.input.eventId, project);
 
     return {
       output: {
@@ -358,15 +396,16 @@ export let getEvent = SlateTool.create(spec, {
         eventType: data?.event_type,
         eventName: data?.event_name,
         project: data?.project,
+        projectId: data?.project_id,
         sessionId: data?.session_id,
-        inputs: data?.inputs,
-        outputs: data?.outputs,
-        error: data?.error,
-        duration: data?.duration,
-        metadata: data?.metadata,
-        metrics: data?.metrics,
-        feedback: data?.feedback,
-        children: data?.children
+        inputs: data?.inputs ?? undefined,
+        outputs: data?.outputs ?? undefined,
+        error: data?.error ?? undefined,
+        duration: data?.duration ?? undefined,
+        metadata: data?.metadata ?? undefined,
+        metrics: data?.metrics ?? undefined,
+        feedback: data?.feedback ?? undefined,
+        children: data?.children || data?.children_ids
       },
       message: `Retrieved event \`${ctx.input.eventId}\`.`
     };
@@ -376,9 +415,10 @@ export let getEvent = SlateTool.create(spec, {
 export let deleteEvent = SlateTool.create(spec, {
   name: 'Delete Event',
   key: 'delete_event',
-  description: `Delete a single event by its ID.`,
+  description: `DEPRECATED — unavailable: HoneyHive does not document an API for deleting individual events. Retained for existing workflows; invoking this tool reports the provider limitation.`,
   tags: {
-    destructive: true
+    destructive: true,
+    deprecated: true
   }
 })
   .input(
@@ -391,17 +431,10 @@ export let deleteEvent = SlateTool.create(spec, {
       success: z.boolean().describe('Whether the deletion was successful')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.config.serverUrl
-    });
-
-    await client.deleteEvent(ctx.input.eventId);
-
-    return {
-      output: { success: true },
-      message: `Deleted event \`${ctx.input.eventId}\`.`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'HoneyHive does not document an event deletion API. This operation is unavailable.',
+      { reason: 'honeyhive_unsupported_operation' }
+    );
   })
   .build();

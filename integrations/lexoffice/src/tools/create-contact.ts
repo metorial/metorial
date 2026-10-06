@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { contactPayload } from '../lib/payloads';
+import { xRechnungSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let addressSchema = z
@@ -12,7 +14,9 @@ let addressSchema = z
     countryCode: z
       .string()
       .optional()
-      .describe('ISO 3166-1 alpha-2 country code (e.g. DE, AT, CH)')
+      .describe(
+        'Provider country or tax-region code (e.g. DE, ES_CN); discover choices with list_reference_data'
+      )
   })
   .describe('Postal address');
 
@@ -29,10 +33,7 @@ let contactPersonSchema = z
 
 let roleSchema = z
   .object({
-    number: z
-      .number()
-      .optional()
-      .describe('Customer or vendor number (auto-assigned if omitted)')
+    number: z.number().optional().describe('Legacy read-only number; assigned by Lexoffice')
   })
   .optional()
   .describe('Role configuration');
@@ -95,6 +96,11 @@ export let createContact = SlateTool.create(spec, {
         })
         .optional()
         .describe('Contact addresses'),
+      xRechnung: xRechnungSchema
+        .optional()
+        .describe(
+          'XRechnung settings for this contact; a buyer reference also requires your vendor number at the customer'
+        ),
       emailAddresses: z
         .object({
           business: z.array(z.string()).optional().describe('Business email addresses'),
@@ -127,71 +133,8 @@ export let createContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let contactPayload: Record<string, any> = {
-      version: 0,
-      roles: {}
-    };
-
-    if (ctx.input.roles.customer) {
-      contactPayload.roles.customer =
-        ctx.input.roles.customer.number !== undefined
-          ? { number: ctx.input.roles.customer.number }
-          : {};
-    }
-    if (ctx.input.roles.vendor) {
-      contactPayload.roles.vendor =
-        ctx.input.roles.vendor.number !== undefined
-          ? { number: ctx.input.roles.vendor.number }
-          : {};
-    }
-
-    if (ctx.input.company) {
-      contactPayload.company = {
-        name: ctx.input.company.name
-      };
-      if (ctx.input.company.taxNumber)
-        contactPayload.company.taxNumber = ctx.input.company.taxNumber;
-      if (ctx.input.company.vatRegistrationId)
-        contactPayload.company.vatRegistrationId = ctx.input.company.vatRegistrationId;
-      if (ctx.input.company.allowTaxFreeInvoices !== undefined)
-        contactPayload.company.allowTaxFreeInvoices = ctx.input.company.allowTaxFreeInvoices;
-      if (ctx.input.company.contactPersons)
-        contactPayload.company.contactPersons = ctx.input.company.contactPersons;
-    }
-
-    if (ctx.input.person) {
-      contactPayload.person = {
-        lastName: ctx.input.person.lastName
-      };
-      if (ctx.input.person.salutation)
-        contactPayload.person.salutation = ctx.input.person.salutation;
-      if (ctx.input.person.firstName)
-        contactPayload.person.firstName = ctx.input.person.firstName;
-    }
-
-    if (ctx.input.note) contactPayload.note = ctx.input.note;
-    if (ctx.input.addresses) contactPayload.addresses = ctx.input.addresses;
-    if (ctx.input.emailAddresses) contactPayload.emailAddresses = ctx.input.emailAddresses;
-    if (ctx.input.phoneNumbers) contactPayload.phoneNumbers = ctx.input.phoneNumbers;
-
-    let result = await client.createContact(contactPayload);
-
-    let contactName =
-      ctx.input.company?.name ??
-      [ctx.input.person?.firstName, ctx.input.person?.lastName].filter(Boolean).join(' ') ??
-      result.id;
-
-    return {
-      output: {
-        id: result.id,
-        resourceUri: result.resourceUri,
-        createdDate: result.createdDate,
-        updatedDate: result.updatedDate,
-        version: result.version
-      },
-      message: `Created contact **${contactName}** (ID: ${result.id}).`
-    };
+    const client = new Client({ token: ctx.auth.token });
+    const result = await client.createContact(contactPayload(ctx.input, true));
+    return { output: result, message: `Created contact **${result.id}**.` };
   })
   .build();

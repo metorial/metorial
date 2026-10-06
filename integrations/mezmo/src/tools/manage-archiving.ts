@@ -1,11 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { MezmoClient } from '../lib/client';
+import { isMissing, MezmoClient } from '../lib/client';
 import { spec } from '../spec';
 
 let archiveOutputSchema = z.object({
-  integration: z.string().describe('Storage provider (e.g., "s3", "ibm", "gcs")'),
-  bucket: z.string().describe('Storage bucket name'),
+  integration: z.string().min(1).describe('Provider storage integration identifier'),
+  bucket: z.string().min(1).describe('Storage bucket name'),
   endpoint: z.string().optional().describe('Storage endpoint URL'),
   projectId: z.string().optional().describe('GCS project ID')
 });
@@ -13,7 +13,7 @@ let archiveOutputSchema = z.object({
 export let getArchiveConfig = SlateTool.create(spec, {
   name: 'Get Archive Config',
   key: 'get_archive_config',
-  description: `Retrieve the current archiving configuration. Archiving sends logs to long-term cold storage (e.g., Amazon S3, IBM Cloud Object Storage, Google Cloud Storage). Only one archiving configuration can exist at a time.`,
+  description: `Retrieve the current archiving configuration. Archiving sends logs to long-term cold storage. Only one archiving configuration can exist at a time.`,
   tags: { readOnly: true, destructive: false }
 })
   .input(z.object({}))
@@ -21,11 +21,13 @@ export let getArchiveConfig = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new MezmoClient({ token: ctx.auth.token });
     let result = await client.getArchiveConfig();
+    if (!result)
+      throw createApiServiceError('No archiving configuration exists for this account.');
 
     return {
       output: {
-        integration: result.integration || '',
-        bucket: result.bucket || '',
+        integration: result.integration,
+        bucket: result.bucket,
         endpoint: result.endpoint,
         projectId: result.projectid
       },
@@ -37,19 +39,24 @@ export let getArchiveConfig = SlateTool.create(spec, {
 export let configureArchiving = SlateTool.create(spec, {
   name: 'Configure Archiving',
   key: 'configure_archiving',
-  description: `Create or update the archiving configuration for long-term log storage. Supports Amazon S3, IBM Cloud Object Storage, and Google Cloud Storage. Only one archiving configuration may exist at a time; calling this will overwrite any existing configuration.`,
+  description: `Create or update the archiving configuration for long-term log storage. Only one archiving configuration may exist at a time; calling this will overwrite any existing configuration.`,
   instructions: [
-    'For Amazon S3: provide integration="s3", bucket, and AWS credentials (accesskey, secretkey).',
-    'For IBM COS: provide integration="ibm", bucket, endpoint, and IBM credentials.',
-    'For GCS: provide integration="gcs", bucket, and projectId.'
+    'Use the provider integration identifier and storage credentials documented for your account. This changes the account-wide destination and can send retained logs to that storage.'
   ],
-  tags: { readOnly: false, destructive: false }
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
-      integration: z.string().describe('Storage provider type (e.g., "s3", "ibm", "gcs")'),
-      bucket: z.string().describe('Target storage bucket name'),
+      integration: z.string().min(1).describe('Provider storage integration identifier'),
+      bucket: z.string().min(1).describe('Target storage bucket name'),
       endpoint: z.string().optional().describe('Storage endpoint URL'),
+      apiKey: z.string().optional().describe('Cloud Object Storage API key'),
+      space: z.string().optional().describe('Provider storage space'),
+      authUrl: z.string().optional().describe('Storage authentication URL'),
+      username: z.string().optional().describe('Storage authentication username'),
+      password: z.string().optional().describe('Storage authentication password'),
+      tenantName: z.string().optional().describe('Storage tenant name'),
+      expires: z.string().optional().describe('Provider credential expiry value'),
       accessKey: z.string().optional().describe('AWS access key (for S3)'),
       secretKey: z.string().optional().describe('AWS secret key (for S3)'),
       resourceInstanceId: z.string().optional().describe('IBM resource instance ID'),
@@ -66,6 +73,13 @@ export let configureArchiving = SlateTool.create(spec, {
       integration: ctx.input.integration,
       bucket: ctx.input.bucket,
       endpoint: ctx.input.endpoint,
+      apikey: ctx.input.apiKey,
+      space: ctx.input.space,
+      authurl: ctx.input.authUrl,
+      username: ctx.input.username,
+      password: ctx.input.password,
+      tenantname: ctx.input.tenantName,
+      expires: ctx.input.expires,
       accesskey: ctx.input.accessKey,
       secretkey: ctx.input.secretKey,
       resourceinstanceid: ctx.input.resourceInstanceId,
@@ -74,18 +88,21 @@ export let configureArchiving = SlateTool.create(spec, {
       accountkey: ctx.input.accountKey
     };
 
-    let result: Awaited<ReturnType<typeof client.createArchiveConfig>>;
+    let existing: Awaited<ReturnType<typeof client.getArchiveConfig>>;
     try {
-      await client.getArchiveConfig();
-      result = await client.updateArchiveConfig(params);
-    } catch {
-      result = await client.createArchiveConfig(params);
+      existing = await client.getArchiveConfig();
+    } catch (error) {
+      if (!isMissing(error)) throw error;
+      existing = null;
     }
+    const result = existing
+      ? await client.updateArchiveConfig(params)
+      : await client.createArchiveConfig(params);
 
     return {
       output: {
-        integration: result.integration || '',
-        bucket: result.bucket || '',
+        integration: result.integration,
+        bucket: result.bucket,
         endpoint: result.endpoint,
         projectId: result.projectid
       },

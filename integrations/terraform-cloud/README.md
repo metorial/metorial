@@ -1,101 +1,48 @@
-# <img src="https://provider-logos.metorial-cdn.com/terraform-cloud.png" height="20"> Terraform Cloud
+# Terraform Cloud (HCP Terraform)
 
-Manage infrastructure-as-code workflows on Terraform Cloud (HCP Terraform). Create, update, delete, lock, and unlock workspaces. Trigger and manage Terraform runs including plan, apply, and destroy operations. Approve, cancel, discard, or force-execute runs. Create and manage Terraform variables and environment variables at the workspace or variable set level, including sensitive values. Organize workspaces into projects. Manage organizations, teams, team memberships, and granular workspace permissions. Enforce policies using Sentinel and OPA policy-as-code frameworks. View and manage Terraform state versions and outputs. Connect workspaces to VCS repositories (GitHub, GitLab, Bitbucket, Azure DevOps) for automatic run triggers. Configure run tasks to integrate external services during plan and apply stages. Set up run triggers for workspace dependency chains. Enable health assessments including drift detection and continuous validation. Publish and manage private Terraform modules and providers in a private registry. Manage agent pools for private infrastructure execution. Access audit trail logs. Configure webhook notifications for run progress, workspace health, and auto-destroy events to Slack, Microsoft Teams, email, or custom endpoints.
+Manage HCP Terraform workspaces, runs, variables, projects, teams, workspace grants, policy sets, variable sets, state metadata and public outputs. Discover the connected account and accessible organizations before selecting resource IDs.
+
+## Authentication
+
+Connect with a user, team/group or organization API token. Set the connection API URL to the region or Terraform Enterprise installation that issued the token: `https://app.terraform.io/api/v2` by default, or `https://app.eu.terraform.io/api/v2` for HCP Europe. The URL must use HTTPS and end in `/api/v2`.
+
+User and team tokens need the appropriate workspace permissions to queue or apply runs. Organization tokens cannot execute runs or create configuration versions. Identity discovery returns the authenticated service account for team/group and organization tokens. HCP Europe uses HCP groups; the team membership API is unavailable there. SCIM-managed team membership must be changed through the identity provider.
+
+The optional configured organization is a convenience default. Call `list_organizations`, then pass `organizationName` to organization-scoped tools to select a different organization. Workspace-ID tools use the resource's own scope.
 
 ## Tools
 
-### Create Run
+| Capability | Tool keys |
+| --- | --- |
+| Account and organization discovery | `get_current_user`, `list_organizations`, `get_organization` |
+| Workspaces | `list_workspaces`, `get_workspace`, `create_workspace`, `update_workspace`, `delete_workspace`, `lock_unlock_workspace` |
+| Terraform runs | `list_runs`, `get_run`, `create_run`, `manage_run` |
+| Workspace variables | `list_variables`, `create_variable`, `update_variable`, `delete_variable` |
+| Projects | `list_projects`, `create_project`, `update_project`, `delete_project` |
+| Teams and membership | `list_teams`, `create_team`, `delete_team`, `manage_team_members` |
+| Workspace grants | `list_team_workspace_access`, `set_team_workspace_access`, `delete_team_workspace_access` |
+| Variable sets | `list_variable_sets`, `create_variable_set`, `delete_variable_set` |
+| State inspection | `list_state_versions`, `get_current_state` |
+| Policy sets | `list_policy_sets`, `create_policy_set`, `delete_policy_set` |
+| Workspace notifications | `list_notifications`, `create_notification`, `delete_notification` |
+| Workspace dependency configuration | `list_run_triggers`, `create_run_trigger`, `delete_run_trigger` |
 
-Trigger a new Terraform run (plan, apply, or destroy) in a workspace. Supports plan-only, refresh-only, destroy runs, targeted resources, and resource replacement. For VCS-connected workspaces, uses the latest configuration; for API-driven workspaces, optionally specify a configuration version.
+## Behavior and permissions
 
-### Create Variable
+Paginated tools return one provider page. Use positive integral `pageNumber` and `pageSize` values; the default size is 20 and the maximum is 100. Run-trigger listing defaults to inbound dependencies; select `type: "outbound"` to discover downstream workspaces. Current-state reads fetch every output page within a bounded 10,000-output window. `outputsReady: false` means the provider is still extracting outputs; retry later.
 
-Create a Terraform variable or environment variable in a workspace. Supports HCL-formatted values and marking variables as sensitive to protect secrets.
+Sensitive workspace variable values are empty strings and sensitive state-output values are `null`, even if an upstream response contains their plaintext. Notification URLs omit credential-bearing paths and query parameters. HCP Terraform email notification addresses resolve to accepted members of the workspace's organization; no invitation is sent. Terraform Enterprise also supports direct email recipient addresses. A generic notification's HMAC secret is write-only. Notifications are disabled by default; enabling them can send verification or event deliveries.
 
-### Create Workspace
+Team membership inputs remain usernames. Adding resolves accepted organization members to user IDs; removal uses the current API's username contract. The legacy `organizationAccess.manageRuns` field is retained for compatibility, but `true` is rejected because the current organization-access API has no such permission. Use workspace grants for run permissions. `set_team_workspace_access` creates a grant and returns its relationship ID; list and revoke grants with the corresponding tools. Revoking a workspace grant does not revoke permissions inherited from organization or project roles.
 
-Create a new Terraform workspace. Configure execution mode, Terraform version, auto-apply behavior, and optionally connect to a VCS repository for automatic run triggers.
+Agent-mode workspace creation requires an existing `agentPoolId`. Workspace creation can connect an existing VCS OAuth token. Runs use an already uploaded configuration version or the workspace's current configuration. Configuration upload, state-file upload/download, registry administration, agent-pool administration, audit logs and run-task administration are outside this tool set.
 
-### Delete Variable
+## Operational effects
 
-Permanently delete a variable from a workspace. This removes the variable from both the workspace and any future runs.
+Deleting a workspace permanently removes its content. Applying or destroying runs can change real infrastructure and incur costs. Run actions are asynchronous: acceptance does not mean completion; inspect `get_run`. Force-execute cancels prior incomplete runs and unlocks the workspace. Force-cancel requires a prior graceful cancellation and the provider's cool-off prerequisite. Team changes and global policy/variable sets can affect many users or workspaces. Use controlled resources and the required permissions before making these changes.
 
-### Delete Workspace
-
-Permanently delete a workspace and all of its content (state versions, runs, variables). This action cannot be undone.
-
-### Get Organization
-
-Get details about the configured Terraform Cloud organization, including plan entitlements, feature flags, and usage limits.
-
-### Get Run
-
-Get detailed information about a specific Terraform run. Returns the run's current status, plan/apply details, timestamps, and whether it has changes.
-
-### List State Versions
-
-List historical state versions for a workspace. Each state version represents a snapshot of the infrastructure state at a point in time.
-
-### Get Workspace
-
-Get detailed information about a specific workspace by its ID or name. Returns full workspace configuration including execution mode, Terraform version, VCS settings, lock status, and resource count.
-
-### List Runs
-
-List Terraform runs for a workspace. Filter by status to find pending, planning, applying, or completed runs. Returns run details including status, changes, and timing information.
-
-### List Variables
-
-List all Terraform and environment variables in a workspace. Returns the key, value, category, and whether each variable is sensitive or uses HCL syntax. Sensitive variable values are not returned.
-
-### List Workspaces
-
-List workspaces in the organization. Supports searching by name and filtering by project. Returns workspace configuration including execution mode, Terraform version, lock status, and VCS connection.
-
-### Lock/Unlock Workspace
-
-Lock or unlock a workspace. Locking prevents new runs from being queued. Supports regular unlock and force-unlock (requires admin access). Provide a reason when locking to document why the workspace is locked.
-
-### List Notifications
-
-List all notification configurations for a workspace. Shows webhook, Slack, Microsoft Teams, and email notification destinations and the events they listen for.
-
-### List Policy Sets
-
-List policy sets configured in the organization. Policy sets contain Sentinel or OPA policies that are enforced on runs.
-
-### List Projects
-
-List all projects in the organization. Projects are used to organize and group workspaces.
-
-### List Run Triggers
-
-List run triggers (workspace dependencies) for a workspace. Run triggers automatically queue runs when dependent workspaces complete successfully.
-
-### Manage Run
-
-Perform an action on an existing Terraform run. Apply a planned run, discard an unapplied plan, cancel a running operation, force-cancel a stuck run, or force-execute a run that is waiting in the queue.
-
-### List Teams
-
-List all teams in the organization. Returns team details including member count, visibility, and organization-level access permissions.
-
-### List Variable Sets
-
-List all variable sets in the organization. Variable sets allow sharing common variables across multiple workspaces without duplicating them.
-
-### Update Variable
-
-Update an existing variable's key, value, description, HCL setting, or sensitivity. Only provided fields will be updated.
-
-### Update Workspace
-
-Update an existing workspace's settings. Modify name, description, execution mode, Terraform version, auto-apply behavior, or working directory. Only provided fields will be updated.
+`allowEmptyApply: true` can automatically apply an empty plan even when `autoApply` is false. Leave it false when applying must wait for separate confirmation. Run listing excludes speculative plan-only runs by default; pass the optional `operation` filter to include them.
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE)

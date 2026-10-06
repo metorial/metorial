@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, nextBefore } from '../lib/client';
 import { spec } from '../spec';
 
 export let getPagespeedHistory = SlateTool.create(spec, {
@@ -15,10 +15,22 @@ export let getPagespeedHistory = SlateTool.create(spec, {
   .input(
     z.object({
       testId: z.string().describe('ID of the page speed test'),
-      before: z.string().optional().describe('ISO 8601 date to filter results before'),
-      after: z.string().optional().describe('ISO 8601 date to filter results after'),
-      limit: z.number().optional().describe('Number of results per page'),
-      page: z.number().optional().describe('Page number for pagination')
+      before: z
+        .string()
+        .optional()
+        .describe('RFC3339 date or UNIX-seconds string to filter results before'),
+      after: z
+        .string()
+        .optional()
+        .describe('RFC3339 date or UNIX-seconds string to filter results after'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Number of results per response, between 1 and 100'),
+      page: z
+        .number()
+        .optional()
+        .describe('Legacy first-page selector; use before/after cursors for continuation')
     })
   )
   .output(
@@ -29,7 +41,12 @@ export let getPagespeedHistory = SlateTool.create(spec, {
       metadata: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Aggregated statistics and pagination info')
+        .describe('Aggregated statistics and pagination info'),
+      links: z.record(z.string(), z.any()).optional().describe('Provider continuation links'),
+      nextBefore: z
+        .string()
+        .optional()
+        .describe('UNIX-seconds cursor to pass as before for the next response')
     })
   )
   .handleInvocation(async ctx => {
@@ -42,11 +59,11 @@ export let getPagespeedHistory = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let records = result?.data ?? [];
-    let metadata = result?.metadata ?? undefined;
+    let records = result.data;
+    let metadata = result.metadata;
 
     return {
-      output: { records, metadata },
+      output: { records, metadata, links: result.links, nextBefore: nextBefore(result.links) },
       message: `Retrieved **${records.length}** history record(s) for page speed test **${ctx.input.testId}**.`
     };
   })

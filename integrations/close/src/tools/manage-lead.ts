@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, customFields, nonEmpty } from '../lib/client';
+import { mapLead } from '../lib/models';
 import { spec } from '../spec';
 
 let contactSchema = z.object({
@@ -14,7 +15,7 @@ let contactSchema = z.object({
       })
     )
     .optional()
-    .describe('Contact email addresses'),
+    .describe('Contact email addresses, when provided'),
   phones: z
     .array(
       z.object({
@@ -26,7 +27,7 @@ let contactSchema = z.object({
       })
     )
     .optional()
-    .describe('Contact phone numbers'),
+    .describe('Contact phone numbers, when provided'),
   urls: z
     .array(
       z.object({
@@ -38,7 +39,7 @@ let contactSchema = z.object({
       })
     )
     .optional()
-    .describe('Contact URLs')
+    .describe('Contact URLs, when provided')
 });
 
 let addressSchema = z.object({
@@ -52,7 +53,7 @@ let addressSchema = z.object({
 
 let leadOutputSchema = z.object({
   leadId: z.string().describe('Unique lead ID'),
-  name: z.string().describe('Lead/company name'),
+  name: z.string().optional().describe('Lead/company name, when set'),
   statusId: z.string().nullable().describe('Lead status ID'),
   statusLabel: z.string().nullable().describe('Lead status label'),
   url: z.string().nullable().describe('Lead company URL'),
@@ -64,107 +65,26 @@ let leadOutputSchema = z.object({
         contactId: z.string(),
         name: z.string().nullable(),
         title: z.string().nullable(),
-        emails: z.array(z.object({ email: z.string(), type: z.string() })),
-        phones: z.array(z.object({ phone: z.string(), type: z.string() }))
+        emails: z.array(z.object({ email: z.string(), type: z.string() })).optional(),
+        phones: z.array(z.object({ phone: z.string(), type: z.string() })).optional()
       })
     )
     .describe('Contacts associated with the lead'),
-  displayName: z.string().describe('Lead display name')
+  displayName: z.string().optional().describe('Lead display name, when provided')
 });
-
-let mapLeadToOutput = (lead: any) => ({
-  leadId: lead.id,
-  name: lead.name || lead.display_name || '',
-  statusId: lead.status_id || null,
-  statusLabel: lead.status_label || null,
-  url: lead.url || null,
-  dateCreated: lead.date_created || '',
-  dateUpdated: lead.date_updated || '',
-  contacts: (lead.contacts || []).map((c: any) => ({
-    contactId: c.id,
-    name: c.name || null,
-    title: c.title || null,
-    emails: (c.emails || []).map((e: any) => ({
-      email: e.email || '',
-      type: e.type || 'office'
-    })),
-    phones: (c.phones || []).map((p: any) => ({
-      phone: p.phone || '',
-      type: p.type || 'office'
-    }))
-  })),
-  displayName: lead.display_name || lead.name || ''
-});
-
-let buildLeadPayload = (input: any) => {
-  let payload: Record<string, any> = {};
-
-  if (input.name !== undefined) payload.name = input.name;
-  if (input.statusId !== undefined) payload.status_id = input.statusId;
-  if (input.description !== undefined) payload.description = input.description;
-  if (input.url !== undefined) payload.url = input.url;
-
-  if (input.contacts !== undefined) {
-    payload.contacts = input.contacts.map((c: any) => {
-      let contact: Record<string, any> = {};
-      if (c.name !== undefined) contact.name = c.name;
-      if (c.title !== undefined) contact.title = c.title;
-      if (c.emails !== undefined) {
-        contact.emails = c.emails.map((e: any) => ({
-          email: e.email,
-          type: e.type || 'office'
-        }));
-      }
-      if (c.phones !== undefined) {
-        contact.phones = c.phones.map((p: any) => ({
-          phone: p.phone,
-          type: p.type || 'office'
-        }));
-      }
-      if (c.urls !== undefined) {
-        contact.urls = c.urls.map((u: any) => ({
-          url: u.url,
-          type: u.type || 'url'
-        }));
-      }
-      return contact;
-    });
-  }
-
-  if (input.addresses !== undefined) {
-    payload.addresses = input.addresses.map((a: any) => {
-      let address: Record<string, any> = {};
-      if (a.address1 !== undefined) address.address_1 = a.address1;
-      if (a.address2 !== undefined) address.address_2 = a.address2;
-      if (a.city !== undefined) address.city = a.city;
-      if (a.state !== undefined) address.state = a.state;
-      if (a.zipcode !== undefined) address.zipcode = a.zipcode;
-      if (a.country !== undefined) address.country = a.country;
-      return address;
-    });
-  }
-
-  if (input.customFields !== undefined) {
-    for (let [key, value] of Object.entries(input.customFields)) {
-      let fieldKey = key.startsWith('custom.') ? key : `custom.${key}`;
-      payload[fieldKey] = value;
-    }
-  }
-
-  return payload;
-};
 
 export let manageLeadTool = SlateTool.create(spec, {
   name: 'Manage Lead',
   key: 'manage_lead',
-  description: `Creates or updates a lead in Close CRM. If a leadId is provided, the existing lead is updated with the supplied fields. If no leadId is provided, a new lead is created. Supports setting contacts, addresses, and custom fields.`,
+  description: `Creates or updates a lead in Close CRM. If a leadId is provided, the existing lead is updated with the supplied fields. If no leadId is provided, a new lead is created. Supports setting contacts, addresses, and custom fields. Nested contacts are supported only during creation. Use Manage Contact to change contacts on an existing lead.`,
   instructions: [
     'Omit leadId to create a new lead. Provide leadId to update an existing lead.',
     'Custom fields should be passed in customFields as key-value pairs. Keys can be provided with or without the "custom." prefix.',
-    'When creating a lead, at minimum provide a name.'
+    'A name is recommended when creating a lead. Nested contacts are only supported during creation; use Manage Contact for contact updates.'
   ],
   tags: {
-    readOnly: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -177,8 +97,11 @@ export let manageLeadTool = SlateTool.create(spec, {
       contacts: z
         .array(contactSchema)
         .optional()
-        .describe('Contacts to associate with the lead'),
-      addresses: z.array(addressSchema).optional().describe('Physical addresses for the lead'),
+        .describe('Initial contacts for a new lead. For existing leads, use Manage Contact.'),
+      addresses: z
+        .array(addressSchema)
+        .optional()
+        .describe('Physical addresses for the lead, when provided'),
       customFields: z
         .record(z.string(), z.any())
         .optional()
@@ -189,22 +112,46 @@ export let manageLeadTool = SlateTool.create(spec, {
   )
   .output(leadOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-    let payload = buildLeadPayload(ctx.input);
-    let lead: any;
-
-    if (ctx.input.leadId) {
-      lead = await client.updateLead(ctx.input.leadId, payload);
-    } else {
-      lead = await client.createLead(payload);
-    }
-
-    let isUpdate = !!ctx.input.leadId;
-    let action = isUpdate ? 'Updated' : 'Created';
-
+    const client = new Client(ctx.auth);
+    const input = ctx.input;
+    if (input.leadId !== undefined && input.contacts !== undefined)
+      throw createApiServiceError(
+        'Nested contacts cannot be updated through a lead. Use Manage Contact with the contact ID instead.'
+      );
+    if (input.name !== undefined) nonEmpty(input.name, 'name');
+    const payload = pickDefined({
+      name: input.name,
+      status_id: input.statusId,
+      description: input.description,
+      url: input.url,
+      contacts: input.contacts?.map(c =>
+        pickDefined({
+          name: c.name,
+          title: c.title,
+          emails: c.emails,
+          phones: c.phones,
+          urls: c.urls
+        })
+      ),
+      addresses: input.addresses?.map(a =>
+        pickDefined({
+          address_1: a.address1,
+          address_2: a.address2,
+          city: a.city,
+          state: a.state,
+          zipcode: a.zipcode,
+          country: a.country
+        })
+      ),
+      ...customFields(input.customFields)
+    });
+    const lead =
+      input.leadId !== undefined
+        ? await client.updateLead(input.leadId, payload)
+        : await client.createLead(payload);
     return {
-      output: mapLeadToOutput(lead),
-      message: `${action} lead **${lead.display_name || lead.name || lead.id}**`
+      output: mapLead(lead),
+      message: `${input.leadId !== undefined ? 'Updated' : 'Created'} lead **${lead.id}**.`
     };
   })
   .build();

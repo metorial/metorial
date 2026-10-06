@@ -12,7 +12,12 @@ let fieldSchema = z.object({
 
 let submissionSchema = z.object({
   submissionId: z.string().describe('Unique submission identifier'),
-  respondentId: z.string().describe('Unique respondent identifier'),
+  respondentId: z
+    .string()
+    .optional()
+    .describe(
+      'Respondent ID from the exact responses, when the submission has answered questions'
+    ),
   formId: z.string().describe('Form this submission belongs to'),
   formName: z.string().describe('Name of the form'),
   createdAt: z.string().describe('ISO 8601 submission timestamp'),
@@ -30,6 +35,10 @@ export let listSubmissions = SlateTool.create(spec, {
   .input(
     z.object({
       formId: z.string().describe('The form ID to retrieve submissions for'),
+      filter: z
+        .enum(['all', 'completed', 'partial'])
+        .optional()
+        .describe('Native submission status filter; defaults to all'),
       page: z.number().optional().describe('Page number for pagination'),
       limit: z.number().optional().describe('Number of submissions per page'),
       startDate: z.string().optional().describe('Filter submissions after this ISO 8601 date'),
@@ -62,6 +71,7 @@ export let listSubmissions = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listSubmissions(ctx.input.formId, {
+      filter: ctx.input.filter,
       page: ctx.input.page,
       limit: ctx.input.limit,
       startDate: ctx.input.startDate,

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ControlPlaneClient } from '../lib/client';
+import { ControlPlaneClient, stringField } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageTransformation = SlateTool.create(spec, {
@@ -15,7 +15,7 @@ Supports creating new transformations, updating code/description, publishing, an
     'Set publish to true to make the transformation live for incoming event traffic.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -49,72 +49,44 @@ Supports creating new transformations, updating code/description, publishing, an
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ControlPlaneClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
+    let client = new ControlPlaneClient({ token: ctx.auth.token, region: ctx.config.region });
     let { action, transformationId, name, code, language, description, publish } = ctx.input;
-
-    if (action === 'create') {
-      if (!name) throw new Error('Name is required when creating a transformation.');
-      if (!code) throw new Error('Code is required when creating a transformation.');
-
-      let result = await client.createTransformation({
-        name,
-        code,
-        language,
-        description,
-        publish
-      });
-      let transformation = result.transformation || result;
-
-      return {
-        output: {
-          transformationId: transformation.id,
-          name: transformation.name,
-          versionId: transformation.versionId,
-          published: !!publish
-        },
-        message: `Created transformation **${transformation.name}**${publish ? ' and published it' : ''}.`
-      };
-    }
-
-    if (action === 'update') {
-      if (!transformationId) throw new Error('Transformation ID is required for update.');
-
-      let result = await client.updateTransformation(transformationId, {
-        code,
-        description,
-        publish
-      });
-      let transformation = result.transformation || result;
-
-      return {
-        output: {
-          transformationId: transformation.id || transformationId,
-          name: transformation.name,
-          versionId: transformation.versionId,
-          published: !!publish
-        },
-        message: `Updated transformation \`${transformationId}\`${publish ? ' and published it' : ''}.`
-      };
-    }
-
     if (action === 'delete') {
-      if (!transformationId) throw new Error('Transformation ID is required for delete.');
-
+      if (!transformationId)
+        throw createApiServiceError('Transformation ID is required for delete.');
       await client.deleteTransformation(transformationId);
-
       return {
-        output: {
-          transformationId,
-          deleted: true
-        },
-        message: `Deleted transformation \`${transformationId}\`.`
+        output: { transformationId, deleted: true },
+        message:
+          'Deleted the transformation. Revision history may remain retained by RudderStack.'
       };
     }
-
-    throw new Error(`Unknown action: ${action}`);
+    if (action === 'create' && (!name?.trim() || !code?.trim()))
+      throw createApiServiceError('Name and code are required for create.');
+    if (action === 'update' && !transformationId)
+      throw createApiServiceError('Transformation ID is required for update.');
+    let resource =
+      action === 'create'
+        ? await client.createTransformation({ name, code, language, description, publish })
+        : await client.updateTransformation(transformationId!, {
+            name,
+            code,
+            language,
+            description,
+            publish
+          });
+    return {
+      output: {
+        transformationId: stringField(resource.id, 'the resource ID'),
+        name: typeof resource.name === 'string' ? resource.name : undefined,
+        versionId: stringField(resource.versionId, 'the revision ID'),
+        published:
+          typeof resource.isPublished === 'boolean' ? resource.isPublished : (publish ?? false)
+      },
+      message:
+        action === 'create'
+          ? 'Created the transformation revision.'
+          : 'Updated the transformation revision.'
+    };
   })
   .build();

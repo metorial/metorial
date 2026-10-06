@@ -1,140 +1,137 @@
 import { createAxios } from 'slates';
-
+import { nativeApp, nativeUser, nativeWorkspace } from './schemas';
+import {
+  type AuthOutput,
+  clean,
+  connection,
+  fail,
+  id,
+  jsonBytes,
+  parse,
+  type Row,
+  upstream,
+  z
+} from './validation';
 export class Client {
   private axios;
-
-  constructor(options: { baseUrl: string; token: string }) {
+  private token: string;
+  constructor(auth: AuthOutput, config: unknown = {}) {
+    const c = connection(auth, config);
+    this.token = c.token;
     this.axios = createAxios({
-      baseURL: `${options.baseUrl.replace(/\/+$/, '')}/api/ext`,
-      headers: {
-        Authorization: `Basic ${options.token}`,
-        'Content-Type': 'application/json'
-      }
+      baseURL: `${c.baseUrl}/api/ext`,
+      headers: { Authorization: `Basic ${c.token}`, 'Content-Type': 'application/json' },
+      timeout: 30000,
+      maxRedirects: 0,
+      maxContentLength: 8 * 1024 * 1024,
+      maxBodyLength: 8 * 1024 * 1024
     });
   }
-
-  // ─── User Management ───
-
-  async listUsers(groupNames?: string): Promise<any[]> {
-    let params: Record<string, string> = {};
-    if (groupNames) {
-      params.group_names = groupNames;
+  private async request(
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT',
+    url: string,
+    data?: unknown,
+    params?: Row
+  ) {
+    if (data !== undefined) jsonBytes(data);
+    let response: { data: unknown; headers: Record<string, unknown> };
+    try {
+      response = await this.axios.request<unknown>({ method, url, data, params });
+    } catch (e) {
+      throw upstream(e, method !== 'GET' && !url.startsWith('/export/'));
     }
-    let response = await this.axios.get('/users', { params });
-    return response.data;
+    clean({ ...response.headers }, [this.token]);
+    return clean(response.data, [this.token]);
   }
-
-  async getUser(identifier: string): Promise<any> {
-    let response = await this.axios.get(`/user/${encodeURIComponent(identifier)}`);
-    return response.data;
+  async listUsers(groupNames?: string, status?: string) {
+    return parse(
+      z.array(nativeUser).max(1000),
+      await this.request('GET', '/users', undefined, { group_names: groupNames, status })
+    );
   }
-
-  async createUser(body: {
-    name: string;
-    email: string;
-    password?: string;
-    status?: string;
-    workspaces?: any[];
-  }): Promise<any> {
-    let response = await this.axios.post('/users', body);
-    return response.data;
+  async getUser(identifier: string) {
+    const result = await this.request(
+      'GET',
+      `/user/${encodeURIComponent(id(identifier, 'user UUID or email'))}`
+    );
+    if (Array.isArray(result) && result.length === 0)
+      fail(
+        'No user matches this UUID or email. Verify the identifier with list_users.',
+        'not_found'
+      );
+    const user = parse(nativeUser, result);
+    if (user.id !== identifier && user.email.toLowerCase() !== identifier.toLowerCase())
+      fail(
+        'ToolJet returned a different user; no further write was attempted.',
+        'identity_mismatch'
+      );
+    return user;
   }
-
-  async updateUser(
-    identifier: string,
-    body: {
-      name?: string;
-      email?: string;
-      password?: string;
-      status?: string;
-    }
-  ): Promise<any> {
-    let response = await this.axios.patch(`/user/${encodeURIComponent(identifier)}`, body);
-    return response.data;
+  async createUser(body: Row) {
+    return parse(nativeUser, await this.request('POST', '/users', body));
   }
-
-  async updateUserRole(
-    workspaceId: string,
-    body: { newRole: string; email: string }
-  ): Promise<any> {
-    let response = await this.axios.put(
-      `/update-user-role/workspace/${encodeURIComponent(workspaceId)}`,
+  async updateUser(identifier: string, body: Row) {
+    await this.request('PATCH', `/user/${encodeURIComponent(id(identifier))}`, body);
+  }
+  async updateUserRole(workspaceId: string, body: Row) {
+    await this.request(
+      'PUT',
+      `/update-user-role/workspace/${encodeURIComponent(id(workspaceId, 'workspace UUID'))}`,
       body
     );
-    return response.data;
   }
-
-  // ─── Workspace Management ───
-
-  async listWorkspaces(): Promise<any[]> {
-    let response = await this.axios.get('/workspaces');
-    return response.data;
+  async listWorkspaces() {
+    return parse(z.array(nativeWorkspace).max(1000), await this.request('GET', '/workspaces'));
   }
-
-  async replaceUserWorkspaces(userId: string, workspaces: any[]): Promise<any> {
-    let response = await this.axios.put(
-      `/user/${encodeURIComponent(userId)}/workspaces`,
+  async replaceUserWorkspaces(userId: string, workspaces: Row[]) {
+    await this.request(
+      'PUT',
+      `/user/${encodeURIComponent(id(userId, 'user UUID'))}/workspaces`,
       workspaces
     );
-    return response.data;
   }
-
-  async updateUserWorkspace(
-    userId: string,
-    workspaceId: string,
-    body: {
-      id?: string;
-      name?: string;
-      status?: string;
-      groups?: any[];
-    }
-  ): Promise<any> {
-    let response = await this.axios.patch(
-      `/user/${encodeURIComponent(userId)}/workspace/${encodeURIComponent(workspaceId)}`,
+  async updateUserWorkspace(userId: string, workspaceId: string, body: Row) {
+    await this.request(
+      'PATCH',
+      `/user/${encodeURIComponent(id(userId, 'user UUID'))}/workspace/${encodeURIComponent(id(workspaceId, 'workspace UUID'))}`,
       body
     );
-    return response.data;
   }
-
-  // ─── Application Management ───
-
-  async listApps(workspaceId: string): Promise<any[]> {
-    let response = await this.axios.get(`/workspace/${encodeURIComponent(workspaceId)}/apps`);
-    return response.data;
+  async listApps(workspaceId: string) {
+    return parse(
+      z.array(nativeApp).max(1000),
+      await this.request(
+        'GET',
+        `/workspace/${encodeURIComponent(id(workspaceId, 'workspace UUID'))}/apps`
+      )
+    );
   }
-
   async exportApp(
     workspaceId: string,
     appId: string,
-    options?: {
-      exportTJDB?: boolean;
-      appVersion?: string;
-      exportAllVersions?: boolean;
-    }
-  ): Promise<any> {
-    let params: Record<string, string> = {};
-    if (options?.exportTJDB !== undefined) {
-      params.exportTJDB = String(options.exportTJDB);
-    }
-    if (options?.appVersion) {
-      params.appVersion = options.appVersion;
-    }
-    if (options?.exportAllVersions !== undefined) {
-      params.exportAllVersions = String(options.exportAllVersions);
-    }
-    let response = await this.axios.post(
-      `/export/workspace/${encodeURIComponent(workspaceId)}/apps/${encodeURIComponent(appId)}`,
+    options: { exportTJDB?: boolean; appVersion?: string; exportAllVersions?: boolean }
+  ) {
+    const raw = await this.request(
+      'POST',
+      `/export/workspace/${encodeURIComponent(id(workspaceId, 'workspace UUID'))}/apps/${encodeURIComponent(id(appId, 'app UUID'))}`,
       {},
-      { params }
+      options
     );
-    return response.data;
+    return parse(
+      z
+        .object({
+          tooljet_version: z.string(),
+          app: z.array(z.record(z.string(), z.unknown())).min(1)
+        })
+        .passthrough(),
+      raw
+    );
   }
-
-  async importApp(workspaceId: string, body: any): Promise<any> {
-    let response = await this.axios.post(
-      `/import/workspace/${encodeURIComponent(workspaceId)}/apps`,
+  async importApp(workspaceId: string, body: Row) {
+    return this.request(
+      'POST',
+      `/import/workspace/${encodeURIComponent(id(workspaceId, 'workspace UUID'))}/apps`,
       body
     );
-    return response.data;
   }
 }

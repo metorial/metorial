@@ -10,8 +10,6 @@ import {
   manageDeployment,
   manageReport
 } from './tools';
-import { feedbackReceived } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     manageDataset,
     manageDeployment
   ],
-  triggers: [feedbackReceived]
+  triggers: []
 });

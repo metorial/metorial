@@ -1,70 +1,40 @@
-# Slates Specification for Wolfram Alpha Api
+# Wolfram Alpha API Specification
 
-## Overview
+This integration computes mathematical and factual results using Wolfram Alpha's request-response APIs. It does not provide webhooks or event subscriptions.
 
-Wolfram Alpha is a computational knowledge engine that answers factual queries by computing results from structured data across mathematics, science, geography, finance, linguistics, and many other domains. It provides multiple API types for different output needs, from full structured results to short text answers, spoken results, and image-based outputs.
+## Authentication and configuration
 
-## Authentication
+Register an application in the [Developer Portal](https://developer.wolframalpha.com/) and connect its AppID. Each request uses the `appid` query parameter. There is no OAuth refresh flow. An AppID must be enabled for the API products used by the selected tools; provider licensing and topic restrictions may apply. No account identity endpoint is documented for these APIs.
 
-Wolfram Alpha uses **API key authentication** via an AppID parameter.
+The optional `unitSystem` configuration defaults to `metric`. Individual tools can override it with `metric` or `imperial`. Full Results and LLM requests translate `imperial` into the provider's `nonmetric` value; the other API products use `imperial` directly.
 
-1. Register a Wolfram ID at the [Wolfram Alpha Developer Portal](https://developer.wolframalpha.com).
-2. Navigate to the "My Apps" tab and click "Get an AppID" (or "Sign up to get your first AppID").
-3. Provide an application name, description, and select the API type you want (e.g., Full Results API, Simple API, etc.).
-4. Each application receives a unique AppID.
+## Tools
 
-The AppID is passed as a query parameter (`appid`) in every API request:
+| Key | Provider endpoint | Result |
+| --- | --- | --- |
+| `full_results_query` | `https://api.wolframalpha.com/v2/query` | JSON result pods with IDs, text, images, assumptions, and available state tokens. Image and sound files are available for download. |
+| `short_answer` | `https://api.wolframalpha.com/v1/result` | One concise plaintext answer. |
+| `spoken_result` | `https://api.wolframalpha.com/v1/spoken` | A text sentence suitable for speech synthesis; it does not generate audio. |
+| `simple_image` | `https://api.wolframalpha.com/v1/simple` | A downloadable rendered image. The retained `imageUrl` field identifies the provider endpoint without credentials and requires an AppID when called directly. |
+| `llm_query` | `https://www.wolframalpha.com/api/v1/llm-api` | Computed text for language-model workflows. Supports a character limit, assumption tokens, units, and location context. |
+| `validate_query` | `https://api.wolframalpha.com/v2/validatequery` and `https://www.wolframalpha.com/queryrecognizer/query.jsp` | Parsing status, recognition status, domain, and the provider result significance score. `confidence` is that score divided by 100, not a probability. |
 
-```
-http://api.wolframalpha.com/v2/query?appid=YOUR_APP_ID&input=your+query
-```
+All existing tool keys and field types are retained. Additional pod-ID and pod-state arrays extend their corresponding single-value fields. Multiple assumptions and states use repeated query parameters. Location, IP address, and latitude/longitude context are mutually exclusive.
 
-For the LLM API, the AppID can alternatively be provided as a Bearer token in the `Authorization` header:
+`significantDigits` remains present for compatibility but cannot be used: the provider's `sig` parameter is a request signature, not a precision setting. To request more digits, pass a `More digits` state token returned by a previous query to `podState` or `podStates`.
 
-```
-Authorization: Bearer YOUR_APP_ID
-```
+## Result behavior
 
-There is no OAuth flow or additional scopes. A verified email address on the Wolfram ID is required for the AppID to work.
+Full queries can return `success: false` with suggestions when an input cannot be understood. Provider errors, HTTP failures, unsupported combinations, and empty inputs produce actionable errors. Query validation does not guarantee that a complete computation will succeed. Short and spoken APIs may return HTTP 501 when no sufficiently short answer exists.
 
-## Features
+The full-results tool returns JSON structure and supports the provider's pod-content formats, including plaintext, images, MathML, and sound where available. Formula computation is possible through assumption tokens; this integration does not generate interactive calculator interfaces. Step-by-step results are available only when returned pod states and account entitlements permit them. Asynchronous delivery and recalculation are outside the current tool surface.
 
-### Full Results Query
+## Official references
 
-Submit free-form natural language queries and receive comprehensive, structured results organized into categorized "pods" (e.g., Input Interpretation, Result, Charts, Properties). Results can be returned in XML or JSON, and individual pod content can be formatted as images, plaintext, MathML, Wolfram Language expressions, or audio. Supports disambiguation via assumptions, pod state changes (e.g., "More digits"), asynchronous pod delivery, and recalculation of timed-out results. Users can filter results by pod ID, title, index, or scanner type. Location can be specified via IP, lat/long, or semantic string to affect location-sensitive queries.
-
-### Short Answers
-
-Returns a single plain text answer extracted from the primary result pod. Ideal for quick lookups or integrations that need a concise, machine-readable response. Queries that cannot produce a sufficiently short answer may fail.
-
-### Spoken Results
-
-Returns a natural language sentence phrasing the computed answer, designed for text-to-speech applications or conversational interfaces. Supports unit system selection (metric/imperial).
-
-### Simple Image Results
-
-Returns the entire Wolfram Alpha result page rendered as a single GIF/JPEG image. Supports customization of layout style, background color, image width, font size, and unit system. Does not support disambiguation or drilldown.
-
-### LLM-Optimized Results
-
-Returns results in a text format optimized for consumption by large language models. Includes computed answers, image URLs, and links back to the Wolfram Alpha website. Supports assumption parameters for disambiguation. The AppID can be passed via query parameter or Authorization header.
-
-### Query Validation and Recognition
-
-Quickly determine whether a query is likely to be understood by Wolfram Alpha before sending a full request. The Fast Query Recognizer classifies queries, indicates the expected content domain, and provides a confidence score. Available in "Default" and "Voice" modes, where Voice mode is more permissive for spoken input. The `validatequery` function performs only the parsing phase to check if input can be interpreted.
-
-### Step-by-Step Solutions
-
-Access detailed step-by-step explanations for mathematical and scientific computations. Useful for educational applications where showing the process of arriving at an answer is important.
-
-### Instant Calculators
-
-Generate interactive, form-based calculator interfaces for common formulas and computations. Users can manipulate variables through assumptions to explore different formula configurations (e.g., RAID array calculator, Doppler shift formula).
-
-### Assumptions and Disambiguation
-
-When queries are ambiguous, the API provides assumption data that enables selecting between interpretations (e.g., "pi" as a mathematical constant vs. a movie), unit systems, date formats, formula variables, coordinate systems, and more. Assumptions can be applied to subsequent queries to refine results.
-
-## Events
-
-The provider does not support events. Wolfram Alpha APIs are purely request-response based and do not offer webhooks, event subscriptions, or purpose-built polling mechanisms.
+- [Full Results API](https://products.wolframalpha.com/api/documentation/)
+- [Short Answers API](https://products.wolframalpha.com/short-answers-api/documentation/)
+- [Spoken Results API](https://products.wolframalpha.com/spoken-results-api/documentation/)
+- [Simple API](https://products.wolframalpha.com/simple-api/documentation/)
+- [LLM API](https://products.wolframalpha.com/llm-api/documentation/)
+- [Fast Query Recognizer](https://products.wolframalpha.com/query-recognizer/documentation/)
+- [Instant Calculators](https://products.wolframalpha.com/instant-calculators-api/documentation/)

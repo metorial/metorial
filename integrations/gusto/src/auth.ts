@@ -1,294 +1,184 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  requestAxiosData,
+  SlateAuth,
+  type SlateAuthWithOauth
+} from 'slates';
 import { z } from 'zod';
+import { readContext } from './lib/context';
+import { BASE_URLS, gustoError } from './lib/helpers';
 
-let BASE_URLS: Record<string, string> = {
-  production: 'https://api.gusto.com',
-  demo: 'https://api.gusto-demo.com'
+const authOutput = z.object({
+  token: z.string().min(1),
+  refreshToken: z.string().optional(),
+  expiresAt: z.string().optional(),
+  environment: z.enum(['production', 'demo']),
+  companyId: z.string().optional(),
+  redirectUri: z.string().optional()
+});
+type AuthOutput = z.infer<typeof authOutput>;
+const scopeIds = [
+  'companies:read',
+  'companies:write',
+  'employees:read',
+  'employees:manage',
+  'employees:write',
+  'employments:write',
+  'contractors:read',
+  'contractors:manage',
+  'contractors:write',
+  'payrolls:read',
+  'payrolls:write',
+  'payrolls:run',
+  'company_benefits:read',
+  'company_benefits:write',
+  'employee_benefits:read',
+  'employee_benefits:write',
+  'pay_schedules:read',
+  'time_off_policies:read',
+  'employee_time_off_activities:read',
+  'garnishments:read',
+  'garnishments:write',
+  'departments:read',
+  'departments:write',
+  'jobs:read',
+  'jobs:write',
+  'compensations:read',
+  'compensations:write',
+  'company_forms:read',
+  'employee_forms:read',
+  'signatories:read'
+];
+const scopes = scopeIds.map(scope => ({
+  title: scope.replaceAll('_', ' ').replace(':', ' — '),
+  scope,
+  description: `Provider-approved access for ${scope}. Embedded-only capabilities require an approved Embedded Payroll application.`
+}));
+
+const tokenResponse = (data: unknown, previousRefreshToken?: string) => {
+  const parsed = z
+    .object({
+      access_token: z.string().min(1),
+      refresh_token: z.string().min(1).optional(),
+      expires_in: z.number().positive().max(31536000)
+    })
+    .safeParse(data);
+  if (!parsed.success)
+    throw createApiServiceError(
+      'Gusto did not return a valid access token and positive expiry. Reconnect the account.',
+      { reason: 'oauth_token_response' }
+    );
+  return normalizeOAuthTokenResponse(parsed.data, {
+    providerLabel: 'Gusto',
+    required: true,
+    previousRefreshToken
+  });
 };
 
-let scopes = [
-  {
-    title: 'Companies Read',
-    description: 'Read company information',
-    scope: 'companies:read'
-  },
-  {
-    title: 'Companies Write',
-    description: 'Create and update company information',
-    scope: 'companies:write'
-  },
-  {
-    title: 'Employees Read',
-    description: 'Read employee information',
-    scope: 'employees:read'
-  },
-  {
-    title: 'Employees Write',
-    description: 'Create and update employee information',
-    scope: 'employees:write'
-  },
-  { title: 'Payrolls Read', description: 'Read payroll information', scope: 'payrolls:read' },
-  {
-    title: 'Payrolls Write',
-    description: 'Create and process payrolls',
-    scope: 'payrolls:write'
-  },
-  {
-    title: 'Contractors Read',
-    description: 'Read contractor information',
-    scope: 'contractors:read'
-  },
-  {
-    title: 'Contractors Write',
-    description: 'Create and update contractor information',
-    scope: 'contractors:write'
-  },
-  {
-    title: 'Contractor Payments Read',
-    description: 'Read contractor payment information',
-    scope: 'contractor_payments:read'
-  },
-  {
-    title: 'Contractor Payments Write',
-    description: 'Create and manage contractor payments',
-    scope: 'contractor_payments:write'
-  },
-  {
-    title: 'Company Benefits Read',
-    description: 'Read company benefit information',
-    scope: 'company_benefits:read'
-  },
-  {
-    title: 'Company Benefits Write',
-    description: 'Create and update company benefits',
-    scope: 'company_benefits:write'
-  },
-  {
-    title: 'Employee Benefits Read',
-    description: 'Read employee benefit enrollments',
-    scope: 'employee_benefits:read'
-  },
-  {
-    title: 'Employee Benefits Write',
-    description: 'Create and update employee benefit enrollments',
-    scope: 'employee_benefits:write'
-  },
-  {
-    title: 'Pay Schedules Read',
-    description: 'Read pay schedule information',
-    scope: 'pay_schedules:read'
-  },
-  {
-    title: 'Pay Schedules Write',
-    description: 'Create and update pay schedules',
-    scope: 'pay_schedules:write'
-  },
-  {
-    title: 'Locations Read',
-    description: 'Read company location information',
-    scope: 'locations:read'
-  },
-  {
-    title: 'Locations Write',
-    description: 'Create and update company locations',
-    scope: 'locations:write'
-  },
-  {
-    title: 'Bank Accounts Read',
-    description: 'Read bank account information',
-    scope: 'bank_accounts:read'
-  },
-  {
-    title: 'Bank Accounts Write',
-    description: 'Create and update bank accounts',
-    scope: 'bank_accounts:write'
-  },
-  { title: 'Jobs Read', description: 'Read job information', scope: 'jobs:read' },
-  {
-    title: 'Jobs Write',
-    description: 'Create and update job information',
-    scope: 'jobs:write'
-  },
-  {
-    title: 'Compensations Read',
-    description: 'Read compensation information',
-    scope: 'compensations:read'
-  },
-  {
-    title: 'Compensations Write',
-    description: 'Create and update compensation information',
-    scope: 'compensations:write'
-  },
-  { title: 'Taxes Read', description: 'Read tax information', scope: 'taxes:read' },
-  { title: 'Taxes Write', description: 'Update tax information', scope: 'taxes:write' },
-  { title: 'Forms Read', description: 'Read forms and documents', scope: 'forms:read' },
-  { title: 'Forms Write', description: 'Create and manage forms', scope: 'forms:write' },
-  {
-    title: 'Time Off Policies Read',
-    description: 'Read time off policies and balances',
-    scope: 'time_off_policies:read'
-  },
-  {
-    title: 'Time Off Policies Write',
-    description: 'Create and update time off policies',
-    scope: 'time_off_policies:write'
-  },
-  {
-    title: 'Signatories Read',
-    description: 'Read signatory information',
-    scope: 'signatories:read'
-  },
-  {
-    title: 'Signatories Write',
-    description: 'Create and update signatories',
-    scope: 'signatories:write'
-  },
-  {
-    title: 'Earning Types Read',
-    description: 'Read earning type information',
-    scope: 'earning_types:read'
-  },
-  {
-    title: 'Earning Types Write',
-    description: 'Create and update earning types',
-    scope: 'earning_types:write'
-  },
-  {
-    title: 'Garnishments Read',
-    description: 'Read garnishment information',
-    scope: 'garnishments:read'
-  },
-  {
-    title: 'Garnishments Write',
-    description: 'Create and update garnishments',
-    scope: 'garnishments:write'
-  },
-  {
-    title: 'Departments Read',
-    description: 'Read department information',
-    scope: 'departments:read'
-  },
-  {
-    title: 'Departments Write',
-    description: 'Create and update departments',
-    scope: 'departments:write'
-  },
-  {
-    title: 'Webhooks Read',
-    description: 'Read webhook subscriptions',
-    scope: 'webhooks:read'
-  },
-  {
-    title: 'Webhooks Write',
-    description: 'Create and manage webhook subscriptions',
-    scope: 'webhooks:write'
-  }
-];
-
-function createGustoOauth(name: string, key: string, environment: 'production' | 'demo') {
-  let baseUrl = BASE_URLS[environment]!;
-
+function createGustoOauth(
+  name: string,
+  key: string,
+  environment: 'production' | 'demo'
+): SlateAuthWithOauth<Record<string, never>, AuthOutput> {
+  const baseUrl = BASE_URLS[environment];
+  const exchange = (data: Record<string, unknown>) => {
+    const http = createAuthenticatedAxios({
+      baseURL: baseUrl,
+      timeout: 30000,
+      maxRedirects: 0,
+      errorAdapter: error => gustoError(error, 'OAuth exchange')
+    });
+    return requestAxiosData(
+      'OAuth exchange',
+      () => http.post<unknown>('/oauth/token', data),
+      gustoError
+    );
+  };
   return {
-    type: 'auth.oauth' as const,
+    type: 'auth.oauth',
     name,
     key,
+    scopes,
     docs: [
       {
-        type: 'docs.auth.oauth' as const,
+        type: 'docs.auth.oauth',
         name: 'OAuth documentation',
         url: 'https://docs.gusto.com/app-integrations/docs/oauth2'
       },
       {
-        type: 'docs.auth.oauth_scopes' as const,
-        name: 'OAuth scopes',
+        type: 'docs.auth.oauth_scopes',
+        name: 'Approved API scopes',
         url: 'https://docs.gusto.com/app-integrations/docs/scopes'
       }
     ],
-    scopes,
-
-    getAuthorizationUrl: async (ctx: any) => {
-      let params = new URLSearchParams({
-        client_id: ctx.clientId,
-        redirect_uri: ctx.redirectUri,
-        response_type: 'code',
-        state: ctx.state
-      });
-      return { url: `${baseUrl}/oauth/authorize?${params.toString()}` };
+    getAuthorizationUrl: async ctx => ({
+      url: `${baseUrl}/oauth/authorize?${new URLSearchParams({ client_id: ctx.clientId, redirect_uri: ctx.redirectUri, response_type: 'code', state: ctx.state })}`
+    }),
+    handleCallback: async ctx => {
+      const tokens = tokenResponse(
+        await exchange({
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          redirect_uri: ctx.redirectUri,
+          code: ctx.code,
+          grant_type: 'authorization_code'
+        })
+      );
+      const output = { ...tokens, environment, redirectUri: ctx.redirectUri };
+      const context = await readContext(output);
+      return { output: { ...output, companyId: context.companyId }, scopes: context.scopes };
     },
-
-    handleCallback: async (ctx: any) => {
-      let http = createAxios({ baseURL: baseUrl });
-      let response = await http.post('/oauth/token', {
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        redirect_uri: ctx.redirectUri,
-        code: ctx.code,
-        grant_type: 'authorization_code'
-      });
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
-          environment
-        }
+    handleTokenRefresh: async ctx => {
+      if (!ctx.output.refreshToken?.trim())
+        throw createApiServiceError(
+          'No Gusto refresh token is available. Reconnect the account.',
+          { reason: 'missing_refresh_token' }
+        );
+      if (ctx.output.environment !== environment)
+        throw createApiServiceError('Reconnect using the original Gusto environment.', {
+          reason: 'environment_mismatch'
+        });
+      if (!ctx.output.redirectUri?.trim())
+        throw createApiServiceError(
+          'This Gusto connection is missing its original redirect URI. Reconnect the account before refreshing the token.',
+          { reason: 'missing_redirect_uri' }
+        );
+      const tokens = tokenResponse(
+        await exchange({
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          redirect_uri: ctx.output.redirectUri,
+          refresh_token: ctx.output.refreshToken,
+          grant_type: 'refresh_token'
+        }),
+        ctx.output.refreshToken
+      );
+      const output = {
+        ...tokens,
+        environment,
+        companyId: ctx.output.companyId,
+        redirectUri: ctx.output.redirectUri
       };
+      const context = await readContext(output);
+      return { output: { ...output, companyId: context.companyId } };
     },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
-      }
-      let http = createAxios({ baseURL: baseUrl });
-      let response = await http.post('/oauth/token', {
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        grant_type: 'refresh_token',
-        refresh_token: ctx.output.refreshToken
-      });
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+    getProfile: async ctx => {
+      const info = await readContext(ctx.output);
+      const identity = info.resourceOwner ?? info.resource;
+      if (!identity)
+        throw createApiServiceError(
+          'Gusto did not expose an identity for this token. Reconnect with a company administrator.',
+          { reason: 'missing_token_identity' }
+        );
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt,
-          environment
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let http = createAxios({ baseURL: baseUrl });
-      let response = await http.get('/v1/me', {
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
-      });
-      let user = response.data;
-      return {
-        profile: {
-          id: user.uuid || user.id?.toString(),
-          email: user.email,
-          name: user.name
-        }
+        profile: { id: identity.uuid, type: identity.type, companyId: info.companyId }
       };
     }
   };
 }
-
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string(),
-      refreshToken: z.string().optional(),
-      expiresAt: z.string().optional(),
-      environment: z.enum(['production', 'demo'])
-    })
-  )
+export const auth = SlateAuth.create()
+  .output(authOutput)
   .addOauth(createGustoOauth('Production', 'oauth_production', 'production'))
   .addOauth(createGustoOauth('Demo', 'oauth_demo', 'demo'));

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugsnagClient } from '../lib/client';
 import { spec } from '../spec';
@@ -42,33 +42,33 @@ export let getProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
+    let client = new BugsnagClient(ctx.auth);
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('Project ID is required.');
+    if (!projectId) throw createApiServiceError('Project ID is required.');
 
     let p = await client.getProject(projectId);
 
     let output = {
-      projectId: p.id,
-      name: p.name,
-      slug: p.slug,
-      type: p.type,
-      apiKey: p.api_key,
-      releaseStages: p.release_stages,
-      language: p.language,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at,
-      openErrorCount: p.open_error_count,
-      forReview: p.for_review,
-      collaboratorsCount: p.collaborators_count,
-      globalGrouping: p.global_grouping,
-      locationGrouping: p.location_grouping,
-      discardedAppVersions: p.discarded_app_versions,
-      discardedErrors: p.discarded_errors,
-      url: p.url,
-      htmlUrl: p.html_url,
-      errorsUrl: p.errors_url,
-      eventsUrl: p.events_url
+      projectId: p.id ?? undefined,
+      name: p.name ?? undefined,
+      slug: p.slug ?? undefined,
+      type: p.type ?? undefined,
+      apiKey: p.api_key ?? undefined,
+      releaseStages: p.release_stages ?? undefined,
+      language: p.language ?? undefined,
+      createdAt: p.created_at ?? undefined,
+      updatedAt: p.updated_at ?? undefined,
+      openErrorCount: p.open_error_count ?? undefined,
+      forReview: p.for_review_error_count ?? undefined,
+      collaboratorsCount: p.collaborators_count ?? undefined,
+      globalGrouping: p.global_grouping ?? undefined,
+      locationGrouping: p.location_grouping ?? undefined,
+      discardedAppVersions: p.discarded_app_versions ?? undefined,
+      discardedErrors: p.discarded_errors ?? undefined,
+      url: p.url ?? undefined,
+      htmlUrl: p.html_url ?? undefined,
+      errorsUrl: p.errors_url ?? undefined,
+      eventsUrl: p.events_url ?? undefined
     };
 
     return {

@@ -26,7 +26,7 @@ export let getContactGroup = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.getContactGroup(ctx.input.groupId);
-    let group = result?.data ?? result;
+    let group = result.data;
 
     return {
       output: { group },

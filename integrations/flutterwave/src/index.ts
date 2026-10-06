@@ -4,8 +4,10 @@ import {
   createRefund,
   createTransfer,
   createVirtualAccount,
+  getBillPayment,
   getTransactionFee,
   getTransferRate,
+  getVirtualAccount,
   listBillCategories,
   listRefunds,
   listSettlements,
@@ -18,8 +20,6 @@ import {
   resolveBankAccount,
   verifyTransaction
 } from './tools';
-import { chargeCompleted, subscriptionEvent, transferCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,7 +38,9 @@ export let provider = Slate.create({
     listRefunds,
     listSettlements,
     resolveBankAccount,
-    manageBeneficiaries
+    manageBeneficiaries,
+    getVirtualAccount,
+    getBillPayment
   ],
-  triggers: [chargeCompleted, transferCompleted, subscriptionEvent]
+  triggers: []
 });

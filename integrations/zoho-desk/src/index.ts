@@ -25,16 +25,6 @@ import {
   search,
   updateTicket
 } from './tools';
-import {
-  accountEvents,
-  activityEvents,
-  agentEvents,
-  articleEvents,
-  contactEvents,
-  taskEvents,
-  ticketEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,13 +52,5 @@ export let provider = Slate.create({
     manageTimeEntry,
     listDepartments
   ],
-  triggers: [
-    ticketEvents,
-    contactEvents,
-    accountEvents,
-    agentEvents,
-    taskEvents,
-    articleEvents,
-    activityEvents
-  ]
+  triggers: []
 });

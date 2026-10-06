@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getMfaFactors = SlateTool.create(spec, {
   name: 'Get MFA Factors',
   key: 'get_mfa_factors',
-  description: `Retrieve MFA information for a user including both available (unenrolled) factors and enrolled devices. Provides a complete view of a user's multi-factor authentication status.`,
+  description: `Retrieve MFA information for a user including both available (unenrolled) factors and enrolled devices. The two reads are not an atomic snapshot and available factors are limited by the user's policy and API support.`,
   tags: {
     readOnly: true
   }
@@ -61,27 +61,24 @@ export let getMfaFactors = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
     let [available, enrolled] = await Promise.all([
       client.getAvailableFactors(ctx.input.userId),
       client.getEnrolledDevices(ctx.input.userId)
     ]);
 
-    let availableList = Array.isArray(available) ? available : available?.data || [];
-    let enrolledList = Array.isArray(enrolled) ? enrolled : enrolled?.data || [];
+    let availableList = available;
+    let enrolledList = enrolled;
 
-    let availableFactors = availableList.map((f: any) => ({
+    let availableFactors = availableList.map(f => ({
       factorId: f.factor_id,
       name: f.name,
       authFactorName: f.auth_factor_name
     }));
 
-    let enrolledDevices = enrolledList.map((d: any) => ({
-      deviceId: d.device_id,
+    let enrolledDevices = enrolledList.map(d => ({
+      deviceId: Number(d.device_id),
       displayName: d.user_display_name,
       typeDisplayName: d.type_display_name,
       authFactorName: d.auth_factor_name,

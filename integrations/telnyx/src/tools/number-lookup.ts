@@ -25,20 +25,20 @@ export let numberLookup = SlateTool.create(spec, {
   .output(
     z.object({
       phoneNumber: z.string().describe('Phone number looked up'),
-      countryCode: z.string().optional().describe('ISO country code'),
-      nationalFormat: z.string().optional().describe('Number in national format'),
-      carrierName: z.string().optional().describe('Carrier/operator name'),
+      countryCode: z.string().nullish().describe('ISO country code'),
+      nationalFormat: z.string().nullish().describe('Number in national format'),
+      carrierName: z.string().nullish().describe('Carrier/operator name'),
       carrierType: z
         .string()
-        .optional()
+        .nullish()
         .describe('Line type (e.g., "mobile", "landline", "voip")'),
-      mobileCountryCode: z.string().optional().describe('Mobile country code (MCC)'),
-      mobileNetworkCode: z.string().optional().describe('Mobile network code (MNC)'),
-      callerName: z.string().optional().describe('CNAM caller name'),
-      portabilityLineType: z.string().optional().describe('Line type from portability data'),
-      portedStatus: z.string().optional().describe('Porting status'),
-      city: z.string().optional().describe('City associated with the number'),
-      state: z.string().optional().describe('State associated with the number')
+      mobileCountryCode: z.string().nullish().describe('Mobile country code (MCC)'),
+      mobileNetworkCode: z.string().nullish().describe('Mobile network code (MNC)'),
+      callerName: z.string().nullish().describe('CNAM caller name'),
+      portabilityLineType: z.string().nullish().describe('Line type from portability data'),
+      portedStatus: z.string().nullish().describe('Porting status'),
+      city: z.string().nullish().describe('City associated with the number'),
+      state: z.string().nullish().describe('State associated with the number')
     })
   )
   .handleInvocation(async ctx => {

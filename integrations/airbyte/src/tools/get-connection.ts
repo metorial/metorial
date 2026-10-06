@@ -30,12 +30,16 @@ export let getConnectionTool = SlateTool.create(spec, {
           cronExpression: z.string().optional()
         })
         .optional(),
-      dataResidency: z.string(),
+      dataResidency: z
+        .string()
+        .describe(
+          'Legacy connection residency field; empty when the provider no longer reports it. Use get_workspace for current workspace residency.'
+        ),
       namespaceDefinition: z.string().optional(),
       namespaceFormat: z.string().optional(),
       prefix: z.string().optional(),
       nonBreakingSchemaUpdatesBehavior: z.string().optional(),
-      configurations: z.any().optional(),
+      configurations: z.unknown().optional(),
       createdAt: z.number().optional()
     })
   )

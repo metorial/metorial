@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SatisMeterClient } from '../lib/client';
+import { projectIdSchema, resolveProject } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let trackEventTool = SlateTool.create(spec, {
   name: 'Track Event',
   key: 'track_event',
-  description: `Track a user event in SatisMeter. If a live survey is configured to trigger on this event, SatisMeter will display the survey to the user. Use this to trigger event-based surveys programmatically.`,
+  description: `Submit a user event for survey targeting. If configured, it can trigger a live survey. Acceptance does not confirm survey delivery; the API does not expose an event-history receipt.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       userId: z.string().describe('ID of the user who performed the event'),
       eventName: z
         .string()
@@ -33,7 +35,7 @@ export let trackEventTool = SlateTool.create(spec, {
     await client.trackEvent({
       userId: ctx.input.userId,
       event: ctx.input.eventName,
-      projectId: ctx.config.projectId
+      projectId: resolveProject(ctx.input.projectId, ctx.config)
     });
 
     return {
@@ -42,7 +44,7 @@ export let trackEventTool = SlateTool.create(spec, {
         eventName: ctx.input.eventName,
         success: true
       },
-      message: `Tracked event **${ctx.input.eventName}** for user **${ctx.input.userId}**.`
+      message: `Accepted event **${ctx.input.eventName}** for user **${ctx.input.userId}**.`
     };
   })
   .build();

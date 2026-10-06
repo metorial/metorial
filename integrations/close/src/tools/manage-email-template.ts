@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, nonEmpty } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageEmailTemplate = SlateTool.create(spec, {
@@ -44,47 +44,32 @@ export let manageEmailTemplate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-
-    let isUpdate = !!ctx.input.templateId;
-    let result: any;
-
-    if (isUpdate) {
-      let updateData: Record<string, any> = {};
-      if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
-      if (ctx.input.subject !== undefined) updateData.subject = ctx.input.subject;
-      if (ctx.input.body !== undefined) updateData.body = ctx.input.body;
-      if (ctx.input.isArchived !== undefined) updateData.is_archived = ctx.input.isArchived;
-
-      result = await client.updateEmailTemplate(ctx.input.templateId!, updateData);
-    } else {
-      if (!ctx.input.name) {
-        throw new Error('name is required when creating a new email template');
-      }
-
-      let createData: Record<string, any> = {
-        name: ctx.input.name
-      };
-      if (ctx.input.subject !== undefined) createData.subject = ctx.input.subject;
-      if (ctx.input.body !== undefined) createData.body = ctx.input.body;
-      if (ctx.input.isArchived !== undefined) createData.is_archived = ctx.input.isArchived;
-
-      result = await client.createEmailTemplate(createData);
-    }
-
+    const input = ctx.input;
+    if (input.templateId === undefined && input.name === undefined)
+      throw createApiServiceError('name is required when creating an email template.');
+    if (input.name !== undefined) nonEmpty(input.name, 'name');
+    const body = pickDefined({
+      name: input.name,
+      subject: input.subject,
+      body: input.body,
+      is_archived: input.isArchived
+    });
+    const client = new Client(ctx.auth);
+    const template =
+      input.templateId !== undefined
+        ? await client.updateEmailTemplate(input.templateId, body)
+        : await client.createEmailTemplate(body);
     return {
       output: {
-        templateId: result.id,
-        name: result.name,
-        subject: result.subject,
-        body: result.body,
-        isArchived: result.is_archived ?? false,
-        dateCreated: result.date_created,
-        dateUpdated: result.date_updated
+        templateId: template.id,
+        name: template.name,
+        subject: template.subject ?? undefined,
+        body: template.body ?? undefined,
+        isArchived: template.is_archived,
+        dateCreated: template.date_created,
+        dateUpdated: template.date_updated
       },
-      message: isUpdate
-        ? `Updated email template \`${result.id}\` ("${result.name}").`
-        : `Created email template \`${result.id}\` ("${result.name}").`
+      message: `${input.templateId !== undefined ? 'Updated' : 'Created'} email template **${template.id}**.`
     };
   })
   .build();

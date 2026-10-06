@@ -16,8 +16,6 @@ import {
   updateCustomerTool,
   updateTicketTool
 } from './tools';
-import { conversationEventTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     updateTicketTool,
     listAgentsTool
   ] as any,
-  triggers: [conversationEventTrigger] as any
+  triggers: []
 });

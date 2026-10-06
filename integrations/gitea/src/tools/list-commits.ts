@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listCommits = SlateTool.create(spec, {
@@ -13,8 +14,8 @@ export let listCommits = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       sha: z
         .string()
         .optional()
@@ -23,8 +24,8 @@ export let listCommits = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('File path to filter commits that affect this file'),
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page')
     })
   )
   .output(
@@ -45,7 +46,7 @@ export let listCommits = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let commits = await client.listCommits(ctx.input.owner, ctx.input.repo, {
       sha: ctx.input.sha,
       path: ctx.input.path,

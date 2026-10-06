@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoupaClient } from '../lib/client';
+import { page, pageFields } from '../lib/contracts';
 import { spec } from '../spec';
 
 let invoiceSummarySchema = z.object({
@@ -15,7 +16,7 @@ let invoiceSummarySchema = z.object({
   paymentTerm: z.any().nullable().optional().describe('Payment terms'),
   createdAt: z.string().nullable().optional().describe('Creation timestamp'),
   updatedAt: z.string().nullable().optional().describe('Last update timestamp'),
-  rawData: z.any().optional().describe('Complete raw invoice data')
+  rawData: z.any().optional().describe('Native data with documented credential fields omitted')
 });
 
 export let searchInvoices = SlateTool.create(spec, {
@@ -62,14 +63,12 @@ export let searchInvoices = SlateTool.create(spec, {
   .output(
     z.object({
       invoices: z.array(invoiceSummarySchema).describe('List of matching invoices'),
-      count: z.number().describe('Number of invoices returned')
+      count: z.number().describe('Number of invoices returned'),
+      ...pageFields
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let filters: Record<string, string> = {};
     if (ctx.input.filters) {
@@ -92,14 +91,14 @@ export let searchInvoices = SlateTool.create(spec, {
       exportedFlag: ctx.input.exportedFlag
     });
 
-    let invoices = (Array.isArray(results) ? results : []).map((inv: any) => ({
+    let invoices = results.map((inv: any) => ({
       invoiceId: inv.id,
       invoiceNumber: inv['invoice-number'] ?? inv.invoice_number ?? null,
       status: inv.status ?? null,
       invoiceDate: inv['invoice-date'] ?? inv.invoice_date ?? null,
       supplier: inv.supplier ?? null,
       currency: inv.currency ?? null,
-      totalAmount: inv.total ?? inv.total ?? null,
+      totalAmount: inv.total ?? null,
       lineCount: inv['invoice-lines']
         ? inv['invoice-lines'].length
         : inv.invoice_lines
@@ -114,7 +113,8 @@ export let searchInvoices = SlateTool.create(spec, {
     return {
       output: {
         invoices,
-        count: invoices.length
+        count: invoices.length,
+        ...page(invoices.length, ctx.input)
       },
       message: `Found **${invoices.length}** invoice(s).`
     };

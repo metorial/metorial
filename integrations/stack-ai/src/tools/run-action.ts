@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listToolProviders = SlateTool.create(spec, {
   name: 'List Tool Providers',
   key: 'list_tool_providers',
-  description: `List all available tool providers (integrations) in Stack AI. Providers offer actions and triggers for interacting with external services like web search, databases, and third-party APIs.`,
+  description: `List available tool providers in Stack AI for interacting with external services such as web search, databases, and third-party APIs.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -21,10 +21,7 @@ export let listToolProviders = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let providers = await client.listToolProviders();
 
@@ -38,14 +35,13 @@ export let listToolProviders = SlateTool.create(spec, {
 export let runAction = SlateTool.create(spec, {
   name: 'Run Action',
   key: 'run_action',
-  description: `Execute a specific action from a tool provider. Actions allow workflows to interact with external systems like sending data, updating databases, or triggering web searches.
-Use **List Tool Providers** to discover available providers and their actions.`,
+  description: `Execute a specific action from a tool provider. Depending on the action, this can search, create, change, or delete data in an external system. Obtain the action ID and expected input schema from your Stack AI action configuration.`,
   instructions: [
-    'First use List Tool Providers to find available provider and action IDs.',
+    'Use List Tool Providers to discover provider IDs; obtain the action ID from your Stack AI configuration.',
     "The inputs object must match the action's expected input schema."
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -66,10 +62,7 @@ Use **List Tool Providers** to discover available providers and their actions.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let result = await client.runAction(
       ctx.input.providerId,

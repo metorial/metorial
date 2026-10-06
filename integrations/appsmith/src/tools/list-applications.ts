@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listApplications = SlateTool.create(spec, {
@@ -45,23 +45,20 @@ export let listApplications = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
     let apps = await client.listApplications(ctx.input.workspaceId);
 
-    let mapped = apps.map((app: any) => ({
-      applicationId: app.id ?? '',
-      name: app.name ?? '',
+    let mapped = apps.map(app => ({
+      applicationId: app.id,
+      name: app.name,
       slug: app.slug,
       isPublic: app.isPublic,
       color: app.color,
       icon: app.icon,
       lastDeployedAt: app.lastDeployedAt,
       lastEditedAt: app.lastEditedAt,
-      gitConnected: !!app.gitApplicationMetadata
+      gitConnected: app.gitConnected
     }));
 
     return {

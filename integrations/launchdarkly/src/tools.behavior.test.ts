@@ -45,7 +45,6 @@ import { manageEnvironment } from './tools/manage-environment';
 import { manageProject } from './tools/manage-project';
 import { manageSegment } from './tools/manage-segment';
 import { searchContexts } from './tools/search-contexts';
-import { flagChangeTrigger } from './triggers/flag-change';
 
 let createCtx = (input: Record<string, unknown>) =>
   ({
@@ -172,39 +171,5 @@ describe('LaunchDarkly tool response contracts', () => {
       inviteMembers.handleInvocation(createCtx({ members: [{ email: 'new@example.com' }] }))
     ).rejects.toBeDefined();
     expect(clientMocks.inviteMembers).not.toHaveBeenCalled();
-  });
-
-  it('pages through audit entries without exceeding the provider page limit', async () => {
-    let entry = (id: string, date: number) => ({
-      _id: id,
-      date,
-      name: id,
-      target: { resources: ['proj/storefront:env/production:flag/checkout'] }
-    });
-    let firstPage = Array.from({ length: 20 }, (_, index) =>
-      entry(`entry-${index}`, 2_000 - index)
-    );
-    clientMocks.getAuditLogEntries
-      .mockResolvedValueOnce({ items: firstPage })
-      .mockResolvedValueOnce({ items: [entry('entry-20', 1_980)] });
-
-    let result = await (flagChangeTrigger as any)._params.pollEvents({
-      auth: { token: 'api-token' },
-      state: { lastTimestamp: 1_000 }
-    });
-
-    expect(clientMocks.getAuditLogEntries).toHaveBeenNthCalledWith(1, {
-      limit: 20,
-      spec: 'proj/*:env/*:flag/*',
-      after: 1_000
-    });
-    expect(clientMocks.getAuditLogEntries).toHaveBeenNthCalledWith(2, {
-      limit: 20,
-      spec: 'proj/*:env/*:flag/*',
-      after: 1_000,
-      before: 1_981
-    });
-    expect(result.inputs).toHaveLength(21);
-    expect(result.updatedState).toEqual({ lastTimestamp: 2_000 });
   });
 });

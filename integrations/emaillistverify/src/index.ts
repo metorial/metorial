@@ -9,10 +9,8 @@ import {
   verifyEmail
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [verifyEmail, enrichEmail, findEmail, domainSearch, uploadBulkFile, checkBulkStatus],
-  triggers: [inboundWebhook]
+  triggers: []
 });

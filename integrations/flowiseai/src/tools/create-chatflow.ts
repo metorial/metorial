@@ -27,7 +27,10 @@ export let createChatflow = SlateTool.create(spec, {
       apikeyid: z.string().optional().describe('API key ID to assign to this chatflow'),
       chatbotConfig: z.string().optional().describe('JSON string of chatbot configuration'),
       category: z.string().optional().describe('Category for the chatflow'),
-      type: z.string().optional().describe('Type of flow: CHATFLOW or MULTIAGENT')
+      type: z
+        .string()
+        .optional()
+        .describe('Flow type: CHATFLOW, MULTIAGENT, ASSISTANT, or AGENTFLOW')
     })
   )
   .output(

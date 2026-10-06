@@ -10,8 +10,6 @@ import {
   manageUsages,
   quotePricing
 } from './tools';
-import { customerEvents, invoiceAndPaymentEvents, subscriptionEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     manageCustomerSettings,
     quotePricing
   ],
-  triggers: [customerEvents, subscriptionEvents, invoiceAndPaymentEvents]
+  triggers: []
 });

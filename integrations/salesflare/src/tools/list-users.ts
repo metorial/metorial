@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -30,7 +30,7 @@ export let listUsers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let params: Record<string, any> = {
+    let params: Row = {
       limit: ctx.input.limit,
       offset: ctx.input.offset
     };
@@ -40,7 +40,7 @@ export let listUsers = SlateTool.create(spec, {
     if (ctx.input.onlyEnabled !== undefined) params.onlyEnabled = ctx.input.onlyEnabled;
 
     let users = await client.listUsers(params);
-    let list = Array.isArray(users) ? users : [];
+    let list = users;
 
     return {
       output: {

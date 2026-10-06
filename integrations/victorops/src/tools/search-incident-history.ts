@@ -29,14 +29,28 @@ export let searchIncidentHistory = SlateTool.create(spec, {
       currentPhase: z
         .string()
         .optional()
-        .describe('Filter by current phase (UNACKED, ACKED, RESOLVED)'),
+        .describe(
+          'Filter by phase: triggered, acknowledged or resolved; legacy UNACKED, ACKED and RESOLVED are translated; comma-separated values supported'
+        ),
       routingKey: z.string().optional().describe('Filter by routing key'),
-      offset: z.number().optional().describe('Pagination offset'),
-      limit: z.number().optional().describe('Maximum number of results to return')
+      offset: z.number().optional().describe('Nonnegative pagination offset'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Maximum number of results to return; greater than 0, maximum 100')
     })
   )
   .output(
     z.object({
+      offset: z.number().int().optional(),
+      limit: z.number().int().optional(),
+      totalCount: z
+        .number()
+        .int()
+        .optional()
+        .describe('Total matches only when supplied by the provider'),
+      nextOffset: z.number().int().optional(),
+      returnedCount: z.number().int(),
       incidents: z.array(z.any()).describe('List of historical incidents matching the filters')
     })
   )
@@ -59,10 +73,24 @@ export let searchIncidentHistory = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let incidents = data?.incidents ?? [];
+    let incidents = data.incidents;
 
     return {
-      output: { incidents },
+      output: {
+        incidents,
+        offset: data.offset,
+        limit: data.limit,
+        totalCount: data.total,
+        returnedCount: incidents.length,
+        nextOffset:
+          data.total !== undefined &&
+          data.offset !== undefined &&
+          data.limit !== undefined &&
+          data.limit > 0 &&
+          data.offset + data.limit < data.total
+            ? data.offset + data.limit
+            : undefined
+      },
       message: `Found **${incidents.length}** incident(s) matching the search criteria.`
     };
   })

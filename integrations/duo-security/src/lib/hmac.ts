@@ -1,108 +1,71 @@
-// HMAC-SHA1 signing for Duo Security API authentication
-// Implements the canonical request signing as specified by Duo's API docs
-
-export let encodeRfc3986 = (str: string): string => {
-  return encodeURIComponent(str)
-    .replace(/!/g, '%21')
-    .replace(/'/g, '%27')
-    .replace(/\(/g, '%28')
-    .replace(/\)/g, '%29')
-    .replace(/\*/g, '%2A');
+import { createHash } from 'node:crypto';
+import { createHmacSignature } from 'slates';
+import { requireValue } from './contracts';
+export const encodeRfc3986 = (value: string) => {
+  requireValue(value.isWellFormed(), 'Provide well-formed Unicode text.');
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
+  );
 };
-
-export let canonicalizeParams = (params: Record<string, string>): string => {
-  let keys = Object.keys(params).sort();
-  let pairs = keys.map(key => `${encodeRfc3986(key)}=${encodeRfc3986(params[key] ?? '')}`);
-  return pairs.join('&');
-};
-
-export let buildCanonicalString = (
+export const canonicalizeParams = (params: Record<string, string>) =>
+  Object.keys(params)
+    .sort()
+    .map(key => `${encodeRfc3986(key)}=${encodeRfc3986(params[key]!)}`)
+    .join('&');
+export const buildCanonicalString = (
   date: string,
   method: string,
-  host: string,
+  hostname: string,
   path: string,
   params: Record<string, string>
-): string => {
-  return [
-    date,
-    method.toUpperCase(),
-    host.toLowerCase(),
-    path,
-    canonicalizeParams(params)
-  ].join('\n');
-};
-
-export let hmacSha1Hex = async (key: string, message: string): Promise<string> => {
-  let encoder = new TextEncoder();
-  let keyData = encoder.encode(key);
-  let messageData = encoder.encode(message);
-
-  let cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-1' },
-    false,
-    ['sign']
+) =>
+  [date, method.toUpperCase(), hostname.toLowerCase(), path, canonicalizeParams(params)].join(
+    '\n'
   );
-
-  let signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
-  let bytes = new Uint8Array(signature);
-  return Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-};
-
-export let getRfc2822Date = (): string => {
-  let now = new Date();
-  let days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  let months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec'
-  ];
-
-  let pad = (n: number): string => (n < 10 ? `0${n}` : `${n}`);
-
-  let dayName = days[now.getUTCDay()];
-  let day = pad(now.getUTCDate());
-  let month = months[now.getUTCMonth()];
-  let year = now.getUTCFullYear();
-  let hours = pad(now.getUTCHours());
-  let minutes = pad(now.getUTCMinutes());
-  let seconds = pad(now.getUTCSeconds());
-
-  return `${dayName}, ${day} ${month} ${year} ${hours}:${minutes}:${seconds} +0000`;
-};
-
-export let signRequest = async (params: {
+export const hmacSha1Hex = async (key: string, message: string) =>
+  createHmacSignature({ secret: key, payload: message, algorithm: 'sha1', digest: 'hex' });
+export const getRfc2822Date = () => new Date().toUTCString().replace('GMT', '+0000');
+export const signRequest = async (params: {
   integrationKey: string;
   secretKey: string;
   apiHostname: string;
   method: string;
   path: string;
   params: Record<string, string>;
-}): Promise<{ authorization: string; date: string }> => {
-  let date = getRfc2822Date();
-  let canonical = buildCanonicalString(
-    date,
-    params.method,
-    params.apiHostname,
-    params.path,
-    params.params
-  );
-
-  let hmac = await hmacSha1Hex(params.secretKey, canonical);
-  let authString = `${params.integrationKey}:${hmac}`;
-  let authorization = `Basic ${btoa(authString)}`;
-
-  return { authorization, date };
+  version?: 'v2' | 'v5';
+  body?: string;
+  date?: string;
+}) => {
+  const date = params.date ?? getRfc2822Date(),
+    version = params.version ?? 'v5';
+  const hash = (text: string) => createHash('sha512').update(text).digest('hex');
+  const canonical =
+    version === 'v2'
+      ? buildCanonicalString(
+          date,
+          params.method,
+          params.apiHostname,
+          params.path,
+          params.params
+        )
+      : [
+          date,
+          params.method.toUpperCase(),
+          params.apiHostname.toLowerCase(),
+          params.path,
+          canonicalizeParams(params.params),
+          hash(params.body ?? ''),
+          hash('')
+        ].join('\n');
+  const digest = createHmacSignature({
+    secret: params.secretKey,
+    payload: canonical,
+    algorithm: version === 'v2' ? 'sha1' : 'sha512',
+    digest: 'hex'
+  });
+  return {
+    authorization: `Basic ${Buffer.from(`${params.integrationKey}:${digest}`).toString('base64')}`,
+    date
+  };
 };

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { nativeId, optionalText, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 let userSummarySchema = z.object({
@@ -38,10 +39,7 @@ export let listUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.listUsers({
       cursor: ctx.input.cursor,
@@ -50,17 +48,15 @@ export let listUsers = SlateTool.create(spec, {
     });
 
     let users = result.users.map((u: Record<string, unknown>) => ({
-      userId: Number(u.id),
-      username: String(u.username ?? ''),
-      email: u.email ? String(u.email) : undefined,
-      name: u.name ? String(u.name) : undefined,
+      userId: nativeId(u.id),
+      username: text(u.username),
+      email: optionalText(u.email),
+      name: optionalText(u.name),
       siteAdmin: typeof u.site_admin === 'boolean' ? u.site_admin : undefined,
       disabled: typeof u.disabled === 'boolean' ? u.disabled : undefined,
-      authenticationMethod: u.authentication_method
-        ? String(u.authentication_method)
-        : undefined,
-      lastLoginAt: u.last_login_at ? String(u.last_login_at) : undefined,
-      createdAt: u.created_at ? String(u.created_at) : undefined
+      authenticationMethod: optionalText(u.authentication_method),
+      lastLoginAt: optionalText(u.last_login_at),
+      createdAt: optionalText(u.created_at)
     }));
 
     return {

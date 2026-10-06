@@ -1,34 +1,37 @@
+import { createApiServiceError } from 'slates';
 import { ContentfulGraphQLClient } from './client';
-import { ContentfulWebhookClient } from './webhook-client';
+import { validateLocator } from './validation';
+
+export interface ContentfulAuth {
+  token: string;
+  previewToken?: string;
+  managementToken?: string;
+}
+export interface ContentfulConfig {
+  environmentId?: string;
+  region?: 'us' | 'eu';
+  spaceId?: unknown;
+}
 
 export let createGraphQLClient = (
-  config: { spaceId: string; environmentId: string; region: 'us' | 'eu' },
-  auth: { token: string; previewToken?: string; managementToken?: string },
-  options?: { preview?: boolean }
+  config: ContentfulConfig,
+  auth: ContentfulAuth,
+  options: { preview?: boolean; spaceId?: string; environmentId?: string } = {}
 ): ContentfulGraphQLClient => {
-  return new ContentfulGraphQLClient({
-    token: auth.token,
-    spaceId: config.spaceId,
-    environmentId: config.environmentId,
-    region: config.region,
-    preview: options?.preview,
-    previewToken: auth.previewToken
-  });
-};
-
-export let createWebhookClient = (
-  config: { spaceId: string; region: 'us' | 'eu' },
-  auth: { managementToken?: string }
-): ContentfulWebhookClient => {
-  if (!auth.managementToken) {
-    throw new Error(
-      'A Content Management API token is required for webhook management. Provide a managementToken in the authentication settings.'
+  let spaceId = options.spaceId ?? config.spaceId;
+  if (spaceId === undefined)
+    throw createApiServiceError(
+      'Provide spaceId for this call. Use list_spaces with a CMA token for account discovery, or copy the space authorized by your delivery or preview key from Contentful API-key settings.',
+      { reason: 'missing_scope' }
     );
-  }
-
-  return new ContentfulWebhookClient({
-    managementToken: auth.managementToken,
-    spaceId: config.spaceId,
-    region: config.region
+  return new ContentfulGraphQLClient({
+    ...auth,
+    spaceId: validateLocator(spaceId, 'space'),
+    environmentId: validateLocator(
+      options.environmentId ?? config.environmentId ?? 'master',
+      'environment'
+    ),
+    region: config.region ?? 'us',
+    preview: options.preview
   });
 };

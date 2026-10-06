@@ -23,7 +23,13 @@ export let getCollection = SlateTool.create(spec, {
       title: z.string().describe('Title of the collection.'),
       description: z.string().nullable().describe('Description of the collection.'),
       createdAt: z.string().describe('Creation timestamp in ISO 8601 format.'),
-      updatedAt: z.string().describe('Last updated timestamp in ISO 8601 format.')
+      updatedAt: z.string().describe('Last updated timestamp in ISO 8601 format.'),
+      noteCount: z
+        .number()
+        .optional()
+        .describe(
+          'Current number of notes in the collection; use list_notes with collectionId to discover them.'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -37,7 +43,8 @@ export let getCollection = SlateTool.create(spec, {
         title: collection.title,
         description: collection.description,
         createdAt: collection.created_at,
-        updatedAt: collection.updated_at
+        updatedAt: collection.updated_at,
+        noteCount: collection.note_count
       },
       message: `Retrieved collection **${collection.title}** (${collection.id}).`
     };

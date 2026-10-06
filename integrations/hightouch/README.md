@@ -1,37 +1,39 @@
-# <img src="https://provider-logos.metorial-cdn.com/hightouch.png" height="20"> Hightouch
+# Hightouch
 
-Manage reverse ETL pipelines that sync data from warehouses to 200+ SaaS destinations. Create and configure sources, destinations, models, and syncs. Trigger syncs and sync sequences on demand, monitor sync run history with status and error details, and serve low-latency personalization data via collection queries. Supports field mappings, sync modes (upsert, insert, update, mirror), and integration with orchestration tools.
+Manage sources, destinations, models and syncs in the workspace authorized by a Hightouch API key. Submit syncs and sequences, inspect run history, and remove models or sync configurations.
+
+## Authentication
+
+Create a workspace API key from Settings > API keys. Keys inherit their selected user group permissions, and their creator must retain the required workspace access. Read-only keys cannot create or change resources. The API URL is `https://api.hightouch.com/api/v1`; no workspace configuration ID is required.
 
 ## Tools
 
-### List Destinations
+| Capability | Tools |
+| --- | --- |
+| Sources | `list_sources`, `get_source`, `create_source`, `update_source` |
+| Destinations | `list_destinations`, `get_destination`, `create_destination`, `update_destination` |
+| Models | `list_models`, `get_model`, `create_model`, `update_model`, `delete_model` |
+| Sync configurations | `list_syncs`, `get_sync`, `create_sync`, `update_sync`, `delete_sync` |
+| Execution and monitoring | `trigger_sync`, `trigger_sync_sequence`, `list_sync_runs`, `get_sync_sequence_run` |
 
-List all destinations configured in your Hightouch workspace. Destinations are the SaaS tools and services (CRMs, ad platforms, marketing tools, etc.) where Hightouch sends data. Supports pagination.
+Lists use limit/offset pagination and report whether another page exists. Resource IDs are exposed under the existing sourceId, destinationId, modelId, syncId and runId fields. The API has no suitable account/self endpoint and does not expose source/destination deletion or sequence management.
 
-### List Models
+## Effects and returned data
 
-List models in your Hightouch workspace. Models define which data to pull from a source. Supports filtering by name or slug and pagination.
+Source/destination creation may validate external connections. Creating or updating a model can query its warehouse and incur charges; `skipColumnQuery` only skips the documented creation column query. Enabled scheduled syncs and on-demand sequences can modify destination data and incur charges. Use `disabled=true` and no schedule for pipeline setup; disabled suppresses scheduled runs but does not block manual/API/sequence triggers. `clearSchedule=true` removes a sync schedule. Accepted run IDs confirm submission; inspect run history or sequence status for completion.
 
-### List Sources
+Connection configuration is intentionally returned as an empty object for sources, destinations and syncs because provider-specific values can contain credentials. Model query definitions remain available. Run error text is replaced with a generic debugger reference. No warehouse row data, run error files or personalization queries are exported by these tools.
 
-List data sources connected to your Hightouch workspace. Sources are the data warehouses, databases, or other systems from which Hightouch pulls data. Supports pagination via limit and offset.
+For dbt references, supply the numeric ID as a string in the existing `dbt.modelId` field. For visual models, supply `visual.parentId` as a numeric ID string and `visual.filter` as a JSON filter object encoded as a string. The existing visual label maps to the provider's primaryLabel.
 
-### List Syncs
+Deleting a sync removes future execution configuration, without undoing previously delivered data. Models with dependent syncs must have those syncs removed first.
 
-List syncs in your Hightouch workspace. Syncs move data from models to destinations with configurable field mappings and scheduling. Supports filtering by model ID or slug and pagination.
+## References
 
-### List Sync Runs
-
-List run history for a specific sync, including status, row counts (added/changed/removed), error details, and timing. Useful for monitoring and debugging sync execution. Supports filtering by time range and pagination.
-
-### Trigger Sync
-
-Trigger a sync to run on demand. You can trigger by sync ID or slug. Optionally perform a full resync (ignoring previously synced rows) or reset CDC state. Useful for integrating Hightouch into data pipelines and orchestration workflows.
+- [API overview and key permissions](https://hightouch.com/docs/developer-tools/api-guide)
+- [API reference](https://hightouch.com/docs/api-reference)
+- [Run and scheduling concepts](https://hightouch.com/docs/syncs/overview)
 
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>

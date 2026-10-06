@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OneLoginClient } from '../lib/client';
+import { publicPagination } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listApps = SlateTool.create(spec, {
@@ -13,6 +14,15 @@ export let listApps = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      afterCursor: z
+        .string()
+        .optional()
+        .describe('Opaque next cursor; repeat the same filters. Do not combine with page.'),
+      page: z
+        .number()
+        .optional()
+        .describe('Positive page number; do not combine with afterCursor.'),
+      limit: z.number().optional().describe('Page size, maximum 1000'),
       name: z.string().optional().describe('Filter by app name (supports wildcards *)'),
       connectorId: z.number().optional().describe('Filter by connector ID'),
       authMethod: z
@@ -25,6 +35,11 @@ export let listApps = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      afterCursor: z
+        .string()
+        .nullable()
+        .describe('Native next cursor, or null when none is supplied'),
+      pagination: publicPagination,
       apps: z
         .array(
           z.object({
@@ -50,20 +65,21 @@ export let listApps = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
-    let params: Record<string, string | number | undefined> = {};
-    if (ctx.input.name) params.name = ctx.input.name;
-    if (ctx.input.connectorId) params.connector_id = ctx.input.connectorId;
+    let params: Record<string, string | number | undefined> = {
+      cursor: ctx.input.afterCursor,
+      page: ctx.input.page,
+      limit: ctx.input.limit
+    };
+    if (ctx.input.name !== undefined) params.name = ctx.input.name;
+    if (ctx.input.connectorId !== undefined) params.connector_id = ctx.input.connectorId;
     if (ctx.input.authMethod !== undefined) params.auth_method = ctx.input.authMethod;
 
     let data = await client.listApps(params);
-    let apps = Array.isArray(data) ? data : data.data || [];
+    let apps = data.data;
 
-    let mapped = apps.map((a: any) => ({
+    let mapped = apps.map(a => ({
       appId: a.id,
       name: a.name,
       connectorId: a.connector_id,
@@ -75,7 +91,11 @@ export let listApps = SlateTool.create(spec, {
     }));
 
     return {
-      output: { apps: mapped },
-      message: `Found **${mapped.length}** application(s).`
+      output: {
+        apps: mapped,
+        afterCursor: data.pagination.afterCursor,
+        pagination: data.pagination
+      },
+      message: `Found **${mapped.length}** on this page; application(s).`
     };
   });

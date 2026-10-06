@@ -1,14 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { GitHubActionsClient } from '../lib/client';
+import { GitHubActionsClient, githubHeaders } from '../lib/client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageArtifact = SlateTool.create(spec, {
   name: 'Manage Artifact',
   key: 'manage_artifact',
-  description: `Get details about a specific artifact, download it (returns a download URL), or delete it. Use "get" to view metadata, "download" to get a zip archive URL, or "delete" to remove the artifact.`,
+  description: `Inspect, download a ZIP archive of, or permanently delete a workflow artifact. Expired or deleted artifacts cannot be downloaded.`,
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -25,11 +27,17 @@ export let manageArtifact = SlateTool.create(spec, {
       name: z.string().optional().describe('Artifact name'),
       sizeInBytes: z.number().optional().describe('Artifact size in bytes'),
       expired: z.boolean().optional().describe('Whether the artifact has expired'),
-      downloadUrl: z.string().optional().describe('URL to download the artifact zip archive'),
+      downloadUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Temporary provider download URL; expires after one minute. Request the download again to obtain a fresh URL while the file exists'
+        ),
       deleted: z.boolean().optional().describe('Whether the artifact was deleted')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new GitHubActionsClient(ctx.auth.token);
     let { owner, repo, artifactId, action } = ctx.input;
 
@@ -42,10 +50,22 @@ export let manageArtifact = SlateTool.create(spec, {
     }
 
     if (action === 'download') {
-      let url = await client.downloadArtifact(owner, repo, artifactId);
+      const artifact = await client.getArtifact(owner, repo, artifactId);
+      if (artifact.expired)
+        throw createApiServiceError(
+          'This GitHub artifact has expired and can no longer be downloaded.'
+        );
+      let file = await client.downloadArtifact(owner, repo, artifactId);
+      await ctx.addAttachment({
+        type: 'url',
+        url: file.apiUrl,
+        mimeType: 'application/zip',
+        filename: `artifact-${artifactId}.zip`,
+        headers: { ...githubHeaders, Authorization: `Bearer ${ctx.auth.token}` }
+      });
       return {
-        output: { downloadUrl: typeof url === 'string' ? url : '', artifactId },
-        message: `Retrieved download URL for artifact **${artifactId}**.`
+        output: { downloadUrl: file.downloadUrl, artifactId },
+        message: `Prepared archive download for artifact **${artifactId}**.`
       };
     }
 

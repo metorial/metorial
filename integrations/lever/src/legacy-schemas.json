@@ -1,0 +1,1031 @@
+{
+  "list_opportunities": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactEmail": {
+          "description": "Filter by candidate email address",
+          "type": "string"
+        },
+        "tag": {
+          "description": "Filter by tags",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "origin": {
+          "description": "Filter by opportunity origin",
+          "type": "string",
+          "enum": ["applied", "sourced", "referred", "university", "agency", "internal"]
+        },
+        "postingId": {
+          "description": "Filter by posting ID",
+          "type": "string"
+        },
+        "stageId": {
+          "description": "Filter by pipeline stage ID",
+          "type": "string"
+        },
+        "archiveStatus": {
+          "description": "Filter by archive status. Defaults to active.",
+          "type": "string",
+          "enum": ["archived", "active"]
+        },
+        "createdAtStart": {
+          "description": "Filter by creation date start (ISO 8601 timestamp)",
+          "type": "string"
+        },
+        "createdAtEnd": {
+          "description": "Filter by creation date end (ISO 8601 timestamp)",
+          "type": "string"
+        },
+        "updatedAtStart": {
+          "description": "Filter by update date start (ISO 8601 timestamp)",
+          "type": "string"
+        },
+        "updatedAtEnd": {
+          "description": "Filter by update date end (ISO 8601 timestamp)",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Max results to return (default 100, max 100)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Pagination cursor from previous response",
+          "type": "string"
+        },
+        "expand": {
+          "description": "Related objects to include in the response",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["applications", "stage", "owner", "followers", "sourcedBy", "contact"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunities": {
+          "type": "array",
+          "items": {},
+          "description": "List of opportunity objects"
+        },
+        "hasNext": {
+          "type": "boolean",
+          "description": "Whether more results are available"
+        },
+        "next": {
+          "description": "Pagination cursor for next page",
+          "type": "string"
+        }
+      },
+      "required": ["opportunities", "hasNext"],
+      "additionalProperties": false
+    }
+  },
+  "get_opportunity": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "string",
+          "description": "The ID of the opportunity to retrieve"
+        },
+        "expand": {
+          "description": "Related objects to include",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["applications", "stage", "owner", "followers", "sourcedBy", "contact"]
+          }
+        }
+      },
+      "required": ["opportunityId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunity": {
+          "description": "The opportunity object with all details"
+        }
+      },
+      "required": ["opportunity"],
+      "additionalProperties": false
+    }
+  },
+  "create_opportunity": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full name of the candidate"
+        },
+        "headline": {
+          "description": "Candidate headline or current title",
+          "type": "string"
+        },
+        "location": {
+          "description": "Candidate location",
+          "type": "string"
+        },
+        "emails": {
+          "description": "Candidate email addresses",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "phones": {
+          "description": "Candidate phone numbers",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["mobile", "home", "work", "other"]
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": ["value"],
+            "additionalProperties": false
+          }
+        },
+        "links": {
+          "description": "Links (LinkedIn, portfolio, etc.)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags": {
+          "description": "Tags to apply to the opportunity",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sources": {
+          "description": "Sources for this opportunity",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "origin": {
+          "description": "How the candidate was sourced",
+          "type": "string",
+          "enum": ["applied", "sourced", "referred", "university", "agency", "internal"]
+        },
+        "postingId": {
+          "description": "Posting ID to associate with",
+          "type": "string"
+        },
+        "stageId": {
+          "description": "Initial pipeline stage ID",
+          "type": "string"
+        },
+        "ownerId": {
+          "description": "User ID of the opportunity owner",
+          "type": "string"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "string",
+          "description": "ID of the created opportunity"
+        },
+        "contactId": {
+          "type": "string",
+          "description": "ID of the candidate contact"
+        },
+        "opportunity": {
+          "description": "The full created opportunity object"
+        }
+      },
+      "required": ["opportunityId", "contactId", "opportunity"],
+      "additionalProperties": false
+    }
+  },
+  "update_opportunity": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "string",
+          "description": "ID of the opportunity to update"
+        },
+        "stageId": {
+          "description": "Move to this pipeline stage ID",
+          "type": "string"
+        },
+        "archived": {
+          "description": "Set to true to archive, false to unarchive",
+          "type": "boolean"
+        },
+        "archiveReasonId": {
+          "description": "Archive reason ID (only when archiving)",
+          "type": "string"
+        },
+        "addTags": {
+          "description": "Tags to add",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removeTags": {
+          "description": "Tags to remove",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "addLinks": {
+          "description": "Links to add",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removeLinks": {
+          "description": "Links to remove",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "addSources": {
+          "description": "Sources to add",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removeSources": {
+          "description": "Sources to remove",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["opportunityId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "string",
+          "description": "ID of the updated opportunity"
+        },
+        "updatesApplied": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of updates that were applied"
+        }
+      },
+      "required": ["opportunityId", "updatesApplied"],
+      "additionalProperties": false
+    }
+  },
+  "list_postings": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "state": {
+          "description": "Filter by posting state",
+          "type": "string",
+          "enum": ["published", "internal", "closed", "draft", "pending", "rejected"]
+        },
+        "team": {
+          "description": "Filter by team name",
+          "type": "string"
+        },
+        "department": {
+          "description": "Filter by department name",
+          "type": "string"
+        },
+        "location": {
+          "description": "Filter by location name",
+          "type": "string"
+        },
+        "commitment": {
+          "description": "Filter by commitment (e.g., Full-time)",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Max results to return",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Pagination cursor from previous response",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "postings": {
+          "type": "array",
+          "items": {},
+          "description": "List of job posting objects"
+        },
+        "hasNext": {
+          "type": "boolean",
+          "description": "Whether more results are available"
+        },
+        "next": {
+          "description": "Pagination cursor for next page",
+          "type": "string"
+        }
+      },
+      "required": ["postings", "hasNext"],
+      "additionalProperties": false
+    }
+  },
+  "manage_posting": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "postingId": {
+          "description": "ID of posting to update. Omit to create new.",
+          "type": "string"
+        },
+        "text": {
+          "description": "Job title/posting text",
+          "type": "string"
+        },
+        "state": {
+          "description": "Posting state",
+          "type": "string",
+          "enum": ["published", "internal", "closed", "draft", "pending"]
+        },
+        "distributionChannels": {
+          "description": "Distribution channels",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["public", "internal"]
+          }
+        },
+        "categories": {
+          "description": "Posting categories",
+          "type": "object",
+          "properties": {
+            "team": {
+              "description": "Team name",
+              "type": "string"
+            },
+            "department": {
+              "description": "Department name",
+              "type": "string"
+            },
+            "location": {
+              "description": "Location name",
+              "type": "string"
+            },
+            "commitment": {
+              "description": "Commitment type (e.g., Full-time)",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "content": {
+          "description": "Posting content",
+          "type": "object",
+          "properties": {
+            "description": {
+              "description": "HTML job description",
+              "type": "string"
+            },
+            "descriptionPlain": {
+              "description": "Plain text job description",
+              "type": "string"
+            },
+            "lists": {
+              "description": "Additional content sections (requirements, etc.)",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "List header"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "HTML list content"
+                  }
+                },
+                "required": ["text", "content"],
+                "additionalProperties": false
+              }
+            },
+            "closing": {
+              "description": "HTML closing content",
+              "type": "string"
+            },
+            "closingPlain": {
+              "description": "Plain text closing content",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "salaryRange": {
+          "description": "Salary range information",
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "interval": {
+              "type": "string",
+              "enum": ["per-year-salary", "per-hour-wage", "one-time"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "workplaceType": {
+          "description": "Workplace type",
+          "type": "string",
+          "enum": ["unspecified", "on-site", "remote", "hybrid"]
+        },
+        "ownerId": {
+          "description": "User ID of posting owner",
+          "type": "string"
+        },
+        "reqId": {
+          "description": "Requisition ID to associate",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "postingId": {
+          "type": "string",
+          "description": "ID of the created or updated posting"
+        },
+        "posting": {
+          "description": "The full posting object"
+        }
+      },
+      "required": ["postingId", "posting"],
+      "additionalProperties": false
+    }
+  },
+  "manage_interview": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "The action to perform"
+        },
+        "opportunityId": {
+          "description": "Opportunity ID (required for creating)",
+          "type": "string"
+        },
+        "panelId": {
+          "description": "Panel ID (required for creating an interview)",
+          "type": "string"
+        },
+        "interviewId": {
+          "description": "Interview ID (required for updating or deleting)",
+          "type": "string"
+        },
+        "subject": {
+          "description": "Interview subject/title",
+          "type": "string"
+        },
+        "date": {
+          "description": "Interview date (ISO 8601 timestamp)",
+          "type": "string"
+        },
+        "duration": {
+          "description": "Interview duration in minutes",
+          "type": "number"
+        },
+        "location": {
+          "description": "Interview location or meeting link",
+          "type": "string"
+        },
+        "note": {
+          "description": "Notes about the interview",
+          "type": "string"
+        },
+        "interviewerIds": {
+          "description": "User IDs of interviewers",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "feedbackTemplateId": {
+          "description": "Feedback template ID to use",
+          "type": "string"
+        },
+        "feedbackReminderFrequency": {
+          "description": "Feedback reminder frequency",
+          "type": "string",
+          "enum": ["none", "daily", "frequent"]
+        },
+        "timezone": {
+          "description": "Timezone for the interview (IANA format)",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "interviewId": {
+          "description": "ID of the created/updated interview",
+          "type": "string"
+        },
+        "deleted": {
+          "description": "True if the interview was deleted",
+          "type": "boolean"
+        },
+        "interview": {
+          "description": "The interview object (for create/update)"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "add_note": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "string",
+          "description": "ID of the opportunity to add a note to"
+        },
+        "value": {
+          "type": "string",
+          "description": "The note content (supports HTML)"
+        },
+        "notifyFollowers": {
+          "description": "Whether to notify followers of the opportunity",
+          "type": "boolean"
+        }
+      },
+      "required": ["opportunityId", "value"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "description": "ID of the created note"
+        },
+        "note": {
+          "description": "The full note object"
+        }
+      },
+      "required": ["noteId", "note"],
+      "additionalProperties": false
+    }
+  },
+  "manage_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "deactivate", "reactivate"],
+          "description": "Action to perform"
+        },
+        "userId": {
+          "description": "User ID (required for update/deactivate/reactivate)",
+          "type": "string"
+        },
+        "name": {
+          "description": "User full name",
+          "type": "string"
+        },
+        "email": {
+          "description": "User email address",
+          "type": "string"
+        },
+        "accessRole": {
+          "description": "User access role",
+          "type": "string",
+          "enum": ["super admin", "admin", "team member", "limited team member", "interviewer"]
+        },
+        "externalDirectoryId": {
+          "description": "External directory ID for HRIS integration",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ID of the user"
+        },
+        "user": {
+          "description": "The user object (for create/update)"
+        },
+        "deactivated": {
+          "description": "True if user was deactivated",
+          "type": "boolean"
+        },
+        "reactivated": {
+          "description": "True if user was reactivated",
+          "type": "boolean"
+        }
+      },
+      "required": ["userId"],
+      "additionalProperties": false
+    }
+  },
+  "list_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "description": "Filter by user email",
+          "type": "string"
+        },
+        "includeDeactivated": {
+          "description": "Include deactivated users in results",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Max results to return",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Pagination cursor from previous response",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {},
+          "description": "List of user objects"
+        },
+        "hasNext": {
+          "type": "boolean",
+          "description": "Whether more results are available"
+        },
+        "next": {
+          "description": "Pagination cursor for next page",
+          "type": "string"
+        }
+      },
+      "required": ["users", "hasNext"],
+      "additionalProperties": false
+    }
+  },
+  "get_pipeline_metadata": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["stages", "archiveReasons", "sources", "tags"]
+          },
+          "description": "Types of metadata to include"
+        }
+      },
+      "required": ["include"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "stages": {
+          "description": "Pipeline stages",
+          "type": "array",
+          "items": {}
+        },
+        "archiveReasons": {
+          "description": "Archive reasons",
+          "type": "array",
+          "items": {}
+        },
+        "sources": {
+          "description": "Candidate sources",
+          "type": "array",
+          "items": {}
+        },
+        "tags": {
+          "description": "Tags",
+          "type": "array",
+          "items": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_opportunity_activity": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "string",
+          "description": "ID of the opportunity"
+        },
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "notes",
+              "feedback",
+              "interviews",
+              "offers",
+              "applications",
+              "resumes",
+              "files",
+              "referrals"
+            ]
+          },
+          "description": "Types of activity to include"
+        }
+      },
+      "required": ["opportunityId", "include"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "notes": {
+          "description": "Notes on the opportunity",
+          "type": "array",
+          "items": {}
+        },
+        "feedback": {
+          "description": "Feedback forms",
+          "type": "array",
+          "items": {}
+        },
+        "interviews": {
+          "description": "Interviews",
+          "type": "array",
+          "items": {}
+        },
+        "offers": {
+          "description": "Offers",
+          "type": "array",
+          "items": {}
+        },
+        "applications": {
+          "description": "Applications",
+          "type": "array",
+          "items": {}
+        },
+        "resumes": {
+          "description": "Resumes",
+          "type": "array",
+          "items": {}
+        },
+        "files": {
+          "description": "Files",
+          "type": "array",
+          "items": {}
+        },
+        "referrals": {
+          "description": "Referrals",
+          "type": "array",
+          "items": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_requisition": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "requisitionId": {
+          "description": "Requisition ID (required for update/delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Requisition name",
+          "type": "string"
+        },
+        "headcountTotal": {
+          "description": "Total headcount for this requisition",
+          "type": "number"
+        },
+        "compensationBand": {
+          "description": "Compensation band",
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "interval": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "ownerId": {
+          "description": "User ID of the requisition owner",
+          "type": "string"
+        },
+        "hiringManagerId": {
+          "description": "User ID of the hiring manager",
+          "type": "string"
+        },
+        "status": {
+          "description": "Requisition status",
+          "type": "string",
+          "enum": ["open", "onHold", "closed", "draft"]
+        },
+        "customFields": {
+          "description": "Custom fields as key-value pairs",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "postingIds": {
+          "description": "Posting IDs to associate",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requisitionId": {
+          "description": "ID of the requisition",
+          "type": "string"
+        },
+        "requisition": {
+          "description": "The requisition object"
+        },
+        "deleted": {
+          "description": "True if the requisition was deleted",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "update_contact": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "description": "Contact ID to view or update"
+        },
+        "name": {
+          "description": "Updated full name",
+          "type": "string"
+        },
+        "headline": {
+          "description": "Updated headline or current title",
+          "type": "string"
+        },
+        "location": {
+          "description": "Updated location",
+          "type": "string"
+        },
+        "emails": {
+          "description": "Updated email addresses (replaces existing)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "phones": {
+          "description": "Updated phone numbers (replaces existing)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["mobile", "home", "work", "other"]
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": ["value"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["contactId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "description": "ID of the contact"
+        },
+        "contact": {
+          "description": "The contact object"
+        },
+        "updated": {
+          "type": "boolean",
+          "description": "Whether the contact was updated (vs just viewed)"
+        }
+      },
+      "required": ["contactId", "contact", "updated"],
+      "additionalProperties": false
+    }
+  }
+}

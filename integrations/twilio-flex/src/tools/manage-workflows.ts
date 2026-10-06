@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TaskRouterClient } from '../lib/taskrouter-client';
+import { fail, validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let workflowSchema = z.object({
@@ -25,16 +26,24 @@ export let manageWorkflowsTool = SlateTool.create(spec, {
   key: 'manage_workflows',
   description: `Create, read, update, delete, or list workflows in a TaskRouter workspace. Workflows define the routing rules that determine how tasks are assigned to workers based on task attributes and queue configurations.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque continuation from nextPageToken; retain the same resource and filters.'
+        ),
       action: z
         .enum(['create', 'get', 'update', 'delete', 'list'])
         .describe('Action to perform'),
-      workspaceSid: z.string().describe('Workspace SID'),
+      workspaceSid: z
+        .string()
+        .describe('Workspace SID. Call list_workspaces to discover authorized workspaces.'),
       workflowSid: z
         .string()
         .optional()
@@ -55,11 +64,21 @@ export let manageWorkflowsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Native continuation; omitted when this page is exhausted.'),
+      hasMore: z.boolean().optional().describe('Whether a next page is available.'),
       workflows: z.array(workflowSchema).describe('Workflow records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TaskRouterClient(ctx.auth.token, ctx.auth.accountSid);
+    validateInput('manage_workflows', ctx.input);
+    let client = new TaskRouterClient(
+      ctx.auth.token,
+      ctx.auth.accountSid,
+      ctx.input.pageToken
+    );
 
     if (ctx.input.action === 'list') {
       let result = await client.listWorkflows(ctx.input.workspaceSid, ctx.input.pageSize);
@@ -74,13 +93,13 @@ export let manageWorkflowsTool = SlateTool.create(spec, {
         dateUpdated: w.date_updated
       }));
       return {
-        output: { workflows },
+        output: { workflows, nextPageToken: result.nextPageToken, hasMore: result.hasMore },
         message: `Found **${workflows.length}** workflows.`
       };
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.workflowSid) throw new Error('workflowSid is required');
+      if (!ctx.input.workflowSid) throw fail('workflowSid is required');
       let w = await client.getWorkflow(ctx.input.workspaceSid, ctx.input.workflowSid);
       return {
         output: {
@@ -102,8 +121,8 @@ export let manageWorkflowsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.friendlyName) throw new Error('friendlyName is required');
-      if (!ctx.input.configuration) throw new Error('configuration is required');
+      if (!ctx.input.friendlyName) throw fail('friendlyName is required');
+      if (!ctx.input.configuration) throw fail('configuration is required');
       let params: Record<string, string | undefined> = {
         FriendlyName: ctx.input.friendlyName,
         Configuration: ctx.input.configuration,
@@ -132,7 +151,7 @@ export let manageWorkflowsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.workflowSid) throw new Error('workflowSid is required');
+      if (!ctx.input.workflowSid) throw fail('workflowSid is required');
       let params: Record<string, string | undefined> = {
         FriendlyName: ctx.input.friendlyName,
         Configuration: ctx.input.configuration,
@@ -165,7 +184,7 @@ export let manageWorkflowsTool = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.workflowSid) throw new Error('workflowSid is required');
+    if (!ctx.input.workflowSid) throw fail('workflowSid is required');
     await client.deleteWorkflow(ctx.input.workspaceSid, ctx.input.workflowSid);
     return {
       output: {

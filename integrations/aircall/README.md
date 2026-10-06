@@ -1,69 +1,19 @@
-# <img src="https://provider-logos.metorial-cdn.com/aircall.png" height="20"> Aircall
+# Aircall
 
-Manage cloud-based business phone system including calls, SMS/MMS messaging, contacts, users, teams, and phone numbers. Retrieve call recordings, notes, and metadata. Transfer calls to users, teams, or external numbers. Create and manage contacts with phone numbers and emails. Send SMS/MMS messages from Aircall numbers. Display contextual insight cards during live calls. Manage tags on calls, configure webhooks for real-time call, message, contact, and user events. Automate outbound dialing with Power Dialer. Monitor user availability and initiate outbound calls on behalf of agents.
+Manage calls, shared contacts, users, teams, number discovery and text messaging through Aircall's Public API. Seventeen tools retain all fourteen existing action keys and add company summary, exact contact detail and existing call-audio download. No event subscriptions are registered.
 
-## Tools
+Use Basic authentication for one company's API-key settings or OAuth for an authorized company integration. OAuth access tokens do not expire according to the current API reference. Basic company summary does not expose a company ID or identify a person; OAuth integration details provide a native company ID. Reconnect if authorization is revoked.
 
-### Create Insight Card
+Call IDs are native Int64 values. Use `callIdExact` from list/get tools. The legacy numeric `callId` remains available only when safely representable. Page size is at most fifty; calls and contacts expose at most 10,000 results per query, and calls have a six-month history window. Follow native continuation metadata and narrow time ranges rather than assuming an exhaustive collection. The retained `contactId` call-search field has no documented native filter; select a phone number with `get_contact` instead. Tag filters use decimal ID strings.
 
-Display contextual information to agents during an ongoing call. Push custom data such as customer details, CRM links, or account information into the agent's call view. Cards are only visible during the active call and are not stored afterward.
+Call creation and many call controls return empty native acknowledgements. Acceptance does not prove completion or provide a new call ID. Comments cannot be removed. Archive changes a legacy flag, without closing the Workspace conversation or erasing history. Recording deletion is delayed and also removes AI artifacts; voicemail deletion is delayed. User creation sends an invitation and queued deletion can destroy associated data. The documented V1 user routes have announced deprecation and remain supported here while available.
 
-### Get Call
+Shared-contact updates use native contact/detail routes. Names are optional at creation; at least one phone value is required. Phone values may be normalized. Contact deletion is independently checked for exact absence, without an erasure claim for call history. Team deletion affects routing and retains users/calls.
 
-Retrieve detailed information about a specific call including participants, recording URLs, comments, tags, transfer details, and IVR selections.
+`send_message` retains its existing key and text fields. It sends text through the native number route in the retained inbox-skipping mode. A pending message ID is acceptance, not delivery; there is no documented history endpoint for reconciliation, so wait for the provider callback and avoid automatic resends. Media uploads are not exposed by this tool.
 
-### Get User
+`download_call_media` prepares an existing recording or voicemail MP3 from the documented signed storage location. Direct URLs expire after one hour and access remains subject to retention, privacy and permissions. Renewal rereads the same call and binds authorization, SID, start time, number, media kind and storage resource. Other storage locations require the native call view. No API credentials are sent to signed storage.
 
-Retrieve detailed information about a specific user including their availability, assigned numbers, timezone, and role details. Optionally check the user's real-time availability status.
+The private suite remains active. Authorized fixture reads and audio verification are available; mutative scenarios stop before effects where complete isolation, association history or reversal cannot be independently proven. Offline checks do not establish live API acceptance, deployed URL renewal or provider retention outcomes.
 
-### List Calls
-
-List and search calls in Aircall. Filter by direction, phone number, user, contact, tags, and time range. Returns call metadata including direction, status, duration, participants, and associated recordings.
-
-### List Contacts
-
-List and search contacts in Aircall. Optionally filter by phone number or email address. Returns contact details including phone numbers, emails, and company information.
-
-### List Numbers
-
-List all phone numbers associated with the Aircall account. Returns number details including country, timezone, open/closed status, and live recording settings.
-
-### List Tags
-
-List all tags available in the Aircall account. Tags are used to categorize and label calls. Use the returned tag IDs to apply tags to calls via the Manage Call tool.
-
-### List Users
-
-List all users in the Aircall account with their availability status, assigned numbers, and role information. Supports pagination and time-based filtering.
-
-### Manage Call
-
-Perform actions on a call: transfer to a user/team/number, add comments or tags, archive/unarchive, or control recording (pause/resume/delete). Combine multiple actions in a single operation.
-
-### Manage Contact
-
-Create, update, or delete a contact in Aircall. When creating, provide at least first name, last name, and one phone number. When updating, specify only the fields to change. Also supports adding, updating, or removing phone numbers and emails on existing contacts.
-
-### Manage Team
-
-Create or delete teams, and add or remove users from teams. Teams are used in call distribution for numbers. Retrieve team details with user membership.
-
-### Manage User
-
-Create, update, or delete a user in Aircall. When creating, provide email, first name, and last name. When updating, specify only the fields to change. Supports setting availability, roles, and wrap-up time.
-
-### Send SMS/MMS
-
-Send an SMS or MMS message from an Aircall phone number. The number must be pre-configured for API-based messaging. Messages sent via API are **not** recorded or displayed in the Aircall platform.
-
-### Start Outbound Call
-
-Initiate an outbound call on behalf of a user. The user must be available, not currently on a call, and associated with the specified number. Works only on desktop app.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Sources: [API reference](https://developers.aircall.io/api-references), [authentication](https://developer.aircall.io/docs/authentication), [call data](https://developer.aircall.io/docs/work-with-call-data).

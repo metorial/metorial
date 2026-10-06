@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { QdrantClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageAliases = SlateTool.create(spec, {
   name: 'Manage Collection Aliases',
   key: 'manage_aliases',
-  description: `Creates, deletes, or renames collection aliases. Aliases provide alternative names for collections, useful for versioning or A/B testing. Multiple alias operations can be performed atomically in a single call. Can also list existing aliases.`,
+  description: `Creates, deletes, or renames collection aliases. Aliases provide alternative names for collections, useful for versioning or A/B testing. Can also list existing aliases.`,
   instructions: [
     'To list all aliases, set `action` to "list". Optionally provide `collectionName` to list aliases for a specific collection.',
     'To create an alias, set `action` to "create" and provide both `aliasName` and `collectionName`.',
@@ -14,7 +14,7 @@ export let manageAliases = SlateTool.create(spec, {
     'To rename an alias, set `action` to "rename" and provide both `aliasName` (current) and `newAliasName`.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -47,7 +47,7 @@ export let manageAliases = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 
@@ -72,7 +72,9 @@ export let manageAliases = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.aliasName || !ctx.input.collectionName) {
-        throw new Error('aliasName and collectionName are required for create action');
+        throw createApiServiceError(
+          'aliasName and collectionName are required for create action'
+        );
       }
       await client.updateAliases([
         {
@@ -90,7 +92,7 @@ export let manageAliases = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.aliasName) {
-        throw new Error('aliasName is required for delete action');
+        throw createApiServiceError('aliasName is required for delete action');
       }
       await client.updateAliases([{ delete_alias: { alias_name: ctx.input.aliasName } }]);
       return {
@@ -101,7 +103,9 @@ export let manageAliases = SlateTool.create(spec, {
 
     if (ctx.input.action === 'rename') {
       if (!ctx.input.aliasName || !ctx.input.newAliasName) {
-        throw new Error('aliasName and newAliasName are required for rename action');
+        throw createApiServiceError(
+          'aliasName and newAliasName are required for rename action'
+        );
       }
       await client.updateAliases([
         {
@@ -117,6 +121,6 @@ export let manageAliases = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

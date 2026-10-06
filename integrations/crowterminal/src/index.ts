@@ -9,8 +9,6 @@ import {
   manageSchedule,
   updatePost
 } from './tools';
-import { inboundWebhook, postStatusChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     listAccounts,
     manageSchedule
   ],
-  triggers: [inboundWebhook, postStatusChanges]
+  triggers: []
 });

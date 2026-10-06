@@ -23,8 +23,6 @@ import {
   sendInvoice,
   startStopTimer
 } from './tools';
-import { inboundWebhook, invoiceChanges, projectChanges, timeEntryChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     generateReport,
     getCompany
   ],
-  triggers: [inboundWebhook, timeEntryChanges, invoiceChanges, projectChanges]
+  triggers: []
 });

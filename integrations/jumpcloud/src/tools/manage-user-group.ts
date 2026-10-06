@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageUserGroup = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let manageUserGroup = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       groupId: z.string().optional().describe('Group ID (required for update and delete)'),
       name: z.string().optional().describe('Group name (required for create)'),
@@ -29,46 +31,48 @@ export let manageUserGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      let group: import('../lib/types').JumpCloudGroup;
+      let actionMessage: string;
 
-    let group: any;
-    let actionMessage: string;
+      if (ctx.input.action === 'create') {
+        if (!ctx.input.name) throw createApiServiceError('name is required for create action');
+        group = await client.createUserGroup({
+          name: ctx.input.name,
+          description: ctx.input.description,
+          email: ctx.input.email
+        });
+        actionMessage = `Created user group **${group.name}**`;
+      } else if (ctx.input.action === 'update') {
+        if (!ctx.input.groupId)
+          throw createApiServiceError('groupId is required for update action');
+        let data: Record<string, unknown> = {};
+        if (ctx.input.name !== undefined) data.name = ctx.input.name;
+        if (ctx.input.description !== undefined) data.description = ctx.input.description;
+        if (ctx.input.email !== undefined) data.email = ctx.input.email;
+        group = await client.updateUserGroup(ctx.input.groupId, data);
+        actionMessage = `Updated user group **${group.name}**`;
+      } else {
+        if (!ctx.input.groupId)
+          throw createApiServiceError('groupId is required for delete action');
+        let existing = await client.getUserGroup(ctx.input.groupId);
+        await client.deleteUserGroup(ctx.input.groupId);
+        group = existing;
+        actionMessage = `Deletion accepted for user group **${group.name}**`;
+      }
 
-    if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
-      group = await client.createUserGroup({
-        name: ctx.input.name,
-        description: ctx.input.description,
-        email: ctx.input.email
-      });
-      actionMessage = `Created user group **${group.name}**`;
-    } else if (ctx.input.action === 'update') {
-      if (!ctx.input.groupId) throw new Error('groupId is required for update action');
-      let data: Record<string, any> = {};
-      if (ctx.input.name !== undefined) data.name = ctx.input.name;
-      if (ctx.input.description !== undefined) data.description = ctx.input.description;
-      if (ctx.input.email !== undefined) data.email = ctx.input.email;
-      group = await client.updateUserGroup(ctx.input.groupId, data);
-      actionMessage = `Updated user group **${group.name}**`;
-    } else {
-      if (!ctx.input.groupId) throw new Error('groupId is required for delete action');
-      let existing = await client.getUserGroup(ctx.input.groupId);
-      await client.deleteUserGroup(ctx.input.groupId);
-      group = existing;
-      actionMessage = `Deleted user group **${group.name}**`;
+      return {
+        output: {
+          groupId: group.id,
+          name: group.name,
+          description: group.description,
+          type: group.type
+        },
+        message: actionMessage
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
     }
-
-    return {
-      output: {
-        groupId: group.id,
-        name: group.name,
-        description: group.description,
-        type: group.type
-      },
-      message: actionMessage
-    };
   })
   .build();

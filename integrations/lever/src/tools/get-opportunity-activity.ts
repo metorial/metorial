@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { id, invalid, page, pagination, type Row } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getOpportunityActivityTool = SlateTool.create(spec, {
@@ -11,6 +12,11 @@ export let getOpportunityActivityTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      limit: z.number().optional().describe('Page size from 1 to 100'),
+      offset: z
+        .string()
+        .optional()
+        .describe('Cursor for one selected resource type from its previous response'),
       opportunityId: z.string().describe('ID of the opportunity'),
       include: z
         .array(
@@ -30,6 +36,10 @@ export let getOpportunityActivityTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: z
+        .record(z.string(), z.object({ hasNext: z.boolean(), next: z.string().optional() }))
+        .optional()
+        .describe('Paging state for each selected resource type'),
       notes: z.array(z.any()).optional().describe('Notes on the opportunity'),
       feedback: z.array(z.any()).optional().describe('Feedback forms'),
       interviews: z.array(z.any()).optional().describe('Interviews'),
@@ -41,51 +51,42 @@ export let getOpportunityActivityTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, environment: ctx.auth.environment });
-    let output: Record<string, any> = {};
-    let parts: string[] = [];
-
-    let fetches = ctx.input.include.map(async type => {
-      if (type === 'notes') {
-        let result = await client.listOpportunityNotes(ctx.input.opportunityId);
-        output.notes = result.data || [];
-        parts.push(`${(result.data || []).length} notes`);
-      } else if (type === 'feedback') {
-        let result = await client.listOpportunityFeedback(ctx.input.opportunityId);
-        output.feedback = result.data || [];
-        parts.push(`${(result.data || []).length} feedback`);
-      } else if (type === 'interviews') {
-        let result = await client.listOpportunityInterviews(ctx.input.opportunityId);
-        output.interviews = result.data || [];
-        parts.push(`${(result.data || []).length} interviews`);
-      } else if (type === 'offers') {
-        let result = await client.listOpportunityOffers(ctx.input.opportunityId);
-        output.offers = result.data || [];
-        parts.push(`${(result.data || []).length} offers`);
-      } else if (type === 'applications') {
-        let result = await client.listOpportunityApplications(ctx.input.opportunityId);
-        output.applications = result.data || [];
-        parts.push(`${(result.data || []).length} applications`);
-      } else if (type === 'resumes') {
-        let result = await client.listOpportunityResumes(ctx.input.opportunityId);
-        output.resumes = result.data || [];
-        parts.push(`${(result.data || []).length} resumes`);
-      } else if (type === 'files') {
-        let result = await client.listOpportunityFiles(ctx.input.opportunityId);
-        output.files = result.data || [];
-        parts.push(`${(result.data || []).length} files`);
-      } else if (type === 'referrals') {
-        let result = await client.listOpportunityReferrals(ctx.input.opportunityId);
-        output.referrals = result.data || [];
-        parts.push(`${(result.data || []).length} referrals`);
-      }
-    });
-
-    await Promise.all(fetches);
-
+    const opportunityId = id(ctx.input.opportunityId, 'Opportunity ID');
+    if (ctx.input.offset !== undefined && new Set(ctx.input.include).size !== 1)
+      invalid(
+        'A pagination cursor belongs to one resource type. Select exactly one type when using offset.'
+      );
+    if (!ctx.input.include.length) invalid('Choose at least one activity type.');
+    const client = new Client(ctx.auth);
+    const output: {
+      notes?: Row[];
+      feedback?: Row[];
+      interviews?: Row[];
+      offers?: Row[];
+      applications?: Row[];
+      resumes?: Row[];
+      files?: Row[];
+      referrals?: Row[];
+      pagination: Record<string, { hasNext: boolean; next?: string }>;
+    } = { pagination: {} };
+    const methods = {
+      notes: client.listOpportunityNotes.bind(client),
+      feedback: client.listOpportunityFeedback.bind(client),
+      interviews: client.listOpportunityInterviews.bind(client),
+      offers: client.listOpportunityOffers.bind(client),
+      applications: client.listOpportunityApplications.bind(client),
+      resumes: client.listOpportunityResumes.bind(client),
+      files: client.listOpportunityFiles.bind(client),
+      referrals: client.listOpportunityReferrals.bind(client)
+    };
+    for (const type of new Set(ctx.input.include)) {
+      const result = page(await methods[type](opportunityId, pagination(ctx.input)));
+      output[type] = result.data;
+      output.pagination[type] = { hasNext: result.hasNext, next: result.next };
+    }
     return {
-      output: output as any,
-      message: `Retrieved activity for opportunity **${ctx.input.opportunityId}**: ${parts.join(', ')}.`
+      output,
+      message: `Retrieved the selected activity page for opportunity ${opportunityId}. Follow each activity type's cursor separately.`
     };
   })
   .build();

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { EosGameServicesClient } from '../lib/client';
+import { gameClient } from '../lib/client';
+import { epicError, identifier, identifiers, whole } from '../lib/validation';
 import { spec } from '../spec';
 
 let sanctionSchema = z.object({
@@ -26,7 +27,11 @@ let sanctionSchema = z.object({
     .record(z.string(), z.string())
     .optional()
     .describe('Custom metadata key-value pairs'),
-  displayName: z.string().optional().describe('Display name of the sanctioned player'),
+  displayName: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Display name of the sanctioned player'),
   deploymentId: z.string().optional().describe('Deployment ID'),
   createdAt: z.string().optional().describe('Creation timestamp'),
   updatedAt: z.string().nullable().optional().describe('Last update timestamp')
@@ -70,7 +75,9 @@ Use **create** to apply a new sanction, **update** to modify an existing one, or
             duration: z
               .number()
               .optional()
-              .describe('Duration in seconds. Omit for permanent sanctions.'),
+              .describe(
+                'Duration in seconds. Create accepts a whole number; updates require0 for permanent or 600–31536000 seconds. Omit to preserve the native default.'
+              ),
             tags: z
               .array(z.string())
               .optional()
@@ -94,52 +101,181 @@ Use **create** to apply a new sanction, **update** to modify an existing one, or
   )
   .output(
     z.object({
-      sanctions: z.array(sanctionSchema).describe('Resulting sanction records')
+      sanctions: z
+        .array(sanctionSchema)
+        .describe('Native created or updated records; removal returns no records.'),
+      removedReferenceIds: z
+        .array(z.string())
+        .optional()
+        .describe('Exact identifiers whose removal request was accepted.'),
+      outcome: z
+        .literal('accepted')
+        .optional()
+        .describe(
+          'Provider accepted the operation; history and downstream effects may remain.'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EosGameServicesClient({
-      token: ctx.auth.token,
-      deploymentId: ctx.config.deploymentId
-    });
-
-    let data: any;
-
-    if (ctx.input.operation === 'create') {
-      let createPayload = ctx.input.sanctions.map(s => ({
-        productUserId: s.productUserId!,
-        action: s.action!,
-        justification: s.justification!,
-        source: s.source!,
-        duration: s.duration,
-        tags: s.tags,
-        pending: s.pending,
-        metadata: s.metadata,
-        displayName: s.displayName,
-        identityProvider: s.identityProvider,
-        accountId: s.accountId
-      }));
-      data = await client.createSanctions(createPayload);
-    } else if (ctx.input.operation === 'update') {
-      let updatePayload = ctx.input.sanctions.map(s => ({
-        referenceId: s.referenceId!,
-        updates: {
-          tags: s.tags,
-          metadata: s.metadata,
-          justification: s.justification
-        }
-      }));
-      data = await client.updateSanctions(updatePayload);
-    } else {
-      let referenceIds = ctx.input.sanctions.map(s => s.referenceId!);
-      data = await client.removeSanctions(referenceIds);
-    }
-
-    let sanctions = data.elements ?? (Array.isArray(data) ? data : [data]);
-
-    return {
-      output: { sanctions },
-      message: `Successfully **${ctx.input.operation}d** ${sanctions.length} sanction(s).`
+    const required = (value: string | undefined, name: string) => {
+      identifier(value, name);
+      return value;
     };
+    for (const row of ctx.input.sanctions) {
+      if (ctx.input.operation === 'create') {
+        required(row.productUserId, 'Product User ID');
+        const action = required(row.action, 'Action'),
+          source = required(row.source, 'Source');
+        if (
+          !/^[a-zA-Z0-9_-]{1,64}$/.test(action) ||
+          !/^[a-zA-Z0-9_-]{2,64}$/.test(source) ||
+          source.toLowerCase() === 'developer-portal'
+        )
+          throw createApiServiceError('Use a valid action and nonreserved source identifier.');
+        required(row.justification, 'Justification');
+        if (row.referenceId !== undefined)
+          throw createApiServiceError('referenceId does not apply to create.');
+      } else {
+        required(row.referenceId, 'Sanction reference ID');
+        if (
+          [
+            'productUserId',
+            'action',
+            'source',
+            'pending',
+            'displayName',
+            'identityProvider',
+            'accountId'
+          ].some(key => row[key as keyof typeof row] !== undefined)
+        )
+          throw createApiServiceError(
+            'Creation-only fields do not apply to update or remove.'
+          );
+        if (
+          ctx.input.operation === 'remove' &&
+          ['tags', 'metadata', 'duration'].some(
+            key => row[key as keyof typeof row] !== undefined
+          )
+        )
+          throw createApiServiceError(
+            'Removal accepts referenceId and an optional common justification only.'
+          );
+        if (
+          ctx.input.operation === 'update' &&
+          [row.tags, row.metadata, row.justification, row.duration].every(
+            value => value === undefined
+          )
+        )
+          throw createApiServiceError('Supply an updatable sanction field.');
+      }
+      if (
+        row.justification !== undefined &&
+        (!row.justification.length || row.justification.length > 2048)
+      )
+        throw createApiServiceError('Justification requires 1–2048 characters.');
+      if (
+        row.tags &&
+        (new Set(row.tags.map(tag => tag.toLowerCase())).size !== row.tags.length ||
+          row.tags.some(tag => !/^[a-zA-Z0-9_-]{1,16}$/.test(tag)))
+      )
+        throw createApiServiceError(
+          'Sanction tags must be unique without regard to case, with 1–16 letters, digits, underscores or hyphens.'
+        );
+      if (
+        row.metadata &&
+        (Object.keys(row.metadata).length > 25 ||
+          Object.entries(row.metadata).some(
+            ([key, value]) => key.length > 64 || value.length > 128
+          ))
+      )
+        throw createApiServiceError(
+          'Metadata supports up to 25 pairs, keys up to 64 characters and values up to 128 characters.'
+        );
+      for (const value of [row.displayName, row.identityProvider, row.accountId])
+        if (value !== undefined && value.length > 64)
+          throw createApiServiceError('Player metadata fields support at most 64 characters.');
+      if (row.duration !== undefined) {
+        whole(row.duration, 0, Number.MAX_SAFE_INTEGER, 'Duration');
+        if (
+          ctx.input.operation === 'update' &&
+          row.duration !== 0 &&
+          (row.duration < 600 || row.duration > 31536000)
+        )
+          throw createApiServiceError(
+            'Updated duration must be 0 for permanent or 600–31536000 seconds.'
+          );
+      }
+    }
+    const client = gameClient(ctx);
+    if (ctx.input.operation !== 'create')
+      identifiers(
+        ctx.input.sanctions.map(row => required(row.referenceId, 'Reference ID')),
+        100,
+        'Reference IDs'
+      );
+    try {
+      if (ctx.input.operation === 'create') {
+        const data = await client.createSanctions(
+          ctx.input.sanctions.map(row => ({
+            ...pickDefined({ ...row, referenceId: undefined }),
+            productUserId: required(row.productUserId, 'Product User ID'),
+            action: required(row.action, 'Action'),
+            source: required(row.source, 'Source'),
+            justification: required(row.justification, 'Justification')
+          }))
+        );
+        return {
+          output: { sanctions: data.elements, outcome: 'accepted' as const },
+          message:
+            'Epic accepted the sanctions and returned their exact receipts. Moderation effects and audit history may remain.'
+        };
+      }
+      if (ctx.input.operation === 'update') {
+        const data = await client.updateSanctions(
+          ctx.input.sanctions.map(row => ({
+            referenceId: required(row.referenceId, 'Reference ID'),
+            updates: pickDefined({
+              tags: row.tags,
+              metadata: row.metadata,
+              justification: row.justification,
+              duration: row.duration
+            })
+          }))
+        );
+        return {
+          output: { sanctions: data.elements, outcome: 'accepted' as const },
+          message:
+            'Epic returned the updated sanction receipts. Duration changes require independent expiry verification.'
+        };
+      }
+      const reasons = [
+        ...new Set(
+          ctx.input.sanctions
+            .map(row => row.justification)
+            .filter(value => value !== undefined)
+        )
+      ];
+      if (reasons.length > 1)
+        throw createApiServiceError(
+          'Removal supports one common justification for the batch.'
+        );
+      const data = await client.removeSanctions(
+        ctx.input.sanctions.map(row => required(row.referenceId, 'Reference ID')),
+        reasons[0]
+      );
+      return {
+        output: {
+          sanctions: data.elements,
+          removedReferenceIds: data.removedReferenceIds,
+          outcome: 'accepted' as const
+        },
+        message:
+          'Epic accepted removal of the specified sanctions. This does not erase moderation or audit history.'
+      };
+    } catch (error) {
+      const safe = epicError(error, true);
+      safe.data.outcomeUncertain = true;
+      throw safe;
+    }
   })
   .build();

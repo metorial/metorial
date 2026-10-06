@@ -16,14 +16,6 @@ import {
   sendMessage,
   verifyCredential
 } from './tools';
-import {
-  credentialEvents,
-  didEvents,
-  proofEvents,
-  registryEvents,
-  schemaEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +34,5 @@ export let provider = Slate.create({
     sendMessage,
     getJobStatus
   ],
-  triggers: [credentialEvents, didEvents, registryEvents, schemaEvents, proofEvents]
+  triggers: []
 });

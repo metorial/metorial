@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import type { cadenceSchema, membershipSchema } from '../lib/api-schemas';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -20,7 +21,7 @@ let cadenceOutputSchema = z.object({
   tags: z.array(z.string()).nullable().optional().describe('Tags applied to cadence')
 });
 
-let mapCadence = (raw: any) => ({
+let mapCadence = (raw: z.output<typeof cadenceSchema>) => ({
   cadenceId: raw.id,
   name: raw.name,
   cadenceState: raw.cadence_state,
@@ -32,8 +33,8 @@ let mapCadence = (raw: any) => ({
   ownerId: raw.owner?.id ?? null,
   createdAt: raw.created_at,
   updatedAt: raw.updated_at,
-  totalPeople: raw.counts?.people_added ?? null,
-  countsPeopleTouched: raw.counts?.target_people ?? null,
+  totalPeople: raw.counts?.cadence_people ?? null,
+  countsPeopleTouched: raw.counts?.people_acted_on_count ?? null,
   tags: raw.tags
 });
 
@@ -167,7 +168,7 @@ export let addPersonToCadence = SlateTool.create(spec, {
 export let removePersonFromCadence = SlateTool.create(spec, {
   name: 'Remove Person from Cadence',
   key: 'remove_person_from_cadence',
-  description: `Remove a person from a cadence by deleting the cadence membership. The person will stop receiving touches from this cadence.`,
+  description: `Remove a person from a cadence by deleting the cadence membership. Historical membership and previously created activity can remain; independently verify queued work before removing related records.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -175,7 +176,11 @@ export let removePersonFromCadence = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      membershipId: z.number().describe('Cadence membership ID to remove')
+      membershipId: z
+        .number()
+        .describe(
+          'Cadence membership ID from list_cadence_memberships or add_person_to_cadence.'
+        )
     })
   )
   .output(
@@ -194,6 +199,63 @@ export let removePersonFromCadence = SlateTool.create(spec, {
         removed: true
       },
       message: `Removed cadence membership ${ctx.input.membershipId}.`
+    };
+  })
+  .build();
+
+export const listCadenceMemberships = SlateTool.create(spec, {
+  key: 'list_cadence_memberships',
+  name: 'List Cadence Memberships',
+  description:
+    'List current and historical cadence memberships. Discover membership IDs before removing a person from a cadence.',
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      page: z.number().optional(),
+      perPage: z.number().optional(),
+      personId: z.number().optional().describe('Person ID from list_people.'),
+      cadenceId: z.number().optional().describe('Cadence ID from list_cadences.'),
+      currentlyOnCadence: z
+        .boolean()
+        .optional()
+        .describe('Filter current (true) or historical (false) memberships.')
+    })
+  )
+  .output(
+    z.object({
+      memberships: z.array(
+        z.object({
+          membershipId: z.number(),
+          personId: z.number(),
+          cadenceId: z.number(),
+          userId: z.number().nullable(),
+          currentlyOnCadence: z.boolean(),
+          currentState: z.string().nullish(),
+          createdAt: z.string().nullish()
+        })
+      ),
+      paging: paginationOutputSchema
+    })
+  )
+  .handleInvocation(async ctx => {
+    const result = await new Client({ token: ctx.auth.token }).listCadenceMemberships(
+      ctx.input
+    );
+    return {
+      output: {
+        memberships: result.data.map((value: z.output<typeof membershipSchema>) => ({
+          membershipId: value.id,
+          personId: value.person.id,
+          cadenceId: value.cadence.id,
+          userId: value.user?.id ?? null,
+          currentlyOnCadence: value.currently_on_cadence,
+          currentState: value.current_state,
+          createdAt: value.created_at
+        })),
+        paging: result.metadata.paging
+      },
+      message: `Retrieved ${result.data.length} cadence memberships.`
     };
   })
   .build();

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { actionFields, safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageLivehuntRuleset = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let manageLivehuntRuleset = SlateTool.create(spec, {
   key: 'manage_livehunt_ruleset',
   description: `Create, update, enable/disable, or delete Livehunt YARA rulesets. Livehunt hooks into the stream of files submitted to VirusTotal and generates notifications when YARA rules match. **Premium feature.**`,
   constraints: [
-    'This feature requires a VirusTotal Premium API key.',
+    'This feature requires the relevant VirusTotal Intelligence and hunting privileges.',
     'The notification limit configures the max notifications per ruleset in any 24-hour period.'
   ],
   tags: {
@@ -80,12 +81,32 @@ export let manageLivehuntRuleset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    actionFields(
+      ctx.input,
+      {
+        create: ['name', 'rules', 'enabled', 'notificationLimit', 'notificationEmails'],
+        update: [
+          'rulesetId',
+          'name',
+          'rules',
+          'enabled',
+          'notificationLimit',
+          'notificationEmails'
+        ],
+        get: ['rulesetId'],
+        delete: ['rulesetId'],
+        list: ['limit', 'cursor']
+      }[ctx.input.action]
+    );
+    let client = new Client(ctx.auth);
 
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.name || !ctx.input.rules) {
-          throw new Error('Name and rules are required when creating a Livehunt ruleset.');
+          throw createApiServiceError(
+            'Name and rules are required when creating a Livehunt ruleset.'
+          );
         }
         let result = await client.createLivehuntRuleset(
           ctx.input.name,
@@ -98,7 +119,7 @@ export let manageLivehuntRuleset = SlateTool.create(spec, {
         return {
           output: {
             ruleset: {
-              rulesetId: result?.id ?? '',
+              rulesetId: result.id,
               name: attrs.name,
               rules: attrs.rules,
               enabled: attrs.enabled,
@@ -112,7 +133,7 @@ export let manageLivehuntRuleset = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.rulesetId) {
-          throw new Error('Ruleset ID is required for update.');
+          throw createApiServiceError('Ruleset ID is required for update.');
         }
         let result = await client.updateLivehuntRuleset(ctx.input.rulesetId, {
           name: ctx.input.name,
@@ -125,7 +146,7 @@ export let manageLivehuntRuleset = SlateTool.create(spec, {
         return {
           output: {
             ruleset: {
-              rulesetId: result?.id ?? '',
+              rulesetId: result.id,
               name: attrs.name,
               rules: attrs.rules,
               enabled: attrs.enabled,
@@ -139,7 +160,7 @@ export let manageLivehuntRuleset = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.rulesetId) {
-          throw new Error('Ruleset ID is required for delete.');
+          throw createApiServiceError('Ruleset ID is required for delete.');
         }
         await client.deleteLivehuntRuleset(ctx.input.rulesetId);
         return {
@@ -149,14 +170,14 @@ export let manageLivehuntRuleset = SlateTool.create(spec, {
       }
       case 'get': {
         if (!ctx.input.rulesetId) {
-          throw new Error('Ruleset ID is required for get.');
+          throw createApiServiceError('Ruleset ID is required for get.');
         }
         let result = await client.getLivehuntRuleset(ctx.input.rulesetId);
         let attrs = result?.attributes ?? {};
         return {
           output: {
             ruleset: {
-              rulesetId: result?.id ?? '',
+              rulesetId: result.id,
               name: attrs.name,
               rules: attrs.rules,
               enabled: attrs.enabled,
@@ -170,8 +191,8 @@ export let manageLivehuntRuleset = SlateTool.create(spec, {
       }
       case 'list': {
         let result = await client.getLivehuntRulesets(ctx.input.limit, ctx.input.cursor);
-        let rulesets = (result?.data ?? []).map((item: any) => ({
-          rulesetId: item.id ?? '',
+        let rulesets = (result?.data ?? []).map(item => ({
+          rulesetId: item.id,
           name: item.attributes?.name,
           enabled: item.attributes?.enabled,
           ruleCount: item.attributes?.number_of_rules,

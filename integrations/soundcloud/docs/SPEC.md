@@ -1,83 +1,17 @@
-# Slates Specification for SoundCloud
+# SoundCloud API contract
 
-## Overview
+The API root is `https://api.soundcloud.com`; authenticated resource requests use `Authorization: OAuth <access_token>`. No automatic redirects or retries are enabled. User operations require OAuth; known Client Credentials mode is refused before user requests. Older outputs without a mode retain native authorization-failure behavior.
 
-SoundCloud is an audio streaming and sharing platform for musicians, podcasters, and creators. Its API provides access to resources such as tracks, playlists, users, and comments, enabling applications to upload, stream, search, and manage audio content programmatically.
+Authorization uses `https://secure.soundcloud.com/authorize` with state and S256 PKCE. Form token exchanges use `/oauth/token`; Client Credentials authenticates with UTF-8 HTTP Basic `client_id:client_secret`. Both modes keep native `expires_in` and single-use rotated refresh tokens. No fictional scopes, fixed expiry or application user identity is supplied.
 
-## Authentication
+All 26 retained tools use the current documented resource contracts. Likes use `/likes/{tracks|playlists}/{urn}`; reposts use `/reposts/{tracks|playlists}/{urn}`; follow uses PUT `/me/followings/{urn}`. Comments use JSON `{comment:{body,timestamp}}`. Playlist writes use `{playlist:{tracks:[{urn}],set_type,...}}`, with legacy `isAlbum` mapped to native `set_type`. Track metadata updates use `{track:{...}}`; upload uses multipart audio. Documented numeric path aliases remain accepted, while outputs identify URNs.
 
-SoundCloud authentication uses the OAuth 2.1 draft. PKCE is now required in order to securely exchange the auth code. To begin, you must register an application on the SoundCloud Developers portal to obtain a `client_id` and `client_secret`.
+Linked lists preserve `collection` and exact native `next_href` end semantics. Continuations must stay on the same HTTPS API origin and resource path, without credential query parameters. Empty or short pages do not invent totals or end markers. Local bounds are 1,000 records per response and 10 pages/1,000 records for relationship absence checks, not provider caps. Profile lists have separate continuation inputs. Embedded playlist tracks may be incomplete; `listTracks` uses the dedicated track collection.
 
-Two grant types are supported:
+Resolve supports the documented 302 Location or body location with one manually validated API resource request. Stream records preserve native format-to-resolver URLs. Original-file delivery only follows the exact native enabled download URL bound to the track and accepted API origin; unknown expiry falls back to bounded content. No CDN authentication, automatic redirect, stream conversion or renewal is inferred.
 
-### Authorization Code Flow (with PKCE)
+Native optional fields and nulls are preserved. Country names are not relabeled as country codes. Legacy favorites count is used only when native likes count is absent. Native URN-only resources do not require obsolete numeric IDs.
 
-Used when your application needs to perform actions on behalf of a user (e.g., uploading tracks, liking, commenting).
+Success receipts validate exact resource IDs and requested documented fields. Relationship mutations require fresh native state. Requested playlist membership must be complete before it is asserted. Partial effects and concurrency remain possible; there is no atomicity or history-erasure claim. Comment deletion is undocumented and unsupported.
 
-- **Authorization URL:** `https://soundcloud.com/connect`
-- **Token URL:** `https://secure.soundcloud.com/oauth/token`
-- Required parameters: `client_id` (obtained during app registration) and `redirect_uri` (provided during app registration).
-- A PKCE `code_challenge` is required.
-- A `state` parameter (random string) should be used for CSRF protection.
-- The token response includes `access_token`, `refresh_token`, `expires_in`, and `scope`.
-- Tokens can expire and need to be refreshed.
-
-### Client Credentials Flow
-
-Used for server-side integrations that only need access to public resources without acting on behalf of a user.
-
-- There is no need to go through the connect flow; you pass along the `client_id` and `client_secret` to authenticate and get a token.
-- For the client credentials grant type, only basic header client authentication is supported (Base64-encoded `client_id:client_secret`).
-
-### General Notes
-
-- All SoundCloud resources require an `Authorization` header; requests without it will be rejected with a 401 error. The header format is: `Authorization: OAuth ACCESS_TOKEN`.
-- Currently, all clients are treated as confidential rather than public, meaning a secret is required to obtain a token.
-
-## Features
-
-### Track Management
-
-Tracks are core to SoundCloud. The API allows uploading, managing, and sharing tracks. Apps can upload audio files to a user's account and manage metadata including tags. Supported formats include AIFF, WAVE, FLAC, OGG, MP2, MP3, AAC, AMR, and WMA.
-
-- Track metadata can be updated after upload, including artwork.
-- Tracks can be deleted by the owner.
-- Tracks have three access levels: `playable` (fully streamable), `preview` (preview only), and `blocked` (metadata only).
-
-### Audio Streaming
-
-The API provides access to a track's stream URL for use in custom audio players. A GET request to the stream resource returns available transcodings to choose from.
-
-- Public tracks can be streamed without a user session; private tracks require an authorized session and a secret token.
-- Proper attribution to SoundCloud is required when streaming off-platform.
-
-### Playlist Management
-
-Playlists (also called "sets") can be created, retrieved, updated, and deleted. Tracks can be added to or removed from playlists. Playlists can be marked as albums.
-
-### User Profiles
-
-Once authorized, you can access information about the authenticated user via the `/me` endpoint. You can also retrieve public profile information for any user, including their tracks, playlists, followers, and followings.
-
-### Social Interactions
-
-The API supports social features including following other users and liking tracks or playlists. Tracks from followed users appear in the activity feed.
-
-- Users interact primarily through comments on tracks. Comments can be timed (tied to a specific point in the track). Commenting can be disabled by the track creator.
-- Tracks and playlists can be reposted to a user's profile.
-
-### Search and Discovery
-
-The API allows searching for tracks, playlists, and users by query. Search results can be filtered by various parameters including access level (playable, preview, blocked).
-
-### URL Resolution
-
-SoundCloud URLs (e.g., `soundcloud.com/user/track-name`) can be resolved to their corresponding API resource representations, which is useful for fetching data from user-facing links.
-
-### Embedding (oEmbed)
-
-Given a track or playlist URL, you can retrieve embed information via the oEmbed endpoint to embed a SoundCloud player on external websites. Configurable options include max width, max height, and auto-play.
-
-## Events
-
-The provider does not support events. SoundCloud's API does not offer webhooks or any built-in event subscription mechanism for receiving real-time notifications about changes to resources.
+Primary references: [OpenAPI](https://github.com/soundcloud/api/blob/master/openapi/api.yaml), [API guide](https://developers.soundcloud.com/docs/api/guide), [OAuth migration](https://developers.soundcloud.com/blog/oauth-migration/), [URN migration](https://developers.soundcloud.com/blog/urn-num-to-string/), [optional track fields](https://developers.soundcloud.com/blog/soundclouds-new-api-track-object/), [oEmbed](https://developers.soundcloud.com/docs/oembed).

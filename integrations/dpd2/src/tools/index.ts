@@ -1,3 +1,4 @@
+export * from './get-api-status';
 export * from './get-customer';
 export * from './get-product';
 export * from './get-purchase';

@@ -9,14 +9,6 @@ import {
   sendMessage,
   trackEvent
 } from './tools';
-import {
-  companyEvents,
-  formEvents,
-  messageEvents,
-  relationshipEvents,
-  userEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +20,5 @@ export let provider = Slate.create({
     trackEvent,
     sendMessage
   ],
-  triggers: [userEvents, companyEvents, relationshipEvents, messageEvents, formEvents]
+  triggers: []
 });

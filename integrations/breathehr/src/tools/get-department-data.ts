@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fail, pageParams, paginationSchema, readRows, requireId } from '../lib/response';
 import { spec } from '../spec';
 
 export let getDepartmentData = SlateTool.create(spec, {
@@ -27,46 +28,32 @@ export let getDepartmentData = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: paginationSchema.optional(),
       records: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .describe('List of department data records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let pagination = { page: ctx.input.page, perPage: ctx.input.perPage };
-    let result: any;
-
-    switch (ctx.input.dataType) {
-      case 'absences':
-        result = await client.getDepartmentAbsences(ctx.input.departmentId, {
-          ...pagination,
-          excludeCancelledAbsences: ctx.input.excludeCancelledAbsences
-        });
-        break;
-      case 'benefits':
-        result = await client.getDepartmentBenefits(ctx.input.departmentId, pagination);
-        break;
-      case 'bonuses':
-        result = await client.getDepartmentBonuses(ctx.input.departmentId, pagination);
-        break;
-      case 'leave_requests':
-        result = await client.getDepartmentLeaveRequests(ctx.input.departmentId, pagination);
-        break;
-      case 'salaries':
-        result = await client.getDepartmentSalaries(ctx.input.departmentId, pagination);
-        break;
-    }
-
-    let records = result?.[ctx.input.dataType] || [];
-
+    const client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
+    if (ctx.input.dataType !== 'absences' && ctx.input.excludeCancelledAbsences !== undefined)
+      fail(
+        'excludeCancelledAbsences applies only to department absences. Omit it for this dataType.'
+      );
+    const result = await client.department(
+      ctx.input.dataType,
+      requireId(ctx.input.departmentId, 'departmentId'),
+      {
+        ...pageParams(ctx.input),
+        ...(ctx.input.dataType === 'absences'
+          ? { exclude_cancelled_absences: ctx.input.excludeCancelledAbsences }
+          : {})
+      }
+    );
+    const records = readRows(result, ctx.input.dataType);
     return {
-      output: { records },
-      message: `Retrieved **${records.length}** ${ctx.input.dataType.replace('_', ' ')} record(s) for department **${ctx.input.departmentId}**.`
+      output: { records, pagination: result.pagination },
+      message: `Retrieved **${records.length}** record(s).`
     };
   })
   .build();

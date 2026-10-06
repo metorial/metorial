@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaveClient } from '../lib/client';
+import type { Product } from '../lib/contracts';
+import { decimalNumber } from '../lib/validation';
 import { spec } from '../spec';
 
 let productOutputSchema = z.object({
@@ -38,11 +40,11 @@ let productOutputSchema = z.object({
   modifiedAt: z.string().optional().describe('Last modification timestamp')
 });
 
-let mapProduct = (p: any) => ({
+let mapProduct = (p: Product) => ({
   productId: p.id,
   name: p.name,
   description: p.description,
-  unitPrice: p.unitPrice,
+  unitPrice: decimalNumber(p.unitPrice),
   isSold: p.isSold,
   isBought: p.isBought,
   isArchived: p.isArchived,
@@ -52,7 +54,7 @@ let mapProduct = (p: any) => ({
   expenseAccount: p.expenseAccount
     ? { accountId: p.expenseAccount.id, name: p.expenseAccount.name }
     : undefined,
-  defaultSalesTaxes: p.defaultSalesTaxes?.map((t: any) => ({
+  defaultSalesTaxes: p.defaultSalesTaxes?.map(t => ({
     salesTaxId: t.id,
     name: t.name
   })),
@@ -70,9 +72,14 @@ export let listProducts = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('product:read'))
   .input(
     z.object({
-      businessId: z.string().describe('ID of the business to list products for'),
+      businessId: z
+        .string()
+        .describe(
+          'ID of the business to list products for. Call list_businesses to discover a permitted business ID.'
+        ),
       page: z.number().optional().describe('Page number (starts at 1, default: 1)'),
       pageSize: z.number().optional().describe('Number of results per page (default: 20)')
     })
@@ -89,8 +96,8 @@ export let listProducts = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.listProducts(
       ctx.input.businessId,
-      ctx.input.page || 1,
-      ctx.input.pageSize || 20
+      ctx.input.page ?? 1,
+      ctx.input.pageSize ?? 20
     );
 
     return {
@@ -110,11 +117,17 @@ export let listProducts = SlateTool.create(spec, {
 export let createProduct = SlateTool.create(spec, {
   name: 'Create Product',
   key: 'create_product',
+  tags: { readOnly: false },
   description: `Create a new product or service in a Wave business's catalog. Products can be associated with income and expense accounts and configured with default sales taxes for easy invoicing.`
 })
+  .scopes(anyOf('product:write'))
   .input(
     z.object({
-      businessId: z.string().describe('ID of the business to create the product for'),
+      businessId: z
+        .string()
+        .describe(
+          'ID of the business to create the product for. Call list_businesses to discover a permitted business ID.'
+        ),
       name: z.string().describe('Product or service name'),
       unitPrice: z.number().describe('Per-unit price'),
       description: z.string().optional().describe('Product description'),
@@ -127,11 +140,14 @@ export let createProduct = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('IDs of default sales taxes to apply'),
-      isSold: z.boolean().optional().describe('Whether the product is sold to customers'),
+      isSold: z
+        .boolean()
+        .optional()
+        .describe('Legacy field unsupported by product writes; set incomeAccountId instead.'),
       isBought: z
         .boolean()
         .optional()
-        .describe('Whether the product is purchased from vendors')
+        .describe('Legacy field unsupported by product writes; set expenseAccountId instead.')
     })
   )
   .output(productOutputSchema)
@@ -139,15 +155,9 @@ export let createProduct = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.createProduct(ctx.input);
 
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to create product: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
-
     return {
       output: mapProduct(result.data),
-      message: `Created product **${result.data.name}** ($${result.data.unitPrice}).`
+      message: `Created product **${result.data.name}** at ${result.data.unitPrice} per unit in the business currency.`
     };
   })
   .build();
@@ -157,8 +167,10 @@ export let createProduct = SlateTool.create(spec, {
 export let updateProduct = SlateTool.create(spec, {
   name: 'Update Product',
   key: 'update_product',
+  tags: { readOnly: false },
   description: `Update an existing product's details. Only the fields you provide will be updated; omitted fields remain unchanged.`
 })
+  .scopes(anyOf('product:write'))
   .input(
     z.object({
       productId: z.string().describe('ID of the product to update'),
@@ -171,8 +183,14 @@ export let updateProduct = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Updated default sales tax IDs'),
-      isSold: z.boolean().optional().describe('Updated sold status'),
-      isBought: z.boolean().optional().describe('Updated bought status')
+      isSold: z
+        .boolean()
+        .optional()
+        .describe('Legacy field unsupported by product writes; set incomeAccountId instead.'),
+      isBought: z
+        .boolean()
+        .optional()
+        .describe('Legacy field unsupported by product writes; set expenseAccountId instead.')
     })
   )
   .output(productOutputSchema)
@@ -180,12 +198,6 @@ export let updateProduct = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let { productId, ...rest } = ctx.input;
     let result = await client.patchProduct({ id: productId, ...rest });
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to update product: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
 
     return {
       output: mapProduct(result.data),
@@ -199,11 +211,10 @@ export let updateProduct = SlateTool.create(spec, {
 export let archiveProduct = SlateTool.create(spec, {
   name: 'Archive Product',
   key: 'archive_product',
-  description: `Archive a product in the catalog. Archived products are hidden from active listings but are not deleted. Products cannot be permanently deleted in Wave.`,
-  tags: {
-    destructive: true
-  }
+  tags: { readOnly: false, destructive: true },
+  description: `Archive a product in the catalog. Archived products are hidden from active listings but are not deleted. Products cannot be permanently deleted in Wave.`
 })
+  .scopes(anyOf('product:write'))
   .input(
     z.object({
       productId: z.string().describe('ID of the product to archive')
@@ -216,13 +227,7 @@ export let archiveProduct = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new WaveClient(ctx.auth.token);
-    let result = await client.archiveProduct(ctx.input.productId);
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to archive product: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
+    await client.archiveProduct(ctx.input.productId);
 
     return {
       output: { success: true },

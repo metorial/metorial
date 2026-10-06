@@ -21,6 +21,21 @@ Use this to find environment IDs when creating incidents or alerts.`,
   )
   .output(
     z.object({
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider total number of matching records, when supplied'),
+      returnedCount: z.number().describe('Number of records returned in this response'),
+      currentPage: z.number().optional().describe('Provider page number, when supplied'),
+      totalPages: z.number().optional().describe('Provider page count, when supplied'),
+      nextCursor: z
+        .string()
+        .optional()
+        .describe('Provider continuation cursor, when supplied'),
+      included: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Requested related resources'),
       environments: z.array(z.record(z.string(), z.any())).describe('List of environments')
     })
   )
@@ -37,6 +52,12 @@ Use this to find environment IDs when creating incidents or alerts.`,
 
     return {
       output: {
+        totalCount: result.meta?.total_count,
+        returnedCount: environments.length,
+        currentPage: result.meta?.current_page,
+        totalPages: result.meta?.total_pages,
+        nextCursor: result.meta?.next_cursor,
+        included: result.included ? flattenResources(result.included) : undefined,
         environments
       },
       message: `Found **${environments.length}** environments.`

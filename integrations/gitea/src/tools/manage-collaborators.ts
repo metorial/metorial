@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listCollaborators = SlateTool.create(spec, {
@@ -13,17 +14,17 @@ export let listCollaborators = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page')
     })
   )
   .output(
     z.object({
       collaborators: z.array(
         z.object({
-          username: z.string().describe('Collaborator username'),
+          username: z.string().min(1).describe('Collaborator username'),
           fullName: z.string().describe('Collaborator display name'),
           email: z.string().describe('Collaborator email'),
           avatarUrl: z.string().describe('Avatar URL')
@@ -32,7 +33,7 @@ export let listCollaborators = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let collabs = await client.listCollaborators(ctx.input.owner, ctx.input.repo, {
       page: ctx.input.page,
       limit: ctx.input.limit
@@ -57,14 +58,14 @@ export let manageCollaborator = SlateTool.create(spec, {
   key: 'manage_collaborator',
   description: `Add or remove a collaborator from a repository. When adding, you can specify the permission level.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      username: z.string().describe('Username of the collaborator'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      username: z.string().min(1).describe('Username of the collaborator'),
       action: z.enum(['add', 'remove']).describe('Whether to add or remove the collaborator'),
       permission: z
         .enum(['read', 'write', 'admin'])
@@ -79,7 +80,7 @@ export let manageCollaborator = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
 
     if (ctx.input.action === 'add') {
       await client.addCollaborator(

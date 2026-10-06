@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let triggerDeployment = SlateTool.create(spec, {
@@ -17,10 +18,7 @@ export let triggerDeployment = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe('Organization name (uses default from config if not set)'),
+      organization: organizationInput,
       projectName: z.string().describe('Project name'),
       stackName: z.string().describe('Stack name'),
       operation: z
@@ -37,18 +35,17 @@ export let triggerDeployment = SlateTool.create(spec, {
     z.object({
       deploymentId: z.string().optional(),
       version: z.number().optional(),
-      status: z.string().optional()
+      status: z.string().optional(),
+      consoleUrl: z.string().optional().describe('Pulumi deployment console link')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
 
     let result = await client.createDeployment(
       org,
@@ -64,7 +61,7 @@ export let triggerDeployment = SlateTool.create(spec, {
       output: {
         deploymentId: result.id,
         version: result.version,
-        status: result.status
+        consoleUrl: result.consoleUrl
       },
       message: `Triggered **${ctx.input.operation}** deployment on stack **${org}/${ctx.input.projectName}/${ctx.input.stackName}**${result.id ? ` (deployment ID: ${result.id})` : ''}`
     };

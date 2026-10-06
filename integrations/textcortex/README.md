@@ -1,6 +1,13 @@
-# Textcortex
+# TextCortex
 
-Generate and transform text content using AI models. Create blog articles, product descriptions, ad copy, emails, and social media posts from prompts and parameters. Rewrite, paraphrase, summarize, and translate text across 25+ languages. Generate code and SQL queries, classify text, extract entities, and compute text similarity. Manage knowledge bases that aggregate documents from Google Drive, SharePoint, OneDrive, and Notion for AI-powered retrieval and insights. Configure generation with temperature, word count, language, and model selection (Velox, Alta, Sophos).
+Discover current TextCortex AI models and API credit balance. Generate text,
+blog articles, product descriptions, ad copy, emails, social media posts, and
+code. Rewrite, summarize, and translate supplied text using the supported chat
+completion API.
+
+Create an API key in TextCortex API Settings. Use `list_models` to choose a
+current model. Summarization accepts raw text; the current API cannot retrieve
+legacy file IDs or run embeddings summarization.
 
 ## License
 

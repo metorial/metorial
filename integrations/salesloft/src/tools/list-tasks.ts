@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import type { taskSchema } from '../lib/api-schemas';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -19,15 +20,15 @@ let taskOutputSchema = z.object({
   updatedAt: z.string().nullable().optional().describe('Last update timestamp')
 });
 
-let mapTask = (raw: any) => ({
+let mapTask = (raw: z.output<typeof taskSchema>) => ({
   taskId: raw.id,
   subject: raw.subject,
   taskType: raw.task_type,
-  status: raw.status,
+  status: undefined,
   currentState: raw.current_state,
   dueDate: raw.due_date,
   description: raw.description,
-  completed: raw.completed,
+  completed: raw.current_state == null ? undefined : raw.current_state === 'completed',
   completedAt: raw.completed_at,
   personId: raw.person?.id ?? null,
   userId: raw.user?.id ?? null,

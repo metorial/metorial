@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaveClient } from '../lib/client';
+import type { Invoice } from '../lib/contracts';
+import { decimalNumber } from '../lib/validation';
 import { spec } from '../spec';
 
 let moneySchema = z
@@ -92,7 +94,7 @@ let invoiceOutputSchema = z.object({
   modifiedAt: z.string().optional().describe('Last modification timestamp')
 });
 
-let mapInvoice = (inv: any) => ({
+let mapInvoice = (inv: Invoice) => ({
   invoiceId: inv.id,
   status: inv.status,
   invoiceNumber: inv.invoiceNumber,
@@ -118,15 +120,15 @@ let mapInvoice = (inv: any) => ({
   footer: inv.footer,
   pdfUrl: inv.pdfUrl,
   viewUrl: inv.viewUrl,
-  items: inv.items?.map((item: any) => ({
+  items: inv.items?.map(item => ({
     description: item.description,
-    quantity: item.quantity,
-    unitPrice: item.unitPrice,
-    amount: item.amount,
+    quantity: decimalNumber(item.quantity),
+    unitPrice: decimalNumber(item.unitPrice),
+    amount: item.total,
     product: item.product
       ? { productId: item.product.id, name: item.product.name }
       : undefined,
-    taxes: item.taxes?.map((t: any) => ({
+    taxes: item.taxes?.map(t => ({
       amount: t.amount,
       salesTax: t.salesTax ? { salesTaxId: t.salesTax.id, name: t.salesTax.name } : undefined
     }))
@@ -141,7 +143,10 @@ let mapInvoice = (inv: any) => ({
 });
 
 let lineItemInputSchema = z.object({
-  productId: z.string().optional().describe('ID of an existing product to associate'),
+  productId: z
+    .string()
+    .optional()
+    .describe('Existing product ID from list_products, required for each supplied item.'),
   description: z.string().optional().describe('Line item description'),
   quantity: z.number().optional().describe('Quantity'),
   unitPrice: z.number().optional().describe('Unit price'),
@@ -165,9 +170,14 @@ export let listInvoices = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('invoice:read'))
   .input(
     z.object({
-      businessId: z.string().describe('ID of the business to list invoices for'),
+      businessId: z
+        .string()
+        .describe(
+          'ID of the business to list invoices for. Call list_businesses to discover a permitted business ID.'
+        ),
       customerId: z.string().optional().describe('Optional customer ID to filter invoices by'),
       page: z.number().optional().describe('Page number (starts at 1, default: 1)'),
       pageSize: z.number().optional().describe('Number of results per page (default: 20)')
@@ -185,8 +195,8 @@ export let listInvoices = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.listInvoices(
       ctx.input.businessId,
-      ctx.input.page || 1,
-      ctx.input.pageSize || 20,
+      ctx.input.page ?? 1,
+      ctx.input.pageSize ?? 20,
       ctx.input.customerId
     );
 
@@ -207,15 +217,21 @@ export let listInvoices = SlateTool.create(spec, {
 export let createInvoice = SlateTool.create(spec, {
   name: 'Create Invoice',
   key: 'create_invoice',
-  description: `Create a new invoice for a customer in a Wave business. The invoice is created in DRAFT status by default. Add line items with products, quantities, prices, and taxes. Configure payment options and display settings.`,
+  tags: { readOnly: false },
+  description: `Create a new invoice for a customer in a Wave business. The invoice is created in DRAFT status by default. Every supplied line item requires a productId from list_products. Add quantities, prices, and taxes. Configure payment options and display settings.`,
   instructions: [
     'The invoice is created as a DRAFT by default. Use the "Send Invoice" or "Approve Invoice" tool to finalize it.',
-    'Line items require at least a productId or a description with unitPrice and quantity.'
+    'Every supplied line item requires a productId from list_products; description, quantity and unitPrice may override that product.'
   ]
 })
+  .scopes(anyOf('invoice:write'))
   .input(
     z.object({
-      businessId: z.string().describe('ID of the business to create the invoice for'),
+      businessId: z
+        .string()
+        .describe(
+          'ID of the business to create the invoice for. Call list_businesses to discover a permitted business ID.'
+        ),
       customerId: z.string().describe('ID of the customer the invoice is for'),
       status: z
         .enum(['DRAFT', 'SAVED'])
@@ -247,12 +263,6 @@ export let createInvoice = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.createInvoice(ctx.input);
 
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to create invoice: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
-
     return {
       output: mapInvoice(result.data),
       message: `Created invoice **#${result.data.invoiceNumber || result.data.id}** (status: ${result.data.status}).`
@@ -265,11 +275,13 @@ export let createInvoice = SlateTool.create(spec, {
 export let updateInvoice = SlateTool.create(spec, {
   name: 'Update Invoice',
   key: 'update_invoice',
+  tags: { readOnly: false },
   description: `Update an existing invoice's details. Only the fields you provide will be updated; omitted fields remain unchanged. You can modify the customer, dates, line items, payment options, and display settings.`,
   instructions: [
     'When updating items, the entire items array is replaced. Include all line items you want on the invoice.'
   ]
 })
+  .scopes(anyOf('invoice:write'))
   .input(
     z.object({
       invoiceId: z.string().describe('ID of the invoice to update'),
@@ -301,12 +313,6 @@ export let updateInvoice = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.patchInvoice(ctx.input);
 
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to update invoice: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
-
     return {
       output: mapInvoice(result.data),
       message: `Updated invoice **#${result.data.invoiceNumber || result.data.id}**.`
@@ -319,11 +325,10 @@ export let updateInvoice = SlateTool.create(spec, {
 export let deleteInvoice = SlateTool.create(spec, {
   name: 'Delete Invoice',
   key: 'delete_invoice',
-  description: `Permanently delete an invoice from a Wave business. This action cannot be undone.`,
-  tags: {
-    destructive: true
-  }
+  tags: { readOnly: false, destructive: true },
+  description: `Delete an invoice from a Wave business. Provider accounting history may remain, and deletion does not recall sent email.`
 })
+  .scopes(anyOf('invoice:write'))
   .input(
     z.object({
       invoiceId: z.string().describe('ID of the invoice to delete')
@@ -336,13 +341,7 @@ export let deleteInvoice = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new WaveClient(ctx.auth.token);
-    let result = await client.deleteInvoice(ctx.input.invoiceId);
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to delete invoice: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
+    await client.deleteInvoice(ctx.input.invoiceId);
 
     return {
       output: { success: true },
@@ -356,12 +355,14 @@ export let deleteInvoice = SlateTool.create(spec, {
 export let sendInvoice = SlateTool.create(spec, {
   name: 'Send Invoice',
   key: 'send_invoice',
-  description: `Send an invoice to a customer via email. Optionally customize the recipients, subject, message, and whether to attach a PDF. The invoice must be approved (not in DRAFT status) before sending.`,
+  tags: { readOnly: false, destructive: true },
+  description: `Send an invoice to a customer via email. Supply explicit recipients, and optionally customize the subject, message, and PDF option. The invoice must be approved (not in DRAFT status) before sending.`,
   instructions: [
-    "If no recipients are specified, the invoice will be sent to the customer's email address on file.",
+    'Supply explicit valid recipient addresses; recipients are never inferred from the customer record.',
     'If the invoice is still in DRAFT, approve it first using the "Approve Invoice" tool.'
   ]
 })
+  .scopes(anyOf('invoice:send'))
   .input(
     z.object({
       invoiceId: z.string().describe('ID of the invoice to send'),
@@ -373,12 +374,12 @@ export let sendInvoice = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the invoice was sent successfully')
+      success: z.boolean().describe('Whether Wave acknowledged queuing the invoice email')
     })
   )
   .handleInvocation(async ctx => {
     let client = new WaveClient(ctx.auth.token);
-    let result = await client.sendInvoice(
+    await client.sendInvoice(
       ctx.input.invoiceId,
       ctx.input.to,
       ctx.input.subject,
@@ -386,15 +387,9 @@ export let sendInvoice = SlateTool.create(spec, {
       ctx.input.attachPdf
     );
 
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to send invoice: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
-
     return {
       output: { success: true },
-      message: `Invoice \`${ctx.input.invoiceId}\` has been sent.`
+      message: `Invoice \`${ctx.input.invoiceId}\` was queued for email delivery.`
     };
   })
   .build();
@@ -404,8 +399,10 @@ export let sendInvoice = SlateTool.create(spec, {
 export let approveInvoice = SlateTool.create(spec, {
   name: 'Approve Invoice',
   key: 'approve_invoice',
-  description: `Approve a draft invoice, moving it from DRAFT to an approvable state. This is required before sending an invoice.`
+  tags: { readOnly: false },
+  description: `Approve a draft invoice, moving it from DRAFT to SAVED. This is required before sending an invoice.`
 })
+  .scopes(anyOf('invoice:write'))
   .input(
     z.object({
       invoiceId: z.string().describe('ID of the invoice to approve')
@@ -415,12 +412,6 @@ export let approveInvoice = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.approveInvoice(ctx.input.invoiceId);
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to approve invoice: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
 
     return {
       output: mapInvoice(result.data),
@@ -434,8 +425,10 @@ export let approveInvoice = SlateTool.create(spec, {
 export let cloneInvoice = SlateTool.create(spec, {
   name: 'Clone Invoice',
   key: 'clone_invoice',
+  tags: { readOnly: false },
   description: `Create a copy of an existing invoice. The cloned invoice will be created as a new DRAFT with the same details as the original.`
 })
+  .scopes(anyOf('invoice:write'))
   .input(
     z.object({
       invoiceId: z.string().describe('ID of the invoice to clone')
@@ -445,12 +438,6 @@ export let cloneInvoice = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.cloneInvoice(ctx.input.invoiceId);
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to clone invoice: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
 
     return {
       output: mapInvoice(result.data),
@@ -464,11 +451,27 @@ export let cloneInvoice = SlateTool.create(spec, {
 export let markInvoiceSent = SlateTool.create(spec, {
   name: 'Mark Invoice Sent',
   key: 'mark_invoice_sent',
+  tags: { readOnly: false },
   description: `Mark an invoice as sent without actually emailing it. Use this when the invoice was delivered through a channel outside of Wave (e.g., printed and mailed, sent via another system).`
 })
+  .scopes(anyOf('invoice:write'))
   .input(
     z.object({
       invoiceId: z.string().describe('ID of the invoice to mark as sent'),
+      sendMethod: z
+        .enum([
+          'EXPORT_PDF',
+          'GMAIL',
+          'MARKED_SENT',
+          'OUTLOOK',
+          'SHARED_LINK',
+          'WAVE',
+          'YAHOO'
+        ])
+        .optional()
+        .describe(
+          'Recorded delivery method; defaults to MARKED_SENT. This action does not send an email.'
+        ),
       sentAt: z
         .string()
         .optional()
@@ -478,13 +481,11 @@ export let markInvoiceSent = SlateTool.create(spec, {
   .output(invoiceOutputSchema)
   .handleInvocation(async ctx => {
     let client = new WaveClient(ctx.auth.token);
-    let result = await client.markInvoiceSent(ctx.input.invoiceId, ctx.input.sentAt);
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to mark invoice as sent: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
+    let result = await client.markInvoiceSent(
+      ctx.input.invoiceId,
+      ctx.input.sentAt,
+      ctx.input.sendMethod
+    );
 
     return {
       output: mapInvoice(result.data),

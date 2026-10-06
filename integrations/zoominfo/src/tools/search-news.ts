@@ -1,50 +1,84 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, pagination, records } from '../lib/client';
 import { spec } from '../spec';
 
 export let searchNews = SlateTool.create(spec, {
   name: 'Search News',
   key: 'search_news',
   description: `Search for recent news about companies in the ZoomInfo database. Returns news articles, press releases, and related coverage. Useful for staying updated on prospects and accounts.`,
+  constraints: [
+    'Current GTM company news requests require allowCompanyEnrichment=true and can consume credits. Non-company news searches do not consume credits but count against request limits.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
     z.object({
       companyId: z.number().optional().describe('ZoomInfo company ID'),
-      companyName: z.string().optional().describe('Company name'),
-      keywords: z.array(z.string()).optional().describe('Keywords to search for in news'),
+      companyName: z
+        .string()
+        .optional()
+        .describe(
+          'Company name; current GTM resolves an exact match before authorized company enrichment'
+        ),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe('Current GTM news categories from Lookup Data'),
+      urls: z.array(z.string()).optional().describe('Current GTM news article URLs to match'),
+      allowCompanyEnrichment: z
+        .boolean()
+        .optional()
+        .describe(
+          'Explicitly authorize current GTM company news enrichment, which can consume credits'
+        ),
+      keywords: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Legacy text keyword search; current GTM connections use categories or urls'
+        ),
       publishedDateAfter: z
         .string()
         .optional()
-        .describe('Only return news published after this date (ISO 8601)'),
+        .describe(
+          'Current GTM earliest inclusive publishing day (YYYY-MM-DD); legacy connections retain ISO 8601 input'
+        ),
       page: z.number().min(1).optional().describe('Page number'),
       pageSize: z.number().min(1).max(100).optional().describe('Results per page')
     })
   )
   .output(
     z.object({
-      articles: z.array(z.record(z.string(), z.any())).describe('News articles and coverage'),
-      totalResults: z.number().optional().describe('Total matching articles')
+      articles: z
+        .array(z.record(z.string(), z.unknown()))
+        .describe('News articles and coverage'),
+      totalResults: z.number().optional().describe('Total matching articles'),
+      currentPage: z.number().optional().describe('Provider current page'),
+      totalPages: z.number().optional().describe('Provider total pages'),
+      returnedCount: z.number().optional().describe('Number of records in this response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion
-    });
+    const client = Client.fromContext(ctx);
 
     let { page, pageSize, ...searchParams } = ctx.input;
 
     let result = await client.searchNews(searchParams, page, pageSize);
 
-    let articles = result.data || result.result || [];
-    let totalResults = result.meta?.totalResults ?? result.totalResults;
+    const articles = records(result);
+    const { totalResults, currentPage, totalPages } = pagination(result);
 
     return {
-      output: { articles, totalResults },
+      output: {
+        articles,
+        totalResults,
+        currentPage,
+        totalPages,
+        returnedCount: articles.length
+      },
       message: `Found **${totalResults ?? articles.length}** news article(s).`
     };
   })

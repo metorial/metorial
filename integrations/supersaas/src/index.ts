@@ -22,8 +22,6 @@ import {
   updateAppointmentTool,
   updateUserTool
 } from './tools';
-import { appointmentChangesTrigger, formChangesTrigger, userChangesTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     duplicatePromotionTool,
     getRecentChangesTool
   ],
-  triggers: [appointmentChangesTrigger, userChangesTrigger, formChangesTrigger]
+  triggers: []
 });

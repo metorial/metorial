@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'vimeo',
   name: 'Vimeo',
   description:
-    'Upload, manage, and stream videos on Vimeo. Search videos, organize content with showcases and folders, manage channels, and receive real-time event notifications.',
+    'Read, search and organize Vimeo videos. Manage authorized metadata, showcases, folders, channels, comments and likes, and download eligible native video renditions.',
   metadata: {},
   config,
   auth

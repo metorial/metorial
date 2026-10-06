@@ -16,8 +16,6 @@ import {
   updatePass,
   updateTemplate
 } from './tools';
-import { passEvents, registrationEvents, scanEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     manageScanner,
     listScanners
   ],
-  triggers: [passEvents, registrationEvents, scanEvents]
+  triggers: []
 });

@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let deleteEntry = SlateTool.create(spec, {
   name: 'Delete Entry',
   key: 'delete_entry',
-  description: `Permanently delete an entry from any Strapi content type by its document ID. This removes both draft and published versions. For i18n content, a specific locale can be targeted.`,
+  description: `Permanently delete an entry from an authorized Strapi content type by its document ID. Strapi 5 removes draft and published versions of the requested/default locale. Strapi 4 uses its numeric entry ID.`,
   constraints: [
-    'This action is irreversible — the entry and all its locale versions (unless a specific locale is targeted) will be permanently removed.'
+    'Deletion is irreversible and can invoke instance hooks. Strapi 5 targets the requested locale or the default locale when omitted; it is not proof that backups, histories or other locales were erased.'
   ],
   tags: {
     destructive: true
@@ -19,11 +19,17 @@ export let deleteEntry = SlateTool.create(spec, {
       contentType: z
         .string()
         .describe('Plural API ID of the content type (e.g., "articles", "products")'),
-      documentId: z.string().describe('Document ID of the entry to delete'),
+      documentId: z
+        .string()
+        .describe(
+          'Strapi 5 documentId, or Strapi 4 numeric ID as a string, of the entry to delete'
+        ),
       locale: z
         .string()
         .optional()
-        .describe('Specific locale to delete (omit to delete all locales)')
+        .describe(
+          'Strapi 5 locale to delete; omission targets the default locale. Strapi 4 uses the locale entry ID and requires this field omitted.'
+        )
     })
   )
   .output(
@@ -35,10 +41,7 @@ export let deleteEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.deleteEntry(ctx.input.contentType, ctx.input.documentId, {
       locale: ctx.input.locale
@@ -48,7 +51,7 @@ export let deleteEntry = SlateTool.create(spec, {
       output: {
         deletedEntry: result.data
       },
-      message: `Deleted entry **${ctx.input.documentId}** from **${ctx.input.contentType}**.`
+      message: `Strapi accepted deletion of entry **${ctx.input.documentId}** from **${ctx.input.contentType}**.`
     };
   })
   .build();

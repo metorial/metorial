@@ -16,7 +16,7 @@ export let verifyNotification = SlateTool.create(spec, {
       notificationParams: z
         .record(z.string(), z.any())
         .describe(
-          'All parameters received from the DPD notification POST, passed through for verification'
+          'Every original decoded notification form parameter with its string value; preserve empty values, amounts, signatures and product keys exactly'
         )
     })
   )

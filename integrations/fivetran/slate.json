@@ -1,18 +1,18 @@
 {
   "name": "@metorial/fivetran",
-  "description": "Manage automated data pipelines that extract data from hundreds of sources and load it into data warehouses, lakes, and other destinations. Create, configure, pause, and monitor connectors (connections) for SaaS apps, databases, events, and files. Manage groups, destinations, and schema configurations including selecting which schemas, tables, and columns to sync. Trigger manual syncs and historical re-syncs. Create and schedule transformations using dbt Core, dbt Cloud, or Coalesce. Manage users, teams, roles, and permissions. Configure webhooks for sync, transformation, and dbt run events. Manage hybrid deployment agents, private links, proxy agents, certificates, log services, and system API keys.",
+  "description": "Manage Fivetran groups, connections, destinations, schema selection, users, teams, dbt Core and Quickstart transformations, and webhook subscriptions. Discover account identity, source configuration metadata and role names. Configure paused pipelines, inspect status, trigger incremental or historical syncs, and manage controlled data workflows.",
   "categories": ["apis-and-http-requests", "task-and-project-management"],
   "skills": [
-    "create and manage connectors",
+    "create and manage connections",
+    "inspect pipeline status",
     "trigger data syncs",
-    "configure schema mappings",
-    "manage data destinations",
-    "schedule transformations",
+    "configure schema selection",
+    "manage destinations and groups",
+    "manage transformations",
     "manage users and teams",
-    "configure sync webhooks",
-    "manage deployment agents",
-    "retrieve connector metadata",
-    "manage log services"
+    "discover role names",
+    "configure webhook subscriptions",
+    "retrieve connector metadata"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/fivetran.png"
 }

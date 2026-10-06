@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { V0Client } from '../lib/client';
 import { spec } from '../spec';
@@ -26,7 +26,7 @@ export let createProjectTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('Project name'),
+      name: z.string().min(1).describe('Project name'),
       description: z.string().optional().describe('Brief summary of the project purpose'),
       icon: z.string().optional().describe('Visual identifier/emoji for the project'),
       instructions: z
@@ -44,7 +44,7 @@ export let createProjectTool = SlateTool.create(spec, {
       environmentVariables: z
         .array(
           z.object({
-            key: z.string().describe('Variable name'),
+            key: z.string().min(1).describe('Variable name'),
             value: z.string().describe('Variable value')
           })
         )
@@ -85,7 +85,7 @@ export let getProjectTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The project ID to retrieve')
+      projectId: z.string().min(1).describe('The project ID to retrieve')
     })
   )
   .output(
@@ -107,7 +107,7 @@ export let getProjectTool = SlateTool.create(spec, {
     let client = new V0Client(ctx.auth.token);
     let result = await client.getProject(ctx.input.projectId);
 
-    let chats = (result.chats || []).map((c: any) => ({
+    let chats = (result.chats || []).map(c => ({
       chatId: c.id,
       name: c.name,
       privacy: c.privacy,
@@ -140,8 +140,8 @@ export let updateProjectTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The project ID to update'),
-      name: z.string().optional().describe('New project name'),
+      projectId: z.string().min(1).describe('The project ID to update'),
+      name: z.string().min(1).optional().describe('New project name'),
       description: z.string().optional().describe('New project description'),
       instructions: z.string().optional().describe('New instructions for the AI model'),
       privacy: z.enum(['private', 'team']).optional().describe('New privacy setting')
@@ -150,6 +150,8 @@ export let updateProjectTool = SlateTool.create(spec, {
   .output(projectOutputSchema)
   .handleInvocation(async ctx => {
     let { projectId, ...updateData } = ctx.input;
+    if (!Object.values(updateData).some(value => value !== undefined))
+      throw createApiServiceError('Provide at least one project field to update.');
     let client = new V0Client(ctx.auth.token);
     let result = await client.updateProject(projectId, updateData);
 
@@ -181,7 +183,7 @@ export let deleteProjectTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The project ID to delete')
+      projectId: z.string().min(1).describe('The project ID to delete')
     })
   )
   .output(

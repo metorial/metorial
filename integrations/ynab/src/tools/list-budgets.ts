@@ -1,9 +1,27 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapPlan } from '../lib/models';
+import { milliunits } from '../lib/validation';
 import { spec } from '../spec';
 
 let budgetSchema = z.object({
+  accounts: z
+    .array(
+      z.object({
+        accountId: z.string(),
+        name: z.string(),
+        type: z.string(),
+        onBudget: z.boolean(),
+        closed: z.boolean(),
+        balance: milliunits,
+        clearedBalance: milliunits,
+        unclearedBalance: milliunits,
+        deleted: z.boolean()
+      })
+    )
+    .optional()
+    .describe('Account summaries when includeAccounts is true.'),
   budgetId: z.string().describe('Unique identifier for the budget'),
   name: z.string().describe('Name of the budget'),
   lastModifiedOn: z
@@ -39,23 +57,10 @@ export let listBudgets = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let budgets = await client.getBudgets(ctx.input.includeAccounts);
-
-    let mapped = budgets.map((b: any) => ({
-      budgetId: b.id,
-      name: b.name,
-      lastModifiedOn: b.last_modified_on,
-      firstMonth: b.first_month,
-      lastMonth: b.last_month,
-      dateFormat: b.date_format?.format,
-      currencyIsoCode: b.currency_format?.iso_code,
-      currencySymbol: b.currency_format?.currency_symbol
-    }));
-
-    return {
-      output: { budgets: mapped },
-      message: `Found **${mapped.length}** budget(s): ${mapped.map((b: any) => b.name).join(', ')}`
-    };
+    const budgets = await new Client({ token: ctx.auth.token }).getBudgets(
+      ctx.input.includeAccounts
+    );
+    const mapped = budgets.map(mapPlan);
+    return { output: { budgets: mapped }, message: `Found ${mapped.length} budget(s).` };
   })
   .build();

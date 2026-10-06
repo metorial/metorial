@@ -26,6 +26,12 @@ export let getGoals = SlateTool.create(spec, {
       filter: z.string().optional().describe('OData $filter expression'),
       select: z.string().optional().describe('Comma-separated fields to return'),
       top: z.number().optional().describe('Maximum records to return').default(100),
+      nextPage: z
+        .string()
+        .optional()
+        .describe(
+          'Exact nextLink from the preceding result. Keep the entity and original query unchanged; do not combine with skip.'
+        ),
       skip: z.number().optional().describe('Number of records to skip')
     })
   )
@@ -39,6 +45,13 @@ export let getGoals = SlateTool.create(spec, {
         .array(z.record(z.string(), z.unknown()))
         .optional()
         .describe('List of goals within the specified plan (when planId is provided)'),
+      nextLink: z
+        .string()
+        .optional()
+        .describe(
+          'Exact provider continuation URL; pass it as nextPage to retrieve the next page.'
+        ),
+      hasMore: z.boolean().optional().describe('Whether SAP returned another page.'),
       totalCount: z.number().optional().describe('Total count of matching records')
     })
   )
@@ -48,19 +61,22 @@ export let getGoals = SlateTool.create(spec, {
       apiServerUrl: ctx.auth.apiServerUrl
     });
 
-    if (ctx.input.planId) {
+    if (ctx.input.planId !== undefined) {
       let result = await client.queryGoals(ctx.input.planId, {
         filter: ctx.input.filter,
         select: ctx.input.select,
         top: ctx.input.top,
         skip: ctx.input.skip,
+        nextPage: ctx.input.nextPage,
         inlineCount: true
       });
 
       return {
         output: {
           goals: result.results,
-          totalCount: result.count
+          totalCount: result.count,
+          nextLink: result.nextLink,
+          hasMore: result.hasMore
         },
         message: `Found **${result.results.length}** goals in plan #${ctx.input.planId}`
       };
@@ -71,13 +87,16 @@ export let getGoals = SlateTool.create(spec, {
       select: ctx.input.select,
       top: ctx.input.top,
       skip: ctx.input.skip,
+      nextPage: ctx.input.nextPage,
       inlineCount: true
     });
 
     return {
       output: {
         goalPlans: result.results,
-        totalCount: result.count
+        totalCount: result.count,
+        nextLink: result.nextLink,
+        hasMore: result.hasMore
       },
       message: `Found **${result.results.length}** goal plan templates`
     };

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listFolders = SlateTool.create(spec, {
@@ -15,8 +15,18 @@ export let listFolders = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().optional().describe('Search query to filter folders by name'),
-      limit: z.number().optional().describe('Maximum number of folders to return'),
-      offset: z.number().optional().describe('Offset for pagination')
+      limit: z
+        .number()
+        .multipleOf(1)
+        .positive()
+        .optional()
+        .describe('Maximum number of folders to return'),
+      offset: z
+        .number()
+        .multipleOf(1)
+        .nonnegative()
+        .optional()
+        .describe('Offset for pagination')
     })
   )
   .output(
@@ -25,10 +35,7 @@ export let listFolders = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let folders = await client.listFolders({
       query: ctx.input.query,
@@ -61,8 +68,10 @@ export let manageFolder = SlateTool.create(spec, {
         .describe('The folder ID (required for update and delete)'),
       name: z
         .string()
+        .trim()
+        .min(1)
         .optional()
-        .describe('Folder name (required for create, optional for update)')
+        .describe('Folder name (required for create and update)')
     })
   )
   .output(
@@ -75,14 +84,11 @@ export let manageFolder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('Name is required for creating a folder');
+        throw createApiServiceError('Name is required for creating a folder');
       }
       let folder = await client.createFolder(ctx.input.name);
       return {
@@ -93,7 +99,10 @@ export let manageFolder = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.folderId) {
-        throw new Error('Folder ID is required for updating a folder');
+        throw createApiServiceError('Folder ID is required for updating a folder');
+      }
+      if (!ctx.input.name) {
+        throw createApiServiceError('Name is required for updating a folder');
       }
       let updateData: Record<string, unknown> = {};
       if (ctx.input.name) updateData.name = ctx.input.name;
@@ -106,7 +115,7 @@ export let manageFolder = SlateTool.create(spec, {
 
     // delete
     if (!ctx.input.folderId) {
-      throw new Error('Folder ID is required for deleting a folder');
+      throw createApiServiceError('Folder ID is required for deleting a folder');
     }
     await client.deleteFolder(ctx.input.folderId);
     return {

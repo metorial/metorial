@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listDeployments = SlateTool.create(spec, {
@@ -13,13 +14,15 @@ export let listDeployments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe('Organization name (uses default from config if not set)'),
+      organization: organizationInput,
       projectName: z.string().optional().describe('Project name (omit for org-wide listing)'),
       stackName: z.string().optional().describe('Stack name (omit for org-wide listing)'),
-      status: z.string().optional().describe('Filter by deployment status'),
+      status: z
+        .string()
+        .optional()
+        .describe(
+          'Filter the fetched page by status locally; provider totals include all statuses'
+        ),
       page: z.number().optional().describe('Page number (starts at 1)'),
       pageSize: z.number().optional().describe('Results per page (1-100, default 10)')
     })
@@ -36,20 +39,30 @@ export let listDeployments = SlateTool.create(spec, {
           stackName: z.string().optional(),
           created: z.string().optional()
         })
-      )
+      ),
+      page: z.number().optional(),
+      pageSize: z.number().optional(),
+      returnedCount: z.number().optional(),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider total before the optional local status filter'),
+      hasMore: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
 
-    let result: any;
+    if (!!ctx.input.projectName !== !!ctx.input.stackName)
+      throw createApiServiceError(
+        'Provide both projectName and stackName for a stack listing, or omit both for the organization.'
+      );
+    let result: Awaited<ReturnType<Client['listDeployments']>>;
     if (ctx.input.projectName && ctx.input.stackName) {
       result = await client.listDeployments(org, ctx.input.projectName, ctx.input.stackName, {
         page: ctx.input.page,
@@ -64,11 +77,11 @@ export let listDeployments = SlateTool.create(spec, {
       });
     }
 
-    let deployments = (result.deployments || []).map((d: any) => ({
+    let deployments = result.deployments.map(d => ({
       deploymentId: d.id,
       version: d.version,
       status: d.status,
-      operation: d.operation,
+      operation: d.pulumiOperation ?? d.operation,
       projectName: d.projectName,
       stackName: d.stackName,
       created: d.created
@@ -80,7 +93,17 @@ export let listDeployments = SlateTool.create(spec, {
         : `organization **${org}**`;
 
     return {
-      output: { deployments },
+      output: {
+        deployments,
+        page: result.page,
+        pageSize: result.itemsPerPage ?? result.pageSize,
+        returnedCount: deployments.length,
+        totalCount: result.total,
+        hasMore:
+          result.total !== undefined
+            ? result.page * (result.itemsPerPage ?? result.pageSize) < result.total
+            : undefined
+      },
       message: `Found **${deployments.length}** deployment(s) for ${scope}`
     };
   })

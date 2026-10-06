@@ -22,8 +22,6 @@ import {
   querySegmentation,
   trackEvents
 } from './tools';
-import { cohortSync } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     listCohorts,
     queryInsights
   ],
-  triggers: [cohortSync]
+  triggers: []
 });

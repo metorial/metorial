@@ -1,8 +1,61 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { getBaseUrl } from '../lib/helpers';
+import { invokeGusto } from '../lib/actions';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  pagination: paginationSchema.optional(),
+  enrollments: z
+    .array(
+      z.object({
+        employeeBenefitId: z.string().describe('UUID of the employee benefit enrollment'),
+        version: z.string().nullable().optional(),
+        companyBenefitId: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('UUID of the company benefit'),
+        employeeId: z.string().nullable().optional().describe('UUID of the employee'),
+        active: z.boolean().nullable().optional().describe('Whether active'),
+        employeeDeduction: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('Employee deduction amount'),
+        companyContribution: z
+          .string()
+          .nullable()
+          .optional()
+          .describe('Company contribution amount')
+      })
+    )
+    .optional()
+    .describe('List of enrollments (for list action)'),
+  enrollment: z
+    .object({
+      employeeBenefitId: z.string().describe('UUID of the employee benefit enrollment'),
+      companyBenefitId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('UUID of the company benefit'),
+      active: z.boolean().nullable().optional().describe('Whether active'),
+      employeeDeduction: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Employee deduction amount'),
+      companyContribution: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Company contribution amount'),
+      version: z.string().nullable().optional().describe('Current resource version')
+    })
+    .optional()
+    .describe('Single enrollment (for create/update)')
+});
 
 export let manageEmployeeBenefit = SlateTool.create(spec, {
   name: 'Manage Employee Benefit',
@@ -15,6 +68,8 @@ export let manageEmployeeBenefit = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      page: z.number().optional().describe('Page number for list, starting at 1.'),
+      per: z.number().optional().describe('Results per list page, 1 to 100.'),
       action: z.enum(['list', 'create', 'update']).describe('The action to perform'),
       employeeId: z.string().optional().describe('Employee UUID (required for list/create)'),
       employeeBenefitId: z
@@ -60,118 +115,8 @@ export let manageEmployeeBenefit = SlateTool.create(spec, {
         .describe('Effective date for the benefit change (YYYY-MM-DD)')
     })
   )
-  .output(
-    z.object({
-      enrollments: z
-        .array(
-          z.object({
-            employeeBenefitId: z.string().describe('UUID of the employee benefit enrollment'),
-            companyBenefitId: z.string().optional().describe('UUID of the company benefit'),
-            employeeId: z.string().optional().describe('UUID of the employee'),
-            active: z.boolean().optional().describe('Whether active'),
-            employeeDeduction: z.string().optional().describe('Employee deduction amount'),
-            companyContribution: z.string().optional().describe('Company contribution amount')
-          })
-        )
-        .optional()
-        .describe('List of enrollments (for list action)'),
-      enrollment: z
-        .object({
-          employeeBenefitId: z.string().describe('UUID of the employee benefit enrollment'),
-          companyBenefitId: z.string().optional().describe('UUID of the company benefit'),
-          active: z.boolean().optional().describe('Whether active'),
-          employeeDeduction: z.string().optional().describe('Employee deduction amount'),
-          companyContribution: z.string().optional().describe('Company contribution amount'),
-          version: z.string().optional().describe('Current resource version')
-        })
-        .optional()
-        .describe('Single enrollment (for create/update)')
-    })
+  .output(outputSchema)
+  .handleInvocation(ctx =>
+    invokeGusto('manage_employee_benefit', ctx.input, ctx.auth, outputSchema)
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: getBaseUrl(ctx.auth.environment)
-    });
-
-    switch (ctx.input.action) {
-      case 'list': {
-        if (!ctx.input.employeeId) throw new Error('employeeId is required');
-        let result = await client.listEmployeeBenefits(ctx.input.employeeId);
-        let enrollments = Array.isArray(result) ? result : result.employee_benefits || result;
-        let mapped = enrollments.map((e: any) => ({
-          employeeBenefitId: e.uuid || e.id?.toString(),
-          companyBenefitId: e.company_benefit_uuid || e.company_benefit_id?.toString(),
-          employeeId: e.employee_uuid || e.employee_id?.toString(),
-          active: e.active,
-          employeeDeduction: e.employee_deduction,
-          companyContribution: e.company_contribution
-        }));
-        return {
-          output: { enrollments: mapped },
-          message: `Found **${mapped.length}** benefit enrollment(s).`
-        };
-      }
-      case 'create': {
-        if (!ctx.input.employeeId) throw new Error('employeeId is required');
-        let result = await client.createEmployeeBenefit(ctx.input.employeeId, {
-          company_benefit_uuid: ctx.input.companyBenefitId,
-          active: ctx.input.active,
-          employee_deduction: ctx.input.employeeDeduction,
-          company_contribution: ctx.input.companyContribution,
-          employee_deduction_annual_maximum: ctx.input.employeeDeductionAnnualMaximum,
-          company_contribution_annual_maximum: ctx.input.companyContributionAnnualMaximum,
-          deduct_as_percentage: ctx.input.deductAsPercentage,
-          contribute_as_percentage: ctx.input.contributeAsPercentage,
-          effective_date: ctx.input.effectiveDate
-        });
-        return {
-          output: {
-            enrollment: {
-              employeeBenefitId: result.uuid || result.id?.toString(),
-              companyBenefitId: result.company_benefit_uuid,
-              active: result.active,
-              employeeDeduction: result.employee_deduction,
-              companyContribution: result.company_contribution,
-              version: result.version
-            }
-          },
-          message: `Created benefit enrollment for employee ${ctx.input.employeeId}.`
-        };
-      }
-      case 'update': {
-        if (!ctx.input.employeeBenefitId) throw new Error('employeeBenefitId is required');
-        let data: Record<string, any> = {};
-        if (ctx.input.version) data.version = ctx.input.version;
-        if (ctx.input.active !== undefined) data.active = ctx.input.active;
-        if (ctx.input.employeeDeduction) data.employee_deduction = ctx.input.employeeDeduction;
-        if (ctx.input.companyContribution)
-          data.company_contribution = ctx.input.companyContribution;
-        if (ctx.input.employeeDeductionAnnualMaximum)
-          data.employee_deduction_annual_maximum = ctx.input.employeeDeductionAnnualMaximum;
-        if (ctx.input.companyContributionAnnualMaximum)
-          data.company_contribution_annual_maximum =
-            ctx.input.companyContributionAnnualMaximum;
-        if (ctx.input.deductAsPercentage !== undefined)
-          data.deduct_as_percentage = ctx.input.deductAsPercentage;
-        if (ctx.input.contributeAsPercentage !== undefined)
-          data.contribute_as_percentage = ctx.input.contributeAsPercentage;
-        if (ctx.input.effectiveDate) data.effective_date = ctx.input.effectiveDate;
-        let result = await client.updateEmployeeBenefit(ctx.input.employeeBenefitId, data);
-        return {
-          output: {
-            enrollment: {
-              employeeBenefitId: result.uuid || result.id?.toString(),
-              companyBenefitId: result.company_benefit_uuid,
-              active: result.active,
-              employeeDeduction: result.employee_deduction,
-              companyContribution: result.company_contribution,
-              version: result.version
-            }
-          },
-          message: `Updated benefit enrollment ${ctx.input.employeeBenefitId}.`
-        };
-      }
-    }
-  })
   .build();

@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   deletePhantom,
+  downloadResults,
   getExecution,
   getPhantom,
   getPhantomOutput,
@@ -14,8 +15,6 @@ import {
   savePhantom,
   stopPhantom
 } from './tools';
-import { phantomExecutionCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,7 +29,8 @@ export let provider = Slate.create({
     listExecutions,
     manageLeads,
     manageLists,
-    getWorkspace
+    getWorkspace,
+    downloadResults
   ],
-  triggers: [phantomExecutionCompleted]
+  triggers: []
 });

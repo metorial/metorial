@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteVideoTool = SlateTool.create(spec, {
   name: 'Delete Video',
   key: 'delete_video',
-  description: `Permanently delete a video from Vimeo. This action cannot be undone.`,
+  description: `Delete a video owned by the authenticated user. Vimeo may retain deletion state or history; this tool does not restore the video or erase retained history.`,
   tags: {
     destructive: true
   }

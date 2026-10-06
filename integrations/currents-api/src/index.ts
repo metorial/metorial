@@ -8,10 +8,8 @@ import {
   searchNews
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [getLatestNews, searchNews, getNewsSources, getSourceNews, getAvailableFilters],
-  triggers: [inboundWebhook]
+  triggers: []
 });

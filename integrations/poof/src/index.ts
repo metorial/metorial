@@ -13,8 +13,6 @@ import {
   manageWallet,
   sendPayout
 } from './tools';
-import { paymentNotification } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     getProduct,
     getSmartContracts
   ],
-  triggers: [paymentNotification]
+  triggers: []
 });

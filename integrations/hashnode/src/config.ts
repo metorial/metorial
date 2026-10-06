@@ -1,12 +1,12 @@
 import { SlateConfig } from 'slates';
 import { z } from 'zod';
-
-export let config = SlateConfig.create(
+import { host } from './lib/schemas';
+export const config = SlateConfig.create(
   z.object({
-    publicationHost: z
-      .string()
+    publicationHost: host
+      .optional()
       .describe(
-        'The host of your Hashnode publication, e.g. "yourblog.hashnode.dev" or your custom domain'
+        'Optional default publication hostname. Individual tools can select an exact publication ID or hostname; omit this to use publication discovery first.'
       )
   })
 );

@@ -1,12 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WriterClient } from '../lib/client';
+import {
+  graphFileStatus,
+  graphIdSchema,
+  paginationInput,
+  paginationOutput
+} from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createKnowledgeGraph = SlateTool.create(spec, {
   name: 'Create Knowledge Graph',
   key: 'create_knowledge_graph',
-  description: `Create a new Knowledge Graph in Writer. A Knowledge Graph is a collection of files used for RAG-based question answering. After creation, add files to it using the **Manage Knowledge Graph Files** tool.`,
+  description: `Create a new Knowledge Graph in Writer. A Knowledge Graph is a collection of files used for RAG-based question answering. After creation, add files to it using add_file_to_graph.`,
   tags: {
     destructive: false
   }
@@ -26,7 +32,8 @@ export let createKnowledgeGraph = SlateTool.create(spec, {
       graphId: z.string().describe('Unique ID of the created Knowledge Graph'),
       name: z.string().describe('Name of the Knowledge Graph'),
       description: z.string().describe('Description of the Knowledge Graph'),
-      createdAt: z.string().describe('Creation timestamp')
+      createdAt: z.string().describe('Creation timestamp'),
+      fileStatus: graphFileStatus
     })
   )
   .handleInvocation(async ctx => {
@@ -45,12 +52,22 @@ export let createKnowledgeGraph = SlateTool.create(spec, {
 export let listKnowledgeGraphs = SlateTool.create(spec, {
   name: 'List Knowledge Graphs',
   key: 'list_knowledge_graphs',
-  description: `List all Knowledge Graphs in your Writer account. Returns the ID, name, description, and creation date of each graph.`,
+  description: `List a page of accessible Knowledge Graphs in your Writer account. Returns the ID, name, description, and creation date of each graph.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      ...paginationInput,
+      teamIds: z
+        .array(z.number().int().positive())
+        .optional()
+        .describe(
+          'Optional team IDs to include team-deployed graphs. Omit for org-wide graphs; a team-scoped API key is automatically restricted to its team.'
+        )
+    })
+  )
   .output(
     z.object({
       graphs: z
@@ -59,20 +76,23 @@ export let listKnowledgeGraphs = SlateTool.create(spec, {
             graphId: z.string().describe('Unique ID of the Knowledge Graph'),
             name: z.string().describe('Name of the Knowledge Graph'),
             description: z.string().describe('Description of the Knowledge Graph'),
-            createdAt: z.string().describe('Creation timestamp')
+            createdAt: z.string().describe('Creation timestamp'),
+            fileStatus: graphFileStatus
           })
         )
-        .describe('List of Knowledge Graphs')
+        .describe('List of Knowledge Graphs'),
+      ...paginationOutput
     })
   )
   .handleInvocation(async ctx => {
     let client = new WriterClient(ctx.auth.token);
 
     ctx.progress('Listing Knowledge Graphs...');
-    let graphs = await client.listGraphs();
+    let page = await client.listGraphs(ctx.input);
+    let graphs = page.data;
 
     return {
-      output: { graphs },
+      output: { graphs, hasMore: page.hasMore, firstId: page.firstId, lastId: page.lastId },
       message: `Found **${graphs.length}** Knowledge Graph(s)`
     };
   })
@@ -81,14 +101,14 @@ export let listKnowledgeGraphs = SlateTool.create(spec, {
 export let getKnowledgeGraph = SlateTool.create(spec, {
   name: 'Get Knowledge Graph',
   key: 'get_knowledge_graph',
-  description: `Retrieve details of a specific Knowledge Graph by its ID, including its name, description, and creation date.`,
+  description: `Retrieve details and file ingestion status for a Knowledge Graph. Call list_knowledge_graphs to discover IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      graphId: z.string().describe('ID of the Knowledge Graph to retrieve')
+      graphId: graphIdSchema
     })
   )
   .output(
@@ -96,7 +116,8 @@ export let getKnowledgeGraph = SlateTool.create(spec, {
       graphId: z.string().describe('Unique ID of the Knowledge Graph'),
       name: z.string().describe('Name of the Knowledge Graph'),
       description: z.string().describe('Description of the Knowledge Graph'),
-      createdAt: z.string().describe('Creation timestamp')
+      createdAt: z.string().describe('Creation timestamp'),
+      fileStatus: graphFileStatus
     })
   )
   .handleInvocation(async ctx => {
@@ -115,14 +136,14 @@ export let getKnowledgeGraph = SlateTool.create(spec, {
 export let updateKnowledgeGraph = SlateTool.create(spec, {
   name: 'Update Knowledge Graph',
   key: 'update_knowledge_graph',
-  description: `Update the name and/or description of an existing Knowledge Graph.`,
+  description: `Update the name and/or description of an existing Knowledge Graph. Call list_knowledge_graphs to discover IDs.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
-      graphId: z.string().describe('ID of the Knowledge Graph to update'),
+      graphId: graphIdSchema,
       name: z.string().max(255).optional().describe('New name for the Knowledge Graph'),
       description: z
         .string()
@@ -136,15 +157,20 @@ export let updateKnowledgeGraph = SlateTool.create(spec, {
       graphId: z.string().describe('Unique ID of the Knowledge Graph'),
       name: z.string().describe('Updated name'),
       description: z.string().describe('Updated description'),
-      createdAt: z.string().describe('Creation timestamp')
+      createdAt: z.string().describe('Creation timestamp'),
+      fileStatus: graphFileStatus
     })
   )
   .handleInvocation(async ctx => {
     let client = new WriterClient(ctx.auth.token);
 
     let updates: { name?: string; description?: string } = {};
-    if (ctx.input.name) updates.name = ctx.input.name;
-    if (ctx.input.description) updates.description = ctx.input.description;
+    if (ctx.input.name !== undefined) updates.name = ctx.input.name;
+    if (ctx.input.description !== undefined) updates.description = ctx.input.description;
+    if (Object.keys(updates).length === 0)
+      throw createApiServiceError(
+        'Provide a name or description to update the Knowledge Graph.'
+      );
 
     ctx.progress('Updating Knowledge Graph...');
     let result = await client.updateGraph(ctx.input.graphId, updates);
@@ -159,14 +185,14 @@ export let updateKnowledgeGraph = SlateTool.create(spec, {
 export let deleteKnowledgeGraph = SlateTool.create(spec, {
   name: 'Delete Knowledge Graph',
   key: 'delete_knowledge_graph',
-  description: `Permanently delete a Knowledge Graph and disassociate all its files. This action cannot be undone.`,
+  description: `Permanently delete a Knowledge Graph and disassociate all its files. Call list_knowledge_graphs to discover IDs. This action cannot be undone.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      graphId: z.string().describe('ID of the Knowledge Graph to delete')
+      graphId: graphIdSchema
     })
   )
   .output(

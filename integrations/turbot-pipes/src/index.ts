@@ -27,8 +27,6 @@ import {
   updateOrganization,
   updateWorkspace
 } from './tools';
-import { inboundWebhook, processActivity } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,5 +56,5 @@ export let provider = Slate.create({
     listSnapshots,
     getSnapshot
   ],
-  triggers: [inboundWebhook, processActivity]
+  triggers: []
 });

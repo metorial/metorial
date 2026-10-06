@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageWorkspace = SlateTool.create(spec, {
@@ -50,87 +50,38 @@ export let manageWorkspace = SlateTool.create(spec, {
         )
         .optional()
         .describe('Workspace members (for get_members action).'),
-      deleted: z.boolean().optional().describe('Whether the workspace was deleted.')
+      deleted: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether Appsmith accepted archival of this workspace. This does not erase retained history.'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
-
-    let { action, workspaceId, name, website } = ctx.input;
-
-    if (action === 'create') {
-      if (!name) throw new Error('Name is required to create a workspace.');
-      let ws = await client.createWorkspace(name);
+    const client = clientFor(ctx);
+    const { action, workspaceId, name, website } = ctx.input;
+    if (action === 'get_members')
       return {
-        output: {
-          workspaceId: ws.id,
-          name: ws.name,
-          slug: ws.slug
-        },
-        message: `Created workspace **${ws.name}** (ID: ${ws.id}).`
+        output: { workspaceId, members: await client.getWorkspaceMembers(workspaceId ?? '') },
+        message: 'Retrieved native workspace members.'
       };
-    }
-
-    if (!workspaceId) throw new Error('Workspace ID is required for this action.');
-
-    if (action === 'get') {
-      let ws = await client.getWorkspace(workspaceId);
-      return {
-        output: {
-          workspaceId: ws.id,
-          name: ws.name,
-          slug: ws.slug
-        },
-        message: `Retrieved workspace **${ws.name}**.`
-      };
-    }
-
-    if (action === 'get_members') {
-      let members = await client.getWorkspaceMembers(workspaceId);
-      let mapped = members.map((m: any) => ({
-        userId: m.userId,
-        username: m.username,
-        name: m.name,
-        roleName: m.roleName
-      }));
-      return {
-        output: {
-          workspaceId,
-          members: mapped
-        },
-        message: `Found **${mapped.length}** member(s) in workspace.`
-      };
-    }
-
-    if (action === 'update') {
-      let updates: Record<string, any> = {};
-      if (name) updates.name = name;
-      if (website) updates.website = website;
-      let ws = await client.updateWorkspace(workspaceId, updates);
-      return {
-        output: {
-          workspaceId: ws.id,
-          name: ws.name,
-          slug: ws.slug
-        },
-        message: `Updated workspace **${ws.name}**.`
-      };
-    }
-
     if (action === 'delete') {
-      await client.deleteWorkspace(workspaceId);
+      const ws = await client.deleteWorkspace(workspaceId ?? '');
       return {
-        output: {
-          workspaceId,
-          deleted: true
-        },
-        message: `Deleted workspace ${workspaceId}.`
+        output: { workspaceId: ws.id, deleted: true },
+        message: 'Appsmith accepted workspace archival. Retained history is not erased.'
       };
     }
-
-    throw new Error(`Unknown action: ${action}`);
+    const ws =
+      action === 'create'
+        ? await client.createWorkspace(name ?? '')
+        : action === 'update'
+          ? await client.updateWorkspace(workspaceId ?? '', { name, website })
+          : await client.getWorkspace(workspaceId ?? '');
+    return {
+      output: { workspaceId: ws.id, name: ws.name, slug: ws.slug },
+      message: `Workspace ${action} confirmed by native readback.`
+    };
   })
   .build();

@@ -30,6 +30,7 @@ Files are stored for a maximum of 3 hours.`,
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
+      masterToken: ctx.auth.masterToken,
       region: ctx.config.region
     });
 
@@ -37,7 +38,7 @@ Files are stored for a maximum of 3 hours.`,
 
     return {
       output: result,
-      message: `Uploaded \`${result.fileName}\` to ConvertAPI storage. File ID: \`${result.fileId}\`. Valid for 3 hours.`
+      message: `Uploaded \`${result.fileName}\` to ConvertAPI storage. File ID: \`${result.fileId}\`. Available for up to 3 hours.`
     };
   })
   .build();

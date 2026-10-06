@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, mergeQuery, pageInfo } from '../lib/helpers';
+import { limitSchema, pageOutput, resourceId, selection, skipSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let searchEntries = SlateTool.create(spec, {
@@ -18,7 +19,14 @@ export let searchEntries = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      contentTypeId: z.string().optional().describe('Filter entries by content type ID.'),
+      ...selection,
+      api: z
+        .enum(['management', 'delivery', 'preview'])
+        .optional()
+        .describe(
+          'API for legacy token-only connections. Must match the credential type; reconnect if unknown.'
+        ),
+      contentTypeId: resourceId.optional().describe('Filter entries by content type ID.'),
       fullTextSearch: z
         .string()
         .optional()
@@ -29,22 +37,20 @@ export let searchEntries = SlateTool.create(spec, {
         .describe(
           'Additional Contentful search parameters as key-value pairs, e.g. {"fields.title[match]": "hello", "order": "-sys.createdAt"}.'
         ),
-      limit: z
-        .number()
-        .optional()
-        .describe('Max number of entries to return (1-1000, default 100).'),
-      skip: z.number().optional().describe('Number of entries to skip for pagination.')
+      limit: limitSchema.describe('Max number of entries to return (1-1000, default 100).'),
+      skip: skipSchema.describe('Number of entries to skip for pagination.')
     })
   )
   .output(
     z.object({
+      ...pageOutput,
       total: z.number().describe('Total number of matching entries.'),
       skip: z.number().describe('Number of entries skipped.'),
       limit: z.number().describe('Max entries returned.'),
       entries: z.array(
         z.object({
-          entryId: z.string(),
-          contentTypeId: z.string().optional(),
+          entryId: resourceId,
+          contentTypeId: resourceId.optional(),
           fields: z.record(z.string(), z.any()),
           version: z.number().optional(),
           createdAt: z.string().optional(),
@@ -55,21 +61,17 @@ export let searchEntries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
 
     let params: Record<string, string | number | boolean> = {};
     if (ctx.input.contentTypeId) params.content_type = ctx.input.contentTypeId;
     if (ctx.input.fullTextSearch) params.query = ctx.input.fullTextSearch;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.skip) params.skip = ctx.input.skip;
-    if (ctx.input.queryParams) {
-      for (let [key, value] of Object.entries(ctx.input.queryParams)) {
-        params[key] = value;
-      }
-    }
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
+    if (ctx.input.skip !== undefined) params.skip = ctx.input.skip;
+    mergeQuery(params, ctx.input.queryParams);
 
     let result = await client.getEntries(params);
-    let items = result.items || [];
+    let items = result.items;
 
     let entries = items.map((item: any) => ({
       entryId: item.sys?.id,
@@ -83,12 +85,13 @@ export let searchEntries = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total || 0,
-        skip: result.skip || 0,
-        limit: result.limit || 100,
+        ...pageInfo(result),
+        total: result.total,
+        skip: result.skip,
+        limit: result.limit,
         entries
       },
-      message: `Found **${result.total || 0}** entries (showing ${entries.length}).`
+      message: `Found **${result.total}** entries (showing ${entries.length}).`
     };
   })
   .build();

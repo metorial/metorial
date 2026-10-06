@@ -10,7 +10,6 @@
     "manage cloud storage files",
     "publish remote config templates",
     "deploy serverless functions",
-    "stream real-time data changes",
     "generate authentication tokens",
     "batch write documents"
   ],

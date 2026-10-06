@@ -1,14 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, TravisCIClient } from '../lib/client';
+import type { Repository } from '../lib/types';
 import { spec } from '../spec';
 
 export let getRepository = SlateTool.create(spec, {
   name: 'Get Repository',
   key: 'get_repository',
-  description: `Retrieve detailed information about a Travis CI repository, including its build status, settings, and owner. Can also activate, deactivate, star, or unstar a repository.`,
+  description: `Retrieve detailed information about a Travis CI repository, including its activation status, default branch, and owner. Use manage_repository_settings for CI settings. Can also activate, deactivate, star, or unstar a repository.`,
   tags: {
-    readOnly: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -41,10 +43,10 @@ export let getRepository = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
-    let repo: any;
+    let repo: Repository;
     let actionLabel = 'Retrieved';
 
     switch (ctx.input.action) {

@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { apiKey, Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -21,23 +22,13 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: apiKey(ctx.input.apiKey)
         }
       };
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.rocketreach.co/api/v2'
-      });
-
-      let response = await axios.get('/account', {
-        headers: {
-          'Api-Key': ctx.output.token
-        }
-      });
-
-      let data = response.data;
+      let data = await new Client({ token: ctx.output.token }).getAccount();
 
       return {
         profile: {

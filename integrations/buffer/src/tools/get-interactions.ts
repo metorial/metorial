@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getInteractionsTool = SlateTool.create(spec, {
   name: 'Get Interactions',
   key: 'get_interactions',
-  description: `Retrieve social media interactions (mentions, retweets, likes, comments, etc.) for a sent update. Supported interaction types vary by social network.`,
+  description: `Read individual interaction records through the retained legacy REST contract. This is not available through the current API; legacy availability and event support depend on the provider. Current aggregate metrics can be requested through Get Updates with a personal API key.`,
   instructions: [
     'Common event types include: "retweet", "favorite", "mention", "comment", "like", "reshare". Available types depend on the social network.'
   ],
@@ -28,44 +28,49 @@ export let getInteractionsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      total: z.number().describe('Total number of interactions of this type'),
+      total: z.number().optional().describe('Total supplied by the provider, when available'),
+      returnedCount: z.number().describe('Number of records returned in this response'),
       interactions: z
         .array(
           z.object({
             interactionId: z.string().describe('Unique ID of the interaction'),
             event: z.string().describe('Type of interaction'),
-            createdAt: z.number().describe('Unix timestamp of the interaction'),
-            username: z.string().describe('Username of the person who interacted'),
-            avatar: z.string().describe('Avatar URL of the person who interacted'),
-            followers: z.number().describe('Follower count of the person who interacted')
+            createdAt: z
+              .number()
+              .optional()
+              .describe('Unix timestamp supplied by the provider'),
+            username: z.string().optional().describe('Username when supplied'),
+            avatar: z.string().optional().describe('Avatar URL when supplied'),
+            followers: z.number().optional().describe('Follower count when supplied')
           })
         )
         .describe('List of interactions')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.getInteractions(ctx.input.updateId, ctx.input.event, {
       page: ctx.input.page,
       count: ctx.input.count
     });
 
-    let interactions = (result.interactions || []).map(i => ({
-      interactionId: i.interactionId || i.id,
+    let interactions = result.interactions.map(i => ({
+      interactionId: i.id,
       event: i.event,
       createdAt: i.createdAt,
-      username: i.user?.username || '',
-      avatar: i.user?.avatarHttps || i.user?.avatar || '',
-      followers: i.user?.followers || 0
+      username: i.username,
+      avatar: i.avatar,
+      followers: i.followers
     }));
 
     return {
       output: {
         total: result.total,
+        returnedCount: interactions.length,
         interactions
       },
-      message: `Retrieved **${interactions.length}** "${ctx.input.event}" interaction(s) for update **${ctx.input.updateId}** (${result.total} total).`
+      message: `Retrieved **${interactions.length}** interaction(s) for update **${ctx.input.updateId}**.`
     };
   })
   .build();

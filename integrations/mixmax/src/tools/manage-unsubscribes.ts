@@ -39,8 +39,8 @@ export let listUnsubscribes = SlateTool.create(spec, {
       next: ctx.input.cursor
     });
 
-    let results = data.results || data || [];
-    let unsubscribes = results.map((u: any) => ({
+    let results = data.results;
+    let unsubscribes = results.map(u => ({
       email: u.email,
       createdAt: u.createdAt
     }));

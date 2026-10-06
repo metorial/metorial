@@ -1,6 +1,6 @@
 {
   "name": "@metorial/superhuman-gmail",
-  "description": "Workflow-oriented Gmail built around conversations: search threads, load full thread context with reply-ready headers, triage with archive, read/unread, star, labels, trash, restore, or permanent delete, manage threaded reply drafts, send replies in-thread, and poll the Gmail history API for new mail and label changes. Omits generic admin/settings CRUD and features that need a custom datastore (read receipts, team comments, shared links, persistent snooze).",
+  "description": "Gmail conversation workflows for accounts used with Superhuman: verify mailbox identity, search threads, read context, download message files, archive or label conversations, manage threaded reply drafts, and send replies. Permanent deletion requires full Gmail access. Uses the documented Gmail API; native Superhuman features and drafts are separate.",
   "categories": ["email-and-messaging", "task-and-project-management"],
   "skills": [
     "search email conversations",
@@ -10,7 +10,8 @@
     "trash restore or delete threads",
     "compose threaded reply drafts",
     "send threaded replies",
-    "detect new mail and label changes"
+    "verify Gmail mailbox identity",
+    "download email files"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/superhuman.png"
 }

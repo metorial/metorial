@@ -1,11 +1,13 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getResource,
   getSystem,
   getUser,
   listApplications,
   listCommandResults,
   listGroups,
+  listOrganizations,
   listSystems,
   listUsers,
   manageAssociations,
@@ -19,16 +21,11 @@ import {
   runCommand,
   userActions
 } from './tools';
-import {
-  authenticationEvents,
-  directoryEvents,
-  inboundWebhook,
-  systemEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    listOrganizations,
+    getResource,
     listUsers,
     getUser,
     manageUser,
@@ -47,5 +44,5 @@ export let provider = Slate.create({
     listApplications,
     queryEvents
   ],
-  triggers: [inboundWebhook, directoryEvents, authenticationEvents, systemEvents]
+  triggers: []
 });

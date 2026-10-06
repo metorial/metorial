@@ -20,8 +20,6 @@ import {
   updateReviewStatus,
   uploadDocument
 } from './tools';
-import { documentStatusChanged } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     updateCase,
     runCaseWorkflow
   ],
-  triggers: [documentStatusChanged]
+  triggers: []
 });

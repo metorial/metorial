@@ -1,4 +1,6 @@
 export * from './delete-user';
+export * from './get-project';
+export * from './get-survey';
 export * from './get-survey-statistics';
 export * from './insert-response';
 export * from './list-responses';

@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { validateAgentSettings } from '../lib/agent-settings';
 import { RetellClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -21,6 +22,13 @@ export let updateAgent = SlateTool.create(spec, {
       agentName: z.string().optional().describe('New name for the agent'),
       voiceId: z.string().optional().describe('New voice ID'),
       responseEngine: z.any().optional().describe('Updated response engine configuration'),
+      languages: z
+        .array(z.string().min(1))
+        .min(1)
+        .optional()
+        .describe(
+          'Explicit locale codes for a multilingual agent; omit language when using this field'
+        ),
       language: z.string().optional().describe('Language/dialect for speech recognition'),
       webhookUrl: z
         .string()
@@ -50,13 +58,13 @@ export let updateAgent = SlateTool.create(spec, {
       agentId: z.string().describe('Unique identifier of the updated agent'),
       agentName: z.string().nullable().optional().describe('Name of the agent'),
       version: z.number().describe('Version number'),
-      isPublished: z.boolean().describe('Whether the agent is published')
+      isPublished: z.boolean().optional().describe('Whether the agent is published')
     })
   )
   .handleInvocation(async ctx => {
     let client = new RetellClient(ctx.auth.token);
 
-    let body: Record<string, any> = {};
+    let body: Record<string, any> = { ...ctx.input.additionalSettings };
 
     if (ctx.input.agentName !== undefined) body.agent_name = ctx.input.agentName;
     if (ctx.input.voiceId !== undefined) body.voice_id = ctx.input.voiceId;
@@ -73,9 +81,11 @@ export let updateAgent = SlateTool.create(spec, {
       body.enable_backchannel = ctx.input.enableBackchannel;
     if (ctx.input.ambientSound !== undefined) body.ambient_sound = ctx.input.ambientSound;
 
-    if (ctx.input.additionalSettings) {
-      Object.assign(body, ctx.input.additionalSettings);
+    if (ctx.input.language !== undefined && ctx.input.languages !== undefined) {
+      throw createApiServiceError('Provide language or languages, not both.');
     }
+    if (ctx.input.languages) body.language = ctx.input.languages;
+    validateAgentSettings(body);
 
     let agent = await client.updateAgent(ctx.input.agentId, body, ctx.input.version);
 

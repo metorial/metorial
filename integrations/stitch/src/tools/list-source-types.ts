@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { StitchConnectClient } from '../lib/client';
+import { resolveRegion, StitchConnectClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listSourceTypes = SlateTool.create(spec, {
@@ -24,11 +24,11 @@ export let listSourceTypes = SlateTool.create(spec, {
   .output(
     z.object({
       sourceTypes: z
-        .array(z.any())
+        .array(z.unknown())
         .optional()
         .describe('List of all available source types (when no specific type requested)'),
       sourceTypeDetails: z
-        .any()
+        .unknown()
         .optional()
         .describe(
           'Detailed configuration for a specific source type (when sourceType is provided)'
@@ -38,11 +38,11 @@ export let listSourceTypes = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
-    if (ctx.input.sourceType) {
+    if (ctx.input.sourceType !== undefined) {
       let details = await client.getSourceType(ctx.input.sourceType);
       return {
         output: { sourceTypeDetails: details },

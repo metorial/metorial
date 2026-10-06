@@ -9,8 +9,6 @@ import {
   getCredits,
   listCampaigns
 } from './tools';
-import { campaignCompleted, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     getCredits,
     getCampaignPdf
   ],
-  triggers: [inboundWebhook, campaignCompleted]
+  triggers: []
 });

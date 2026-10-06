@@ -35,13 +35,13 @@ export let getConnectionTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ConnectClient(ctx.auth.token);
+    let client = new ConnectClient(ctx.auth);
     let result = await client.getConnection(ctx.input.connectionId, ctx.input.userId);
 
     return {
       output: {
         connectionId: ctx.input.connectionId,
-        status: result?.user_connection?.status || result?.status,
+        status: typeof result.user_status === 'string' ? result.user_status : undefined,
         connection: result
       },
       message: `Retrieved connection **${ctx.input.connectionId}**${ctx.input.userId ? ` for user ${ctx.input.userId}` : ''}.`

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,6 +30,7 @@ export let getBatch = SlateTool.create(spec, {
             totalContacts: z.number().optional().describe('Total contacts in the file'),
             createdAt: z.string().optional().describe('Creation timestamp'),
             scheduledAt: z.string().optional().describe('Scheduled execution time'),
+            fromPhoneNumbers: z.array(z.string()).optional().describe('Caller phone numbers'),
             fromPhoneNumber: z.string().optional().describe('Caller phone number'),
             executionStatus: z
               .record(z.string(), z.number())
@@ -43,21 +44,26 @@ export let getBatch = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
+    if (Boolean(ctx.input.batchId) === Boolean(ctx.input.agentId)) {
+      throw createApiServiceError('Provide exactly one of batchId or agentId.');
+    }
+
     if (ctx.input.batchId) {
       let batch = await client.getBatch(ctx.input.batchId);
       return {
         output: {
           batches: [
             {
-              batchId: batch.batch_id,
-              status: batch.status,
-              fileName: batch.file_name,
-              validContacts: batch.valid_contacts,
-              totalContacts: batch.total_contacts,
-              createdAt: batch.created_at,
-              scheduledAt: batch.scheduled_at,
-              fromPhoneNumber: batch.from_phone_number,
-              executionStatus: batch.execution_status
+              batchId: batch.batch_id ?? undefined,
+              status: batch.status ?? undefined,
+              fileName: batch.file_name ?? undefined,
+              validContacts: batch.valid_contacts ?? undefined,
+              totalContacts: batch.total_contacts ?? undefined,
+              createdAt: batch.created_at ?? undefined,
+              scheduledAt: batch.scheduled_at ?? undefined,
+              fromPhoneNumbers: batch.from_phone_numbers ?? undefined,
+              fromPhoneNumber: batch.from_phone_number ?? undefined,
+              executionStatus: batch.execution_status ?? undefined
             }
           ]
         },
@@ -72,24 +78,22 @@ export let getBatch = SlateTool.create(spec, {
       return {
         output: {
           batches: batchList.map((b: any) => ({
-            batchId: b.batch_id,
-            status: b.status,
-            fileName: b.file_name,
-            validContacts: b.valid_contacts,
-            totalContacts: b.total_contacts,
-            createdAt: b.created_at,
-            scheduledAt: b.scheduled_at,
-            fromPhoneNumber: b.from_phone_number,
-            executionStatus: b.execution_status
+            batchId: b.batch_id ?? undefined,
+            status: b.status ?? undefined,
+            fileName: b.file_name ?? undefined,
+            validContacts: b.valid_contacts ?? undefined,
+            totalContacts: b.total_contacts ?? undefined,
+            createdAt: b.created_at ?? undefined,
+            scheduledAt: b.scheduled_at ?? undefined,
+            fromPhoneNumbers: b.from_phone_numbers ?? undefined,
+            fromPhoneNumber: b.from_phone_number ?? undefined,
+            executionStatus: b.execution_status ?? undefined
           }))
         },
         message: `Found **${batchList.length}** batch(es) for agent \`${ctx.input.agentId}\`.`
       };
     }
 
-    return {
-      output: { batches: [] },
-      message: 'No batchId or agentId provided. Please specify one.'
-    };
+    throw createApiServiceError('Provide batchId or agentId.');
   })
   .build();

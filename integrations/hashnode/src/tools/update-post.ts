@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updatePost = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let updatePost = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...selection,
       postId: z.string().describe('ID of the post to update'),
       title: z.string().optional().describe('New title'),
       contentMarkdown: z.string().optional().describe('New Markdown content'),
@@ -21,7 +23,12 @@ export let updatePost = SlateTool.create(spec, {
       tags: z
         .array(
           z.object({
-            tagId: z.string().optional().describe('Existing tag ID'),
+            tagId: z
+              .string()
+              .optional()
+              .describe(
+                'Legacy tag ID, unsupported by current writes. Omit and provide the tag slug.'
+              ),
             name: z.string().optional().describe('Tag display name'),
             slug: z.string().optional().describe('Tag slug identifier')
           })
@@ -47,7 +54,10 @@ export let updatePost = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      publicationHost: ctx.config.publicationHost
+      publicationHost:
+        ctx.input.publicationHost ??
+        (ctx.input.publicationId === undefined ? ctx.config.publicationHost : undefined),
+      publicationId: ctx.input.publicationId
     });
 
     let tags = ctx.input.tags?.map(t => ({

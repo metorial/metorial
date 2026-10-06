@@ -24,14 +24,6 @@ import {
   updateConversation,
   updatePerson
 } from './tools';
-import {
-  conversationStateChanged,
-  inboundWebhook,
-  newConversation,
-  newMessage,
-  peopleProfileChanged
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,11 +50,5 @@ export let provider = Slate.create({
     batchConversationActions,
     manageWebsiteSettings
   ],
-  triggers: [
-    inboundWebhook,
-    newConversation,
-    conversationStateChanged,
-    newMessage,
-    peopleProfileChanged
-  ]
+  triggers: []
 });

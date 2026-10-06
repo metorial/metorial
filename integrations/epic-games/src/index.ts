@@ -5,6 +5,7 @@ import {
   findPlayerReports,
   getAccountInfo,
   getAntiCheatStatus,
+  getConnectionContext,
   getEntitlements,
   getFriends,
   lookupProductUser,
@@ -14,8 +15,6 @@ import {
   redeemEntitlements,
   sendPlayerReport
 } from './tools';
-import { inboundWebhook, playerReportsPoll, sanctionsSync } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,7 +29,8 @@ export let provider = Slate.create({
     getEntitlements,
     redeemEntitlements,
     manageVoiceRoom,
-    getAntiCheatStatus
+    getAntiCheatStatus,
+    getConnectionContext
   ],
-  triggers: [inboundWebhook, sanctionsSync, playerReportsPoll]
+  triggers: []
 });

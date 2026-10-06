@@ -22,10 +22,7 @@ export let getMedia = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let file = await client.getFile(ctx.input.fileId);
 

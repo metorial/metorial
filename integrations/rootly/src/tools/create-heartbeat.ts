@@ -15,6 +15,10 @@ Configure the expected interval and notification target for when the heartbeat e
   .input(
     z.object({
       name: z.string().describe('Heartbeat name'),
+      enabled: z
+        .boolean()
+        .optional()
+        .describe('Whether missed pings can trigger alerts; use false for a disabled monitor'),
       description: z
         .string()
         .optional()
@@ -25,8 +29,18 @@ Configure the expected interval and notification target for when the heartbeat e
         .enum(['User', 'Group', 'EscalationPolicy', 'Service'])
         .optional()
         .describe('Type of notification target when heartbeat expires'),
-      notificationTargetId: z.string().optional().describe('ID of the notification target'),
-      alertSummary: z.string().optional().describe('Alert summary when heartbeat expires'),
+      notificationTargetId: z
+        .string()
+        .optional()
+        .describe(
+          'Required by the provider together with notificationTargetType, including disabled monitors'
+        ),
+      alertSummary: z
+        .string()
+        .optional()
+        .describe(
+          'Required alert summary when heartbeat expires, including disabled monitors'
+        ),
       alertUrgencyId: z.string().optional().describe('Alert urgency ID')
     })
   )
@@ -40,6 +54,7 @@ Configure the expected interval and notification target for when the heartbeat e
 
     let result = await client.createHeartbeat({
       name: ctx.input.name,
+      enabled: ctx.input.enabled,
       description: ctx.input.description,
       interval: ctx.input.interval,
       intervalUnit: ctx.input.intervalUnit,

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VimeoClient } from '../lib/client';
+import { nativeCategory, parse, uriId } from '../lib/native';
 import {
   mapVideo,
   paginationInputSchema,
@@ -18,14 +19,17 @@ let categorySchema = z.object({
   pictureUrl: z.string().nullable().optional().describe('URL of the category image')
 });
 
-let mapCategory = (c: any) => ({
-  categoryName: c.uri?.replace('/categories/', '') ?? '',
-  uri: c.uri ?? '',
-  name: c.name ?? '',
-  link: c.link ?? '',
-  topLevel: c.top_level ?? undefined,
-  pictureUrl: c.pictures?.sizes?.[c.pictures.sizes.length - 1]?.link ?? null
-});
+let mapCategory = (value: unknown) => {
+  const c = parse(nativeCategory, value);
+  return {
+    categoryName: uriId(c.uri, 'categories'),
+    uri: c.uri,
+    name: c.name,
+    link: c.link,
+    topLevel: c.top_level,
+    pictureUrl: c.pictures?.sizes.at(-1)?.link
+  };
+};
 
 export let listCategoriesTool = SlateTool.create(spec, {
   name: 'List Categories',
@@ -52,9 +56,10 @@ export let listCategoriesTool = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total ?? 0,
-        page: result.page ?? 1,
-        perPage: result.perPage ?? categories.length,
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+        paging: result.paging,
         categories
       },
       message: `Found **${result.total ?? categories.length}** categories`
@@ -107,9 +112,10 @@ export let listCategoryVideosTool = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total ?? 0,
-        page: result.page ?? 1,
-        perPage: result.perPage ?? videos.length,
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+        paging: result.paging,
         videos
       },
       message: `Found **${result.total ?? videos.length}** videos in category "${ctx.input.categoryName}"`

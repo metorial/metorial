@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { organizationNameSchema } from '../lib/contracts';
 import { createClient } from '../lib/helpers';
 import { mapWorkspace } from '../lib/mappers';
 import { spec } from '../spec';
@@ -7,13 +8,14 @@ import { spec } from '../spec';
 export let createWorkspaceTool = SlateTool.create(spec, {
   name: 'Create Workspace',
   key: 'create_workspace',
-  description: `Create a new Terraform workspace. Configure execution mode, Terraform version, auto-apply behavior, and optionally connect to a VCS repository for automatic run triggers.`,
+  description: `Call list_organizations to select an organization or use the optional configured default. Create a new Terraform workspace. Configure execution mode, Terraform version, auto-apply behavior, and optionally connect to a VCS repository for automatic run triggers.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       name: z
         .string()
         .describe('Name of the workspace. Must be unique within the organization.'),
@@ -26,6 +28,12 @@ export let createWorkspaceTool = SlateTool.create(spec, {
         .enum(['remote', 'local', 'agent'])
         .optional()
         .describe('Execution mode for the workspace'),
+      agentPoolId: z
+        .string()
+        .optional()
+        .describe(
+          'Agent pool ID for agent execution mode; required when creating an agent-mode workspace.'
+        ),
       terraformVersion: z
         .string()
         .optional()
@@ -58,6 +66,12 @@ export let createWorkspaceTool = SlateTool.create(spec, {
       description: z.string(),
       autoApply: z.boolean(),
       executionMode: z.string(),
+      agentPoolId: z
+        .string()
+        .optional()
+        .describe(
+          'Agent pool ID for agent execution mode; required when creating an agent-mode workspace.'
+        ),
       terraformVersion: z.string(),
       workingDirectory: z.string(),
       locked: z.boolean(),

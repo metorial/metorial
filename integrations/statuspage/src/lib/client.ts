@@ -1,288 +1,399 @@
-import { createAxios } from 'slates';
+import { setTimeout as delay } from 'node:timers/promises';
+import { createApiServiceError, createAuthenticatedAxios, pickDefined } from 'slates';
+import { z } from 'zod';
+import {
+  componentSchema,
+  groupComponentIds,
+  groupSchema,
+  incidentSchema,
+  metricSchema,
+  metricsProviderSchema,
+  pageSchema,
+  postmortemSchema,
+  subscriberSchema,
+  templateSchema
+} from './models';
+import { pathId, requireUpdate, statuspageError, validatePagination } from './validation';
 
+type Fields = Record<string, unknown>;
+type Pagination = { limit?: number; page?: number };
 export class Client {
-  private api: ReturnType<typeof createAxios>;
-  private pageId: string;
-
-  constructor(params: { token: string; pageId: string }) {
+  private api;
+  private pageId?: string;
+  constructor(params: { token: string; pageId?: string }) {
+    if (!params.token.trim()) throw createApiServiceError('A Statuspage API key is required.');
     this.pageId = params.pageId;
-    this.api = createAxios({
+    this.api = createAuthenticatedAxios({
       baseURL: 'https://api.statuspage.io/v1',
-      headers: {
-        Authorization: `OAuth ${params.token}`,
-        'Content-Type': 'application/json'
+      timeout: 30_000,
+      maxRedirects: 0,
+      authHeader: { value: `OAuth ${params.token.trim()}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: statuspageError
+    });
+  }
+  private pagePath() {
+    if (!this.pageId)
+      throw createApiServiceError(
+        'Provide pageId or configure a default page. Use list_pages to discover accessible pages.'
+      );
+    return `/pages/${pathId(this.pageId, 'pageId')}`;
+  }
+  private parse<T extends z.ZodType>(schema: T, data: unknown): z.output<T> {
+    const result = schema.safeParse(data);
+    if (!result.success)
+      throw createApiServiceError(
+        'Statuspage returned an invalid response. Check the provider service before retrying.'
+      );
+    return result.data;
+  }
+  async listPages() {
+    return this.parse(z.array(pageSchema), (await this.api.get('/pages')).data);
+  }
+  async getPage() {
+    return this.parse(pageSchema, (await this.api.get(this.pagePath())).data);
+  }
+  async updatePage(data: Fields) {
+    requireUpdate(data);
+    return this.parse(
+      pageSchema,
+      (await this.api.patch(this.pagePath(), { page: data })).data
+    );
+  }
+  async createComponent(data: Fields) {
+    if (typeof data.name !== 'string' || !data.name.trim())
+      throw createApiServiceError('name is required to create this resource.');
+    return this.parse(
+      componentSchema,
+      (await this.api.post(`${this.pagePath()}/components`, { component: data })).data
+    );
+  }
+  async updateComponent(id: string, data: Fields) {
+    requireUpdate(data);
+    if (data.group_id === null) {
+      const endpoint = `${this.pagePath()}/components/${pathId(id)}`;
+      const component = this.parse(componentSchema, (await this.api.get(endpoint)).data);
+      if (component.group_id) {
+        await delay(1100);
+        const groupEndpoint = `${this.pagePath()}/component-groups/${pathId(component.group_id)}`;
+        const group = this.parse(groupSchema, (await this.api.get(groupEndpoint)).data);
+        await delay(1100);
+        await this.api.patch(groupEndpoint, {
+          component_group: {
+            name: group.name,
+            components: groupComponentIds(group).filter(member => member !== id)
+          }
+        });
       }
-    });
-  }
-
-  // ─── Page ───
-
-  async getPage(): Promise<any> {
-    let response = await this.api.get(`/pages/${this.pageId}`);
-    return response.data;
-  }
-
-  async updatePage(data: Record<string, any>): Promise<any> {
-    let response = await this.api.patch(`/pages/${this.pageId}`, { page: data });
-    return response.data;
-  }
-
-  // ─── Components ───
-
-  async listComponents(): Promise<any[]> {
-    let response = await this.api.get(`/pages/${this.pageId}/components`);
-    return response.data;
-  }
-
-  async getComponent(componentId: string): Promise<any> {
-    let response = await this.api.get(`/pages/${this.pageId}/components/${componentId}`);
-    return response.data;
-  }
-
-  async createComponent(data: Record<string, any>): Promise<any> {
-    let response = await this.api.post(`/pages/${this.pageId}/components`, {
-      component: data
-    });
-    return response.data;
-  }
-
-  async updateComponent(componentId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.api.patch(`/pages/${this.pageId}/components/${componentId}`, {
-      component: data
-    });
-    return response.data;
-  }
-
-  async deleteComponent(componentId: string): Promise<void> {
-    await this.api.delete(`/pages/${this.pageId}/components/${componentId}`);
-  }
-
-  async getComponentUptime(componentId: string, start?: string, end?: string): Promise<any> {
-    let params: Record<string, string> = {};
-    if (start) params.start = start;
-    if (end) params.end = end;
-    let response = await this.api.get(
-      `/pages/${this.pageId}/components/${componentId}/uptime`,
-      { params }
+      await delay(1100);
+      const { group_id: _groupId, ...fields } = data;
+      return this.parse(
+        componentSchema,
+        Object.keys(fields).length
+          ? (await this.api.patch(endpoint, { component: fields })).data
+          : (await this.api.get(endpoint)).data
+      );
+    }
+    return this.parse(
+      componentSchema,
+      (
+        await this.api.patch(`${this.pagePath()}/components/${pathId(id)}`, {
+          component: data
+        })
+      ).data
     );
-    return response.data;
   }
-
-  // ─── Component Groups ───
-
-  async listComponentGroups(): Promise<any[]> {
-    let response = await this.api.get(`/pages/${this.pageId}/component-groups`);
-    return response.data;
+  async deleteComponent(id: string) {
+    await this.api.delete(`${this.pagePath()}/components/${pathId(id)}`);
   }
-
-  async createComponentGroup(data: Record<string, any>): Promise<any> {
-    let response = await this.api.post(`/pages/${this.pageId}/component-groups`, {
-      component_group: data
-    });
-    return response.data;
-  }
-
-  async updateComponentGroup(groupId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.api.patch(`/pages/${this.pageId}/component-groups/${groupId}`, {
-      component_group: data
-    });
-    return response.data;
-  }
-
-  async deleteComponentGroup(groupId: string): Promise<void> {
-    await this.api.delete(`/pages/${this.pageId}/component-groups/${groupId}`);
-  }
-
-  // ─── Incidents ───
-
-  async listIncidents(params?: {
-    query?: string;
-    limit?: number;
-    page?: number;
-  }): Promise<any[]> {
-    let response = await this.api.get(`/pages/${this.pageId}/incidents`, {
-      params: { q: params?.query, per_page: params?.limit, page: params?.page }
-    });
-    return response.data;
-  }
-
-  async listUnresolvedIncidents(): Promise<any[]> {
-    let response = await this.api.get(`/pages/${this.pageId}/incidents/unresolved`);
-    return response.data;
-  }
-
-  async listScheduledIncidents(): Promise<any[]> {
-    let response = await this.api.get(`/pages/${this.pageId}/incidents/scheduled`);
-    return response.data;
-  }
-
-  async getIncident(incidentId: string): Promise<any> {
-    let response = await this.api.get(`/pages/${this.pageId}/incidents/${incidentId}`);
-    return response.data;
-  }
-
-  async createIncident(data: Record<string, any>): Promise<any> {
-    let response = await this.api.post(`/pages/${this.pageId}/incidents`, { incident: data });
-    return response.data;
-  }
-
-  async updateIncident(incidentId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.api.patch(`/pages/${this.pageId}/incidents/${incidentId}`, {
-      incident: data
-    });
-    return response.data;
-  }
-
-  async deleteIncident(incidentId: string): Promise<void> {
-    await this.api.delete(`/pages/${this.pageId}/incidents/${incidentId}`);
-  }
-
-  // ─── Incident Templates ───
-
-  async listIncidentTemplates(): Promise<any[]> {
-    let response = await this.api.get(`/pages/${this.pageId}/incident_templates`);
-    return response.data;
-  }
-
-  // ─── Subscribers ───
-
-  async listSubscribers(params?: {
-    type?: string;
-    state?: string;
-    limit?: number;
-    page?: number;
-    sortField?: string;
-    sortDirection?: string;
-  }): Promise<any[]> {
-    let queryParams: Record<string, any> = {};
-    if (params?.type) queryParams.type = params.type;
-    if (params?.state) queryParams.state = params.state;
-    if (params?.limit) queryParams.per_page = params.limit;
-    if (params?.page) queryParams.page = params.page;
-    if (params?.sortField) queryParams.sort_field = params.sortField;
-    if (params?.sortDirection) queryParams.sort_direction = params.sortDirection;
-    let response = await this.api.get(`/pages/${this.pageId}/subscribers`, {
-      params: queryParams
-    });
-    return response.data;
-  }
-
-  async getSubscriber(subscriberId: string): Promise<any> {
-    let response = await this.api.get(`/pages/${this.pageId}/subscribers/${subscriberId}`);
-    return response.data;
-  }
-
-  async createSubscriber(data: Record<string, any>): Promise<any> {
-    let response = await this.api.post(`/pages/${this.pageId}/subscribers`, {
-      subscriber: data
-    });
-    return response.data;
-  }
-
-  async unsubscribeSubscriber(subscriberId: string): Promise<void> {
-    await this.api.delete(`/pages/${this.pageId}/subscribers/${subscriberId}`);
-  }
-
-  async resubscribeSubscriber(subscriberId: string): Promise<any> {
-    let response = await this.api.post(
-      `/pages/${this.pageId}/subscribers/${subscriberId}/resubscribe`
+  async getIncident(id: string) {
+    return this.parse(
+      incidentSchema,
+      (await this.api.get(`${this.pagePath()}/incidents/${pathId(id)}`)).data
     );
-    return response.data;
   }
-
-  // ─── Incident Subscribers ───
-
-  async listIncidentSubscribers(incidentId: string): Promise<any[]> {
-    let response = await this.api.get(
-      `/pages/${this.pageId}/incidents/${incidentId}/subscribers`
+  async createIncident(data: Fields) {
+    if (typeof data.name !== 'string' || !data.name.trim())
+      throw createApiServiceError('name is required to create this resource.');
+    return this.parse(
+      incidentSchema,
+      (await this.api.post(`${this.pagePath()}/incidents`, { incident: data })).data
     );
-    return response.data;
   }
-
-  async createIncidentSubscriber(incidentId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.api.post(
-      `/pages/${this.pageId}/incidents/${incidentId}/subscribers`,
-      { subscriber: data }
+  async updateIncident(id: string, data: Fields) {
+    requireUpdate(data);
+    return this.parse(
+      incidentSchema,
+      (await this.api.patch(`${this.pagePath()}/incidents/${pathId(id)}`, { incident: data }))
+        .data
     );
-    return response.data;
   }
-
-  // ─── Metrics ───
-
-  async listMetrics(): Promise<any[]> {
-    let response = await this.api.get(`/pages/${this.pageId}/metrics`);
-    return response.data;
+  async deleteIncident(id: string) {
+    await this.api.delete(`${this.pagePath()}/incidents/${pathId(id)}`);
   }
-
-  async getMetric(metricId: string): Promise<any> {
-    let response = await this.api.get(`/pages/${this.pageId}/metrics/${metricId}`);
-    return response.data;
+  async getMetric(id: string) {
+    return this.parse(
+      metricSchema,
+      (await this.api.get(`${this.pagePath()}/metrics/${pathId(id)}`)).data
+    );
   }
-
-  async createMetric(data: Record<string, any>): Promise<any> {
-    let response = await this.api.post(`/pages/${this.pageId}/metrics`, { metric: data });
-    return response.data;
+  async updateMetric(id: string, data: Fields) {
+    requireUpdate(data);
+    return this.parse(
+      metricSchema,
+      (await this.api.patch(`${this.pagePath()}/metrics/${pathId(id)}`, { metric: data })).data
+    );
   }
-
-  async updateMetric(metricId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.api.patch(`/pages/${this.pageId}/metrics/${metricId}`, {
-      metric: data
+  async deleteMetric(id: string) {
+    await this.api.delete(`${this.pagePath()}/metrics/${pathId(id)}`);
+  }
+  async getSubscriber(id: string) {
+    return this.parse(
+      subscriberSchema,
+      (await this.api.get(`${this.pagePath()}/subscribers/${pathId(id)}`)).data
+    );
+  }
+  async createSubscriber(data: Fields) {
+    return this.parse(
+      subscriberSchema,
+      (await this.api.post(`${this.pagePath()}/subscribers`, { subscriber: data })).data
+    );
+  }
+  async listComponents(params: Pagination = {}) {
+    validatePagination(params);
+    return this.parse(
+      z.array(componentSchema),
+      (
+        await this.api.get(`${this.pagePath()}/components`, {
+          params: pickDefined({ per_page: params.limit, page: params.page })
+        })
+      ).data
+    );
+  }
+  async listComponentGroups(params: Pagination = {}) {
+    validatePagination(params);
+    return this.parse(
+      z.array(groupSchema),
+      (
+        await this.api.get(`${this.pagePath()}/component-groups`, {
+          params: pickDefined({ per_page: params.limit, page: params.page })
+        })
+      ).data
+    );
+  }
+  async listIncidentTemplates(params: Pagination = {}) {
+    validatePagination(params);
+    return this.parse(
+      z.array(templateSchema),
+      (
+        await this.api.get(`${this.pagePath()}/incident_templates`, {
+          params: pickDefined({ per_page: params.limit, page: params.page })
+        })
+      ).data
+    );
+  }
+  async listMetrics(params: Pagination = {}) {
+    validatePagination(params);
+    return this.parse(
+      z.array(metricSchema),
+      (
+        await this.api.get(`${this.pagePath()}/metrics`, {
+          params: pickDefined({ per_page: params.limit, page: params.page })
+        })
+      ).data
+    );
+  }
+  async createComponentGroup(data: Fields) {
+    if (typeof data.name !== 'string' || !data.name.trim())
+      throw createApiServiceError('name is required to create a component group.');
+    const { description, ...group } = data;
+    return this.parse(
+      groupSchema,
+      (
+        await this.api.post(
+          `${this.pagePath()}/component-groups`,
+          pickDefined({
+            description,
+            component_group: { ...group, components: data.components ?? [] }
+          })
+        )
+      ).data
+    );
+  }
+  async updateComponentGroup(id: string, data: Fields) {
+    requireUpdate(data);
+    const endpoint = `${this.pagePath()}/component-groups/${pathId(id)}`;
+    const current = this.parse(groupSchema, (await this.api.get(endpoint)).data);
+    // Both fields are required by the provider, even for a partial edit.
+    await delay(1100);
+    return this.parse(
+      groupSchema,
+      (
+        await this.api.patch(
+          endpoint,
+          pickDefined({
+            description: data.description,
+            component_group: {
+              name: data.name ?? current.name,
+              components: data.components ?? groupComponentIds(current) ?? []
+            }
+          })
+        )
+      ).data
+    );
+  }
+  async deleteComponentGroup(id: string) {
+    await this.api.delete(`${this.pagePath()}/component-groups/${pathId(id)}`);
+  }
+  async listIncidents(params: Pagination & { query?: string; filter?: string } = {}) {
+    validatePagination(params);
+    const filtered = params.filter === 'unresolved' || params.filter === 'scheduled';
+    if (filtered && params.query !== undefined)
+      throw createApiServiceError('query is supported only with filter="all".');
+    return this.parse(
+      z.array(incidentSchema),
+      (
+        await this.api.get(
+          `${this.pagePath()}/incidents${filtered ? `/${params.filter}` : ''}`,
+          {
+            params: pickDefined(
+              filtered
+                ? { per_page: params.limit, page: params.page }
+                : { q: params.query, limit: params.limit, page: params.page }
+            )
+          }
+        )
+      ).data
+    );
+  }
+  async listSubscribers(
+    params: Pagination & {
+      type?: string;
+      state?: string;
+      sortField?: string;
+      sortDirection?: string;
+      query?: string;
+    } = {}
+  ) {
+    validatePagination(params, 0, params.query ? 100 : Number.MAX_SAFE_INTEGER);
+    if (
+      params.sortField &&
+      !['primary', 'created_at', 'quarantined_at', 'relevance'].includes(params.sortField)
+    )
+      throw createApiServiceError(
+        'sortField must be primary, created_at, quarantined_at, or relevance.'
+      );
+    if (params.sortField === 'relevance' && !params.query)
+      throw createApiServiceError('Sorting by relevance requires query.');
+    return this.parse(
+      z.array(subscriberSchema),
+      (
+        await this.api.get(`${this.pagePath()}/subscribers`, {
+          params: pickDefined({
+            type: params.type,
+            state: params.state,
+            limit: params.limit,
+            page: params.page,
+            sort_field: params.sortField,
+            sort_direction: params.sortDirection,
+            q: params.query
+          })
+        })
+      ).data
+    );
+  }
+  async unsubscribeSubscriber(id: string, skipNotification?: boolean) {
+    await this.api.delete(`${this.pagePath()}/subscribers/${pathId(id)}`, {
+      params: pickDefined({ skip_unsubscription_notification: skipNotification })
     });
-    return response.data;
   }
-
-  async deleteMetric(metricId: string): Promise<void> {
-    await this.api.delete(`/pages/${this.pageId}/metrics/${metricId}`);
+  async listMetricsProviders() {
+    return this.parse(
+      z.array(metricsProviderSchema),
+      (await this.api.get(`${this.pagePath()}/metrics_providers`)).data
+    );
   }
-
-  async submitMetricData(
-    metricId: string,
-    dataPoints: { timestamp: number; value: number }[]
-  ): Promise<any> {
-    let response = await this.api.post(`/pages/${this.pageId}/metrics/${metricId}/data`, {
-      data: dataPoints
+  async createMetric(providerId: string, data: Fields) {
+    return this.parse(
+      metricSchema,
+      (
+        await this.api.post(
+          `${this.pagePath()}/metrics_providers/${pathId(providerId)}/metrics`,
+          { metric: data }
+        )
+      ).data
+    );
+  }
+  async submitMetricData(id: string, dataPoints: { timestamp: number; value: number }[]) {
+    pathId(id, 'metricId');
+    if (!dataPoints.length)
+      throw createApiServiceError('Provide at least one metric data point.');
+    const now = Math.floor(Date.now() / 1000);
+    for (const point of dataPoints)
+      if (
+        !Number.isInteger(point.timestamp) ||
+        point.timestamp < now - 28 * 86400 ||
+        point.timestamp > now ||
+        !Number.isFinite(point.value)
+      )
+        throw createApiServiceError(
+          'Metric timestamps must be whole Unix seconds within the past 28 days; values must be finite numbers.'
+        );
+    const response = await this.api.post(`${this.pagePath()}/metrics/data`, {
+      data: { [id]: dataPoints }
     });
-    return response.data;
-  }
-
-  // ─── Postmortems ───
-
-  async getPostmortem(incidentId: string): Promise<any> {
-    let response = await this.api.get(
-      `/pages/${this.pageId}/incidents/${incidentId}/postmortem`
+    if (response.status !== 202)
+      throw createApiServiceError(
+        'Statuspage did not confirm acceptance of the metric batch.'
+      );
+    const accepted = this.parse(
+      z.record(z.string(), z.array(z.object({ timestamp: z.number(), value: z.number() }))),
+      response.data
     );
-    return response.data;
+    if (
+      !accepted[id] ||
+      accepted[id].length !== dataPoints.length ||
+      accepted[id].some(
+        (point, index) =>
+          point.value !== dataPoints[index]?.value ||
+          Math.abs(point.timestamp - (dataPoints[index]?.timestamp ?? 0)) > 30
+      )
+    )
+      throw createApiServiceError(
+        'Statuspage did not acknowledge all submitted metric points. Check metric data before repeating the write.'
+      );
+    return accepted;
   }
-
-  async createOrUpdatePostmortem(incidentId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.api.put(
-      `/pages/${this.pageId}/incidents/${incidentId}/postmortem`,
-      { postmortem: data }
+  async getPostmortem(id: string) {
+    return this.parse(
+      postmortemSchema,
+      (await this.api.get(`${this.pagePath()}/incidents/${pathId(id)}/postmortem`)).data
     );
-    return response.data;
   }
-
-  async publishPostmortem(
-    incidentId: string,
-    notifySubscribers: boolean,
-    notifyTwitter: boolean
-  ): Promise<any> {
-    let response = await this.api.put(
-      `/pages/${this.pageId}/incidents/${incidentId}/postmortem/publish`,
-      {
-        postmortem: {
-          notify_subscribers: notifySubscribers,
-          notify_twitter: notifyTwitter
-        }
-      }
+  async createOrUpdatePostmortem(id: string, body: string) {
+    return this.parse(
+      postmortemSchema,
+      (
+        await this.api.put(`${this.pagePath()}/incidents/${pathId(id)}/postmortem`, {
+          postmortem: { body_draft: body }
+        })
+      ).data
     );
-    return response.data;
   }
-
-  async revertPostmortem(incidentId: string): Promise<any> {
-    let response = await this.api.put(
-      `/pages/${this.pageId}/incidents/${incidentId}/postmortem/revert`
+  async publishPostmortem(id: string, notifySubscribers: boolean, notifyTwitter: boolean) {
+    return this.parse(
+      postmortemSchema,
+      (
+        await this.api.put(`${this.pagePath()}/incidents/${pathId(id)}/postmortem/publish`, {
+          postmortem: { notify_subscribers: notifySubscribers, notify_twitter: notifyTwitter }
+        })
+      ).data
     );
-    return response.data;
+  }
+  async revertPostmortem(id: string) {
+    return this.parse(
+      postmortemSchema,
+      (await this.api.put(`${this.pagePath()}/incidents/${pathId(id)}/postmortem/revert`)).data
+    );
   }
 }

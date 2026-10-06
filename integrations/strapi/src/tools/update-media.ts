@@ -28,10 +28,7 @@ export let updateMedia = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let fileInfo: { name?: string; alternativeText?: string; caption?: string } = {};
     if (ctx.input.name !== undefined) fileInfo.name = ctx.input.name;

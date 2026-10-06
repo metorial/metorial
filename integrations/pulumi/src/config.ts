@@ -2,18 +2,14 @@ import { SlateConfig } from 'slates';
 import { z } from 'zod';
 
 export let config = SlateConfig.create(
-  z.object({
-    baseUrl: z
-      .string()
-      .default('https://api.pulumi.com')
-      .describe(
-        'Pulumi Cloud API base URL. Use default for managed service, or specify custom URL for self-hosted instances.'
-      ),
-    organization: z
-      .string()
-      .optional()
-      .describe(
-        'Default Pulumi organization name. If set, used as default for all operations.'
-      )
-  })
+  z
+    .object({
+      organization: z
+        .string()
+        .optional()
+        .describe(
+          'Optional default organization login. Call get_current_user to discover authorized organizations; individual tools can choose another organization.'
+        )
+    })
+    .passthrough()
 );

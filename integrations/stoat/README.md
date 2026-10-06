@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Revolt
 
-Send, edit, delete, and search messages in channels and DMs. Manage servers, channels, roles, and permissions. Create and configure bots and webhooks. Handle user relationships (friends, blocks), server members (kick, ban, roles, nicknames), and custom emoji. Upload file attachments, pin messages, add reactions, and manage invite links. Receive real-time events for messages, channel updates, server changes, and user activity via WebSocket.
+Send, edit, delete, and search messages in channels and DMs. Manage servers, channels, roles, and permissions. Create and configure bots and webhooks. Handle user relationships (friends, blocks), server members (kick, ban, roles, nicknames), and custom emoji. Upload file attachments, pin messages, add reactions, and manage invite links.
 
 ## License
 

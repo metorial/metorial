@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HoneybadgerClient } from '../lib/client';
+import type { Fault } from '../lib/types';
+import { nextUrlSchema, projectIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 let faultSchema = z.object({
@@ -17,7 +19,7 @@ let faultSchema = z.object({
   createdAt: z.string().optional().describe('When the error was first seen'),
   lastNoticeAt: z.string().optional().describe('When the error last occurred'),
   tags: z.array(z.string()).optional().describe('Tags associated with the error'),
-  assignee: z.any().optional().describe('User assigned to this error'),
+  assignee: z.unknown().optional().describe('User assigned to this error'),
   url: z.string().optional().describe('URL to view error in Honeybadger')
 });
 
@@ -36,7 +38,8 @@ export let searchErrors = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project ID to search errors in'),
+      nextUrl: nextUrlSchema,
+      projectId: projectIdSchema,
       query: z
         .string()
         .optional()
@@ -61,14 +64,19 @@ export let searchErrors = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextUrl: z
+        .string()
+        .optional()
+        .describe('Next-page URL, when another page may be available'),
       faults: z.array(faultSchema).describe('List of matching errors'),
       totalCount: z.number().optional().describe('Total number of matching faults')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HoneybadgerClient({ token: ctx.auth.token });
+    let client = new HoneybadgerClient(ctx.auth);
     let data = await client.listFaults(ctx.input.projectId, {
       q: ctx.input.query,
+      nextUrl: ctx.input.nextUrl,
       createdAfter: ctx.input.createdAfter,
       occurredAfter: ctx.input.occurredAfter,
       occurredBefore: ctx.input.occurredBefore,
@@ -77,27 +85,28 @@ export let searchErrors = SlateTool.create(spec, {
     });
 
     let results = data.results || [];
-    let faults = results.map((f: any) => ({
-      faultId: f.id,
-      projectId: f.project_id,
-      klass: f.klass,
-      message: f.message,
-      component: f.component,
-      action: f.action,
-      environment: f.environment,
-      resolved: f.resolved,
-      ignored: f.ignored,
-      noticesCount: f.notices_count,
-      createdAt: f.created_at,
-      lastNoticeAt: f.last_notice_at,
-      tags: f.tags,
-      assignee: f.assignee,
-      url: f.url
+    let faults = results.map((f: Fault) => ({
+      faultId: f.id ?? undefined,
+      projectId: f.project_id ?? undefined,
+      klass: f.klass ?? undefined,
+      message: f.message ?? undefined,
+      component: f.component ?? undefined,
+      action: f.action ?? undefined,
+      environment: f.environment ?? undefined,
+      resolved: f.resolved ?? undefined,
+      ignored: f.ignored ?? undefined,
+      noticesCount: f.notices_count ?? undefined,
+      createdAt: f.created_at ?? undefined,
+      lastNoticeAt: f.last_notice_at ?? undefined,
+      tags: f.tags ?? undefined,
+      assignee: f.assignee ?? undefined,
+      url: f.url ?? undefined
     }));
 
     return {
       output: {
         faults,
+        nextUrl: data.links?.next ?? undefined,
         totalCount: data.total_count
       },
       message: `Found **${faults.length}** error(s) in project ${ctx.input.projectId}.`

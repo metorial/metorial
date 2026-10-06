@@ -30,9 +30,19 @@ export let searchPoints = SlateTool.create(spec, {
         .any()
         .optional()
         .describe('Filter conditions to narrow search (Qdrant filter syntax)'),
-      limit: z.number().optional().describe('Maximum number of results (default: 10)'),
-      offset: z.number().optional().describe('Number of results to skip'),
-      scoreThreshold: z.number().optional().describe('Minimum score threshold for results'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum number of results (default: 10)'),
+      offset: z.number().int().nonnegative().optional().describe('Number of results to skip'),
+      scoreThreshold: z
+        .number()
+        .optional()
+        .describe(
+          'Return scores better than this threshold; the comparison direction depends on the distance metric.'
+        ),
       vectorName: z
         .string()
         .optional()
@@ -51,7 +61,12 @@ export let searchPoints = SlateTool.create(spec, {
         .describe('Prefetch configuration for hybrid/multi-stage search'),
       searchParams: z
         .object({
-          hnswEf: z.number().optional().describe('HNSW ef parameter for search accuracy'),
+          hnswEf: z
+            .number()
+            .int()
+            .positive()
+            .optional()
+            .describe('HNSW ef parameter for search accuracy'),
           exact: z.boolean().optional().describe('Use exact search instead of approximate')
         })
         .optional()
@@ -75,7 +90,7 @@ export let searchPoints = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 

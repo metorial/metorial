@@ -14,8 +14,6 @@ import {
   getWiimsTool,
   searchNewsTool
 } from './tools';
-import { newsWebhookTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     getShortInterestTool,
     getWiimsTool
   ],
-  triggers: [newsWebhookTrigger]
+  triggers: []
 });

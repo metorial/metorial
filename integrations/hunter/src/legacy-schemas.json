@@ -1,0 +1,2087 @@
+{
+  "domain_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "domain": {
+          "description": "Domain name to search (e.g., \"stripe.com\"). Either domain or companyName is required.",
+          "type": "string"
+        },
+        "companyName": {
+          "description": "Company name to search. Either domain or companyName is required.",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of results to return (1-100, default 10)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        },
+        "type": {
+          "description": "Filter by email type",
+          "type": "string",
+          "enum": ["personal", "generic"]
+        },
+        "seniority": {
+          "description": "Filter by seniority level (e.g., \"senior\", \"executive\", \"junior\")",
+          "type": "string"
+        },
+        "department": {
+          "description": "Filter by department (e.g., \"executive\", \"engineering\", \"marketing\")",
+          "type": "string"
+        },
+        "verificationStatus": {
+          "description": "Filter by verification status",
+          "type": "string",
+          "enum": ["valid", "invalid", "accept_all", "unknown"]
+        },
+        "location": {
+          "description": "Filter by location of the contacts",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "The domain searched"
+        },
+        "organization": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Organization name"
+        },
+        "emailCount": {
+          "type": "number",
+          "description": "Total number of emails found"
+        },
+        "emails": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "string",
+                "description": "The email address"
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Type of email: personal or generic"
+              },
+              "confidence": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Confidence score from 0 to 100"
+              },
+              "firstName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "First name of the contact"
+              },
+              "lastName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Last name of the contact"
+              },
+              "position": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Job position of the contact"
+              },
+              "seniority": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Seniority level of the contact"
+              },
+              "department": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Department of the contact"
+              },
+              "linkedin": {
+                "description": "LinkedIn URL",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "twitter": {
+                "description": "Twitter handle",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "phoneNumber": {
+                "description": "Phone number",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "verificationStatus": {
+                "description": "Email verification status",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "value",
+              "type",
+              "confidence",
+              "firstName",
+              "lastName",
+              "position",
+              "seniority",
+              "department"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of email addresses found"
+        },
+        "pattern": {
+          "description": "Most common email pattern for this domain",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["domain", "organization", "emailCount", "emails"],
+      "additionalProperties": false
+    }
+  },
+  "find_email": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "domain": {
+          "description": "Domain of the company (e.g., \"stripe.com\")",
+          "type": "string"
+        },
+        "companyName": {
+          "description": "Company name to search",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "First name of the person",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Last name of the person",
+          "type": "string"
+        },
+        "fullName": {
+          "description": "Full name of the person (alternative to firstName + lastName)",
+          "type": "string"
+        },
+        "linkedinHandle": {
+          "description": "LinkedIn handle or profile URL of the person",
+          "type": "string"
+        },
+        "maxDuration": {
+          "description": "Max time in seconds (3-20) for the search to refine results",
+          "type": "number",
+          "minimum": 3,
+          "maximum": 20
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The email address found"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Confidence score from 0 to 100"
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First name of the person"
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last name of the person"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Job position of the person"
+        },
+        "company": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Company name"
+        },
+        "domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Domain used for the search"
+        },
+        "linkedin": {
+          "description": "LinkedIn URL",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "twitter": {
+          "description": "Twitter handle",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phoneNumber": {
+          "description": "Phone number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "verificationStatus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Verification status of the email"
+        }
+      },
+      "required": [
+        "email",
+        "score",
+        "firstName",
+        "lastName",
+        "position",
+        "company",
+        "domain",
+        "verificationStatus"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "verify_email": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The email address to verify"
+        }
+      },
+      "required": ["email"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The email address verified"
+        },
+        "status": {
+          "type": "string",
+          "description": "Verification status: valid, invalid, accept_all, webmail, disposable, or unknown"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Confidence score from 0 to 100"
+        },
+        "regexp": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the email passes regex validation"
+        },
+        "gibberish": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the email appears to be gibberish"
+        },
+        "disposable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the email is from a disposable provider"
+        },
+        "webmail": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the email is from a webmail provider"
+        },
+        "mxRecords": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether MX records are found for the domain"
+        },
+        "smtpServer": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the SMTP server is reachable"
+        },
+        "smtpCheck": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the SMTP check passed"
+        },
+        "acceptAll": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the server accepts all emails"
+        }
+      },
+      "required": [
+        "email",
+        "status",
+        "score",
+        "regexp",
+        "gibberish",
+        "disposable",
+        "webmail",
+        "mxRecords",
+        "smtpServer",
+        "smtpCheck",
+        "acceptAll"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "enrich_person": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "description": "Email address of the person to enrich",
+          "type": "string"
+        },
+        "linkedinHandle": {
+          "description": "LinkedIn handle or profile URL of the person",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Email address"
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First name"
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last name"
+        },
+        "fullName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Full name"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Country"
+        },
+        "city": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "City"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "State"
+        },
+        "linkedinUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "LinkedIn profile URL"
+        },
+        "twitter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Twitter handle"
+        },
+        "github": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "GitHub handle"
+        },
+        "facebook": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Facebook URL"
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Phone number"
+        },
+        "company": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Current company name"
+        },
+        "companyDomain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Current company domain"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Current job position"
+        }
+      },
+      "required": [
+        "email",
+        "firstName",
+        "lastName",
+        "fullName",
+        "country",
+        "city",
+        "state",
+        "linkedinUrl",
+        "twitter",
+        "github",
+        "facebook",
+        "phone",
+        "company",
+        "companyDomain",
+        "position"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "enrich_company": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "Domain name of the company (e.g., \"stripe.com\")"
+        }
+      },
+      "required": ["domain"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Company domain"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Company name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Company description"
+        },
+        "industry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Industry classification"
+        },
+        "headcount": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Employee count range"
+        },
+        "foundedYear": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Year the company was founded"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Headquarters country"
+        },
+        "city": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Headquarters city"
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Headquarters state"
+        },
+        "linkedinUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "LinkedIn company page URL"
+        },
+        "twitterHandle": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Twitter handle"
+        },
+        "facebookHandle": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Facebook page URL"
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Phone number"
+        },
+        "technologies": {
+          "description": "Technologies used by the company",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags": {
+          "description": "Category tags",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "domain",
+        "name",
+        "description",
+        "industry",
+        "headcount",
+        "foundedYear",
+        "country",
+        "city",
+        "state",
+        "linkedinUrl",
+        "twitterHandle",
+        "facebookHandle",
+        "phone"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "discover_companies": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Natural language search query (e.g., \"US-based Software companies\"). Automatically maps to structured filters.",
+          "type": "string"
+        },
+        "industry": {
+          "description": "Filter by industry (e.g., [\"Software\", \"Internet\"])",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "companyType": {
+          "description": "Filter by company type (e.g., [\"private\", \"public\"])",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "headquartersCountry": {
+          "description": "Filter by headquarters country",
+          "type": "string"
+        },
+        "headquartersState": {
+          "description": "Filter by headquarters state",
+          "type": "string"
+        },
+        "headquartersCity": {
+          "description": "Filter by headquarters city",
+          "type": "string"
+        },
+        "headcountMin": {
+          "description": "Minimum employee headcount",
+          "type": "number"
+        },
+        "headcountMax": {
+          "description": "Maximum employee headcount",
+          "type": "number"
+        },
+        "limit": {
+          "description": "Maximum number of results (1-100)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of companies matching the query"
+        },
+        "companies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "domain": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Company domain"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Company name"
+              },
+              "industry": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Industry"
+              },
+              "headcount": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Employee count range"
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Headquarters country"
+              },
+              "city": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Headquarters city"
+              },
+              "emailCount": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of email addresses available"
+              }
+            },
+            "required": [
+              "domain",
+              "name",
+              "industry",
+              "headcount",
+              "country",
+              "city",
+              "emailCount"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of discovered companies"
+        }
+      },
+      "required": ["totalCount", "companies"],
+      "additionalProperties": false
+    }
+  },
+  "email_count": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "domain": {
+          "description": "Domain name to count emails for (e.g., \"stripe.com\")",
+          "type": "string"
+        },
+        "companyName": {
+          "description": "Company name to count emails for",
+          "type": "string"
+        },
+        "type": {
+          "description": "Filter by email type",
+          "type": "string",
+          "enum": ["personal", "generic"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "number",
+          "description": "Total number of email addresses found"
+        },
+        "personalEmails": {
+          "type": "number",
+          "description": "Number of personal email addresses"
+        },
+        "genericEmails": {
+          "type": "number",
+          "description": "Number of generic email addresses"
+        },
+        "departments": {
+          "description": "Breakdown by department",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "department": {
+                "type": "string",
+                "description": "Department name"
+              },
+              "count": {
+                "type": "number",
+                "description": "Number of emails in this department"
+              }
+            },
+            "required": ["department", "count"],
+            "additionalProperties": false
+          }
+        },
+        "seniorities": {
+          "description": "Breakdown by seniority level",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "seniority": {
+                "type": "string",
+                "description": "Seniority level"
+              },
+              "count": {
+                "type": "number",
+                "description": "Number of emails at this seniority level"
+              }
+            },
+            "required": ["seniority", "count"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["total", "personalEmails", "genericEmails"],
+      "additionalProperties": false
+    }
+  },
+  "manage_lead": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "upsert"],
+          "description": "Action to perform"
+        },
+        "leadId": {
+          "description": "Lead ID (required for \"update\" action)",
+          "type": "number"
+        },
+        "email": {
+          "description": "Email address (required for \"create\" and \"upsert\")",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "First name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Last name",
+          "type": "string"
+        },
+        "position": {
+          "description": "Job position",
+          "type": "string"
+        },
+        "company": {
+          "description": "Company name",
+          "type": "string"
+        },
+        "companyIndustry": {
+          "description": "Company industry",
+          "type": "string"
+        },
+        "companySize": {
+          "description": "Company size (number of employees)",
+          "type": "number"
+        },
+        "website": {
+          "description": "Company website",
+          "type": "string"
+        },
+        "countryCode": {
+          "description": "Two-letter country code",
+          "type": "string"
+        },
+        "linkedinUrl": {
+          "description": "LinkedIn URL",
+          "type": "string"
+        },
+        "phoneNumber": {
+          "description": "Phone number",
+          "type": "string"
+        },
+        "twitter": {
+          "description": "Twitter handle",
+          "type": "string"
+        },
+        "notes": {
+          "description": "Notes about the lead",
+          "type": "string"
+        },
+        "leadListId": {
+          "description": "Lead list ID to assign the lead to",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "type": "number",
+          "description": "Lead ID"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Email address"
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First name"
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last name"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Job position"
+        },
+        "company": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Company name"
+        },
+        "companyIndustry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Company industry"
+        },
+        "companySize": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Company size"
+        },
+        "website": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Website URL"
+        },
+        "countryCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Country code"
+        },
+        "linkedinUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "LinkedIn URL"
+        },
+        "phoneNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Phone number"
+        },
+        "twitter": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Twitter handle"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Notes"
+        },
+        "verificationStatus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Email verification status"
+        }
+      },
+      "required": [
+        "leadId",
+        "email",
+        "firstName",
+        "lastName",
+        "position",
+        "company",
+        "companyIndustry",
+        "companySize",
+        "website",
+        "countryCode",
+        "linkedinUrl",
+        "phoneNumber",
+        "twitter",
+        "notes",
+        "verificationStatus"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "list_leads": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Number of leads to return (1-1000, default 20)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "offset": {
+          "description": "Offset for pagination (max 100000)",
+          "type": "number"
+        },
+        "leadListId": {
+          "description": "Filter leads by a specific list ID",
+          "type": "number"
+        },
+        "email": {
+          "description": "Filter by email address",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "Filter by first name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Filter by last name",
+          "type": "string"
+        },
+        "company": {
+          "description": "Filter by company name",
+          "type": "string"
+        },
+        "industry": {
+          "description": "Filter by industry",
+          "type": "string"
+        },
+        "verificationStatus": {
+          "description": "Filter by verification status",
+          "type": "string"
+        },
+        "sendingStatus": {
+          "description": "Filter by sending status",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "leadId": {
+                "type": "number",
+                "description": "Lead ID"
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Email address"
+              },
+              "firstName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "First name"
+              },
+              "lastName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Last name"
+              },
+              "position": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Job position"
+              },
+              "company": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Company name"
+              },
+              "companyIndustry": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Company industry"
+              },
+              "website": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Website URL"
+              },
+              "countryCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Country code"
+              },
+              "linkedinUrl": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "LinkedIn URL"
+              },
+              "verificationStatus": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Verification status"
+              }
+            },
+            "required": [
+              "leadId",
+              "email",
+              "firstName",
+              "lastName",
+              "position",
+              "company",
+              "companyIndustry",
+              "website",
+              "countryCode",
+              "linkedinUrl",
+              "verificationStatus"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of leads"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of leads matching filters"
+        }
+      },
+      "required": ["leads", "total"],
+      "additionalProperties": false
+    }
+  },
+  "delete_lead": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "type": "number",
+          "description": "ID of the lead to delete"
+        }
+      },
+      "required": ["leadId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "type": "number",
+          "description": "ID of the deleted lead"
+        },
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the lead was successfully deleted"
+        }
+      },
+      "required": ["leadId", "deleted"],
+      "additionalProperties": false
+    }
+  },
+  "manage_leads_list": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "get", "create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "listId": {
+          "description": "List ID (required for get, update, delete)",
+          "type": "number"
+        },
+        "name": {
+          "description": "List name (required for create and update)",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Number of lists to return (for list action, 1-100, default 20)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "offset": {
+          "description": "Offset for pagination (for list action)",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "lists": {
+          "description": "List of leads lists (for \"list\" action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "listId": {
+                "type": "number",
+                "description": "List ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "List name"
+              },
+              "leadsCount": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of leads in the list"
+              }
+            },
+            "required": ["listId", "name", "leadsCount"],
+            "additionalProperties": false
+          }
+        },
+        "list": {
+          "description": "Single list (for get, create, update actions)",
+          "type": "object",
+          "properties": {
+            "listId": {
+              "type": "number",
+              "description": "List ID"
+            },
+            "name": {
+              "type": "string",
+              "description": "List name"
+            },
+            "leadsCount": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Number of leads in the list"
+            }
+          },
+          "required": ["listId", "name", "leadsCount"],
+          "additionalProperties": false
+        },
+        "deleted": {
+          "description": "Whether the list was deleted (for delete action)",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_sequence": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "list_recipients", "add_recipients", "cancel_recipient", "start"],
+          "description": "Action to perform"
+        },
+        "sequenceId": {
+          "description": "Sequence (campaign) ID",
+          "type": "number"
+        },
+        "emails": {
+          "description": "Email addresses to add as recipients (max 50, for add_recipients)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "leadIds": {
+          "description": "Lead IDs to add as recipients (max 50, for add_recipients)",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "recipientEmail": {
+          "description": "Email of recipient to cancel (for cancel_recipient)",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Number of results to return (for list and list_recipients)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sequences": {
+          "description": "List of sequences (for list action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sequenceId": {
+                "type": "number",
+                "description": "Sequence ID"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Sequence name"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Sequence status"
+              },
+              "recipientsCount": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Number of recipients"
+              }
+            },
+            "required": ["sequenceId", "name", "status", "recipientsCount"],
+            "additionalProperties": false
+          }
+        },
+        "recipients": {
+          "description": "List of recipients (for list_recipients action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "Recipient email"
+              },
+              "firstName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "First name"
+              },
+              "lastName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Last name"
+              },
+              "sendingStatus": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Sending status"
+              }
+            },
+            "required": ["email", "firstName", "lastName", "sendingStatus"],
+            "additionalProperties": false
+          }
+        },
+        "recipientsAdded": {
+          "description": "Number of recipients added (for add_recipients)",
+          "type": "number"
+        },
+        "cancelled": {
+          "description": "Whether scheduled emails were cancelled (for cancel_recipient)",
+          "type": "boolean"
+        },
+        "started": {
+          "description": "Whether the sequence was started (for start)",
+          "type": "boolean"
+        },
+        "recipientsCount": {
+          "description": "Total recipients in the sequence (for start)",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_account": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Account email"
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First name"
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last name"
+        },
+        "planName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Current plan name"
+        },
+        "resetDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Date when usage resets"
+        },
+        "teamId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Team ID"
+        },
+        "searchesUsed": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Number of searches used"
+        },
+        "searchesAvailable": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total searches available"
+        },
+        "verificationsUsed": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Number of verifications used"
+        },
+        "verificationsAvailable": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total verifications available"
+        }
+      },
+      "required": [
+        "email",
+        "firstName",
+        "lastName",
+        "planName",
+        "resetDate",
+        "teamId",
+        "searchesUsed",
+        "searchesAvailable",
+        "verificationsUsed",
+        "verificationsAvailable"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -27,15 +27,23 @@ export let updateTrack = SlateTool.create(spec, {
     z.object({
       trackId: z.string().describe('Unique identifier (URN) of the updated track'),
       title: z.string().describe('Updated title'),
-      permalinkUrl: z.string().describe('URL to the track on SoundCloud'),
-      sharing: z.string().describe('Sharing setting'),
-      genre: z.string().nullable().describe('Genre'),
-      tags: z.string().describe('Tags'),
-      lastModified: z.string().describe('When the track was last modified')
+      permalinkUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('URL to the track on SoundCloud'),
+      sharing: z.string().nullable().optional().describe('Sharing setting'),
+      genre: z.string().nullable().optional().describe('Genre'),
+      tags: z.string().nullable().optional().describe('Tags'),
+      lastModified: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('When the track was last modified')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let track = await client.updateTrack(ctx.input.trackId, {
       title: ctx.input.title,
@@ -48,7 +56,7 @@ export let updateTrack = SlateTool.create(spec, {
 
     return {
       output: {
-        trackId: track.urn || String(track.id),
+        trackId: track.urn,
         title: track.title,
         permalinkUrl: track.permalink_url,
         sharing: track.sharing,
@@ -78,7 +86,7 @@ export let deleteTrack = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     await client.deleteTrack(ctx.input.trackId);
 
@@ -94,7 +102,7 @@ export let uploadTrack = SlateTool.create(spec, {
   key: 'upload_track',
   description: `Upload a new audio track to SoundCloud. Requires base64-encoded audio data. Supported formats: AIFF, WAVE, FLAC, OGG, MP2, MP3, AAC, AMR, WMA. Optionally set metadata and artwork.`,
   constraints: [
-    'Maximum file size is 500MB',
+    'Local base64 upload limit is 64 MiB of audio and 8 MiB of artwork; this is smaller than the provider upload limit',
     'Audio data must be base64-encoded',
     'Requires user-level OAuth authentication (not client credentials)'
   ]
@@ -121,13 +129,17 @@ export let uploadTrack = SlateTool.create(spec, {
     z.object({
       trackId: z.string().describe('Unique identifier (URN) of the uploaded track'),
       title: z.string().describe('Title of the track'),
-      permalinkUrl: z.string().describe('URL to the track on SoundCloud'),
-      sharing: z.string().describe('Sharing setting'),
-      createdAt: z.string().describe('When the track was created')
+      permalinkUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('URL to the track on SoundCloud'),
+      sharing: z.string().nullable().optional().describe('Sharing setting'),
+      createdAt: z.string().nullable().optional().describe('When the track was created')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let track = await client.uploadTrack({
       title: ctx.input.title,
@@ -143,7 +155,7 @@ export let uploadTrack = SlateTool.create(spec, {
 
     return {
       output: {
-        trackId: track.urn || String(track.id),
+        trackId: track.urn,
         title: track.title,
         permalinkUrl: track.permalink_url,
         sharing: track.sharing,

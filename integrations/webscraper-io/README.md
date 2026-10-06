@@ -1,6 +1,6 @@
 # Webscraper Io
 
-Create, manage, and execute web scraping jobs to extract structured data from websites. Define sitemaps with CSS selectors and start URLs, run scraping jobs with configurable drivers (fast or full JavaScript), proxies, and timing controls. Monitor job status and data quality, download scraped data in JSON or CSV format, and schedule recurring scraping jobs using cron expressions. Receive webhook notifications when scraping jobs complete. Retrieve account information and remaining page credits.
+Create, manage, and execute web scraping jobs to extract structured data from websites. Define sitemaps with CSS selectors and start URLs, run scraping jobs with configurable drivers (fast or full JavaScript), proxies, and timing controls. Monitor job status and data quality, download scraped data in JSON or CSV format, and schedule recurring scraping jobs using cron expressions. Retrieve account information and remaining page credits.
 
 ## License
 

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateOpportunity = SlateTool.create(spec, {
@@ -18,7 +18,12 @@ export let updateOpportunity = SlateTool.create(spec, {
       ownerId: z.number().optional().describe('Updated owner user ID'),
       stageId: z.number().optional().describe('Updated pipeline stage ID'),
       value: z.number().optional().describe('Updated opportunity value'),
-      currencyId: z.number().optional().describe('Updated currency ID'),
+      currencyId: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy currency-change input: the current API does not document this update; choose currency at creation'
+        ),
       closeDate: z.string().optional().describe('Updated close date (ISO 8601)'),
       probability: z.number().optional().describe('Updated win probability (0-100)'),
       assigneeId: z.number().optional().describe('Updated assignee user ID'),
@@ -54,7 +59,7 @@ export let updateOpportunity = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let data: Record<string, any> = {};
+    let data: Row = {};
     if (ctx.input.name !== undefined) data.name = ctx.input.name;
     if (ctx.input.ownerId !== undefined) data.owner = ctx.input.ownerId;
     if (ctx.input.stageId !== undefined) data.stage = ctx.input.stageId;

@@ -11,8 +11,7 @@
     "manage connected devices",
     "subscribe to channels",
     "manage chats",
-    "upload files",
-    "receive real-time events"
+    "upload files"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/pushbullet.png"
 }

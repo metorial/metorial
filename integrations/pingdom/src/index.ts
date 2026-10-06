@@ -5,6 +5,7 @@ import {
   createContact,
   createMaintenance,
   createTeam,
+  createTmsCheck,
   deleteCheck,
   deleteContact,
   deleteMaintenance,
@@ -15,6 +16,7 @@ import {
   getAnalysis,
   getCheck,
   getCheckResults,
+  getMaintenance,
   getProbes,
   getSummary,
   getTmsCheck,
@@ -27,16 +29,18 @@ import {
   updateCheck,
   updateContact,
   updateMaintenance,
-  updateTeam
+  updateTeam,
+  updateTmsCheck
 } from './tools';
-import { stateChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     listChecks,
     getCheck,
     createCheck,
+    createTmsCheck,
+    updateTmsCheck,
+    getMaintenance,
     updateCheck,
     deleteCheck,
     getCheckResults,
@@ -62,5 +66,5 @@ export let provider = Slate.create({
     getActions,
     getAnalysis
   ],
-  triggers: [stateChange]
+  triggers: []
 });

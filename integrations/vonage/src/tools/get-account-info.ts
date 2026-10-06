@@ -1,13 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VonageRestClient } from '../lib/client';
+import { invalid, protect } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getAccountInfo = SlateTool.create(spec, {
   name: 'Get Account Info',
   key: 'get_account_info',
   description: `Retrieve Vonage account information including current balance, auto-reload status, and subaccount details.
-Can also create subaccounts and transfer credit or balance between accounts.`,
+Can also create subaccounts using a secret you already hold and transfer credit or balance between accounts. Subaccounts require restricted API access; financial writes can incur retained effects.`,
   instructions: [
     'Use action "balance" to check account balance.',
     'Use action "list_subaccounts" to see all subaccounts.',
@@ -30,6 +31,12 @@ Can also create subaccounts and transfer credit or balance between accounts.`,
           'transfer_balance'
         ])
         .describe('Action to perform'),
+      subaccountSecret: z
+        .string()
+        .optional()
+        .describe(
+          'Caller-held secret for a new subaccount; required before creation and never returned. Keep it securely.'
+        ),
       subaccountName: z
         .string()
         .optional()
@@ -61,6 +68,7 @@ Can also create subaccounts and transfer credit or balance between accounts.`,
     })
   )
   .handleInvocation(async ctx => {
+    protect(ctx.input, [ctx.auth.apiSecret, ctx.auth.privateKey ?? '']);
     let client = new VonageRestClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret
@@ -84,9 +92,10 @@ Can also create subaccounts and transfer credit or balance between accounts.`,
       }
 
       case 'create_subaccount': {
-        if (!ctx.input.subaccountName) throw new Error('subaccountName is required');
+        if (!ctx.input.subaccountName) throw invalid('subaccountName is required');
         let created = await client.createSubaccount({
           name: ctx.input.subaccountName,
+          secret: ctx.input.subaccountSecret,
           usePrimaryAccountBalance: ctx.input.usePrimaryAccountBalance
         });
         return {
@@ -101,7 +110,7 @@ Can also create subaccounts and transfer credit or balance between accounts.`,
           !ctx.input.toAccountApiKey ||
           ctx.input.amount === undefined
         ) {
-          throw new Error('fromAccountApiKey, toAccountApiKey, and amount are required');
+          throw invalid('fromAccountApiKey, toAccountApiKey, and amount are required');
         }
         let creditResult = await client.transferCredit({
           from: ctx.input.fromAccountApiKey,
@@ -121,7 +130,7 @@ Can also create subaccounts and transfer credit or balance between accounts.`,
           !ctx.input.toAccountApiKey ||
           ctx.input.amount === undefined
         ) {
-          throw new Error('fromAccountApiKey, toAccountApiKey, and amount are required');
+          throw invalid('fromAccountApiKey, toAccountApiKey, and amount are required');
         }
         let balResult = await client.transferBalance({
           from: ctx.input.fromAccountApiKey,

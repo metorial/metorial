@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -18,12 +19,12 @@ export let auth = SlateAuth.create()
       apiId: z
         .string()
         .describe(
-          'Your VictorOps API ID (X-VO-Api-Id). Found under Integrations >> API in your VictorOps account.'
+          'Your Splunk On-Call API ID (X-VO-Api-Id). Found under Integrations >> API in your Splunk On-Call account.'
         ),
       apiKey: z
         .string()
         .describe(
-          'Your VictorOps API Key (X-VO-Api-Key). Only admin users can create API keys.'
+          'Your Splunk On-Call API Key (X-VO-Api-Key). Only admin users can create API keys.'
         )
     }),
 
@@ -40,22 +41,7 @@ export let auth = SlateAuth.create()
       output: { apiId: string; token: string };
       input: { apiId: string; apiKey: string };
     }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.victorops.com',
-        headers: {
-          'X-VO-Api-Id': ctx.output.apiId,
-          'X-VO-Api-Key': ctx.output.token
-        }
-      });
-
-      let response = await axios.get('/api-public/v1/user');
-      let users = response.data?.users ?? [];
-
-      return {
-        profile: {
-          name: users.length > 0 ? `${users[0].firstName} ${users[0].lastName}` : undefined,
-          email: users.length > 0 ? users[0].email : undefined
-        }
-      };
+      await new Client(ctx.output).listUsers();
+      return { profile: { name: 'Splunk On-Call organization' } };
     }
   });

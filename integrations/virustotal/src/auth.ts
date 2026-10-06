@@ -1,14 +1,15 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createHash } from 'node:crypto';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client, type VirusTotalAuth } from './lib/client';
+import { credential, opaqueId } from './lib/contracts';
 
-let http = createAxios({
-  baseURL: 'https://www.virustotal.com/api/v3'
-});
-
-export let auth = SlateAuth.create()
+export const auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      username: z.string().optional(),
+      userId: z.string().optional()
     })
   )
   .addTokenAuth({
@@ -19,28 +20,40 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Your VirusTotal API key. Found in your personal settings at virustotal.com.'
+          'Your VirusTotal API key from account settings. Endpoint privileges and licensed quota apply.'
+        ),
+      username: z
+        .string()
+        .optional()
+        .describe(
+          'Your exact VirusTotal account username, used to verify account context without placing the API key in a URL. Optional for existing report workflows.'
         )
     }),
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
+      const token = credential(ctx.input.token),
+        username = ctx.input.username;
+      if (username === undefined) return { output: { token } };
+      opaqueId(username, 'Username');
+      const user = await new Client({ token, username }).getConnectionContext();
+      return { output: { token, username, userId: user.id } };
     },
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await http.get('/users/me', {
-        headers: {
-          'x-apikey': ctx.output.token
-        }
-      });
-      let user = response.data?.data?.attributes;
+    getProfile: async (ctx: { output: VirusTotalAuth }) => {
+      if (!ctx.output.username)
+        return {
+          profile: {
+            id: `api-key-${createHash('sha256').update(ctx.output.token).digest('hex').slice(0, 24)}`,
+            name: 'VirusTotal API key (user not verified)'
+          }
+        };
+      const user = await new Client(ctx.output).getConnectionContext();
       return {
         profile: {
-          id: response.data?.data?.id,
-          name: user?.user ?? user?.first_name,
-          email: user?.email
+          id: user.id,
+          name:
+            [user.attributes?.first_name, user.attributes?.last_name]
+              .filter(Boolean)
+              .join(' ') || user.id,
+          email: user.attributes?.email
         }
       };
     }

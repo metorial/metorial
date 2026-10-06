@@ -6,10 +6,13 @@ import { spec } from '../spec';
 export let updateEntry = SlateTool.create(spec, {
   name: 'Update Entry',
   key: 'update_entry',
-  description: `Update an existing entry in any Strapi content type. Only the fields provided will be updated; other fields remain unchanged. Supports locale-specific updates.`,
+  description: `Update an existing entry in an authorized Strapi content type. Only the fields provided will be updated; other fields remain unchanged. Supports locale-specific updates.`,
   instructions: [
     'Only include fields you want to change — omitted fields are not affected.',
     'For relation fields, use connect/disconnect/set syntax for fine-grained control.'
+  ],
+  constraints: [
+    'Strapi 5 REST writes publish immediately by default when Draft & Publish is enabled. Pass status=draft to keep changes in the draft. Instance hooks can have external effects. For Strapi 4 omit status and use the documented publishedAt field explicitly.'
   ],
   tags: {
     destructive: false
@@ -20,11 +23,18 @@ export let updateEntry = SlateTool.create(spec, {
       contentType: z
         .string()
         .describe('Plural API ID of the content type (e.g., "articles", "products")'),
-      documentId: z.string().describe('Document ID of the entry to update'),
+      documentId: z
+        .string()
+        .describe(
+          'Strapi 5 documentId, or Strapi 4 numeric ID as a string, of the entry to update'
+        ),
       fields: z
         .record(z.string(), z.any())
         .describe('Field values to update (e.g., {"title": "Updated Title"})'),
-      status: z.enum(['draft', 'published']).optional().describe('Publication status to set'),
+      status: z
+        .enum(['draft', 'published'])
+        .optional()
+        .describe('Strapi 5 publication status; omit on Strapi 4 writes'),
       locale: z.string().optional().describe('Locale of the entry to update')
     })
   )
@@ -34,10 +44,7 @@ export let updateEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.updateEntry(
       ctx.input.contentType,

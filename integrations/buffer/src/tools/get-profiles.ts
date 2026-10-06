@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/errors';
 import { spec } from '../spec';
 
 let profileSchema = z.object({
@@ -8,26 +9,48 @@ let profileSchema = z.object({
   service: z
     .string()
     .describe('Social network service name (e.g. twitter, facebook, linkedin)'),
-  serviceUsername: z.string().describe('Username on the social network'),
-  formattedService: z.string().describe('Human-readable service name'),
-  formattedUsername: z.string().describe('Human-readable username'),
-  avatar: z.string().describe('URL of the profile avatar'),
-  isDefault: z.boolean().describe('Whether this is the default profile'),
-  sentCount: z.number().describe('Number of sent updates'),
-  pendingCount: z.number().describe('Number of pending updates'),
-  draftsCount: z.number().describe('Number of draft updates')
+  serviceUsername: z.string().optional().describe('Provider channel name or legacy username'),
+  formattedService: z
+    .string()
+    .optional()
+    .describe('Human-readable service name when supplied'),
+  formattedUsername: z.string().optional().describe('Provider display name when supplied'),
+  avatar: z.string().optional().describe('URL of the profile avatar'),
+  isDefault: z.boolean().optional().describe('Legacy default flag when supplied'),
+  sentCount: z.number().optional().describe('Provider-supplied sent count'),
+  pendingCount: z.number().optional().describe('Provider-supplied pending count'),
+  draftsCount: z.number().optional().describe('Provider-supplied draft count'),
+  organizationId: z
+    .string()
+    .optional()
+    .describe('Current API organization owning this channel'),
+  serviceId: z
+    .string()
+    .optional()
+    .describe('Connected social-account identifier supplied by the current API'),
+  timezone: z.string().optional().describe('Channel timezone supplied by the current API'),
+  isQueuePaused: z
+    .boolean()
+    .optional()
+    .describe('Whether automatic publication from this channel queue is paused')
 });
 
 export let getProfilesTool = SlateTool.create(spec, {
   name: 'Get Profiles',
   key: 'get_profiles',
-  description: `Retrieve connected social media profiles. Returns all profiles linked to the account, or a single profile by ID. Includes service type, username, avatar, and post counts.`,
+  description: `Retrieve connected social media profiles (channels). Read one profile by ID, profiles in a current API organization, or profiles across accessible organizations. Counts are returned only when supplied by the provider.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      organizationId: z
+        .string()
+        .optional()
+        .describe(
+          'Current API organization ID from Get Organizations; omit to discover across accessible organizations.'
+        ),
       profileId: z
         .string()
         .optional()
@@ -42,32 +65,41 @@ export let getProfilesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
-    let profiles: any;
-    if (ctx.input.profileId) {
-      let profile = await client.getProfile(ctx.input.profileId);
-      profiles = [profile];
-    } else {
-      profiles = await client.getProfiles();
-    }
+    const profiles =
+      ctx.input.profileId !== undefined
+        ? [await client.getProfile(ctx.input.profileId)]
+        : await client.getProfiles(ctx.input.organizationId);
+    if (
+      ctx.input.profileId !== undefined &&
+      ctx.input.organizationId !== undefined &&
+      profiles[0]?.organizationId !== ctx.input.organizationId
+    )
+      throw invalid(
+        'The requested profile does not belong to organizationId, or the legacy connection does not expose organizations.'
+      );
 
-    let mapped = profiles.map((p: any) => ({
+    let mapped = profiles.map(p => ({
       profileId: p.id,
       service: p.service,
       serviceUsername: p.serviceUsername,
       formattedService: p.formattedService,
       formattedUsername: p.formattedUsername,
-      avatar: p.avatarHttps || p.avatar,
+      avatar: p.avatar,
       isDefault: p.default,
-      sentCount: p.counts?.sent ?? 0,
-      pendingCount: p.counts?.pending ?? 0,
-      draftsCount: p.counts?.drafts ?? 0
+      sentCount: p.counts?.sent,
+      pendingCount: p.counts?.pending,
+      draftsCount: p.counts?.drafts,
+      organizationId: p.organizationId,
+      serviceId: p.serviceId,
+      timezone: p.timezone,
+      isQueuePaused: p.isQueuePaused
     }));
 
     return {
       output: { profiles: mapped },
-      message: `Retrieved **${mapped.length}** profile(s): ${mapped.map((p: any) => `${p.formattedService} (@${p.serviceUsername})`).join(', ')}.`
+      message: `Retrieved **${mapped.length}** Buffer profile(s).`
     };
   })
   .build();

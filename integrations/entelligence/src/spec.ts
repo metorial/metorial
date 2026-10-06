@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'entelligence',
   name: 'Entelligence',
   description:
-    'AI-powered engineering intelligence platform that provides automated code reviews, codebase documentation generation, natural language codebase chat, and team performance analytics.',
+    'Ask questions about an indexed repository through Entelligence’s chat widget and submit questions to repository owners through its Slack integration.',
   metadata: {},
   config,
   auth

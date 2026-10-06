@@ -1,40 +1,51 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageAccountCampaignMappings = SlateTool.create(spec, {
   name: 'Manage Account Campaign Mappings',
   key: 'manage_account_campaign_mappings',
-  description: `List, create, or remove mappings between email sending accounts and campaigns. These mappings control which accounts send emails for each campaign.`,
+  description:
+    'Read campaigns associated with a sending account, or the sender list of a campaign. The current documented API has no mapping create/delete operation or opaque mapping ID; legacy add/remove actions are retained but cannot execute.',
   instructions: [
-    'Use action "list" to view which accounts are linked to a campaign.',
-    'Use action "add" to link a sending account to a campaign.',
-    'Use action "remove" to unlink an account from a campaign.'
+    'Use list with accountEmail for paginated campaign associations, or campaignId to read the campaign sender list.',
+    'To change senders, use update_campaign with sendingAccounts, which explicitly replaces the full sender list.'
   ]
 })
   .input(
     z.object({
-      action: z.enum(['list', 'add', 'remove']).describe('Action to perform.'),
+      action: z
+        .enum(['list', 'add', 'remove'])
+        .describe('Action. Current documented API supports list only.'),
       campaignId: z
         .string()
         .optional()
-        .describe('Campaign ID (for "list" and "add" actions).'),
+        .describe(
+          'Campaign ID for reading the complete sender list. Retained for legacy add calls.'
+        ),
       accountEmail: z
         .string()
         .optional()
-        .describe('Sending account email address (for "add" action).'),
-      mappingId: z.string().optional().describe('Mapping ID to remove (for "remove" action).'),
+        .describe(
+          'Sending-account email address for paginated association discovery. Retained for legacy add calls.'
+        ),
+      mappingId: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy opaque mapping ID. The current documented API does not expose or delete mappings by ID.'
+        ),
       limit: z
         .number()
         .min(1)
         .max(100)
         .optional()
-        .describe('Number of mappings to return (for "list" action).'),
+        .describe('Page size when reading associations by accountEmail.'),
       startingAfter: z
         .string()
         .optional()
-        .describe('Cursor for pagination (for "list" action).')
+        .describe('Cursor when reading associations by accountEmail.')
     })
   )
   .output(
@@ -42,67 +53,71 @@ export let manageAccountCampaignMappings = SlateTool.create(spec, {
       mappings: z
         .array(
           z.object({
-            mappingId: z.string().describe('Mapping ID'),
-            campaignId: z.string().optional().describe('Campaign ID'),
-            accountEmail: z.string().optional().describe('Account email')
+            mappingId: z
+              .string()
+              .optional()
+              .describe(
+                'Legacy mapping identifier, omitted because current responses contain no mapping ID.'
+              ),
+            campaignId: z.string().optional().describe('Campaign ID.'),
+            campaignName: z
+              .string()
+              .optional()
+              .describe('Campaign name when supplied by the provider.'),
+            accountEmail: z.string().optional().describe('Sending account email.')
           })
         )
+        .optional(),
+      nextStartingAfter: z.string().nullable().optional(),
+      createdMapping: z
+        .any()
         .optional()
-        .describe('List of mappings (for "list" action)'),
-      nextStartingAfter: z.string().nullable().optional().describe('Cursor for next page'),
-      createdMapping: z.any().optional().describe('Created mapping details'),
-      success: z.boolean().describe('Whether the operation was successful')
+        .describe('Legacy creation output; current add requests cannot execute.'),
+      success: z.boolean()
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.action !== 'list') {
+      throw invalid(
+        'The current documented API has no standalone mapping add/remove operation. Use update_campaign with the complete sendingAccounts list; opaque mappingId cannot be resolved.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
-    let { action } = ctx.input;
-
-    if (action === 'list') {
-      let result = await client.listAccountCampaignMappings({
-        limit: ctx.input.limit,
-        startingAfter: ctx.input.startingAfter,
-        campaignId: ctx.input.campaignId
-      });
-
-      let mappings = result.items.map((m: any) => ({
-        mappingId: m.id,
-        campaignId: m.campaign_id,
-        accountEmail: m.email
-      }));
-
+    if (ctx.input.accountEmail) {
+      let result = await client.listAccountCampaignMappings(ctx.input.accountEmail, ctx.input);
+      let mappings = result.items
+        .filter(item => !ctx.input.campaignId || item.campaign_id === ctx.input.campaignId)
+        .map(item => ({
+          campaignId: item.campaign_id,
+          campaignName: item.campaign_name,
+          accountEmail: ctx.input.accountEmail
+        }));
       return {
-        output: {
-          mappings,
-          nextStartingAfter: result.next_starting_after,
-          success: true
-        },
-        message: `Found **${mappings.length}** account-campaign mapping(s).`
+        output: { mappings, nextStartingAfter: result.next_starting_after, success: true },
+        message: `Found ${mappings.length} campaign association(s) on this page. No mapping IDs are available.`
       };
     }
-
-    if (action === 'add' && ctx.input.campaignId && ctx.input.accountEmail) {
-      let result = await client.createAccountCampaignMapping({
-        campaignId: ctx.input.campaignId,
-        accountEmail: ctx.input.accountEmail
-      });
-      return {
-        output: { createdMapping: result, success: true },
-        message: `Linked **${ctx.input.accountEmail}** to campaign ${ctx.input.campaignId}.`
-      };
+    if (!ctx.input.campaignId)
+      throw invalid('Provide accountEmail or campaignId to read sender associations.');
+    if (ctx.input.startingAfter !== undefined)
+      throw invalid(
+        'Campaign sender-list reads are not paginated; use accountEmail for cursor pagination.'
+      );
+    let campaign = await client.getCampaign(ctx.input.campaignId);
+    if (
+      !Array.isArray(campaign.email_list) ||
+      !campaign.email_list.every((email: unknown) => typeof email === 'string')
+    ) {
+      throw invalid('The campaign response did not contain a valid sending-account list.');
     }
-
-    if (action === 'remove' && ctx.input.mappingId) {
-      await client.deleteAccountCampaignMapping(ctx.input.mappingId);
-      return {
-        output: { success: true },
-        message: `Removed account-campaign mapping ${ctx.input.mappingId}.`
-      };
-    }
-
+    let mappings = campaign.email_list.map((email: string) => ({
+      campaignId: ctx.input.campaignId,
+      campaignName: campaign.name,
+      accountEmail: email
+    }));
     return {
-      output: { success: false },
-      message: 'Missing required parameters for the specified action.'
+      output: { mappings, nextStartingAfter: null, success: true },
+      message: `Read ${mappings.length} configured sender(s). No mapping IDs are available.`
     };
   })
   .build();

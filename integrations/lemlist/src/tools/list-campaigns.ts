@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, campaignOutput } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCampaigns = SlateTool.create(spec, {
@@ -38,29 +38,19 @@ export let listCampaigns = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let campaigns = await client.listCampaigns({
-      status: ctx.input.status,
-      offset: ctx.input.offset,
-      limit: ctx.input.limit,
-      sortBy: 'createdAt',
-      sortOrder: ctx.input.sortOrder
-    });
-
-    let result = (Array.isArray(campaigns) ? campaigns : []).map((c: any) => ({
-      campaignId: c._id,
-      name: c.name,
-      status: c.status,
-      createdAt: c.createdAt,
-      hasError: c.hasError,
-      errors: c.errors,
-      labels: c.labels
-    }));
-
+    const client = new Client({ token: ctx.auth.token });
+    const campaigns = (
+      await client.listCampaigns({
+        status: ctx.input.status,
+        offset: ctx.input.offset,
+        limit: ctx.input.limit,
+        sortBy: 'createdAt',
+        sortOrder: ctx.input.sortOrder
+      })
+    ).map(campaignOutput);
     return {
-      output: { campaigns: result },
-      message: `Found **${result.length}** campaign(s)${ctx.input.status ? ` with status "${ctx.input.status}"` : ''}.`
+      output: { campaigns },
+      message: `Retrieved **${campaigns.length}** campaign(s) in this page.`
     };
   })
   .build();

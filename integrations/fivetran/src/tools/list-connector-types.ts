@@ -81,7 +81,26 @@ export let getConnectorType = SlateTool.create(spec, {
       connectorClass: z.string().optional().describe('Connector class'),
       docsUrl: z.string().optional().describe('Documentation URL'),
       erdUrl: z.string().optional().describe('ERD documentation URL'),
-      supportedFeatures: z.array(z.string()).optional().describe('List of supported features')
+      supportedFeatures: z
+        .array(z.string())
+        .optional()
+        .describe('List of supported feature identifiers'),
+      featureDetails: z
+        .array(z.object({ id: z.string(), notes: z.string().optional() }))
+        .optional()
+        .describe('Feature support notes'),
+      configSchema: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Provider metadata describing configuration requirements, without stored credentials'
+        ),
+      authorizationSchema: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Provider metadata describing authorization requirements, without stored credentials'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -99,7 +118,10 @@ export let getConnectorType = SlateTool.create(spec, {
         connectorClass: ct.connector_class,
         docsUrl: ct.link_to_docs,
         erdUrl: ct.link_to_erd,
-        supportedFeatures: ct.supported_features
+        supportedFeatures: ct.supported_features?.map(feature => feature.id),
+        featureDetails: ct.supported_features,
+        configSchema: ct.config,
+        authorizationSchema: ct.auth
       },
       message: `Retrieved connector type **${ct.name}** (${ct.id}).`
     };

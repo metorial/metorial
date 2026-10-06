@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoosendClient } from '../lib/client';
+import { mapSubscriber, optionalNumber } from '../lib/data';
 import { spec } from '../spec';
 
 let subscriberOutputSchema = z.object({
@@ -10,6 +11,11 @@ let subscriberOutputSchema = z.object({
   createdOn: z.string().optional().describe('Subscription date'),
   updatedOn: z.string().optional().describe('Last update date'),
   unsubscribedOn: z.string().optional().describe('Unsubscription date'),
+  status: z
+    .number()
+    .optional()
+    .describe('Subscription status: 1 subscribed, 2 unsubscribed, 3 bounced, 4 removed'),
+  removedOn: z.string().optional().describe('Removal timestamp when archived'),
   customFields: z
     .array(
       z.object({
@@ -25,16 +31,17 @@ let subscriberOutputSchema = z.object({
 export let manageSubscriber = SlateTool.create(spec, {
   name: 'Manage Subscriber',
   key: 'manage_subscriber',
-  description: `Add, update, unsubscribe, or remove subscribers from a mailing list. Supports adding single or multiple subscribers, unsubscribing (moves to suppression list), and permanently removing subscribers. Can also look up subscriber details by email or ID.`,
+  description: `Add, update, unsubscribe, or remove subscribers from a mailing list. Supports adding single or multiple subscribers, unsubscribing (updates subscription state according to account settings), and archiving subscribers. Can also look up subscriber details by email or ID.`,
   instructions: [
     'Use action "add" to subscribe a new email or update an existing subscriber.',
     'Use action "unsubscribe" to move a subscriber to the suppression list without deleting.',
-    'Use action "remove" to permanently delete a subscriber.',
-    'Use action "remove_many" to permanently bulk-remove subscribers by email.',
-    'Custom fields should be provided as an array of "fieldName=value" strings.'
+    'Use action "remove" to archive a subscriber without adding suppression.',
+    'Use action "remove_many" to bulk-archive subscribers by email.',
+    'Custom fields use fieldName=value strings. Upserts can resubscribe previously unsubscribed addresses and clear omitted custom-field values. Include all values you intend to preserve.',
+    'Unsubscribe settings can affect other lists in the account. Removal archives records and does not guarantee history erasure.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -67,6 +74,12 @@ export let manageSubscriber = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Tags to assign to the subscriber (for add)'),
+      hasExternalDoubleOptIn: z
+        .boolean()
+        .optional()
+        .describe(
+          'Record consent already obtained by other means; this does not itself authorize sending'
+        ),
       campaignId: z
         .string()
         .optional()
@@ -114,11 +127,14 @@ export let manageSubscriber = SlateTool.create(spec, {
 
     switch (action) {
       case 'add': {
-        if (!ctx.input.email) throw new Error('email is required for adding a subscriber');
+        if (!ctx.input.email)
+          throw createApiServiceError('email is required for adding a subscriber');
         let body: Record<string, unknown> = { Email: ctx.input.email };
         if (ctx.input.name) body.Name = ctx.input.name;
         if (ctx.input.customFields) body.CustomFields = ctx.input.customFields;
         if (ctx.input.tags) body.Tags = ctx.input.tags;
+        if (ctx.input.hasExternalDoubleOptIn !== undefined)
+          body.HasExternalDoubleOptIn = ctx.input.hasExternalDoubleOptIn;
         let result = await client.addSubscriber(mailingListId, body);
         return {
           output: {
@@ -131,29 +147,43 @@ export let manageSubscriber = SlateTool.create(spec, {
       }
       case 'add_many': {
         if (!ctx.input.subscribers || ctx.input.subscribers.length === 0)
-          throw new Error('subscribers array is required for add_many');
+          throw createApiServiceError('subscribers array is required for add_many');
         let subs = ctx.input.subscribers.map(s => {
           let sub: Record<string, unknown> = { Email: s.email };
           if (s.name) sub.Name = s.name;
           if (s.customFields) sub.CustomFields = s.customFields;
           return sub;
         });
-        let _result = await client.addMultipleSubscribers(mailingListId, subs);
+        let result = await client.addMultipleSubscribers(
+          mailingListId,
+          subs,
+          ctx.input.hasExternalDoubleOptIn
+        );
         return {
           output: {
+            subscribers: result.subscribers.map(mapSubscriber),
+            emailsProcessed: result.subscribers.length,
+            emailsIgnored: Math.max(
+              0,
+              ctx.input.subscribers.length - result.subscribers.length
+            ),
             action,
-            success: true
+            success:
+              !result.partialFailure &&
+              result.subscribers.length === ctx.input.subscribers.length
           },
-          message: `Added **${ctx.input.subscribers.length}** subscriber(s) to list ${mailingListId}.`
+          message: `Moosend accepted **${result.subscribers.length}** of **${ctx.input.subscribers.length}** subscriber records; inspect partial results before retrying.`
         };
       }
       case 'update': {
         if (!ctx.input.subscriberId)
-          throw new Error('subscriberId is required for updating a subscriber');
+          throw createApiServiceError('subscriberId is required for updating a subscriber');
         let body: Record<string, unknown> = {};
         if (ctx.input.email) body.Email = ctx.input.email;
         if (ctx.input.name) body.Name = ctx.input.name;
         if (ctx.input.customFields) body.CustomFields = ctx.input.customFields;
+        if (ctx.input.hasExternalDoubleOptIn !== undefined)
+          body.HasExternalDoubleOptIn = ctx.input.hasExternalDoubleOptIn;
         let result = await client.updateSubscriber(
           mailingListId,
           ctx.input.subscriberId,
@@ -169,7 +199,8 @@ export let manageSubscriber = SlateTool.create(spec, {
         };
       }
       case 'unsubscribe': {
-        if (!ctx.input.email) throw new Error('email is required for unsubscribing');
+        if (!ctx.input.email)
+          throw createApiServiceError('email is required for unsubscribing');
         if (ctx.input.campaignId) {
           await client.unsubscribeFromCampaign(
             mailingListId,
@@ -188,32 +219,47 @@ export let manageSubscriber = SlateTool.create(spec, {
         };
       }
       case 'remove': {
-        if (!ctx.input.email) throw new Error('email is required for removing a subscriber');
+        if (!ctx.input.email)
+          throw createApiServiceError('email is required for removing a subscriber');
         await client.removeSubscriber(mailingListId, ctx.input.email);
         return {
           output: {
             action,
             success: true
           },
-          message: `Permanently removed **${ctx.input.email}** from list ${mailingListId}.`
+          message: `Archived **${ctx.input.email}** from list ${mailingListId}.`
         };
       }
       case 'remove_many': {
         if (!ctx.input.emails || ctx.input.emails.length === 0)
-          throw new Error('emails array is required for remove_many');
+          throw createApiServiceError('emails array is required for remove_many');
         let result = await client.removeMultipleSubscribers(mailingListId, ctx.input.emails);
+        const emailsProcessed = optionalNumber(result.EmailsProcessed),
+          emailsIgnored = optionalNumber(result.EmailsIgnored);
+        if (
+          emailsProcessed === undefined ||
+          emailsIgnored === undefined ||
+          !Number.isSafeInteger(emailsProcessed) ||
+          !Number.isSafeInteger(emailsIgnored) ||
+          emailsProcessed < 0 ||
+          emailsIgnored < 0
+        )
+          throw createApiServiceError(
+            'Moosend returned an incomplete archive receipt. Verify subscriber state before retrying; the request was not repeated.'
+          );
         return {
           output: {
-            emailsProcessed: result?.EmailsProcessed as number | undefined,
-            emailsIgnored: result?.EmailsIgnored as number | undefined,
+            emailsProcessed,
+            emailsIgnored,
             action,
-            success: true
+            success: emailsIgnored === 0 && emailsProcessed === ctx.input.emails.length
           },
-          message: `Bulk removed **${ctx.input.emails.length}** subscriber(s) from list ${mailingListId}.`
+          message: `Moosend processed **${emailsProcessed}** and ignored **${emailsIgnored}** of **${ctx.input.emails.length}** requested subscriber addresses; inspect partial results before retrying.`
         };
       }
       case 'get_by_email': {
-        if (!ctx.input.email) throw new Error('email is required for get_by_email');
+        if (!ctx.input.email)
+          throw createApiServiceError('email is required for get_by_email');
         let result = await client.getSubscriberByEmail(mailingListId, ctx.input.email);
         return {
           output: {
@@ -225,7 +271,8 @@ export let manageSubscriber = SlateTool.create(spec, {
         };
       }
       case 'get_by_id': {
-        if (!ctx.input.subscriberId) throw new Error('subscriberId is required for get_by_id');
+        if (!ctx.input.subscriberId)
+          throw createApiServiceError('subscriberId is required for get_by_id');
         let result = await client.getSubscriberById(mailingListId, ctx.input.subscriberId);
         return {
           output: {
@@ -239,19 +286,3 @@ export let manageSubscriber = SlateTool.create(spec, {
     }
   })
   .build();
-
-let mapSubscriber = (s: Record<string, unknown>) => ({
-  subscriberId: String(s?.ID ?? ''),
-  email: String(s?.Email ?? ''),
-  name: s?.Name ? String(s.Name) : undefined,
-  createdOn: s?.CreatedOn ? String(s.CreatedOn) : undefined,
-  updatedOn: s?.UpdatedOn ? String(s.UpdatedOn) : undefined,
-  unsubscribedOn: s?.UnsubscribedOn ? String(s.UnsubscribedOn) : undefined,
-  customFields: Array.isArray(s?.CustomFields)
-    ? (s.CustomFields as Record<string, unknown>[]).map(cf => ({
-        customFieldId: cf?.CustomFieldID ? String(cf.CustomFieldID) : undefined,
-        fieldName: cf?.Name ? String(cf.Name) : undefined,
-        fieldValue: cf?.Value ? String(cf.Value) : undefined
-      }))
-    : undefined
-});

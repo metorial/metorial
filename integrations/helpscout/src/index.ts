@@ -22,16 +22,6 @@ import {
   updateConversation,
   updateCustomer
 } from './tools';
-import {
-  beaconChatEvents,
-  conversationEvents,
-  customerEvents,
-  organizationEvents,
-  satisfactionEvents,
-  tagEvents,
-  userEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -56,13 +46,5 @@ export let provider = Slate.create({
     listSatisfactionRatings,
     manageDocs
   ],
-  triggers: [
-    conversationEvents,
-    customerEvents,
-    satisfactionEvents,
-    organizationEvents,
-    tagEvents,
-    beaconChatEvents,
-    userEvents
-  ]
+  triggers: []
 });

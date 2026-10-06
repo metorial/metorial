@@ -1,6 +1,8 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  downloadAsset,
+  getCurrentUser,
   getDocument,
   listProjects,
   manageDatasets,
@@ -9,8 +11,6 @@ import {
   queryDocuments,
   uploadAsset
 } from './tools';
-import { documentChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -20,7 +20,9 @@ export let provider = Slate.create({
     listProjects,
     manageDatasets,
     manageWebhooks,
-    uploadAsset
+    uploadAsset,
+    getCurrentUser,
+    downloadAsset
   ],
-  triggers: [documentChange]
+  triggers: []
 });

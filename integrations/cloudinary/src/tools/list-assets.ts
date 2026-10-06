@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import { resourceSchema } from '../lib/types';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listAssets = SlateTool.create(spec, {
@@ -42,42 +44,17 @@ export let listAssets = SlateTool.create(spec, {
         .describe('Include contextual metadata in the response.')
     })
   )
-  .output(
-    z.object({
-      resources: z
-        .array(
-          z.object({
-            assetId: z.string().describe('Immutable unique asset identifier.'),
-            publicId: z.string().describe('Public ID of the asset.'),
-            format: z.string().describe('File format.'),
-            resourceType: z.string().describe('Resource type.'),
-            createdAt: z.string().describe('Creation timestamp.'),
-            bytes: z.number().describe('File size in bytes.'),
-            width: z.number().optional().describe('Width in pixels.'),
-            height: z.number().optional().describe('Height in pixels.'),
-            url: z.string().describe('HTTP delivery URL.'),
-            secureUrl: z.string().describe('HTTPS delivery URL.'),
-            folder: z.string().describe('Folder path.'),
-            tags: z.array(z.string()).optional().describe('Tags on the asset.')
-          })
-        )
-        .describe('List of assets.'),
-      nextCursor: z.string().optional().describe('Cursor for the next page of results.')
-    })
-  )
+  .output(z.object({ resources: z.array(resourceSchema), nextCursor: z.string().optional() }))
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-
-    let result: any;
-    if (ctx.input.tag) {
-      result = await client.listResourcesByTag({
-        tag: ctx.input.tag,
-        resourceType: ctx.input.resourceType,
-        maxResults: ctx.input.maxResults,
-        nextCursor: ctx.input.nextCursor
-      });
-    } else {
-      result = await client.listResources({
+    if (
+      ctx.input.tag !== undefined &&
+      (ctx.input.prefix !== undefined || ctx.input.type !== 'upload')
+    )
+      fail(
+        'Tag listing does not support a public-ID prefix or another delivery type. Use search_assets for combined filters.'
+      );
+    const client = createClient(ctx),
+      params = {
         resourceType: ctx.input.resourceType,
         type: ctx.input.type,
         prefix: ctx.input.prefix,
@@ -85,28 +62,14 @@ export let listAssets = SlateTool.create(spec, {
         nextCursor: ctx.input.nextCursor,
         tags: ctx.input.includeTags,
         context: ctx.input.includeContext
-      });
-    }
-
+      };
+    const result =
+      ctx.input.tag !== undefined
+        ? await client.listResourcesByTag({ ...params, tag: ctx.input.tag })
+        : await client.listResources(params);
     return {
-      output: {
-        resources: result.resources.map((r: any) => ({
-          assetId: r.assetId,
-          publicId: r.publicId,
-          format: r.format,
-          resourceType: r.resourceType,
-          createdAt: r.createdAt,
-          bytes: r.bytes,
-          width: r.width,
-          height: r.height,
-          url: r.url,
-          secureUrl: r.secureUrl,
-          folder: r.folder,
-          tags: r.tags
-        })),
-        nextCursor: result.nextCursor
-      },
-      message: `Listed **${result.resources.length}** asset(s)${ctx.input.prefix ? ` with prefix "${ctx.input.prefix}"` : ''}${ctx.input.tag ? ` tagged "${ctx.input.tag}"` : ''}.${result.nextCursor ? ' More results available via pagination.' : ''}`
+      output: result,
+      message: `Listed ${result.resources.length} asset(s).${result.nextCursor ? ' Continue with nextCursor and the same filters.' : ''}`
     };
   })
   .build();

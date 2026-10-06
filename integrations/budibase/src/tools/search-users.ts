@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapUser } from '../lib/models';
 import { spec } from '../spec';
 
 let userSchema = z.object({
@@ -39,19 +40,10 @@ export let searchUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = Client.fromContext(ctx);
     let results = await client.searchUsers({ name: ctx.input.name });
 
-    let users = results.map((user: any) => ({
-      userId: user._id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      status: user.status,
-      builder: user.builder,
-      admin: user.admin,
-      roles: user.roles
-    }));
+    let users = results.map(row => mapUser(row));
 
     return {
       output: { users },

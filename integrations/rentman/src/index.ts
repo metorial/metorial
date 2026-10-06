@@ -34,8 +34,6 @@ import {
   updateCost,
   updateProjectRequest
 } from './tools';
-import { rentmanEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -72,5 +70,5 @@ export let provider = Slate.create({
     updateCost,
     deleteCost
   ],
-  triggers: [rentmanEvent]
+  triggers: []
 });

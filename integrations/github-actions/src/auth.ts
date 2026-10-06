@@ -1,208 +1,122 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth,
+  type SlateAuthWithOauth
+} from 'slates';
 import { z } from 'zod';
+import { GitHubActionsClient, githubApiError } from './lib/client';
 
-export let auth = SlateAuth.create()
+type AuthOutput = { token: string; refreshToken?: string; expiresAt?: string };
+const profile = async (output: AuthOutput) => {
+  const user = await new GitHubActionsClient(output.token).getCurrentUser();
+  return {
+    profile: {
+      id: String(user.id),
+      email: user.email ?? undefined,
+      name: user.name ?? user.login,
+      imageUrl: user.avatar_url
+    }
+  };
+};
+const oauth = (
+  organization: boolean
+): SlateAuthWithOauth<Record<string, never>, AuthOutput> => ({
+  type: 'auth.oauth',
+  key: organization ? 'oauth_organization' : 'oauth',
+  name: organization ? 'OAuth (repositories and organizations)' : 'OAuth (repositories)',
+  scopes: [
+    {
+      title: 'Repositories',
+      description: 'Manage Actions resources in public and private repositories',
+      scope: 'repo'
+    },
+    ...(organization
+      ? [
+          {
+            title: 'Organization administration',
+            description:
+              'Manage organization Actions secrets, variables, and self-hosted runners',
+            scope: 'admin:org'
+          }
+        ]
+      : [])
+  ],
+  getAuthorizationUrl: async ctx => ({
+    url: `https://github.com/login/oauth/authorize?${new URLSearchParams({ client_id: ctx.clientId, redirect_uri: ctx.redirectUri, state: ctx.state, scope: ctx.scopes.join(' ') })}`
+  }),
+  handleCallback: async ctx => {
+    const http = createAuthenticatedAxios({
+      timeout: 30000,
+      maxRedirects: 0,
+      headers: { Accept: 'application/json' },
+      errorAdapter: githubApiError
+    });
+    const response = await http.post<unknown>('https://github.com/login/oauth/access_token', {
+      client_id: ctx.clientId,
+      client_secret: ctx.clientSecret,
+      code: ctx.code,
+      redirect_uri: ctx.redirectUri
+    });
+    return { output: normalizeOAuthTokenResponse(response.data, { providerLabel: 'GitHub' }) };
+  },
+  handleTokenRefresh: async ctx => {
+    // OAuth App access tokens normally have no expiry/refresh token. GitHub App user tokens may expire.
+    if (!ctx.output.refreshToken) {
+      if (ctx.output.expiresAt)
+        throw createApiServiceError(
+          'The expiring GitHub connection has no refresh token. Reconnect to continue.'
+        );
+      return { output: ctx.output };
+    }
+    const http = createAuthenticatedAxios({
+      timeout: 30000,
+      maxRedirects: 0,
+      headers: { Accept: 'application/json' },
+      errorAdapter: githubApiError
+    });
+    const response = await http.post<unknown>('https://github.com/login/oauth/access_token', {
+      client_id: ctx.clientId,
+      client_secret: ctx.clientSecret,
+      grant_type: 'refresh_token',
+      refresh_token: ctx.output.refreshToken
+    });
+    return {
+      output: normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'GitHub',
+        previousRefreshToken: ctx.output.refreshToken
+      })
+    };
+  },
+  getProfile: ctx => profile(ctx.output)
+});
+
+export const auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
-      refreshToken: z.string().optional()
+      refreshToken: z.string().optional(),
+      expiresAt: z.string().optional()
     })
   )
-  .addOauth({
-    type: 'auth.oauth',
-    name: 'OAuth',
-    key: 'oauth',
-
-    scopes: [
-      {
-        title: 'Repository',
-        description:
-          'Full access to public and private repositories, including Actions workflows, runs, and artifacts',
-        scope: 'repo'
-      },
-      {
-        title: 'Public Repository',
-        description: 'Access to public repositories only',
-        scope: 'public_repo'
-      },
-      {
-        title: 'Workflow',
-        description: 'Manage GitHub Actions workflow files',
-        scope: 'workflow'
-      },
-      {
-        title: 'Admin: Organization',
-        description:
-          'Full management of organizations, required for organization-level secrets and runners',
-        scope: 'admin:org'
-      },
-      {
-        title: 'Write Organization',
-        description: 'Write access to organization membership and settings',
-        scope: 'write:org'
-      },
-      {
-        title: 'Read Organization',
-        description: 'Read access to organization membership',
-        scope: 'read:org'
-      },
-      {
-        title: 'Admin: Repo Hook',
-        description: 'Full access to repository webhooks for configuring event triggers',
-        scope: 'admin:repo_hook'
-      },
-      {
-        title: 'Admin: Org Hook',
-        description: 'Full access to organization webhooks',
-        scope: 'admin:org_hook'
-      },
-      {
-        title: 'User',
-        description: 'Read/write access to user profile information',
-        scope: 'user'
-      },
-      {
-        title: 'User Email',
-        description: 'Read access to email addresses',
-        scope: 'user:email'
-      }
-    ],
-
-    getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
-        client_id: ctx.clientId,
-        redirect_uri: ctx.redirectUri,
-        state: ctx.state,
-        scope: ctx.scopes.join(' ')
-      });
-
-      return {
-        url: `https://github.com/login/oauth/authorize?${params.toString()}`
-      };
-    },
-
-    handleCallback: async ctx => {
-      let http = createAxios();
-
-      let response = await http.post(
-        'https://github.com/login/oauth/access_token',
-        {
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri
-        },
-        {
-          headers: {
-            Accept: 'application/json'
-          }
-        }
-      );
-
-      let data = response.data;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
-      }
-
-      let http = createAxios();
-
-      let response = await http.post(
-        'https://github.com/login/oauth/access_token',
-        {
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken
-        },
-        {
-          headers: {
-            Accept: 'application/json'
-          }
-        }
-      );
-
-      let data = response.data;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://api.github.com',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          Accept: 'application/vnd.github+json'
-        }
-      });
-
-      let response = await http.get('/user');
-      let user = response.data;
-
-      return {
-        profile: {
-          id: String(user.id),
-          email: user.email ?? undefined,
-          name: user.name ?? user.login,
-          imageUrl: user.avatar_url
-        }
-      };
-    }
-  })
+  .addOauth(oauth(false))
+  .addOauth(oauth(true))
   .addTokenAuth({
     type: 'auth.token',
-    name: 'Personal Access Token',
     key: 'personal_access_token',
-
+    name: 'Personal Access Token',
     inputSchema: z.object({
       token: z
         .string()
         .describe(
-          'GitHub Personal Access Token (classic or fine-grained) with Actions permissions'
+          'GitHub personal access token with Actions permissions; secrets, variables, environments, and runners need their separate permissions'
         )
     }),
-
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
+      const token = ctx.input.token.trim();
+      if (!token) throw createApiServiceError('A GitHub personal access token is required.');
+      return { output: { token } };
     },
-
-    getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://api.github.com',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          Accept: 'application/vnd.github+json'
-        }
-      });
-
-      let response = await http.get('/user');
-      let user = response.data;
-
-      return {
-        profile: {
-          id: String(user.id),
-          email: user.email ?? undefined,
-          name: user.name ?? user.login,
-          imageUrl: user.avatar_url
-        }
-      };
-    }
+    getProfile: (ctx: { output: AuthOutput }) => profile(ctx.output)
   });

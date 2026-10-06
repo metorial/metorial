@@ -15,6 +15,7 @@ export let updateUptimeTest = SlateTool.create(spec, {
   .input(
     z.object({
       testId: z.string().describe('ID of the uptime test to update'),
+      websiteUrl: z.string().optional().describe('New URL or IP address to monitor'),
       name: z.string().optional().describe('New name for the test'),
       checkRate: z.number().optional().describe('Check frequency in seconds'),
       confirmation: z
@@ -59,6 +60,7 @@ export let updateUptimeTest = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let {
       testId,
+      websiteUrl,
       checkRate,
       contactGroups,
       findString,
@@ -76,8 +78,9 @@ export let updateUptimeTest = SlateTool.create(spec, {
       ...rest
     } = ctx.input;
 
-    let data: Record<string, any> = { ...rest };
+    let data: Record<string, unknown> = { ...rest };
 
+    if (websiteUrl !== undefined) data.website_url = websiteUrl;
     if (checkRate !== undefined) data.check_rate = checkRate;
     if (contactGroups) data.contact_groups = contactGroups;
     if (findString !== undefined) data.find_string = findString;
@@ -89,7 +92,7 @@ export let updateUptimeTest = SlateTool.create(spec, {
     if (customHeader !== undefined) data.custom_header = customHeader;
     if (basicUsername !== undefined) data.basic_username = basicUsername;
     if (basicPassword !== undefined) data.basic_password = basicPassword;
-    if (statusCodes) data.status_codes = statusCodes;
+    if (statusCodes) data.status_codes_csv = statusCodes.join(',');
     if (userAgent !== undefined) data.user_agent = userAgent;
     if (triggerRate !== undefined) data.trigger_rate = triggerRate;
 

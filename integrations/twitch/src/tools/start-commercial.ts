@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwitchClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let startCommercial = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let startCommercial = SlateTool.create(spec, {
   key: 'start_commercial',
   description: `Start a commercial (ad break) on a channel. The broadcaster must be live and an affiliate or partner.`,
   constraints: [
-    'Valid lengths: 30, 60, 90, 120, 150, or 180 seconds.',
+    'Request a positive integer length up to 180 seconds; Twitch may return a shorter break.',
     'A cooldown period applies between commercials.'
   ],
   tags: {
@@ -18,9 +19,7 @@ export let startCommercial = SlateTool.create(spec, {
   .input(
     z.object({
       broadcasterId: z.string().describe('Broadcaster user ID'),
-      lengthSeconds: z
-        .number()
-        .describe('Commercial length in seconds (30, 60, 90, 120, 150, or 180)')
+      lengthSeconds: z.number().describe('Requested commercial length in seconds (1-180)')
     })
   )
   .output(
@@ -31,7 +30,8 @@ export let startCommercial = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId);
+    validateInput('start_commercial', ctx.input, [ctx.auth.token]);
+    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId, ctx.auth.userId);
 
     let result = await client.startCommercial(
       ctx.input.broadcasterId,

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/rippling",
-  "description": "Manage employee data, company information, and organizational structures in Rippling's unified workforce platform. Retrieve active and terminated employee details including roles, departments, and work locations. Access company information such as addresses, work locations, and contact details. Create and manage employee groups across departments and teams. Automate user provisioning and deprovisioning for third-party applications. Push ATS candidates into the Rippling onboarding flow. Approve or decline leave requests. Retrieve SAML SSO metadata for app integrations. Receive webhook notifications for employee lifecycle events such as account creation, suspension, and deletion.",
+  "description": "Manage employee data, company information, and organizational structures in Rippling's unified workforce platform. Retrieve active and terminated employee details including roles, departments, and work locations. Access company information such as addresses, work locations, and contact details. Create and manage employee groups across departments and teams. Automate user provisioning and deprovisioning for third-party applications. Push ATS candidates into the Rippling onboarding flow. Approve or decline leave requests. Retrieve SAML SSO metadata for app integrations.",
   "categories": ["hr-and-recruiting", "security", "task-and-project-management"],
   "skills": [
     "retrieve employee data",

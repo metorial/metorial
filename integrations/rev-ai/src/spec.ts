@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'rev-ai',
   name: 'Rev AI',
   description:
-    'Speech-to-text and natural language processing platform by Rev, offering transcription, language identification, sentiment analysis, topic extraction, summarization, and translation for 57+ languages.',
+    'Speech-to-text and text analysis for recorded media, including transcription, language identification, sentiment analysis, topic extraction, summarization, translation, downloadable captions, and custom vocabularies.',
   metadata: {},
   config,
   auth

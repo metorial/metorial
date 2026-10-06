@@ -1,24 +1,44 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreshBooksClient } from '../lib/client';
+import { scopeInput } from '../lib/contracts';
+import { invoke } from '../lib/operations';
 import { spec } from '../spec';
+
+const outputSchema = z
+  .object({
+    timeEntryId: z.number(),
+    duration: z.number().nullable().optional(),
+    startedAt: z.string().nullable().optional(),
+    clientId: z.number().nullable().optional(),
+    projectId: z.number().nullable().optional(),
+    note: z.string().nullable().optional(),
+    billable: z.boolean().nullable().optional(),
+    billed: z.boolean().nullable().optional(),
+    isLogged: z.boolean().nullable().optional()
+  })
+  .extend({
+    raw: z.record(z.string(), z.unknown()).optional(),
+    acknowledged: z.boolean().optional(),
+    readbackRequired: z.boolean().optional()
+  });
 
 export let manageTimeEntries = SlateTool.create(spec, {
   name: 'Manage Time Entries',
   key: 'manage_time_entries',
-  description: `Create, update, or delete time entries in FreshBooks. Log time worked against clients and projects with duration, notes, and billable status. Requires a **businessId** in the configuration.`,
+  description: `Create, update, or delete time entries in FreshBooks. Log time worked against clients and projects with duration, notes, and billable status. Select the account or business discovered by get_identity.`,
   instructions: [
     'Duration is specified in seconds (e.g., 3600 = 1 hour).',
     'startedAt is a UTC Unix timestamp.',
     'Requires businessId to be set in the configuration.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      ...scopeInput,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       timeEntryId: z
         .number()
@@ -44,78 +64,6 @@ export let manageTimeEntries = SlateTool.create(spec, {
         )
     })
   )
-  .output(
-    z.object({
-      timeEntryId: z.number(),
-      duration: z.number().nullable().optional(),
-      startedAt: z.string().nullable().optional(),
-      clientId: z.number().nullable().optional(),
-      projectId: z.number().nullable().optional(),
-      note: z.string().nullable().optional(),
-      billable: z.boolean().nullable().optional(),
-      billed: z.boolean().nullable().optional(),
-      isLogged: z.boolean().nullable().optional()
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new FreshBooksClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId,
-      businessId: ctx.config.businessId
-    });
-
-    let buildPayload = () => {
-      let payload: Record<string, any> = {};
-      if (ctx.input.duration !== undefined) payload.duration = ctx.input.duration;
-      if (ctx.input.startedAt !== undefined) payload.started_at = ctx.input.startedAt;
-      if (ctx.input.clientId !== undefined) payload.client_id = ctx.input.clientId;
-      if (ctx.input.projectId !== undefined) payload.project_id = ctx.input.projectId;
-      if (ctx.input.note !== undefined) payload.note = ctx.input.note;
-      if (ctx.input.billable !== undefined) payload.billable = ctx.input.billable;
-      if (ctx.input.isLogged !== undefined) payload.is_logged = ctx.input.isLogged;
-      return payload;
-    };
-
-    let mapResult = (raw: any) => ({
-      timeEntryId: raw.id,
-      duration: raw.duration,
-      startedAt: raw.started_at,
-      clientId: raw.client_id,
-      projectId: raw.project_id,
-      note: raw.note,
-      billable: raw.billable,
-      billed: raw.billed,
-      isLogged: raw.is_logged
-    });
-
-    if (ctx.input.action === 'create') {
-      let result = await client.createTimeEntry(buildPayload());
-      return {
-        output: mapResult(result),
-        message: `Created time entry (ID: ${result.id}) - ${result.duration ? `${Math.round(result.duration / 60)} minutes` : 'timer started'}.`
-      };
-    }
-
-    if (ctx.input.action === 'update') {
-      if (!ctx.input.timeEntryId) throw new Error('timeEntryId is required for update');
-      let result = await client.updateTimeEntry(ctx.input.timeEntryId, buildPayload());
-      return {
-        output: mapResult(result),
-        message: `Updated time entry (ID: ${ctx.input.timeEntryId}).`
-      };
-    }
-
-    if (ctx.input.action === 'delete') {
-      if (!ctx.input.timeEntryId) throw new Error('timeEntryId is required for delete');
-      await client.deleteTimeEntry(ctx.input.timeEntryId);
-      return {
-        output: {
-          timeEntryId: ctx.input.timeEntryId
-        },
-        message: `Deleted time entry (ID: ${ctx.input.timeEntryId}).`
-      };
-    }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
-  })
+  .output(outputSchema)
+  .handleInvocation(async ctx => invoke('manage_time_entries', ctx, outputSchema))
   .build();

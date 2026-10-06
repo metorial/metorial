@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let stopCall = SlateTool.create(spec, {
   name: 'Stop Call',
   key: 'stop_call',
-  description: `Stop an active, queued, or scheduled outbound call. Can also stop all queued calls for an agent.`,
+  description: `Cancel a queued or scheduled outbound call. Can also stop all queued calls for an agent.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -33,6 +33,10 @@ export let stopCall = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
+    if (Boolean(ctx.input.executionId) === Boolean(ctx.input.agentId)) {
+      throw createApiServiceError('Provide exactly one of executionId or agentId.');
+    }
+
     if (ctx.input.executionId) {
       let result = await client.stopCall(ctx.input.executionId);
       return {
@@ -56,12 +60,6 @@ export let stopCall = SlateTool.create(spec, {
       };
     }
 
-    return {
-      output: {
-        stoppedExecutionIds: [],
-        status: 'no_action'
-      },
-      message: 'No executionId or agentId provided. Please specify one.'
-    };
+    throw createApiServiceError('Provide executionId or agentId.');
   })
   .build();

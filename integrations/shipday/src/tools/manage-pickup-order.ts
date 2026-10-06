@@ -1,13 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShipdayClient } from '../lib/client';
+import { child, fail, id, items, type Row, text, validateFields } from '../lib/validation';
 import { spec } from '../spec';
 
 let orderItemSchema = z.object({
   name: z.string().describe('Name of the item'),
   quantity: z.number().describe('Quantity of the item'),
   unitPrice: z.number().optional().describe('Unit price of the item'),
-  addOns: z.string().optional().describe('Add-ons or modifications')
+  addOns: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .describe('Add-ons or modifications')
 });
 
 let pickupOrderInputSchema = z.object({
@@ -20,7 +24,12 @@ let pickupOrderInputSchema = z.object({
     .string()
     .optional()
     .describe('Order number for retrieving or identifying the order'),
-  orderId: z.number().optional().describe('Shipday order ID (required for edit and delete)'),
+  orderId: z
+    .number()
+    .optional()
+    .describe(
+      'Native pickup order ID (documented get, edit and delete); distinct from orderNumber'
+    ),
 
   // For create and edit
   customerName: z.string().optional().describe('Customer full name'),
@@ -69,107 +78,150 @@ export let managePickupOrder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShipdayClient({ token: ctx.auth.token });
-
-    if (ctx.input.action === 'create') {
-      let body: Record<string, unknown> = {};
-      if (ctx.input.orderNumber) body.orderNumber = ctx.input.orderNumber;
-      if (ctx.input.customerName) {
-        body.customer = {
-          name: ctx.input.customerName,
-          phoneNumber: ctx.input.customerPhone,
-          emailAddress: ctx.input.customerEmail
-        };
-      }
-      if (ctx.input.restaurantName) {
-        body.restaurant = {
-          name: ctx.input.restaurantName,
-          address: ctx.input.restaurantAddress,
-          phoneNumber: ctx.input.restaurantPhoneNumber
-        };
-      }
-      if (ctx.input.orderItems) body.orderItem = ctx.input.orderItems;
-      if (ctx.input.tips !== undefined) body.tips = ctx.input.tips;
-      if (ctx.input.tax !== undefined) body.tax = ctx.input.tax;
-      if (ctx.input.discountAmount !== undefined)
-        body.discountAmount = ctx.input.discountAmount;
-      if (ctx.input.totalOrderCost !== undefined)
-        body.totalOrderCost = ctx.input.totalOrderCost;
-      if (ctx.input.paymentMethod) body.paymentMethod = ctx.input.paymentMethod;
-      if (ctx.input.pickupInstruction) body.pickupInstruction = ctx.input.pickupInstruction;
-      if (ctx.input.expectedPickupDate) body.expectedPickupDate = ctx.input.expectedPickupDate;
-      if (ctx.input.expectedPickupTime) body.expectedPickupTime = ctx.input.expectedPickupTime;
-      if (ctx.input.orderSource) body.orderSource = ctx.input.orderSource;
-
-      let result = await client.createPickupOrder(body);
+    const input = ctx.input,
+      client = new ShipdayClient({ token: ctx.auth.token });
+    if (input.action === 'get' || input.action === 'delete') {
+      const allowed = new Set([
+        'action',
+        'orderId',
+        ...(input.action === 'get' ? ['orderNumber'] : [])
+      ]);
+      if (
+        Object.entries(input).some(([key, value]) => value !== undefined && !allowed.has(key))
+      )
+        fail(
+          'Pickup read/deletion accepts only its exact identifier. Remove unrelated edit fields.'
+        );
+    }
+    validateFields(input);
+    if (input.orderItems !== undefined) items(input.orderItems);
+    if (input.action === 'get') {
+      if (input.orderId !== undefined && input.orderNumber !== undefined)
+        fail('Use orderId or the legacy orderNumber lookup, not both.');
+      const order =
+        input.orderId !== undefined
+          ? await client.getPickupById(input.orderId)
+          : await client.getPickupOrderDetails(text(input.orderNumber, 'Order number'));
       return {
-        output: {
-          success: result.success,
-          orderId: result.orderId,
-          responseMessage: result.message
-        },
-        message: `Created pickup order **#${ctx.input.orderNumber}** (ID: ${result.orderId}).`
+        output: { success: true, order, orderId: id(order.orderId) },
+        message: `Retrieved exact pickup order ${order.orderId}.`
       };
     }
-
-    if (ctx.input.action === 'get') {
-      if (!ctx.input.orderNumber) {
-        throw new Error('orderNumber is required to retrieve a pickup order');
-      }
-      let result = await client.getPickupOrderDetails(ctx.input.orderNumber);
+    if (input.action === 'delete') {
+      if (input.orderNumber !== undefined)
+        fail('Pickup deletion uses orderId; do not supply an unrelated orderNumber.');
+      const orderId = id(input.orderId, 'Pickup order ID');
+      await client.deletePickupOrder(orderId);
       return {
         output: {
           success: true,
-          order: result
+          orderId,
+          responseMessage: 'Deletion accepted and native absence confirmed'
         },
-        message: `Retrieved pickup order **#${ctx.input.orderNumber}**.`
+        message: `Pickup order ${orderId} is no longer readable.`
       };
     }
-
-    if (ctx.input.action === 'edit') {
-      if (!ctx.input.orderId) {
-        throw new Error('orderId is required to edit a pickup order');
-      }
-      let body: Record<string, unknown> = {};
-      if (ctx.input.orderNumber) body.orderNumber = ctx.input.orderNumber;
-      if (ctx.input.customerName) body.customerName = ctx.input.customerName;
-      if (ctx.input.customerPhone) body.customerPhone = ctx.input.customerPhone;
-      if (ctx.input.customerEmail) body.customerEmail = ctx.input.customerEmail;
-      if (ctx.input.restaurantName) body.restaurantName = ctx.input.restaurantName;
-      if (ctx.input.restaurantAddress) body.restaurantAddress = ctx.input.restaurantAddress;
-      if (ctx.input.orderItems) body.orderItem = ctx.input.orderItems;
-      if (ctx.input.tips !== undefined) body.tips = ctx.input.tips;
-      if (ctx.input.tax !== undefined) body.tax = ctx.input.tax;
-      if (ctx.input.totalOrderCost !== undefined)
-        body.totalOrderCost = ctx.input.totalOrderCost;
-      if (ctx.input.pickupInstruction) body.pickupInstruction = ctx.input.pickupInstruction;
-      if (ctx.input.expectedPickupDate) body.expectedPickupDate = ctx.input.expectedPickupDate;
-      if (ctx.input.expectedPickupTime) body.expectedPickupTime = ctx.input.expectedPickupTime;
-
-      await client.editPickupOrder(ctx.input.orderId, body);
-      return {
-        output: {
-          success: true,
-          responseMessage: 'Pickup order updated'
+    const optionalKeys = [
+      'tips',
+      'tax',
+      'discountAmount',
+      'totalOrderCost',
+      'paymentMethod',
+      'pickupInstruction',
+      'expectedPickupDate',
+      'expectedPickupTime',
+      'orderSource'
+    ] as const;
+    let body: Row;
+    if (input.action === 'create') {
+      if (input.orderId !== undefined)
+        fail('orderId cannot be supplied when creating a pickup order.');
+      body = {
+        orderNumber: text(input.orderNumber, 'Order number'),
+        customer: {
+          name: text(input.customerName, 'Customer name'),
+          phone: text(input.customerPhone, 'Customer phone'),
+          email: input.customerEmail
         },
-        message: `Updated pickup order **${ctx.input.orderId}**.`
+        restaurant: {
+          name: text(input.restaurantName, 'Restaurant name'),
+          address: text(input.restaurantAddress, 'Restaurant address'),
+          phone: input.restaurantPhoneNumber
+        }
       };
+    } else {
+      const orderId = id(input.orderId, 'Pickup order ID');
+      if (
+        ![
+          'orderNumber',
+          'customerName',
+          'customerPhone',
+          'customerEmail',
+          'restaurantName',
+          'restaurantAddress',
+          'restaurantPhoneNumber',
+          'orderItems',
+          ...optionalKeys
+        ].some(key => input[key as keyof typeof input] !== undefined)
+      )
+        fail('Provide at least one pickup edit field.');
+      const before = await client.getPickupById(orderId);
+      body = {};
+      for (const key of [
+        'orderNumber',
+        'customer',
+        'restaurant',
+        'orderItem',
+        'companyId',
+        'status',
+        ...optionalKeys
+      ])
+        if (before[key] !== undefined) body[key] = before[key];
+      body.customer = { ...child(before.customer) };
+      body.restaurant = { ...child(before.restaurant) };
+      if (input.orderNumber !== undefined) body.orderNumber = input.orderNumber;
+      const customer = child(body.customer),
+        restaurant = child(body.restaurant);
+      for (const [key, value] of [
+        ['name', input.customerName],
+        ['phone', input.customerPhone],
+        ['email', input.customerEmail]
+      ] as const)
+        if (value !== undefined) customer[key] = value;
+      for (const [key, value] of [
+        ['name', input.restaurantName],
+        ['address', input.restaurantAddress],
+        ['phone', input.restaurantPhoneNumber]
+      ] as const)
+        if (value !== undefined) restaurant[key] = value;
+      body.customer = customer;
+      body.restaurant = restaurant;
     }
-
-    if (ctx.input.action === 'delete') {
-      if (!ctx.input.orderId) {
-        throw new Error('orderId is required to delete a pickup order');
-      }
-      await client.deletePickupOrder(ctx.input.orderId);
-      return {
-        output: {
-          success: true,
-          responseMessage: 'Pickup order deleted'
-        },
-        message: `Deleted pickup order **${ctx.input.orderId}**.`
-      };
+    for (const key of optionalKeys) if (input[key] !== undefined) body[key] = input[key];
+    if (input.orderItems !== undefined) body.orderItem = items(input.orderItems);
+    const result =
+      input.action === 'create'
+        ? await client.createPickupOrder(body)
+        : await client.editPickupOrder(id(input.orderId), body);
+    const orderId = id(result.orderId, 'Pickup receipt ID');
+    // Native receipt identifies the mutation; readback keeps an unknown outcome visible.
+    let actual: Row;
+    try {
+      actual = await client.getPickupById(orderId);
+    } catch {
+      return client.partial(orderId, [
+        input.action === 'create' ? 'Pickup creation accepted' : 'Pickup edit accepted'
+      ]);
     }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    if (actual.orderNumber !== body.orderNumber)
+      return client.partial(orderId, ['Pickup request accepted; reference readback differed']);
+    return {
+      output: {
+        success: true,
+        orderId,
+        responseMessage: text(result.message, 'Pickup response')
+      },
+      message: `Shipday confirmed pickup ${input.action} (ID: ${orderId}).`
+    };
   })
   .build();

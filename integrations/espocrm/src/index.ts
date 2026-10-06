@@ -18,8 +18,6 @@ import {
   postStreamNote,
   sendEmail
 } from './tools';
-import { recordEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     generatePdf,
     postStreamNote
   ],
-  triggers: [recordEvents]
+  triggers: []
 });

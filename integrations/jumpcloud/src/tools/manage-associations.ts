@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageAssociations = SlateTool.create(spec, {
@@ -11,7 +12,7 @@ export let manageAssociations = SlateTool.create(spec, {
     'To bind a user group to a system group, use sourceType "user_group" and targetType "system_group".',
     'To bind a user group to an application, use sourceType "user_group" and targetType "application".',
     'Common target types: system, system_group, user, user_group, application, radius_server, ldap_server, active_directory, g_suite, office_365.',
-    'When granting sudo access, provide sudoEnabled and optionally sudoWithoutPassword in the attributes.'
+    'Sudo is supported only on user/system native routes. A relationship acknowledgement does not prove effective access or downstream propagation.'
   ],
   tags: {
     destructive: true
@@ -19,6 +20,7 @@ export let manageAssociations = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       action: z.enum(['add', 'remove', 'list']).describe('Action to perform'),
       sourceType: z
         .enum(['user', 'user_group', 'system', 'system_group'])
@@ -33,7 +35,9 @@ export let manageAssociations = SlateTool.create(spec, {
       sudoEnabled: z
         .boolean()
         .optional()
-        .describe('Enable sudo access (for user group → system group associations)'),
+        .describe(
+          'Enable sudo only for native user/system association routes; unsupported group routes are refused'
+        ),
       sudoWithoutPassword: z.boolean().optional().describe('Enable passwordless sudo'),
       limit: z
         .number()
@@ -58,111 +62,97 @@ export let manageAssociations = SlateTool.create(spec, {
         )
         .optional()
         .describe('Current associations (returned for list action)'),
-      success: z.boolean().describe('Whether the action succeeded')
+      success: z
+        .boolean()
+        .describe(
+          'Whether the native request was accepted; effective downstream access is not confirmed'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      if (ctx.input.action === 'list') {
+        if (
+          ctx.input.targetId !== undefined ||
+          ctx.input.sudoEnabled !== undefined ||
+          ctx.input.sudoWithoutPassword !== undefined
+        )
+          throw createApiServiceError('Omit mutation fields when listing associations.');
+        const associations = await client.listAssociations(
+          ctx.input.sourceType,
+          ctx.input.sourceId,
+          ctx.input.targetType,
+          { limit: ctx.input.limit, skip: ctx.input.skip }
+        );
 
-    if (ctx.input.action === 'list') {
-      let associations: any[];
-      if (ctx.input.sourceType === 'user') {
-        associations = await client.getUserAssociations(
-          ctx.input.sourceId,
-          ctx.input.targetType,
-          {
-            limit: ctx.input.limit,
-            skip: ctx.input.skip
-          }
-        );
-      } else if (ctx.input.sourceType === 'user_group') {
-        associations = await client.listUserGroupAssociations(
-          ctx.input.sourceId,
-          ctx.input.targetType,
-          {
-            limit: ctx.input.limit,
-            skip: ctx.input.skip
-          }
-        );
-      } else if (ctx.input.sourceType === 'system') {
-        associations = await client.getSystemAssociations(
-          ctx.input.sourceId,
-          ctx.input.targetType,
-          {
-            limit: ctx.input.limit,
-            skip: ctx.input.skip
-          }
-        );
-      } else {
-        let axios2 = (client as any).v2Axios();
-        let response = await axios2.get(`/systemgroups/${ctx.input.sourceId}/associations`, {
-          params: {
-            targets: ctx.input.targetType,
-            limit: ctx.input.limit ?? 100,
-            skip: ctx.input.skip ?? 0
-          }
-        });
-        associations = response.data;
+        let mapped = associations.map(a => ({
+          targetId: a.to.id,
+          targetType: a.to.type
+        }));
+
+        return {
+          output: {
+            sourceId: ctx.input.sourceId,
+            sourceType: ctx.input.sourceType,
+            action: 'list',
+            associations: mapped,
+            success: true
+          },
+          message: `Found **${mapped.length}** ${ctx.input.targetType} associations for ${ctx.input.sourceType} \`${ctx.input.sourceId}\`.`
+        };
       }
 
-      let mapped = associations.map((a: any) => ({
-        targetId: a.to?.id ?? a.id,
-        targetType: a.to?.type ?? a.type
-      }));
+      if (!ctx.input.targetId)
+        throw createApiServiceError('targetId is required for add/remove actions');
 
+      if (ctx.input.limit !== undefined || ctx.input.skip !== undefined)
+        throw createApiServiceError('Omit paging fields when changing an association.');
+      if (ctx.input.sudoWithoutPassword !== undefined && ctx.input.sudoEnabled === undefined)
+        throw createApiServiceError(
+          'sudoWithoutPassword requires an explicit sudoEnabled value.'
+        );
+      if (ctx.input.sudoWithoutPassword && !ctx.input.sudoEnabled)
+        throw createApiServiceError('Passwordless sudo requires sudoEnabled true.');
+      let attributes: { sudo: { enabled: boolean; withoutPassword: boolean } } | undefined;
+      if (ctx.input.sudoEnabled !== undefined) {
+        attributes = {
+          sudo: {
+            enabled: ctx.input.sudoEnabled,
+            withoutPassword: ctx.input.sudoWithoutPassword ?? false
+          }
+        };
+      }
+
+      let body = {
+        op: ctx.input.action as 'add' | 'remove',
+        type: ctx.input.targetType,
+        id: ctx.input.targetId,
+        attributes
+      };
+
+      if (ctx.input.sourceType === 'user') {
+        await client.manageUserAssociations(ctx.input.sourceId, body);
+      } else if (ctx.input.sourceType === 'user_group') {
+        await client.manageUserGroupAssociations(ctx.input.sourceId, body);
+      } else if (ctx.input.sourceType === 'system') {
+        await client.manageSystemAssociations(ctx.input.sourceId, body);
+      } else {
+        await client.manageSystemGroupAssociations(ctx.input.sourceId, body);
+      }
+
+      let actionLabel = ctx.input.action === 'add' ? 'Added' : 'Removed';
       return {
         output: {
           sourceId: ctx.input.sourceId,
           sourceType: ctx.input.sourceType,
-          action: 'list',
-          associations: mapped,
+          action: ctx.input.action,
           success: true
         },
-        message: `Found **${mapped.length}** ${ctx.input.targetType} associations for ${ctx.input.sourceType} \`${ctx.input.sourceId}\`.`
+        message: `${actionLabel} association: ${ctx.input.sourceType} \`${ctx.input.sourceId}\` → ${ctx.input.targetType} \`${ctx.input.targetId}\``
       };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
     }
-
-    if (!ctx.input.targetId) throw new Error('targetId is required for add/remove actions');
-
-    let attributes: Record<string, any> | undefined;
-    if (ctx.input.sudoEnabled !== undefined) {
-      attributes = {
-        sudo: {
-          enabled: ctx.input.sudoEnabled,
-          withoutPassword: ctx.input.sudoWithoutPassword ?? false
-        }
-      };
-    }
-
-    let body = {
-      op: ctx.input.action as 'add' | 'remove',
-      type: ctx.input.targetType,
-      id: ctx.input.targetId,
-      attributes
-    };
-
-    if (ctx.input.sourceType === 'user') {
-      await client.manageUserAssociations(ctx.input.sourceId, body);
-    } else if (ctx.input.sourceType === 'user_group') {
-      await client.manageUserGroupAssociations(ctx.input.sourceId, body);
-    } else if (ctx.input.sourceType === 'system') {
-      await client.manageSystemAssociations(ctx.input.sourceId, body);
-    } else {
-      await client.manageSystemGroupAssociations(ctx.input.sourceId, body);
-    }
-
-    let actionLabel = ctx.input.action === 'add' ? 'Added' : 'Removed';
-    return {
-      output: {
-        sourceId: ctx.input.sourceId,
-        sourceType: ctx.input.sourceType,
-        action: ctx.input.action,
-        success: true
-      },
-      message: `${actionLabel} association: ${ctx.input.sourceType} \`${ctx.input.sourceId}\` → ${ctx.input.targetType} \`${ctx.input.targetId}\``
-    };
   })
   .build();

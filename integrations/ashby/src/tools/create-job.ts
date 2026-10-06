@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AshbyClient } from '../lib/client';
+import { id, invalid, mapJob, pageSchema, text, warningsSchema } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let createJobTool = SlateTool.create(spec, {
   name: 'Create Job',
   key: 'create_job',
-  description: `Creates a new job in Ashby with a title and optional location, department, and default interview plan. Returns the created job's ID and basic details.`,
+  description: `Creates a new job in Ashby with a title, required location and department/team IDs, and an optional default interview plan. Use list_organization to discover the location and department. Returns the created job's ID and basic details.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -15,8 +16,14 @@ export let createJobTool = SlateTool.create(spec, {
   .input(
     z.object({
       title: z.string().describe('Title of the job to create'),
-      locationId: z.string().optional().describe('Location ID to associate with the job'),
-      departmentId: z.string().optional().describe('Department ID to associate with the job'),
+      locationId: z
+        .string()
+        .optional()
+        .describe('Required location ID from list_organization locations'),
+      departmentId: z
+        .string()
+        .optional()
+        .describe('Required department/team ID from list_organization departments'),
       defaultInterviewPlanId: z
         .string()
         .optional()
@@ -30,34 +37,31 @@ export let createJobTool = SlateTool.create(spec, {
       status: z.string().describe('Current status of the job'),
       locationId: z.string().optional().describe('Location ID associated with the job'),
       departmentId: z.string().optional().describe('Department ID associated with the job'),
-      createdAt: z.string().describe('Creation timestamp')
+      createdAt: z.string().describe('Creation timestamp'),
+      warnings: warningsSchema,
+      pageInfo: pageSchema.optional(),
+      completedActions: z.array(z.string()).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AshbyClient({ token: ctx.auth.token });
-
-    let params: Record<string, any> = {
-      title: ctx.input.title
-    };
-
-    if (ctx.input.locationId !== undefined) params.locationId = ctx.input.locationId;
-    if (ctx.input.departmentId !== undefined) params.departmentId = ctx.input.departmentId;
-    if (ctx.input.defaultInterviewPlanId !== undefined)
-      params.defaultInterviewPlanId = ctx.input.defaultInterviewPlanId;
-
-    let result = await client.createJob(params as any);
-    let job = result.results;
-
+    const client = new AshbyClient(ctx.auth),
+      input = ctx.input;
+    if (input.departmentId === undefined || input.locationId === undefined)
+      invalid(
+        'Ashby job.create requires departmentId (native teamId) and locationId. Use list_organization departments/locations; choose exact IDs before creating a job.'
+      );
+    const result = await client.post('/job.create', {
+      title: text(input.title, 'Job title'),
+      teamId: id(input.departmentId, 'Department/team ID'),
+      locationId: id(input.locationId, 'Location ID'),
+      defaultInterviewPlanId:
+        input.defaultInterviewPlanId === undefined
+          ? undefined
+          : id(input.defaultInterviewPlanId, 'Default interview plan ID')
+    });
     return {
-      output: {
-        jobId: job.id,
-        title: job.title,
-        status: job.status,
-        ...(job.locationId ? { locationId: job.locationId } : {}),
-        ...(job.departmentId ? { departmentId: job.departmentId } : {}),
-        createdAt: job.createdAt
-      },
-      message: `Created job **${job.title}** (\`${job.id}\`).`
+      output: { ...mapJob(result.results), warnings: client.warnings },
+      message: 'Job creation accepted. The returned provider status is authoritative.'
     };
   })
   .build();

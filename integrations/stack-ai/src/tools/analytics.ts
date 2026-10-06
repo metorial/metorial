@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { orgIdInput } from '../lib/deployment';
+import { analyticsFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getProjectAnalytics = SlateTool.create(spec, {
@@ -14,11 +16,15 @@ export let getProjectAnalytics = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      flowId: z.string().describe('The flow/project ID to get analytics for'),
-      page: z.number().optional().describe('Page number (0-indexed, default 0)'),
-      pageSize: z.number().optional().describe('Results per page (default 25)'),
-      startDate: z.string().optional().describe('Start date filter (ISO 8601 format)'),
-      endDate: z.string().optional().describe('End date filter (ISO 8601 format)')
+      flowId: z.string().min(1).describe('The flow/project ID to get analytics for'),
+      orgId: orgIdInput,
+      ...analyticsFields,
+      userId: z.string().min(1).optional().describe('Filter runs by user ID'),
+      states: z
+        .array(z.enum(['PENDING', 'PAUSED', 'RESUMED', 'COMPLETED', 'FAILED', 'CANCELLED']))
+        .min(1)
+        .optional()
+        .describe('Filter runs by one or more execution states')
     })
   )
   .output(
@@ -31,16 +37,16 @@ export let getProjectAnalytics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    validateDateRange(ctx.input);
+    let client = createClient(ctx, ctx.input.orgId);
 
     let runs = await client.getProjectAnalytics(ctx.input.flowId, {
       page: ctx.input.page,
       pageSize: ctx.input.pageSize,
       startDate: ctx.input.startDate,
-      endDate: ctx.input.endDate
+      endDate: ctx.input.endDate,
+      userId: ctx.input.userId,
+      states: ctx.input.states
     });
 
     return {
@@ -63,10 +69,7 @@ export let getOrganizationAnalytics = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number (0-indexed, default 0)'),
-      pageSize: z.number().optional().describe('Results per page (default 25)'),
-      startDate: z.string().optional().describe('Start date filter (ISO 8601 format)'),
-      endDate: z.string().optional().describe('End date filter (ISO 8601 format)')
+      ...analyticsFields
     })
   )
   .output(
@@ -79,10 +82,8 @@ export let getOrganizationAnalytics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    validateDateRange(ctx.input);
+    let client = createClient(ctx);
 
     let projects = await client.getOrganizationAnalytics({
       page: ctx.input.page,
@@ -120,21 +121,28 @@ export let getStorageAnalytics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let usage = await client.getStorageUsage();
-    let totalBytes = usage.total_storage_bytes as number | undefined;
-    let kbs = usage.knowledge_bases as Record<string, unknown>[] | undefined;
+    let totalBytes = usage.total_storage_bytes;
+    let kbs = usage.knowledge_bases;
 
     return {
       output: {
         totalStorageBytes: totalBytes,
         knowledgeBases: kbs
       },
-      message: `Storage usage: **${totalBytes ? `${(totalBytes / (1024 * 1024)).toFixed(2)} MB` : 'unknown'}** total.`
+      message: `Storage usage: **${totalBytes !== undefined ? `${(totalBytes / (1024 * 1024)).toFixed(2)} MB` : 'unknown'}** total.`
     };
   })
   .build();
+
+const validateDateRange = (input: { startDate?: string; endDate?: string }) => {
+  if (
+    input.startDate &&
+    input.endDate &&
+    Date.parse(input.startDate) > Date.parse(input.endDate)
+  ) {
+    throw createApiServiceError('startDate must be before or equal to endDate.');
+  }
+};

@@ -1,0 +1,1745 @@
+{
+  "get_user_profile": {
+    "name": "Get User Profile",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The user ID"
+        },
+        "teamId": {
+          "type": "string",
+          "description": "The ID of the user's Canva team"
+        },
+        "displayName": {
+          "description": "The display name shown in the Canva UI",
+          "type": "string"
+        }
+      },
+      "required": ["userId", "teamId"],
+      "additionalProperties": false
+    }
+  },
+  "get_asset": {
+    "name": "Get Asset",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "description": "The ID of the asset to retrieve"
+        }
+      },
+      "required": ["assetId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "description": "The asset ID"
+        },
+        "type": {
+          "type": "string",
+          "description": "Asset type: \"image\" or \"video\""
+        },
+        "name": {
+          "type": "string",
+          "description": "Asset name"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "User-defined tags"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Unix timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Unix timestamp of last modification"
+        },
+        "ownerUserId": {
+          "type": "string",
+          "description": "Owner user ID"
+        },
+        "ownerTeamId": {
+          "type": "string",
+          "description": "Owner team ID"
+        },
+        "thumbnailUrl": {
+          "description": "Thumbnail URL (expires after 15 minutes)",
+          "type": "string"
+        },
+        "thumbnailWidth": {
+          "description": "Thumbnail width in pixels",
+          "type": "number"
+        },
+        "thumbnailHeight": {
+          "description": "Thumbnail height in pixels",
+          "type": "number"
+        }
+      },
+      "required": [
+        "assetId",
+        "type",
+        "name",
+        "tags",
+        "createdAt",
+        "updatedAt",
+        "ownerUserId",
+        "ownerTeamId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "update_asset": {
+    "name": "Update Asset",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "description": "The ID of the asset to update"
+        },
+        "name": {
+          "description": "New asset name (max 50 characters)",
+          "type": "string",
+          "maxLength": 50
+        },
+        "tags": {
+          "description": "New tags for the asset (replaces all existing tags, max 50)",
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["assetId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "description": "The asset ID"
+        },
+        "type": {
+          "type": "string",
+          "description": "Asset type"
+        },
+        "name": {
+          "type": "string",
+          "description": "Updated asset name"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Updated tags"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Unix timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Unix timestamp of last modification"
+        },
+        "ownerUserId": {
+          "type": "string",
+          "description": "Owner user ID"
+        },
+        "ownerTeamId": {
+          "type": "string",
+          "description": "Owner team ID"
+        },
+        "thumbnailUrl": {
+          "description": "Thumbnail URL",
+          "type": "string"
+        }
+      },
+      "required": [
+        "assetId",
+        "type",
+        "name",
+        "tags",
+        "createdAt",
+        "updatedAt",
+        "ownerUserId",
+        "ownerTeamId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "delete_asset": {
+    "name": "Delete Asset",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "description": "The ID of the asset to delete"
+        }
+      },
+      "required": ["assetId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "upload_asset": {
+    "name": "Upload Asset",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Name for the asset (max 50 characters)"
+        },
+        "url": {
+          "type": "string",
+          "description": "URL of the file to upload"
+        }
+      },
+      "required": ["name", "url"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "The upload job ID for checking status"
+        },
+        "status": {
+          "type": "string",
+          "description": "Job status: \"in_progress\", \"success\", or \"failed\""
+        },
+        "errorCode": {
+          "description": "Error code if the upload failed",
+          "type": "string"
+        },
+        "errorMessage": {
+          "description": "Error message if the upload failed",
+          "type": "string"
+        },
+        "asset": {
+          "description": "The uploaded asset details (present when status is \"success\")",
+          "type": "object",
+          "properties": {
+            "assetId": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "createdAt": {
+              "type": "number"
+            },
+            "updatedAt": {
+              "type": "number"
+            },
+            "ownerUserId": {
+              "type": "string"
+            },
+            "ownerTeamId": {
+              "type": "string"
+            },
+            "thumbnailUrl": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "assetId",
+            "type",
+            "name",
+            "tags",
+            "createdAt",
+            "updatedAt",
+            "ownerUserId",
+            "ownerTeamId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["jobId", "status"],
+      "additionalProperties": false
+    }
+  },
+  "list_designs": {
+    "name": "List Designs",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Search query to filter designs",
+          "type": "string",
+          "maxLength": 255
+        },
+        "ownership": {
+          "description": "Filter by ownership type",
+          "type": "string",
+          "enum": ["any", "owned", "shared"]
+        },
+        "sortBy": {
+          "description": "Sort order",
+          "type": "string",
+          "enum": [
+            "relevance",
+            "modified_descending",
+            "modified_ascending",
+            "title_descending",
+            "title_ascending"
+          ]
+        },
+        "limit": {
+          "description": "Number of results per page (1-100, default 25)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "continuation": {
+          "description": "Pagination token from a previous response",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "designs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "designId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "ownerUserId": {
+                "type": "string"
+              },
+              "ownerTeamId": {
+                "type": "string"
+              },
+              "editUrl": {
+                "type": "string"
+              },
+              "viewUrl": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "thumbnailUrl": {
+                "type": "string"
+              },
+              "pageCount": {
+                "type": "number"
+              }
+            },
+            "required": ["designId", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          },
+          "description": "List of designs"
+        },
+        "continuation": {
+          "description": "Token for retrieving the next page",
+          "type": "string"
+        }
+      },
+      "required": ["designs"],
+      "additionalProperties": false
+    }
+  },
+  "get_design": {
+    "name": "Get Design",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "designId": {
+          "type": "string",
+          "description": "The ID of the design to retrieve"
+        }
+      },
+      "required": ["designId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "designId": {
+          "type": "string",
+          "description": "The design ID"
+        },
+        "title": {
+          "description": "Design title",
+          "type": "string"
+        },
+        "ownerUserId": {
+          "description": "Owner user ID",
+          "type": "string"
+        },
+        "ownerTeamId": {
+          "description": "Owner team ID",
+          "type": "string"
+        },
+        "editUrl": {
+          "description": "Temporary edit URL (valid for 30 days)",
+          "type": "string"
+        },
+        "viewUrl": {
+          "description": "Temporary view URL (valid for 30 days)",
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Unix timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Unix timestamp of last modification"
+        },
+        "thumbnailUrl": {
+          "description": "Thumbnail URL (expires after 15 minutes)",
+          "type": "string"
+        },
+        "pageCount": {
+          "description": "Number of pages in the design",
+          "type": "number"
+        }
+      },
+      "required": ["designId", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "create_design": {
+    "name": "Create Design",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "presetType": {
+          "description": "Preset design type. Use this OR custom dimensions, not both.",
+          "type": "string",
+          "enum": ["doc", "whiteboard", "presentation"]
+        },
+        "width": {
+          "description": "Custom width in pixels (use with height instead of presetType)",
+          "type": "number",
+          "minimum": 40,
+          "maximum": 8000
+        },
+        "height": {
+          "description": "Custom height in pixels (use with width instead of presetType)",
+          "type": "number",
+          "minimum": 40,
+          "maximum": 8000
+        },
+        "title": {
+          "description": "Design title (1-255 characters)",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "assetId": {
+          "description": "Image asset ID to insert into the design",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "designId": {
+          "type": "string",
+          "description": "The new design ID"
+        },
+        "title": {
+          "description": "Design title",
+          "type": "string"
+        },
+        "editUrl": {
+          "description": "Temporary edit URL (valid for 30 days)",
+          "type": "string"
+        },
+        "viewUrl": {
+          "description": "Temporary view URL (valid for 30 days)",
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Unix timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Unix timestamp of last modification"
+        },
+        "thumbnailUrl": {
+          "description": "Thumbnail URL",
+          "type": "string"
+        },
+        "pageCount": {
+          "description": "Number of pages",
+          "type": "number"
+        }
+      },
+      "required": ["designId", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "export_design": {
+    "name": "Export Design",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "designId": {
+          "type": "string",
+          "description": "The ID of the design to export"
+        },
+        "formatType": {
+          "type": "string",
+          "enum": ["pdf", "jpg", "png", "gif", "pptx", "mp4"],
+          "description": "Export format"
+        },
+        "quality": {
+          "description": "Image quality for JPG exports (1-100)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "width": {
+          "description": "Output width in pixels (JPG, PNG, GIF)",
+          "type": "number",
+          "minimum": 40,
+          "maximum": 25000
+        },
+        "height": {
+          "description": "Output height in pixels (JPG, PNG, GIF)",
+          "type": "number",
+          "minimum": 40,
+          "maximum": 25000
+        },
+        "transparentBackground": {
+          "description": "Use transparent background for PNG exports",
+          "type": "boolean"
+        },
+        "asSingleImage": {
+          "description": "Export all pages as a single image for PNG exports",
+          "type": "boolean"
+        },
+        "lossless": {
+          "description": "Use lossless compression for PNG exports",
+          "type": "boolean"
+        },
+        "exportQuality": {
+          "description": "Export quality tier",
+          "type": "string",
+          "enum": ["regular", "pro"]
+        },
+        "pdfSize": {
+          "description": "Page size for PDF exports",
+          "type": "string",
+          "enum": ["a4", "a3", "letter", "legal"]
+        },
+        "mp4Quality": {
+          "description": "Video quality for MP4 exports (e.g., \"horizontal_1080p\")",
+          "type": "string"
+        },
+        "pages": {
+          "description": "Specific page indices to export (0-based)",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "required": ["designId", "formatType"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "The export job ID"
+        },
+        "status": {
+          "type": "string",
+          "description": "Job status: \"in_progress\", \"success\", or \"failed\""
+        },
+        "downloadUrls": {
+          "description": "Download URLs (valid for 24 hours, present when status is \"success\")",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "errorCode": {
+          "description": "Error code if the export failed",
+          "type": "string"
+        },
+        "errorMessage": {
+          "description": "Error message if the export failed",
+          "type": "string"
+        }
+      },
+      "required": ["jobId", "status"],
+      "additionalProperties": false
+    }
+  },
+  "get_export_job": {
+    "name": "Get Export Job",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "The export job ID to check"
+        }
+      },
+      "required": ["jobId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "The export job ID"
+        },
+        "status": {
+          "type": "string",
+          "description": "Job status: \"in_progress\", \"success\", or \"failed\""
+        },
+        "downloadUrls": {
+          "description": "Download URLs (valid for 24 hours)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "errorCode": {
+          "description": "Error code if failed",
+          "type": "string"
+        },
+        "errorMessage": {
+          "description": "Error message if failed",
+          "type": "string"
+        }
+      },
+      "required": ["jobId", "status"],
+      "additionalProperties": false
+    }
+  },
+  "import_design": {
+    "name": "Import Design",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50,
+          "description": "Title for the imported design (max 50 characters)"
+        },
+        "url": {
+          "type": "string",
+          "description": "URL of the file to import"
+        },
+        "mimeType": {
+          "description": "MIME type of the file (auto-detected if omitted)",
+          "type": "string"
+        }
+      },
+      "required": ["title", "url"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "The import job ID for checking status"
+        },
+        "status": {
+          "type": "string",
+          "description": "Job status: \"in_progress\", \"success\", or \"failed\""
+        },
+        "designs": {
+          "description": "Imported designs (present when status is \"success\")",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "designId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "editUrl": {
+                "type": "string"
+              },
+              "viewUrl": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "pageCount": {
+                "type": "number"
+              }
+            },
+            "required": ["designId", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          }
+        },
+        "errorCode": {
+          "description": "Error code if the import failed",
+          "type": "string"
+        },
+        "errorMessage": {
+          "description": "Error message if the import failed",
+          "type": "string"
+        }
+      },
+      "required": ["jobId", "status"],
+      "additionalProperties": false
+    }
+  },
+  "get_import_job": {
+    "name": "Get Import Job",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "The import job ID to check"
+        }
+      },
+      "required": ["jobId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "The import job ID"
+        },
+        "status": {
+          "type": "string",
+          "description": "Job status: \"in_progress\", \"success\", or \"failed\""
+        },
+        "designs": {
+          "description": "Imported designs",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "designId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "editUrl": {
+                "type": "string"
+              },
+              "viewUrl": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "pageCount": {
+                "type": "number"
+              }
+            },
+            "required": ["designId", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          }
+        },
+        "errorCode": {
+          "description": "Error code if failed",
+          "type": "string"
+        },
+        "errorMessage": {
+          "description": "Error message if failed",
+          "type": "string"
+        }
+      },
+      "required": ["jobId", "status"],
+      "additionalProperties": false
+    }
+  },
+  "get_folder": {
+    "name": "Get Folder",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderId": {
+          "type": "string",
+          "description": "The folder ID. Use \"root\" for top-level projects, \"uploads\" for the Uploads folder."
+        }
+      },
+      "required": ["folderId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderId": {
+          "type": "string",
+          "description": "The folder ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Folder name"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Unix timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Unix timestamp of last modification"
+        },
+        "thumbnailUrl": {
+          "description": "Thumbnail URL (expires after 15 minutes)",
+          "type": "string"
+        }
+      },
+      "required": ["folderId", "name", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "create_folder": {
+    "name": "Create Folder",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "Folder name (1-255 characters)"
+        },
+        "parentFolderId": {
+          "type": "string",
+          "description": "Parent folder ID. Use \"root\" for top-level projects, \"uploads\" for Uploads folder."
+        }
+      },
+      "required": ["name", "parentFolderId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderId": {
+          "type": "string",
+          "description": "The folder ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Folder name"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Unix timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Unix timestamp of last modification"
+        },
+        "thumbnailUrl": {
+          "description": "Thumbnail URL (expires after 15 minutes)",
+          "type": "string"
+        }
+      },
+      "required": ["folderId", "name", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "update_folder": {
+    "name": "Update Folder",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderId": {
+          "type": "string",
+          "description": "The folder ID to update"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "description": "New folder name (1-255 characters)"
+        }
+      },
+      "required": ["folderId", "name"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderId": {
+          "type": "string",
+          "description": "The folder ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Folder name"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Unix timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Unix timestamp of last modification"
+        },
+        "thumbnailUrl": {
+          "description": "Thumbnail URL (expires after 15 minutes)",
+          "type": "string"
+        }
+      },
+      "required": ["folderId", "name", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "delete_folder": {
+    "name": "Delete Folder",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderId": {
+          "type": "string",
+          "description": "The folder ID to delete"
+        }
+      },
+      "required": ["folderId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "list_folder_items": {
+    "name": "List Folder Items",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderId": {
+          "type": "string",
+          "description": "The folder ID. Use \"root\" for top-level projects."
+        },
+        "itemTypes": {
+          "description": "Filter by item types",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["design", "folder", "image"]
+          }
+        },
+        "sortBy": {
+          "description": "Sort order",
+          "type": "string",
+          "enum": [
+            "created_ascending",
+            "created_descending",
+            "modified_ascending",
+            "modified_descending",
+            "title_ascending",
+            "title_descending"
+          ]
+        },
+        "limit": {
+          "description": "Number of items per page (1-100, default 50)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "continuation": {
+          "description": "Pagination token from a previous response",
+          "type": "string"
+        }
+      },
+      "required": ["folderId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Item type: \"design\", \"folder\", or \"image\""
+              },
+              "folder": {
+                "description": "Folder details (when type is \"folder\")",
+                "type": "object",
+                "properties": {
+                  "folderId": {
+                    "type": "string",
+                    "description": "The folder ID"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Folder name"
+                  },
+                  "createdAt": {
+                    "type": "number",
+                    "description": "Unix timestamp of creation"
+                  },
+                  "updatedAt": {
+                    "type": "number",
+                    "description": "Unix timestamp of last modification"
+                  },
+                  "thumbnailUrl": {
+                    "description": "Thumbnail URL (expires after 15 minutes)",
+                    "type": "string"
+                  }
+                },
+                "required": ["folderId", "name", "createdAt", "updatedAt"],
+                "additionalProperties": false
+              },
+              "design": {
+                "description": "Design details (when type is \"design\")",
+                "type": "object",
+                "properties": {
+                  "designId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "editUrl": {
+                    "type": "string"
+                  },
+                  "viewUrl": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "thumbnailUrl": {
+                    "type": "string"
+                  },
+                  "pageCount": {
+                    "type": "number"
+                  }
+                },
+                "required": ["designId", "createdAt", "updatedAt"],
+                "additionalProperties": false
+              },
+              "image": {
+                "description": "Image asset details (when type is \"image\")",
+                "type": "object",
+                "properties": {
+                  "assetId": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "ownerUserId": {
+                    "type": "string"
+                  },
+                  "ownerTeamId": {
+                    "type": "string"
+                  },
+                  "thumbnailUrl": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "assetId",
+                  "type",
+                  "name",
+                  "tags",
+                  "createdAt",
+                  "updatedAt",
+                  "ownerUserId",
+                  "ownerTeamId"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": ["type"],
+            "additionalProperties": false
+          },
+          "description": "Items in the folder"
+        },
+        "continuation": {
+          "description": "Token for retrieving the next page",
+          "type": "string"
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    }
+  },
+  "move_folder_item": {
+    "name": "Move Folder Item",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string",
+          "description": "ID of the item to move (design, folder, or image asset)"
+        },
+        "toFolderId": {
+          "type": "string",
+          "description": "Destination folder ID. Use \"root\" for top-level projects."
+        }
+      },
+      "required": ["itemId", "toFolderId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "moved": {
+          "type": "boolean",
+          "description": "Whether the move was successful"
+        }
+      },
+      "required": ["moved"],
+      "additionalProperties": false
+    }
+  },
+  "create_comment": {
+    "name": "Create Comment",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "designId": {
+          "type": "string",
+          "description": "The design ID to comment on"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "description": "Comment text (1-2048 chars). Mention users via [user_id:team_id]."
+        },
+        "threadId": {
+          "description": "If provided, creates a reply to this thread instead of a new thread",
+          "type": "string"
+        },
+        "assigneeId": {
+          "description": "User ID to assign the comment to (new threads only, user must be mentioned)",
+          "type": "string"
+        }
+      },
+      "required": ["designId", "message"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "thread": {
+          "description": "Created comment thread (when creating a new thread)",
+          "type": "object",
+          "properties": {
+            "threadId": {
+              "type": "string",
+              "description": "The comment thread ID"
+            },
+            "designId": {
+              "type": "string",
+              "description": "The design ID"
+            },
+            "authorUserId": {
+              "description": "Author user ID",
+              "type": "string"
+            },
+            "authorDisplayName": {
+              "description": "Author display name",
+              "type": "string"
+            },
+            "contentPlaintext": {
+              "description": "Comment content in plaintext",
+              "type": "string"
+            },
+            "contentMarkdown": {
+              "description": "Comment content in markdown",
+              "type": "string"
+            },
+            "assigneeUserId": {
+              "description": "Assigned user ID",
+              "type": "string"
+            },
+            "assigneeDisplayName": {
+              "description": "Assigned user display name",
+              "type": "string"
+            },
+            "resolverUserId": {
+              "description": "Resolver user ID",
+              "type": "string"
+            },
+            "resolverDisplayName": {
+              "description": "Resolver display name",
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "number",
+              "description": "Unix timestamp of creation"
+            },
+            "updatedAt": {
+              "type": "number",
+              "description": "Unix timestamp of last modification"
+            }
+          },
+          "required": ["threadId", "designId", "createdAt", "updatedAt"],
+          "additionalProperties": false
+        },
+        "reply": {
+          "description": "Created reply (when replying to a thread)",
+          "type": "object",
+          "properties": {
+            "replyId": {
+              "type": "string",
+              "description": "The reply ID"
+            },
+            "designId": {
+              "description": "The design ID",
+              "type": "string"
+            },
+            "threadId": {
+              "description": "The parent thread ID",
+              "type": "string"
+            },
+            "authorUserId": {
+              "description": "Author user ID",
+              "type": "string"
+            },
+            "authorDisplayName": {
+              "description": "Author display name",
+              "type": "string"
+            },
+            "contentPlaintext": {
+              "description": "Reply content in plaintext",
+              "type": "string"
+            },
+            "contentMarkdown": {
+              "description": "Reply content in markdown",
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "number",
+              "description": "Unix timestamp of creation"
+            },
+            "updatedAt": {
+              "type": "number",
+              "description": "Unix timestamp of last modification"
+            }
+          },
+          "required": ["replyId", "createdAt", "updatedAt"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_comment_thread": {
+    "name": "Get Comment Thread",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "designId": {
+          "type": "string",
+          "description": "The design ID"
+        },
+        "threadId": {
+          "type": "string",
+          "description": "The comment thread ID"
+        },
+        "includeReplies": {
+          "description": "Whether to also fetch replies for this thread",
+          "type": "boolean"
+        },
+        "repliesLimit": {
+          "description": "Number of replies to fetch (1-100, default 50)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": ["designId", "threadId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "thread": {
+          "type": "object",
+          "properties": {
+            "threadId": {
+              "type": "string",
+              "description": "The comment thread ID"
+            },
+            "designId": {
+              "type": "string",
+              "description": "The design ID"
+            },
+            "authorUserId": {
+              "description": "Author user ID",
+              "type": "string"
+            },
+            "authorDisplayName": {
+              "description": "Author display name",
+              "type": "string"
+            },
+            "contentPlaintext": {
+              "description": "Comment content in plaintext",
+              "type": "string"
+            },
+            "contentMarkdown": {
+              "description": "Comment content in markdown",
+              "type": "string"
+            },
+            "assigneeUserId": {
+              "description": "Assigned user ID",
+              "type": "string"
+            },
+            "assigneeDisplayName": {
+              "description": "Assigned user display name",
+              "type": "string"
+            },
+            "resolverUserId": {
+              "description": "Resolver user ID",
+              "type": "string"
+            },
+            "resolverDisplayName": {
+              "description": "Resolver display name",
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "number",
+              "description": "Unix timestamp of creation"
+            },
+            "updatedAt": {
+              "type": "number",
+              "description": "Unix timestamp of last modification"
+            }
+          },
+          "required": ["threadId", "designId", "createdAt", "updatedAt"],
+          "additionalProperties": false,
+          "description": "The comment thread"
+        },
+        "replies": {
+          "description": "Replies in the thread (when includeReplies is true)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "replyId": {
+                "type": "string",
+                "description": "The reply ID"
+              },
+              "designId": {
+                "description": "The design ID",
+                "type": "string"
+              },
+              "threadId": {
+                "description": "The parent thread ID",
+                "type": "string"
+              },
+              "authorUserId": {
+                "description": "Author user ID",
+                "type": "string"
+              },
+              "authorDisplayName": {
+                "description": "Author display name",
+                "type": "string"
+              },
+              "contentPlaintext": {
+                "description": "Reply content in plaintext",
+                "type": "string"
+              },
+              "contentMarkdown": {
+                "description": "Reply content in markdown",
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "number",
+                "description": "Unix timestamp of creation"
+              },
+              "updatedAt": {
+                "type": "number",
+                "description": "Unix timestamp of last modification"
+              }
+            },
+            "required": ["replyId", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          }
+        },
+        "repliesContinuation": {
+          "description": "Pagination token for more replies",
+          "type": "string"
+        }
+      },
+      "required": ["thread"],
+      "additionalProperties": false
+    }
+  },
+  "list_brand_templates": {
+    "name": "List Brand Templates",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Search query to filter templates",
+          "type": "string"
+        },
+        "ownership": {
+          "description": "Filter by ownership type",
+          "type": "string",
+          "enum": ["any", "owned", "shared"]
+        },
+        "sortBy": {
+          "description": "Sort order",
+          "type": "string",
+          "enum": [
+            "relevance",
+            "modified_descending",
+            "modified_ascending",
+            "title_descending",
+            "title_ascending"
+          ]
+        },
+        "dataset": {
+          "description": "Filter by dataset: \"non_empty\" for templates that support autofill",
+          "type": "string",
+          "enum": ["any", "non_empty"]
+        },
+        "limit": {
+          "description": "Number of results per page (1-100, default 25)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "continuation": {
+          "description": "Pagination token from a previous response",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "brandTemplateId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "viewUrl": {
+                "type": "string"
+              },
+              "createUrl": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "thumbnailUrl": {
+                "type": "string"
+              }
+            },
+            "required": ["brandTemplateId", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          },
+          "description": "List of brand templates"
+        },
+        "continuation": {
+          "description": "Token for retrieving the next page",
+          "type": "string"
+        }
+      },
+      "required": ["templates"],
+      "additionalProperties": false
+    }
+  },
+  "get_brand_template": {
+    "name": "Get Brand Template",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "brandTemplateId": {
+          "type": "string",
+          "description": "The brand template ID"
+        },
+        "includeDataset": {
+          "description": "Whether to also fetch the autofill dataset for this template",
+          "type": "boolean"
+        }
+      },
+      "required": ["brandTemplateId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "brandTemplateId": {
+          "type": "string",
+          "description": "The brand template ID"
+        },
+        "title": {
+          "description": "Template title",
+          "type": "string"
+        },
+        "viewUrl": {
+          "description": "URL to view the template",
+          "type": "string"
+        },
+        "createUrl": {
+          "description": "URL to create designs from the template",
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Unix timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Unix timestamp of last modification"
+        },
+        "thumbnailUrl": {
+          "description": "Thumbnail URL",
+          "type": "string"
+        },
+        "dataset": {
+          "description": "Autofill dataset fields (when includeDataset is true)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Field type: \"image\", \"text\", or \"chart\""
+              }
+            },
+            "required": ["type"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["brandTemplateId", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "autofill_brand_template": {
+    "name": "Autofill Brand Template",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "brandTemplateId": {
+          "type": "string",
+          "description": "The brand template ID to autofill"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Key-value pairs of data fields to fill. Keys must match the template dataset field names."
+        },
+        "title": {
+          "description": "Title for the generated design (defaults to the template title)",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        }
+      },
+      "required": ["brandTemplateId", "fields"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "The autofill job ID"
+        },
+        "status": {
+          "type": "string",
+          "description": "Job status: \"in_progress\", \"success\", or \"failed\""
+        },
+        "design": {
+          "description": "The generated design (present when status is \"success\")",
+          "type": "object",
+          "properties": {
+            "designId": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "editUrl": {
+              "type": "string"
+            },
+            "viewUrl": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "number"
+            },
+            "updatedAt": {
+              "type": "number"
+            }
+          },
+          "required": ["designId", "createdAt", "updatedAt"],
+          "additionalProperties": false
+        },
+        "errorCode": {
+          "description": "Error code if the autofill failed",
+          "type": "string"
+        },
+        "errorMessage": {
+          "description": "Error message if the autofill failed",
+          "type": "string"
+        }
+      },
+      "required": ["jobId", "status"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -4,7 +4,7 @@ import { z } from 'zod';
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string().min(1)
     })
   )
   .addTokenAuth({
@@ -14,7 +14,10 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('HoneyHive API key. Obtain from your HoneyHive Account Settings page.')
+        .min(1)
+        .describe(
+          'Project-scoped HoneyHive data-plane API key. Obtain it from the target project API key settings. Classic keys must be replaced; control-plane and ingestion-only keys cannot manage project resources.'
+        )
     }),
     getOutput: async ctx => {
       return {

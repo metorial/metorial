@@ -28,7 +28,7 @@ describe('google-tasks provider contract', () => {
         'move_task',
         'clear_completed_tasks'
       ],
-      triggerIds: ['inbound_webhook', 'task_changes'],
+      triggerIds: [],
       authMethodIds: ['oauth'],
       tools: [
         { id: 'list_task_lists', readOnly: true, destructive: false },
@@ -43,13 +43,10 @@ describe('google-tasks provider contract', () => {
         { id: 'move_task', readOnly: false, destructive: false },
         { id: 'clear_completed_tasks', readOnly: false, destructive: true }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'task_changes', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(13);
+    expect(contract.actions).toHaveLength(11);
 
     let expectedScopes = {
       list_task_lists: googleTasksActionScopes.listTaskLists,
@@ -62,9 +59,7 @@ describe('google-tasks provider contract', () => {
       update_task: googleTasksActionScopes.updateTask,
       delete_task: googleTasksActionScopes.deleteTask,
       move_task: googleTasksActionScopes.moveTask,
-      clear_completed_tasks: googleTasksActionScopes.clearCompletedTasks,
-      inbound_webhook: googleTasksActionScopes.inboundWebhook,
-      task_changes: googleTasksActionScopes.taskChanges
+      clear_completed_tasks: googleTasksActionScopes.clearCompletedTasks
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

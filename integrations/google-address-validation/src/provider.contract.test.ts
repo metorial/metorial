@@ -15,12 +15,12 @@ describe('google-address-validation provider contract', () => {
           'Validates, standardizes, and geocodes postal addresses using the Google Maps Platform Address Validation API.'
       },
       toolIds: ['validate_address', 'provide_validation_feedback'],
-      triggerIds: ['inbound_webhook'],
+      triggerIds: [],
       authMethodIds: ['api_key', 'oauth'],
-      triggers: [{ id: 'inbound_webhook', invocationType: 'webhook' }]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(3);
+    expect(contract.actions).toHaveLength(2);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual(['projectId']);
 
     let expectedScopes = {

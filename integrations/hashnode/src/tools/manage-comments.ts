@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -12,6 +12,17 @@ let commentSchema = z.object({
   authorName: z.string().nullable().optional(),
   dateAdded: z.string().nullable().optional().describe('When the comment was posted'),
   totalReactions: z.number().nullable().optional(),
+  repliesHasNextPage: z
+    .boolean()
+    .optional()
+    .describe('Whether more replies exist beyond this bounded list.'),
+  repliesEndCursor: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'Native reply cursor. This legacy tool does not fetch subsequent reply pages; use the dashboard for remaining replies.'
+    ),
   replies: z
     .array(
       z.object({
@@ -31,12 +42,7 @@ let commentSchema = z.object({
 export let manageComments = SlateTool.create(spec, {
   name: 'Manage Comments',
   key: 'manage_comments',
-  description: `Interact with comments on blog posts. Supports listing comments, adding comments, replying to comments, and deleting comments or replies.
-- **list**: Get all comments on a post with their replies.
-- **add**: Add a new comment to a post.
-- **reply**: Reply to an existing comment.
-- **delete_comment**: Remove a comment.
-- **delete_reply**: Remove a reply from a comment.`
+  description: `List a page of post comments and up to 20 replies per comment. Reply pagination metadata identifies incomplete reply lists; use the dashboard for remaining replies. Legacy comment and reply write inputs remain accepted for compatibility, but those writes are absent from the current public API and refuse locally.`
 })
   .input(
     z.object({
@@ -55,6 +61,9 @@ export let manageComments = SlateTool.create(spec, {
         .describe('Comment/reply content in Markdown — required for "add" and "reply"'),
       first: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
         .default(10)
         .describe('Number of comments to return — used with "list"'),
@@ -98,15 +107,22 @@ export let manageComments = SlateTool.create(spec, {
 
     let { action } = ctx.input;
 
+    if (action !== 'list')
+      throw createApiServiceError(
+        'Comment and reply writes are unavailable in the current public API. Use the Hashnode dashboard; no request was sent.',
+        { reason: 'unsupported_operation' }
+      );
+
     if (action === 'list') {
-      if (!ctx.input.postId) throw new Error('postId is required to list comments');
+      if (!ctx.input.postId)
+        throw createApiServiceError('postId is required to list comments');
 
       let result = await client.getComments(ctx.input.postId, {
-        first: Math.min(ctx.input.first, 20),
+        first: ctx.input.first,
         after: ctx.input.after
       });
 
-      let comments = result.comments.map((c: any) => ({
+      let comments = result.comments.map(c => ({
         commentId: c.id,
         contentMarkdown: c.content?.markdown,
         contentHtml: c.content?.html,
@@ -115,7 +131,9 @@ export let manageComments = SlateTool.create(spec, {
         authorName: c.author?.name,
         dateAdded: c.dateAdded,
         totalReactions: c.totalReactions,
-        replies: (c.replies || []).map((r: any) => ({
+        repliesHasNextPage: c.repliesPageInfo?.hasNextPage,
+        repliesEndCursor: c.repliesPageInfo?.endCursor,
+        replies: (c.replies || []).map(r => ({
           replyId: r.id,
           contentMarkdown: r.content?.markdown,
           contentHtml: r.content?.html,
@@ -137,72 +155,6 @@ export let manageComments = SlateTool.create(spec, {
       };
     }
 
-    if (action === 'add') {
-      if (!ctx.input.postId) throw new Error('postId is required to add a comment');
-      if (!ctx.input.contentMarkdown) throw new Error('contentMarkdown is required');
-
-      let comment = await client.addComment(ctx.input.postId, ctx.input.contentMarkdown);
-
-      return {
-        output: {
-          comment: {
-            commentId: comment.id,
-            contentMarkdown: comment.content?.markdown,
-            contentHtml: comment.content?.html,
-            authorId: comment.author?.id,
-            authorUsername: comment.author?.username,
-            authorName: comment.author?.name,
-            dateAdded: comment.dateAdded
-          }
-        },
-        message: `Added comment by **${comment.author?.username || 'unknown'}**`
-      };
-    }
-
-    if (action === 'reply') {
-      if (!ctx.input.commentId) throw new Error('commentId is required to reply');
-      if (!ctx.input.contentMarkdown) throw new Error('contentMarkdown is required');
-
-      let reply = await client.addReply(ctx.input.commentId, ctx.input.contentMarkdown);
-
-      return {
-        output: {
-          reply: {
-            replyId: reply.id,
-            contentMarkdown: reply.content?.markdown,
-            contentHtml: reply.content?.html,
-            authorUsername: reply.author?.username,
-            authorName: reply.author?.name,
-            dateAdded: reply.dateAdded
-          }
-        },
-        message: `Added reply by **${reply.author?.username || 'unknown'}**`
-      };
-    }
-
-    if (action === 'delete_comment') {
-      if (!ctx.input.commentId) throw new Error('commentId is required to delete a comment');
-
-      await client.removeComment(ctx.input.commentId);
-
-      return {
-        output: { deleted: true },
-        message: `Deleted comment \`${ctx.input.commentId}\``
-      };
-    }
-
-    if (action === 'delete_reply') {
-      if (!ctx.input.commentId) throw new Error('commentId is required to delete a reply');
-      if (!ctx.input.replyId) throw new Error('replyId is required to delete a reply');
-
-      await client.removeReply(ctx.input.commentId, ctx.input.replyId);
-
-      return {
-        output: { deleted: true },
-        message: `Deleted reply \`${ctx.input.replyId}\``
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

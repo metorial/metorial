@@ -1,6 +1,6 @@
 # Wit.ai
 
-Extract meaning from text and voice inputs using natural language processing. Detect intents, entities, and traits from text messages with confidence scores. Transcribe and analyze audio files and streams via speech recognition. Synthesize human-like speech from text. Manage multi-turn conversational flows with dialogue state and context. Detect languages from text input. Create, update, and delete entities, intents, and training utterances programmatically. Manage Wit.ai apps, export and import app configurations, and train NLU models with annotated samples.
+Analyze text for intents, entities, and traits, detect languages, and synthesize downloadable speech with Wit.ai. Manage apps, model version tags, entities, intents, traits, and annotated training utterances, and export app configurations.
 
 ## License
 

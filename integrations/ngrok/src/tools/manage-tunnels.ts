@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import type { Tunnel, TunnelSession } from '../lib/models';
 import { spec } from '../spec';
 
 let refSchema = z
@@ -24,7 +25,7 @@ let tunnelOutputSchema = z.object({
   endpoint: refSchema.describe('Associated endpoint')
 });
 
-let mapTunnel = (t: any) => ({
+let mapTunnel = (t: Tunnel) => ({
   tunnelId: t.id,
   publicUrl: t.public_url || '',
   startedAt: t.started_at || '',
@@ -51,7 +52,7 @@ let sessionOutputSchema = z.object({
   credential: refSchema.describe('Credential used for the session')
 });
 
-let mapSession = (s: any) => ({
+let mapSession = (s: TunnelSession) => ({
   sessionId: s.id,
   agentVersion: s.agent_version || '',
   ip: s.ip || '',
@@ -71,8 +72,17 @@ export let listTunnels = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -84,6 +94,7 @@ export let listTunnels = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listTunnels({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -125,8 +136,17 @@ export let listTunnelSessions = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -138,6 +158,7 @@ export let listTunnelSessions = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listTunnelSessions({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -149,13 +170,35 @@ export let listTunnelSessions = SlateTool.create(spec, {
   })
   .build();
 
+export let getTunnelSession = SlateTool.create(spec, {
+  name: 'Get Tunnel Session',
+  key: 'get_tunnel_session',
+  description:
+    'Retrieve a connected agent or SSH session by ID, including the credential and metadata needed to identify it before issuing lifecycle commands.',
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({ sessionId: z.string().describe('Tunnel session ID from list_tunnel_sessions') })
+  )
+  .output(sessionOutputSchema)
+  .handleInvocation(async ctx => {
+    const session = await new NgrokClient(ctx.auth.token).getTunnelSession(
+      ctx.input.sessionId
+    );
+    return {
+      output: mapSession(session),
+      message: `Retrieved tunnel session **${session.id}**.`
+    };
+  })
+  .build();
+
 export let restartTunnelSession = SlateTool.create(spec, {
   name: 'Restart Tunnel Session',
   key: 'restart_tunnel_session',
   description: `Restart an ngrok agent tunnel session. Uses exec() to restart the agent process. Not supported on Windows agents.`,
   constraints: [
     'Not supported on Windows agents',
-    'The agent process will be replaced via exec()'
+    'The command is asynchronous; a restarted agent reconnects with a new session ID'
   ],
   tags: { destructive: true }
 })

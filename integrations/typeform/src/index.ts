@@ -20,8 +20,6 @@ import {
   patchForm,
   updateForm
 } from './tools';
-import { formResponse } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     manageTranslation,
     getFormInsights
   ],
-  triggers: [formResponse]
+  triggers: []
 });

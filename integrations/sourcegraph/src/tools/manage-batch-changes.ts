@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 let changesetStatsSchema = z.object({
@@ -14,6 +15,14 @@ let changesetStatsSchema = z.object({
 
 let batchChangeSchema = z.object({
   batchChangeId: z.string().describe('GraphQL ID of the batch change'),
+  changesetsFirst: z
+    .number()
+    .optional()
+    .describe('Changesets page size from 1 to 100; default 50.'),
+  changesetsAfter: z
+    .string()
+    .optional()
+    .describe('Native changeset cursor from a previous read.'),
   name: z.string().describe('Name of the batch change'),
   description: z.string().optional().describe('Description of the batch change'),
   state: z.string().describe('State: OPEN, CLOSED, DRAFT'),
@@ -55,10 +64,7 @@ Returns batch change metadata and changeset statistics.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
     let data = await client.listBatchChanges({
       state: ctx.input.state,
@@ -67,26 +73,26 @@ Returns batch change metadata and changeset statistics.`,
     });
 
     let bc = data.batchChanges;
-    let batchChanges = (bc.nodes || []).map((n: any) => ({
+    let batchChanges = (bc.nodes || []).map(n => ({
       batchChangeId: n.id,
       name: n.name,
-      description: n.description || undefined,
+      description: n.description ?? undefined,
       state: n.state,
-      url: n.url || undefined,
-      namespace: n.namespace?.username || n.namespace?.name || undefined,
-      creator: n.creator?.username || undefined,
-      createdAt: n.createdAt || undefined,
-      updatedAt: n.updatedAt || undefined,
-      closedAt: n.closedAt || undefined,
-      changesetStats: n.changesetsStats || undefined
+      url: n.url ?? undefined,
+      namespace: n.namespace?.username ?? n.namespace?.name ?? undefined,
+      creator: n.creator?.username ?? undefined,
+      createdAt: n.createdAt ?? undefined,
+      updatedAt: n.updatedAt ?? undefined,
+      closedAt: n.closedAt ?? undefined,
+      changesetStats: n.changesetsStats ?? undefined
     }));
 
     return {
       output: {
         batchChanges,
-        totalCount: bc.totalCount || 0,
-        hasNextPage: bc.pageInfo?.hasNextPage || false,
-        endCursor: bc.pageInfo?.endCursor || undefined
+        totalCount: bc.totalCount,
+        hasNextPage: bc.pageInfo.hasNextPage,
+        endCursor: bc.pageInfo?.endCursor ?? undefined
       },
       message: `Found **${bc.totalCount}** batch changes${ctx.input.state ? ` with state ${ctx.input.state}` : ''}. Showing ${batchChanges.length}.`
     };
@@ -105,7 +111,15 @@ Returns the batch change metadata, changeset statistics, and a list of associate
 })
   .input(
     z.object({
-      batchChangeId: z.string().describe('GraphQL ID of the batch change')
+      batchChangeId: z.string().describe('GraphQL ID of the batch change'),
+      changesetsFirst: z
+        .number()
+        .optional()
+        .describe('Changesets page size from 1 to 100; default 50.'),
+      changesetsAfter: z
+        .string()
+        .optional()
+        .describe('Native changeset cursor from a previous read.')
     })
   )
   .output(
@@ -138,53 +152,58 @@ Returns the batch change metadata, changeset statistics, and a list of associate
           })
         )
         .optional(),
+      changesetsHasNextPage: z.boolean().optional(),
+      changesetsEndCursor: z.string().optional(),
       changesetCount: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
-    let data = await client.getBatchChange(ctx.input.batchChangeId);
+    let data = await client.getBatchChange(
+      ctx.input.batchChangeId,
+      ctx.input.changesetsFirst,
+      ctx.input.changesetsAfter
+    );
     let bc = data.node;
 
     if (!bc) {
-      throw new Error(`Batch change not found: ${ctx.input.batchChangeId}`);
+      throw fail(`Batch change not found: ${ctx.input.batchChangeId}`);
     }
 
-    let changesets = (bc.changesets?.nodes || []).map((cs: any) => ({
+    let changesets = (bc.changesets?.nodes || []).map(cs => ({
       changesetId: cs.id,
       state: cs.state,
-      externalId: cs.externalID || undefined,
-      title: cs.title || undefined,
-      body: cs.body || undefined,
-      reviewState: cs.reviewState || undefined,
-      checkState: cs.checkState || undefined,
-      repositoryName: cs.repository?.name || undefined,
-      externalUrl: cs.externalURL?.url || undefined,
-      createdAt: cs.createdAt || undefined,
-      updatedAt: cs.updatedAt || undefined
+      externalId: cs.externalID ?? undefined,
+      title: cs.title ?? undefined,
+      body: cs.body ?? undefined,
+      reviewState: cs.reviewState ?? undefined,
+      checkState: cs.checkState ?? undefined,
+      repositoryName: cs.repository?.name ?? undefined,
+      externalUrl: cs.externalURL?.url ?? undefined,
+      createdAt: cs.createdAt ?? undefined,
+      updatedAt: cs.updatedAt ?? undefined
     }));
 
     return {
       output: {
         batchChangeId: bc.id,
         name: bc.name,
-        description: bc.description || undefined,
+        description: bc.description ?? undefined,
         state: bc.state,
-        url: bc.url || undefined,
-        namespace: bc.namespace?.username || bc.namespace?.name || undefined,
-        creator: bc.creator?.username || undefined,
-        createdAt: bc.createdAt || undefined,
-        updatedAt: bc.updatedAt || undefined,
-        closedAt: bc.closedAt || undefined,
-        changesetStats: bc.changesetsStats || undefined,
+        url: bc.url ?? undefined,
+        namespace: bc.namespace?.username ?? bc.namespace?.name ?? undefined,
+        creator: bc.creator?.username ?? undefined,
+        createdAt: bc.createdAt ?? undefined,
+        updatedAt: bc.updatedAt ?? undefined,
+        closedAt: bc.closedAt ?? undefined,
+        changesetStats: bc.changesetsStats ?? undefined,
         changesets,
-        changesetCount: bc.changesets?.totalCount
+        changesetCount: bc.changesets?.totalCount,
+        changesetsHasNextPage: bc.changesets?.pageInfo.hasNextPage,
+        changesetsEndCursor: bc.changesets?.pageInfo.endCursor
       },
-      message: `Batch change **${bc.name}** (${bc.state}) — ${bc.changesetsStats?.total || 0} changesets: ${bc.changesetsStats?.merged || 0} merged, ${bc.changesetsStats?.open || 0} open, ${bc.changesetsStats?.closed || 0} closed.`
+      message: `Batch change **${bc.name}** (${bc.state}) — ${bc.changesetsStats?.total ?? 0} changesets: ${bc.changesetsStats?.merged ?? 0} merged, ${bc.changesetsStats?.open ?? 0} open, ${bc.changesetsStats?.closed ?? 0} closed.`
     };
   })
   .build();
@@ -216,14 +235,11 @@ export let closeBatchChange = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
     let data = await client.closeBatchChange(
       ctx.input.batchChangeId,
-      ctx.input.closeChangesets || false
+      ctx.input.closeChangesets ?? false
     );
     let bc = data.closeBatchChange;
 
@@ -232,9 +248,9 @@ export let closeBatchChange = SlateTool.create(spec, {
         batchChangeId: bc.id,
         name: bc.name,
         state: bc.state,
-        closedAt: bc.closedAt || undefined
+        closedAt: bc.closedAt ?? undefined
       },
-      message: `Closed batch change **${bc.name}**${ctx.input.closeChangesets ? ' and all associated changesets' : ''}.`
+      message: `Closed batch change **${bc.name}**${ctx.input.closeChangesets ? '; code-host changeset closure requested and may still be processing' : ''}.`
     };
   })
   .build();

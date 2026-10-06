@@ -1,0 +1,1170 @@
+{
+  "create_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fullName": {
+          "type": "string",
+          "description": "Full name of the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user"
+        },
+        "password": {
+          "description": "Password for the user. If omitted, Softr auto-generates one.",
+          "type": "string"
+        },
+        "generateMagicLink": {
+          "description": "Whether to generate a magic link for passwordless login",
+          "type": "boolean"
+        }
+      },
+      "required": ["fullName", "email"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email of the created user"
+        },
+        "magicLink": {
+          "description": "Generated magic link URL, if requested",
+          "type": "string"
+        }
+      },
+      "required": ["email"],
+      "additionalProperties": false
+    }
+  },
+  "delete_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address of the user to delete"
+        }
+      },
+      "required": ["email"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email of the deleted user"
+        },
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["email", "deleted"],
+      "additionalProperties": false
+    }
+  },
+  "generate_magic_link": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address of the user to generate a magic link for"
+        }
+      },
+      "required": ["email"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email of the user"
+        },
+        "magicLink": {
+          "type": "string",
+          "description": "Generated magic link URL"
+        }
+      },
+      "required": ["email", "magicLink"],
+      "additionalProperties": false
+    }
+  },
+  "sync_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "emails": {
+          "description": "Optional list of email addresses to sync. If omitted, all users are synced.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "synced": {
+          "type": "boolean",
+          "description": "Whether the sync was triggered successfully"
+        },
+        "scope": {
+          "type": "string",
+          "description": "Whether all users or specific users were synced"
+        }
+      },
+      "required": ["synced", "scope"],
+      "additionalProperties": false
+    }
+  },
+  "validate_user_token": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jwt": {
+          "type": "string",
+          "description": "The JWT token to validate"
+        }
+      },
+      "required": ["jwt"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "valid": {
+          "type": "boolean",
+          "description": "Whether the token is valid"
+        },
+        "user": {
+          "description": "User data extracted from the token, if valid",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["valid"],
+      "additionalProperties": false
+    }
+  },
+  "list_databases": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {}
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "databases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "databaseId": {
+                "type": "string",
+                "description": "Unique identifier of the database"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the database"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Description of the database"
+              },
+              "workspaceId": {
+                "type": "string",
+                "description": "ID of the workspace the database belongs to"
+              },
+              "tablesCount": {
+                "type": "number",
+                "description": "Number of tables in the database"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last update timestamp"
+              }
+            },
+            "required": [
+              "databaseId",
+              "name",
+              "description",
+              "workspaceId",
+              "tablesCount",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of accessible databases"
+        }
+      },
+      "required": ["databases"],
+      "additionalProperties": false
+    }
+  },
+  "manage_database": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "description": "ID of the database (required for get/update/delete)",
+          "type": "string"
+        },
+        "workspaceId": {
+          "description": "Workspace ID (required for creating a new database)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the database (required for create, optional for update)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description of the database",
+          "type": "string"
+        },
+        "delete": {
+          "description": "Set to true to delete the database",
+          "type": "boolean"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "database": {
+          "description": "Database details (not returned on delete)",
+          "type": "object",
+          "properties": {
+            "databaseId": {
+              "type": "string",
+              "description": "Unique identifier of the database"
+            },
+            "name": {
+              "type": "string",
+              "description": "Name of the database"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Description of the database"
+            },
+            "workspaceId": {
+              "type": "string",
+              "description": "ID of the workspace"
+            },
+            "tablesCount": {
+              "type": "number",
+              "description": "Number of tables in the database"
+            },
+            "createdAt": {
+              "type": "string",
+              "description": "Creation timestamp"
+            },
+            "updatedAt": {
+              "type": "string",
+              "description": "Last update timestamp"
+            }
+          },
+          "required": [
+            "databaseId",
+            "name",
+            "description",
+            "workspaceId",
+            "tablesCount",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        },
+        "deleted": {
+          "description": "True if database was deleted",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_tables": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string",
+          "description": "ID of the database to list tables from"
+        }
+      },
+      "required": ["databaseId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tables": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tableId": {
+                "type": "string",
+                "description": "Unique table identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Table name"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Table description"
+              },
+              "primaryFieldId": {
+                "type": "string",
+                "description": "ID of the primary field"
+              },
+              "defaultViewId": {
+                "type": "string",
+                "description": "ID of the default view"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "fieldId": {
+                      "type": "string",
+                      "description": "Unique field identifier"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Field name"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Field type (e.g., SINGLE_LINE_TEXT, NUMBER, EMAIL, etc.)"
+                    },
+                    "description": {
+                      "description": "Field description",
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "required": {
+                      "description": "Whether the field is required",
+                      "type": "boolean"
+                    },
+                    "readonly": {
+                      "description": "Whether the field is read-only",
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["fieldId", "name", "type"],
+                  "additionalProperties": false
+                },
+                "description": "Fields (columns) defined on the table"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last update timestamp"
+              }
+            },
+            "required": [
+              "tableId",
+              "name",
+              "description",
+              "primaryFieldId",
+              "defaultViewId",
+              "fields",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of tables in the database"
+        }
+      },
+      "required": ["tables"],
+      "additionalProperties": false
+    }
+  },
+  "manage_table": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string",
+          "description": "ID of the database"
+        },
+        "tableId": {
+          "description": "ID of the table (required for get/update/delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Table name (required for create, optional for update)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Table description",
+          "type": "string"
+        },
+        "primaryFieldName": {
+          "description": "Name of the primary field (only for create)",
+          "type": "string"
+        },
+        "fields": {
+          "description": "Fields to create with the table (only for create)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Field name"
+              },
+              "type": {
+                "type": "string",
+                "description": "Field type (e.g., SINGLE_LINE_TEXT, CHECKBOX, CURRENCY, DATE, DATETIME, DURATION, EMAIL, SELECT, NUMBER, ATTACHMENT, RATING, LINKED_RECORD, LONG_TEXT, URL, PERCENT, PHONE)"
+              },
+              "options": {
+                "description": "Type-specific configuration options",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "required": ["name", "type"]
+          }
+        },
+        "delete": {
+          "description": "Set to true to delete the table",
+          "type": "boolean"
+        }
+      },
+      "required": ["databaseId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "table": {
+          "description": "Table details (not returned on delete)",
+          "type": "object",
+          "properties": {
+            "tableId": {
+              "type": "string",
+              "description": "Unique table identifier"
+            },
+            "name": {
+              "type": "string",
+              "description": "Table name"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Table description"
+            },
+            "primaryFieldId": {
+              "type": "string",
+              "description": "ID of the primary field"
+            },
+            "defaultViewId": {
+              "type": "string",
+              "description": "ID of the default view"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "fieldId": {
+                    "type": "string",
+                    "description": "Unique field identifier"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Field name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Field type"
+                  },
+                  "description": {
+                    "description": "Field description",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "required": {
+                    "description": "Whether the field is required",
+                    "type": "boolean"
+                  },
+                  "readonly": {
+                    "description": "Whether the field is read-only",
+                    "type": "boolean"
+                  }
+                },
+                "required": ["fieldId", "name", "type"],
+                "additionalProperties": false
+              },
+              "description": "Table fields"
+            },
+            "createdAt": {
+              "type": "string",
+              "description": "Creation timestamp"
+            },
+            "updatedAt": {
+              "type": "string",
+              "description": "Last update timestamp"
+            }
+          },
+          "required": [
+            "tableId",
+            "name",
+            "description",
+            "primaryFieldId",
+            "defaultViewId",
+            "fields",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        },
+        "deleted": {
+          "description": "True if table was deleted",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_table_field": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string",
+          "description": "ID of the database"
+        },
+        "tableId": {
+          "type": "string",
+          "description": "ID of the table"
+        },
+        "fieldId": {
+          "description": "ID of the field (required for get/update/delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Field name (required for add)",
+          "type": "string"
+        },
+        "type": {
+          "description": "Field type (required for add)",
+          "type": "string"
+        },
+        "options": {
+          "description": "Type-specific configuration options",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": {
+          "description": "Field description (for add)",
+          "type": "string"
+        },
+        "allowMultipleEntries": {
+          "description": "Whether to allow multiple entries (for add)",
+          "type": "boolean"
+        },
+        "required": {
+          "description": "Whether the field is required (for add)",
+          "type": "boolean"
+        },
+        "defaultValue": {
+          "description": "Default value (for add)",
+          "type": "string"
+        },
+        "delete": {
+          "description": "Set to true to delete the field",
+          "type": "boolean"
+        }
+      },
+      "required": ["databaseId", "tableId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "field": {
+          "description": "Field details (not returned on delete)",
+          "type": "object",
+          "properties": {
+            "fieldId": {
+              "type": "string",
+              "description": "Unique field identifier"
+            },
+            "name": {
+              "type": "string",
+              "description": "Field name"
+            },
+            "type": {
+              "type": "string",
+              "description": "Field type"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Field description"
+            },
+            "allowMultipleEntries": {
+              "description": "Whether multiple entries are allowed",
+              "type": "boolean"
+            },
+            "readonly": {
+              "description": "Whether the field is read-only",
+              "type": "boolean"
+            },
+            "required": {
+              "description": "Whether the field is required",
+              "type": "boolean"
+            },
+            "locked": {
+              "description": "Whether the field is locked",
+              "type": "boolean"
+            },
+            "defaultValue": {
+              "description": "Default value for the field",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "string",
+              "description": "Creation timestamp"
+            },
+            "updatedAt": {
+              "type": "string",
+              "description": "Last update timestamp"
+            }
+          },
+          "required": ["fieldId", "name", "type", "description", "createdAt", "updatedAt"],
+          "additionalProperties": false
+        },
+        "deleted": {
+          "description": "True if field was deleted",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_records": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string",
+          "description": "ID of the database"
+        },
+        "tableId": {
+          "type": "string",
+          "description": "ID of the table"
+        },
+        "recordId": {
+          "description": "Specific record ID to retrieve. If omitted, lists records.",
+          "type": "string"
+        },
+        "offset": {
+          "description": "Number of records to skip (for pagination, default 0)",
+          "type": "number"
+        },
+        "limit": {
+          "description": "Maximum number of records to return (default 10, max 200)",
+          "type": "number"
+        },
+        "fieldNames": {
+          "description": "Use field names instead of IDs as keys in the response",
+          "type": "boolean"
+        },
+        "viewId": {
+          "description": "Filter records by a specific view",
+          "type": "string"
+        }
+      },
+      "required": ["databaseId", "tableId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "records": {
+          "description": "List of records (when listing)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "recordId": {
+                "type": "string",
+                "description": "Unique record identifier"
+              },
+              "tableId": {
+                "type": "string",
+                "description": "Table the record belongs to"
+              },
+              "fields": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Field values of the record (keyed by field ID or name)"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last update timestamp"
+              }
+            },
+            "required": ["recordId", "tableId", "fields", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          }
+        },
+        "record": {
+          "description": "Single record (when fetching by ID)",
+          "type": "object",
+          "properties": {
+            "recordId": {
+              "type": "string",
+              "description": "Unique record identifier"
+            },
+            "tableId": {
+              "type": "string",
+              "description": "Table the record belongs to"
+            },
+            "fields": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {},
+              "description": "Field values of the record (keyed by field ID or name)"
+            },
+            "createdAt": {
+              "type": "string",
+              "description": "Creation timestamp"
+            },
+            "updatedAt": {
+              "type": "string",
+              "description": "Last update timestamp"
+            }
+          },
+          "required": ["recordId", "tableId", "fields", "createdAt", "updatedAt"],
+          "additionalProperties": false
+        },
+        "total": {
+          "description": "Total number of records in the table",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Current offset",
+          "type": "number"
+        },
+        "limit": {
+          "description": "Current limit",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "create_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string",
+          "description": "ID of the database"
+        },
+        "tableId": {
+          "type": "string",
+          "description": "ID of the table"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Map of field IDs (or names) to values for the new record"
+        },
+        "fieldNames": {
+          "description": "Use field names instead of IDs as keys",
+          "type": "boolean"
+        }
+      },
+      "required": ["databaseId", "tableId", "fields"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "description": "ID of the created record"
+        },
+        "tableId": {
+          "type": "string",
+          "description": "Table the record was created in"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Field values of the created record"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["recordId", "tableId", "fields", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "update_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string",
+          "description": "ID of the database"
+        },
+        "tableId": {
+          "type": "string",
+          "description": "ID of the table"
+        },
+        "recordId": {
+          "type": "string",
+          "description": "ID of the record to update"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Map of field IDs (or names) to new values"
+        },
+        "fieldNames": {
+          "description": "Use field names instead of IDs as keys",
+          "type": "boolean"
+        }
+      },
+      "required": ["databaseId", "tableId", "recordId", "fields"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "description": "ID of the updated record"
+        },
+        "tableId": {
+          "type": "string",
+          "description": "Table the record belongs to"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Updated field values"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["recordId", "tableId", "fields", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "delete_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string",
+          "description": "ID of the database"
+        },
+        "tableId": {
+          "type": "string",
+          "description": "ID of the table"
+        },
+        "recordId": {
+          "type": "string",
+          "description": "ID of the record to delete"
+        }
+      },
+      "required": ["databaseId", "tableId", "recordId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "description": "ID of the deleted record"
+        },
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["recordId", "deleted"],
+      "additionalProperties": false
+    }
+  },
+  "search_records": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string",
+          "description": "ID of the database"
+        },
+        "tableId": {
+          "type": "string",
+          "description": "ID of the table to search"
+        },
+        "filter": {
+          "description": "Filter conditions for the search",
+          "type": "object",
+          "properties": {
+            "condition": {
+              "$ref": "#/$defs/__schema0"
+            }
+          },
+          "required": ["condition"]
+        },
+        "sort": {
+          "description": "Sorting rules",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sortingField": {
+                "type": "string",
+                "description": "Field ID to sort by"
+              },
+              "sortType": {
+                "type": "string",
+                "enum": ["ASC", "DESC"],
+                "description": "Sort direction"
+              }
+            },
+            "required": ["sortingField", "sortType"]
+          }
+        },
+        "offset": {
+          "description": "Number of records to skip (default 0)",
+          "type": "number"
+        },
+        "limit": {
+          "description": "Maximum records to return (default 50, max 200)",
+          "type": "number"
+        },
+        "fieldNames": {
+          "description": "Use field names instead of IDs as keys in the response",
+          "type": "boolean"
+        }
+      },
+      "required": ["databaseId", "tableId"],
+      "$defs": {
+        "__schema0": {
+          "type": "object",
+          "properties": {
+            "operator": {
+              "type": "string",
+              "description": "Filter operator (e.g., IS, IS_NOT, CONTAINS, GREATER_THAN, IS_EMPTY, AND, OR, IS_BETWEEN, etc.)"
+            },
+            "field": {
+              "description": "Field ID to filter on (for binary/unary operators)",
+              "type": "string"
+            },
+            "value": {
+              "description": "Value to compare against (for binary operators)"
+            },
+            "values": {
+              "description": "Array of values (for IS_ONE_OF, IS_NOT_ONE_OF, HAS_ANY_OF, etc.)",
+              "type": "array",
+              "items": {}
+            },
+            "conditions": {
+              "description": "Nested conditions (for AND/OR composite operators)",
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          },
+          "required": ["operator"]
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "recordId": {
+                "type": "string",
+                "description": "Unique record identifier"
+              },
+              "tableId": {
+                "type": "string",
+                "description": "Table the record belongs to"
+              },
+              "fields": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Field values"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last update timestamp"
+              }
+            },
+            "required": ["recordId", "tableId", "fields", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          },
+          "description": "Matching records"
+        },
+        "total": {
+          "description": "Total number of matching records",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Current offset",
+          "type": "number"
+        },
+        "limit": {
+          "description": "Current limit",
+          "type": "number"
+        }
+      },
+      "required": ["records"],
+      "additionalProperties": false
+    }
+  }
+}

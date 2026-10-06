@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let createContact = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let createContact = SlateTool.create(spec, {
   key: 'create_contact',
   description: `Create a new contact (person) in Salesflare. Set name, email, phone numbers, account, tags, addresses, positions, social profiles, and custom fields. Use **force=false** to skip creation if a contact with the same email already exists.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -59,14 +59,14 @@ export let createContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let data: Record<string, any> = {};
+    let data: Row = {};
     if (ctx.input.email) data.email = ctx.input.email;
     if (ctx.input.firstname) data.firstname = ctx.input.firstname;
     if (ctx.input.lastname) data.lastname = ctx.input.lastname;
     if (ctx.input.prefix) data.prefix = ctx.input.prefix;
     if (ctx.input.suffix) data.suffix = ctx.input.suffix;
-    if (ctx.input.accountId) data.account = ctx.input.accountId;
-    if (ctx.input.owner) data.owner = ctx.input.owner;
+    if (ctx.input.accountId !== undefined) data.account = ctx.input.accountId;
+    if (ctx.input.owner !== undefined) data.owner = ctx.input.owner;
     if (ctx.input.phoneNumber) data.phone_number = ctx.input.phoneNumber;
     if (ctx.input.mobilePhoneNumber) data.mobile_phone_number = ctx.input.mobilePhoneNumber;
     if (ctx.input.birthDate) data.birth_date = ctx.input.birthDate;
@@ -90,8 +90,8 @@ export let createContact = SlateTool.create(spec, {
     }
 
     let result = await client.createContact(data, ctx.input.force);
-    let contactData = Array.isArray(result) ? result[0] : result;
-    let contactId = contactData?.id ?? 0;
+    let contactData = result;
+    let contactId = contactData.id;
 
     return {
       output: {

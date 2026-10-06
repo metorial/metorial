@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { id, type Row, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let addNoteTool = SlateTool.create(spec, {
@@ -25,23 +26,14 @@ export let addNoteTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, environment: ctx.auth.environment });
-
-    let data: Record<string, any> = {
-      value: ctx.input.value
-    };
-    if (ctx.input.notifyFollowers !== undefined) {
+    const opportunityId = id(ctx.input.opportunityId, 'Opportunity ID');
+    const data: Row = { value: text(ctx.input.value, 'Note content') };
+    if (ctx.input.notifyFollowers !== undefined)
       data.notifyFollowers = ctx.input.notifyFollowers;
-    }
-
-    let result = await client.createNote(ctx.input.opportunityId, data);
-
+    const result = await new Client(ctx.auth).createNote(opportunityId, data);
     return {
-      output: {
-        noteId: result.data.id,
-        note: result.data
-      },
-      message: `Added note to opportunity **${ctx.input.opportunityId}**.`
+      output: { noteId: result.data.id, note: result.data },
+      message: `Created note ${result.data.id} on opportunity ${opportunityId}.`
     };
   })
   .build();

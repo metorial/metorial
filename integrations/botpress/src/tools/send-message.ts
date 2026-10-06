@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RuntimeClient } from '../lib/client';
+import { resolveRuntimeParams, runtimeScopeFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let sendMessageTool = SlateTool.create(spec, {
   name: 'Send Message',
   key: 'send_message',
-  description: `Send a message to a conversation via the Runtime API. Supports text, image, audio, video, file, location, card, carousel, choice, and dropdown message types. The **payload** must match the expected format for the given **messageType**.`,
+  description: `Send a message to a conversation via the Runtime API. Supports text, image, audio, video, file, location, card, carousel, choice, and dropdown message types. The **payload** must match the expected format for the given **messageType**. Call list_workspaces to discover workspace IDs, then list_bots to discover bot IDs.`,
   instructions: [
     'For text messages, set messageType to "text" and include { "text": "your message" } in the payload.',
     'For image messages, set messageType to "image" and include { "imageUrl": "url" } in the payload.',
@@ -15,7 +16,7 @@ export let sendMessageTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      botId: z.string().optional().describe('Bot ID. Falls back to config botId.'),
+      ...runtimeScopeFields,
       conversationId: z.string().describe('Conversation to send the message to'),
       userId: z.string().describe('User ID sending the message'),
       messageType: z
@@ -43,10 +44,10 @@ export let sendMessageTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let botId = ctx.input.botId || ctx.config.botId;
-    if (!botId) throw new Error('botId is required (provide in input or config)');
-
-    let client = new RuntimeClient({ token: ctx.auth.token, botId });
+    let client = new RuntimeClient({
+      token: ctx.auth.token,
+      ...resolveRuntimeParams(ctx.input, ctx.config)
+    });
 
     let result = await client.createMessage({
       payload: ctx.input.payload,

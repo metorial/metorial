@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,7 +18,8 @@ export let manageTeam = SlateTool.create(spec, {
         .enum(['list', 'invite', 'update_role'])
         .describe('Action to perform: list teammates, invite new members, or update roles'),
       emails: z
-        .array(z.string())
+        .array(z.email())
+        .min(1)
         .optional()
         .describe(
           'Email addresses of teammates to invite or update (required for invite and update_role)'
@@ -75,13 +76,13 @@ export let manageTeam = SlateTool.create(spec, {
 
     if (ctx.input.action === 'invite') {
       if (!ctx.input.emails || !ctx.input.teamRole) {
-        throw new Error('emails and teamRole are required for invite action');
+        throw createApiServiceError('emails and teamRole are required for invite action');
       }
       let result = await client.inviteTeammates(ctx.input.emails, ctx.input.teamRole);
       return {
         output: {
-          success: true,
-          ...result
+          ...(Array.isArray(result) ? { teammates: result } : result),
+          success: true
         },
         message: `Invited **${ctx.input.emails.length}** teammate(s) as \`${ctx.input.teamRole}\`.`
       };
@@ -89,18 +90,18 @@ export let manageTeam = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update_role') {
       if (!ctx.input.emails || !ctx.input.teamRole) {
-        throw new Error('emails and teamRole are required for update_role action');
+        throw createApiServiceError('emails and teamRole are required for update_role action');
       }
       let result = await client.setTeammateRole(ctx.input.emails, ctx.input.teamRole);
       return {
         output: {
-          success: true,
-          ...result
+          ...(Array.isArray(result) ? { teammates: result } : result),
+          success: true
         },
         message: `Updated **${ctx.input.emails.length}** teammate(s) to role \`${ctx.input.teamRole}\`.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

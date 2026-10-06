@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, continuation } from '../lib/client';
 import { spec } from '../spec';
 
 export let listAdAccounts = SlateTool.create(spec, {
@@ -12,18 +12,24 @@ export let listAdAccounts = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('r_ads', 'rw_ads'))
   .input(
     z.object({
       search: z.string().optional().describe('Filter accounts by name'),
-      pageSize: z.number().optional().describe('Number of results per page (max 100)'),
+      pageSize: z.number().optional().describe('Number of results per page (max 1000)'),
       pageToken: z.string().optional().describe('Page token for pagination')
     })
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Continuation token for pageToken with the same filters'),
       accounts: z.array(
         z.object({
           accountId: z.number().describe('Numeric ID of the ad account'),
+          test: z.boolean().optional().describe('Provider test-account flag'),
           name: z.string().describe('Name of the ad account'),
           status: z.string().describe('Account status (ACTIVE, CANCELED, DRAFT, etc.)'),
           type: z.string().describe('Account type (BUSINESS, ENTERPRISE)'),
@@ -46,6 +52,7 @@ export let listAdAccounts = SlateTool.create(spec, {
 
     let accounts = result.elements.map(account => ({
       accountId: account.id,
+      test: account.test,
       name: account.name,
       status: account.status,
       type: account.type,
@@ -57,6 +64,7 @@ export let listAdAccounts = SlateTool.create(spec, {
     return {
       output: {
         accounts,
+        nextPageToken: continuation(result),
         totalCount: result.paging?.total
       },
       message: `Found **${accounts.length}** ad account(s).${accounts.length > 0 ? ` Accounts: ${accounts.map(a => `${a.name} (${a.status})`).join(', ')}` : ''}`

@@ -6,13 +6,12 @@ import { spec } from '../spec';
 export let addMemory = SlateTool.create(spec, {
   name: 'Add Memory',
   key: 'add_memory',
-  description: `Store new memories from conversation messages. Mem0 uses an LLM to extract facts from the messages and stores them as memories. You can optionally store messages directly without extraction by disabling inference.
-Memories can be scoped to a specific user, agent, app, or session (run). Supports graph memory for relationship extraction.`,
+  description: `Store new memories from conversation messages using Mem0's V3 additive pipeline. Inference is processed asynchronously; use get_event to check completion. Disable inference to store messages directly. Memories must be scoped to a user, agent, app, or run.`,
   instructions: [
     'Messages must follow OpenAI chat format with "role" and "content" fields.',
-    'At least one scope identifier (userId, agentId, appId, or runId) should be provided to organize memories.',
+    'Provide at least one scope identifier (userId, agentId, appId, or runId).',
     'Set infer to false to store messages as-is without LLM extraction.',
-    'Set memoryType to "procedural_memory" for step-by-step knowledge (requires agentId).'
+    'For asynchronous processing, retain eventId and call get_event until status is SUCCEEDED or FAILED.'
   ],
   tags: {
     destructive: false,
@@ -30,11 +29,17 @@ Memories can be scoped to a specific user, agent, app, or session (run). Support
             content: z.string().describe('Content of the message')
           })
         )
+        .min(1)
         .describe('Conversation messages in OpenAI chat format'),
-      userId: z.string().optional().describe('User ID to scope the memory to'),
-      agentId: z.string().optional().describe('Agent ID to scope the memory to'),
-      appId: z.string().optional().describe('App ID to scope the memory to'),
-      runId: z.string().optional().describe('Run/session ID to scope the memory to'),
+      userId: z.string().trim().min(1).optional().describe('User ID to scope the memory to'),
+      agentId: z.string().trim().min(1).optional().describe('Agent ID to scope the memory to'),
+      appId: z.string().trim().min(1).optional().describe('App ID to scope the memory to'),
+      runId: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe('Run/session ID to scope the memory to'),
       metadata: z
         .record(z.string(), z.unknown())
         .optional()
@@ -52,17 +57,34 @@ Memories can be scoped to a specific user, agent, app, or session (run). Support
       memoryType: z
         .string()
         .optional()
-        .describe(
-          'Memory type, e.g. "procedural_memory" for step-by-step knowledge (requires agentId)'
-        )
+        .describe('Legacy option not supported by the hosted V3 API. Omit this field.'),
+      expirationDate: z.iso
+        .date()
+        .optional()
+        .describe('Date after which the memory is hidden from search, YYYY-MM-DD'),
+      customInstructions: z
+        .string()
+        .optional()
+        .describe('Instructions guiding memory extraction for this request')
     })
   )
   .output(
     z.object({
+      eventId: z
+        .string()
+        .optional()
+        .describe('Processing event ID. Call get_event to check completion.'),
+      status: z
+        .string()
+        .describe('Processing status; PENDING means the memories are not ready yet'),
       events: z
         .array(
           z.object({
-            memoryId: z.string().describe('Unique identifier of the created/affected memory'),
+            memoryId: z
+              .string()
+              .trim()
+              .min(1)
+              .describe('Unique identifier of the created/affected memory'),
             event: z.string().describe('Event type: ADD, UPDATE, or DELETE'),
             memory: z.string().describe('The processed memory text')
           })
@@ -73,8 +95,7 @@ Memories can be scoped to a specific user, agent, app, or session (run). Support
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      orgId: ctx.config.orgId,
-      projectId: ctx.config.projectId
+      legacyScope: ctx.config
     });
 
     let result = await client.addMemory({
@@ -86,14 +107,12 @@ Memories can be scoped to a specific user, agent, app, or session (run). Support
       metadata: ctx.input.metadata,
       infer: ctx.input.infer,
       enableGraph: ctx.input.enableGraph,
-      memoryType: ctx.input.memoryType
+      memoryType: ctx.input.memoryType,
+      expirationDate: ctx.input.expirationDate,
+      customInstructions: ctx.input.customInstructions
     });
 
-    let events = (Array.isArray(result) ? result : []).map(e => ({
-      memoryId: e.id,
-      event: e.event,
-      memory: e.data?.memory || ''
-    }));
+    let events = result.events;
 
     let addCount = events.filter(e => e.event === 'ADD').length;
     let updateCount = events.filter(e => e.event === 'UPDATE').length;
@@ -105,8 +124,11 @@ Memories can be scoped to a specific user, agent, app, or session (run). Support
     if (deleteCount > 0) parts.push(`${deleteCount} deleted`);
 
     return {
-      output: { events },
-      message: `Processed ${events.length} memory event(s): ${parts.join(', ') || 'none'}.`
+      output: { events, eventId: result.eventId, status: result.status },
+      message:
+        result.status === 'PENDING' || result.status === 'RUNNING'
+          ? `Memory processing is ${result.status.toLowerCase()}. Call get_event with eventId ${result.eventId} to check completion.`
+          : `Processed ${events.length} memory event(s): ${parts.join(', ') || 'none'}.`
     };
   })
   .build();

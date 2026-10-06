@@ -32,15 +32,6 @@ import {
   runPipeline,
   search
 } from './tools';
-import {
-  commentEvents,
-  deploymentEvents,
-  issueEvents,
-  mergeRequestEvents,
-  pipelineEvents,
-  pushEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -75,12 +66,5 @@ export let provider = Slate.create({
     createRelease,
     listGroups
   ],
-  triggers: [
-    pushEvents,
-    mergeRequestEvents,
-    issueEvents,
-    pipelineEvents,
-    commentEvents,
-    deploymentEvents
-  ]
+  triggers: []
 });

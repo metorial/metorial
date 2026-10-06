@@ -19,14 +19,6 @@ import {
   triggerAutomation,
   updateContact
 } from './tools';
-import {
-  contactEvents,
-  engagementEvents,
-  financialEvents,
-  loyaltyEvents,
-  voucherEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +40,5 @@ export let provider = Slate.create({
     getLoyaltyProgram,
     triggerAutomation
   ],
-  triggers: [contactEvents, loyaltyEvents, financialEvents, voucherEvents, engagementEvents]
+  triggers: []
 });

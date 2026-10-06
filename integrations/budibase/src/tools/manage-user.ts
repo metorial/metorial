@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapUser } from '../lib/models';
+import { invalid } from '../lib/validation';
 import { spec } from '../spec';
 
 let userOutputSchema = z.object({
@@ -27,10 +29,11 @@ export let manageUser = SlateTool.create(spec, {
   instructions: [
     'For "create", email is required. Password is optional if using SSO.',
     'Roles map application IDs to role names (e.g. "BASIC", "POWER", "ADMIN").',
-    'Builder and admin objects control global builder and admin access.'
+    'Builder and admin objects control global builder and admin access; role and privilege writes require a business or enterprise edition.',
+    'Omitted passwords remain unchanged during updates. Deletion cannot target the user whose API key is in use.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -75,7 +78,7 @@ export let manageUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = Client.fromContext(ctx);
     let {
       action,
       userId,
@@ -90,19 +93,8 @@ export let manageUser = SlateTool.create(spec, {
       roles
     } = ctx.input;
 
-    let mapUser = (u: any) => ({
-      userId: u._id,
-      email: u.email,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      status: u.status,
-      builder: u.builder,
-      admin: u.admin,
-      roles: u.roles
-    });
-
     if (action === 'create') {
-      if (!email) throw new Error('Email is required to create a user');
+      if (!email) invalid('Email is required to create a user');
       let user = await client.createUser({
         email,
         password,
@@ -121,7 +113,7 @@ export let manageUser = SlateTool.create(spec, {
       };
     }
 
-    if (!userId) throw new Error('userId is required for get, update, and delete actions');
+    if (!userId) invalid('userId is required for get, update, and delete actions');
 
     if (action === 'get') {
       let user = await client.getUser(userId);
@@ -133,7 +125,7 @@ export let manageUser = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      let updateData: Record<string, any> = {};
+      let updateData: Record<string, unknown> = {};
       if (email !== undefined) updateData.email = email;
       if (password !== undefined) updateData.password = password;
       if (firstName !== undefined) updateData.firstName = firstName;

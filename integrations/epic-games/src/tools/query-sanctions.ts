@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { EosGameServicesClient } from '../lib/client';
+import { gameClient } from '../lib/client';
+import { pagingSchema } from '../lib/types';
+import { whole } from '../lib/validation';
 import { spec } from '../spec';
 
 let sanctionSchema = z.object({
@@ -20,7 +22,7 @@ let sanctionSchema = z.object({
     .optional()
     .describe('When the sanction expires, or null if permanent'),
   metadata: z.record(z.string(), z.string()).optional().describe('Custom metadata'),
-  displayName: z.string().optional().describe('Player display name'),
+  displayName: z.string().nullable().optional().describe('Player display name'),
   deploymentId: z.string().optional().describe('Deployment ID'),
   createdAt: z.string().optional().describe('Creation timestamp'),
   updatedAt: z.string().nullable().optional().describe('Last update timestamp')
@@ -62,6 +64,11 @@ Supports pagination and filtering by action type.`,
   .output(
     z.object({
       sanctions: z.array(sanctionSchema).describe('Sanction records matching the query'),
+      paging: pagingSchema.optional().describe('Verified pagination metadata.'),
+      pagination: z
+        .enum(['native', 'local'])
+        .optional()
+        .describe('Native offset page or local slice of an active snapshot.'),
       total: z
         .number()
         .optional()
@@ -69,41 +76,54 @@ Supports pagination and filtering by action type.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EosGameServicesClient({
-      token: ctx.auth.token,
-      deploymentId: ctx.config.deploymentId
-    });
-
-    let data: any;
-
-    if (ctx.input.productUserId && ctx.input.activeOnly) {
-      data = await client.getActiveSanctionsForPlayer(
-        ctx.input.productUserId,
+    if (ctx.input.activeOnly && !ctx.input.productUserId)
+      throw createApiServiceError('activeOnly requires one Product User ID.');
+    if (ctx.input.actions?.length && !ctx.input.activeOnly)
+      throw createApiServiceError(
+        'Action filtering is supported only with activeOnly and one Product User ID.'
+      );
+    whole(ctx.input.limit, 1, 100, 'Limit');
+    whole(ctx.input.offset, 0, Number.MAX_SAFE_INTEGER, 'Offset');
+    const client = gameClient(ctx);
+    if (ctx.input.activeOnly) {
+      const data = await client.getActiveSanctionsForPlayer(
+        ctx.input.productUserId!,
         ctx.input.actions
       );
-      let sanctions = data.elements ?? [];
+      const sanctions = data.elements.slice(
+        ctx.input.offset,
+        ctx.input.offset + ctx.input.limit
+      );
       return {
-        output: { sanctions },
-        message: `Found **${sanctions.length}** active sanction(s) for player \`${ctx.input.productUserId}\`.`
+        output: {
+          sanctions,
+          total: data.elements.length,
+          paging: {
+            offset: ctx.input.offset,
+            limit: ctx.input.limit,
+            total: data.elements.length
+          },
+          pagination: 'local' as const
+        },
+        message: 'Returned a local slice of the native active-sanction snapshot.'
       };
     }
-
-    if (ctx.input.productUserId) {
-      data = await client.queryPlayerSanctions(
-        ctx.input.productUserId,
-        ctx.input.limit,
-        ctx.input.offset
-      );
-    } else {
-      data = await client.querySanctions(ctx.input.limit, ctx.input.offset);
-    }
-
-    let sanctions = data.elements ?? [];
-    let total = data.paging?.total;
-
+    const data = ctx.input.productUserId
+      ? await client.queryPlayerSanctions(
+          ctx.input.productUserId,
+          ctx.input.limit,
+          ctx.input.offset
+        )
+      : await client.querySanctions(ctx.input.limit, ctx.input.offset);
     return {
-      output: { sanctions, total },
-      message: `Found **${sanctions.length}** sanction(s)${total !== undefined ? ` out of ${total} total` : ''}.`
+      output: {
+        sanctions: data.elements,
+        total: data.paging.total,
+        paging: data.paging,
+        pagination: 'native' as const
+      },
+      message:
+        'Returned one native sanction page. Continue with offset plus limit while records remain.'
     };
   })
   .build();

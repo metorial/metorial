@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RevAIClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,18 +6,18 @@ import { spec } from '../spec';
 export let submitTranscriptionJob = SlateTool.create(spec, {
   name: 'Submit Transcription Job',
   key: 'submit_transcription_job',
-  description: `Submits an audio/video file for asynchronous speech-to-text transcription. Provide a public media URL and configure options such as language, speaker diarization, profanity filtering, translation, and summarization.
-Returns the created job with its ID and status. Poll the job status or use webhooks to know when it completes.`,
+  description: `Submits an audio/video file for asynchronous speech-to-text transcription. Provide a media URL and configure options such as language, speaker diarization, profanity filtering, translation, and summarization.
+Returns the created job with its ID and status. Poll get_transcription_job until the job completes.`,
   instructions: [
-    'Provide a publicly accessible media URL for the audio/video file.',
-    'Use the transcriber field to select between "machine" (default Reverb ASR), "human", or "low_cost" (Reverb Turbo).',
+    'Provide a direct media URL and sourceAuthHeaders when its download requires authorization.',
+    'Use the transcriber field to select between "machine" (default Reverb ASR), "human", or "low_cost" (deprecated by Rev AI; prefer "machine").',
     'Set language to an ISO 639-1 code (default: "en"). Use "cmn" for Mandarin Chinese.'
   ],
   constraints: [
-    'Maximum file size is 2GB.',
+    'Maximum upload size is 2GB; larger files may be submitted through a media URL.',
     'Files are billed per second with a minimum charge of 15 seconds.',
     'Low-cost transcriber is only available for US deployment.',
-    'Human transcription is only available for English.'
+    'Human transcription is only available for English and accepts at most 20 glossary phrases, each up to 255 characters.'
   ],
   tags: {
     destructive: false,
@@ -26,7 +26,15 @@ Returns the created job with its ID and status. Poll the job status or use webho
 })
   .input(
     z.object({
-      mediaUrl: z.string().describe('Public URL of the audio/video file to transcribe'),
+      mediaUrl: z
+        .string()
+        .url()
+        .max(2048)
+        .describe('Direct download URL of the audio/video file to transcribe'),
+      sourceAuthHeaders: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Optional HTTP headers required to download the media URL'),
       language: z
         .string()
         .optional()
@@ -35,10 +43,11 @@ Returns the created job with its ID and status. Poll the job status or use webho
         .enum(['machine', 'human', 'low_cost'])
         .optional()
         .describe(
-          'Transcription engine: "machine" (default), "human", or "low_cost" (Reverb Turbo)'
+          'Transcription engine: "machine" (default), "human", or "low_cost" (deprecated by Rev AI; prefer "machine")'
         ),
       metadata: z
         .string()
+        .max(512)
         .optional()
         .describe('Optional metadata to associate with the job (max 512 chars)'),
       skipDiarization: z
@@ -68,6 +77,9 @@ Returns the created job with its ID and status. Poll the job status or use webho
         .describe('Skip inverse text normalization, casing, and punctuation steps'),
       speakerChannelsCount: z
         .number()
+        .int()
+        .min(1)
+        .max(8)
         .optional()
         .describe('Number of speaker channels (1-8) for multi-channel audio'),
       customVocabularyId: z
@@ -77,18 +89,29 @@ Returns the created job with its ID and status. Poll the job status or use webho
       customVocabularies: z
         .array(
           z.object({
-            phrases: z.array(z.string()).describe('List of custom words or phrases')
+            phrases: z
+              .array(z.string().min(1))
+              .min(1)
+              .max(6000)
+              .describe('List of custom words or phrases')
           })
         )
+        .min(1)
+        .max(50)
         .optional()
         .describe('Inline custom vocabulary phrases for improving accuracy'),
       translationTargetLanguages: z
-        .array(z.string())
+        .array(z.string().min(1))
+        .min(1)
+        .max(5)
         .optional()
         .describe('Target language codes to translate the transcript into'),
       enableSummarization: z.boolean().optional().describe('Enable transcript summarization'),
       deleteAfterSeconds: z
         .number()
+        .int()
+        .min(0)
+        .max(2592000)
         .optional()
         .describe('Auto-delete job after this many seconds (0-2592000)'),
       diarizationType: z
@@ -97,21 +120,67 @@ Returns the created job with its ID and status. Poll the job status or use webho
         .describe('Speaker diarization type'),
       expectedSpeakerCount: z
         .number()
+        .int()
+        .min(1)
         .optional()
         .describe('Expected number of speakers for better diarization')
     })
   )
   .output(
     z.object({
-      jobId: z.string().describe('Unique identifier for the transcription job'),
+      jobId: z.string().min(1).describe('Unique identifier for the transcription job'),
       status: z.string().describe('Job status: "in_progress", "transcribed", "failed"'),
       createdOn: z.string().describe('ISO 8601 timestamp when the job was created'),
       language: z.string().optional().describe('Language of the transcription'),
       transcriber: z.string().optional().describe('Transcriber used for the job'),
-      metadata: z.string().optional().describe('Metadata associated with the job')
+      metadata: z.string().max(512).optional().describe('Metadata associated with the job')
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.customVocabularyId && ctx.input.customVocabularies) {
+      throw createApiServiceError(
+        'Provide customVocabularyId or customVocabularies, not both.'
+      );
+    }
+    let phrasesCount =
+      ctx.input.customVocabularies?.reduce(
+        (count, vocabulary) => count + vocabulary.phrases.length,
+        0
+      ) ?? 0;
+    let phraseLimit = !ctx.input.language || ctx.input.language.startsWith('en') ? 6000 : 1000;
+    if (phrasesCount > phraseLimit) {
+      throw createApiServiceError(
+        `Custom vocabulary exceeds the ${phraseLimit}-phrase limit for this language. Reduce the number of phrases.`
+      );
+    }
+    if (ctx.input.transcriber === 'human') {
+      if (ctx.input.language && !['en', 'en-us', 'en-gb'].includes(ctx.input.language)) {
+        throw createApiServiceError('Human transcription requires English audio.');
+      }
+      if (
+        phrasesCount > 20 ||
+        ctx.input.customVocabularies?.some(vocabulary =>
+          vocabulary.phrases.some(phrase => phrase.length > 255)
+        )
+      ) {
+        throw createApiServiceError(
+          'Human transcription accepts at most 20 phrases, each up to 255 characters. Reduce the glossary or use the machine transcriber.'
+        );
+      }
+      if (
+        ctx.input.removeDisfluencies !== undefined ||
+        ctx.input.removeAtmospherics !== undefined ||
+        ctx.input.speakerChannelsCount !== undefined ||
+        ctx.input.diarizationType !== undefined ||
+        ctx.input.expectedSpeakerCount !== undefined ||
+        ctx.input.translationTargetLanguages !== undefined ||
+        ctx.input.enableSummarization
+      ) {
+        throw createApiServiceError(
+          'Human transcription does not support removal filters, speaker channel/count options, diarization type, translation, or summarization. Use the machine transcriber.'
+        );
+      }
+    }
     let client = new RevAIClient({ token: ctx.auth.token });
 
     let translationConfig = ctx.input.translationTargetLanguages?.length
@@ -132,6 +201,7 @@ Returns the created job with its ID and status. Poll the job status or use webho
 
     let job = await client.submitTranscriptionJob({
       mediaUrl: ctx.input.mediaUrl,
+      sourceAuthHeaders: ctx.input.sourceAuthHeaders,
       language: ctx.input.language,
       transcriber: ctx.input.transcriber,
       metadata: ctx.input.metadata,

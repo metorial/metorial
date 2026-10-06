@@ -25,8 +25,6 @@ import {
   updateGroupSettings,
   updateUser
 } from './tools';
-import { activityEvents, userChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -59,5 +57,5 @@ export let provider = Slate.create({
     transferData,
     getCustomerInfo
   ],
-  triggers: [userChanges, activityEvents]
+  triggers: []
 });

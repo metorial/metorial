@@ -1,5 +1,6 @@
 export * from './fire-webhook';
 export * from './get-connection';
+export * from './get-current-context';
 export * from './get-field-options';
 export * from './perform-query';
 export * from './run-action';

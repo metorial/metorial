@@ -22,7 +22,7 @@ export let getSubmitter = SlateTool.create(spec, {
       submissionId: z.number().optional().describe('Submission ID'),
       uuid: z.string().optional().describe('Submitter UUID'),
       slug: z.string().optional().describe('Submitter slug'),
-      email: z.string().optional().describe('Submitter email'),
+      email: z.string().nullable().optional().describe('Submitter email'),
       name: z.string().nullable().optional().describe('Submitter name'),
       phone: z.string().nullable().optional().describe('Submitter phone'),
       status: z.string().optional().describe('Submitter status'),
@@ -33,12 +33,12 @@ export let getSubmitter = SlateTool.create(spec, {
       completedAt: z.string().nullable().optional().describe('When the form was completed'),
       declinedAt: z.string().nullable().optional().describe('When the form was declined'),
       createdAt: z.string().optional().describe('Creation timestamp'),
-      metadata: z.record(z.string(), z.any()).optional().describe('Custom metadata'),
+      metadata: z.record(z.string(), z.unknown()).optional().describe('Custom metadata'),
       values: z
         .array(
           z.object({
             field: z.string().describe('Field name'),
-            value: z.any().describe('Field value')
+            value: z.unknown().describe('Field value')
           })
         )
         .optional()
@@ -98,11 +98,11 @@ export let getSubmitter = SlateTool.create(spec, {
         createdAt: s.created_at,
         metadata: s.metadata,
         values: s.values || [],
-        documents: (s.documents || []).map((d: any) => ({
+        documents: (s.documents || []).map(d => ({
           name: d.name,
           url: d.url
         })),
-        submissionEvents: (s.submission_events || []).map((e: any) => ({
+        submissionEvents: (s.submission_events || []).map(e => ({
           eventId: e.id,
           eventType: e.event_type,
           eventTimestamp: e.event_timestamp

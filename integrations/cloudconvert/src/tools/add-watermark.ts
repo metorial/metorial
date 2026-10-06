@@ -1,125 +1,112 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invalidInput } from '../lib/errors';
+import { createAndRead, jobMessage, singleResult } from '../lib/jobs';
+import { singleFileOutput, sourceUrl, tagInput, waitInput } from '../lib/schemas';
+import type { Tasks } from '../lib/validation';
 import { spec } from '../spec';
 
-export let addWatermark = SlateTool.create(spec, {
+export const addWatermark = SlateTool.create(spec, {
   name: 'Add Watermark',
   key: 'add_watermark',
-  description: `Add a text or image watermark to a PDF, image (PNG, JPG), or video (MP4, MOV) file.
-
-Configure the watermark appearance with font, size, color, position, opacity, and rotation options.`,
-  tags: {
-    destructive: false,
-    readOnly: false
-  }
+  description:
+    'Add exactly one text or image watermark to a PDF, image, or video. Watermarking keeps the input format; use convert_file for a separate format conversion.',
+  constraints: [
+    'Production processing can consume conversion credits. Sandbox only accepts whitelisted files.',
+    'Download result files before the job is deleted, normally 24 hours after completion.'
+  ],
+  tags: { destructive: false, readOnly: false }
 })
   .input(
     z.object({
-      sourceUrl: z.string().describe('URL of the file to watermark'),
-      inputFormat: z
+      sourceUrl,
+      inputFormat: z.string().min(1).optional(),
+      outputFormat: z
         .string()
-        .optional()
-        .describe('File format (e.g., "pdf", "png", "mp4"). Auto-detected if omitted.'),
-      outputFormat: z.string().describe('Output format for the watermarked file'),
-      text: z.string().optional().describe('Watermark text (use this or imageUrl, not both)'),
-      imageUrl: z
-        .string()
-        .optional()
-        .describe('URL of the watermark image (use this or text, not both)'),
-      fontName: z.string().optional().describe('Font name for text watermark'),
-      fontSize: z.number().optional().describe('Font size for text watermark'),
-      fontColor: z.string().optional().describe('Font color as hex (e.g., "#FF0000")'),
+        .min(1)
+        .describe(
+          'Format of the source and watermarked result. Must match inputFormat when supplied.'
+        ),
+      text: z.string().min(1).optional(),
+      imageUrl: sourceUrl.optional(),
+      fontName: z.string().min(1).optional(),
+      fontSize: z.number().positive().optional(),
+      fontColor: z.string().optional(),
       position: z
         .string()
         .optional()
-        .describe('Watermark position (e.g., "center", "top-right", "bottom-left")'),
-      opacity: z.number().optional().describe('Watermark opacity from 0 to 100'),
-      rotation: z.number().optional().describe('Rotation angle in degrees'),
-      layer: z.string().optional().describe('Layer placement: "above" or "below" content'),
-      tag: z.string().optional().describe('Tag to label the job'),
-      waitForCompletion: z
-        .boolean()
-        .optional()
-        .default(true)
-        .describe('Wait for watermarking to complete')
+        .describe(
+          'center, top-left, top-center, top-right, center-left, center-right, bottom-left, bottom-center, or bottom-right.'
+        ),
+      opacity: z.number().min(0).max(100).optional(),
+      rotation: z.number().finite().optional(),
+      layer: z.string().optional().describe('above or below'),
+      tag: tagInput,
+      waitForCompletion: waitInput
     })
   )
-  .output(
-    z.object({
-      jobId: z.string().describe('ID of the watermark job'),
-      status: z.string().describe('Current status of the job'),
-      resultUrl: z
-        .string()
-        .optional()
-        .describe('Temporary download URL for the watermarked file'),
-      resultFilename: z.string().optional().describe('Filename of the watermarked file')
-    })
-  )
+  .output(singleFileOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let watermarkTask: Record<string, any> = {
+    if ((ctx.input.text === undefined) === (ctx.input.imageUrl === undefined))
+      throw invalidInput('Provide exactly one of text or imageUrl.');
+    if (
+      ctx.input.inputFormat !== undefined &&
+      ctx.input.inputFormat !== ctx.input.outputFormat
+    )
+      throw invalidInput(
+        'Watermarking does not change formats. outputFormat must match inputFormat; use convert_file separately.'
+      );
+    if (ctx.input.layer !== undefined && !['above', 'below'].includes(ctx.input.layer))
+      throw invalidInput('layer must be above or below.');
+    if (
+      ctx.input.text === undefined &&
+      [ctx.input.fontName, ctx.input.fontSize, ctx.input.fontColor].some(
+        value => value !== undefined
+      )
+    )
+      throw invalidInput('Font settings require a text watermark.');
+    const position = ctx.input.position ?? 'center';
+    const positions: Record<string, [string, string]> = {
+      center: ['center', 'center'],
+      'top-left': ['top', 'left'],
+      'top-center': ['top', 'center'],
+      'top-right': ['top', 'right'],
+      'center-left': ['center', 'left'],
+      'center-right': ['center', 'right'],
+      'bottom-left': ['bottom', 'left'],
+      'bottom-center': ['bottom', 'center'],
+      'bottom-right': ['bottom', 'right']
+    };
+    const placement = positions[position];
+    if (!placement) throw invalidInput('Choose a documented watermark position.');
+    const task: Record<string, unknown> = {
       operation: 'watermark',
       input: ['import-file'],
-      output_format: ctx.input.outputFormat
+      input_format: ctx.input.inputFormat ?? ctx.input.outputFormat,
+      position_vertical: placement[0],
+      position_horizontal: placement[1]
     };
-
-    if (ctx.input.inputFormat) watermarkTask.input_format = ctx.input.inputFormat;
-    if (ctx.input.text) watermarkTask.text = ctx.input.text;
-    if (ctx.input.fontName) watermarkTask.font_name = ctx.input.fontName;
-    if (ctx.input.fontSize) watermarkTask.font_size = ctx.input.fontSize;
-    if (ctx.input.fontColor) watermarkTask.font_color = ctx.input.fontColor;
-    if (ctx.input.position) watermarkTask.position = ctx.input.position;
-    if (ctx.input.opacity !== undefined) watermarkTask.opacity = ctx.input.opacity;
-    if (ctx.input.rotation !== undefined) watermarkTask.rotation = ctx.input.rotation;
-    if (ctx.input.layer) watermarkTask.layer = ctx.input.layer;
-
-    let tasksConfig: Record<string, any> = {
-      'import-file': {
-        operation: 'import/url',
-        url: ctx.input.sourceUrl
-      }
+    const fields = {
+      text: ctx.input.text,
+      font_name: ctx.input.fontName,
+      font_size: ctx.input.fontSize,
+      font_color: ctx.input.fontColor,
+      opacity: ctx.input.opacity,
+      rotation: ctx.input.rotation,
+      layer: ctx.input.layer
     };
-
-    if (ctx.input.imageUrl) {
-      tasksConfig['import-watermark'] = {
-        operation: 'import/url',
-        url: ctx.input.imageUrl
-      };
-      watermarkTask.input = ['import-file'];
-      watermarkTask.input_watermark = ['import-watermark'];
+    for (const [key, value] of Object.entries(fields))
+      if (value !== undefined) task[key] = value;
+    const tasks: Tasks = {
+      'import-file': { operation: 'import/url', url: ctx.input.sourceUrl }
+    };
+    if (ctx.input.imageUrl !== undefined) {
+      tasks['import-watermark'] = { operation: 'import/url', url: ctx.input.imageUrl };
+      task.image = 'import-watermark';
     }
-
-    tasksConfig['watermark-file'] = watermarkTask;
-    tasksConfig['export-file'] = {
-      operation: 'export/url',
-      input: ['watermark-file']
-    };
-
-    let job = await client.createJob(tasksConfig, ctx.input.tag);
-
-    if (ctx.input.waitForCompletion) {
-      job = await client.waitForJob(job.id);
-    }
-
-    let exportTask = (job.tasks ?? []).find((t: any) => t.operation === 'export/url');
-    let resultFile = exportTask?.result?.files?.[0];
-
-    return {
-      output: {
-        jobId: job.id,
-        status: job.status,
-        resultUrl: resultFile?.url,
-        resultFilename: resultFile?.filename
-      },
-      message:
-        job.status === 'finished'
-          ? `Watermark added successfully. ${resultFile?.url ? `Download: ${resultFile.url}` : ''}`
-          : `Watermark job created (status: ${job.status}).`
-    };
+    tasks['watermark-file'] = task;
+    tasks['export-file'] = { operation: 'export/url', input: ['watermark-file'] };
+    const job = await createAndRead(ctx, tasks, ctx.input);
+    return { output: singleResult(job), message: jobMessage(job, 'Add Watermark') };
   })
   .build();

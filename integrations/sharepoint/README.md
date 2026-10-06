@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/sharepoint-icon.svg" height="20"> Sharepoint
 
-Manage SharePoint sites, document libraries, lists, and files. Create, read, update, and delete lists and list items with custom columns. Resolve site users to numeric Person/Group LookupId values. Upload, download, move, copy, and version files in document libraries. Search across sites, files, folders, lists, and list items using Microsoft Search. Manage permissions at site, list, and item levels with granular access control. Define and manage content types and site columns. Subscribe to webhooks for list and library change notifications. Retrieve site properties and search for sites across Microsoft 365.
+Manage SharePoint sites, document libraries, lists, and files. Create, read, update, and delete lists and list items with custom columns. Resolve site users to numeric Person/Group LookupId values. Upload, download, move, copy, and version files in document libraries. Search across sites, files, folders, lists, and list items using Microsoft Search. Manage permissions at site, list, and item levels with granular access control. Define and manage content types and site columns. Retrieve site properties and search for sites across Microsoft 365.
 
 ## Authentication
 

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/loyverse",
-  "description": "Manage a cloud-based point-of-sale system for retail stores, cafes, and restaurants. Create, read, update, and delete items, categories, modifiers, and variants in the product catalog. Track and update inventory stock levels across multiple store locations. Create sales receipts and process refunds. Manage customer records with lookup by email or phone. Create and configure discounts, tax rates, suppliers, and POS devices. Read employee and shift data. Retrieve store locations, payment types, and merchant information. Receive real-time webhooks for receipt, item, inventory, customer, shift, employee, and store events.",
+  "description": "Manage a cloud-based point-of-sale system for retail stores, cafes, and restaurants. Create, read, update, and delete items, categories, modifiers, and variants in the product catalog. Track and update inventory stock levels across multiple store locations. Create sales receipts and process refunds. Manage customer records with lookup by email or phone. Create and configure discounts, tax rates, suppliers, and POS devices. Read employee and shift data. Retrieve store locations, payment types, and merchant information.",
   "categories": [
     "crm-and-sales-tools",
     "e-commerce-and-retail",
@@ -15,8 +15,7 @@
     "configure discounts and taxes",
     "manage suppliers",
     "read employee and shift data",
-    "retrieve store locations",
-    "receive real-time webhooks"
+    "retrieve store locations"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/loyverse.png"
 }

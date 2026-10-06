@@ -8,10 +8,8 @@ import {
   markPayments,
   submitEnquiry
 } from './tools';
-import { inboundWebhook, newInvoices, newPayments } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [submitEnquiry, listCustomers, getInvoices, markInvoices, getPayments, markPayments],
-  triggers: [inboundWebhook, newInvoices, newPayments]
+  triggers: []
 });

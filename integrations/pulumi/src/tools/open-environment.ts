@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let openEnvironment = SlateTool.create(spec, {
@@ -12,15 +13,12 @@ export let openEnvironment = SlateTool.create(spec, {
     'Use the property parameter to fetch a specific nested value instead of the entire resolved environment.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
     z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe('Organization name (uses default from config if not set)'),
+      organization: organizationInput,
       projectName: z.string().describe('ESC project name'),
       environmentName: z.string().describe('Environment name'),
       duration: z.string().optional().describe('Session duration (e.g., "1h", "2h45m")'),
@@ -41,12 +39,10 @@ export let openEnvironment = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
 
     let session = await client.openEnvironment(
       org,
@@ -54,7 +50,7 @@ export let openEnvironment = SlateTool.create(spec, {
       ctx.input.environmentName,
       ctx.input.duration
     );
-    let sessionId = String(session.id);
+    let sessionId = session.id;
 
     let resolvedValues = await client.readOpenEnvironment(
       org,

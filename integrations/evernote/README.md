@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/evernote.png" height="20"> Evernote
 
-Create, read, update, and trash notes in Evernote. Manage note content written in ENML markup, attach resources when creating notes, download resource file contents through Slate attachments, organize notes with notebooks and tags, search by Evernote search grammar, and receive note-change notifications through Evernote webhooks or polling.
+Create, read, update, and trash notes in Evernote. Manage note content written in ENML markup, attach resources when creating notes, download resource file contents through Slate attachments, organize notes with notebooks and tags, search by Evernote search grammar.
 
 ## Tools
 

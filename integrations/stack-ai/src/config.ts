@@ -2,9 +2,6 @@ import { SlateConfig } from 'slates';
 import { z } from 'zod';
 
 export let config = SlateConfig.create(
-  z.object({
-    orgId: z
-      .string()
-      .describe('Your Stack AI organization ID. Found in your account settings or URL.')
-  })
+  // Preserve stored connection configuration while new connections resolve IDs from an API URL.
+  z.object({}).passthrough()
 );

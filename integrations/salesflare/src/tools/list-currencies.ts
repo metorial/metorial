@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, text } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCurrencies = SlateTool.create(spec, {
@@ -29,12 +29,12 @@ export let listCurrencies = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
     let currencies = await client.listCurrencies();
-    let list = Array.isArray(currencies) ? currencies : [];
+    let list = currencies;
 
-    let mapped = list.map((c: any) => ({
+    let mapped = list.map(c => ({
       currencyId: c.id,
-      iso: c.iso,
-      html: c.html
+      iso: text(c.iso, 'currency code'),
+      html: text(c.html, 'currency symbol')
     }));
 
     return {

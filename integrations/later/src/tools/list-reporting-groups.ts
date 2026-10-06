@@ -6,7 +6,11 @@ import { spec } from '../spec';
 export let listReportingGroupsTool = SlateTool.create(spec, {
   name: 'List Reporting Groups',
   key: 'list_reporting_groups',
-  description: `Retrieve reporting groups for your Later Influence community. Reporting groups allow you to aggregate data across related campaigns. Optionally filter by reporting group ID or campaign ID.`,
+  description:
+    'List reporting groups using legacy Reporting API v1 credentials. Reporting API v2 has no direct equivalent; this tool cannot use a v2 connection.',
+  instructions: [
+    'Requires the Legacy Reporting API v1 authentication method. No reporting-group to campaign mapping is assumed.'
+  ],
   tags: {
     readOnly: true
   }
@@ -43,7 +47,7 @@ export let listReportingGroupsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let groups = await client.getReportingGroups({
       reportingGroupId: ctx.input.reportingGroupId,
       campaignId: ctx.input.campaignId
@@ -53,11 +57,9 @@ export let listReportingGroupsTool = SlateTool.create(spec, {
 
     return {
       output: {
-        reportingGroups: groupList as any
+        reportingGroups: groupList
       },
-      message: ctx.input.reportingGroupId
-        ? `Retrieved reporting group **${ctx.input.reportingGroupId}**.`
-        : `Retrieved **${groupList.length}** reporting group(s).`
+      message: `Retrieved ${groupList.length} legacy reporting group(s).`
     };
   })
   .build();

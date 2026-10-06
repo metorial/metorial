@@ -1,12 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, requireInput, TravisCIClient } from '../lib/client';
+import type { EnvVar } from '../lib/types';
 import { spec } from '../spec';
 
 export let manageEnvVars = SlateTool.create(spec, {
   name: 'Manage Environment Variables',
   key: 'manage_env_vars',
-  description: `List, create, update, or delete environment variables for a Travis CI repository. Environment variables can be marked as public or private (encrypted). Private variable values are not returned by the API.`,
+  description: `List, get, create, update, or delete environment variables for a Travis CI repository. Environment variables can be marked as public or private (encrypted). Private variable values are not returned by the API.`,
+  tags: { destructive: true },
   instructions: [
     'When creating or updating a variable, set isPublic to true to make the value visible in build logs. Default is false (encrypted).'
   ]
@@ -14,11 +16,13 @@ export let manageEnvVars = SlateTool.create(spec, {
   .input(
     z.object({
       repoSlugOrId: z.string().describe('Repository slug (e.g. "owner/repo") or numeric ID.'),
-      action: z.enum(['list', 'create', 'update', 'delete']).describe('Action to perform.'),
+      action: z
+        .enum(['list', 'create', 'update', 'delete', 'get'])
+        .describe('Action to perform.'),
       envVarId: z
         .string()
         .optional()
-        .describe('Environment variable ID. Required for update and delete actions.'),
+        .describe('Environment variable ID. Required for get, update, and delete actions.'),
       name: z
         .string()
         .optional()
@@ -64,13 +68,13 @@ export let manageEnvVars = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
-    let mapEnvVar = (ev: any) => ({
+    let mapEnvVar = (ev: EnvVar) => ({
       envVarId: ev.id,
       name: ev.name,
-      value: ev.value ?? null,
+      value: ev.public === true ? (ev.value ?? null) : null,
       isPublic: ev.public,
       branch: ev.branch ?? null
     });
@@ -87,8 +91,8 @@ export let manageEnvVars = SlateTool.create(spec, {
 
       case 'create': {
         let result = await client.createEnvVar(ctx.input.repoSlugOrId, {
-          name: ctx.input.name!,
-          value: ctx.input.value!,
+          name: requireInput(ctx.input.name, 'name'),
+          value: ctx.input.value ?? requireInput(undefined, 'value'),
           isPublic: ctx.input.isPublic,
           branch: ctx.input.branch
         });
@@ -98,13 +102,33 @@ export let manageEnvVars = SlateTool.create(spec, {
         };
       }
 
+      case 'get': {
+        const result = await client.getEnvVar(
+          ctx.input.repoSlugOrId,
+          requireInput(ctx.input.envVarId, 'envVarId')
+        );
+        return {
+          output: { envVar: mapEnvVar(result) },
+          message: `Retrieved environment variable **${result.name}**.`
+        };
+      }
       case 'update': {
-        let result = await client.updateEnvVar(ctx.input.repoSlugOrId, ctx.input.envVarId!, {
-          name: ctx.input.name,
-          value: ctx.input.value,
-          isPublic: ctx.input.isPublic,
-          branch: ctx.input.branch
-        });
+        if (
+          [ctx.input.name, ctx.input.value, ctx.input.isPublic, ctx.input.branch].every(
+            value => value === undefined
+          )
+        )
+          throw createApiServiceError('Provide at least one field to update.');
+        let result = await client.updateEnvVar(
+          ctx.input.repoSlugOrId,
+          requireInput(ctx.input.envVarId, 'envVarId'),
+          {
+            name: ctx.input.name,
+            value: ctx.input.value,
+            isPublic: ctx.input.isPublic,
+            branch: ctx.input.branch
+          }
+        );
         return {
           output: { envVar: mapEnvVar(result) },
           message: `Updated environment variable **${result.name}** for **${ctx.input.repoSlugOrId}**.`
@@ -112,7 +136,10 @@ export let manageEnvVars = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        await client.deleteEnvVar(ctx.input.repoSlugOrId, ctx.input.envVarId!);
+        await client.deleteEnvVar(
+          ctx.input.repoSlugOrId,
+          requireInput(ctx.input.envVarId, 'envVarId')
+        );
         return {
           output: { deleted: true },
           message: `Deleted environment variable **${ctx.input.envVarId}** from **${ctx.input.repoSlugOrId}**.`

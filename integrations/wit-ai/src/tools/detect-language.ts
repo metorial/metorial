@@ -21,6 +21,8 @@ export let detectLanguage = SlateTool.create(spec, {
       text: z.string().describe('The text for which to detect the language'),
       maxResults: z
         .number()
+        .int()
+        .min(1)
         .optional()
         .describe('Maximum number of detected locales to return')
     })

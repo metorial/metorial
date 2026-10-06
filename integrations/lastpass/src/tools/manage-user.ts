@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { LastPassClient } from '../lib/client';
+import { email, invalid, LastPassClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageUser = SlateTool.create(spec, {
@@ -11,7 +11,7 @@ export let manageUser = SlateTool.create(spec, {
     'Use **resetPassword** to trigger a master password reset email for the user.',
     'Use **disableMultifactor** to remove multifactor authentication from the user.',
     'Use **disableAccount** to disable the user account (block logins).',
-    'You can combine multiple actions in a single call.'
+    'You can combine actions. They run in reset-password, disable-MFA, disable-account order and are not atomic. Earlier effects can remain after a later failure; no automatic rollback occurs.'
   ],
   tags: {
     destructive: true,
@@ -37,11 +37,42 @@ export let manageUser = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      completed: z
+        .boolean()
+        .describe('Whether all selected actions received native receipts without warnings'),
+      failedAction: z
+        .string()
+        .optional()
+        .describe(
+          'Action that failed or reported warnings; subsequent actions were not attempted'
+        ),
+      outcomeUncertain: z
+        .boolean()
+        .optional()
+        .describe(
+          'The failed request may have applied; inspect account state before retrying'
+        ),
+      skippedActions: z
+        .array(z.string())
+        .optional()
+        .describe('Selected actions not attempted after a failure or warning'),
       results: z
         .array(
           z.object({
             action: z.string().describe('Action performed'),
-            status: z.string().describe('Result status')
+            status: z.string().describe('Native result status'),
+            warnings: z
+              .array(z.string())
+              .optional()
+              .describe('Native warnings indicating a partial result'),
+            disabledUsers: z
+              .array(z.string())
+              .optional()
+              .describe('Native disabled user receipt'),
+            unchangedUsers: z
+              .array(z.string())
+              .optional()
+              .describe('Native unchanged user receipt')
           })
         )
         .describe('Results of each action performed')
@@ -53,34 +84,62 @@ export let manageUser = SlateTool.create(spec, {
       provisioningHash: ctx.auth.provisioningHash
     });
 
-    let results: Array<{ action: string; status: string }> = [];
-
-    if (ctx.input.resetPassword) {
-      let result = await client.resetPassword(ctx.input.username);
-      results.push({ action: 'resetPassword', status: result.status || 'OK' });
-    }
-
-    if (ctx.input.disableMultifactor) {
-      let result = await client.disableMultifactor(ctx.input.username);
-      results.push({ action: 'disableMultifactor', status: result.status || 'OK' });
-    }
-
-    if (ctx.input.disableAccount) {
-      let result = await client.disableUser(ctx.input.username);
-      results.push({ action: 'disableAccount', status: result.status || 'OK' });
-    }
-
-    if (results.length === 0) {
-      throw new Error(
-        'No actions specified. Set at least one of: resetPassword, disableMultifactor, disableAccount.'
+    let username = email(ctx.input.username);
+    let selected = [
+      ...(ctx.input.resetPassword ? ['resetPassword' as const] : []),
+      ...(ctx.input.disableMultifactor ? ['disableMultifactor' as const] : []),
+      ...(ctx.input.disableAccount ? ['disableAccount' as const] : [])
+    ];
+    if (!selected.length)
+      throw invalid(
+        'Select at least one true action: resetPassword, disableMultifactor, or disableAccount.'
       );
+    let results: Array<{
+      action: string;
+      status: string;
+      warnings?: string[];
+      disabledUsers?: string[];
+      unchangedUsers?: string[];
+    }> = [];
+    for (let [index, action] of selected.entries()) {
+      try {
+        let result =
+          action === 'resetPassword'
+            ? await client.resetPassword(username)
+            : action === 'disableMultifactor'
+              ? await client.disableMultifactor(username)
+              : await client.disableUser(username);
+        results.push({ action, ...result });
+        if (result.status === 'WARN')
+          return {
+            output: {
+              results,
+              completed: false,
+              failedAction: action,
+              outcomeUncertain: true,
+              skippedActions: selected.slice(index + 1)
+            },
+            message:
+              'LastPass returned warnings. Earlier actions remain applied; subsequent selected actions were not attempted. Verify current account state before retrying.'
+          };
+      } catch (error) {
+        if (!results.length) throw error;
+        return {
+          output: {
+            results,
+            completed: false,
+            failedAction: action,
+            outcomeUncertain: true,
+            skippedActions: selected.slice(index + 1)
+          },
+          message:
+            'A later action failed after earlier native receipts. Earlier effects remain; subsequent selected actions were not attempted. Verify account state before retrying.'
+        };
+      }
     }
-
-    let actionNames = results.map(r => r.action).join(', ');
-
     return {
-      output: { results },
-      message: `Performed action(s) **${actionNames}** on user **${ctx.input.username}**.`
+      output: { results, completed: true },
+      message: `LastPass returned receipts for **${selected.join(', ')}** on **${username}**.`
     };
   })
   .build();

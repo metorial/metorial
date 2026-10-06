@@ -24,8 +24,7 @@ export let deleteCollection = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.auth.serverUrl
+      ...ctx.auth
     });
 
     await client.deleteCollection(ctx.input.collectionId);

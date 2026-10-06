@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getProfile = SlateTool.create(spec, {
   name: 'Get Profile',
   key: 'get_profile',
-  description: `Retrieves the organization profile from Lexoffice, including company name, tax information, address, and contact details. Useful for understanding the connected account's configuration.`,
+  description: `Retrieves the organization profile from Lexoffice, including organization identity, tax configuration, connection identity and available features. Useful for understanding the connected account's configuration.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,6 +15,26 @@ export let getProfile = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      connectionId: z.string().optional().describe('Current API connection ID'),
+      created: z
+        .object({
+          userId: z.string().optional(),
+          userName: z.string().optional(),
+          userEmail: z.string().optional(),
+          date: z.string().optional()
+        })
+        .optional()
+        .describe('User and date associated with this API connection'),
+      features: z.array(z.string()).optional().describe('Available features'),
+      businessFeatures: z
+        .array(z.string())
+        .optional()
+        .describe('Available business capabilities'),
+      subscriptionStatus: z.string().optional().describe('Current subscription status'),
+      distanceSalesPrinciple: z
+        .string()
+        .optional()
+        .describe('Configured distance sales tax principle'),
       organizationId: z.string().optional().describe('Unique organization ID'),
       companyName: z.string().optional().describe('Company name'),
       businessName: z.string().optional().describe('Business name'),
@@ -35,35 +55,10 @@ export let getProfile = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let profile = await client.getProfile();
-
-    let address = profile.address || {};
-    let contactDetails = profile.contactDetails || {};
-
-    let output = {
-      organizationId: profile.organizationId,
-      companyName: profile.companyName,
-      businessName: profile.businessName,
-      taxType: profile.taxType,
-      taxNumber: profile.taxNumber,
-      vatRegistrationId: profile.vatRegistrationId,
-      smallBusiness: profile.smallBusiness,
-      street: address.street,
-      zip: address.zip,
-      city: address.city,
-      countryCode: address.countryCode,
-      contactEmail: contactDetails.email,
-      contactPhone: contactDetails.phone,
-      createdDate: profile.createdDate
-    };
-
-    let displayName = output.companyName || output.businessName || 'Unknown';
-
+    const profile = await new Client({ token: ctx.auth.token }).getProfile();
     return {
-      output,
-      message: `Organization: **${displayName}**${output.city ? `, ${output.city}` : ''}${output.countryCode ? ` (${output.countryCode})` : ''}${output.smallBusiness ? ' — Kleinunternehmer' : ''}.`
+      output: profile,
+      message: `Connected organization: **${profile.companyName}** (${profile.organizationId}).`
     };
   })
   .build();

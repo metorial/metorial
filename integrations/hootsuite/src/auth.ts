@@ -1,31 +1,74 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { HOOTSUITE_BASE_URL, HootsuiteClient, upstreamFailure } from './lib/client';
 
-let api = createAxios({
-  baseURL: 'https://platform.hootsuite.com'
+let outputSchema = z.object({
+  token: z.string(),
+  refreshToken: z.string().optional(),
+  expiresAt: z.string().optional()
 });
+type AuthOutput = z.infer<typeof outputSchema>;
+
+let normalizeTokens = (value: unknown, previousRefreshToken?: string) => {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    'expires_in' in value
+  ) {
+    let seconds = value.expires_in;
+    if (
+      typeof seconds !== 'number' ||
+      !Number.isFinite(seconds) ||
+      seconds <= 0 ||
+      !Number.isFinite(new Date(Date.now() + seconds * 1000).getTime())
+    ) {
+      throw createApiServiceError(
+        'Hootsuite returned an invalid OAuth token expiry. Reconnect the account.',
+        { reason: 'oauth_token_response' }
+      );
+    }
+  }
+  return normalizeOAuthTokenResponse(value, {
+    providerLabel: 'Hootsuite',
+    previousRefreshToken,
+    refreshTokenFallbackMode: 'falsy',
+    expiresInType: 'number'
+  });
+};
+
+let exchangeToken = async (clientId: string, clientSecret: string, body: URLSearchParams) => {
+  let credentials = Buffer.from(`${clientId}:${clientSecret}`, 'utf8').toString('base64');
+  let api = createAuthenticatedAxios({
+    baseURL: HOOTSUITE_BASE_URL,
+    authHeader: { value: `Basic ${credentials}` },
+    contentType: 'application/x-www-form-urlencoded',
+    timeout: 30_000,
+    maxRedirects: 0,
+    errorAdapter: error => upstreamFailure(error, 'OAuth token exchange')
+  });
+  let response = await api.post<unknown>('/oauth2/token', body.toString());
+  return response.data;
+};
 
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string(),
-      refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
-    })
-  )
+  .output(outputSchema)
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth 2.0',
     key: 'oauth2',
-
     scopes: [
       {
         title: 'Offline Access',
-        description: 'Enables refresh tokens for long-lived access',
+        description: 'Allows refreshing access without signing in again',
         scope: 'offline'
       }
     ],
-
     getAuthorizationUrl: async ctx => {
       let params = new URLSearchParams({
         response_type: 'code',
@@ -34,92 +77,46 @@ export let auth = SlateAuth.create()
         scope: ctx.scopes.join(' '),
         state: ctx.state
       });
-
-      return {
-        url: `https://platform.hootsuite.com/oauth2/auth?${params.toString()}`
-      };
+      return { url: `${HOOTSUITE_BASE_URL}/oauth2/auth?${params.toString()}` };
     },
-
     handleCallback: async ctx => {
-      let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
-
-      let response = await api.post(
-        '/oauth2/token',
+      let value = await exchangeToken(
+        ctx.clientId,
+        ctx.clientSecret,
         new URLSearchParams({
           grant_type: 'authorization_code',
           code: ctx.code,
-          redirect_uri: ctx.redirectUri,
-          scope: ctx.scopes.join(' ')
-        }).toString(),
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
+          redirect_uri: ctx.redirectUri
+        })
       );
-
-      let expiresAt = new Date(
-        Date.now() + (response.data.expires_in || 3600) * 1000
-      ).toISOString();
-
-      return {
-        output: {
-          token: response.data.access_token,
-          refreshToken: response.data.refresh_token,
-          expiresAt
-        }
-      };
+      return { output: normalizeTokens(value) };
     },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
-
-      let response = await api.post(
-        '/oauth2/token',
+    handleTokenRefresh: async (ctx: {
+      output: AuthOutput;
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken)
+        throw createApiServiceError(
+          'Reconnect Hootsuite with Offline Access to obtain a refresh token.',
+          { reason: 'missing_refresh_token' }
+        );
+      let value = await exchangeToken(
+        ctx.clientId,
+        ctx.clientSecret,
         new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken,
-          scope: ctx.scopes.join(' ')
-        }).toString(),
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
+          refresh_token: ctx.output.refreshToken
+        })
       );
-
-      let expiresAt = new Date(
-        Date.now() + (response.data.expires_in || 3600) * 1000
-      ).toISOString();
-
-      return {
-        output: {
-          token: response.data.access_token,
-          refreshToken: response.data.refresh_token || ctx.output.refreshToken,
-          expiresAt
-        }
-      };
+      return { output: normalizeTokens(value, ctx.output.refreshToken) };
     },
-
-    getProfile: async (ctx: any) => {
-      let response = await api.get('/v1/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let me = response.data.data;
-
+    getProfile: async (ctx: { output: AuthOutput }) => {
+      let me = await new HootsuiteClient(ctx.output.token).getMe();
       return {
         profile: {
-          id: String(me.id),
-          name: me.fullName,
+          id: me.id,
+          name: me.fullName || me.email || `Member ${me.id}`,
           email: me.email
         }
       };

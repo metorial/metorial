@@ -9,6 +9,9 @@ import {
   deleteCollector,
   deleteContactList,
   deleteSurvey,
+  exportResponses,
+  getFileUrl,
+  getResource,
   getResponse,
   getResponses,
   getSurvey,
@@ -16,13 +19,13 @@ import {
   listCollectors,
   listContactLists,
   listContacts,
+  listReferenceData,
   listSurveys,
+  manageContact,
   sendInvitation,
   updateCollector,
   updateSurvey
 } from './tools';
-import { responseEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,7 +47,12 @@ export let provider = Slate.create({
     createContactsBulk,
     deleteContactList,
     sendInvitation,
-    getUser
+    getUser,
+    getResource,
+    manageContact,
+    listReferenceData,
+    exportResponses,
+    getFileUrl
   ],
-  triggers: [responseEvent]
+  triggers: []
 });

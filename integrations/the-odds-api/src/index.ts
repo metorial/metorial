@@ -11,8 +11,6 @@ import {
   getScoresTool,
   listSportsTool
 } from './tools';
-import { inboundWebhook, scoreUpdatesTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     getHistoricalOddsTool,
     getHistoricalEventsTool
   ],
-  triggers: [inboundWebhook, scoreUpdatesTrigger]
+  triggers: []
 });

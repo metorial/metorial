@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type SyncWriteInput, workspaceClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let mappingSchema = z.object({
@@ -34,15 +35,16 @@ export let createSync = SlateTool.create(spec, {
   key: 'create_sync',
   description: `Creates a new data sync that moves data from a source (data warehouse) to a destination (SaaS tool). Configure the source object, destination object, field mappings, sync behavior, and schedule.`,
   instructions: [
-    'You must specify at least one mapping with isPrimaryIdentifier set to true for record-matching operations (upsert, update, mirror).',
-    'Use "append" operation for event-style syncs that do not need a primary identifier.'
+    'Call list_source_objects and list_destination_objects to discover object names, supported operations and per-operation primary identifier requirements.',
+    'Creating or scheduling a sync can query a warehouse, transfer data, incur costs and trigger notifications. Mirror can delete destination records.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
+      workspaceId,
       label: z.string().optional().describe('Human-readable label for the sync.'),
       operation: z
         .enum(['upsert', 'update', 'insert', 'mirror', 'append'])
@@ -59,8 +61,15 @@ export let createSync = SlateTool.create(spec, {
           tableCatalog: z
             .string()
             .optional()
-            .describe('Database/catalog name (for table type).'),
-          tableSchema: z.string().optional().describe('Schema name (for table type).'),
+            .describe(
+              'Database/catalog name for a table. If omitted, a unique table is discovered with list_source_objects.'
+            ),
+          tableSchema: z
+            .string()
+            .optional()
+            .describe(
+              'Schema name for a table. If omitted, a unique table is discovered with list_source_objects.'
+            ),
           tableName: z.string().optional().describe('Table name (for table type).')
         })
         .describe('Source object configuration.'),
@@ -87,7 +96,7 @@ export let createSync = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Day of the week for weekly schedules (e.g., "monday").'),
-      scheduleHour: z.number().optional().describe('Hour (0-23) for daily/weekly schedules.'),
+      scheduleHour: z.number().optional().describe('Hour (0–24) for daily/weekly schedules.'),
       scheduleMinute: z
         .number()
         .optional()
@@ -96,28 +105,42 @@ export let createSync = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Cron expression for expression-based schedules.'),
-      paused: z.boolean().optional().describe('Whether to create the sync in a paused state.')
+      paused: z.boolean().optional().describe('Whether to create the sync in a paused state.'),
+      failedRunNotificationsEnabled: z
+        .boolean()
+        .optional()
+        .describe('Enable failed-run email notifications (legacy provider option).'),
+      failedRecordNotificationsEnabled: z
+        .boolean()
+        .optional()
+        .describe('Enable failed-record email notifications (legacy provider option).'),
+      alertAttributes: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe(
+          'Provider alert configurations. An empty array disables configured sync alerts.'
+        )
     })
   )
   .output(
     z.object({
       syncId: z.number().describe('ID of the created sync.'),
-      label: z.string().nullable().describe('Label of the created sync.'),
+      label: z.string().nullish().describe('Label of the created sync.'),
       status: z.string().describe('Initial status of the sync.'),
       operation: z.string().describe('Configured sync behavior.'),
-      createdAt: z.string().describe('When the sync was created.')
+      createdAt: z.string().nullish().describe('When the sync was created.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = await workspaceClient(ctx);
 
-    let syncConfig: Record<string, unknown> = {
+    let syncConfig: SyncWriteInput = {
       label: ctx.input.label,
       operation: ctx.input.operation,
       paused: ctx.input.paused,
+      failedRunNotificationsEnabled: ctx.input.failedRunNotificationsEnabled,
+      failedRecordNotificationsEnabled: ctx.input.failedRecordNotificationsEnabled,
+      alertAttributes: ctx.input.alertAttributes,
       sourceAttributes: {
         connectionId: ctx.input.sourceConnectionId,
         object: ctx.input.sourceObject

@@ -9,8 +9,6 @@ import {
   updateTemplate,
   uploadTemplate
 } from './tools';
-import { renderCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     checkStatus,
     listCategoriesAndTags
   ],
-  triggers: [renderCompleted]
+  triggers: []
 });

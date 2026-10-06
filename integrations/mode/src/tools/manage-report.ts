@@ -45,11 +45,7 @@ Use **delete** to permanently remove a report.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let { action, reportToken } = ctx.input;
 

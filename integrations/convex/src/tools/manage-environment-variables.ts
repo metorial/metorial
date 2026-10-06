@@ -8,15 +8,17 @@ export let manageEnvironmentVariables = SlateTool.create(spec, {
   key: 'manage_environment_variables',
   description: `View or update environment variables for a Convex deployment.
 When no changes are provided, lists all current environment variables.
-When changes are provided, updates the specified environment variables.
-Requires deploy key authentication.`,
+When changes are provided, updates the specified environment variables; omit a change's value to delete that variable.
+Listing includes secret values. Requires deployment environment-variable permission.`,
   instructions: [
     'To list variables, call without the "changes" parameter',
-    'To set or update variables, provide an array of name/value pairs in "changes"'
+    'To set or update variables, provide an array of name/value pairs in "changes"',
+    'To delete a variable, provide its name without a value; an empty string sets an empty value'
   ],
-  constraints: ['Requires deploy key (admin) authentication'],
+  constraints: ['Requires deployment environment-variable view/write permission'],
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -25,7 +27,12 @@ Requires deploy key authentication.`,
         .array(
           z.object({
             name: z.string().describe('Environment variable name'),
-            value: z.string().describe('Environment variable value')
+            value: z
+              .string()
+              .optional()
+              .describe(
+                'Environment variable value. Omit to delete the variable; an empty string is a value.'
+              )
           })
         )
         .optional()

@@ -9,8 +9,6 @@ import {
   manageNewsletterContacts,
   sendEmail
 } from './tools';
-import { inboundWebhook, newFormSubmission, newOrder, orderStatusUpdated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     manageNewsletterContacts,
     getFailedEmails
   ],
-  triggers: [inboundWebhook, newFormSubmission, newOrder, orderStatusUpdated]
+  triggers: []
 });

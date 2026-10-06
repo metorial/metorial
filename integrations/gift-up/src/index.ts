@@ -23,13 +23,6 @@ import {
   updateOrder,
   voidGiftCard
 } from './tools';
-import {
-  giftCardCreatedTrigger,
-  giftCardRedeemedTrigger,
-  giftCardUpdatedTrigger,
-  orderCreatedTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -55,10 +48,5 @@ export let provider = Slate.create({
     getCompany,
     listLocations
   ],
-  triggers: [
-    orderCreatedTrigger,
-    giftCardCreatedTrigger,
-    giftCardRedeemedTrigger,
-    giftCardUpdatedTrigger
-  ]
+  triggers: []
 });

@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { anyOf, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { dataObject, objectResponse, requireNumber, requireText } from '../lib/response';
 import { createClient } from '../lib/utils';
 import { spec } from '../spec';
 
@@ -11,6 +12,7 @@ export let getEorCountryGuide = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('contracts:read'))
   .input(
     z.object({
       countryCode: z.string().describe('ISO country code (e.g. "US", "GB", "DE")')
@@ -26,8 +28,12 @@ export let getEorCountryGuide = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
+    if (!/^[A-Z]{2}$/.test(ctx.input.countryCode))
+      throw createApiServiceError(
+        'countryCode must be an uppercase two-letter ISO country code.'
+      );
     let result = await client.getEorCountryGuide(ctx.input.countryCode);
-    let guide = result?.data ?? result;
+    let guide = dataObject(result, 'EOR guide');
 
     return {
       output: { guide },
@@ -49,7 +55,14 @@ export let calculateEorCost = SlateTool.create(spec, {
       countryCode: z.string().describe('ISO country code for the employee'),
       currencyCode: z.string().optional().describe('Currency code (e.g. "USD")'),
       salary: z.number().optional().describe('Annual or monthly salary amount'),
-      salaryPeriod: z.string().optional().describe('Salary period: "annual" or "monthly"')
+      salaryPeriod: z
+        .string()
+        .optional()
+        .describe('Salary period: annual/ANNUALLY or monthly/MONTHLY'),
+      countryName: z
+        .string()
+        .optional()
+        .describe('Required full country name, for example Germany or United States')
     })
   )
   .output(
@@ -60,18 +73,28 @@ export let calculateEorCost = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let country = requireText(ctx.input.countryName, 'countryName');
+    let currency = requireText(ctx.input.currencyCode, 'currencyCode');
+    requireNumber(ctx.input.salary, 'salary', 1);
+    if (!/^[A-Z]{2}$/.test(ctx.input.countryCode) || !/^[A-Z]{3}$/.test(currency))
+      throw createApiServiceError('Use uppercase ISO country and currency codes.');
+    let salaryPeriod = ctx.input.salaryPeriod?.toUpperCase();
+    if (salaryPeriod === 'ANNUAL') salaryPeriod = 'ANNUALLY';
+    if (salaryPeriod !== undefined && !['ANNUALLY', 'MONTHLY'].includes(salaryPeriod))
+      throw createApiServiceError('salaryPeriod must be annual/ANNUALLY or monthly/MONTHLY.');
     let client = createClient(ctx);
-
-    let data: Record<string, any> = {
-      country_code: ctx.input.countryCode
+    let data = {
+      country,
+      currency,
+      salary: ctx.input.salary,
+      country_code: ctx.input.countryCode,
+      ...(salaryPeriod ? { salary_period: salaryPeriod } : {})
     };
-    if (ctx.input.currencyCode) data.currency_code = ctx.input.currencyCode;
-    if (ctx.input.salary) data.salary = ctx.input.salary;
-    if (ctx.input.salaryPeriod) data.salary_period = ctx.input.salaryPeriod;
-
-    let result = await client.getEorCostCalculation(data);
-    let costBreakdown = result?.data ?? result;
-
+    let result = objectResponse(await client.getEorCostCalculation(data), 'EOR cost');
+    // The reference documents an unwrapped body; the guide also shows a data envelope.
+    let costBreakdown = result.data === undefined ? result : dataObject(result, 'EOR cost');
+    if (!('costs' in costBreakdown || 'total_costs' in costBreakdown))
+      throw createApiServiceError('Deel returned an invalid employment cost breakdown.');
     return {
       output: { costBreakdown },
       message: `Calculated EOR cost for **${ctx.input.countryCode}**.`

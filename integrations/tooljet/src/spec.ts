@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'tooljet',
   name: 'ToolJet',
   description:
-    'Open-source low-code platform for building internal tools. Manage users, workspaces, and applications programmatically.',
+    'Use the Enterprise self-hosted external API to manage users, workspaces and applications, and access separately configured workflow webhooks.',
   metadata: {},
   config,
   auth

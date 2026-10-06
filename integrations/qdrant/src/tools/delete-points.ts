@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { QdrantClient } from '../lib/client';
+import { validatePointSelector } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deletePoints = SlateTool.create(spec, {
@@ -37,8 +38,9 @@ export let deletePoints = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePointSelector(ctx.input.pointIds, ctx.input.filter);
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 
@@ -48,7 +50,7 @@ export let deletePoints = SlateTool.create(spec, {
     } else if (ctx.input.filter) {
       selector.filter = ctx.input.filter;
     } else {
-      throw new Error('Either pointIds or filter must be provided');
+      throw createApiServiceError('Either pointIds or filter must be provided');
     }
 
     let result = await client.deletePoints(
@@ -59,12 +61,12 @@ export let deletePoints = SlateTool.create(spec, {
 
     return {
       output: {
-        operationId: result.result?.operation_id,
+        operationId: result.result?.operation_id ?? undefined,
         status: result.result?.status ?? 'completed'
       },
       message: ctx.input.pointIds
-        ? `Deleted **${ctx.input.pointIds.length}** point(s) from \`${ctx.input.collectionName}\`. Status: **${result.result?.status ?? 'completed'}**.`
-        : `Deleted points matching filter from \`${ctx.input.collectionName}\`. Status: **${result.result?.status ?? 'completed'}**.`
+        ? `Deletion operation for **${ctx.input.pointIds.length}** point(s) in \`${ctx.input.collectionName}\`. Status: **${result.result?.status ?? 'completed'}**.`
+        : `Deletion operation for points matching the filter in \`${ctx.input.collectionName}\`. Status: **${result.result?.status ?? 'completed'}**.`
     };
   })
   .build();

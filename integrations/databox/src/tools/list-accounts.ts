@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listAccounts = SlateTool.create(spec, {
   name: 'List Accounts',
   key: 'list_accounts',
-  description: `Retrieves all Databox accounts accessible to the authenticated user. Returns account IDs, names, and types. Use this to identify the correct **accountId** needed when creating data sources.`,
+  description: `Retrieves all Databox accounts accessible to the authenticated user. Returns account IDs, names, and types. Available only in v1 because v2 has no equivalent organization/agency/client classification. Use get_current_user for current identity; use this roster to discover v1 accountId.`,
   tags: {
     readOnly: true
   }
@@ -26,7 +26,7 @@ export let listAccounts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, apiVersion: ctx.config.apiVersion });
     let accounts = await client.listAccounts();
 
     return {

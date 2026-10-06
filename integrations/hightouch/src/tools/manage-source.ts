@@ -1,18 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { sourceSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let sourceSchema = z.object({
-  sourceId: z.number().describe('Unique ID of the source'),
-  name: z.string().describe('Name of the source'),
-  slug: z.string().describe('URL-friendly slug for the source'),
-  type: z.string().describe('Source type (e.g. snowflake, postgres, bigquery)'),
-  configuration: z.record(z.string(), z.any()).describe('Source connection configuration'),
-  workspaceId: z.number().describe('ID of the workspace the source belongs to'),
-  createdAt: z.string().describe('ISO timestamp when the source was created'),
-  updatedAt: z.string().describe('ISO timestamp when the source was last updated')
-});
 
 export let listSources = SlateTool.create(spec, {
   name: 'List Sources',
@@ -26,6 +16,8 @@ export let listSources = SlateTool.create(spec, {
     z.object({
       limit: z.number().optional().describe('Max number of sources to return (default 100)'),
       offset: z.number().optional().describe('Offset for pagination (default 0)'),
+      name: z.string().optional().describe('Filter by resource name'),
+      slug: z.string().optional().describe('Filter by resource slug'),
       orderBy: z
         .enum(['id', 'name', 'slug', 'createdAt', 'updatedAt'])
         .optional()
@@ -35,7 +27,8 @@ export let listSources = SlateTool.create(spec, {
   .output(
     z.object({
       sources: z.array(sourceSchema).describe('List of sources'),
-      hasMore: z.boolean().describe('Whether more results are available')
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextOffset: z.number().optional().describe('Offset for the next page, when available')
     })
   )
   .handleInvocation(async ctx => {
@@ -43,13 +36,16 @@ export let listSources = SlateTool.create(spec, {
     let result = await client.listSources({
       limit: ctx.input.limit,
       offset: ctx.input.offset,
-      orderBy: ctx.input.orderBy
+      orderBy: ctx.input.orderBy,
+      name: ctx.input.name,
+      slug: ctx.input.slug
     });
 
     return {
       output: {
         sources: result.data,
-        hasMore: result.hasMore
+        hasMore: result.hasMore,
+        nextOffset: result.nextOffset
       },
       message: `Found **${result.data.length}** source(s).${result.hasMore ? ' More results available.' : ''}`
     };
@@ -59,7 +55,7 @@ export let listSources = SlateTool.create(spec, {
 export let getSource = SlateTool.create(spec, {
   name: 'Get Source',
   key: 'get_source',
-  description: `Retrieve details of a specific data source by its ID, including its type, connection configuration, and metadata.`,
+  description: `Retrieve details of a specific data source by its ID, including its type and metadata. Connection credentials are omitted.`,
   tags: {
     readOnly: true
   }
@@ -86,7 +82,7 @@ export let createSource = SlateTool.create(spec, {
   key: 'create_source',
   description: `Create a new data source connection in your Hightouch workspace. A source defines where your data lives — a data warehouse, database, or other system that Hightouch will pull data from.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -95,7 +91,7 @@ export let createSource = SlateTool.create(spec, {
       slug: z.string().describe('URL-friendly slug for the source'),
       type: z.string().describe('Source type (e.g. snowflake, postgres, bigquery)'),
       configuration: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .describe('Source connection configuration (varies by type)')
     })
   )
@@ -116,7 +112,7 @@ export let updateSource = SlateTool.create(spec, {
   key: 'update_source',
   description: `Update an existing data source's name or connection configuration.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -124,7 +120,7 @@ export let updateSource = SlateTool.create(spec, {
       sourceId: z.number().describe('ID of the source to update'),
       name: z.string().optional().describe('New name for the source'),
       configuration: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Updated connection configuration')
     })

@@ -29,7 +29,7 @@ describe('google-analytics provider contract', () => {
         'manage_audiences',
         'audit_data_access'
       ],
-      triggerIds: ['inbound_webhook', 'property_change'],
+      triggerIds: [],
       authMethodIds: ['oauth', 'measurement_protocol'],
       tools: [
         { id: 'run_report', readOnly: true, destructive: false },
@@ -46,13 +46,10 @@ describe('google-analytics provider contract', () => {
         { id: 'manage_audiences', readOnly: false, destructive: false },
         { id: 'audit_data_access', readOnly: true, destructive: false }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'property_change', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(15);
+    expect(contract.actions).toHaveLength(13);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([
       'propertyId',
       'measurementId'
@@ -70,14 +67,13 @@ describe('google-analytics provider contract', () => {
       manage_custom_metrics: googleAnalyticsActionScopes.manageCustomMetrics,
       manage_key_events: googleAnalyticsActionScopes.manageKeyEvents,
       manage_audiences: googleAnalyticsActionScopes.manageAudiences,
-      audit_data_access: googleAnalyticsActionScopes.auditDataAccess,
-      property_change: googleAnalyticsActionScopes.propertyChange
+      audit_data_access: googleAnalyticsActionScopes.auditDataAccess
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {
       expect(contract.actions.find(action => action.id === actionId)?.scopes).toEqual(scopes);
     }
-    for (let actionId of ['send_events', 'validate_events', 'inbound_webhook']) {
+    for (let actionId of ['send_events', 'validate_events']) {
       expect(contract.actions.find(action => action.id === actionId)?.scopes).toBeUndefined();
     }
 

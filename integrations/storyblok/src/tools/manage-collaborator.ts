@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StoryblokClient } from '../lib/client';
+import { branches, pagingOutput, resolveSpace, spaceIdInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageCollaborator = SlateTool.create(spec, {
@@ -13,22 +14,38 @@ export let manageCollaborator = SlateTool.create(spec, {
     'To **list** all collaborators, set action to "list".'
   ],
   tags: {
-    readOnly: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
     z.object({
+      spaceId: spaceIdInput,
       action: z.enum(['add', 'remove', 'list']).describe('The collaborator action to perform'),
       collaboratorId: z.string().optional().describe('Collaborator ID (required for remove)'),
       email: z
         .string()
         .optional()
         .describe('Email address of the user to add (required for add)'),
-      spaceRoleId: z.number().optional().describe('Space role ID to assign to the user')
+      spaceRoleId: z
+        .number()
+        .optional()
+        .describe(
+          'Custom role ID from Get Space Info; the native numeric role selector is resolved and verified before invitation'
+        ),
+      role: z
+        .string()
+        .optional()
+        .describe(
+          'Explicit role for add: admin, editor, or an exact custom role ID/name from Get Space Info; custom roles resolve to their native numeric selector'
+        ),
+      page: z.number().optional().describe('Page for list; default 1'),
+      perPage: z.number().optional().describe('Items per page for list; maximum 100')
     })
   )
   .output(
     z.object({
+      ...pagingOutput,
       collaboratorId: z.number().optional().describe('ID of the affected collaborator'),
       email: z.string().optional().describe('Email of the collaborator'),
       collaborators: z
@@ -46,40 +63,55 @@ export let manageCollaborator = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    branches(
+      ctx.input,
+      {
+        add: ['email', 'role', 'spaceRoleId'],
+        remove: ['collaboratorId'],
+        list: ['page', 'perPage']
+      }[ctx.input.action]
+    );
     let client = new StoryblokClient({
-      token: ctx.auth.token,
-      region: ctx.auth.region,
-      spaceId: ctx.config.spaceId
+      ...ctx.auth,
+      spaceId: resolveSpace(
+        ctx.input.spaceId,
+        ctx.config.spaceId,
+        ctx.auth.mode === 'oauth' ? ctx.auth.spaceId : undefined
+      )
     });
 
     let { action } = ctx.input;
 
     if (action === 'list') {
-      let collaborators = await client.listCollaborators();
+      let result = await client.listCollaborators(ctx.input);
       return {
         output: {
-          collaborators: collaborators.map(c => ({
+          ...result,
+          collaborators: result.collaborators.map(c => ({
             collaboratorId: c.id,
-            firstname: c.firstname,
-            lastname: c.lastname,
-            email: c.user?.email,
+            firstname: c.user?.firstname ?? c.firstname,
+            lastname: c.user?.lastname ?? c.lastname,
+            email: c.user?.real_email ?? c.user?.email ?? c.email,
             role: c.role
           }))
         },
-        message: `Found **${collaborators.length}** collaborators.`
+        message: `Found **${result.collaborators.length}** collaborators.`
       };
     }
 
     if (action === 'add') {
-      if (!ctx.input.email) throw new Error('Email is required to add a collaborator');
+      if (!ctx.input.email)
+        throw createApiServiceError('Email is required to add a collaborator');
       let collaborator = await client.addCollaborator({
         email: ctx.input.email,
-        spaceRoleId: ctx.input.spaceRoleId
+        spaceRoleId: ctx.input.spaceRoleId,
+        role: ctx.input.role
       });
       return {
         output: {
           collaboratorId: collaborator.id,
-          email: ctx.input.email
+          email:
+            collaborator.user?.real_email ?? collaborator.user?.email ?? collaborator.email
         },
         message: `Added collaborator **${ctx.input.email}** (\`${collaborator.id}\`).`
       };
@@ -87,10 +119,10 @@ export let manageCollaborator = SlateTool.create(spec, {
 
     // action === 'remove'
     if (!ctx.input.collaboratorId)
-      throw new Error('collaboratorId is required to remove a collaborator');
+      throw createApiServiceError('collaboratorId is required to remove a collaborator');
     await client.removeCollaborator(ctx.input.collaboratorId);
     return {
-      output: { collaboratorId: Number.parseInt(ctx.input.collaboratorId, 10) },
+      output: { collaboratorId: Number(ctx.input.collaboratorId) },
       message: `Removed collaborator \`${ctx.input.collaboratorId}\`.`
     };
   })

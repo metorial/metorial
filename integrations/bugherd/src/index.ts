@@ -22,14 +22,6 @@ import {
   updateProject,
   updateTask
 } from './tools';
-import {
-  commentCreated,
-  projectCreated,
-  taskCreated,
-  taskDestroyed,
-  taskUpdated
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -54,5 +46,5 @@ export let provider = Slate.create({
     createColumn,
     updateColumn
   ],
-  triggers: [projectCreated, taskCreated, taskUpdated, taskDestroyed, commentCreated]
+  triggers: []
 });

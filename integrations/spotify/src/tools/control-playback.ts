@@ -1,7 +1,28 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
+import type { z as Zod } from 'zod';
 import { z } from 'zod';
 import { SpotifyClient } from '../lib/client';
+import type { playableSchema } from '../lib/types';
 import { spec } from '../spec';
+
+const itemOutputSchema = z.object({
+  trackId: z.string().nullable(),
+  episodeId: z.string().nullable().optional(),
+  itemType: z.string(),
+  name: z.string(),
+  artists: z.array(z.object({ artistId: z.string().nullable(), name: z.string() })).nullable(),
+  uri: z.string()
+});
+function mapItem(item: Zod.infer<typeof playableSchema>) {
+  return {
+    trackId: item.type === 'track' ? (item.id ?? null) : null,
+    episodeId: item.type === 'episode' ? (item.id ?? null) : undefined,
+    itemType: item.type,
+    name: item.name,
+    artists: item.artists?.map(a => ({ artistId: a.id ?? null, name: a.name })) ?? null,
+    uri: item.uri
+  };
+}
 
 export let controlPlayback = SlateTool.create(spec, {
   name: 'Control Playback',
@@ -66,32 +87,37 @@ export let controlPlayback = SlateTool.create(spec, {
       playbackState: z
         .object({
           isPlaying: z.boolean(),
-          shuffleState: z.boolean(),
-          repeatState: z.string(),
+          shuffleState: z.boolean().optional(),
+          repeatState: z.string().optional(),
           progressMs: z.number().nullable(),
+          currentItem: itemOutputSchema.nullable(),
           currentTrack: z
             .object({
-              trackId: z.string(),
+              trackId: z.string().nullable(),
               name: z.string(),
-              artists: z.array(
-                z.object({
-                  artistId: z.string(),
-                  name: z.string()
-                })
-              ),
-              albumName: z.string(),
+              artists: z
+                .array(
+                  z.object({
+                    artistId: z.string().nullable(),
+                    name: z.string()
+                  })
+                )
+                .nullable(),
+              albumName: z.string().nullable(),
               durationMs: z.number(),
-              spotifyUrl: z.string(),
+              spotifyUrl: z.string().nullable(),
               uri: z.string()
             })
             .nullable(),
-          device: z.object({
-            deviceId: z.string().nullable(),
-            name: z.string(),
-            type: z.string(),
-            isActive: z.boolean(),
-            volumePercent: z.number().nullable()
-          }),
+          device: z
+            .object({
+              deviceId: z.string().nullable(),
+              name: z.string(),
+              type: z.string(),
+              isActive: z.boolean(),
+              volumePercent: z.number().nullable()
+            })
+            .optional(),
           context: z
             .object({
               type: z.string(),
@@ -108,47 +134,27 @@ export let controlPlayback = SlateTool.create(spec, {
             type: z.string(),
             isActive: z.boolean(),
             volumePercent: z.number().nullable(),
-            supportsVolume: z.boolean()
+            supportsVolume: z.boolean().optional()
           })
         )
         .optional(),
       queue: z
         .object({
-          currentlyPlaying: z
-            .object({
-              trackId: z.string(),
-              name: z.string(),
-              artists: z.array(
-                z.object({
-                  artistId: z.string(),
-                  name: z.string()
-                })
-              ),
-              uri: z.string()
-            })
-            .nullable(),
-          upcoming: z.array(
-            z.object({
-              trackId: z.string(),
-              name: z.string(),
-              artists: z.array(
-                z.object({
-                  artistId: z.string(),
-                  name: z.string()
-                })
-              ),
-              uri: z.string()
-            })
-          )
+          currentlyPlaying: itemOutputSchema.nullable(),
+          upcoming: z.array(itemOutputSchema)
         })
         .optional(),
-      success: z.boolean().optional()
+      success: z.boolean().optional(),
+      outcome: z.literal('accepted').optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new SpotifyClient({
       token: ctx.auth.token,
-      market: ctx.config.market
+      refreshToken: ctx.auth.refreshToken,
+      input: ctx.input,
+      market: ctx.config.market,
+      endpointCompatibility: ctx.config.endpointCompatibility
     });
 
     let { action } = ctx.input;
@@ -166,43 +172,36 @@ export let controlPlayback = SlateTool.create(spec, {
         };
       }
 
-      let playbackState = {
+      const currentItem = state.item ? mapItem(state.item) : null;
+      const playbackState = {
         isPlaying: state.is_playing,
         shuffleState: state.shuffle_state,
         repeatState: state.repeat_state,
         progressMs: state.progress_ms,
-        currentTrack: state.item
+        currentItem,
+        currentTrack:
+          state.item?.type === 'track'
+            ? {
+                ...mapItem(state.item),
+                albumName: state.item.album?.name ?? null,
+                durationMs: state.item.duration_ms,
+                spotifyUrl: state.item.external_urls?.spotify ?? null
+              }
+            : null,
+        device: state.device
           ? {
-              trackId: state.item.id,
-              name: state.item.name,
-              artists: state.item.artists.map(a => ({ artistId: a.id, name: a.name })),
-              albumName: state.item.album.name,
-              durationMs: state.item.duration_ms,
-              spotifyUrl: state.item.external_urls.spotify,
-              uri: state.item.uri
+              deviceId: state.device.id,
+              name: state.device.name,
+              type: state.device.type,
+              isActive: state.device.is_active,
+              volumePercent: state.device.volume_percent
             }
-          : null,
-        device: {
-          deviceId: state.device.id,
-          name: state.device.name,
-          type: state.device.type,
-          isActive: state.device.is_active,
-          volumePercent: state.device.volume_percent
-        },
-        context: state.context
-          ? {
-              type: state.context.type,
-              uri: state.context.uri
-            }
-          : null
+          : undefined,
+        context: state.context ? { type: state.context.type, uri: state.context.uri } : null
       };
-
-      let trackName = state.item
-        ? `**${state.item.name}** by ${state.item.artists.map(a => a.name).join(', ')}`
-        : 'nothing';
       return {
         output: { playbackState },
-        message: `Currently ${state.is_playing ? 'playing' : 'paused'}: ${trackName} on ${state.device.name}.`
+        message: `Spotify reports playback ${state.is_playing ? 'playing' : 'paused'}${state.item ? `: **${state.item.name}**` : ''}.`
       };
     }
 
@@ -224,35 +223,20 @@ export let controlPlayback = SlateTool.create(spec, {
     }
 
     if (action === 'getQueue') {
-      let result = await client.getQueue();
-
-      let queue = {
-        currentlyPlaying: result.currently_playing
-          ? {
-              trackId: result.currently_playing.id,
-              name: result.currently_playing.name,
-              artists: result.currently_playing.artists.map(a => ({
-                artistId: a.id,
-                name: a.name
-              })),
-              uri: result.currently_playing.uri
-            }
-          : null,
-        upcoming: result.queue.map(t => ({
-          trackId: t.id,
-          name: t.name,
-          artists: t.artists.map(a => ({ artistId: a.id, name: a.name })),
-          uri: t.uri
-        }))
+      const result = await client.getQueue();
+      const queue = {
+        currentlyPlaying: result.currently_playing ? mapItem(result.currently_playing) : null,
+        upcoming: result.queue.map(mapItem)
       };
-
       return {
         output: { queue },
-        message: `Queue has ${queue.upcoming.length} upcoming track(s).${queue.currentlyPlaying ? ` Currently playing: **${queue.currentlyPlaying.name}**.` : ''}`
+        message: `Spotify reports ${queue.upcoming.length} queued item(s). Tracks and episodes remain distinct.`
       };
     }
 
     if (action === 'play') {
+      if (ctx.input.offsetPosition !== undefined && ctx.input.offsetUri !== undefined)
+        throw createApiServiceError('Use offsetPosition or offsetUri, not both.');
       let offset: { position?: number; uri?: string } | undefined;
       if (ctx.input.offsetPosition !== undefined)
         offset = { position: ctx.input.offsetPosition };
@@ -267,78 +251,95 @@ export let controlPlayback = SlateTool.create(spec, {
       });
 
       return {
-        output: { success: true },
-        message: 'Playback started.'
+        output: { success: true, outcome: 'accepted' },
+        message:
+          'Spotify accepted the playback request; execution was not independently observed.'
       };
     }
 
     if (action === 'pause') {
       await client.pausePlayback(ctx.input.deviceId);
-      return { output: { success: true }, message: 'Playback paused.' };
+      return {
+        output: { success: true, outcome: 'accepted' },
+        message: 'Spotify accepted the pause request.'
+      };
     }
 
     if (action === 'next') {
       await client.skipToNext(ctx.input.deviceId);
-      return { output: { success: true }, message: 'Skipped to next track.' };
+      return {
+        output: { success: true, outcome: 'accepted' },
+        message: 'Spotify accepted the next-item request.'
+      };
     }
 
     if (action === 'previous') {
       await client.skipToPrevious(ctx.input.deviceId);
-      return { output: { success: true }, message: 'Skipped to previous track.' };
+      return {
+        output: { success: true, outcome: 'accepted' },
+        message: 'Spotify accepted the previous-item request.'
+      };
     }
 
     if (action === 'seek') {
       if (ctx.input.positionMs === undefined)
-        throw new Error('positionMs is required for "seek" action');
+        throw createApiServiceError('positionMs is required for "seek" action');
       await client.seekToPosition(ctx.input.positionMs, ctx.input.deviceId);
       return {
-        output: { success: true },
-        message: `Seeked to ${Math.round(ctx.input.positionMs / 1000)}s.`
+        output: { success: true, outcome: 'accepted' },
+        message: `Spotify accepted a seek request to ${Math.round(ctx.input.positionMs / 1000)}s.`
       };
     }
 
     if (action === 'setVolume') {
       if (ctx.input.volumePercent === undefined)
-        throw new Error('volumePercent is required for "setVolume" action');
+        throw createApiServiceError('volumePercent is required for "setVolume" action');
       await client.setVolume(ctx.input.volumePercent, ctx.input.deviceId);
       return {
-        output: { success: true },
-        message: `Volume set to ${ctx.input.volumePercent}%.`
+        output: { success: true, outcome: 'accepted' },
+        message: `Spotify accepted a volume request for ${ctx.input.volumePercent}%.`
       };
     }
 
     if (action === 'setShuffle') {
       if (ctx.input.shuffle === undefined)
-        throw new Error('shuffle is required for "setShuffle" action');
+        throw createApiServiceError('shuffle is required for "setShuffle" action');
       await client.toggleShuffle(ctx.input.shuffle, ctx.input.deviceId);
       return {
-        output: { success: true },
-        message: `Shuffle ${ctx.input.shuffle ? 'enabled' : 'disabled'}.`
+        output: { success: true, outcome: 'accepted' },
+        message: `Spotify accepted shuffle ${ctx.input.shuffle ? 'enabled' : 'disabled'}.`
       };
     }
 
     if (action === 'setRepeat') {
       if (!ctx.input.repeatMode)
-        throw new Error('repeatMode is required for "setRepeat" action');
+        throw createApiServiceError('repeatMode is required for "setRepeat" action');
       await client.setRepeatMode(ctx.input.repeatMode, ctx.input.deviceId);
       return {
-        output: { success: true },
-        message: `Repeat mode set to ${ctx.input.repeatMode}.`
+        output: { success: true, outcome: 'accepted' },
+        message: `Spotify accepted repeat mode ${ctx.input.repeatMode}.`
       };
     }
 
     if (action === 'transferPlayback') {
       if (!ctx.input.deviceId)
-        throw new Error('deviceId is required for "transferPlayback" action');
+        throw createApiServiceError('deviceId is required for "transferPlayback" action');
       await client.transferPlayback([ctx.input.deviceId], ctx.input.play);
-      return { output: { success: true }, message: 'Playback transferred.' };
+      return {
+        output: { success: true, outcome: 'accepted' },
+        message: 'Spotify accepted the transfer request.'
+      };
     }
 
     if (action === 'addToQueue') {
-      if (!ctx.input.uri) throw new Error('uri is required for "addToQueue" action');
+      if (!ctx.input.uri)
+        throw createApiServiceError('uri is required for "addToQueue" action');
       await client.addToQueue(ctx.input.uri, ctx.input.deviceId);
-      return { output: { success: true }, message: 'Item added to queue.' };
+      return {
+        output: { success: true, outcome: 'accepted' },
+        message: 'Spotify accepted the queue request.'
+      };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   });

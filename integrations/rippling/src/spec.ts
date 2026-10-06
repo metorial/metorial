@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'rippling',
   name: 'Rippling',
   description:
-    'Unified workforce management platform for HR, IT, and Finance. Manage employees, company data, groups, leave requests, and onboarding through a single integration.',
+    'Read workforce and company data with the Rippling v1 API, manage app groups and pending leave requests, and submit candidates through authorized partner onboarding.',
   metadata: {},
   config,
   auth

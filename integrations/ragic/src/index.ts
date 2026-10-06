@@ -13,8 +13,6 @@ import {
   lockRecord,
   updateRecord
 } from './tools';
-import { recordChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     exportRecord,
     getFileUrl
   ],
-  triggers: [recordChanges]
+  triggers: []
 });

@@ -13,8 +13,6 @@ import {
   requestProofOfAddress,
   runAmlScreening
 } from './tools';
-import { verificationCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     requestKybReport,
     getKybReport
   ],
-  triggers: [verificationCompleted]
+  triggers: []
 });

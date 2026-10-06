@@ -1,14 +1,20 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios, pickDefined } from 'slates';
 
 export class Client {
   private http;
 
   constructor(token: string) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.bolna.ai',
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      authHeader: { value: `Bearer ${token}` },
+      contentType: false,
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Bolna',
+          reason: 'bolna_api_error'
+        })
     });
   }
 
@@ -23,7 +29,7 @@ export class Client {
   }
 
   async getAgent(agentId: string) {
-    let response = await this.http.get(`/v2/agent/${agentId}`);
+    let response = await this.http.get(`/v2/agent/${encodeURIComponent(agentId)}`);
     return response.data;
   }
 
@@ -37,7 +43,7 @@ export class Client {
     agentConfig: Record<string, any>,
     agentPrompts: Record<string, any>
   ) {
-    let response = await this.http.put(`/v2/agent/${agentId}`, {
+    let response = await this.http.put(`/v2/agent/${encodeURIComponent(agentId)}`, {
       agent_config: agentConfig,
       agent_prompts: agentPrompts
     });
@@ -53,12 +59,12 @@ export class Client {
     if (agentConfig) body.agent_config = agentConfig;
     if (agentPrompts) body.agent_prompts = agentPrompts;
 
-    let response = await this.http.patch(`/v2/agent/${agentId}`, body);
+    let response = await this.http.patch(`/v2/agent/${encodeURIComponent(agentId)}`, body);
     return response.data;
   }
 
   async deleteAgent(agentId: string) {
-    let response = await this.http.delete(`/v2/agent/${agentId}`);
+    let response = await this.http.delete(`/v2/agent/${encodeURIComponent(agentId)}`);
     return response.data;
   }
 
@@ -90,7 +96,7 @@ export class Client {
   }
 
   async stopCall(executionId: string) {
-    let response = await this.http.post(`/call/${executionId}/stop`);
+    let response = await this.http.post(`/call/${encodeURIComponent(executionId)}/stop`);
     return response.data;
   }
 
@@ -107,7 +113,9 @@ export class Client {
     formData.append('agent_id', agentId);
     formData.append('file', new Blob([fileContent], { type: 'text/csv' }), fileName);
     if (fromPhoneNumbers) {
-      formData.append('from_phone_numbers', JSON.stringify(fromPhoneNumbers));
+      fromPhoneNumbers.forEach((number, index) => {
+        formData.append(`from_phone_numbers[${index}]`, number);
+      });
     }
     if (retryConfig) {
       formData.append('retry_config', JSON.stringify(retryConfig));
@@ -120,12 +128,12 @@ export class Client {
   }
 
   async getBatch(batchId: string) {
-    let response = await this.http.get(`/batches/${batchId}`);
+    let response = await this.http.get(`/batches/${encodeURIComponent(batchId)}`);
     return response.data;
   }
 
   async listBatches(agentId: string) {
-    let response = await this.http.get(`/batches/${agentId}/all`);
+    let response = await this.http.get(`/batches/${encodeURIComponent(agentId)}/all`);
     return response.data;
   }
 
@@ -136,36 +144,45 @@ export class Client {
       formData.append('bypass_call_guardrails', String(bypassCallGuardrails));
     }
 
-    let response = await this.http.post(`/batches/${batchId}/schedule`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    let response = await this.http.post(
+      `/batches/${encodeURIComponent(batchId)}/schedule`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      }
+    );
     return response.data;
   }
 
   async stopBatch(batchId: string) {
-    let response = await this.http.post(`/batches/${batchId}/stop`);
+    let response = await this.http.post(`/batches/${encodeURIComponent(batchId)}/stop`);
     return response.data;
   }
 
   async deleteBatch(batchId: string) {
-    let response = await this.http.delete(`/batches/${batchId}`);
+    let response = await this.http.delete(`/batches/${encodeURIComponent(batchId)}`);
     return response.data;
   }
 
-  async listBatchExecutions(batchId: string) {
-    let response = await this.http.get(`/batches/${batchId}/executions`);
+  async listBatchExecutions(batchId: string, pageNumber = 1, pageSize = 20) {
+    let response = await this.http.get(
+      `/v2/batches/${encodeURIComponent(batchId)}/executions`,
+      {
+        params: { page_number: pageNumber, page_size: pageSize }
+      }
+    );
     return response.data;
   }
 
   // ── Executions ──
 
   async getExecution(executionId: string) {
-    let response = await this.http.get(`/executions/${executionId}`);
+    let response = await this.http.get(`/executions/${encodeURIComponent(executionId)}`);
     return response.data;
   }
 
   async getExecutionLogs(executionId: string) {
-    let response = await this.http.get(`/executions/${executionId}/log`);
+    let response = await this.http.get(`/executions/${encodeURIComponent(executionId)}/log`);
     return response.data;
   }
 
@@ -195,7 +212,7 @@ export class Client {
     if (params?.from) queryParams.from = params.from;
     if (params?.to) queryParams.to = params.to;
 
-    let response = await this.http.get(`/v2/agent/${agentId}/executions`, {
+    let response = await this.http.get(`/v2/agent/${encodeURIComponent(agentId)}/executions`, {
       params: queryParams
     });
     return response.data;
@@ -217,7 +234,8 @@ export class Client {
     if (options?.chunkSize) formData.append('chunk_size', String(options.chunkSize));
     if (options?.similarityTopK)
       formData.append('similarity_top_k', String(options.similarityTopK));
-    if (options?.overlapping) formData.append('overlapping', String(options.overlapping));
+    if (options?.overlapping !== undefined)
+      formData.append('overlapping', String(options.overlapping));
     if (options?.languageSupport) formData.append('language_support', options.languageSupport);
 
     let response = await this.http.post('/knowledgebase', formData, {
@@ -227,7 +245,7 @@ export class Client {
   }
 
   async getKnowledgeBase(ragId: string) {
-    let response = await this.http.get(`/knowledgebase/${ragId}`);
+    let response = await this.http.get(`/knowledgebase/${encodeURIComponent(ragId)}`);
     return response.data;
   }
 
@@ -237,7 +255,7 @@ export class Client {
   }
 
   async deleteKnowledgeBase(ragId: string) {
-    let response = await this.http.delete(`/knowledgebase/${ragId}`);
+    let response = await this.http.delete(`/knowledgebase/${encodeURIComponent(ragId)}`);
     return response.data;
   }
 
@@ -265,7 +283,9 @@ export class Client {
   }
 
   async deletePhoneNumber(phoneNumberId: string) {
-    let response = await this.http.delete(`/phone-numbers/${phoneNumberId}`);
+    let response = await this.http.delete(
+      `/phone-numbers/${encodeURIComponent(phoneNumberId)}`
+    );
     return response.data;
   }
 
@@ -291,8 +311,27 @@ export class Client {
 
   // ── Voices ──
 
-  async listVoices() {
-    let response = await this.http.get('/me/voices');
+  async listVoiceProviders(language = 'en') {
+    let response = await this.http.get('/api/v1/voice-config/tts', { params: { language } });
+    return response.data;
+  }
+
+  async listVoices(params: {
+    providerId: string;
+    modelId: string;
+    language?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    let response = await this.http.get('/api/v1/voice-config/tts/voices', {
+      params: pickDefined({
+        provider_id: params.providerId,
+        model_id: params.modelId,
+        language: params.language,
+        page: params.page,
+        page_size: params.pageSize
+      })
+    });
     return response.data;
   }
 
@@ -319,14 +358,14 @@ export class Client {
   }
 
   async removeProvider(providerKeyName: string) {
-    let response = await this.http.delete(`/providers/${providerKeyName}`);
+    let response = await this.http.delete(`/providers/${encodeURIComponent(providerKeyName)}`);
     return response.data;
   }
 
   // ── Stop Agent Calls ──
 
   async stopAgentCalls(agentId: string) {
-    let response = await this.http.post(`/v2/agent/${agentId}/stop`);
+    let response = await this.http.post(`/v2/agent/${encodeURIComponent(agentId)}/stop`);
     return response.data;
   }
 }

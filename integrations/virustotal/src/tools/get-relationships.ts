@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getRelationships = SlateTool.create(spec, {
@@ -13,6 +14,9 @@ Common relationship types:
 - **Domains:** communicating_files, downloaded_files, referrer_files, resolutions, siblings, subdomains, urls
 - **IPs:** communicating_files, downloaded_files, referrer_files, resolutions, urls
 - **URLs:** contacted_domains, contacted_ips, downloaded_files, redirecting_urls, redirects_to, referrer_urls`,
+  constraints: [
+    'Use non-sensitive public indicators; submitted or queried indicators may be scanned and included in the community dataset.'
+  ],
   tags: {
     readOnly: true
   }
@@ -43,6 +47,10 @@ Common relationship types:
           z.object({
             itemId: z.string().describe('ID of the related item'),
             itemType: z.string().optional().describe('Type of the related item'),
+            errorCode: z
+              .string()
+              .optional()
+              .describe('Native availability error for this related object'),
             attributes: z
               .record(z.string(), z.any())
               .optional()
@@ -54,9 +62,10 @@ Common relationship types:
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    let client = new Client(ctx.auth);
 
-    let result: any;
+    let result: Awaited<ReturnType<Client['getFileRelationships']>> | undefined;
     switch (ctx.input.resourceType) {
       case 'file':
         result = await client.getFileRelationships(
@@ -92,9 +101,10 @@ Common relationship types:
         break;
     }
 
-    let relatedItems = (result?.data ?? []).map((item: any) => ({
-      itemId: item.id ?? '',
+    let relatedItems = (result?.data ?? []).map(item => ({
+      itemId: item.id,
       itemType: item.type,
+      errorCode: item.error?.code,
       attributes: item.attributes
     }));
 

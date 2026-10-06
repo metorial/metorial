@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTable } from '../lib/models';
+import { invalid } from '../lib/validation';
 import { spec } from '../spec';
 
 let tableOutputSchema = z.object({
@@ -8,7 +10,7 @@ let tableOutputSchema = z.object({
   name: z.string().describe('Name of the table'),
   primaryDisplay: z.string().optional().describe('Column used as the primary display value'),
   schema: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .optional()
     .describe('Table column definitions keyed by column name')
 });
@@ -16,13 +18,14 @@ let tableOutputSchema = z.object({
 export let manageTable = SlateTool.create(spec, {
   name: 'Manage Table',
   key: 'manage_table',
-  description: `Create, retrieve, update, or delete a table within a Budibase application. Use "create" with a name and optional schema to define columns. Use "update" to modify the table name, primary display column, or schema.`,
+  description: `Create, retrieve, update, or delete a table within a Budibase application or workspace. Creation requires a name and schema ({} is an empty schema). Updates retain current metadata before applying supplied fields; a supplied schema replaces the column definitions.`,
   instructions: [
     'The appId is required for all operations to scope the request to the correct application.',
-    'Schema is a record of column definitions keyed by column name. Each column has a "type" (string, number, boolean, datetime, etc.) and optional "constraints".'
+    'Schema is a record of column definitions keyed by column name. Each column has a "type" (string, number, boolean, datetime, etc.) and optional "constraints".',
+    'Read-modify-write updates are not atomic; coordinate concurrent edits in the builder. Deletion removes table data.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -41,7 +44,7 @@ export let manageTable = SlateTool.create(spec, {
         .optional()
         .describe('Column name to use as the primary display value'),
       schema: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe(
           'Column definitions keyed by column name, e.g. { "Name": { "type": "string" }, "Age": { "type": "number" } }'
@@ -55,22 +58,11 @@ export let manageTable = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      appId: ctx.input.appId
-    });
+    let client = Client.fromContext(ctx, ctx.input.appId);
     let { action, tableId, name, primaryDisplay, schema } = ctx.input;
 
-    let mapTable = (t: any) => ({
-      tableId: t._id,
-      name: t.name,
-      primaryDisplay: t.primaryDisplay,
-      schema: t.schema
-    });
-
     if (action === 'create') {
-      if (!name) throw new Error('Name is required to create a table');
+      if (!name) invalid('Name is required to create a table');
       let table = await client.createTable({ name, primaryDisplay, schema });
       let mapped = mapTable(table);
       return {
@@ -79,7 +71,7 @@ export let manageTable = SlateTool.create(spec, {
       };
     }
 
-    if (!tableId) throw new Error('tableId is required for get, update, and delete actions');
+    if (!tableId) invalid('tableId is required for get, update, and delete actions');
 
     if (action === 'get') {
       let table = await client.getTable(tableId);
@@ -91,7 +83,7 @@ export let manageTable = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      let updateData: Record<string, any> = {};
+      let updateData: Record<string, unknown> = {};
       if (name !== undefined) updateData.name = name;
       if (primaryDisplay !== undefined) updateData.primaryDisplay = primaryDisplay;
       if (schema !== undefined) updateData.schema = schema;

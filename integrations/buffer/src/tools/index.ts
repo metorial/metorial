@@ -4,6 +4,7 @@ export * from './edit-update';
 export * from './get-configuration';
 export * from './get-interactions';
 export * from './get-link-shares';
+export * from './get-organizations';
 export * from './get-profiles';
 export * from './get-updates';
 export * from './get-user';

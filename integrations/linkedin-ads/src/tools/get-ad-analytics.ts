@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,6 +14,7 @@ export let getAdAnalytics = SlateTool.create(spec, {
   key: 'get_ad_analytics',
   description: `Retrieve advertising performance analytics from LinkedIn. Query metrics like impressions, clicks, spend, conversions, and engagement across accounts, campaigns, campaign groups, or creatives. Supports time-based breakdowns (daily, monthly, all).`,
   instructions: [
+    'The exclusive end date preserves the tool date contract; LinkedIn receives the preceding inclusive UTC day. Analytics is capped at 15,000 rows and does not support continuation. An empty result is not proof of account access.',
     'At least one of accountIds, campaignIds, creativeIds, or campaignGroupIds must be provided.',
     'Common metrics include: impressions, clicks, costInLocalCurrency, externalWebsiteConversions, likes, comments, shares, follows, leadGenerationMailContactInfoShares.',
     'Pivot determines the grouping of results: ACCOUNT, CAMPAIGN, CAMPAIGN_GROUP, CREATIVE, MEMBER_COMPANY, MEMBER_COMPANY_SIZE, MEMBER_JOB_FUNCTION, MEMBER_JOB_TITLE, MEMBER_INDUSTRY, MEMBER_SENIORITY, MEMBER_COUNTRY, MEMBER_REGION.'
@@ -23,6 +24,7 @@ export let getAdAnalytics = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('r_ads_reporting'))
   .input(
     z.object({
       pivot: z
@@ -38,11 +40,15 @@ export let getAdAnalytics = SlateTool.create(spec, {
           'MEMBER_INDUSTRY',
           'MEMBER_SENIORITY',
           'MEMBER_COUNTRY',
-          'MEMBER_REGION'
+          'MEMBER_REGION',
+          'MEMBER_COUNTRY_V2',
+          'MEMBER_REGION_V2'
         ])
         .describe('Dimension to group results by'),
       startDate: dateComponentSchema.describe('Start date for the analytics period'),
-      endDate: dateComponentSchema.describe('End date for the analytics period (exclusive)'),
+      endDate: dateComponentSchema.describe(
+        'Exclusive end date; converted to the preceding inclusive UTC day for LinkedIn'
+      ),
       timeGranularity: z
         .enum(['DAILY', 'MONTHLY', 'ALL'])
         .default('ALL')

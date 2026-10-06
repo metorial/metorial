@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getUser = SlateTool.create(spec, {
   name: 'Get User',
   key: 'get_user',
-  description: `Retrieve detailed information about a specific Duo user, including associated phones, tokens, groups, and WebAuthn credentials.`,
+  description: `Retrieve detailed information about a specific Duo user, including associated phones, tokens, and groups.`,
   tags: {
     readOnly: true
   }
@@ -61,10 +62,12 @@ export let getUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('get_user', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.getUser(ctx.input.userId);

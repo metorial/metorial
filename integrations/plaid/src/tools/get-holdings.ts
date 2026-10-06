@@ -66,7 +66,7 @@ export let getHoldingsTool = SlateTool.create(spec, {
 
     let result = await client.getHoldings(ctx.input.accessToken, ctx.input.accountIds);
 
-    let holdings = (result.holdings || []).map((h: any) => ({
+    let holdings = result.holdings.map(h => ({
       accountId: h.account_id,
       securityId: h.security_id,
       quantity: h.quantity,
@@ -77,7 +77,7 @@ export let getHoldingsTool = SlateTool.create(spec, {
       isoCurrencyCode: h.iso_currency_code ?? null
     }));
 
-    let securities = (result.securities || []).map((s: any) => ({
+    let securities = result.securities.map(s => ({
       securityId: s.security_id,
       name: s.name ?? null,
       tickerSymbol: s.ticker_symbol ?? null,

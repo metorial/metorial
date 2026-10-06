@@ -1,6 +1,6 @@
 {
   "name": "@metorial/hootsuite",
-  "description": "Schedule, publish, and manage social media messages across multiple platforms (Twitter, Facebook, Instagram, LinkedIn, Pinterest). Upload media (images and videos) for use in scheduled posts. Retrieve and manage social profiles, organizations, teams, and members. Approve, reject, or delete scheduled messages. Shorten links using Ow.ly. Receive real-time webhook notifications for message, comment, and application events. Manage member permissions and onboard users via SCIM provisioning.",
+  "description": "Schedule and inspect social media messages, discover connected accounts and organizations, manage teams and members, and prepare media uploads. Approve, reject or delete scheduled messages. Legacy Ow.ly API access depends on provider availability.",
   "categories": ["crm-and-sales-tools", "news-and-media", "scheduling-and-calendars"],
   "skills": [
     "schedule social media posts",
@@ -10,7 +10,6 @@
     "manage teams and permissions",
     "approve or reject messages",
     "shorten links",
-    "receive webhook notifications",
     "retrieve user information",
     "invite organization members"
   ],

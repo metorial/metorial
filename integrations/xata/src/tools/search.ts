@@ -6,14 +6,16 @@ import { spec } from '../spec';
 export let searchRecords = SlateTool.create(spec, {
   name: 'Search Records',
   key: 'search_records',
-  description: `Run a free-text search across a single table or the entire database branch. Powered by the Elasticsearch-based search engine with support for fuzziness, column boosting, and filters. Results are ranked by relevancy.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Run a free-text search across a single table or the entire database branch. Powered by the Elasticsearch-based search engine with support for fuzziness, column boosting, and filters. Results are ranked by relevancy.`,
   instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.',
     'Table-level search supports filters and column boosters for fine-tuned relevancy.',
     'Branch-level search (no tableName) searches across all tables simultaneously.',
     'Search runs against the eventually consistent search store.'
   ],
   constraints: ['Available on Pro and Enterprise plans only.'],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

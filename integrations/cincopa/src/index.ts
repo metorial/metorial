@@ -12,8 +12,6 @@ import {
   managePortal,
   uploadMedia
 } from './tools';
-import { accountEvents, assetEvents, galleryEvents, leadEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     managePortal,
     manageLiveStream
   ],
-  triggers: [assetEvents, galleryEvents, leadEvents, accountEvents]
+  triggers: []
 });

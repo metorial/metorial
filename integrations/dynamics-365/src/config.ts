@@ -15,12 +15,6 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe('Dataverse Web API version. Defaults to v9.2.'),
-    recordChangedEntitySetName: z
-      .string()
-      .optional()
-      .describe(
-        'OData entity set name polled by the record_changed trigger, for example contacts. Defaults to accounts.'
-      ),
     finOpsBaseUrl: z
       .string()
       .optional()

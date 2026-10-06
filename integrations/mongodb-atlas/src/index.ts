@@ -17,8 +17,6 @@ import {
   manageOnlineArchiveTool,
   manageSearchIndexesTool
 } from './tools';
-import { alertWebhookTrigger, projectEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     listEventsTool,
     manageOnlineArchiveTool
   ],
-  triggers: [alertWebhookTrigger, projectEventsTrigger]
+  triggers: []
 });

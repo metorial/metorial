@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid, validateVariables } from '../lib/client';
 import { spec } from '../spec';
 
 export let createLead = SlateTool.create(spec, {
@@ -52,6 +52,13 @@ export let createLead = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.campaignId && !ctx.input.email) {
+      throw invalid('An email address is required when adding a lead to a campaign.');
+    }
+    if (ctx.input.listId && !ctx.input.email && !ctx.input.firstName && !ctx.input.lastName) {
+      throw invalid('Provide an email address, firstName, or lastName for the lead.');
+    }
+    validateVariables(ctx.input.customVariables);
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.createLead({
@@ -68,13 +75,16 @@ export let createLead = SlateTool.create(spec, {
       skipIfInCampaign: ctx.input.skipIfInCampaign,
       customVariables: ctx.input.customVariables
     });
+    if (typeof result?.id !== 'string') {
+      throw invalid('Lead creation did not return an identifier. Read back before retrying.');
+    }
 
     return {
       output: {
         leadId: result.id,
-        email: result.email,
-        firstName: result.first_name,
-        lastName: result.last_name,
+        email: result.email ?? undefined,
+        firstName: result.first_name ?? undefined,
+        lastName: result.last_name ?? undefined,
         timestampCreated: result.timestamp_created
       },
       message: `Created lead **${result.email || result.first_name || result.id}**.`

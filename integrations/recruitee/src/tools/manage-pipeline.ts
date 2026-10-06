@@ -1,109 +1,127 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RecruiteeClient } from '../lib/client';
+import { entity, fail, integer, type Row } from '../lib/validation';
 import { spec } from '../spec';
-
 export let managePipeline = SlateTool.create(spec, {
   name: 'Manage Pipeline',
   key: 'manage_pipeline',
-  description: `Move a candidate through the recruitment pipeline, disqualify them, or remove them from a job/talent pool. Use the placement ID to identify the candidate's assignment to a specific job.
-
-To find placement IDs, use the **Get Candidate** tool which returns placements for each job the candidate is assigned to.`,
+  description:
+    'Assign a candidate to an offer or talent pool, change an existing placement stage, disqualify or requalify it, or remove the assignment. Removing a placement does not erase the candidate or its history.',
   instructions: [
-    'The placementId is required for all actions. Retrieve it from the candidate details (Get Candidate tool).',
-    'For "change_stage", you must provide the target stageId.'
+    'Use Get Candidate to discover placement IDs. Use Get Job Offer to discover pipeline stage IDs and List Disqualify Reasons for a required reason. Hiring stages may require workLocationId or openingId. These changes can run configured recruiting automations; use an appropriate account and permissions.'
   ],
-  tags: {
-    readOnly: false
-  }
+  tags: { readOnly: false }
 })
   .input(
     z.object({
-      action: z
-        .enum(['change_stage', 'disqualify', 'remove'])
-        .describe(
-          '"change_stage" to move to a new stage, "disqualify" to reject, "remove" to unassign from job'
-        ),
+      action: z.enum(['change_stage', 'disqualify', 'remove', 'assign', 'requalify']),
       placementId: z
         .number()
-        .describe("Placement ID (candidate's assignment to a specific job)"),
-      stageId: z
+        .optional()
+        .describe('Placement ID for all actions except assign'),
+      candidateId: z
         .number()
         .optional()
-        .describe('Target pipeline stage ID (required for "change_stage")'),
-      proceed: z
-        .boolean()
+        .describe('Required for assign; optional identity guard for other actions'),
+      offerId: z
+        .number()
         .optional()
-        .describe('Whether to proceed the candidate to the new stage (for "change_stage")'),
-      hiredAt: z
-        .string()
+        .describe('Job offer ID for assign, mutually exclusive with talentPoolId'),
+      talentPoolId: z
+        .number()
         .optional()
-        .describe('Hire date (ISO 8601) when moving to the hired stage'),
-      jobStartsAt: z.string().optional().describe('Job start date (ISO 8601) when hiring'),
+        .describe('Talent pool ID for assign, mutually exclusive with offerId'),
+      stageId: z.number().optional().describe('Target stage ID for change_stage'),
+      proceed: z.boolean().optional().describe('Provider proceed option for change_stage'),
+      hiredAt: z.string().optional().describe('Hire date for a hired stage'),
+      jobStartsAt: z.string().optional().describe('Job start date when hiring'),
+      workLocationId: z
+        .number()
+        .optional()
+        .describe('Work location ID when required by a hiring stage'),
+      openingId: z
+        .number()
+        .optional()
+        .describe('Requisition opening ID when required by the job'),
       disqualifyReasonId: z
         .number()
         .optional()
-        .describe(
-          'Disqualification reason ID (optional for "disqualify"). Use the List Departments & Locations tool to find available reasons.'
-        )
+        .describe('Required for disqualify; discover with List Disqualify Reasons')
     })
   )
   .output(
     z.object({
-      placementId: z.number().describe('Placement ID'),
-      actionPerformed: z.string().describe('Action that was performed'),
-      success: z.boolean().describe('Whether the action succeeded')
+      placementId: z.number(),
+      actionPerformed: z.string(),
+      success: z.boolean(),
+      candidateId: z.number().optional(),
+      retainedHistoryPossible: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
-
-    if (ctx.input.action === 'change_stage') {
-      if (!ctx.input.stageId) {
-        throw new Error('stageId is required for change_stage action.');
-      }
-      await client.changeStage(ctx.input.placementId, ctx.input.stageId, {
-        proceed: ctx.input.proceed,
-        hiredAt: ctx.input.hiredAt,
-        jobStartsAt: ctx.input.jobStartsAt
-      });
-      return {
-        output: {
-          placementId: ctx.input.placementId,
-          actionPerformed: 'change_stage',
-          success: true
-        },
-        message: `Moved placement ${ctx.input.placementId} to stage ${ctx.input.stageId}.`
-      };
+    const input = ctx.input;
+    if (input.action === 'assign') {
+      integer(input.candidateId, 'Candidate ID');
+      if ((input.offerId === undefined) === (input.talentPoolId === undefined))
+        fail('Assign requires exactly one offerId or talentPoolId.');
+    } else integer(input.placementId, 'Placement ID');
+    if (input.action === 'change_stage') integer(input.stageId, 'Stage ID');
+    if (input.action === 'disqualify')
+      integer(input.disqualifyReasonId, 'Disqualification reason ID');
+    const client = await RecruiteeClient.forContext(ctx);
+    if (input.action !== 'assign' && input.candidateId !== undefined) {
+      const candidate = (await client.getCandidate(integer(input.candidateId, 'Candidate ID')))
+        .candidate;
+      if (!candidate.placements.some(p => p.id === input.placementId))
+        fail('Placement does not belong to the supplied candidate. No change was attempted.');
     }
-
-    if (ctx.input.action === 'disqualify') {
-      await client.disqualifyCandidate(ctx.input.placementId, ctx.input.disqualifyReasonId);
-      return {
-        output: {
-          placementId: ctx.input.placementId,
-          actionPerformed: 'disqualify',
-          success: true
-        },
-        message: `Disqualified placement ${ctx.input.placementId}.`
-      };
-    }
-
-    if (ctx.input.action === 'remove') {
-      await client.deletePlacement(ctx.input.placementId);
-      return {
-        output: {
-          placementId: ctx.input.placementId,
-          actionPerformed: 'remove',
-          success: true
-        },
-        message: `Removed placement ${ctx.input.placementId}.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    let result: Row;
+    if (input.action === 'assign')
+      result = await client.createPlacement(
+        integer(input.candidateId, 'Candidate ID'),
+        input.offerId,
+        input.talentPoolId
+      );
+    else if (input.action === 'change_stage')
+      result = await client.changeStage(
+        integer(input.placementId, 'Placement ID'),
+        integer(input.stageId, 'Stage ID'),
+        {
+          proceed: input.proceed,
+          hiredAt: input.hiredAt,
+          jobStartsAt: input.jobStartsAt,
+          workLocationId: input.workLocationId,
+          openingId: input.openingId
+        }
+      );
+    else if (input.action === 'disqualify')
+      result = await client.disqualifyCandidate(
+        integer(input.placementId, 'Placement ID'),
+        input.disqualifyReasonId
+      );
+    else if (input.action === 'requalify')
+      result = await client.requalifyCandidate(integer(input.placementId, 'Placement ID'));
+    else result = await client.deletePlacement(integer(input.placementId, 'Placement ID'));
+    const placement = entity(
+      result,
+      'placement',
+      input.action === 'assign' ? undefined : input.placementId
+    );
+    const candidateId = integer(placement.candidate_id, 'Placement candidate ID');
+    if (input.candidateId !== undefined && candidateId !== input.candidateId)
+      fail(
+        'Changed placement candidate did not match the requested identity. Read the records before retrying.'
+      );
+    return {
+      output: {
+        placementId: integer(placement.id, 'Placement ID'),
+        actionPerformed: input.action,
+        success: true,
+        candidateId,
+        ...(input.action === 'remove' ? { retainedHistoryPossible: true } : {})
+      },
+      message: `Confirmed ${input.action} for placement ${placement.id}.`
+    };
   })
   .build();

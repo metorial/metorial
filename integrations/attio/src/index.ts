@@ -26,14 +26,6 @@ import {
   updateRecordTool,
   updateTaskTool
 } from './tools';
-import {
-  commentEventsTrigger,
-  listEntryEventsTrigger,
-  noteEventsTrigger,
-  recordEventsTrigger,
-  taskEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,11 +54,5 @@ export let provider = Slate.create({
     deleteCommentTool,
     listWorkspaceMembersTool
   ],
-  triggers: [
-    recordEventsTrigger,
-    listEntryEventsTrigger,
-    noteEventsTrigger,
-    taskEventsTrigger,
-    commentEventsTrigger
-  ]
+  triggers: []
 });

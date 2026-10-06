@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createFolderTool = SlateTool.create(spec, {
   name: 'Create Folder',
   key: 'create_folder',
-  description: `Create a new folder at the specified path in Egnyte. All intermediate folders in the path will be created automatically if they don't exist.`,
+  description: `Create a new folder at the specified path in Egnyte. The parent location must allow folder creation.`,
   tags: {
     destructive: false
   }
@@ -20,20 +20,19 @@ export let createFolderTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      path: z.string().describe('Path of the created folder')
+      path: z.string().describe('Path of the created folder'),
+      folderId: z.string().optional().describe('Persistent ID of the created folder')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
-    await client.createFolder(ctx.input.folderPath);
+    let result = await client.createFolder(ctx.input.folderPath);
 
     return {
       output: {
-        path: ctx.input.folderPath
+        path: String(result.path),
+        folderId: String(result.folder_id)
       },
       message: `Created folder **${ctx.input.folderPath}**`
     };
@@ -62,10 +61,7 @@ export let copyItemTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     await client.copyFileOrFolder(
       ctx.input.sourcePath,
@@ -108,10 +104,7 @@ export let moveItemTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     await client.moveFileOrFolder(
       ctx.input.sourcePath,
@@ -153,10 +146,7 @@ export let deleteItemTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     await client.deleteFileOrFolder(ctx.input.path, ctx.input.entryId);
 
@@ -189,10 +179,7 @@ export let lockFileTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     if (ctx.input.action === 'lock') {
       await client.lockFile(ctx.input.path, ctx.input.lockToken);

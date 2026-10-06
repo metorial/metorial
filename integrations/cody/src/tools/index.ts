@@ -1,3 +1,4 @@
+export * from './download-document';
 export * from './list-bots';
 export * from './list-messages';
 export * from './manage-conversations';

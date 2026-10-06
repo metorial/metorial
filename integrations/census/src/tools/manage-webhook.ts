@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { workspaceClient } from '../lib/client';
+import { webhookEvents, workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageWebhook = SlateTool.create(spec, {
@@ -8,14 +9,15 @@ export let manageWebhook = SlateTool.create(spec, {
   key: 'manage_webhook',
   description: `Creates, updates, or deletes a Census webhook. Webhooks notify external HTTPS endpoints when sync alert events occur (e.g., sync failures, alert resolution). Specify an action: "create" to register a new webhook, "update" to modify an existing one, or "delete" to remove it.`,
   instructions: [
-    'Available event types: "sync.alert.raised" (sync alert triggered) and "sync.alert.resolved" (alert resolved). If no events are specified, the webhook receives all event types.'
+    'Supports sync alerts and lifecycle events. If events are omitted, the provider subscribes to all events; registered endpoints may receive external requests.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
+      workspaceId,
       action: z
         .enum(['create', 'update', 'delete'])
         .describe('Action to perform on the webhook.'),
@@ -30,7 +32,7 @@ export let manageWebhook = SlateTool.create(spec, {
         .describe('HTTPS URL to receive webhook events (required for create).'),
       description: z.string().optional().describe('Description of the webhook.'),
       events: z
-        .array(z.enum(['sync.alert.raised', 'sync.alert.resolved']))
+        .array(webhookEvents.element)
         .optional()
         .describe('Event types to subscribe to. If omitted, receives all events.')
     })
@@ -45,14 +47,11 @@ export let manageWebhook = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = await workspaceClient(ctx);
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name || !ctx.input.endpoint) {
-        throw new Error('Name and endpoint are required when creating a webhook.');
+        throw createApiServiceError('Name and endpoint are required when creating a webhook.');
       }
       let webhook = await client.createWebhook({
         name: ctx.input.name,
@@ -67,13 +66,13 @@ export let manageWebhook = SlateTool.create(spec, {
           endpoint: webhook.endpoint,
           events: webhook.events
         },
-        message: `Created webhook **${webhook.name}** (ID: ${webhook.id}) targeting ${webhook.endpoint}.`
+        message: `Created webhook **${webhook.name}** (ID: ${webhook.id}).`
       };
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.webhookId) {
-        throw new Error('webhookId is required when updating a webhook.');
+      if (ctx.input.webhookId === undefined) {
+        throw createApiServiceError('webhookId is required when updating a webhook.');
       }
       let webhook = await client.updateWebhook(ctx.input.webhookId, {
         name: ctx.input.name,
@@ -93,8 +92,8 @@ export let manageWebhook = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.webhookId) {
-        throw new Error('webhookId is required when deleting a webhook.');
+      if (ctx.input.webhookId === undefined) {
+        throw createApiServiceError('webhookId is required when deleting a webhook.');
       }
       await client.deleteWebhook(ctx.input.webhookId);
       return {
@@ -105,6 +104,6 @@ export let manageWebhook = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

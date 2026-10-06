@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginationParams {
   limit?: number;
@@ -17,16 +17,35 @@ export interface ListCallsParams extends PaginationParams {
   phoneNumberId?: string;
 }
 
+export interface VapiFile {
+  id: string;
+  name?: string;
+  originalName?: string;
+  status?: 'processing' | 'done' | 'failed';
+  bytes?: number;
+  purpose?: string;
+  mimetype?: string;
+  url?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export class Client {
   private http;
+  readonly baseUrl: string;
 
-  constructor(token: string) {
-    this.http = createAxios({
-      baseURL: 'https://api.vapi.ai',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+  constructor(token: string, region: 'us' | 'eu' = 'us') {
+    this.baseUrl = region === 'eu' ? 'https://api.eu.vapi.ai' : 'https://api.vapi.ai';
+    this.http = createAuthenticatedAxios({
+      baseURL: this.baseUrl,
+      authHeader: { value: `Bearer ${token}` },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Vapi',
+          reason: 'Vapi API request failed'
+        })
     });
   }
 
@@ -38,7 +57,7 @@ export class Client {
   }
 
   async getAssistant(assistantId: string): Promise<any> {
-    let response = await this.http.get(`/assistant/${assistantId}`);
+    let response = await this.http.get(`/assistant/${encodeURIComponent(assistantId)}`);
     return response.data;
   }
 
@@ -48,12 +67,15 @@ export class Client {
   }
 
   async updateAssistant(assistantId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.patch(`/assistant/${assistantId}`, data);
+    let response = await this.http.patch(
+      `/assistant/${encodeURIComponent(assistantId)}`,
+      data
+    );
     return response.data;
   }
 
   async deleteAssistant(assistantId: string): Promise<void> {
-    await this.http.delete(`/assistant/${assistantId}`);
+    await this.http.delete(`/assistant/${encodeURIComponent(assistantId)}`);
   }
 
   // ---- Calls ----
@@ -64,7 +86,7 @@ export class Client {
   }
 
   async getCall(callId: string): Promise<any> {
-    let response = await this.http.get(`/call/${callId}`);
+    let response = await this.http.get(`/call/${encodeURIComponent(callId)}`);
     return response.data;
   }
 
@@ -74,12 +96,21 @@ export class Client {
   }
 
   async updateCall(callId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.patch(`/call/${callId}`, data);
+    let response = await this.http.patch(`/call/${encodeURIComponent(callId)}`, data);
     return response.data;
   }
 
   async deleteCall(callId: string): Promise<void> {
-    await this.http.delete(`/call/${callId}`);
+    await this.http.delete(`/call/${encodeURIComponent(callId)}`, { data: {} });
+  }
+
+  async checkCallArtifact(callId: string, artifact: string): Promise<void> {
+    let response = await this.http.get(`/call/${encodeURIComponent(callId)}/${artifact}`, {
+      maxRedirects: 0,
+      responseType: 'stream',
+      validateStatus: status => status === 200 || status === 302
+    });
+    response.data.destroy();
   }
 
   // ---- Phone Numbers ----
@@ -90,7 +121,7 @@ export class Client {
   }
 
   async getPhoneNumber(phoneNumberId: string): Promise<any> {
-    let response = await this.http.get(`/phone-number/${phoneNumberId}`);
+    let response = await this.http.get(`/phone-number/${encodeURIComponent(phoneNumberId)}`);
     return response.data;
   }
 
@@ -100,12 +131,15 @@ export class Client {
   }
 
   async updatePhoneNumber(phoneNumberId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.patch(`/phone-number/${phoneNumberId}`, data);
+    let response = await this.http.patch(
+      `/phone-number/${encodeURIComponent(phoneNumberId)}`,
+      data
+    );
     return response.data;
   }
 
   async deletePhoneNumber(phoneNumberId: string): Promise<void> {
-    await this.http.delete(`/phone-number/${phoneNumberId}`);
+    await this.http.delete(`/phone-number/${encodeURIComponent(phoneNumberId)}`);
   }
 
   // ---- Squads ----
@@ -116,7 +150,7 @@ export class Client {
   }
 
   async getSquad(squadId: string): Promise<any> {
-    let response = await this.http.get(`/squad/${squadId}`);
+    let response = await this.http.get(`/squad/${encodeURIComponent(squadId)}`);
     return response.data;
   }
 
@@ -126,54 +160,40 @@ export class Client {
   }
 
   async updateSquad(squadId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.patch(`/squad/${squadId}`, data);
+    let response = await this.http.patch(`/squad/${encodeURIComponent(squadId)}`, data);
     return response.data;
   }
 
   async deleteSquad(squadId: string): Promise<void> {
-    await this.http.delete(`/squad/${squadId}`);
-  }
-
-  // ---- Workflows ----
-
-  async listWorkflows(params?: PaginationParams): Promise<any[]> {
-    let response = await this.http.get('/workflow', { params });
-    return response.data;
-  }
-
-  async getWorkflow(workflowId: string): Promise<any> {
-    let response = await this.http.get(`/workflow/${workflowId}`);
-    return response.data;
-  }
-
-  async createWorkflow(data: Record<string, any>): Promise<any> {
-    let response = await this.http.post('/workflow', data);
-    return response.data;
-  }
-
-  async updateWorkflow(workflowId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.patch(`/workflow/${workflowId}`, data);
-    return response.data;
-  }
-
-  async deleteWorkflow(workflowId: string): Promise<void> {
-    await this.http.delete(`/workflow/${workflowId}`);
+    await this.http.delete(`/squad/${encodeURIComponent(squadId)}`);
   }
 
   // ---- Files ----
 
-  async listFiles(): Promise<any[]> {
-    let response = await this.http.get('/file');
+  async listFiles(params?: { purpose?: string }): Promise<VapiFile[]> {
+    let response = await this.http.get('/file', { params });
     return response.data;
   }
 
-  async getFile(fileId: string): Promise<any> {
-    let response = await this.http.get(`/file/${fileId}`);
+  async getFile(fileId: string): Promise<VapiFile> {
+    let response = await this.http.get(`/file/${encodeURIComponent(fileId)}`);
+    return response.data;
+  }
+
+  async uploadFile(form: FormData): Promise<VapiFile> {
+    let response = await this.http.post('/file', form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  }
+
+  async updateFile(fileId: string, data: { name: string }): Promise<VapiFile> {
+    let response = await this.http.patch(`/file/${encodeURIComponent(fileId)}`, data);
     return response.data;
   }
 
   async deleteFile(fileId: string): Promise<void> {
-    await this.http.delete(`/file/${fileId}`);
+    await this.http.delete(`/file/${encodeURIComponent(fileId)}`);
   }
 
   // ---- Chats ----
@@ -184,7 +204,7 @@ export class Client {
   }
 
   async getChat(chatId: string): Promise<any> {
-    let response = await this.http.get(`/chat/${chatId}`);
+    let response = await this.http.get(`/chat/${encodeURIComponent(chatId)}`);
     return response.data;
   }
 
@@ -194,7 +214,7 @@ export class Client {
   }
 
   async deleteChat(chatId: string): Promise<void> {
-    await this.http.delete(`/chat/${chatId}`);
+    await this.http.delete(`/chat/${encodeURIComponent(chatId)}`);
   }
 
   // ---- Tools ----
@@ -205,7 +225,7 @@ export class Client {
   }
 
   async getTool(toolId: string): Promise<any> {
-    let response = await this.http.get(`/tool/${toolId}`);
+    let response = await this.http.get(`/tool/${encodeURIComponent(toolId)}`);
     return response.data;
   }
 
@@ -215,12 +235,12 @@ export class Client {
   }
 
   async updateTool(toolId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.patch(`/tool/${toolId}`, data);
+    let response = await this.http.patch(`/tool/${encodeURIComponent(toolId)}`, data);
     return response.data;
   }
 
   async deleteTool(toolId: string): Promise<void> {
-    await this.http.delete(`/tool/${toolId}`);
+    await this.http.delete(`/tool/${encodeURIComponent(toolId)}`);
   }
 
   // ---- Analytics ----
@@ -232,13 +252,23 @@ export class Client {
 
   // ---- Campaigns ----
 
-  async listCampaigns(params?: PaginationParams): Promise<any[]> {
+  async listCampaigns(
+    params?: PaginationParams & { page?: number; status?: string }
+  ): Promise<{
+    results: any[];
+    metadata: {
+      currentPage: number;
+      totalItems: number;
+      totalPages?: number;
+      hasNextPage?: boolean;
+    };
+  }> {
     let response = await this.http.get('/campaign', { params });
     return response.data;
   }
 
   async getCampaign(campaignId: string): Promise<any> {
-    let response = await this.http.get(`/campaign/${campaignId}`);
+    let response = await this.http.get(`/campaign/${encodeURIComponent(campaignId)}`);
     return response.data;
   }
 
@@ -248,11 +278,17 @@ export class Client {
   }
 
   async updateCampaign(campaignId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.http.patch(`/campaign/${campaignId}`, data);
+    let response = await this.http.patch(`/campaign/${encodeURIComponent(campaignId)}`, data);
     return response.data;
   }
 
   async deleteCampaign(campaignId: string): Promise<void> {
-    await this.http.delete(`/campaign/${campaignId}`);
+    await this.http.delete(`/campaign/${encodeURIComponent(campaignId)}`);
   }
 }
+
+export const getCallDuration = (call: { startedAt?: string; endedAt?: string }) => {
+  if (!call.startedAt || !call.endedAt) return undefined;
+  let duration = (Date.parse(call.endedAt) - Date.parse(call.startedAt)) / 1000;
+  return Number.isFinite(duration) && duration >= 0 ? duration : undefined;
+};

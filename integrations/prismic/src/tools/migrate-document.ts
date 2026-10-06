@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MigrationApiClient } from '../lib/client';
+import { ContentApiClient, MigrationApiClient } from '../lib/client';
+import { invalid, protect } from '../lib/contracts';
 import { spec } from '../spec';
 
 let migrationDocumentOutputSchema = z.object({
@@ -8,16 +9,16 @@ let migrationDocumentOutputSchema = z.object({
   title: z.string().describe('Document title'),
   type: z.string().describe('Document type'),
   lang: z.string().describe('Language code'),
-  uid: z.string().optional().describe('Document UID if set')
+  uid: z.string().nullable().optional().describe('Document UID if set')
 });
 
 export let createMigrationDocument = SlateTool.create(spec, {
   name: 'Create Migration Document',
   key: 'create_migration_document',
-  description: `Create a new document via the Migration API. Documents are created as drafts in a migration release and must be published through the Prismic UI.
+  description: `Create a new document via the Migration API. Documents are created as drafts in a migration release and can be reviewed and published through the Prismic UI.
 Requires a Migration API token.`,
   constraints: [
-    'Documents are created as drafts — they cannot be published programmatically.',
+    'Documents are created as drafts; this tool does not publish them.',
     'Created documents are added to a migration release by default.'
   ],
   tags: {
@@ -32,33 +33,55 @@ Requires a Migration API token.`,
       lang: z
         .string()
         .optional()
-        .describe('Language code (defaults to repository master locale)'),
+        .describe(
+          'Language code from Get Repository Info. May be omitted only for a single-language repository.'
+        ),
       tags: z.array(z.string()).optional().describe('Tags to apply to the document'),
       alternateLanguageDocumentId: z
         .string()
         .optional()
         .describe('ID of existing document to link as an alternate language'),
       data: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .describe('Document field data matching the custom type schema')
     })
   )
   .output(migrationDocumentOutputSchema)
   .handleInvocation(async ctx => {
-    if (!ctx.auth.migrationToken) {
-      throw new Error('Migration API token is required for creating migration documents.');
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
+    if (!ctx.auth.migrationToken && !ctx.auth.writeToken) {
+      invalid('Migration API token is required for creating migration documents.');
     }
 
     let client = new MigrationApiClient({
       repositoryName: ctx.config.repositoryName,
-      migrationToken: ctx.auth.migrationToken
+      protectedTokens,
+      migrationToken: ctx.auth.migrationToken ?? ctx.auth.writeToken!
     });
 
+    let lang = ctx.input.lang;
+    if (lang === undefined) {
+      const metadata = await new ContentApiClient({
+        repositoryName: ctx.config.repositoryName,
+        accessToken: ctx.auth.token,
+        protectedTokens
+      }).getApiMetadata();
+      if (metadata.languages.length !== 1)
+        invalid(
+          'Provide lang from Get Repository Info when the repository has multiple languages.'
+        );
+      lang = metadata.languages[0]!.id;
+    }
     let result = await client.createDocument({
       title: ctx.input.title,
       type: ctx.input.type,
       uid: ctx.input.uid,
-      lang: ctx.input.lang,
+      lang,
       tags: ctx.input.tags,
       alternate_language_id: ctx.input.alternateLanguageDocumentId,
       data: ctx.input.data
@@ -80,10 +103,10 @@ Requires a Migration API token.`,
 export let updateMigrationDocument = SlateTool.create(spec, {
   name: 'Update Migration Document',
   key: 'update_migration_document',
-  description: `Update an existing document via the Migration API. Changes are saved as drafts in a migration release and must be published through the Prismic UI.
+  description: `Update an existing document via the Migration API. Changes are saved as drafts in a migration release and can be reviewed and published through the Prismic UI.
 Requires a Migration API token.`,
   constraints: [
-    'Changes are saved as drafts — they cannot be published programmatically.',
+    'Changes are saved as drafts; this tool does not publish them.',
     'Updates are added to a migration release by default.'
   ],
   tags: {
@@ -94,26 +117,50 @@ Requires a Migration API token.`,
     z.object({
       documentId: z.string().describe('ID of the document to update'),
       title: z.string().describe('Updated document title'),
-      type: z.string().describe('Custom type ID for the document'),
-      uid: z.string().optional().describe('Updated UID'),
-      lang: z.string().optional().describe('Language code'),
-      tags: z.array(z.string()).optional().describe('Updated tags'),
+      type: z
+        .string()
+        .describe(
+          'Existing custom type ID, checked against the receipt; the provider cannot change it.'
+        ),
+      uid: z
+        .string()
+        .optional()
+        .describe('Updated UID; required by a model containing a UID field.'),
+      lang: z
+        .string()
+        .optional()
+        .describe(
+          'Existing language, checked against the receipt; the provider cannot change it.'
+        ),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Replacement tags. Required at runtime; pass an empty array to clear tags.'),
       alternateLanguageDocumentId: z
         .string()
         .optional()
-        .describe('ID of existing document to link as alternate language'),
-      data: z.record(z.string(), z.any()).describe('Updated document field data')
+        .describe(
+          'Legacy field retained for compatibility; the provider cannot change this association on updates.'
+        ),
+      data: z.record(z.string(), z.unknown()).describe('Updated document field data')
     })
   )
   .output(migrationDocumentOutputSchema)
   .handleInvocation(async ctx => {
-    if (!ctx.auth.migrationToken) {
-      throw new Error('Migration API token is required for updating migration documents.');
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
+    if (!ctx.auth.migrationToken && !ctx.auth.writeToken) {
+      invalid('Migration API token is required for updating migration documents.');
     }
 
     let client = new MigrationApiClient({
       repositoryName: ctx.config.repositoryName,
-      migrationToken: ctx.auth.migrationToken
+      protectedTokens,
+      migrationToken: ctx.auth.migrationToken ?? ctx.auth.writeToken!
     });
 
     let result = await client.updateDocument(ctx.input.documentId, {

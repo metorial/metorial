@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageUserAttributes = SlateTool.create(spec, {
   name: 'Manage User Attributes',
   key: 'manage_user_attributes',
-  description: `Set or delete custom attributes (key-value metadata) on a Retool user. Use the "set" action to create or update an attribute, or "delete" to remove one.`
+  description: `Set or delete custom attributes (key-value metadata) on a Retool user. Use the "set" action to update an existing attribute with a string or null, or "delete" to remove its value. The attribute name must already exist in Retool.`
 })
   .input(
     z.object({
@@ -18,7 +18,9 @@ export let manageUserAttributes = SlateTool.create(spec, {
       attributeValue: z
         .any()
         .optional()
-        .describe('Value of the attribute (required for "set" action, ignored for "delete")')
+        .describe(
+          'String or null value of an existing attribute (required for "set", ignored for "delete")'
+        )
     })
   )
   .output(
@@ -30,7 +32,7 @@ export let manageUserAttributes = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     if (ctx.input.action === 'set') {
       await client.setUserAttribute(

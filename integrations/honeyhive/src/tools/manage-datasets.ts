@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listDatasets = SlateTool.create(spec, {
   name: 'List Datasets',
   key: 'list_datasets',
-  description: `List datasets in a project, optionally filtering by type or specific dataset ID. Datasets contain curated input/output pairs used for evaluations and experiments.`,
+  description: `List datasets in a project, optionally filtering by dataset ID. Dataset type filtering is unavailable on the current API. Datasets contain curated input/output pairs used for evaluations and experiments.`,
   tags: {
     readOnly: true
   }
@@ -16,11 +16,13 @@ export let listDatasets = SlateTool.create(spec, {
       project: z
         .string()
         .optional()
-        .describe('Project name. Falls back to the configured default project.'),
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        ),
       type: z
         .enum(['evaluation', 'fine-tuning'])
         .optional()
-        .describe('Filter by dataset type'),
+        .describe('Legacy type filter unavailable on the current API; omit this field.'),
       datasetId: z.string().optional().describe('Filter by specific dataset ID')
     })
   )
@@ -34,6 +36,10 @@ export let listDatasets = SlateTool.create(spec, {
             description: z.string().optional().describe('Dataset description'),
             type: z.string().optional().describe('Dataset type'),
             numPoints: z.number().optional().describe('Number of datapoints'),
+            datapointIds: z
+              .array(z.string())
+              .optional()
+              .describe('Datapoint IDs belonging to the dataset'),
             pipelineType: z.string().optional().describe('Pipeline type (event or session)'),
             createdAt: z.string().optional().describe('Creation timestamp'),
             updatedAt: z.string().optional().describe('Last update timestamp')
@@ -49,9 +55,6 @@ export let listDatasets = SlateTool.create(spec, {
     });
 
     let project = ctx.input.project || ctx.config.project;
-    if (!project) {
-      throw new Error('Project name is required.');
-    }
 
     let data = await client.listDatasets({
       project,
@@ -60,11 +63,12 @@ export let listDatasets = SlateTool.create(spec, {
     });
 
     let datasets = (data.testcases || data.datasets || []).map((d: any) => ({
-      datasetId: d._id || d.id,
+      datasetId: d.dataset_id || d._id || d.id,
       name: d.name,
-      description: d.description,
+      description: d.description ?? undefined,
       type: d.type,
-      numPoints: d.num_points,
+      numPoints: d.datapoints?.length ?? d.num_points,
+      datapointIds: d.datapoints,
       pipelineType: d.pipeline_type,
       createdAt: d.created_at,
       updatedAt: d.updated_at
@@ -87,20 +91,29 @@ export let createDataset = SlateTool.create(spec, {
       project: z
         .string()
         .optional()
-        .describe('Project name. Falls back to the configured default project.'),
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        ),
       name: z.string().describe('Name of the dataset'),
       description: z.string().optional().describe('Description of the dataset'),
       type: z
         .enum(['evaluation', 'fine-tuning'])
         .optional()
         .default('evaluation')
-        .describe('Type of dataset'),
+        .describe(
+          'Legacy setting: evaluation is accepted for compatibility; fine-tuning is unavailable on the current API.'
+        ),
       pipelineType: z
         .enum(['event', 'session'])
         .optional()
         .default('event')
-        .describe('Pipeline type'),
-      metadata: z.record(z.string(), z.any()).optional().describe('Additional metadata')
+        .describe(
+          'Legacy setting: event is accepted for compatibility; session is unavailable on the current API.'
+        ),
+      metadata: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Legacy field unavailable on the current dataset API.')
     })
   )
   .output(
@@ -116,9 +129,6 @@ export let createDataset = SlateTool.create(spec, {
     });
 
     let project = ctx.input.project || ctx.config.project;
-    if (!project) {
-      throw new Error('Project name is required.');
-    }
 
     let data = await client.createDataset({
       project,
@@ -142,14 +152,23 @@ export let createDataset = SlateTool.create(spec, {
 export let updateDataset = SlateTool.create(spec, {
   name: 'Update Dataset',
   key: 'update_dataset',
-  description: `Update an existing dataset's name, description, or metadata.`
+  description: `Update a dataset name, description, or datapoint membership.`
 })
   .input(
     z.object({
       datasetId: z.string().describe('ID of the dataset to update'),
       name: z.string().optional().describe('New name'),
       description: z.string().optional().describe('New description'),
-      metadata: z.record(z.string(), z.any()).optional().describe('Updated metadata')
+      metadata: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Legacy field unavailable on the current dataset API.'),
+      datapointIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Complete replacement list of datapoint IDs. Call list_datapoints to discover IDs.'
+        )
     })
   )
   .output(
@@ -167,7 +186,8 @@ export let updateDataset = SlateTool.create(spec, {
       dataset_id: ctx.input.datasetId,
       name: ctx.input.name,
       description: ctx.input.description,
-      metadata: ctx.input.metadata
+      metadata: ctx.input.metadata,
+      datapoints: ctx.input.datapointIds
     });
 
     return {
@@ -224,7 +244,9 @@ export let addDatapointsToDataset = SlateTool.create(spec, {
       project: z
         .string()
         .optional()
-        .describe('Project name. Falls back to the configured default project.'),
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        ),
       records: z.array(z.record(z.string(), z.any())).describe('Raw data records to add'),
       mapping: z
         .object({
@@ -253,10 +275,9 @@ export let addDatapointsToDataset = SlateTool.create(spec, {
     });
 
     let project = ctx.input.project || ctx.config.project;
-    if (!project) {
-      throw new Error('Project name is required.');
-    }
 
+    if (!ctx.input.records.length)
+      throw createApiServiceError('Provide at least one record to add.');
     let data = await client.addDatapoints(ctx.input.datasetId, {
       project,
       data: ctx.input.records,

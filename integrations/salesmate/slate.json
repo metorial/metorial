@@ -1,6 +1,6 @@
 {
   "name": "@metorial/salesmate",
-  "description": "Manage sales pipelines, contacts, companies, deals, and activities in a CRM platform. Create and update contact and company records, track deals across customizable pipeline stages, schedule activities and tasks, and manage a product catalog. Add notes to contacts, companies, deals, and activities. Create and monitor customer support tickets. Manage users and custom module records. Track email conversations and log communications. Subscribe to webhooks for create/update events on contacts, companies, deals, activities, users, and custom modules.",
+  "description": "Manage sales pipelines, contacts, companies, deals, and activities in a CRM platform. Create and update contact and company records, track deals across customizable pipeline stages, schedule activities and tasks, and manage a product catalog. Add notes to contacts, companies, deals, and activities. Create and monitor customer support tickets. Manage users and custom module records. Track email conversations and log communications.",
   "categories": ["crm-and-sales-tools"],
   "skills": [
     "manage contacts and companies",
@@ -11,8 +11,7 @@
     "add notes to records",
     "manage custom modules",
     "track email conversations",
-    "manage CRM users",
-    "subscribe to webhooks"
+    "manage CRM users"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/salesmate.jpeg"
 }

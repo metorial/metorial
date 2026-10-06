@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/teamwork.png" height="20"> Teamwork
 
-Manage projects, task lists, and tasks with support for assignees, due dates, priorities, dependencies, subtasks, and custom fields. Track time entries and timers against projects and tasks. Create and manage milestones, calendar events, messages, comments, notebooks, files, invoices, expenses, and budgets. Organize people and companies, assign roles and teams, and manage project permissions. Monitor project health with status updates and portfolio boards. Define custom fields, tags, and categories to extend and organize data. Subscribe to webhooks for events on tasks, projects, milestones, time entries, files, messages, and more.
+Manage projects, task lists, and tasks with support for assignees, due dates, priorities, dependencies, subtasks, and custom fields. Track time entries and timers against projects and tasks. Create and manage milestones, calendar events, messages, comments, notebooks, files, invoices, expenses, and budgets. Organize people and companies, assign roles and teams, and manage project permissions. Monitor project health with status updates and portfolio boards. Define custom fields, tags, and categories to extend and organize data.
 
 ## Tools
 

@@ -1,0 +1,110 @@
+{
+  "add_survey_response": {
+    "file": "add-survey-response.ts",
+    "name": "Add Survey Response",
+    "tags": {
+      "destructive": false,
+      "readOnly": false
+    },
+    "schemaSource": "\n  .input(\n    z.object({\n      personId: z.string().describe('ID of the person to add the response for'),\n      score: z.number().describe('Response score (e.g., 0-10 for NPS, 1-5 for CSAT)'),\n      comment: z.string().optional().describe('Optional text feedback from the respondent'),\n      personProperties: z\n        .record(z.string(), z.string())\n        .optional()\n        .describe('Custom properties to associate with the response'),\n      createdAt: z\n        .number()\n        .optional()\n        .describe('Unix timestamp of when the response was collected. Defaults to now.')\n    })\n  )\n  .output(\n    z.object({\n      responseId: z.string().describe('ID of the created response'),\n      person: z.any().describe('Person ID or expanded person object'),\n      surveyType: z.string().describe('Survey type'),\n      score: z.number().describe('Response score'),\n      comment: z.string().nullable().describe('Comment text'),\n      permalink: z.string().nullable().describe('Link to view the response'),\n      createdAt: z.number().describe('Unix timestamp of creation'),\n      updatedAt: z.number().describe('Unix timestamp of last update')\n    })\n  )\n"
+  },
+  "cancel_pending_surveys": {
+    "file": "cancel-pending-surveys.ts",
+    "name": "Cancel Pending Surveys",
+    "tags": {
+      "destructive": true,
+      "readOnly": false
+    },
+    "schemaSource": "\n  .input(\n    z.object({\n      email: z\n        .string()\n        .describe('Email address of the person whose pending surveys should be cancelled')\n    })\n  )\n  .output(\n    z.object({\n      ok: z.boolean().describe('Whether the cancellation was successful')\n    })\n  )\n"
+  },
+  "delete_person": {
+    "file": "delete-person.ts",
+    "name": "Delete Person",
+    "tags": {
+      "destructive": true,
+      "readOnly": false
+    },
+    "schemaSource": "\n  .input(\n    z.object({\n      personId: z.string().optional().describe('Delete person by their unique ID'),\n      email: z.string().optional().describe('Delete person by email address'),\n      phoneNumber: z\n        .string()\n        .optional()\n        .describe('Delete person by phone number in E.164 format')\n    })\n  )\n  .output(\n    z.object({\n      ok: z.boolean().describe('Whether the deletion was accepted')\n    })\n  )\n"
+  },
+  "get_metrics": {
+    "file": "get-metrics.ts",
+    "name": "Get Metrics",
+    "tags": {
+      "destructive": false,
+      "readOnly": true
+    },
+    "schemaSource": "\n  .input(\n    z.object({\n      since: z\n        .number()\n        .optional()\n        .describe('Unix timestamp to restrict metrics to responses on or after this time'),\n      until: z\n        .number()\n        .optional()\n        .describe('Unix timestamp to restrict metrics to responses on or before this time'),\n      trend: z.string().optional().describe('Restrict to a specific trend by its ID')\n    })\n  )\n  .output(\n    z.object({\n      nps: z.number().describe('Net Promoter Score (-100 to 100)'),\n      promoterCount: z.number().describe('Number of promoters (score 9-10)'),\n      promoterPercent: z.number().describe('Percentage of promoters'),\n      passiveCount: z.number().describe('Number of passives (score 7-8)'),\n      passivePercent: z.number().describe('Percentage of passives'),\n      detractorCount: z.number().describe('Number of detractors (score 0-6)'),\n      detractorPercent: z.number().describe('Percentage of detractors'),\n      responseCount: z.number().describe('Total number of responses')\n    })\n  )\n"
+  },
+  "list_people": {
+    "file": "list-people.ts",
+    "name": "List People",
+    "tags": {
+      "destructive": false,
+      "readOnly": true
+    },
+    "schemaSource": "\n  .input(\n    z.object({\n      listType: z\n        .enum(['all', 'unsubscribed', 'bounced'])\n        .optional()\n        .describe('Type of people list to retrieve. Defaults to all.'),\n      perPage: z.number().optional().describe('Results per page (max 100, default 20)'),\n      page: z.number().optional().describe('Page number (for unsubscribed/bounced lists)'),\n      since: z\n        .number()\n        .optional()\n        .describe('Unix timestamp to filter records on or after this time'),\n      until: z\n        .number()\n        .optional()\n        .describe('Unix timestamp to filter records on or before this time'),\n      email: z.string().optional().describe('Search for a specific person by email'),\n      phoneNumber: z.string().optional().describe('Search by phone number in E.164 format')\n    })\n  )\n  .output(\n    z.object({\n      people: z.array(z.any()).describe('List of people records')\n    })\n  )\n"
+  },
+  "list_survey_responses": {
+    "file": "list-survey-responses.ts",
+    "name": "List Survey Responses",
+    "tags": {
+      "destructive": false,
+      "readOnly": true
+    },
+    "schemaSource": "let noteSchema = z.object({\n  noteId: z.string().describe('ID of the note'),\n  body: z.string().describe('Note content'),\n  createdAt: z.number().describe('Unix timestamp when the note was created')\n});\nlet additionalAnswerSchema = z.object({\n  answerId: z.string().describe('ID of the answer'),\n  value: z\n    .any()\n    .describe(\n      'Answer value containing free_response, scale, select_one, and select_many fields'\n    ),\n  question: z.any().describe('Question object with id, type, and text fields')\n});\nlet surveyResponseSchema = z.object({\n  responseId: z.string().describe('Unique ID of the survey response'),\n  person: z.any().describe('Person ID or expanded person object'),\n  surveyType: z\n    .string()\n    .describe('Type of survey (nps, csat, ces, pmf, enps, smileys, stars, thumbs)'),\n  score: z.number().describe('Response score'),\n  comment: z.string().nullable().describe('Optional text comment from the respondent'),\n  permalink: z.string().nullable().describe('Link to view the response in Delighted'),\n  createdAt: z.number().describe('Unix timestamp when the response was created'),\n  updatedAt: z.number().describe('Unix timestamp when the response was last updated'),\n  personProperties: z\n    .record(z.string(), z.string())\n    .describe('Custom properties of the person'),\n  notes: z.array(noteSchema).describe('Internal notes added to the response'),\n  tags: z.array(z.string()).describe('Tags applied to the response'),\n  additionalAnswers: z\n    .array(additionalAnswerSchema)\n    .describe('Answers to additional questions')\n});\n  .input(\n    z.object({\n      perPage: z.number().optional().describe('Results per page (max 100, default 20)'),\n      page: z.number().optional().describe('Page number (default 1)'),\n      since: z\n        .number()\n        .optional()\n        .describe('Unix timestamp to filter responses created on or after this time'),\n      until: z\n        .number()\n        .optional()\n        .describe('Unix timestamp to filter responses created on or before this time'),\n      updatedSince: z\n        .number()\n        .optional()\n        .describe('Unix timestamp to filter responses updated on or after this time'),\n      updatedUntil: z\n        .number()\n        .optional()\n        .describe('Unix timestamp to filter responses updated on or before this time'),\n      personId: z.string().optional().describe('Filter responses by person ID'),\n      personEmail: z.string().optional().describe('Filter responses by person email'),\n      trend: z.string().optional().describe('Filter by trend ID'),\n      order: z\n        .enum(['asc', 'desc', 'asc:updated_at', 'desc:updated_at'])\n        .optional()\n        .describe('Sort order (default asc)'),\n      expandPerson: z\n        .boolean()\n        .optional()\n        .describe('Set to true to expand person details in each response')\n    })\n  )\n  .output(\n    z.object({\n      responses: z.array(surveyResponseSchema).describe('List of survey responses')\n    })\n  )\n"
+  },
+  "get_autopilot_config": {
+    "file": "manage-autopilot.ts",
+    "name": "Get Autopilot Configuration",
+    "tags": {
+      "destructive": false,
+      "readOnly": true
+    },
+    "schemaSource": "\n  .input(\n    z.object({\n      platform: z.enum(['email', 'sms']).describe('Autopilot platform to query')\n    })\n  )\n  .output(\n    z.object({\n      platformId: z.string().describe('Platform identifier (email or sms)'),\n      active: z.boolean().describe('Whether Autopilot is currently active'),\n      frequency: z.number().describe('Seconds between recurring surveys'),\n      createdAt: z.number().describe('Unix timestamp when Autopilot was created'),\n      updatedAt: z.number().describe('Unix timestamp when Autopilot was last updated')\n    })\n  )\n"
+  },
+  "add_to_autopilot": {
+    "file": "manage-autopilot.ts",
+    "name": "Add to Autopilot",
+    "tags": {
+      "destructive": false,
+      "readOnly": false
+    },
+    "schemaSource": "\n  .input(\n    z.object({\n      platform: z.enum(['email', 'sms']).describe('Autopilot platform to add the person to'),\n      personEmail: z\n        .string()\n        .optional()\n        .describe('Email address (required for email Autopilot)'),\n      personPhoneNumber: z\n        .string()\n        .optional()\n        .describe('Phone number in E.164 format (required for SMS Autopilot)'),\n      personId: z.string().optional().describe('Person ID if already known'),\n      personName: z.string().optional().describe('Name of the person'),\n      properties: z\n        .record(z.string(), z.string())\n        .optional()\n        .describe('Custom properties (e.g., locale, question_product_name)')\n    })\n  )\n  .output(\n    z.object({\n      person: z.any().nullable().describe('Person details'),\n      properties: z\n        .record(z.string(), z.string())\n        .describe('Properties associated with the membership')\n    })\n  )\n"
+  },
+  "list_autopilot_members": {
+    "file": "manage-autopilot.ts",
+    "name": "List Autopilot Members",
+    "tags": {
+      "destructive": false,
+      "readOnly": true
+    },
+    "schemaSource": "\n  .input(\n    z.object({\n      platform: z.enum(['email', 'sms']).describe('Autopilot platform to list members for'),\n      perPage: z.number().optional().describe('Results per page (max 100, default 20)'),\n      personId: z.string().optional().describe('Filter by person ID'),\n      personEmail: z.string().optional().describe('Filter by person email'),\n      personPhoneNumber: z\n        .string()\n        .optional()\n        .describe('Filter by phone number in E.164 format')\n    })\n  )\n  .output(\n    z.object({\n      members: z\n        .array(\n          z.object({\n            createdAt: z.number().describe('Unix timestamp when added to Autopilot'),\n            updatedAt: z.number().describe('Unix timestamp of last update'),\n            person: z.any().nullable().describe('Person details'),\n            nextSurveyRequest: z\n              .any()\n              .nullable()\n              .describe('Next scheduled survey request details')\n          })\n        )\n        .describe('List of Autopilot members')\n    })\n  )\n"
+  },
+  "remove_from_autopilot": {
+    "file": "manage-autopilot.ts",
+    "name": "Remove from Autopilot",
+    "tags": {
+      "destructive": true,
+      "readOnly": false
+    },
+    "schemaSource": "\n  .input(\n    z.object({\n      platform: z\n        .enum(['email', 'sms'])\n        .describe('Autopilot platform to remove the person from'),\n      personId: z.string().optional().describe('Person ID'),\n      personEmail: z.string().optional().describe('Person email address'),\n      personPhoneNumber: z.string().optional().describe('Phone number in E.164 format')\n    })\n  )\n  .output(\n    z.object({\n      person: z.any().nullable().describe('Removed person details')\n    })\n  )\n"
+  },
+  "send_survey": {
+    "file": "send-survey.ts",
+    "name": "Send Survey",
+    "tags": {
+      "destructive": false,
+      "readOnly": false
+    },
+    "schemaSource": "\n  .input(\n    z.object({\n      email: z.string().optional().describe('Email address of the person to survey'),\n      phoneNumber: z\n        .string()\n        .optional()\n        .describe(\n          'Phone number in E.164 format (e.g., +17132746524). Required when channel is sms.'\n        ),\n      name: z.string().optional().describe('Name of the person'),\n      channel: z\n        .enum(['email', 'sms'])\n        .optional()\n        .describe('Survey delivery channel. Defaults to email.'),\n      delay: z\n        .number()\n        .optional()\n        .describe('Number of seconds to wait before sending the survey'),\n      send: z\n        .boolean()\n        .optional()\n        .describe(\n          'Set to false to create the person without sending a survey. Defaults to true.'\n        ),\n      lastSentAt: z\n        .number()\n        .optional()\n        .describe(\n          'Unix timestamp to manually set last survey send time for throttling purposes'\n        ),\n      properties: z\n        .record(z.string(), z.string())\n        .optional()\n        .describe(\n          'Custom metadata key-value pairs. Special keys: locale, question_product_name, delighted_email_subject, delighted_intro_message'\n        )\n    })\n  )\n  .output(\n    z.object({\n      personId: z.string().describe('ID of the person'),\n      email: z.string().nullable().describe('Email address'),\n      name: z.string().nullable().describe('Name of the person'),\n      phoneNumber: z.string().nullable().describe('Phone number'),\n      surveyScheduledAt: z\n        .number()\n        .nullable()\n        .describe('Unix timestamp when the survey is scheduled to be sent'),\n      properties: z\n        .record(z.string(), z.string())\n        .describe('Custom properties attached to the person')\n    })\n  )\n"
+  },
+  "unsubscribe_person": {
+    "file": "unsubscribe-person.ts",
+    "name": "Unsubscribe Person",
+    "tags": {
+      "destructive": false,
+      "readOnly": false
+    },
+    "schemaSource": "\n  .input(\n    z.object({\n      email: z.string().describe('Email address of the person to unsubscribe')\n    })\n  )\n  .output(\n    z.object({\n      ok: z.boolean().describe('Whether the unsubscribe was successful')\n    })\n  )\n"
+  }
+}

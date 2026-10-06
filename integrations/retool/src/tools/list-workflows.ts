@@ -1,13 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listWorkflows = SlateTool.create(spec, {
   name: 'List Workflows',
   key: 'list_workflows',
   description: `List all workflows in the Retool organization. Workflows automate processes and can be triggered by schedules, webhooks, or other events.`,
-  constraints: ['Available on Enterprise Premium plan only.'],
+  constraints: [
+    'Requires the relevant read or write API token scope and support in this deployment.'
+  ],
   tags: {
     readOnly: true
   }
@@ -20,7 +22,12 @@ export let listWorkflows = SlateTool.create(spec, {
         .max(100)
         .optional()
         .describe('Maximum number of workflows to return (1-100)'),
-      nextToken: z.string().optional().describe('Pagination token from a previous response')
+      nextToken: z
+        .string()
+        .optional()
+        .describe(
+          'Local continuation token from a previous response; use the same limit and restart if the inventory changes'
+        )
     })
   )
   .output(
@@ -41,7 +48,7 @@ export let listWorkflows = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.listWorkflows({
       limit: ctx.input.limit,

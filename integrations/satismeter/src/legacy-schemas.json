@@ -1,0 +1,466 @@
+{
+  "list_surveys": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "surveyId": {
+                "type": "string",
+                "description": "Unique identifier of the survey"
+              },
+              "name": {
+                "description": "Name of the survey",
+                "type": "string"
+              },
+              "type": {
+                "description": "Survey type (e.g., NPS, CSAT, CES)",
+                "type": "string"
+              },
+              "state": {
+                "description": "Current state of the survey",
+                "type": "string"
+              }
+            },
+            "required": ["surveyId"],
+            "additionalProperties": false
+          },
+          "description": "List of surveys in the project"
+        }
+      },
+      "required": ["surveys"],
+      "additionalProperties": false
+    }
+  },
+  "list_responses": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "description": "Filter responses to a specific survey. If omitted, returns responses from all surveys.",
+          "type": "string"
+        },
+        "startDate": {
+          "description": "Start of the date range filter in ISO 8601 format (e.g., 2024-01-01T00:00:00.000Z)",
+          "type": "string"
+        },
+        "endDate": {
+          "description": "End of the date range filter in ISO 8601 format (e.g., 2024-12-31T23:59:59.999Z)",
+          "type": "string"
+        },
+        "pageCursor": {
+          "description": "Cursor for pagination. Use the nextPageCursor from a previous response to get the next page.",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of responses per page (1-100, default 20)",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "responses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "responseId": {
+                "description": "Unique identifier of the response",
+                "type": "string"
+              },
+              "rating": {
+                "description": "Numeric rating given by the user",
+                "type": "number"
+              },
+              "feedback": {
+                "description": "Textual feedback from the user",
+                "type": "string"
+              },
+              "answers": {
+                "description": "Array of answer objects for each survey question",
+                "type": "array",
+                "items": {}
+              },
+              "category": {
+                "description": "Response category (e.g., promoter, passive, detractor)",
+                "type": "string"
+              },
+              "completed": {
+                "description": "Whether the user completed all survey questions",
+                "type": "boolean"
+              },
+              "created": {
+                "description": "Timestamp when the response was created",
+                "type": "string"
+              },
+              "method": {
+                "description": "Survey delivery method (In-App, Mobile, Email)",
+                "type": "string"
+              },
+              "user": {
+                "description": "User information associated with the response"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "List of survey responses"
+        },
+        "nextPageCursor": {
+          "description": "Cursor to fetch the next page of results",
+          "type": "string"
+        }
+      },
+      "required": ["responses"],
+      "additionalProperties": false
+    }
+  },
+  "get_survey_statistics": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "ID of the survey to get statistics for"
+        },
+        "startDate": {
+          "description": "Start of the date range in ISO 8601 format",
+          "type": "string"
+        },
+        "endDate": {
+          "description": "End of the date range in ISO 8601 format",
+          "type": "string"
+        }
+      },
+      "required": ["surveyId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "statistics": {
+          "description": "Aggregated statistics for the survey, including response counts, rates, and question-level metrics"
+        }
+      },
+      "required": ["statistics"],
+      "additionalProperties": false
+    }
+  },
+  "upsert_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Unique user identifier as used in your system"
+        },
+        "traits": {
+          "description": "Custom user properties to set or update (e.g., { name: \"John\", email: \"john@example.com\", plan: \"premium\" })",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["userId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The user ID that was created or updated"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the operation was successful"
+        }
+      },
+      "required": ["userId", "success"],
+      "additionalProperties": false
+    }
+  },
+  "list_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "description": "Filter by a specific userId to look up one user. If omitted, returns all users.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userInternalId": {
+                "description": "SatisMeter internal user ID (use this for delete operations)",
+                "type": "string"
+              },
+              "userId": {
+                "description": "External user ID as provided during creation",
+                "type": "string"
+              },
+              "traits": {
+                "description": "User custom traits/properties",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "lastSeen": {
+                "description": "Timestamp when the user was last seen",
+                "type": "string"
+              },
+              "created": {
+                "description": "Timestamp when the user was created",
+                "type": "string"
+              },
+              "unsubscribed": {
+                "description": "Whether the user is unsubscribed from surveys",
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "List of users"
+        }
+      },
+      "required": ["users"],
+      "additionalProperties": false
+    }
+  },
+  "delete_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userInternalId": {
+          "type": "string",
+          "description": "SatisMeter internal user ID (found via List Users, different from the external userId)"
+        }
+      },
+      "required": ["userInternalId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userInternalId": {
+          "type": "string",
+          "description": "The internal ID of the deleted user"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["userInternalId", "success"],
+      "additionalProperties": false
+    }
+  },
+  "track_event": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "ID of the user who performed the event"
+        },
+        "eventName": {
+          "type": "string",
+          "description": "Name of the event to track (must match the event name configured in the survey)"
+        }
+      },
+      "required": ["userId", "eventName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The user ID the event was tracked for"
+        },
+        "eventName": {
+          "type": "string",
+          "description": "The name of the tracked event"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the event was tracked successfully"
+        }
+      },
+      "required": ["userId", "eventName", "success"],
+      "additionalProperties": false
+    }
+  },
+  "insert_response": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "ID of the survey (campaign) to associate the response with"
+        },
+        "userId": {
+          "description": "ID of the user submitting the response. Provide either userId or anonymousId.",
+          "type": "string"
+        },
+        "anonymousId": {
+          "description": "Anonymous identifier if the user cannot be identified. Provide either userId or anonymousId.",
+          "type": "string"
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "questionId": {
+                "type": "string",
+                "description": "ID of the survey question"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "description": "Answer value: integer for rating questions, string for text/single-choice questions"
+              }
+            },
+            "required": ["questionId", "value"],
+            "additionalProperties": false
+          },
+          "description": "Array of answers to the survey questions"
+        },
+        "method": {
+          "description": "Survey delivery method (defaults to In-App)",
+          "type": "string",
+          "enum": ["In-App", "Mobile", "Email"]
+        },
+        "traits": {
+          "description": "Optional user traits to associate with the response",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["surveyId", "answers"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the response was inserted successfully"
+        },
+        "surveyId": {
+          "type": "string",
+          "description": "The survey ID the response was associated with"
+        }
+      },
+      "required": ["success", "surveyId"],
+      "additionalProperties": false
+    }
+  },
+  "get_unsubscribed_emails": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "emails": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of unsubscribed email addresses"
+        }
+      },
+      "required": ["emails"],
+      "additionalProperties": false
+    }
+  },
+  "update_unsubscribed_emails": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "emails": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Complete list of email addresses to unsubscribe"
+        }
+      },
+      "required": ["emails"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "emails": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The updated list of unsubscribed email addresses"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the update was successful"
+        }
+      },
+      "required": ["emails", "success"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import type { LiveSessionRequestParams } from '../lib/types';
 import { spec } from '../spec';
 
 export let initiateLiveSession = SlateTool.create(spec, {
@@ -37,16 +38,28 @@ export let initiateLiveSession = SlateTool.create(spec, {
       bitDepth: z
         .number()
         .optional()
-        .describe('Audio bit depth (8, 16, 24, or 32; default: 16)'),
-      channels: z.number().optional().describe('Number of audio channels (1-8; default: 1)'),
+        .describe(
+          'Audio bit depth (8, 16, 24, or 32; default: 16 for PCM, 8 for A-law/µ-law)'
+        ),
+      channels: z
+        .number()
+        .int()
+        .min(1)
+        .max(8)
+        .optional()
+        .describe('Number of audio channels (1-8; default: 1)'),
       endpointing: z
         .number()
+        .min(0.01)
+        .max(10)
         .optional()
         .describe(
           'Silence duration in seconds to trigger utterance finalization (0.01-10; default: 0.05)'
         ),
       maximumDurationWithoutEndpointing: z
         .number()
+        .min(5)
+        .max(60)
         .optional()
         .describe(
           'Maximum utterance duration in seconds before forced finalization (default: 5)'
@@ -68,6 +81,8 @@ export let initiateLiveSession = SlateTool.create(spec, {
         .describe('Enable audio quality enhancement (increases latency)'),
       speechThreshold: z
         .number()
+        .min(0)
+        .max(1)
         .optional()
         .describe('Speech detection sensitivity (0-1; default: 0.6)'),
 
@@ -77,7 +92,7 @@ export let initiateLiveSession = SlateTool.create(spec, {
         .optional()
         .describe('Target language codes for real-time translation'),
       realtimeTranslationModel: z
-        .enum(['base', 'enhanced'])
+        .enum(['base', 'batch', 'enhanced'])
         .optional()
         .describe('Translation model quality'),
       realtimeNer: z
@@ -97,18 +112,24 @@ export let initiateLiveSession = SlateTool.create(spec, {
       postChapterization: z
         .boolean()
         .optional()
-        .describe('Enable post-session chapterization'),
+        .describe('Legacy option, ignored by Gladia. Use summarization instead.'),
 
       receivePartialTranscripts: z
         .boolean()
         .optional()
-        .describe('Receive interim (partial) transcript results (default: true)'),
+        .describe('Receive interim (partial) transcript results (default: false)'),
 
-      callbackUrl: z.string().optional().describe('URL to receive post-processing results'),
+      callbackUrl: z
+        .string()
+        .url()
+        .optional()
+        .describe('URL to receive callback events including post-processing results'),
       callbackMethod: z
         .enum(['POST', 'PUT'])
         .optional()
-        .describe('HTTP method for callback (default: POST)'),
+        .describe(
+          'Live callbacks only support POST. PUT is retained for compatibility but is unsupported.'
+        ),
 
       customMetadata: z
         .record(z.string(), z.any())
@@ -126,11 +147,59 @@ export let initiateLiveSession = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let params: any = {};
+    if (
+      (ctx.input.realtimeTranslationTargetLanguages !== undefined ||
+        ctx.input.realtimeTranslationModel !== undefined) &&
+      !ctx.input.realtimeTranslation
+    ) {
+      throw createApiServiceError(
+        'Enable realtimeTranslation to configure its targets or model.'
+      );
+    }
+    if (ctx.input.postSummarizationType !== undefined && !ctx.input.postSummarization) {
+      throw createApiServiceError('Enable postSummarization to set postSummarizationType.');
+    }
+    if (ctx.input.callbackMethod !== undefined && !ctx.input.callbackUrl) {
+      throw createApiServiceError('Provide callbackUrl when setting callbackMethod.');
+    }
+
+    if (
+      ctx.input.sampleRate !== undefined &&
+      ![8000, 16000, 32000, 44100, 48000].includes(ctx.input.sampleRate)
+    ) {
+      throw createApiServiceError('sampleRate must be 8000, 16000, 32000, 44100, or 48000.');
+    }
+    let encoding = ctx.input.encoding ?? 'wav/pcm';
+    let bitDepth = ctx.input.bitDepth ?? (encoding === 'wav/pcm' ? 16 : 8);
+    if (![8, 16, 24, 32].includes(bitDepth) || (encoding !== 'wav/pcm' && bitDepth !== 8)) {
+      throw createApiServiceError('Use 8, 16, 24, or 32 bit PCM, or 8 bit A-law/µ-law.');
+    }
+    if (ctx.input.region && !['eu-west', 'us-west'].includes(ctx.input.region)) {
+      throw createApiServiceError('region must be eu-west or us-west.');
+    }
+    if (ctx.input.callbackMethod === 'PUT') {
+      throw createApiServiceError(
+        'Live session callbacks support POST only. Set callbackMethod to POST.'
+      );
+    }
+    if (ctx.input.postChapterization) {
+      throw createApiServiceError(
+        'Gladia no longer supports live chapterization. Use postSummarization instead.'
+      );
+    }
+    if (
+      ctx.input.realtimeTranslation &&
+      !ctx.input.realtimeTranslationTargetLanguages?.length
+    ) {
+      throw createApiServiceError(
+        'Provide realtimeTranslationTargetLanguages when realtimeTranslation is enabled.'
+      );
+    }
+    let params: LiveSessionRequestParams = {};
 
     if (ctx.input.encoding) params.encoding = ctx.input.encoding;
     if (ctx.input.sampleRate) params.sample_rate = ctx.input.sampleRate;
-    if (ctx.input.bitDepth) params.bit_depth = ctx.input.bitDepth;
+    params.bit_depth = bitDepth;
     if (ctx.input.channels) params.channels = ctx.input.channels;
     if (ctx.input.endpointing !== undefined) params.endpointing = ctx.input.endpointing;
     if (ctx.input.maximumDurationWithoutEndpointing !== undefined)
@@ -138,7 +207,7 @@ export let initiateLiveSession = SlateTool.create(spec, {
         ctx.input.maximumDurationWithoutEndpointing;
     if (ctx.input.region) params.region = ctx.input.region;
 
-    if (ctx.input.languages || ctx.input.codeSwitching) {
+    if (ctx.input.languages !== undefined || ctx.input.codeSwitching !== undefined) {
       params.language_config = {
         languages: ctx.input.languages,
         code_switching: ctx.input.codeSwitching
@@ -183,7 +252,6 @@ export let initiateLiveSession = SlateTool.create(spec, {
           };
         }
       }
-      if (ctx.input.postChapterization) params.post_processing.chapterization = true;
     }
 
     if (ctx.input.receivePartialTranscripts !== undefined) {
@@ -194,9 +262,9 @@ export let initiateLiveSession = SlateTool.create(spec, {
 
     if (ctx.input.callbackUrl) {
       params.callback_config = {
-        url: ctx.input.callbackUrl,
-        method: ctx.input.callbackMethod
+        url: ctx.input.callbackUrl
       };
+      params.callback = true;
     }
 
     if (ctx.input.customMetadata) {

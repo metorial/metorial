@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TrayRestClient } from '../lib/client';
+import { clientConfig, TrayRestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let callConnector = SlateTool.create(spec, {
@@ -14,10 +14,11 @@ Requires a valid authentication ID for the target service.`,
   ],
   constraints: [
     'Each call is billable and counts as one task on the Tray.io account.',
-    'Requires a user token (not a master token).'
+    'Requires a user token (not a master token).',
+    'Operations can cause irreversible third-party effects. Verify an uncertain result before retrying; no automatic retry occurs.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -42,10 +43,7 @@ Requires a valid authentication ID for the target service.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TrayRestClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = new TrayRestClient(clientConfig(ctx));
 
     let result = await client.callConnector(
       ctx.input.connectorName,

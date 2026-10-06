@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { StitchConnectClient } from '../lib/client';
+import { resolveRegion, StitchConnectClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let deleteSource = SlateTool.create(spec, {
@@ -27,8 +27,8 @@ export let deleteSource = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     await client.deleteSource(ctx.input.sourceId);

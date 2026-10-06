@@ -9,7 +9,9 @@ import {
   deleteMessage,
   deleteSpace,
   deleteTeam,
+  downloadResourceFile,
   editMessage,
+  getFileUrl,
   getMeeting,
   getMessage,
   getPersonDetails,
@@ -28,17 +30,11 @@ import {
   updateMember,
   updateSpace
 } from './tools';
-import {
-  attachmentActionEvents,
-  meetingEvents,
-  membershipEvents,
-  messageEvents,
-  roomEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    downloadResourceFile,
+    getFileUrl,
     sendMessage,
     getMessage,
     listMessages,
@@ -66,11 +62,5 @@ export let provider = Slate.create({
     createTeam,
     deleteTeam
   ],
-  triggers: [
-    messageEvents,
-    roomEvents,
-    membershipEvents,
-    meetingEvents,
-    attachmentActionEvents
-  ]
+  triggers: []
 });

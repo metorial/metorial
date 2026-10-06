@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid } from '../lib/client';
+import { listIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTags = SlateTool.create(spec, {
@@ -9,12 +10,21 @@ export let manageTags = SlateTool.create(spec, {
   description: `Create, rename, delete, or list tags on a contact list. Tags are labels used for segmenting and targeting contacts.
 Use **action** to specify the operation: \`list\`, \`create\`, \`rename\`, or \`delete\`.`,
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
     z.object({
-      listId: z.string().describe('ID of the list to manage tags on'),
+      startingAfter: z.string().optional().describe('Cursor from a previous tag-list page'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum tags per page, 1–100'),
+      listId: listIdSchema,
       action: z.enum(['list', 'create', 'rename', 'delete']).describe('Operation to perform'),
       tag: z
         .string()
@@ -25,10 +35,15 @@ Use **action** to specify the operation: \`list\`, \`create\`, \`rename\`, or \`
   )
   .output(
     z.object({
+      pagingNext: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Cursor for the next tag-list page'),
       tags: z
         .array(z.string())
         .optional()
-        .describe('List of all tags on the list (returned for list action)'),
+        .describe('Tags on this result page (returned for list action)'),
       tag: z.string().optional().describe('The created, renamed, or deleted tag name'),
       deleted: z
         .boolean()
@@ -41,15 +56,16 @@ Use **action** to specify the operation: \`list\`, \`create\`, \`rename\`, or \`
     let { action, listId, tag, newTag } = ctx.input;
 
     if (action === 'list') {
-      let tags = await client.getTags(listId);
+      let result = await client.getTags(listId, ctx.input.startingAfter, ctx.input.limit);
+      let tags = result.data;
       return {
-        output: { tags },
+        output: { tags, pagingNext: result.pagingNext },
         message: `Found ${tags.length} tag(s) on the list.`
       };
     }
 
     if (action === 'create') {
-      if (!tag) throw new Error('Tag name is required for create action.');
+      if (!tag) throw invalid('Tag name is required for create action.');
       let created = await client.createTag(listId, tag);
       return {
         output: { tag: created },
@@ -58,24 +74,24 @@ Use **action** to specify the operation: \`list\`, \`create\`, \`rename\`, or \`
     }
 
     if (action === 'rename') {
-      if (!tag) throw new Error('Tag name is required for rename action.');
-      if (!newTag) throw new Error('New tag name is required for rename action.');
+      if (!tag) throw invalid('Tag name is required for rename action.');
+      if (!newTag) throw invalid('New tag name is required for rename action.');
       let renamed = await client.updateTag(listId, tag, newTag);
       return {
         output: { tag: renamed },
-        message: `Renamed tag from **${tag}** to **${renamed}**.`
+        message: `Renamed tag from **${client.safeText(tag)}** to **${renamed}**.`
       };
     }
 
     if (action === 'delete') {
-      if (!tag) throw new Error('Tag name is required for delete action.');
+      if (!tag) throw invalid('Tag name is required for delete action.');
       await client.deleteTag(listId, tag);
       return {
         output: { deleted: true },
-        message: `Deleted tag **${tag}**.`
+        message: `Deleted tag **${client.safeText(tag)}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw invalid(`Unknown action: ${action}`);
   })
   .build();

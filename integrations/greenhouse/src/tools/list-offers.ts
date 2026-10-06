@@ -1,22 +1,33 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GreenhouseClient } from '../lib/client';
-import { mapOffer } from '../lib/mappers';
+import { mapOffer, offerOutputSchema } from '../lib/mappers';
 import { spec } from '../spec';
-
-export let listOffersTool = SlateTool.create(spec, {
-  name: 'List Offers',
+export const listOffersTool = SlateTool.create(spec, {
   key: 'list_offers',
-  description: `List offers in Greenhouse. Can list all offers globally or filter by a specific application. Supports filtering by status and date ranges.`,
-  tags: { readOnly: true }
+  name: 'List Offers',
+  description:
+    'List offers by application, supported status or one date range. sentAt and startsAt are calendar dates. Sent is not a v3 status.',
+  tags: { readOnly: true, destructive: false }
 })
   .input(
     z.object({
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque nextCursor from the preceding response. Pass cursor alone for subsequent pages.'
+        ),
       applicationId: z
         .string()
         .optional()
         .describe('If provided, list offers only for this application'),
-      page: z.number().optional().describe('Page number for pagination (starts at 1)'),
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy first-page selector. Only page 1 is supported; use cursor for subsequent pages.'
+        ),
       perPage: z
         .number()
         .optional()
@@ -45,56 +56,20 @@ export let listOffersTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      offers: z.array(
-        z.object({
-          offerId: z.string(),
-          version: z.number().nullable(),
-          applicationId: z.string(),
-          candidateId: z.string().nullable(),
-          jobId: z.string().nullable(),
-          status: z.string().nullable(),
-          createdAt: z.string().nullable(),
-          sentAt: z.string().nullable(),
-          resolvedAt: z.string().nullable(),
-          startsAt: z.string().nullable(),
-          customFields: z.record(z.string(), z.any())
-        })
-      ),
-      hasMore: z.boolean()
+      offers: z.array(offerOutputSchema),
+      hasMore: z.boolean(),
+      nextCursor: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GreenhouseClient({
-      token: ctx.auth.token,
-      onBehalfOf: ctx.config.onBehalfOf
-    });
-    let perPage = ctx.input.perPage || 50;
-
-    let results: any[];
-    if (ctx.input.applicationId) {
-      results = await client.listOffersForApplication(
-        Number.parseInt(ctx.input.applicationId, 10)
-      );
-    } else {
-      results = await client.listOffers({
-        page: ctx.input.page,
-        perPage,
-        status: ctx.input.status,
-        createdAfter: ctx.input.createdAfter,
-        createdBefore: ctx.input.createdBefore,
-        updatedAfter: ctx.input.updatedAfter,
-        updatedBefore: ctx.input.updatedBefore
-      });
-    }
-
-    let offers = results.map(mapOffer);
-
+    const page = await new GreenhouseClient(ctx.auth, ctx.config).listOffers(ctx.input);
     return {
       output: {
-        offers,
-        hasMore: !ctx.input.applicationId && results.length >= perPage
+        offers: page.items.map(mapOffer),
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor
       },
-      message: `Found ${offers.length} offer(s)${ctx.input.applicationId ? ` for application ${ctx.input.applicationId}` : ''}.`
+      message: `Retrieved ${page.items.length} result(s).`
     };
   })
   .build();

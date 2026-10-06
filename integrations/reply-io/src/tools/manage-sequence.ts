@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageSequence = SlateTool.create(spec, {
   key: 'manage_sequence',
   description: `Create, update, delete, or control the state of an outreach sequence. Use this to create new sequences, update existing ones, or change a sequence's state (start, pause, archive, delete).`,
   instructions: [
-    'To create a sequence, provide the "name" and "settings" fields. The "sequenceId" is not needed for creation.',
+    'To create a sequence, provide "name" and at least one "steps" entry. Omit settings for provider defaults, or supply the full settings object. The "sequenceId" is not needed for creation.',
     'To update, provide "sequenceId" and any fields to change.',
     'To change state, set "action" to "start", "pause", "archive", or "delete" along with "sequenceId".'
   ],
@@ -28,6 +28,12 @@ export let manageSequence = SlateTool.create(spec, {
       name: z.string().optional().describe('Sequence name (required for create)'),
       scheduleId: z.number().optional().describe('Schedule ID to associate with the sequence'),
       emailAccounts: z.array(z.number()).optional().describe('Email account IDs to use'),
+      steps: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe(
+          'Required for create: at least one documented sequence step. Creation does not start a sequence.'
+        ),
       settings: z
         .object({
           emailsCountPerDay: z.number().optional(),
@@ -52,12 +58,13 @@ export let manageSequence = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let { action, sequenceId, name, scheduleId, emailAccounts, settings } = ctx.input;
+    let client = new Client(ctx.auth);
+    let { action, sequenceId, name, scheduleId, emailAccounts, settings, steps } = ctx.input;
 
     if (action === 'create') {
-      let data: Record<string, any> = { name, settings: settings ?? {} };
-      if (scheduleId) data.scheduleId = scheduleId;
+      let data: Record<string, unknown> = { name, steps };
+      if (settings !== undefined) data.settings = settings;
+      if (scheduleId !== undefined) data.scheduleId = scheduleId;
       if (emailAccounts) data.emailAccounts = emailAccounts;
 
       let sequence = await client.createSequence(data);
@@ -68,13 +75,13 @@ export let manageSequence = SlateTool.create(spec, {
     }
 
     if (!sequenceId) {
-      throw new Error('sequenceId is required for this action');
+      throw createApiServiceError('sequenceId is required for this action');
     }
 
     if (action === 'update') {
       let data: Record<string, any> = {};
-      if (name) data.name = name;
-      if (scheduleId) data.scheduleId = scheduleId;
+      if (name !== undefined) data.name = name;
+      if (scheduleId !== undefined) data.scheduleId = scheduleId;
       if (emailAccounts) data.emailAccounts = emailAccounts;
       if (settings) data.settings = settings;
 
@@ -86,25 +93,25 @@ export let manageSequence = SlateTool.create(spec, {
     }
 
     if (action === 'start') {
-      await client.startSequence(sequenceId);
+      let sequence = await client.startSequence(sequenceId);
       return {
-        output: { sequence: { sequenceId, status: 'Active' } },
+        output: { sequence },
         message: `Started sequence **${sequenceId}**.`
       };
     }
 
     if (action === 'pause') {
-      await client.pauseSequence(sequenceId);
+      let sequence = await client.pauseSequence(sequenceId);
       return {
-        output: { sequence: { sequenceId, status: 'Paused' } },
+        output: { sequence },
         message: `Paused sequence **${sequenceId}**.`
       };
     }
 
     if (action === 'archive') {
-      await client.archiveSequence(sequenceId);
+      let sequence = await client.archiveSequence(sequenceId);
       return {
-        output: { sequence: { sequenceId, status: 'Archived' } },
+        output: { sequence },
         message: `Archived sequence **${sequenceId}**.`
       };
     }

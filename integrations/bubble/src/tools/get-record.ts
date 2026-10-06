@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getRecord = SlateTool.create(spec, {
   name: 'Get Record',
   key: 'get_record',
-  description: `Retrieve a single record by its unique ID from a Bubble data type. Returns all fields of the record including system fields like Created Date and Modified Date.`,
+  description: `Retrieve a single record by its unique ID from a Bubble data type. Returns visible fields, including the exact native ID; privacy rules can hide fields.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -23,15 +23,12 @@ export let getRecord = SlateTool.create(spec, {
       record: z
         .record(z.string(), z.any())
         .describe(
-          'The full record with all field values, including _id, _type, Created Date, Modified Date, and all custom fields.'
+          'Visible record fields, including _id and available provider-managed date fields.'
         )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.appBaseUrl,
-      token: ctx.auth?.token
-    });
+    const client = clientFor(ctx);
 
     let record = await client.getRecord(ctx.input.dataType, ctx.input.recordId);
 

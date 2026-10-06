@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   executeQuery,
+  exportApplication,
   manageApplication,
   manageRow,
   manageTable,
@@ -13,8 +14,6 @@ import {
   searchTables,
   searchUsers
 } from './tools';
-import { inboundWebhook, rowChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,7 +27,8 @@ export let provider = Slate.create({
     searchUsers,
     manageUser,
     searchQueries,
-    executeQuery
+    executeQuery,
+    exportApplication
   ],
-  triggers: [inboundWebhook, rowChanges]
+  triggers: []
 });

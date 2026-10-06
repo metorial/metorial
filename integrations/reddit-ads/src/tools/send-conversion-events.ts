@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import type { ConversionEvent } from '../lib/conversions-client';
+import { id, invalid } from '../lib/contracts';
 import { ConversionsClient } from '../lib/conversions-client';
 import { spec } from '../spec';
 
@@ -31,7 +31,9 @@ let eventSchema = z.object({
   customEventName: z
     .string()
     .optional()
-    .describe('Custom event name (required when trackingType is Custom)'),
+    .describe(
+      'Custom event name (required when trackingType is Custom; up to 64 Unicode characters)'
+    ),
   email: z.string().optional().describe('User email (SHA256-hashed and lowercased)'),
   externalId: z.string().optional().describe('Advertiser-assigned user ID (SHA256-hashed)'),
   uuid: z.string().optional().describe('Reddit Pixel-generated UUID'),
@@ -51,114 +53,69 @@ let eventSchema = z.object({
 export let sendConversionEvents = SlateTool.create(spec, {
   name: 'Send Conversion Events',
   key: 'send_conversion_events',
-  description: `Send server-side conversion events to Reddit's Conversions API. Track purchases, sign-ups, leads, and custom events for attribution back to Reddit ad interactions. Requires a Conversion Access Token and Pixel ID (use the Conversion Access Token auth method).`,
+  description:
+    'Submit irreversible conversion events using deliberately selected CAPI v2 or v3. Preserves prehashed match keys and base-currency value. An HTTP acknowledgment is distinct from attribution or deduplication completion.',
   instructions: [
     'Each event must include at least one attribution signal: clickId, email, externalId, or a combination of ipAddress and userAgent.',
     'Events must have occurred within the last 7 days.',
     'Use SHA256-hashed lowercase values for email, externalId, idfa, and aaid fields.',
     'Set conversionId for deduplication if also using Reddit Pixel.'
   ],
-  constraints: ['Maximum 500 events per batch request.'],
+  constraints: ['Maximum 500 events for legacy v2 or 1000 events for v3.'],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
+      apiVersion: z
+        .enum(['v2', 'v3'])
+        .optional()
+        .describe(
+          'Explicit CAPI version override. Existing unmarked connections default to v2; new conversion connections default to v3.'
+        ),
+      actionSource: z
+        .enum(['WEBSITE', 'APP', 'OTHER', 'PHYSICAL_STORE'])
+        .optional()
+        .describe('Required for v3 events; classifies where the event happened.'),
+      testId: z
+        .string()
+        .optional()
+        .describe('v3 Events Testing identifier; does not erase retained ingestion history.'),
       pixelId: z
         .string()
         .optional()
         .describe('Reddit Pixel ID; uses the one from auth if not provided'),
-      events: z.array(eventSchema).min(1).describe('Conversion events to send (max 500)')
+      events: z
+        .array(eventSchema)
+        .min(1)
+        .describe('Conversion events to submit; 500 for v2 or 1000 for v3')
     })
   )
   .output(
     z.object({
+      apiVersion: z.enum(['v2', 'v3']),
+      acknowledged: z.boolean(),
+      attributionVerified: z.boolean(),
       eventsSent: z.number(),
       response: z.any().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let pixelId = ctx.input.pixelId || ctx.auth.pixelId;
-    if (!pixelId) {
-      throw new Error(
-        'Pixel ID is required. Provide it in the input or use the Conversion Access Token auth method.'
+    const pixelId = ctx.input.pixelId ?? ctx.auth.pixelId;
+    if (pixelId === undefined)
+      invalid(
+        'Provide pixelId or connect with a Conversion Access Token and its authorized Pixel.'
       );
-    }
-
-    let client = new ConversionsClient({
-      token: ctx.auth.token,
-      pixelId
-    });
-
-    let events: ConversionEvent[] = ctx.input.events.map(e => {
-      let event: ConversionEvent = {
-        event_at: e.eventAt,
-        event_type: {
-          tracking_type: e.trackingType,
-          custom_event_name: e.customEventName
-        }
-      };
-
-      if (e.clickId) {
-        event.click_id = e.clickId;
-      }
-
-      let hasUserFields =
-        e.email ||
-        e.externalId ||
-        e.uuid ||
-        e.ipAddress ||
-        e.userAgent ||
-        e.idfa ||
-        e.aaid ||
-        e.screenWidth ||
-        e.screenHeight;
-      if (hasUserFields) {
-        event.user = {};
-        if (e.email) event.user.email = e.email;
-        if (e.externalId) event.user.external_id = e.externalId;
-        if (e.uuid) event.user.uuid = e.uuid;
-        if (e.ipAddress) event.user.ip_address = e.ipAddress;
-        if (e.userAgent) event.user.user_agent = e.userAgent;
-        if (e.idfa) event.user.idfa = e.idfa;
-        if (e.aaid) event.user.aaid = e.aaid;
-        if (e.screenWidth) event.user.screen_width = e.screenWidth;
-        if (e.screenHeight) event.user.screen_height = e.screenHeight;
-      }
-
-      let hasMetadata =
-        e.conversionId ||
-        e.itemCount !== undefined ||
-        e.currency ||
-        e.valueDecimal !== undefined ||
-        (e.products && e.products.length > 0);
-      if (hasMetadata) {
-        event.event_metadata = {};
-        if (e.conversionId) event.event_metadata.conversion_id = e.conversionId;
-        if (e.itemCount !== undefined) event.event_metadata.item_count = e.itemCount;
-        if (e.currency) event.event_metadata.currency = e.currency;
-        if (e.valueDecimal !== undefined) event.event_metadata.value_decimal = e.valueDecimal;
-        if (e.products && e.products.length > 0) {
-          event.event_metadata.products = e.products.map(p => ({
-            id: p.productId,
-            name: p.productName,
-            category: p.productCategory
-          }));
-        }
-      }
-
-      return event;
-    });
-
-    let response = await client.sendConversionEvents(events);
-
+    const result = await new ConversionsClient(
+      ctx.auth,
+      id(pixelId, 'Pixel ID'),
+      ctx.input.apiVersion
+    ).send(ctx.input);
     return {
-      output: {
-        eventsSent: events.length,
-        response
-      },
-      message: `Successfully sent **${events.length}** conversion event(s) to Reddit Conversions API.`
+      output: result,
+      message:
+        'Reddit acknowledged conversion-event submission. Submitted count is not proof of attribution or deduplication completion; do not automatically resend.'
     };
   })
   .build();

@@ -1,27 +1,33 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GhostAdminClient } from '../lib/client';
+import { getClient } from '../lib/client';
+import { invalid, resourceId, validateContentWrite } from '../lib/schemas';
 import { spec } from '../spec';
 
-let postOutputSchema = z.object({
-  postId: z.string().describe('Unique post ID'),
-  uuid: z.string().describe('Post UUID'),
-  title: z.string().describe('Post title'),
-  slug: z.string().describe('URL-friendly slug'),
-  status: z.string().describe('Post status: draft, published, or scheduled'),
-  visibility: z.string().describe('Post visibility level'),
-  featured: z.boolean().describe('Whether the post is featured'),
-  html: z.string().nullable().optional().describe('HTML content'),
-  excerpt: z.string().nullable().describe('Auto-generated excerpt'),
-  customExcerpt: z.string().nullable().describe('Custom excerpt'),
-  featureImage: z.string().nullable().describe('Feature image URL'),
-  metaTitle: z.string().nullable().describe('SEO meta title'),
-  metaDescription: z.string().nullable().describe('SEO meta description'),
-  publishedAt: z.string().nullable().describe('Publication timestamp'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp'),
-  url: z.string().describe('Full URL of the post')
-});
+let postOutputSchema = z
+  .object({
+    postId: z.string().describe('Unique post ID'),
+    uuid: z.string().optional().describe('Post UUID'),
+    title: z.string().optional().describe('Post title'),
+    slug: z.string().optional().describe('URL-friendly slug'),
+    status: z.string().optional().describe('Post status: draft, published, or scheduled'),
+    visibility: z.string().optional().describe('Post visibility level'),
+    featured: z.boolean().optional().describe('Whether the post is featured'),
+    lexical: z.string().nullable().optional().describe('Native Lexical document'),
+    plaintext: z.string().nullable().optional().describe('Native plain text'),
+    html: z.string().nullable().optional().describe('HTML content'),
+    excerpt: z.string().nullable().optional().describe('Auto-generated excerpt'),
+    customExcerpt: z.string().nullable().optional().describe('Custom excerpt'),
+    featureImage: z.string().nullable().optional().describe('Feature image URL'),
+    metaTitle: z.string().nullable().optional().describe('SEO meta title'),
+    metaDescription: z.string().nullable().optional().describe('SEO meta description'),
+    publishedAt: z.string().nullable().optional().describe('Publication timestamp'),
+    createdAt: z.string().optional().describe('Creation timestamp'),
+    updatedAt: z.string().optional().describe('Last update timestamp'),
+    url: z.string().optional().describe('Full URL of the post')
+  })
+  .partial()
+  .required({ postId: true });
 
 export let managePost = SlateTool.create(spec, {
   name: 'Manage Post',
@@ -42,9 +48,15 @@ export let managePost = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      api: z
+        .enum(['admin', 'content'])
+        .optional()
+        .describe(
+          'Read through Admin or published Content API. Writes require Admin. Defaults to the connection type.'
+        ),
       action: z.enum(['create', 'read', 'update', 'delete']).describe('Operation to perform'),
-      postId: z.string().optional().describe('Post ID (required for read/update/delete)'),
-      slug: z.string().optional().describe('Post slug (alternative to postId for reading)'),
+      postId: resourceId.optional().describe('Post ID (required for read/update/delete)'),
+      slug: resourceId.optional().describe('Post slug (alternative to postId for reading)'),
       title: z.string().optional().describe('Post title'),
       html: z.string().optional().describe('HTML content for the post'),
       lexical: z.string().optional().describe('Lexical JSON content for the post'),
@@ -84,15 +96,14 @@ export let managePost = SlateTool.create(spec, {
   )
   .output(postOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GhostAdminClient({
-      domain: ctx.config.adminDomain,
-      apiKey: ctx.auth.token
-    });
+    let client = getClient(ctx, ctx.input.api);
 
     let { action } = ctx.input;
 
     if (action === 'read') {
       let result: any;
+      if (ctx.input.slug && ctx.input.postId)
+        throw invalid('Provide one exact ID or slug, not both.');
       if (ctx.input.slug) {
         result = await client.readPostBySlug(ctx.input.slug, {
           include: 'tags,authors',
@@ -104,7 +115,7 @@ export let managePost = SlateTool.create(spec, {
           formats: 'html'
         });
       } else {
-        throw new Error('Either postId or slug is required for reading a post');
+        throw invalid('Either postId or slug is required for reading a post');
       }
 
       let p = result.posts[0];
@@ -115,7 +126,7 @@ export let managePost = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.postId) throw new Error('postId is required for deleting a post');
+      if (!ctx.input.postId) throw invalid('postId is required for deleting a post');
       await client.deletePost(ctx.input.postId);
       return {
         output: {
@@ -141,6 +152,7 @@ export let managePost = SlateTool.create(spec, {
       };
     }
 
+    validateContentWrite(ctx.input);
     let postData = buildPostData(ctx.input);
     let sourceParams = ctx.input.source ? { source: ctx.input.source } : {};
 
@@ -154,8 +166,8 @@ export let managePost = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.postId) throw new Error('postId is required for updating a post');
-      if (!ctx.input.updatedAt) throw new Error('updatedAt is required for updating a post');
+      if (!ctx.input.postId) throw invalid('postId is required for updating a post');
+      if (!ctx.input.updatedAt) throw invalid('updatedAt is required for updating a post');
       postData.updated_at = ctx.input.updatedAt;
 
       let result = await client.updatePost(ctx.input.postId, postData, sourceParams);
@@ -166,7 +178,7 @@ export let managePost = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw invalid(`Unknown action: ${action}`);
   })
   .build();
 
@@ -211,18 +223,20 @@ let buildPostData = (input: any): Record<string, any> => {
 let mapPost = (p: any) => ({
   postId: p.id,
   uuid: p.uuid,
+  lexical: p.lexical,
+  plaintext: p.plaintext,
   title: p.title,
   slug: p.slug,
   status: p.status,
   visibility: p.visibility,
-  featured: p.featured ?? false,
-  html: p.html ?? null,
-  excerpt: p.excerpt ?? null,
-  customExcerpt: p.custom_excerpt ?? null,
-  featureImage: p.feature_image ?? null,
-  metaTitle: p.meta_title ?? null,
-  metaDescription: p.meta_description ?? null,
-  publishedAt: p.published_at ?? null,
+  featured: p.featured,
+  html: p.html,
+  excerpt: p.excerpt,
+  customExcerpt: p.custom_excerpt,
+  featureImage: p.feature_image,
+  metaTitle: p.meta_title,
+  metaDescription: p.meta_description,
+  publishedAt: p.published_at,
   createdAt: p.created_at,
   updatedAt: p.updated_at,
   url: p.url

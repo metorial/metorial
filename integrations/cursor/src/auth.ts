@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { CurrentAgentsClient } from './lib/current-client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -15,8 +16,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .min(1)
         .describe(
-          'Cursor API key (User API Key or Admin API Key). Generated from your Cursor dashboard.'
+          'Cursor user, service-account, or team Admin API key from Dashboard → API Keys. Admin tools require Enterprise access and admin:* permissions.'
         )
     }),
 
@@ -29,28 +31,9 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let basicAuth = Buffer.from(`${ctx.output.token}:`).toString('base64');
-      let client = createAxios({
-        baseURL: 'https://api.cursor.com'
-      });
-
-      try {
-        let response = await client.get('/v0/me', {
-          headers: {
-            Authorization: `Basic ${basicAuth}`
-          }
-        });
-
-        return {
-          profile: {
-            email: response.data.userEmail,
-            name: response.data.apiKeyName
-          }
-        };
-      } catch {
-        return {
-          profile: {}
-        };
-      }
+      let info = await new CurrentAgentsClient(ctx.output).getApiKeyInfo();
+      return {
+        profile: { email: info.userEmail, name: info.apiKeyName }
+      };
     }
   });

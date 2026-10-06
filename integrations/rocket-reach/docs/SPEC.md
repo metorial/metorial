@@ -1,86 +1,28 @@
-# Slates Specification for RocketReach
+# RocketReach API coverage
 
-## Overview
+Reviewed October 5, 2026. This package preserves six API-key REST tools. Base origin: `https://api.rocketreach.co`; prefix: `/api/v2`; authentication: `Api-Key` header. The separate provider MCP service uses OAuth and is not this REST connection.
 
-RocketReach is a contact data and business intelligence platform that provides access to verified email addresses, phone numbers, and social media links for over 700 million professionals and 60 million companies. It offers search and lookup APIs for people and company data enrichment, primarily used for lead generation, prospecting, and CRM enrichment.
+| Tool | Request | Effect |
+| --- | --- | --- |
+| `get_account` | `GET /account` | Read account identity, supplied credit/rate data; omit credential fields |
+| `search_people` | `POST /search` | Preview people with array-valued query filters |
+| `lookup_person` | `GET /person/lookup` | Enrich one identified person, possibly spend credits and retain history |
+| `check_lookup_status` | `GET /person/checkStatus?ids=ID&ids=ID` | Read already-requested lookup results |
+| `search_companies` | `POST /searchCompany` | Preview companies |
+| `lookup_company` | `GET /company/lookup` | Enrich a company; Company Export access and charges may apply |
 
-## Authentication
+The official Python SDK confirms the account and person routes, 1-based search offsets, `page_size`, array-valued query filters, `profiles`, `pagination.next`, repeated `ids` parameters, asynchronous enrichment and HTTP 429 handling. The official September 2026 MCP plugin confirms people/company preview and enrichment workflows, free preview searches, company-export prerequisites and varied credit types. It is not an HTTP specification: company routes retain the existing implementation because no accessible current primary source establishes a replacement. All provider responses are validated before mapping; absent fields are not invented. Person search IDs may be absent, so keep other supplied identifiers.
 
-Every request to the RocketReach API requires an API Key for authentication. All API calls require the API Key to be included in the request header.
+`start` accepts integer values from 1 to 10000 and `pageSize` from 1 to 100. These are runtime validations while the original public number schemas remain unchanged. Returned pagination fields come from the provider, including `nextStart`. A missing continuation is unknown; null or zero indicates no next page. Keep the same filters across pages.
 
-**Method:** API Key (passed as a custom header)
+Person enrichment accepts a profile ID, LinkedIn URL, email, or name plus employer. Unknown status strings remain forward compatible. Only `complete` means completion; pending/queued/waiting/searching/progress require status-only polling. Failed or unfamiliar states are never silently completed. No automatic enrichment retry occurs. Default external account webhooks may be configured outside this package; verify their effects before enrichment.
 
-- **Header name:** `Api-Key`
-- **Header value:** Your generated API key
-- To create a RocketReach API key, go to Account Settings and click "Generate New API Key."
+Account responses can contain API keys; only explicitly mapped identity and usage fields are returned. HTTP failures preserve a safe status without returning provider bodies, request headers or credential-bearing causes. Redirects are rejected, timeouts are bounded, and credentials stay in the authentication header.
 
-**Example:**
+## Primary evidence and limits
 
-```
-Api-Key: YOUR_API_KEY
-```
+- [Official Python SDK](https://github.com/rocketreach/rocketreach_python), current `main` reviewed October 5, 2026; [published SDK 2.1.8](https://pypi.org/project/rocketreach/), released March 26, 2025.
+- [Person gateway](https://github.com/rocketreach/rocketreach_python/blob/main/rocketreach/person_gateway.py), [search paginator](https://github.com/rocketreach/rocketreach_python/blob/main/rocketreach/person_search.py), [API-key gateway](https://github.com/rocketreach/rocketreach_python/blob/main/rocketreach/gateway.py), [account model](https://github.com/rocketreach/rocketreach_python/blob/main/rocketreach/account.py).
+- [Official MCP plugin](https://github.com/rocketreach/rocketreach-mcp-plugin), [preview search guidance](https://github.com/rocketreach/rocketreach-mcp-plugin/blob/main/skills/build-list/SKILL.md), [person enrichment](https://github.com/rocketreach/rocketreach-mcp-plugin/blob/main/skills/enrich-person/SKILL.md), [company enrichment](https://github.com/rocketreach/rocketreach-mcp-plugin/blob/main/skills/enrich-company/SKILL.md).
 
-**Base URL:** `https://api.rocketreach.co/api/v2/`
-
-If the API Key is missing or invalid, you will receive a 401 Unauthorized error.
-
-No OAuth or other authentication methods are supported. The API key is the sole authentication mechanism.
-
-## Features
-
-### People Search
-
-You can search for people by name, job title, company, LinkedIn URL, and location. You can refine searches using exact matches, exclusions, and ordering filters. Search results do not include contact details — you must use the Lookup API to retrieve emails or phone numbers. API searches do not deduct lookup or export credits — only contact retrieval does.
-
-### People Lookup (Contact Enrichment)
-
-The API allows you to retrieve contact details, including email addresses, phone numbers, and social media links, for professionals based on their name, company, LinkedIn URL, or other identifiers.
-
-- Lookups can be performed using name + employer, LinkedIn URL, or a RocketReach profile ID.
-- Lookup credits are deducted only when contact information is successfully retrieved.
-- Lookups may take time to process, so you may need to check the status before retrieving results.
-- You can set an email preference (personal vs. professional) in Account Settings. Only that type will be shown, and credits are only charged if it's found.
-
-### Bulk People Lookup
-
-Bulk lookups allow you to retrieve contact information for multiple people in a single API request.
-
-- Bulk lookups require at least 10 profiles per request. Up to 100 profiles can be retrieved in a single request. You must set up a webhook to receive bulk lookup results.
-
-### Company Search
-
-Find and filter millions of business records. Supports queries by name, domain, industry, and location.
-
-- Company lookups require a separate purchase of Company Exports.
-
-### Company Lookup (Firmographic Enrichment)
-
-You can search for companies using domain, name, or LinkedIn URL. Company lookups return metadata such as industry, size, revenue, and social links.
-
-- Additional data includes technographics, funding history, and key team members.
-- Company lookups do not return direct contact information for employees. To find contacts at a company, use the People Search API after retrieving company metadata.
-
-### Combined People and Company Lookup
-
-A single endpoint that retrieves both a person's contact details and their current company's metadata in one request.
-
-### Suppression Lists
-
-You can suppress (hide) certain profiles from search by uploading a Suppression List (via LinkedIn URL or Name & Company) in Account Settings.
-
-### Account Management
-
-You can use the /v2/account endpoint to view current usage. This includes tracking credits consumed and remaining.
-
-## Events
-
-Webhooks automate API workflows by sending results to your server once a lookup is complete. You must configure a callback URL in your API settings to receive webhook notifications.
-
-### Lookup Completion
-
-When performing a person lookup or bulk lookup, include your webhook ID in the API request. Once the lookup completes, RocketReach will send the results to your webhook URL automatically.
-
-- Webhooks are configured in the RocketReach API Usage & Settings page, where you specify a callback URL and select which endpoints to enable.
-- If no webhook ID is provided in the request, the value will default to your top-most enabled webhook.
-- Webhook responses can be verified using an HMAC-SHA256 signature with a generated secret, delivered via the `X-RocketReach-Signature` header.
-- RocketReach retries failed webhooks multiple times.
+The documentation website could not be opened by the web tool and browser security policy blocked the site. No bypass was attempted. New Universal Credits HTTP contracts, exact company-route currentness, current rate thresholds and plan-specific billing have not been verified against that reference. There is no provider-retirement claim. The existing six tools are retained; unverified API families, bulk operations and credential administration are outside this refresh.

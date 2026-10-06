@@ -1,6 +1,6 @@
 {
   "name": "@metorial/sprout-social",
-  "description": "Manage social media presence across X, Facebook, Instagram, LinkedIn, YouTube, TikTok, Pinterest, Threads, and Bluesky. Retrieve profile analytics including impressions, follower counts, engagement, and video views. Access post-level performance metrics such as reactions, comments, and shares. Retrieve messages (posts, comments, DMs, mentions, reviews) received or published by owned profiles. Create draft publishing posts with scheduled delivery times, media attachments, and tags targeting multiple profiles and networks. Upload media files for use in posts. Query social listening topics for earned media data including sentiment, engagement, and volume metrics. Manage customer care cases filtered by status, priority, type, queue, and assigned user. Retrieve account metadata including connected profiles, groups, tags, users, teams, and listening topics.",
+  "description": "Discover authorized customers and connected profiles. Retrieve profile and post analytics, social messages, Listening data and customer care cases, subject to provider permissions and network availability. Prepare draft calendar entries with optional schedules, media and tags; upload media for draft use. Draft creation does not publish or confirm delivery.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools", "news-and-media"],
   "skills": [
     "retrieve profile analytics",
@@ -9,10 +9,9 @@
     "create draft posts",
     "upload media files",
     "query social listening data",
-    "manage customer care cases",
+    "retrieve customer care cases",
     "retrieve account metadata",
-    "filter audience demographics",
-    "schedule social posts"
+    "prepare scheduled drafts"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/sprout-social.png"
 }

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { EosGameServicesClient } from '../lib/client';
+import { gameClient } from '../lib/client';
 import { spec } from '../spec';
 
 let accountSchema = z.object({
@@ -70,62 +70,36 @@ Use this to map between platform-specific accounts (Steam, PlayStation, Xbox, et
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EosGameServicesClient({
-      token: ctx.auth.token,
-      deploymentId: ctx.config.deploymentId
-    });
-
-    let result: {
-      externalToProductUser?: Record<string, string>;
-      productUserAccounts?: Record<
-        string,
-        Array<{
-          accountId: string;
-          identityProviderId: string;
-          displayName?: string;
-          lastLogin?: string;
-        }>
-      >;
-    } = {};
-
-    if (ctx.input.externalAccountIds && ctx.input.externalAccountIds.length > 0) {
-      if (!ctx.input.identityProvider) {
-        throw new Error('identityProvider is required when looking up external account IDs');
-      }
-      let data = await client.queryExternalAccounts(
-        ctx.input.externalAccountIds,
-        ctx.input.identityProvider,
-        ctx.input.environment
+    if (!ctx.input.externalAccountIds?.length && !ctx.input.productUserIds?.length)
+      throw createApiServiceError(
+        'Supply Product User IDs or external account IDs to resolve.'
       );
-      result.externalToProductUser = data.ids ?? {};
-    }
-
-    if (ctx.input.productUserIds && ctx.input.productUserIds.length > 0) {
-      let data = await client.queryProductUsers(ctx.input.productUserIds);
-      let accounts: Record<
-        string,
-        Array<{
-          accountId: string;
-          identityProviderId: string;
-          displayName?: string;
-          lastLogin?: string;
-        }>
-      > = {};
-      if (data.productUsers) {
-        for (let [puid, userInfo] of Object.entries(
-          data.productUsers as Record<string, any>
-        )) {
-          accounts[puid] = userInfo.accounts ?? [];
-        }
-      }
-      result.productUserAccounts = accounts;
-    }
-
-    let totalLookups =
-      (ctx.input.externalAccountIds?.length ?? 0) + (ctx.input.productUserIds?.length ?? 0);
+    if (ctx.input.externalAccountIds?.length && !ctx.input.identityProvider)
+      throw createApiServiceError('identityProvider is required for external-account lookup.');
+    if (ctx.input.environment && !ctx.input.externalAccountIds?.length)
+      throw createApiServiceError('environment applies only to external-account lookup.');
+    const client = gameClient(ctx);
+    const external = ctx.input.externalAccountIds?.length
+      ? await client.queryExternalAccounts(
+          ctx.input.externalAccountIds,
+          ctx.input.identityProvider!,
+          ctx.input.environment
+        )
+      : undefined;
+    const users = ctx.input.productUserIds?.length
+      ? await client.queryProductUsers(ctx.input.productUserIds)
+      : undefined;
     return {
-      output: result,
-      message: `Resolved **${totalLookups}** identity lookups across EOS Product Users and external accounts.`
+      output: {
+        externalToProductUser: external?.ids,
+        productUserAccounts: users
+          ? Object.fromEntries(
+              Object.entries(users.productUsers).map(([id, row]) => [id, row.accounts])
+            )
+          : undefined
+      },
+      message:
+        'Returned the resolved identity mappings. Unmatched IDs are omitted by Epic; no account creation occurred.'
     };
   })
   .build();

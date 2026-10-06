@@ -1,45 +1,35 @@
 import { SlateTool } from 'slates';
-import { z } from 'zod';
-import { NangoClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { connectionId, integrationId, jsonObject, text, z } from '../lib/schemas';
 import { spec } from '../spec';
-
-export let triggerAction = SlateTool.create(spec, {
+export const triggerAction = SlateTool.create(spec, {
   name: 'Trigger Action',
   key: 'trigger_action',
-  description: `Execute an on-demand action function against an external API through Nango. Actions are one-off operations like creating a record or sending a message, defined as TypeScript functions deployed to Nango. The action runs with the credentials of the specified connection.`
+  description:
+    'Execute one deployed Nango action synchronously for an exact connection/integration pair. Call list_functions for native action names and required input. This can write to the connected provider or send messages; effects may remain after a timeout. No automatic retry occurs. Recognized credential fields are redacted from the returned result.'
 })
   .input(
     z.object({
-      connectionId: z.string().describe('The connection ID to execute the action for'),
-      providerConfigKey: z.string().describe('The integration ID (unique key)'),
-      actionName: z.string().describe('Name of the action to execute'),
-      actionInput: z
-        .record(z.string(), z.any())
+      connectionId,
+      providerConfigKey: integrationId,
+      actionName: text.describe('Exact deployed action name from list_functions.'),
+      actionInput: jsonObject
         .optional()
-        .describe('Input parameters for the action')
+        .describe(
+          'Provider function input following its deployed schema; no credential fields.'
+        )
     })
   )
-  .output(
-    z.object({
-      actionResult: z.any().describe('The result returned by the action function')
-    })
-  )
+  .output(z.object({ actionResult: z.unknown() }))
   .handleInvocation(async ctx => {
-    let client = new NangoClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let result = await client.triggerAction({
-      connectionId: ctx.input.connectionId,
-      providerConfigKey: ctx.input.providerConfigKey,
-      actionName: ctx.input.actionName,
+    const result = await clientFor(ctx).triggerAction({
+      ...ctx.input,
       input: ctx.input.actionInput
     });
-
     return {
       output: { actionResult: result },
-      message: `Executed action **${ctx.input.actionName}** on connection **${ctx.input.connectionId}**.`
+      message:
+        'Nango returned the synchronous action result. Verify any provider-specific effects independently.'
     };
   })
   .build();

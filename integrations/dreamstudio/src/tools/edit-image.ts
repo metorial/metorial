@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let editImage = SlateTool.create(spec, {
   name: 'Edit Image',
   key: 'edit_image',
-  description: `Edit images using various AI-powered tools. Supports multiple editing operations:
+  description: `DEPRECATED — use \`transform_image\` instead. Edit images using various AI-powered tools. Supports multiple editing operations:
 - **inpaint**: Replace specific masked areas with new content
 - **erase**: Remove unwanted elements using a mask
 - **outpaint**: Extend the image beyond its boundaries
@@ -14,6 +14,7 @@ export let editImage = SlateTool.create(spec, {
 - **search_and_recolor**: Change colors of specific objects via text prompts
 - **remove_background**: Segment the foreground and remove the background`,
   instructions: [
+    'Use transform_image to receive a downloadable file with current generation controls.',
     'For inpaint and erase, provide a mask image (base64) where white areas indicate regions to edit and black areas are preserved.',
     'For outpaint, at least one direction (left, right, up, down) must have a non-zero pixel value.',
     'For search_and_replace, provide both a searchPrompt (what to find) and prompt (what to replace it with).',
@@ -25,6 +26,7 @@ export let editImage = SlateTool.create(spec, {
     'Supported input formats: JPEG, PNG, WebP.'
   ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }
@@ -208,7 +210,7 @@ export let editImage = SlateTool.create(spec, {
         break;
 
       default:
-        throw new Error(`Unknown edit operation: ${input.operation}`);
+        throw createApiServiceError(`Unknown edit operation: ${input.operation}`);
     }
 
     return {

@@ -9,8 +9,6 @@ import {
   listSentEmails,
   updateSubscriberStatus
 } from './tools';
-import { inboundWebhook, newSentEmail } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     listSentEmails,
     getEmailAnalytics
   ],
-  triggers: [inboundWebhook, newSentEmail]
+  triggers: []
 });

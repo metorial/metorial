@@ -53,16 +53,16 @@ Returns insight metadata, data series with their time-series points, and process
   .output(
     z.object({
       insights: z.array(insightViewSchema),
-      totalCount: z.number(),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Native total count, when supplied by the deployment.'),
       hasNextPage: z.boolean(),
       endCursor: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
     let data = await client.listInsightViews({
       first: ctx.input.first,
@@ -70,30 +70,30 @@ Returns insight metadata, data series with their time-series points, and process
     });
 
     let views = data.insightViews;
-    let insights = (views.nodes || []).map((n: any) => ({
+    let insights = (views.nodes || []).map(n => ({
       insightViewId: n.id,
       title: n.title,
-      description: n.description || undefined,
-      includeRepoRegex: n.defaultFilters?.includeRepoRegex || undefined,
-      excludeRepoRegex: n.defaultFilters?.excludeRepoRegex || undefined,
-      dataSeries: (n.dataSeries || []).map((ds: any) => ({
+
+      includeRepoRegex: n.defaultFilters?.includeRepoRegex ?? undefined,
+      excludeRepoRegex: n.defaultFilters?.excludeRepoRegex ?? undefined,
+      dataSeries: (n.dataSeries || []).map(ds => ({
         label: ds.label,
-        points: ds.points?.map((p: any) => ({
+        points: ds.points?.map(p => ({
           dateTime: p.dateTime,
           value: p.value
         })),
-        status: ds.status || undefined
+        status: ds.status ?? undefined
       }))
     }));
 
     return {
       output: {
         insights,
-        totalCount: views.totalCount || 0,
-        hasNextPage: views.pageInfo?.hasNextPage || false,
-        endCursor: views.pageInfo?.endCursor || undefined
+        totalCount: views.totalCount,
+        hasNextPage: views.pageInfo.hasNextPage,
+        endCursor: views.pageInfo?.endCursor ?? undefined
       },
-      message: `Found **${views.totalCount}** code insights. Showing ${insights.length}.`
+      message: `Returned **${insights.length}** visible code insights from this page.`
     };
   })
   .build();
@@ -102,7 +102,7 @@ export let createCodeInsight = SlateTool.create(spec, {
   name: 'Create Code Insight',
   key: 'create_code_insight',
   description: `Create a new line chart search insight that tracks code patterns over time.
-Define one or more data series, each with a search query and label. Optionally scope to specific repositories and set a time interval.`,
+Define one or more data series, each with a search query and label. Optionally scope to specific repositories and set a time interval. Creation schedules persistent historical searches; deletion does not undo completed backfill work or notifications.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -119,7 +119,9 @@ Define one or more data series, each with a search query and label. Optionally s
             repositories: z
               .array(z.string())
               .optional()
-              .describe('Scope to specific repository names. Omit for all repositories.'),
+              .describe(
+                'Scope to specific repository names. Omitted or empty means all visible repositories; creation schedules persistent historical searches.'
+              ),
             stepInterval: z
               .enum(['HOUR', 'DAY', 'WEEK', 'MONTH', 'YEAR'])
               .optional()
@@ -152,37 +154,13 @@ Define one or more data series, each with a search query and label. Optionally s
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
-    let input: any = {
+    const input = {
       title: ctx.input.title,
-      dataSeries: ctx.input.dataSeries.map(ds => {
-        let series: any = {
-          query: ds.query,
-          label: ds.label
-        };
-        if (ds.repositories) {
-          series.repositoryScope = { repositories: ds.repositories };
-        }
-        if (ds.stepInterval && ds.stepValue) {
-          series.timeScope = {
-            stepInterval: ds.stepInterval,
-            stepValue: ds.stepValue
-          };
-        }
-        if (ds.lineColor) {
-          series.lineColor = ds.lineColor;
-        }
-        return series;
-      })
+      dataSeries: ctx.input.dataSeries,
+      dashboardIds: ctx.input.dashboardIds
     };
-
-    if (ctx.input.dashboardIds) {
-      input.dashboards = ctx.input.dashboardIds;
-    }
 
     let data = await client.createLineChartInsight(input);
     let view = data.createLineChartSearchInsight.view;
@@ -191,7 +169,7 @@ Define one or more data series, each with a search query and label. Optionally s
       output: {
         insightViewId: view.id,
         title: view.title,
-        dataSeries: (view.dataSeries || []).map((ds: any) => ({
+        dataSeries: (view.dataSeries || []).map(ds => ({
           label: ds.label
         }))
       },
@@ -220,10 +198,7 @@ export let deleteCodeInsight = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
     await client.deleteInsightView(ctx.input.insightViewId);
 

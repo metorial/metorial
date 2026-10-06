@@ -1,15 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { unsupportedAudit } from '../lib/validation';
 import { spec } from '../spec';
 
 export let queryAuditLogs = SlateTool.create(spec, {
   name: 'Query Audit Logs',
   key: 'query_audit_logs',
-  description: `Query audit logs from an Appsmith instance. Audit logs record notable events including application CRUD, user login/signup, query executions, datasource changes, and configuration updates. **Requires Business or Enterprise edition.**`,
+  description: `DEPRECATED — the historical audit-log route and filters are not verified against the current enterprise API contract. Use Admin Settings > Others > Audit logs on a Business instance`,
   constraints: ['Only available on Appsmith Business and Enterprise editions.'],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(
@@ -44,29 +45,7 @@ export let queryAuditLogs = SlateTool.create(spec, {
       totalCount: z.number().optional().describe('Total number of matching log entries.')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
-
-    let result = await client.queryAuditLogs({
-      resourceType: ctx.input.resourceType,
-      event: ctx.input.event,
-      userId: ctx.input.userId,
-      limit: ctx.input.limit,
-      sortOrder: ctx.input.sortOrder
-    });
-
-    let logs = result?.auditLogs ?? result?.logs ?? (Array.isArray(result) ? result : []);
-    let totalCount = result?.total ?? result?.totalCount ?? logs.length;
-
-    return {
-      output: {
-        logs,
-        totalCount
-      },
-      message: `Retrieved **${logs.length}** audit log entries.`
-    };
+  .handleInvocation(async () => {
+    throw unsupportedAudit();
   })
   .build();

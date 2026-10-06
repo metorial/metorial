@@ -1,6 +1,6 @@
 {
   "name": "@metorial/logdna",
-  "description": "Ingest, search, export, and manage log data from any source. Send log lines with custom metadata, export logs in JSONL format with filtering by time range, hosts, apps, levels, and tags. Create and manage saved views, categories, and dashboards (boards) for log monitoring. Configure preset and view-specific alerts via email, webhook, PagerDuty, or Slack. Set up exclusion rules to filter out unwanted logs, manage archiving to third-party storage like Amazon S3, control ingestion status (suspend/resume), and retrieve aggregated usage reports for apps, hosts, and tags.",
+  "description": "Search and download paginated JSONL log exports, ingest logs with separate credentials, and manage saved views, preset alert templates, boards, categories, exclusion rules, archive configuration, ingestion controls, and byte usage reports.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "ingest log lines",

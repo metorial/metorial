@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,10 @@ import { spec } from '../spec';
 export let updateProject = SlateTool.create(spec, {
   name: 'Update Project',
   key: 'update_project',
-  description: `Update a Scale AI project's parameters, instructions, or ontology. Use this to modify default task parameters or set/update the project's labeling ontology.`,
+  description: `Update a Scale AI project's default task parameters and instructions. Project-level parameters apply to future tasks.`,
+  instructions: [
+    'Publish taxonomy changes in the Scale dashboard. The legacy ontology input is unavailable through the documented API and must be omitted.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -19,7 +22,9 @@ export let updateProject = SlateTool.create(spec, {
       patch: z
         .boolean()
         .optional()
-        .describe('If true, merges with existing parameters instead of replacing them'),
+        .describe(
+          'If true, retains unspecified parameters. Supplied arrays and objects replace their previous values. Defaults to false, replacing all parameters.'
+        ),
       additionalParams: z
         .record(z.string(), z.any())
         .optional()
@@ -30,7 +35,9 @@ export let updateProject = SlateTool.create(spec, {
           labels: z.array(z.any()).describe('List of ontology labels/choices')
         })
         .optional()
-        .describe('Set or update the project ontology')
+        .describe(
+          'Deprecated and unavailable through the documented API. Omit this field and publish taxonomy changes in the Scale dashboard.'
+        )
     })
   )
   .output(
@@ -42,29 +49,21 @@ export let updateProject = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.ontology !== undefined) {
+      throw createApiServiceError(
+        'Ontology updates are unavailable through the documented Scale API. Publish taxonomy changes in the Scale dashboard and omit ontology.'
+      );
+    }
+    if (ctx.input.instruction === undefined && ctx.input.additionalParams === undefined) {
+      throw createApiServiceError(
+        'Provide instruction or additionalParams to update the project.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
-    let result: any;
-
-    if (
-      ctx.input.instruction !== undefined ||
-      ctx.input.patch !== undefined ||
-      ctx.input.additionalParams
-    ) {
-      let params: Record<string, any> = {};
-      if (ctx.input.patch !== undefined) params.patch = ctx.input.patch;
-      if (ctx.input.instruction !== undefined) params.instruction = ctx.input.instruction;
-      if (ctx.input.additionalParams) {
-        Object.assign(params, ctx.input.additionalParams);
-      }
-      result = await client.updateProjectParams(ctx.input.projectName, params);
-    }
-
-    if (ctx.input.ontology) {
-      result = await client.setProjectOntology(ctx.input.projectName, {
-        name: ctx.input.ontology.name,
-        ontology: ctx.input.ontology.labels
-      });
-    }
+    let params: Record<string, unknown> = { ...ctx.input.additionalParams };
+    if (ctx.input.patch !== undefined) params.patch = ctx.input.patch;
+    if (ctx.input.instruction !== undefined) params.instruction = ctx.input.instruction;
+    let result = await client.updateProjectParams(ctx.input.projectName, params);
 
     return {
       output: {

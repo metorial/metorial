@@ -27,8 +27,6 @@ import {
   upsertSmsTemplate,
   upsertVoiceMessage
 } from './tools';
-import { callEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,5 +56,5 @@ export let provider = Slate.create({
     upsertVoiceMessage,
     resetVoiceMessage
   ],
-  triggers: [callEvents]
+  triggers: []
 });

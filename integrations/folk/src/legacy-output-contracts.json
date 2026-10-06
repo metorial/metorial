@@ -1,0 +1,1757 @@
+{
+  "create_company": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "type": "string",
+        "description": "ID of the created company"
+      },
+      "name": {
+        "type": "string",
+        "description": "Company name"
+      },
+      "description": {
+        "type": "string",
+        "description": "Description"
+      },
+      "industry": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Industry"
+      },
+      "fundingRaised": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Funding raised"
+      },
+      "lastFundingDate": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Last funding date"
+      },
+      "foundationYear": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Foundation year"
+      },
+      "employeeRange": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Employee range"
+      },
+      "emails": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Emails"
+      },
+      "phones": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Phone numbers"
+      },
+      "addresses": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Addresses"
+      },
+      "urls": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "URLs"
+      },
+      "groups": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "groupId": {
+              "type": "string"
+            },
+            "groupName": {
+              "type": "string"
+            }
+          },
+          "required": ["groupId", "groupName"],
+          "additionalProperties": false
+        },
+        "description": "Groups"
+      },
+      "createdAt": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Creation timestamp"
+      }
+    },
+    "required": [
+      "companyId",
+      "name",
+      "description",
+      "industry",
+      "fundingRaised",
+      "lastFundingDate",
+      "foundationYear",
+      "employeeRange",
+      "emails",
+      "phones",
+      "addresses",
+      "urls",
+      "groups",
+      "createdAt"
+    ],
+    "additionalProperties": false
+  },
+  "create_deal": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "dealId": {
+        "type": "string",
+        "description": "ID of the created deal"
+      },
+      "name": {
+        "type": "string",
+        "description": "Deal name"
+      },
+      "companies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "companyId": {
+              "type": "string"
+            },
+            "companyName": {
+              "type": "string"
+            }
+          },
+          "required": ["companyId", "companyName"],
+          "additionalProperties": false
+        },
+        "description": "Associated companies"
+      },
+      "people": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "personId": {
+              "type": "string"
+            },
+            "personName": {
+              "type": "string"
+            }
+          },
+          "required": ["personId", "personName"],
+          "additionalProperties": false
+        },
+        "description": "Associated people"
+      },
+      "customFieldValues": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Custom field values"
+      },
+      "createdAt": {
+        "type": "string",
+        "description": "Creation timestamp"
+      }
+    },
+    "required": ["dealId", "name", "companies", "people", "customFieldValues", "createdAt"],
+    "additionalProperties": false
+  },
+  "create_note": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "noteId": {
+        "type": "string",
+        "description": "ID of the created note"
+      },
+      "entityId": {
+        "type": "string",
+        "description": "Entity the note is attached to"
+      },
+      "entityType": {
+        "type": "string",
+        "description": "Type of entity (person, company, etc.)"
+      },
+      "content": {
+        "type": "string",
+        "description": "Note content"
+      },
+      "visibility": {
+        "type": "string",
+        "description": "Visibility setting"
+      },
+      "authorName": {
+        "type": "string",
+        "description": "Author name"
+      },
+      "authorEmail": {
+        "type": "string",
+        "description": "Author email"
+      },
+      "createdAt": {
+        "type": "string",
+        "description": "Creation timestamp"
+      }
+    },
+    "required": [
+      "noteId",
+      "entityId",
+      "entityType",
+      "content",
+      "visibility",
+      "authorName",
+      "authorEmail",
+      "createdAt"
+    ],
+    "additionalProperties": false
+  },
+  "create_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "personId": {
+        "type": "string",
+        "description": "ID of the created person"
+      },
+      "firstName": {
+        "type": "string",
+        "description": "First name"
+      },
+      "lastName": {
+        "type": "string",
+        "description": "Last name"
+      },
+      "fullName": {
+        "type": "string",
+        "description": "Full name"
+      },
+      "description": {
+        "type": "string",
+        "description": "Description"
+      },
+      "birthday": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Birthday"
+      },
+      "jobTitle": {
+        "type": "string",
+        "description": "Job title"
+      },
+      "emails": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Email addresses"
+      },
+      "phones": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Phone numbers"
+      },
+      "addresses": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Addresses"
+      },
+      "urls": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "URLs"
+      },
+      "groups": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "groupId": {
+              "type": "string"
+            },
+            "groupName": {
+              "type": "string"
+            }
+          },
+          "required": ["groupId", "groupName"],
+          "additionalProperties": false
+        },
+        "description": "Groups the person belongs to"
+      },
+      "companies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "companyId": {
+              "type": "string"
+            },
+            "companyName": {
+              "type": "string"
+            }
+          },
+          "required": ["companyId", "companyName"],
+          "additionalProperties": false
+        },
+        "description": "Associated companies"
+      },
+      "createdAt": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Creation timestamp"
+      }
+    },
+    "required": [
+      "personId",
+      "firstName",
+      "lastName",
+      "fullName",
+      "description",
+      "birthday",
+      "jobTitle",
+      "emails",
+      "phones",
+      "addresses",
+      "urls",
+      "groups",
+      "companies",
+      "createdAt"
+    ],
+    "additionalProperties": false
+  },
+  "create_reminder": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "reminderId": {
+        "type": "string",
+        "description": "ID of the created reminder"
+      },
+      "name": {
+        "type": "string",
+        "description": "Reminder name"
+      },
+      "entityId": {
+        "type": "string",
+        "description": "Associated entity ID"
+      },
+      "entityType": {
+        "type": "string",
+        "description": "Entity type"
+      },
+      "recurrenceRule": {
+        "type": "string",
+        "description": "Recurrence rule"
+      },
+      "visibility": {
+        "type": "string",
+        "description": "Visibility"
+      },
+      "nextTriggerTime": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Next trigger time"
+      },
+      "assignedUsers": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "userId": {
+              "type": "string"
+            },
+            "userName": {
+              "type": "string"
+            },
+            "userEmail": {
+              "type": "string"
+            }
+          },
+          "required": ["userId", "userName", "userEmail"],
+          "additionalProperties": false
+        },
+        "description": "Assigned users"
+      },
+      "createdAt": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Creation timestamp"
+      }
+    },
+    "required": [
+      "reminderId",
+      "name",
+      "entityId",
+      "entityType",
+      "recurrenceRule",
+      "visibility",
+      "nextTriggerTime",
+      "assignedUsers",
+      "createdAt"
+    ],
+    "additionalProperties": false
+  },
+  "delete_company": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "type": "string",
+        "description": "ID of the deleted company"
+      }
+    },
+    "required": ["companyId"],
+    "additionalProperties": false
+  },
+  "delete_deal": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "dealId": {
+        "type": "string",
+        "description": "ID of the deleted deal"
+      }
+    },
+    "required": ["dealId"],
+    "additionalProperties": false
+  },
+  "delete_note": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "noteId": {
+        "type": "string",
+        "description": "ID of the deleted note"
+      }
+    },
+    "required": ["noteId"],
+    "additionalProperties": false
+  },
+  "delete_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "personId": {
+        "type": "string",
+        "description": "ID of the deleted person"
+      }
+    },
+    "required": ["personId"],
+    "additionalProperties": false
+  },
+  "delete_reminder": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "reminderId": {
+        "type": "string",
+        "description": "ID of the deleted reminder"
+      }
+    },
+    "required": ["reminderId"],
+    "additionalProperties": false
+  },
+  "get_company": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "type": "string",
+        "description": "ID of the company"
+      },
+      "name": {
+        "type": "string",
+        "description": "Company name"
+      },
+      "description": {
+        "type": "string",
+        "description": "Description"
+      },
+      "industry": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Industry"
+      },
+      "fundingRaised": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Funding raised"
+      },
+      "lastFundingDate": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Last funding date"
+      },
+      "foundationYear": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Foundation year"
+      },
+      "employeeRange": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Employee range"
+      },
+      "emails": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Emails"
+      },
+      "phones": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Phone numbers"
+      },
+      "addresses": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Addresses"
+      },
+      "urls": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "URLs"
+      },
+      "groups": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "groupId": {
+              "type": "string"
+            },
+            "groupName": {
+              "type": "string"
+            }
+          },
+          "required": ["groupId", "groupName"],
+          "additionalProperties": false
+        },
+        "description": "Groups"
+      },
+      "customFieldValues": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Custom field values"
+      },
+      "createdAt": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Creation timestamp"
+      }
+    },
+    "required": [
+      "companyId",
+      "name",
+      "description",
+      "industry",
+      "fundingRaised",
+      "lastFundingDate",
+      "foundationYear",
+      "employeeRange",
+      "emails",
+      "phones",
+      "addresses",
+      "urls",
+      "groups",
+      "customFieldValues",
+      "createdAt"
+    ],
+    "additionalProperties": false
+  },
+  "get_deal": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "dealId": {
+        "type": "string",
+        "description": "ID of the deal"
+      },
+      "name": {
+        "type": "string",
+        "description": "Deal name"
+      },
+      "companies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "companyId": {
+              "type": "string"
+            },
+            "companyName": {
+              "type": "string"
+            }
+          },
+          "required": ["companyId", "companyName"],
+          "additionalProperties": false
+        },
+        "description": "Associated companies"
+      },
+      "people": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "personId": {
+              "type": "string"
+            },
+            "personName": {
+              "type": "string"
+            }
+          },
+          "required": ["personId", "personName"],
+          "additionalProperties": false
+        },
+        "description": "Associated people"
+      },
+      "customFieldValues": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Custom field values"
+      },
+      "createdAt": {
+        "type": "string",
+        "description": "Creation timestamp"
+      }
+    },
+    "required": ["dealId", "name", "companies", "people", "customFieldValues", "createdAt"],
+    "additionalProperties": false
+  },
+  "get_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "personId": {
+        "type": "string",
+        "description": "ID of the person"
+      },
+      "firstName": {
+        "type": "string",
+        "description": "First name"
+      },
+      "lastName": {
+        "type": "string",
+        "description": "Last name"
+      },
+      "fullName": {
+        "type": "string",
+        "description": "Full name"
+      },
+      "description": {
+        "type": "string",
+        "description": "Description"
+      },
+      "birthday": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Birthday"
+      },
+      "jobTitle": {
+        "type": "string",
+        "description": "Job title"
+      },
+      "emails": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Email addresses"
+      },
+      "phones": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Phone numbers"
+      },
+      "addresses": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Addresses"
+      },
+      "urls": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "URLs"
+      },
+      "groups": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "groupId": {
+              "type": "string"
+            },
+            "groupName": {
+              "type": "string"
+            }
+          },
+          "required": ["groupId", "groupName"],
+          "additionalProperties": false
+        },
+        "description": "Groups"
+      },
+      "companies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "companyId": {
+              "type": "string"
+            },
+            "companyName": {
+              "type": "string"
+            }
+          },
+          "required": ["companyId", "companyName"],
+          "additionalProperties": false
+        },
+        "description": "Associated companies"
+      },
+      "customFieldValues": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Custom field values"
+      },
+      "createdAt": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Creation timestamp"
+      }
+    },
+    "required": [
+      "personId",
+      "firstName",
+      "lastName",
+      "fullName",
+      "description",
+      "birthday",
+      "jobTitle",
+      "emails",
+      "phones",
+      "addresses",
+      "urls",
+      "groups",
+      "companies",
+      "customFieldValues",
+      "createdAt"
+    ],
+    "additionalProperties": false
+  },
+  "list_companies": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "companyId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "industry": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "employeeRange": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "emails": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "phones": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "groupId": {
+                    "type": "string"
+                  },
+                  "groupName": {
+                    "type": "string"
+                  }
+                },
+                "required": ["groupId", "groupName"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "companyId",
+            "name",
+            "industry",
+            "employeeRange",
+            "emails",
+            "phones",
+            "groups"
+          ],
+          "additionalProperties": false
+        },
+        "description": "List of companies"
+      },
+      "nextCursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Cursor for next page, null if no more results"
+      }
+    },
+    "required": ["companies", "nextCursor"],
+    "additionalProperties": false
+  },
+  "list_custom_fields": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "customFields": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "fieldName": {
+              "type": "string",
+              "description": "Field name"
+            },
+            "fieldType": {
+              "type": "string",
+              "description": "Field type (textField, numericField, dateField, singleSelect, multipleSelect, userField, contactField, objectField, magicField)"
+            },
+            "options": {
+              "description": "Available options for select fields",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "color": {
+                    "type": "string"
+                  }
+                },
+                "required": ["label", "color"],
+                "additionalProperties": false
+              }
+            },
+            "config": {
+              "description": "Field configuration",
+              "type": "object",
+              "properties": {
+                "format": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": ["fieldName", "fieldType"],
+          "additionalProperties": false
+        },
+        "description": "List of custom fields"
+      },
+      "nextCursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Cursor for next page"
+      }
+    },
+    "required": ["customFields", "nextCursor"],
+    "additionalProperties": false
+  },
+  "list_deals": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "deals": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "dealId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "companies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "companyId": {
+                    "type": "string"
+                  },
+                  "companyName": {
+                    "type": "string"
+                  }
+                },
+                "required": ["companyId", "companyName"],
+                "additionalProperties": false
+              }
+            },
+            "people": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "personId": {
+                    "type": "string"
+                  },
+                  "personName": {
+                    "type": "string"
+                  }
+                },
+                "required": ["personId", "personName"],
+                "additionalProperties": false
+              }
+            },
+            "customFieldValues": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            "createdAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "dealId",
+            "name",
+            "companies",
+            "people",
+            "customFieldValues",
+            "createdAt"
+          ],
+          "additionalProperties": false
+        },
+        "description": "List of deals"
+      },
+      "nextCursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Cursor for next page, null if no more results"
+      }
+    },
+    "required": ["deals", "nextCursor"],
+    "additionalProperties": false
+  },
+  "list_groups": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "groups": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "groupId": {
+              "type": "string"
+            },
+            "groupName": {
+              "type": "string"
+            }
+          },
+          "required": ["groupId", "groupName"],
+          "additionalProperties": false
+        },
+        "description": "List of groups"
+      },
+      "nextCursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Cursor for next page"
+      }
+    },
+    "required": ["groups", "nextCursor"],
+    "additionalProperties": false
+  },
+  "list_notes": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "notes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "noteId": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "visibility": {
+              "type": "string"
+            },
+            "authorName": {
+              "type": "string"
+            },
+            "authorEmail": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "parentNoteId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "noteId",
+            "content",
+            "visibility",
+            "authorName",
+            "authorEmail",
+            "createdAt",
+            "parentNoteId"
+          ],
+          "additionalProperties": false
+        },
+        "description": "List of notes"
+      },
+      "nextCursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Cursor for next page"
+      }
+    },
+    "required": ["notes", "nextCursor"],
+    "additionalProperties": false
+  },
+  "list_people": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "people": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "personId": {
+              "type": "string"
+            },
+            "firstName": {
+              "type": "string"
+            },
+            "lastName": {
+              "type": "string"
+            },
+            "fullName": {
+              "type": "string"
+            },
+            "jobTitle": {
+              "type": "string"
+            },
+            "emails": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "phones": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "groupId": {
+                    "type": "string"
+                  },
+                  "groupName": {
+                    "type": "string"
+                  }
+                },
+                "required": ["groupId", "groupName"],
+                "additionalProperties": false
+              }
+            },
+            "companies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "companyId": {
+                    "type": "string"
+                  },
+                  "companyName": {
+                    "type": "string"
+                  }
+                },
+                "required": ["companyId", "companyName"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "personId",
+            "firstName",
+            "lastName",
+            "fullName",
+            "jobTitle",
+            "emails",
+            "phones",
+            "groups",
+            "companies"
+          ],
+          "additionalProperties": false
+        },
+        "description": "List of people"
+      },
+      "nextCursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Cursor for next page, null if no more results"
+      }
+    },
+    "required": ["people", "nextCursor"],
+    "additionalProperties": false
+  },
+  "list_reminders": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "reminders": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "reminderId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "recurrenceRule": {
+              "type": "string"
+            },
+            "visibility": {
+              "type": "string"
+            },
+            "nextTriggerTime": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lastTriggerTime": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "assignedUsers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string"
+                  },
+                  "userName": {
+                    "type": "string"
+                  },
+                  "userEmail": {
+                    "type": "string"
+                  }
+                },
+                "required": ["userId", "userName", "userEmail"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "reminderId",
+            "name",
+            "recurrenceRule",
+            "visibility",
+            "nextTriggerTime",
+            "lastTriggerTime",
+            "assignedUsers"
+          ],
+          "additionalProperties": false
+        },
+        "description": "List of reminders"
+      },
+      "nextCursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Cursor for next page"
+      }
+    },
+    "required": ["reminders", "nextCursor"],
+    "additionalProperties": false
+  },
+  "update_company": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "type": "string",
+        "description": "ID of the updated company"
+      },
+      "name": {
+        "type": "string",
+        "description": "Company name"
+      },
+      "description": {
+        "type": "string",
+        "description": "Description"
+      },
+      "industry": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Industry"
+      },
+      "fundingRaised": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Funding raised"
+      },
+      "lastFundingDate": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Last funding date"
+      },
+      "foundationYear": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Foundation year"
+      },
+      "employeeRange": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Employee range"
+      },
+      "emails": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Emails"
+      },
+      "phones": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Phone numbers"
+      },
+      "addresses": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Addresses"
+      },
+      "urls": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "URLs"
+      },
+      "groups": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "groupId": {
+              "type": "string"
+            },
+            "groupName": {
+              "type": "string"
+            }
+          },
+          "required": ["groupId", "groupName"],
+          "additionalProperties": false
+        },
+        "description": "Groups"
+      }
+    },
+    "required": [
+      "companyId",
+      "name",
+      "description",
+      "industry",
+      "fundingRaised",
+      "lastFundingDate",
+      "foundationYear",
+      "employeeRange",
+      "emails",
+      "phones",
+      "addresses",
+      "urls",
+      "groups"
+    ],
+    "additionalProperties": false
+  },
+  "update_deal": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "dealId": {
+        "type": "string",
+        "description": "ID of the updated deal"
+      },
+      "name": {
+        "type": "string",
+        "description": "Deal name"
+      },
+      "companies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "companyId": {
+              "type": "string"
+            },
+            "companyName": {
+              "type": "string"
+            }
+          },
+          "required": ["companyId", "companyName"],
+          "additionalProperties": false
+        },
+        "description": "Associated companies"
+      },
+      "people": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "personId": {
+              "type": "string"
+            },
+            "personName": {
+              "type": "string"
+            }
+          },
+          "required": ["personId", "personName"],
+          "additionalProperties": false
+        },
+        "description": "Associated people"
+      },
+      "customFieldValues": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Custom field values"
+      }
+    },
+    "required": ["dealId", "name", "companies", "people", "customFieldValues"],
+    "additionalProperties": false
+  },
+  "update_note": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "noteId": {
+        "type": "string",
+        "description": "ID of the updated note"
+      },
+      "content": {
+        "type": "string",
+        "description": "Updated content"
+      },
+      "visibility": {
+        "type": "string",
+        "description": "Updated visibility"
+      }
+    },
+    "required": ["noteId", "content", "visibility"],
+    "additionalProperties": false
+  },
+  "update_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "personId": {
+        "type": "string",
+        "description": "ID of the updated person"
+      },
+      "firstName": {
+        "type": "string",
+        "description": "First name"
+      },
+      "lastName": {
+        "type": "string",
+        "description": "Last name"
+      },
+      "fullName": {
+        "type": "string",
+        "description": "Full name"
+      },
+      "description": {
+        "type": "string",
+        "description": "Description"
+      },
+      "birthday": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Birthday"
+      },
+      "jobTitle": {
+        "type": "string",
+        "description": "Job title"
+      },
+      "emails": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Email addresses"
+      },
+      "phones": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Phone numbers"
+      },
+      "addresses": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Addresses"
+      },
+      "urls": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "URLs"
+      },
+      "groups": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "groupId": {
+              "type": "string"
+            },
+            "groupName": {
+              "type": "string"
+            }
+          },
+          "required": ["groupId", "groupName"],
+          "additionalProperties": false
+        },
+        "description": "Groups the person belongs to"
+      },
+      "companies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "companyId": {
+              "type": "string"
+            },
+            "companyName": {
+              "type": "string"
+            }
+          },
+          "required": ["companyId", "companyName"],
+          "additionalProperties": false
+        },
+        "description": "Associated companies"
+      }
+    },
+    "required": [
+      "personId",
+      "firstName",
+      "lastName",
+      "fullName",
+      "description",
+      "birthday",
+      "jobTitle",
+      "emails",
+      "phones",
+      "addresses",
+      "urls",
+      "groups",
+      "companies"
+    ],
+    "additionalProperties": false
+  }
+}

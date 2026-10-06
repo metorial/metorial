@@ -1,202 +1,144 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createAxios, normalizeOAuthTokenResponse, requestAxiosData, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { EgnyteClient } from './lib/client';
+import {
+  apiError,
+  domainName,
+  integer,
+  invalid,
+  noControls,
+  record,
+  text
+} from './lib/contracts';
 
-export let auth = SlateAuth.create()
+type OAuthState = { token: string; refreshToken?: string; expiresAt?: string; domain: string };
+type RefreshContext = {
+  output: OAuthState;
+  input: { domain: string };
+  clientId: string;
+  clientSecret: string;
+};
+const scopes = [
+  {
+    title: 'File System',
+    description: 'Manage files, folders, comments, trash and workflows',
+    scope: 'Egnyte.filesystem'
+  },
+  { title: 'Links', description: 'Manage sharing links', scope: 'Egnyte.link' },
+  { title: 'Users', description: 'Read and manage users', scope: 'Egnyte.user' },
+  { title: 'Groups', description: 'Read and manage custom groups', scope: 'Egnyte.group' },
+  {
+    title: 'Permissions',
+    description: 'Read and update folder permissions',
+    scope: 'Egnyte.permission'
+  },
+  { title: 'Audit', description: 'Generate and read audit reports', scope: 'Egnyte.audit' }
+];
+const requestedScopes = (selected: string[]) =>
+  (selected.length ? selected : scopes.map(s => s.scope)).join(' ');
+const exchange = async (
+  domain: string,
+  params: Record<string, string>,
+  previousRefreshToken?: string
+) => {
+  const http = createAxios({
+    baseURL: `https://${domainName(domain)}.egnyte.com`,
+    timeout: 30000,
+    maxRedirects: 0
+  });
+  const data = record(
+    await requestAxiosData(
+      'Egnyte OAuth',
+      () =>
+        http.post('/puboauth/token', new URLSearchParams(params).toString(), {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }),
+      apiError
+    )
+  );
+  noControls(text(data.access_token, 'access token'));
+  if (data.refresh_token !== undefined) noControls(text(data.refresh_token, 'refresh token'));
+  integer(data.expires_in, 1);
+  if (data.token_type !== undefined && String(data.token_type).toLowerCase() !== 'bearer')
+    throw invalid('Egnyte returned an unsupported token type.');
+  return normalizeOAuthTokenResponse(data, {
+    providerLabel: 'Egnyte',
+    required: true,
+    expiresInType: 'number',
+    previousRefreshToken
+  });
+};
+export const auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
-      domain: z.string().describe('Egnyte domain (subdomain part of {domain}.egnyte.com)')
+      domain: z.string().describe('Egnyte domain name')
     })
   )
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth',
     key: 'oauth',
-
-    scopes: [
-      {
-        title: 'File System',
-        description: 'Read, write, and delete files and folders',
-        scope: 'Egnyte.filesystem'
-      },
-      {
-        title: 'Links',
-        description: 'Create and delete file/folder sharing links',
-        scope: 'Egnyte.link'
-      },
-      {
-        title: 'Users',
-        description: 'Create, update, and delete users',
-        scope: 'Egnyte.user'
-      },
-      {
-        title: 'Permissions',
-        description: 'Add, update, delete, and report on folder permissions',
-        scope: 'Egnyte.permission'
-      },
-      {
-        title: 'Audit',
-        description: 'Generate audit reports for login, file, and permission activity',
-        scope: 'Egnyte.audit'
-      },
-      {
-        title: 'Bookmarks',
-        description: 'Manage bookmarks to files and folders',
-        scope: 'Egnyte.bookmark'
-      },
-      {
-        title: 'Project Folders',
-        description: 'Manage project folder structures and activities',
-        scope: 'Egnyte.projectfolders'
-      }
-    ],
-
+    scopes,
     inputSchema: z.object({
       domain: z
         .string()
-        .describe(
-          'Your Egnyte domain (the subdomain part of {domain}.egnyte.com, e.g. "mycompany")'
-        )
+        .describe('Domain name only, for example mycompany for mycompany.egnyte.com')
     }),
-
     getAuthorizationUrl: async ctx => {
-      let domain = ctx.input.domain;
-      let scopeString = ctx.scopes.join(' ');
-      let params = new URLSearchParams({
+      const domain = domainName(ctx.input.domain);
+      const params = new URLSearchParams({
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
         response_type: 'code',
         state: ctx.state,
-        scope: scopeString
+        scope: requestedScopes(ctx.scopes)
       });
-
       return {
-        url: `https://${domain}.egnyte.com/puboauth/token?${params.toString()}`,
+        url: `https://${domain}.egnyte.com/puboauth/token?${params}`,
         input: { domain }
       };
     },
-
     handleCallback: async ctx => {
-      let domain = ctx.input.domain;
-      let http = createAxios({
-        baseURL: `https://${domain}.egnyte.com`
+      const domain = domainName(ctx.input.domain);
+      const output = await exchange(domain, {
+        client_id: ctx.clientId,
+        client_secret: ctx.clientSecret,
+        redirect_uri: ctx.redirectUri,
+        code: ctx.code,
+        grant_type: 'authorization_code',
+        scope: requestedScopes(ctx.scopes)
       });
-
-      let response = await http.post(
-        '/puboauth/token',
-        new URLSearchParams({
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          redirect_uri: ctx.redirectUri,
-          code: ctx.code,
-          grant_type: 'authorization_code',
-          scope: ctx.scopes.join(' ')
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-        token_type: string;
-      };
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
-          domain
-        },
-        input: { domain }
-      };
+      return { output: { ...output, domain }, input: { domain } };
     },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let domain = ctx.output.domain || ctx.input.domain;
-      let http = createAxios({
-        baseURL: `https://${domain}.egnyte.com`
-      });
-
-      let response = await http.post(
-        '/puboauth/token',
-        new URLSearchParams({
+    handleTokenRefresh: async (ctx: RefreshContext) => {
+      const domain = domainName(ctx.output.domain || ctx.input.domain);
+      const refreshToken = ctx.output.refreshToken;
+      if (!refreshToken)
+        throw invalid('This connection has no refresh token. Reconnect to Egnyte.');
+      const output = await exchange(
+        domain,
+        {
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret,
           grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken || ''
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-        token_type: string;
-      };
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt,
-          domain
+          refresh_token: text(refreshToken, 'refresh token')
         },
-        input: { domain }
-      };
+        refreshToken
+      );
+      return { output: { ...output, domain }, input: { domain } };
     },
-
-    getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string; domain: string };
-      input: { domain: string };
-      scopes: string[];
-    }) => {
-      let domain = ctx.output.domain;
-      let http = createAxios({
-        baseURL: `https://${domain}.egnyte.com`
-      });
-
-      let response = await http.get('/pubapi/v1/userinfo', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let data = response.data as {
-        id: number;
-        first_name: string;
-        last_name: string;
-        username: string;
-        email?: string;
-      };
-
+    getProfile: async (ctx: { output: OAuthState }) => {
+      const data = await new EgnyteClient(ctx.output).getCurrentUser();
       return {
         profile: {
           id: String(data.id),
-          name: `${data.first_name} ${data.last_name}`.trim(),
-          email: data.email || data.username
+          name:
+            [data.first_name, data.last_name].filter(v => typeof v === 'string').join(' ') ||
+            text(data.username),
+          ...(typeof data.email === 'string' ? { email: data.email } : {})
         }
       };
     }

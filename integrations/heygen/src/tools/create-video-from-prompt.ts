@@ -32,11 +32,18 @@ export let createVideoFromPrompt = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      videoId: z.string().describe('Generated video ID for status polling')
+      videoId: z
+        .string()
+        .nullable()
+        .describe(
+          'Video ID when available; poll get_video_agent_status using sessionId first'
+        ),
+      sessionId: z.string().describe('Video Agent session ID'),
+      status: z.string().describe('Session status')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HeyGenClient({ token: ctx.auth.token });
+    let client = new HeyGenClient(ctx.auth);
 
     let result = await client.createVideoAgent({
       prompt: ctx.input.prompt,
@@ -48,7 +55,7 @@ export let createVideoFromPrompt = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `Video Agent started generating video from prompt. Video ID: **${result.videoId}**. Use "Get Video Status" to check progress.`
+      message: `Video Agent started generating video from prompt. Session ID: **${result.sessionId}**. Use "get_video_agent_status" with the session ID to check progress.`
     };
   })
   .build();

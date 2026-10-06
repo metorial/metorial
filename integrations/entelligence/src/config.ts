@@ -3,9 +3,19 @@ import { z } from 'zod';
 
 export let config = SlateConfig.create(
   z.object({
-    repoName: z.string().describe('Repository name to interact with (e.g., "my-repo")'),
+    repoName: z
+      .string()
+      .trim()
+      .min(1)
+      .describe(
+        'Repository name configured in your Entelligence chat widget (e.g., "my-repo")'
+      ),
     organization: z
       .string()
-      .describe('Organization name that owns the repository (e.g., "my-org")')
+      .trim()
+      .min(1)
+      .describe(
+        'Organization name configured in your Entelligence chat widget (e.g., "my-org")'
+      )
   })
 );

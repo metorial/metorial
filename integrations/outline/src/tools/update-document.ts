@@ -1,19 +1,31 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, clientConfig } from '../lib/client';
+import { requireValue } from '../lib/validation';
 import { spec } from '../spec';
-
-export let updateDocument = SlateTool.create(spec, {
+export const updateDocument = SlateTool.create(spec, {
   name: 'Update Document',
   key: 'update_document',
-  description: `Update an existing document's title, content, emoji, or other properties.
-Can also be used to append content to a document or to publish a draft.`,
-  instructions: [
-    'Use the append option to add content to the end of a document without replacing existing content.'
-  ]
+  description:
+    'Update document title, Markdown, emoji or display settings, or publish a draft. Use lastRevision to guard against concurrent edits.',
+  tags: {}
 })
   .input(
     z.object({
+      lastRevision: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Current revision from get_document; the provider rejects stale updates'),
+      editMode: z
+        .enum(['replace', 'append', 'prepend', 'patch'])
+        .optional()
+        .describe('Native text edit mode'),
+      findText: z
+        .string()
+        .optional()
+        .describe('Exact Markdown to replace when editMode is patch'),
       documentId: z.string().describe('ID of the document to update'),
       title: z.string().optional().describe('New title for the document'),
       text: z
@@ -30,7 +42,12 @@ Can also be used to append content to a document or to publish a draft.`,
         .optional()
         .describe('If true, appends text to the end of the document instead of replacing'),
       publish: z.boolean().optional().describe('If true, publishes a draft document'),
-      done: z.boolean().optional().describe('Whether the document is marked as done')
+      done: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the editing session is complete; this does not complete document tasks'
+        )
     })
   )
   .output(
@@ -42,22 +59,38 @@ Can also be used to append content to a document or to publish a draft.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let doc = await client.updateDocument({
-      id: ctx.input.documentId,
-      title: ctx.input.title,
-      text: ctx.input.text,
-      emoji: ctx.input.emoji,
-      fullWidth: ctx.input.fullWidth,
-      append: ctx.input.append,
-      publish: ctx.input.publish,
-      done: ctx.input.done
-    });
-
+    const client = new Client(clientConfig(ctx.auth, ctx.config));
+    requireValue(
+      !ctx.input.append || !ctx.input.editMode || ctx.input.editMode === 'append',
+      'append:true conflicts with this editMode. Use one compatible editing mode.'
+    );
+    const mode = ctx.input.editMode ?? (ctx.input.append ? 'append' : undefined);
+    requireValue(
+      (mode !== 'append' && mode !== 'prepend') || !!ctx.input.text,
+      'Provide nonempty text for append or prepend.'
+    );
+    requireValue(
+      mode !== 'patch' || (ctx.input.text !== undefined && !!ctx.input.findText),
+      'Patch mode requires text and nonempty findText.'
+    );
+    requireValue(
+      ctx.input.findText === undefined || mode === 'patch',
+      'findText only applies to patch mode.'
+    );
+    requireValue(
+      Object.entries(ctx.input).some(
+        ([k, v]) =>
+          !['documentId', 'lastRevision', 'editMode', 'findText', 'append'].includes(k) &&
+          v !== undefined
+      ),
+      'Provide at least one document update field.'
+    );
+    requireValue(
+      (ctx.input.title?.length ?? 0) <= 100 && (ctx.input.text?.length ?? 0) <= 1_536_000,
+      'Use a title up to 100 characters and Markdown up to 1,536,000 characters.'
+    );
+    const { documentId, emoji, ...input } = ctx.input;
+    const doc = await client.updateDocument({ ...input, id: documentId, icon: emoji });
     return {
       output: {
         documentId: doc.id,
@@ -65,7 +98,7 @@ Can also be used to append content to a document or to publish a draft.`,
         updatedAt: doc.updatedAt,
         revision: doc.revision
       },
-      message: `Updated document **"${doc.title}"** to revision ${doc.revision}.`
+      message: `Updated document to revision ${doc.revision}.`
     };
   })
   .build();

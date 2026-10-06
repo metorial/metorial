@@ -7,6 +7,9 @@ export let updateNote = SlateTool.create(spec, {
   name: 'Update Note',
   key: 'update_note',
   description: `Updates an existing note's content or visibility.`,
+  instructions: [
+    'Notes containing workspace-user mention links can notify those users. Avoid mentions unless notifications are intended.'
+  ],
   tags: {
     destructive: false,
     readOnly: false

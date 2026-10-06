@@ -26,7 +26,7 @@ export let getSslTest = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.getSslTest(ctx.input.testId);
-    let test = result?.data ?? result;
+    let test = result.data;
 
     return {
       output: { test },

@@ -22,15 +22,25 @@ let transactionSchema = z.object({
 export let listTransactions = SlateTool.create(spec, {
   name: 'List Transactions',
   key: 'list_transactions',
-  description: `Retrieve a list of payment transactions from your Flutterwave account. Supports filtering by date range, status, currency, customer email, and payment type. Returns paginated results with transaction details including amounts, status, and customer information.`,
+  description: `Retrieve payment transactions with explicit date bounds and optional status, currency, customer email or transaction-reference filters. Returns paginated details including the payment method.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      from: z.string().optional().describe('Start date for filtering (YYYY-MM-DD)'),
-      to: z.string().optional().describe('End date for filtering (YYYY-MM-DD)'),
+      txRef: z
+        .string()
+        .optional()
+        .describe('Filter by the exact merchant transaction reference'),
+      from: z
+        .string()
+        .optional()
+        .describe('Start date (YYYY-MM-DD), required by the current API at invocation'),
+      to: z
+        .string()
+        .optional()
+        .describe('End date (YYYY-MM-DD), required by the current API at invocation'),
       page: z.number().optional().describe('Page number for pagination'),
       status: z
         .enum(['successful', 'failed', 'pending'])
@@ -41,7 +51,9 @@ export let listTransactions = SlateTool.create(spec, {
       paymentType: z
         .string()
         .optional()
-        .describe('Filter by payment type (card, account, ussd, mobilemoney)')
+        .describe(
+          'Legacy filter: current v3 listing does not document payment_type. Omit this field; inspect returned paymentType.'
+        )
     })
   )
   .output(
@@ -53,9 +65,10 @@ export let listTransactions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
     let result = await client.listTransactions({
+      txRef: ctx.input.txRef,
       from: ctx.input.from,
       to: ctx.input.to,
       page: ctx.input.page,

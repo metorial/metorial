@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type SyncWriteInput, workspaceClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateSync = SlateTool.create(spec, {
@@ -8,11 +9,12 @@ export let updateSync = SlateTool.create(spec, {
   key: 'update_sync',
   description: `Updates the configuration of an existing sync. Allows modifying the label, operation, schedule, mappings, pause state, and notification settings. Only specified fields are updated; omitted fields remain unchanged.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
+      workspaceId,
       syncId: z.number().describe('ID of the sync to update.'),
       label: z.string().optional().describe('New label for the sync.'),
       operation: z
@@ -33,7 +35,7 @@ export let updateSync = SlateTool.create(spec, {
         .optional()
         .describe('New schedule frequency.'),
       scheduleDay: z.string().optional().describe('Day of the week for weekly schedules.'),
-      scheduleHour: z.number().optional().describe('Hour (0-23) for daily/weekly schedules.'),
+      scheduleHour: z.number().optional().describe('Hour (0–24) for daily/weekly schedules.'),
       scheduleMinute: z
         .number()
         .optional()
@@ -71,20 +73,17 @@ export let updateSync = SlateTool.create(spec, {
   .output(
     z.object({
       syncId: z.number().describe('ID of the updated sync.'),
-      label: z.string().nullable().describe('Updated label.'),
+      label: z.string().nullish().describe('Updated label.'),
       status: z.string().describe('Current sync status.'),
       operation: z.string().describe('Current sync behavior.'),
-      paused: z.boolean().describe('Whether the sync is paused.'),
-      updatedAt: z.string().describe('When the sync was last updated.')
+      paused: z.boolean().optional().describe('Whether the sync is paused.'),
+      updatedAt: z.string().nullish().describe('When the sync was last updated.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = await workspaceClient(ctx);
 
-    let updates: Record<string, unknown> = {};
+    let updates: SyncWriteInput = {};
 
     if (ctx.input.label !== undefined) updates.label = ctx.input.label;
     if (ctx.input.operation !== undefined) updates.operation = ctx.input.operation;
@@ -120,7 +119,7 @@ export let updateSync = SlateTool.create(spec, {
         paused: sync.paused,
         updatedAt: sync.updatedAt
       },
-      message: `Updated sync **${sync.label || sync.id}** (${sync.operation}, ${sync.paused ? 'paused' : 'active'}).`
+      message: `Updated sync **${sync.label || sync.id}** (${sync.operation}, ${sync.paused === undefined ? 'pause state unavailable' : sync.paused ? 'paused' : 'active'}).`
     };
   })
   .build();

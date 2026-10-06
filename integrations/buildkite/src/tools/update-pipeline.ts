@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updatePipeline = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let updatePipeline = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...organizationInput,
       pipelineSlug: z.string().describe('Slug of the pipeline to update'),
       name: z.string().optional().describe('New name for the pipeline'),
       repository: z.string().optional().describe('New repository URL'),
@@ -41,10 +43,7 @@ export let updatePipeline = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     let { pipelineSlug, ...updateData } = ctx.input;
     let p = await client.updatePipeline(pipelineSlug, updateData);

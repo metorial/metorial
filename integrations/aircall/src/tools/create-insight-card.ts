@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { exactId, fail, numericCallId } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let createInsightCard = SlateTool.create(spec, {
@@ -15,7 +16,14 @@ export let createInsightCard = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      callId: z.number().describe('ID of the ongoing call to display the insight card on'),
+      callIdExact: z
+        .string()
+        .optional()
+        .describe('Exact decimal Int64 ID from list_calls; supply instead of callId'),
+      callId: z
+        .number()
+        .optional()
+        .describe('ID of the ongoing call to display the insight card on'),
       contents: z
         .array(
           z.object({
@@ -35,20 +43,33 @@ export let createInsightCard = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      accepted: z.boolean().optional(),
+      confirmed: z.boolean().optional(),
+      pending: z.boolean().optional(),
       success: z.boolean().describe('Whether the insight card was created successfully'),
-      callId: z.number().describe('The call ID the insight card was pushed to')
+      callIdExact: z
+        .string()
+        .optional()
+        .describe('Exact decimal Int64 ID from list_calls; supply instead of callId'),
+      callId: z.number().optional().describe('The call ID the insight card was pushed to')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth);
-    await client.createInsightCard(ctx.input.callId, ctx.input.contents);
-
+    const callIdExact = exactId(ctx.input.callId, ctx.input.callIdExact),
+      client = new Client(ctx.auth);
+    const call = await client.getCall(callIdExact);
+    if (call.status === 'done') fail('Insight cards require an ongoing call.');
+    await client.createInsightCard(callIdExact, ctx.input.contents);
     return {
       output: {
         success: true,
-        callId: ctx.input.callId
+        callId: numericCallId(callIdExact),
+        callIdExact,
+        accepted: true,
+        confirmed: false
       },
-      message: `Pushed insight card with **${ctx.input.contents.length}** lines to call **#${ctx.input.callId}**.`
+      message:
+        'Aircall acknowledged the temporary insight-card request. Cards are not retained after the call; no independent display confirmation is available.'
     };
   })
   .build();

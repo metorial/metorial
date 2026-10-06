@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectUnavailableDelighted, unavailableMessage } from '../lib/unavailable';
 import { spec } from '../spec';
 
 let noteSchema = z.object({
@@ -43,12 +43,11 @@ let surveyResponseSchema = z.object({
 export let listSurveyResponses = SlateTool.create(spec, {
   name: 'List Survey Responses',
   key: 'list_survey_responses',
-  description: `Retrieve survey responses with scores, comments, tags, notes, and additional question answers. Supports filtering by date range, person, and trend. Results are paginated.`,
-  instructions: [
-    'Use since/until for filtering by creation date, or updatedSince/updatedUntil for filtering by update date.',
-    'Set expandPerson to true to include full person details in each response.'
-  ],
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }
@@ -91,26 +90,5 @@ export let listSurveyResponses = SlateTool.create(spec, {
       responses: z.array(surveyResponseSchema).describe('List of survey responses')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let responses = await client.listSurveyResponses({
-      perPage: ctx.input.perPage,
-      page: ctx.input.page,
-      since: ctx.input.since,
-      until: ctx.input.until,
-      updatedSince: ctx.input.updatedSince,
-      updatedUntil: ctx.input.updatedUntil,
-      personId: ctx.input.personId,
-      personEmail: ctx.input.personEmail,
-      trend: ctx.input.trend,
-      order: ctx.input.order,
-      expandPerson: ctx.input.expandPerson
-    });
-
-    return {
-      output: { responses },
-      message: `Retrieved **${responses.length}** survey response(s).`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();

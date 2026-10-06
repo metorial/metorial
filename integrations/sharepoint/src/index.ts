@@ -15,8 +15,6 @@ import {
   search,
   searchDrive
 } from './tools';
-import { driveItemChanges, inboundWebhook, listItemChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     manageColumns,
     getContentTypes
   ],
-  triggers: [inboundWebhook, listItemChanges, driveItemChanges]
+  triggers: []
 });

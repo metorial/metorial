@@ -48,7 +48,7 @@ export let getEntityFiles = SlateTool.create(spec, {
       pageToken: ctx.input.pageToken
     });
 
-    let files = (result.entity_files ?? result ?? []).map((f: any) => ({
+    let files = (result.entity_files ?? result ?? []).map(f => ({
       entityFileId: f.id,
       name: f.name ?? null,
       size: f.size ?? null,

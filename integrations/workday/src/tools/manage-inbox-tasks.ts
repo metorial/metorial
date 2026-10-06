@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { WorkdayClient } from '../lib/client';
+import { createClient, display, reference } from '../lib/client';
+import { workerIdSchema } from '../lib/contracts';
 import { spec } from '../spec';
 
 let workdayReferenceSchema = z.object({
@@ -21,7 +22,10 @@ let inboxTaskSchema = z.object({
     .describe('The overall business process this task belongs to'),
   stepType: workdayReferenceSchema
     .optional()
-    .describe('The type of step in the business process')
+    .describe('The type of step in the business process'),
+  assignedDate: z.string().optional().describe('Date when the event was last updated'),
+  statusReference: workdayReferenceSchema.optional().describe('Native task status reference'),
+  subjectReference: workdayReferenceSchema.optional().describe('Native task subject reference')
 });
 
 export let getInboxTasks = SlateTool.create(spec, {
@@ -34,7 +38,7 @@ export let getInboxTasks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workerId: z.string().describe('The Workday worker ID whose inbox tasks to retrieve'),
+      workerId: workerIdSchema,
       limit: z.number().optional().describe('Maximum number of results (default: 20)'),
       offset: z.number().optional().describe('Pagination offset (default: 0)')
     })
@@ -46,11 +50,7 @@ export let getInboxTasks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let result = await client.getInboxTasks(ctx.input.workerId, {
       limit: ctx.input.limit,
@@ -61,9 +61,17 @@ export let getInboxTasks = SlateTool.create(spec, {
       taskId: t.id,
       descriptor: t.descriptor,
       href: t.href,
-      status: t.status,
-      assigned: t.assigned,
-      subject: t.subject,
+      status: display(t.status),
+      assigned:
+        typeof t.assigned === 'object' && t.assigned !== null
+          ? reference(t.assigned)
+          : undefined,
+      assignedDate: typeof t.assigned === 'string' ? t.assigned : undefined,
+      statusReference:
+        typeof t.status === 'object' && t.status !== null ? reference(t.status) : undefined,
+      subjectReference:
+        typeof t.subject === 'object' && t.subject !== null ? reference(t.subject) : undefined,
+      subject: display(t.subject),
       overallProcess: t.overallProcess,
       stepType: t.stepType
     }));
@@ -78,14 +86,14 @@ export let getInboxTasks = SlateTool.create(spec, {
 export let actionInboxTask = SlateTool.create(spec, {
   name: 'Action Inbox Task',
   key: 'action_inbox_task',
-  description: `Approve or deny a pending inbox task for a worker. Use this to take action on business process steps such as approvals, reviews, or other workflow items awaiting a decision.`,
+  description: `Approve or deny a pending inbox task for a worker. Only an Approval step awaiting action for the connected worker is supported. Discover that worker with get_current_user and read the task first; subsequent business-process steps may remain pending.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
-      workerId: z.string().describe('The Workday worker ID who owns the inbox task'),
+      workerId: workerIdSchema,
       taskId: z.string().describe('The inbox task ID to act on'),
       action: z.enum(['approve', 'deny']).describe('Action to take on the task'),
       comment: z.string().optional().describe('Optional comment explaining the action')
@@ -95,31 +103,19 @@ export let actionInboxTask = SlateTool.create(spec, {
     z.object({
       taskId: z.string().describe('The inbox task ID that was acted upon'),
       action: z.string().describe('The action that was taken'),
-      success: z.boolean().describe('Whether the action was successful'),
+      success: z.boolean().describe('Whether Workday accepted this approval-task action'),
       rawResponse: z.any().optional().describe('Full API response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
-    let result: any;
-    if (ctx.input.action === 'approve') {
-      result = await client.approveInboxTask(
-        ctx.input.workerId,
-        ctx.input.taskId,
-        ctx.input.comment
-      );
-    } else {
-      result = await client.denyInboxTask(
-        ctx.input.workerId,
-        ctx.input.taskId,
-        ctx.input.comment
-      );
-    }
+    const result = await client.actionInboxTask(
+      ctx.input.workerId,
+      ctx.input.taskId,
+      ctx.input.action,
+      ctx.input.comment
+    );
 
     return {
       output: {
@@ -128,7 +124,8 @@ export let actionInboxTask = SlateTool.create(spec, {
         success: true,
         rawResponse: result
       },
-      message: `Inbox task ${ctx.input.taskId} was **${ctx.input.action === 'approve' ? 'approved' : 'denied'}** for worker ${ctx.input.workerId}.`
+      message:
+        'Workday accepted the approval-task action. The overall business process may still have pending steps.'
     };
   })
   .build();

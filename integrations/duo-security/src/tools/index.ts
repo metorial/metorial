@@ -4,6 +4,7 @@ export * from './delete-user';
 export * from './get-account-summary';
 export * from './get-admin-logs';
 export * from './get-authentication-logs';
+export * from './get-resource';
 export * from './get-telephony-logs';
 export * from './get-user';
 export * from './list-integrations';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { appIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let appSchema = z.object({
@@ -28,8 +29,18 @@ export let listApps = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Maximum number of apps to return (default: 10)'),
-      offset: z.number().optional().describe('Number of apps to skip for pagination')
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Maximum number of apps to return (default: 10)'),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Number of apps to skip for pagination')
     })
   )
   .output(
@@ -67,14 +78,14 @@ export let listApps = SlateTool.create(spec, {
 export let getApp = SlateTool.create(spec, {
   name: 'Get App',
   key: 'get_app',
-  description: `Get detailed information about a specific Wit.ai app by its ID. Returns configuration, training status, and metadata.`,
+  description: `Get detailed information about a specific Wit.ai app by its ID. Call list_apps to discover accessible app IDs. Returns configuration, training status, and metadata.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      appId: z.string().describe('The ID of the Wit.ai app to retrieve')
+      appId: appIdSchema
     })
   )
   .output(appSchema)
@@ -154,14 +165,14 @@ export let createApp = SlateTool.create(spec, {
 export let updateApp = SlateTool.create(spec, {
   name: 'Update App',
   key: 'update_app',
-  description: `Update an existing Wit.ai app's configuration such as name, language, timezone, description, or privacy settings.`,
+  description: `Update an existing Wit.ai app's configuration such as name, language, timezone, description, or privacy settings. Call list_apps to discover accessible app IDs.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
-      appId: z.string().describe('ID of the app to update'),
+      appId: appIdSchema,
       name: z.string().optional().describe('New name for the app'),
       lang: z.string().optional().describe('New language code'),
       isPrivate: z.boolean().optional().describe('Whether the app should be private'),
@@ -199,14 +210,14 @@ export let updateApp = SlateTool.create(spec, {
 export let deleteApp = SlateTool.create(spec, {
   name: 'Delete App',
   key: 'delete_app',
-  description: `Permanently delete a Wit.ai app. This action cannot be undone.`,
+  description: `Permanently delete a Wit.ai app. Call list_apps to discover accessible app IDs. This action cannot be undone.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      appId: z.string().describe('ID of the app to delete')
+      appId: appIdSchema
     })
   )
   .output(

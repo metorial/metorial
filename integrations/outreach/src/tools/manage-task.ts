@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { cleanAttributes, flattenResource } from '../lib/helpers';
+import { cleanAttributes, flattenResource, validateInput } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageTask = SlateTool.create(spec, {
@@ -17,7 +17,12 @@ Tasks are automatically created by sequences or can be manually assigned. Use th
   .input(
     z.object({
       taskId: z.string().describe('Task ID to update'),
-      state: z.enum(['incomplete', 'complete']).optional().describe('Task state'),
+      state: z
+        .enum(['incomplete', 'complete'])
+        .optional()
+        .describe(
+          'Set completion through the writable completed field: complete=true, incomplete=false.'
+        ),
       dueAt: z.string().optional().describe('Due date (ISO 8601 format)'),
       note: z.string().optional().describe('Task note')
     })
@@ -37,10 +42,11 @@ Tasks are automatically created by sequences or can be manually assigned. Use th
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     let attributes = cleanAttributes({
-      state: ctx.input.state,
+      completed: ctx.input.state === undefined ? undefined : ctx.input.state === 'complete',
       dueAt: ctx.input.dueAt,
       note: ctx.input.note
     });
@@ -61,7 +67,7 @@ Tasks are automatically created by sequences or can be manually assigned. Use th
         prospectId: flat.prospectId,
         updatedAt: flat.updatedAt
       },
-      message: `Task **${flat.id}** updated. State: **${flat.state}**.`
+      message: `Task **${flat.id}** updated. State: **${flat.state ?? 'not returned'}**.`
     };
   })
   .build();

@@ -42,8 +42,6 @@ import {
   updateConversion,
   updateCustomerStatus
 } from './tools';
-import { affiliateEvents, customerEvents, paymentEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -88,5 +86,5 @@ export let provider = Slate.create({
     deleteAffiliateProspect,
     manageMlmParent
   ],
-  triggers: [affiliateEvents, customerEvents, paymentEvents]
+  triggers: []
 });

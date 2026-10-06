@@ -26,15 +26,12 @@ describe('google-cloud-storage provider contract', () => {
         'manage_lifecycle',
         'manage_notifications'
       ],
-      triggerIds: ['inbound_webhook', 'object_changes'],
+      triggerIds: [],
       authMethodIds: ['oauth', 'service_account'],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'object_changes', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(14);
+    expect(contract.actions).toHaveLength(12);
 
     let expectedScopes = {
       list_buckets: googleCloudStorageActionScopes.listBuckets,
@@ -48,8 +45,7 @@ describe('google-cloud-storage provider contract', () => {
       update_object_metadata: googleCloudStorageActionScopes.updateObjectMetadata,
       manage_bucket_iam: googleCloudStorageActionScopes.manageBucketIam,
       manage_lifecycle: googleCloudStorageActionScopes.manageLifecycle,
-      manage_notifications: googleCloudStorageActionScopes.manageNotifications,
-      object_changes: googleCloudStorageActionScopes.objectChanges
+      manage_notifications: googleCloudStorageActionScopes.manageNotifications
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HootsuiteClient } from '../lib/client';
 import { spec } from '../spec';
@@ -27,7 +27,7 @@ Use **delete** to remove a scheduled message entirely.`,
       reason: z
         .string()
         .optional()
-        .describe('Reason for rejection (only used with reject action)')
+        .describe('Nonblank reason for rejection (required for reject action)')
     })
   )
   .output(
@@ -50,7 +50,9 @@ Use **delete** to remove a scheduled message entirely.`,
     }
 
     if (sequenceNumber === undefined) {
-      throw new Error('sequenceNumber is required for approve/reject actions');
+      throw createApiServiceError(
+        'sequenceNumber is required for approve/reject actions. Read the current message first.'
+      );
     }
 
     if (action === 'approve') {

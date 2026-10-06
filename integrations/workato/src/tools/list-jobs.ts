@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import * as map from '../lib/mappers';
+import { field, malformed, numericId, records } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listJobsTool = SlateTool.create(spec, {
@@ -18,51 +20,52 @@ export let listJobsTool = SlateTool.create(spec, {
         .enum(['succeeded', 'failed', 'pending'])
         .optional()
         .describe('Filter jobs by status'),
+      prev: z
+        .boolean()
+        .optional()
+        .describe('Native paging direction: false returns older jobs, true newer jobs.'),
       rerunOnly: z.boolean().optional().describe('Only return rerun jobs'),
       offsetJobId: z.string().optional().describe('Job ID to use as pagination cursor')
     })
   )
   .output(
     z.object({
-      jobSucceededCount: z.number().describe('Total count of succeeded jobs'),
-      jobFailedCount: z.number().describe('Total count of failed jobs'),
-      jobCount: z.number().describe('Total job count'),
+      jobSucceededCount: z.number().optional().describe('Total count of succeeded jobs'),
+      jobFailedCount: z.number().optional().describe('Total count of failed jobs'),
+      jobCount: z.number().optional().describe('Total job count'),
       jobs: z.array(
         z.object({
-          jobId: z.string().describe('Job ID/handle'),
-          recipeId: z.number().describe('Recipe ID'),
-          status: z.string().describe('Job status (succeeded, failed, pending)'),
-          isError: z.boolean().describe('Whether the job encountered an error'),
-          startedAt: z.string().nullable().describe('Job start timestamp'),
-          completedAt: z.string().nullable().describe('Job completion timestamp')
+          jobId: z.string().optional().describe('Job ID/handle'),
+          recipeId: z.number().optional().describe('Recipe ID'),
+          status: z.string().optional().describe('Job status (succeeded, failed, pending)'),
+          isError: z.boolean().optional().describe('Whether the job encountered an error'),
+          startedAt: z.string().nullable().optional().describe('Job start timestamp'),
+          completedAt: z.string().nullable().optional().describe('Job completion timestamp')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let result = await client.listJobs(ctx.input.recipeId, {
-      status: ctx.input.status,
-      rerunOnly: ctx.input.rerunOnly,
-      offsetJobId: ctx.input.offsetJobId
-    });
-
-    let jobs = (result.items ?? []).map((j: any) => ({
-      jobId: j.id ?? j.handle,
-      recipeId: j.recipe_id,
-      status: j.status,
-      isError: j.is_error ?? false,
-      startedAt: j.started_at ?? null,
-      completedAt: j.completed_at ?? null
-    }));
-
+    const client = createClient(ctx);
+    const result = await client.listJobs(ctx.input.recipeId, ctx.input);
+    const jobs = records(result.items).map(map.job);
+    if (jobs.some(job => String(job.recipeId) !== numericId(ctx.input.recipeId, 'recipeId')))
+      malformed();
     return {
       output: {
-        jobSucceededCount: result.job_succeeded_count ?? 0,
-        jobFailedCount: result.job_failed_count ?? 0,
-        jobCount: result.job_count ?? 0,
-        jobs
+        jobs,
+        jobSucceededCount: field(
+          result,
+          'job_succeeded_count',
+          z.number().int().nonnegative().optional()
+        ),
+        jobFailedCount: field(
+          result,
+          'job_failed_count',
+          z.number().int().nonnegative().optional()
+        ),
+        jobCount: field(result, 'job_count', z.number().int().nonnegative().optional())
       },
-      message: `Recipe **${ctx.input.recipeId}**: ${result.job_succeeded_count ?? 0} succeeded, ${result.job_failed_count ?? 0} failed. Returned **${jobs.length}** jobs.`
+      message: `Returned ${jobs.length} jobs. Continue with offsetJobId and the same direction.`
     };
   });

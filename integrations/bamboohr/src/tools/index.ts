@@ -2,6 +2,7 @@ export * from './account-metadata';
 export * from './applicant-tracking';
 export * from './benefits';
 export * from './create-employee';
+export * from './discovery';
 export * from './files';
 export * from './get-employee';
 export * from './get-employee-directory';

@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { WriterClient } from '../lib/client';
+import { graphIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let queryKnowledgeGraph = SlateTool.create(spec, {
   name: 'Query Knowledge Graph',
   key: 'query_knowledge_graph',
-  description: `Ask a question to one or more Knowledge Graphs and get an AI-generated answer grounded in your uploaded data. Returns the answer, source references, and optional inline citations. Supports subquery decomposition for complex questions.`,
+  description: `Ask a question to one or more Knowledge Graphs discovered with list_knowledge_graphs and get an AI-generated answer grounded in your uploaded data. Returns the answer, source references, and optional inline citations. Supports subquery decomposition for complex questions.`,
   instructions: [
     'Provide at least one Knowledge Graph ID. You can query multiple graphs simultaneously.',
     'Enable subqueries to break complex questions into smaller, more targeted queries.',
@@ -18,7 +19,10 @@ export let queryKnowledgeGraph = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      graphIds: z.array(z.string()).min(1).describe('IDs of the Knowledge Graphs to query'),
+      graphIds: z
+        .array(graphIdSchema)
+        .min(1)
+        .describe('Knowledge Graph IDs. Call list_knowledge_graphs to discover IDs.'),
       question: z.string().describe('Question to ask the Knowledge Graphs'),
       subqueries: z
         .boolean()
@@ -28,12 +32,14 @@ export let queryKnowledgeGraph = SlateTool.create(spec, {
         .object({
           maxSubquestions: z
             .number()
+            .int()
             .min(1)
             .max(10)
             .optional()
             .describe('Maximum number of sub-questions (1-10, default: 6)'),
           searchWeight: z
             .number()
+            .int()
             .min(0)
             .max(100)
             .optional()
@@ -46,12 +52,14 @@ export let queryKnowledgeGraph = SlateTool.create(spec, {
             .describe('Fidelity to source material vs creative response (0-1, default: 0)'),
           maxSnippets: z
             .number()
+            .int()
             .min(1)
             .max(60)
             .optional()
             .describe('Maximum context snippets to retrieve (1-60, default: 30)'),
           maxTokens: z
             .number()
+            .int()
             .min(100)
             .max(8000)
             .optional()
@@ -81,6 +89,10 @@ export let queryKnowledgeGraph = SlateTool.create(spec, {
     z.object({
       question: z.string().describe('The question that was asked'),
       answer: z.string().describe('AI-generated answer grounded in the Knowledge Graph data'),
+      references: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Citation metadata returned by Writer when available.'),
       sources: z
         .array(
           z.object({

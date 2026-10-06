@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwitchClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let sendChatMessage = SlateTool.create(spec, {
@@ -36,11 +37,16 @@ export let sendChatMessage = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('ID of the sent message (not available for announcements)'),
+      dropReason: z
+        .object({ code: z.string(), message: z.string() })
+        .optional()
+        .describe('Native reason Twitch did not send the message'),
       sent: z.boolean()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId);
+    validateInput('send_chat_message', ctx.input, [ctx.auth.token]);
+    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId, ctx.auth.userId);
     let user = await client.getAuthenticatedUser();
 
     if (ctx.input.isAnnouncement) {
@@ -65,7 +71,11 @@ export let sendChatMessage = SlateTool.create(spec, {
     );
 
     return {
-      output: { messageId: result.messageId, sent: result.isSent },
+      output: {
+        messageId: result.messageId,
+        sent: result.isSent,
+        dropReason: result.dropReason
+      },
       message: result.isSent
         ? `Message sent to channel \`${ctx.input.broadcasterId}\``
         : `Message was not delivered to channel \`${ctx.input.broadcasterId}\``

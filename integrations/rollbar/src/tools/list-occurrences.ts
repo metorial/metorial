@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, mapOccurrence } from '../lib/client';
 import { spec } from '../spec';
 
 export let listOccurrences = SlateTool.create(spec, {
@@ -13,13 +13,22 @@ export let listOccurrences = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: z
+        .number()
+        .optional()
+        .describe('Project ID from manage_project; required with an account token.'),
       itemId: z
         .number()
         .optional()
         .describe(
           'Filter occurrences to a specific item ID. If omitted, returns occurrences across all items.'
         ),
-      page: z.number().optional().describe('Page number for pagination')
+      page: z.number().optional().describe('Page number for pagination'),
+      limit: z.number().optional().describe('Page size, default 20; maximum 5000'),
+      lastId: z
+        .number()
+        .optional()
+        .describe('Occurrence ID cursor from the previous page; overrides page')
     })
   )
   .output(
@@ -28,6 +37,7 @@ export let listOccurrences = SlateTool.create(spec, {
         .array(
           z.object({
             occurrenceId: z.string().describe('Unique occurrence ID'),
+            occurrenceUuid: z.string().optional().describe('Ingestion UUID'),
             itemId: z.number().optional().describe('Parent item ID'),
             timestamp: z.number().optional().describe('Unix timestamp of the occurrence'),
             level: z.string().optional().describe('Severity level'),
@@ -44,33 +54,19 @@ export let listOccurrences = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
-    let result: any;
-    if (ctx.input.itemId) {
-      result = await client.listItemOccurrences(ctx.input.itemId, { page: ctx.input.page });
-    } else {
-      result = await client.listOccurrences({ page: ctx.input.page });
-    }
-
-    let instances = result?.result?.instances || [];
-    let occurrences = instances.map((occ: any) => ({
-      occurrenceId: occ.id,
-      itemId: occ.item_id,
-      timestamp: occ.timestamp,
-      level: occ.level_string || occ.level,
-      environment: occ.data?.environment,
-      framework: occ.data?.framework,
-      platform: occ.data?.platform,
-      language: occ.data?.language,
-      server: occ.data?.server,
-      body: occ.data?.body
-    }));
+    const params = { page: ctx.input.page, limit: ctx.input.limit, last_id: ctx.input.lastId };
+    const result =
+      ctx.input.itemId !== undefined
+        ? await client.listItemOccurrences(ctx.input.itemId, params)
+        : await client.listOccurrences(params);
+    const occurrences = result.result.instances.map(mapOccurrence);
 
     return {
       output: {
         occurrences,
-        page: ctx.input.page || 1
+        page: result.result.page ?? ctx.input.page ?? 1
       },
       message: `Found **${occurrences.length}** occurrences${ctx.input.itemId ? ` for item ${ctx.input.itemId}` : ''}.`
     };

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/ynab",
-  "description": "Manage personal budgets, accounts, transactions, and financial categories. Create, read, update, and delete transactions including split transactions and scheduled recurring transactions. Track account balances across checking, savings, credit cards, and loans. Manage budget categories with goal tracking, view monthly budget summaries including income, activity, and \"Ready to Assign\" amounts. Import bank transactions with automatic deduplication and matching. Retrieve payee information and locations. Export full budget data and efficiently sync changes using delta requests.",
+  "description": "Read YNAB budgets, accounts, transactions, categories, payees, and monthly summaries. Create supported accounts and payees, manage transaction and category metadata, schedule recurring transactions, and import linked-bank transactions. Use integer milliunits for monetary values and server knowledge for delta sync. Existing split parts must be edited in the YNAB app; account, category, group, and payee records cannot be deleted through the API.",
   "categories": ["financial-data-and-stock-market"],
   "skills": [
     "manage budget categories",

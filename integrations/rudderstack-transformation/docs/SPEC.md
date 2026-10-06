@@ -1,95 +1,33 @@
-Now let me fetch the full API documentation page for more details on the specific API operations:# Slates Specification for RudderStack Transformation
+# RudderStack Transformations management API
 
-## Overview
+## Authentication and regions
 
-RudderStack Transformation is a feature within RudderStack's customer data platform that allows users to write custom JavaScript or Python functions to transform event data in real-time before it reaches destinations. The Transformations API provides programmatic CRUD operations for managing these transformation functions and reusable code libraries via HTTP calls.
+The current official API uses Bearer Service Access Token or Personal Access Token authentication at `https://api.rudderstack.com` or `https://api.eu.rudderstack.com`. Token permissions cover Transformations Create & Delete, Connect and Edit, Transformation Libraries Edit, and Destinations Connect; a PAT with Read-Write role is intended for testing/personal use. Region is a tool-scoped config value. Tokens are manually managed; no expiry/refresh grant is documented for this API. Requests have a 30-second timeout, no redirects and no automatic write retry. Errors preserve HTTP status while omitting submitted code/test data and upstream error bodies.
 
-## Authentication
+This surface is separate from the Basic-auth `/v0/testSource` and `/v0/testDestination` Test API and from data-plane ingestion. No suitable current-user/workspace identity endpoint is documented for this transformation surface. No identity route is invented.
 
-The Transformations API is authenticated via HTTP Basic Authentication.
+## Supported contracts
 
-To authenticate:
+All 13 original tool keys and input/output schemas remain compatible; four essential additions bring the total to 17. New optional fields support library creation publication, creation test events, destination association metadata and revision publication state. Public tool IDs remain under 60 characters. Legacy triggers were removed without replacement.
 
-1. Generate a workspace-level Service Access Token with the required permissions (Create & Delete, Connect, and Edit for Transformations; Edit for Transformation Libraries; Connect for Destinations).
-2. Use HTTP Basic Authentication with an empty string (`""`) as the username and your workspace-level Service Access Token as the password.
+Transformation CRUD uses `/transformations`; update uses POST, not PUT. Built-in language values are `javascript` and `pythonfaas`. Library CRUD uses `/libraries`; library updates preserve immutable language and hydrate omitted code from the latest revision to satisfy the documented request body. Create/update publication is a `publish` query parameter. Destination IDs require publication; connecting to an existing destination can replace its current transformation.
 
-Alternatively, pass the token directly in the authorization header as:
+Published collection envelopes are `transformations` and `libraries`. Revision envelopes are `TransformationVersions` and `libraryVersions`. Older `versions`/array response variants remain recognized when their contents validate, without treating unexpected objects as empty success. Version IDs are distinct from resource IDs. Count must be a positive whole number; orderBy is asc/desc. The provider documents no continuation cursor/offset for these routes. Get/list may return only published copies; draft updates are read through revision detail endpoints.
 
-```
-Authorization: Basic {Base64Encoded(:<SERVICE_ACCESS_TOKEN>)}
-```
+The existing `publish` tool retains documented POST `/libraries/publish` with `versionId` and optional transformation `testInput`. It reports request acceptance and rejects explicit validation-failure responses; callers should read selected published revisions back. The current official CLI additionally uses `/transformations/publish` with different `testSuite` and validation-output semantics. No automatic mutation fallback between those routes is attempted.
 
-The base URL depends on your region:
+New `test_transformations` calls the current official CLI's POST `/transformations/tests/run` with requested revision IDs, named `testSuite` entries, JSON input and optional expected output. Optional library revision IDs are compiled/validated alongside them. It returns aggregate and per-revision/test-case pass/fail, observed output and generic error summaries, omitting error event bodies and provider messages that could echo test/customer data. Missing or duplicate requested revision/case results fail clearly. Aggregate and per-revision success are reduced to failure when test statuses or execution errors disagree. This does not publish or connect resources, but it executes code and imports that can access external services.
 
-- **US**: `https://api.rudderstack.com`
-- **EU**: `https://api.eu.rudderstack.com`
+New `manage_destination_connection` uses POST `/transformations/{id}/connectToDestination` or `/disconnectFromDestination` with `destinationId`. Transformations must be published. A destination supports only one transformation at a time. The result includes association metadata when reported; state must be read back rather than inferred solely from a success-shaped response.
 
-RudderStack recommends Service Access Tokens (SATs) for production use cases and Personal Access Tokens (PATs) for testing or personal use.
+Code remains part of existing resource and test-result contracts, not a generated/downloaded file. DTOs validate expected fields and discard unrelated response payloads. Empty updates, empty publication/test requests, invalid branch combinations and malformed IDs fail through ServiceError. Deletion does not purge revision history.
 
-## Features
+## Primary sources
 
-### Transformation Management
+- https://www.rudderstack.com/docs/api/transformation-api/
+- https://www.rudderstack.com/docs/api/test-api/
+- https://github.com/rudderlabs/rudder-iac/blob/956121e1d082479e076d84010b1c6b7e06bde6f7/api/client/client.go
+- https://github.com/rudderlabs/rudder-iac/blob/956121e1d082479e076d84010b1c6b7e06bde6f7/api/client/transformations/transformations.go
+- https://github.com/rudderlabs/rudder-iac/blob/956121e1d082479e076d84010b1c6b7e06bde6f7/api/client/transformations/types.go
 
-Allows you to create, read, update, and delete transformations programmatically via HTTP calls. Transformations are custom functions that convert event data into destination-specific formats.
-
-- Transformations can be written in JavaScript or Python 3.11.
-- Python transformations are available only in the RudderStack Cloud Growth and Enterprise plans.
-- Transformations can be created in an unpublished (draft) state and published later when ready for live traffic.
-- A transformation is always connected to a destination, and only one transformation can be connected per destination.
-- Transformations can be used across Event Streams and Reverse ETL pipelines in both cloud mode and device mode.
-
-### Transformation Publishing
-
-Transformations support a publish workflow that separates drafts from live code. When unpublished, RudderStack only creates revisions for the transformation, meaning that you cannot connect destinations to the transformation and it cannot be used for incoming event traffic.
-
-- Multiple transformations and libraries can be published in a single operation via the Publish API.
-- A specific version of a transformation can be selected for publishing, enabling rollbacks.
-
-### Version Control
-
-Any update or change to a transformation causes RudderStack to save the older version as a revision. Multiple revisions are recorded, and the API allows you to roll back and publish any specific version.
-
-- Versions can be listed and retrieved individually by transformation or library ID.
-- Revisions are never deleted, even when the transformation itself is deleted.
-
-### Reusable Libraries
-
-The API exposes libraries for a better development workflow. They give you the flexibility to reuse and maintain different versions of your transformation code. Libraries are JavaScript or Python functions that you can write, export, and reuse.
-
-- Libraries are imported into transformations by their auto-generated `importName` (camelCase of the library name).
-- Libraries have their own independent CRUD operations and version history.
-- If you update a library referenced in a transformation, RudderStack tests the new library code along with the transformation code against the default event payload to ensure the transformation does not break.
-
-### Transformation Templates
-
-RudderStack provides prebuilt JavaScript transformation templates for common use cases including data cleaning and enrichment, event filtering and sampling, and PII management.
-
-- Templates are currently only available for JavaScript.
-- Templates cover use cases like IP anonymization, Clearbit enrichment, URL parameter extraction, and bot filtering.
-
-### Credential Store
-
-The credential store is a central repository for securely storing and managing configuration data. By storing secrets and variables in the credential store, you can avoid hardcoding sensitive information in your transformations.
-
-- Two types of credentials are supported: Secrets and Variables.
-- Credentials are accessed within transformation code using the `getCredential()` function.
-- Available only in the RudderStack Starter, Growth, and Enterprise plans.
-
-### CI/CD via GitHub Actions
-
-You can create, test, and publish transformations and libraries directly from your development repository, automating transformation testing and deployment with GitHub Actions.
-
-- Supports test input files and expected output validation.
-- Uses a meta file to define which transformations and libraries to test and publish.
-
-### Testing and Debugging
-
-RudderStack lets you test transformations to identify and prevent errors, allowing you to test various scenarios and edge cases on event payloads.
-
-- Four sample payload types are provided for testing: identify, track, page, and screen.
-- Live events from connected sources can be imported for testing.
-- A `log` function is available to capture event-related information during testing.
-
-## Events
-
-The provider does not support events. The Transformations API is a management API for CRUD operations on transformation and library objects; it does not provide webhooks or event subscription mechanisms.
+The current API page's destinationIds field table differs from older example bodies using destinations. This integration retains the documented destinationIds input/body and provides the explicit connection lifecycle tool. The legacy publication route remains grounded in current API documentation; the newer official SDK does not independently establish its live availability. First live verification must settle deployment response shapes, retained-history behavior and permissions.

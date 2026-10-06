@@ -1,405 +1,349 @@
-import { createAxios } from 'slates';
+import { ServiceError } from '@lowerdeck/error';
+import {
+  buildApiServiceError,
+  type createAxios,
+  getApiErrorStatus,
+  pickDefined
+} from 'slates';
+import {
+  changes,
+  contactId,
+  credential,
+  invalid,
+  malformed,
+  nativeId,
+  object,
+  page,
+  phone,
+  safeJson
+} from './contracts';
+import { createDialpadAxios } from './http';
+import * as models from './models';
 
-export interface DialpadClientConfig {
-  token: string;
-  environment: string;
-}
-
-export interface PaginatedResponse<T> {
-  items: T[];
-  cursor?: string | null;
-}
-
+export type DialpadClientConfig = { token: string; environment: string };
+export const isMissing = (error: unknown): boolean =>
+  error instanceof ServiceError && error.data.upstreamStatus === 404;
 export class DialpadClient {
-  private axios;
-
-  constructor(config: DialpadClientConfig) {
-    let baseURL =
-      config.environment === 'sandbox'
-        ? 'https://sandbox.dialpad.com/api/v2'
-        : 'https://dialpad.com/api/v2';
-
-    this.axios = createAxios({
-      baseURL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
+  private readonly axios: ReturnType<typeof createAxios>;
+  private readonly secrets: string[];
+  constructor(params: DialpadClientConfig) {
+    const token = credential(params.token);
+    if (!['production', 'sandbox'].includes(params.environment))
+      invalid('Select the production or sandbox Dialpad environment.');
+    this.secrets = [token];
+    this.axios = createDialpadAxios(
+      {
+        baseURL: `${params.environment === 'sandbox' ? 'https://sandbox.dialpad.com' : 'https://dialpad.com'}/api/v2`,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        timeout: 30000,
+        maxRedirects: 0,
+        maxBodyLength: 4 * 1024 * 1024,
+        maxContentLength: 4 * 1024 * 1024
+      },
+      this.secrets
+    );
+  }
+  validate(value: unknown) {
+    safeJson(value, this.secrets);
+  }
+  private async request(
+    method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+    path: string,
+    data?: Record<string, unknown>,
+    params?: Record<string, unknown>,
+    empty = false
+  ): Promise<unknown> {
+    this.validate({ path, data, params });
+    try {
+      const response = await this.axios.request<unknown>({
+        method,
+        url: path,
+        data: data === undefined ? undefined : pickDefined(data),
+        params: params === undefined ? undefined : pickDefined(params)
+      });
+      if (response.status !== 200) malformed();
+      safeJson(response.data, this.secrets, true);
+      if (empty) {
+        if (
+          response.data !== undefined &&
+          response.data !== null &&
+          response.data !== '' &&
+          Object.keys(object(response.data)).length
+        )
+          malformed();
+        return undefined;
       }
-    });
+      return object(response.data);
+    } catch (error) {
+      if (error instanceof ServiceError) throw error;
+      const raw = getApiErrorStatus(error);
+      const status =
+        typeof raw === 'number' && Number.isInteger(raw) && raw >= 100 && raw <= 599
+          ? raw
+          : undefined;
+      throw buildApiServiceError(
+        { response: { status } },
+        {
+          providerLabel: 'Dialpad',
+          reason: 'dialpad_api_error',
+          operation: 'request',
+          parent: {},
+          extractMessage: () =>
+            'Check the environment, resource ID, permissions and approved scopes. A timed-out write may have applied; reconcile before retrying.'
+        }
+      );
+    }
   }
-
-  // ── Users ──────────────────────────────────────────
-
-  async listUsers(params?: { cursor?: string; email?: string; state?: string }) {
-    let response = await this.axios.get('/users', { params });
-    return response.data as PaginatedResponse<any>;
+  async getUser(id: string) {
+    const target = nativeId(id, 'user ID', true);
+    const row = await this.request('GET', `/users/${target}`);
+    models.user(row, target);
+    return object(row);
   }
-
-  async getUser(userId: string) {
-    let response = await this.axios.get(`/users/${userId}`);
-    return response.data;
+  async listUsers(params: { cursor?: string; email?: string; state?: string } = {}) {
+    return page(await this.request('GET', '/users', undefined, params));
   }
-
   async createUser(data: {
     email: string;
     first_name?: string;
     last_name?: string;
-    office_id?: number;
+    office_id: number;
     license?: string;
   }) {
-    let response = await this.axios.post('/users', data);
-    return response.data;
+    const row = await this.request('POST', '/users', data);
+    models.user(row);
+    return row;
   }
-
-  async updateUser(userId: string, data: Record<string, any>) {
-    let response = await this.axios.patch(`/users/${userId}`, data);
-    return response.data;
+  async updateUser(id: string, data: Record<string, unknown>) {
+    const target = nativeId(id, 'user ID', true);
+    const row = await this.request('PATCH', `/users/${target}`, changes(data));
+    models.user(row, target);
+    return row;
   }
-
-  async deleteUser(userId: string) {
-    let response = await this.axios.delete(`/users/${userId}`);
-    return response.data;
-  }
-
-  async toggleDoNotDisturb(userId: string, enabled: boolean) {
-    let response = await this.axios.patch(`/users/${userId}`, { do_not_disturb: enabled });
-    return response.data;
-  }
-
-  // ── Contacts ───────────────────────────────────────
-
-  async listContacts(params?: { cursor?: string; owner_id?: string }) {
-    let response = await this.axios.get('/contacts', { params });
-    return response.data as PaginatedResponse<any>;
-  }
-
-  async getContact(contactId: string) {
-    let response = await this.axios.get(`/contacts/${contactId}`);
-    return response.data;
-  }
-
-  async createContact(data: {
-    first_name?: string;
-    last_name?: string;
-    phones?: string[];
-    emails?: string[];
-    company_name?: string;
-    job_title?: string;
-    urls?: string[];
-    uid?: string;
-  }) {
-    let response = await this.axios.post('/contacts', data);
-    return response.data;
-  }
-
-  async updateContact(contactId: string, data: Record<string, any>) {
-    let response = await this.axios.patch(`/contacts/${contactId}`, data);
-    return response.data;
-  }
-
-  async deleteContact(contactId: string) {
-    let response = await this.axios.delete(`/contacts/${contactId}`);
-    return response.data;
-  }
-
-  async createOrUpdateContact(data: {
-    uid: string;
-    first_name?: string;
-    last_name?: string;
-    phones?: string[];
-    emails?: string[];
-    company_name?: string;
-    job_title?: string;
-    urls?: string[];
-  }) {
-    let response = await this.axios.put('/contacts', data);
-    return response.data;
-  }
-
-  // ── SMS ────────────────────────────────────────────
-
-  async sendSms(data: {
-    to_numbers: string[];
-    text: string;
-    user_id?: number;
-    infer_country_code?: boolean;
-    sender_group_type?: string;
-    sender_group_id?: number;
-  }) {
-    let response = await this.axios.post('/sms', data);
-    return response.data;
-  }
-
-  // ── Calls ──────────────────────────────────────────
-
-  async initiateCall(
-    userId: string,
-    data: {
-      phone_number?: string;
-      user_id?: number;
-      group_type?: string;
-      group_id?: number;
-      custom_data?: string;
-    }
-  ) {
-    let response = await this.axios.post(`/users/${userId}/initiate_call`, data);
-    return response.data;
-  }
-
-  async getCall(callId: string) {
-    let response = await this.axios.get(`/calls/${callId}`);
-    return response.data;
-  }
-
-  async listCalls(params?: {
-    cursor?: string;
-    started_after?: string;
-    started_before?: string;
-    target_type?: string;
-    target_id?: string;
-  }) {
-    let response = await this.axios.get('/calls', { params });
-    return response.data as PaginatedResponse<any>;
-  }
-
-  async hangupCall(callId: string) {
-    let response = await this.axios.post(`/calls/${callId}/hangup`);
-    return response.data;
-  }
-
-  async transferCall(
-    callId: string,
-    data: {
-      phone_number?: string;
-      user_id?: number;
-      type?: string;
-    }
-  ) {
-    let response = await this.axios.post(`/calls/${callId}/transfer`, data);
-    return response.data;
-  }
-
-  async toggleCallRecording(callId: string, enabled: boolean) {
-    let response = await this.axios.patch(`/calls/${callId}`, { is_recording: enabled });
-    return response.data;
-  }
-
-  // ── Call Centers ───────────────────────────────────
-
-  async listCallCenters(officeId: string, params?: { cursor?: string }) {
-    let response = await this.axios.get(`/offices/${officeId}/callcenters`, { params });
-    return response.data as PaginatedResponse<any>;
-  }
-
-  async getCallCenter(callCenterId: string) {
-    let response = await this.axios.get(`/callcenters/${callCenterId}`);
-    return response.data;
-  }
-
-  async createCallCenter(
-    officeId: string,
-    data: {
-      name: string;
-      description?: string;
-    }
-  ) {
-    let response = await this.axios.post(`/offices/${officeId}/callcenters`, data);
-    return response.data;
-  }
-
-  async updateCallCenter(callCenterId: string, data: Record<string, any>) {
-    let response = await this.axios.patch(`/callcenters/${callCenterId}`, data);
-    return response.data;
-  }
-
-  async deleteCallCenter(callCenterId: string) {
-    let response = await this.axios.delete(`/callcenters/${callCenterId}`);
-    return response.data;
-  }
-
-  async listCallCenterOperators(callCenterId: string, params?: { cursor?: string }) {
-    let response = await this.axios.get(`/callcenters/${callCenterId}/operators`, { params });
-    return response.data as PaginatedResponse<any>;
-  }
-
-  async addCallCenterOperator(
-    callCenterId: string,
-    data: { user_id: number; skill_level?: number }
-  ) {
-    let response = await this.axios.post(`/callcenters/${callCenterId}/operators`, data);
-    return response.data;
-  }
-
-  async removeCallCenterOperator(callCenterId: string, operatorId: string) {
-    let response = await this.axios.delete(
-      `/callcenters/${callCenterId}/operators/${operatorId}`
+  async toggleDnd(id: string, enabled: boolean) {
+    const target = nativeId(id, 'user ID', true);
+    const row = object(
+      await this.request('PATCH', `/users/${target}/togglednd`, { do_not_disturb: enabled })
     );
-    return response.data;
+    models.user(row, target);
+    if (row.do_not_disturb !== enabled) malformed();
+    return row;
   }
-
-  // ── Departments ────────────────────────────────────
-
-  async listDepartments(officeId: string, params?: { cursor?: string }) {
-    let response = await this.axios.get(`/offices/${officeId}/departments`, { params });
-    return response.data as PaginatedResponse<any>;
+  async deleteUser(id: string) {
+    const target = nativeId(id, 'user ID');
+    const row = await this.request('DELETE', `/users/${target}`);
+    models.user(row, target);
+    if (object(row).state !== 'deleted') malformed();
   }
-
-  async getDepartment(departmentId: string) {
-    let response = await this.axios.get(`/departments/${departmentId}`);
-    return response.data;
+  async listContacts(params: { cursor?: string; owner_id?: string } = {}) {
+    if (params.owner_id !== undefined) nativeId(params.owner_id, 'owner user ID');
+    return page(await this.request('GET', '/contacts', undefined, params));
   }
-
-  // ── Offices ────────────────────────────────────────
-
-  async listOffices(params?: { cursor?: string }) {
-    let response = await this.axios.get('/offices', { params });
-    return response.data as PaginatedResponse<any>;
+  async getContact(id: string) {
+    const target = contactId(id);
+    const row = await this.request('GET', `/contacts/${encodeURIComponent(target)}`);
+    models.contact(row, target);
+    return object(row);
   }
-
-  async getOffice(officeId: string) {
-    let response = await this.axios.get(`/offices/${officeId}`);
-    return response.data;
+  async createContact(data: Record<string, unknown>) {
+    const row = await this.request('POST', '/contacts', data);
+    models.contact(row);
+    return row;
   }
-
-  // ── Phone Numbers ──────────────────────────────────
-
-  async listNumbers(params?: { cursor?: string; target_type?: string; target_id?: string }) {
-    let response = await this.axios.get('/numbers', { params });
-    return response.data as PaginatedResponse<any>;
+  async upsertContact(data: Record<string, unknown>) {
+    const row = await this.request('PUT', '/contacts', data);
+    models.contact(row);
+    return row;
   }
-
-  async assignNumber(data: { number: string; target_type: string; target_id: number }) {
-    let response = await this.axios.post('/numbers/assign', data);
-    return response.data;
+  async updateContact(id: string, data: Record<string, unknown>) {
+    const target = contactId(id);
+    const row = await this.request(
+      'PATCH',
+      `/contacts/${encodeURIComponent(target)}`,
+      changes(data)
+    );
+    models.contact(row, target);
+    return row;
   }
-
-  async unassignNumber(data: { number: string; target_type: string; target_id: number }) {
-    let response = await this.axios.post('/numbers/unassign', data);
-    return response.data;
+  async deleteContact(id: string) {
+    const target = contactId(id);
+    await this.getContact(target);
+    const row = await this.request('DELETE', `/contacts/${encodeURIComponent(target)}`);
+    models.contact(row, target);
+    try {
+      await this.getContact(target);
+    } catch (error) {
+      if (isMissing(error)) return;
+      throw error;
+    }
+    malformed();
   }
-
-  // ── Blocked Numbers ────────────────────────────────
-
-  async listBlockedNumbers(params?: { cursor?: string }) {
-    let response = await this.axios.get('/blockednumbers', { params });
-    return response.data as PaginatedResponse<any>;
+  async sendSms(data: Record<string, unknown>) {
+    return object(await this.request('POST', '/sms', data));
   }
-
-  async blockNumber(data: { phone_number: string }) {
-    let response = await this.axios.post('/blockednumbers', data);
-    return response.data;
+  async initiateCall(id: string, data: Record<string, unknown>) {
+    return object(
+      await this.request(
+        'POST',
+        `/users/${nativeId(id, 'caller user ID', true)}/initiate_call`,
+        data
+      )
+    );
   }
-
-  async unblockNumber(numberId: string) {
-    let response = await this.axios.delete(`/blockednumbers/${numberId}`);
-    return response.data;
+  async getCall(id: string) {
+    const target = nativeId(id, 'call ID');
+    const row = await this.request('GET', `/call/${target}`);
+    models.call(row, target);
+    return object(row);
   }
-
-  // ── Webhooks & Subscriptions ───────────────────────
-
-  async createWebhook(data: { hook_url: string; secret?: string }) {
-    let response = await this.axios.post('/webhooks', data);
-    return response.data;
+  async listCalls(params: Record<string, unknown> = {}) {
+    return page(await this.request('GET', '/call', undefined, params));
   }
-
-  async deleteWebhook(webhookId: string) {
-    let response = await this.axios.delete(`/webhooks/${webhookId}`);
-    return response.data;
+  async hangupCall(id: string) {
+    await this.request(
+      'PUT',
+      `/call/${nativeId(id, 'call ID')}/actions/hangup`,
+      undefined,
+      undefined,
+      true
+    );
   }
-
-  async createCallEventSubscription(data: {
-    webhook_id: number;
-    call_states?: string[];
-    target_type?: string;
-    target_id?: number;
-    enabled?: boolean;
-  }) {
-    let response = await this.axios.post('/subscriptions/call', data);
-    return response.data;
+  async transferCall(id: string, destination: Record<string, unknown>) {
+    return object(
+      await this.request('POST', `/call/${nativeId(id, 'call ID')}/transfer`, {
+        to: destination
+      })
+    );
   }
-
-  async deleteCallEventSubscription(subscriptionId: string) {
-    let response = await this.axios.delete(`/subscriptions/call/${subscriptionId}`);
-    return response.data;
+  async listCallCenters(id: string, params: { cursor?: string } = {}) {
+    return page(
+      await this.request(
+        'GET',
+        `/offices/${nativeId(id, 'office ID')}/callcenters`,
+        undefined,
+        params
+      )
+    );
   }
-
-  async createSmsEventSubscription(data: {
-    webhook_id: number;
-    sms_direction: string;
-    target_type?: string;
-    target_id?: number;
-    enabled?: boolean;
-  }) {
-    let response = await this.axios.post('/subscriptions/sms', data);
-    return response.data;
+  async getCallCenter(id: string) {
+    const target = nativeId(id, 'call-center ID');
+    const row = await this.request('GET', `/callcenters/${target}`);
+    models.callCenter(row, target);
+    return object(row);
   }
-
-  async deleteSmsEventSubscription(subscriptionId: string) {
-    let response = await this.axios.delete(`/subscriptions/sms/${subscriptionId}`);
-    return response.data;
+  async createCallCenter(id: string, data: Record<string, unknown>) {
+    const row = await this.request('POST', '/callcenters', {
+      ...data,
+      office_id: Number(nativeId(id, 'office ID'))
+    });
+    models.callCenter(row);
+    if (String(object(row).office_id) !== id) malformed();
+    return row;
   }
-
-  async createContactEventSubscription(data: { endpoint_id: number; enabled?: boolean }) {
-    let response = await this.axios.post('/subscriptions/contact', data);
-    return response.data;
+  async updateCallCenter(id: string, data: Record<string, unknown>) {
+    const target = nativeId(id, 'call-center ID');
+    const row = await this.request('PATCH', `/callcenters/${target}`, changes(data));
+    models.callCenter(row, target);
+    return row;
   }
-
-  async deleteContactEventSubscription(subscriptionId: string) {
-    let response = await this.axios.delete(`/subscriptions/contact/${subscriptionId}`);
-    return response.data;
+  async deleteCallCenter(id: string) {
+    const target = nativeId(id, 'call-center ID');
+    const row = await this.request('DELETE', `/callcenters/${target}`);
+    models.callCenter(row, target);
+    if (object(row).state !== 'deleted') malformed();
   }
-
-  // ── Company ────────────────────────────────────────
-
+  async listCallCenterOperators(id: string) {
+    const row = await this.request(
+      'GET',
+      `/callcenters/${nativeId(id, 'call-center ID')}/operators`
+    );
+    models.operators(row);
+    return row;
+  }
+  async addCallCenterOperator(id: string, data: Record<string, unknown>) {
+    const target = nativeId(id, 'call-center ID');
+    const row = await this.request('POST', `/callcenters/${target}/operators`, data);
+    models.callCenter(row, target);
+    return row;
+  }
+  async removeCallCenterOperator(id: string, operator: string) {
+    const target = nativeId(id, 'call-center ID');
+    const row = await this.request('DELETE', `/callcenters/${target}/operators`, {
+      user_id: Number(nativeId(operator, 'operator user ID'))
+    });
+    models.callCenter(row, target);
+    return row;
+  }
+  async listOffices(params: { cursor?: string } = {}) {
+    return page(await this.request('GET', '/offices', undefined, params));
+  }
+  async getOffice(id: string) {
+    const target = nativeId(id, 'office ID');
+    const row = await this.request('GET', `/offices/${target}`);
+    models.office(row, target);
+    return row;
+  }
+  async listNumbers(params: { cursor?: string } = {}) {
+    return page(await this.request('GET', '/numbers', undefined, params));
+  }
+  async getNumber(value: string) {
+    const target = phone(value);
+    const row = await this.request('GET', `/numbers/${encodeURIComponent(target)}`);
+    models.number(row, target);
+    return object(row);
+  }
+  async assignNumber(value: string, type: string, id: string) {
+    const target = phone(value);
+    const row = await this.request('POST', `/numbers/${encodeURIComponent(target)}/assign`, {
+      target_type: type,
+      target_id: Number(nativeId(id, 'target ID'))
+    });
+    const mapped = models.number(row, target);
+    if (mapped.targetId !== id || mapped.targetType !== type) malformed();
+    return row;
+  }
+  async unassignNumber(value: string) {
+    const target = phone(value);
+    const row = await this.request(
+      'DELETE',
+      `/numbers/${encodeURIComponent(target)}`,
+      undefined,
+      { release: false }
+    );
+    models.number(row, target);
+    if (object(row).target_id !== null && object(row).target_id !== undefined) malformed();
+    return row;
+  }
+  async listBlockedNumbers(params: { cursor?: string } = {}) {
+    return page(await this.request('GET', '/blockednumbers', undefined, params));
+  }
+  async getBlockedNumber(value: string) {
+    const target = phone(value);
+    const row = await this.request('GET', `/blockednumbers/${encodeURIComponent(target)}`);
+    models.blocked(row, target);
+    return row;
+  }
+  async blockNumber(value: string) {
+    await this.request(
+      'POST',
+      '/blockednumbers/add',
+      { numbers: [phone(value)] },
+      undefined,
+      true
+    );
+  }
+  async unblockNumber(value: string) {
+    await this.request(
+      'POST',
+      '/blockednumbers/remove',
+      { numbers: [phone(value)] },
+      undefined,
+      true
+    );
+  }
   async getCompany() {
-    let response = await this.axios.get('/company');
-    return response.data;
-  }
-
-  // ── Stats ──────────────────────────────────────────
-
-  async initiateStats(data: {
-    stat_type: string;
-    days_ago_start: number;
-    days_ago_end: number;
-    target_type?: string;
-    target_id?: number;
-    timezone?: string;
-    export_type?: string;
-  }) {
-    let response = await this.axios.post('/stats', data);
-    return response.data;
-  }
-
-  async getStats(requestId: string) {
-    let response = await this.axios.get(`/stats/${requestId}`);
-    return response.data;
-  }
-
-  // ── Meetings ───────────────────────────────────────
-
-  async listMeetings(params?: { cursor?: string }) {
-    let response = await this.axios.get('/meetings', { params });
-    return response.data as PaginatedResponse<any>;
-  }
-
-  async getMeeting(meetingId: string) {
-    let response = await this.axios.get(`/meetings/${meetingId}`);
-    return response.data;
-  }
-
-  async createMeeting(data: {
-    name: string;
-    description?: string;
-    start_time?: string;
-    end_time?: string;
-  }) {
-    let response = await this.axios.post('/meetings', data);
-    return response.data;
-  }
-
-  async deleteMeeting(meetingId: string) {
-    let response = await this.axios.delete(`/meetings/${meetingId}`);
-    return response.data;
+    const row = await this.request('GET', '/company');
+    models.company(row);
+    return row;
   }
 }

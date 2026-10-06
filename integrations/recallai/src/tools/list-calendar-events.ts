@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, nextCursor } from '../lib/client';
 import { spec } from '../spec';
 
 let calendarEventSchema = z.object({
@@ -33,7 +33,10 @@ export let listCalendarEventsTool = SlateTool.create(spec, {
   .input(
     z.object({
       cursor: z.string().optional().describe('Pagination cursor for next page'),
-      calendarId: z.string().optional().describe('Filter by specific calendar ID'),
+      calendarId: z
+        .string()
+        .optional()
+        .describe('Calendar ID from list_calendars; Calendar V2 requires this value'),
       startTimeAfter: z
         .string()
         .optional()
@@ -50,12 +53,19 @@ export let listCalendarEventsTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Whether to include deleted events (default: false)'),
-      pageSize: z.number().optional().describe('Number of results per page')
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Legacy page-size hint; Recall.ai chooses the page size')
     })
   )
   .output(
     z.object({
-      totalCount: z.number().describe('Total number of matching events'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider-wide total when supplied by Recall.ai; omitted when unavailable'),
+      returnedCount: z.number().optional().describe('Number of results on this page'),
       nextCursor: z.string().nullable().describe('Cursor for the next page'),
       events: z.array(calendarEventSchema).describe('List of calendar events')
     })
@@ -76,20 +86,13 @@ export let listCalendarEventsTool = SlateTool.create(spec, {
       pageSize: ctx.input.pageSize
     });
 
-    let nextCursor: string | null = null;
-    if (result.next) {
-      try {
-        let url = new URL(result.next);
-        nextCursor = url.searchParams.get('cursor');
-      } catch {
-        nextCursor = result.next;
-      }
-    }
+    let cursor = nextCursor(result.next);
 
     return {
       output: {
         totalCount: result.count,
-        nextCursor,
+        returnedCount: result.results.length,
+        nextCursor: cursor,
         events: result.results.map(evt => ({
           eventId: evt.id,
           calendarId: evt.calendarId,
@@ -102,7 +105,7 @@ export let listCalendarEventsTool = SlateTool.create(spec, {
           updatedAt: evt.updatedAt
         }))
       },
-      message: `Found **${result.count}** calendar events. Showing ${result.results.length} results${nextCursor ? ' (more available)' : ''}.`
+      message: `Retrieved ${result.results.length} results${cursor ? ' (more available)' : ''}.`
     };
   })
   .build();

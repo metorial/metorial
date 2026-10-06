@@ -14,8 +14,6 @@ import {
   listGifts,
   searchNonprofits
 } from './tools';
-import { inboundWebhook, newContributions, newDonations, newGifts } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     searchNonprofits,
     getNonprofit
   ],
-  triggers: [inboundWebhook, newDonations, newContributions, newGifts]
+  triggers: []
 });

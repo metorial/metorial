@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCategories = SlateTool.create(spec, {
@@ -28,11 +28,7 @@ export let listCategories = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let categories = await client.listCategories();
 

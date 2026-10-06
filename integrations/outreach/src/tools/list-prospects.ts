@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { buildFilterParams, flattenResource } from '../lib/helpers';
+import { buildFilterParams, flattenResource, validateInput } from '../lib/helpers';
 import { spec } from '../spec';
 
 let prospectSummarySchema = z.object({
@@ -24,7 +24,7 @@ export let listProspects = SlateTool.create(spec, {
     readOnly: true
   },
   constraints: [
-    'Returns up to 50 results per page by default. Use pageSize and pageOffset for pagination.'
+    'Returns up to 50 results per page by default. Use pageSize and the returned nextPageAfter cursor for pagination; legacy pageOffset is limited to 10000.'
   ]
 })
   .input(
@@ -36,7 +36,14 @@ export let listProspects = SlateTool.create(spec, {
       ownerId: z.string().optional().describe('Filter by owner user ID'),
       tag: z.string().optional().describe('Filter by tag'),
       pageSize: z.number().optional().describe('Number of results per page (max 1000)'),
-      pageOffset: z.number().optional().describe('Page offset for pagination'),
+      pageOffset: z
+        .number()
+        .optional()
+        .describe('Legacy offset from 0 to 10000; omit to use cursor pagination.'),
+      pageAfter: z
+        .string()
+        .optional()
+        .describe('Returned nextPageAfter cursor; keep the same filters and sorting.'),
       sortBy: z
         .string()
         .optional()
@@ -47,10 +54,22 @@ export let listProspects = SlateTool.create(spec, {
     z.object({
       prospects: z.array(prospectSummarySchema),
       hasMore: z.boolean(),
-      totalCount: z.number().optional()
+      nextPageOffset: z
+        .number()
+        .optional()
+        .describe('Use as pageOffset for the next page with the same filters.'),
+      nextPageAfter: z
+        .string()
+        .optional()
+        .describe('Pass as pageAfter for the next page with unchanged filters.'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Exact provider count when available and not truncated.')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     let filterParams = buildFilterParams({
@@ -66,7 +85,8 @@ export let listProspects = SlateTool.create(spec, {
       ...filterParams
     };
 
-    if (ctx.input.pageSize) params['page[size]'] = ctx.input.pageSize.toString();
+    if (ctx.input.pageSize) params['page[limit]'] = ctx.input.pageSize.toString();
+    if (ctx.input.pageAfter !== undefined) params['page[after]'] = ctx.input.pageAfter;
     if (ctx.input.pageOffset !== undefined)
       params['page[offset]'] = ctx.input.pageOffset.toString();
     if (ctx.input.sortBy) params.sort = ctx.input.sortBy;
@@ -92,6 +112,8 @@ export let listProspects = SlateTool.create(spec, {
       output: {
         prospects,
         hasMore: result.hasMore,
+        nextPageOffset: result.nextPageOffset,
+        nextPageAfter: result.nextPageAfter,
         totalCount: result.totalCount ?? undefined
       },
       message: `Found **${prospects.length}** prospects${result.hasMore ? ' (more available)' : ''}.`

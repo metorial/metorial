@@ -14,7 +14,11 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
-        .describe('Entelligence API key from https://entelligence.ai/manage/api')
+        .trim()
+        .min(1)
+        .describe(
+          'Entelligence API key from Settings → API in https://app.entelligence.ai; the key must support your repository chat widget'
+        )
     }),
     getOutput: async ctx => {
       return {

@@ -13,7 +13,7 @@ export let auth = SlateAuth.create()
     key: 'api_key',
 
     inputSchema: z.object({
-      token: z.string().describe('Scale AI API key (live or test mode)')
+      token: z.string().trim().min(1).describe('Scale AI API key (live or test mode)')
     }),
 
     getOutput: async ctx => {

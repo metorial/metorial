@@ -27,8 +27,6 @@ import {
   updateService,
   updateUser
 } from './tools';
-import { inboundWebhook, newScans } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,5 +56,5 @@ export let provider = Slate.create({
     updateDevice,
     generateBarcode
   ],
-  triggers: [inboundWebhook, newScans]
+  triggers: []
 });

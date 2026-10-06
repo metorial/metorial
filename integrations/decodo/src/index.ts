@@ -15,8 +15,6 @@ import {
   scrapeWebsite,
   updateSubUser
 } from './tools';
-import { accountEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     getSubscriptions,
     getProxyEndpoints
   ],
-  triggers: [accountEvents]
+  triggers: []
 });

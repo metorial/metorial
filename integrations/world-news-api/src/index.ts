@@ -10,8 +10,6 @@ import {
   searchNewsTool,
   topNewsTool
 } from './tools';
-import { inboundWebhook, newArticlesTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     newspaperFrontPagesTool,
     geoCoordinatesTool
   ],
-  triggers: [inboundWebhook, newArticlesTrigger]
+  triggers: []
 });

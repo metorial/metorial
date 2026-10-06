@@ -1,7 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  deleted: z.boolean().describe('Whether the connection was successfully deleted'),
+  connectionId: z.string().describe('ID of the deleted connection')
+});
 
 export let deleteConnection = SlateTool.create(spec, {
   name: 'Delete Connection',
@@ -16,26 +22,14 @@ export let deleteConnection = SlateTool.create(spec, {
       connectionId: z.string().describe('ID of the connection to delete')
     })
   )
-  .output(
-    z.object({
-      deleted: z.boolean().describe('Whether the connection was successfully deleted'),
-      connectionId: z.string().describe('ID of the deleted connection')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    await client.deleteConnection(ctx.input.connectionId);
-
-    return {
-      output: {
-        deleted: true,
-        connectionId: ctx.input.connectionId
-      },
-      message: `Deleted connection **${ctx.input.connectionId}**.`
-    };
+    const result = await invoke('delete_connection', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

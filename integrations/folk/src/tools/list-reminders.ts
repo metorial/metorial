@@ -1,13 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, nextCursorFrom } from '../lib/client';
 import { spec } from '../spec';
 
 export let listReminders = SlateTool.create(spec, {
   name: 'List Reminders',
   key: 'list_reminders',
-  description: `Lists reminders for a specific person, company, or deal. Returns reminder names, schedules, assigned users, and trigger times.`,
+  description: `DEPRECATED — use list_tasks for current task workflows. Lists reminders for a specific person, company, or deal. Returns reminder names, schedules, assigned users, and trigger times.`,
+  instructions: [
+    'Prefer list_tasks; reminder endpoints sunset in February 2027. Existing reminder IDs must still use reminder tools.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -56,11 +60,7 @@ export let listReminders = SlateTool.create(spec, {
       cursor: ctx.input.cursor
     });
 
-    let nextCursor: string | null = null;
-    if (result.pagination.nextLink) {
-      let url = new URL(result.pagination.nextLink);
-      nextCursor = url.searchParams.get('cursor');
-    }
+    const nextCursor = nextCursorFrom(result.pagination.nextLink);
 
     return {
       output: {

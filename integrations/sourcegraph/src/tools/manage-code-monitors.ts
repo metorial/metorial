@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fail, notificationUrl } from '../lib/validation';
 import { spec } from '../spec';
 
 let codeMonitorSchema = z.object({
@@ -18,6 +19,11 @@ let codeMonitorSchema = z.object({
       })
     )
     .optional(),
+  actionsHasNextPage: z
+    .boolean()
+    .optional()
+    .describe('Whether the bounded action list has more entries.'),
+  actionsEndCursor: z.string().optional(),
   createdAt: z.string().optional()
 });
 
@@ -46,10 +52,7 @@ Useful for tracking secrets, anti-patterns, or specific code changes.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
     let data = await client.listCodeMonitors({
       first: ctx.input.first,
@@ -57,9 +60,9 @@ Useful for tracking secrets, anti-patterns, or specific code changes.`,
     });
 
     let monitors = data.currentUser.monitors;
-    let codeMonitors = (monitors.nodes || []).map((n: any) => {
-      let actions = (n.actions?.nodes || []).map((a: any) => {
-        if (a.url !== undefined) {
+    let codeMonitors = (monitors.nodes || []).map(n => {
+      let actions = (n.actions?.nodes || []).map(a => {
+        if (a.__typename !== 'MonitorEmail') {
           let actionType = a.__typename === 'MonitorSlackWebhook' ? 'slackWebhook' : 'webhook';
           return { actionType, enabled: a.enabled, url: a.url };
         }
@@ -70,19 +73,21 @@ Useful for tracking secrets, anti-patterns, or specific code changes.`,
         codeMonitorId: n.id,
         description: n.description,
         enabled: n.enabled,
-        owner: n.owner?.username || n.owner?.name || undefined,
-        query: n.trigger?.query || undefined,
+        owner: n.owner?.username ?? n.owner?.name ?? undefined,
+        query: n.trigger?.query ?? undefined,
         actions,
-        createdAt: n.createdAt || undefined
+        actionsHasNextPage: n.actions?.pageInfo.hasNextPage,
+        actionsEndCursor: n.actions?.pageInfo.endCursor,
+        createdAt: n.createdAt ?? undefined
       };
     });
 
     return {
       output: {
         codeMonitors,
-        totalCount: monitors.totalCount || 0,
-        hasNextPage: monitors.pageInfo?.hasNextPage || false,
-        endCursor: monitors.pageInfo?.endCursor || undefined
+        totalCount: monitors.totalCount,
+        hasNextPage: monitors.pageInfo.hasNextPage,
+        endCursor: monitors.pageInfo?.endCursor ?? undefined
       },
       message: `Found **${monitors.totalCount}** code monitors. Showing ${codeMonitors.length}.`
     };
@@ -94,7 +99,7 @@ export let createCodeMonitor = SlateTool.create(spec, {
   key: 'create_code_monitor',
   description: `Create a new code monitor that watches for code changes matching a search query.
 When matches are found in new commits, the monitor triggers notifications via email, Slack webhook, or generic webhook.
-The search query must include a \`type:diff\` or \`type:commit\` filter.`,
+The search query must include a \`type:diff\` or \`type:commit\` filter. Actions omit result snippets; email priority is NORMAL with no moderation header. Enabled monitors can send notifications immediately; deletion cannot recall them.`,
   instructions: [
     'The search query must include type:diff or type:commit to monitor for new changes',
     'At least one action (email, slack, or webhook) must be specified'
@@ -111,7 +116,9 @@ The search query must include a \`type:diff\` or \`type:commit\` filter.`,
         .boolean()
         .optional()
         .describe('Whether the monitor is enabled. Defaults to true.'),
-      namespaceUserId: z.string().describe('GraphQL ID of the user who owns the monitor'),
+      namespaceUserId: z
+        .string()
+        .describe('Native GraphQL ID of the user or organization that owns the monitor'),
       query: z
         .string()
         .describe('Sourcegraph search query (must include type:diff or type:commit)'),
@@ -132,12 +139,15 @@ The search query must include a \`type:diff\` or \`type:commit\` filter.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
-    let actions: any[] = [];
+    if (
+      ctx.input.emailRecipients &&
+      (ctx.input.emailRecipients.length > 100 ||
+        new Set(ctx.input.emailRecipients).size !== ctx.input.emailRecipients.length)
+    )
+      throw fail('Use at most 100 distinct native email recipient IDs.');
+    const actions: Parameters<Client['createCodeMonitor']>[0]['actions'] = [];
     if (ctx.input.emailRecipients && ctx.input.emailRecipients.length > 0) {
       actions.push({
         email: {
@@ -150,7 +160,7 @@ The search query must include a \`type:diff\` or \`type:commit\` filter.`,
       actions.push({
         slackWebhook: {
           enabled: true,
-          url: ctx.input.slackWebhookUrl
+          url: notificationUrl(ctx.input.slackWebhookUrl)
         }
       });
     }
@@ -158,7 +168,7 @@ The search query must include a \`type:diff\` or \`type:commit\` filter.`,
       actions.push({
         webhook: {
           enabled: true,
-          url: ctx.input.webhookUrl
+          url: notificationUrl(ctx.input.webhookUrl)
         }
       });
     }
@@ -178,7 +188,7 @@ The search query must include a \`type:diff\` or \`type:commit\` filter.`,
         codeMonitorId: monitor.id,
         description: monitor.description,
         enabled: monitor.enabled,
-        query: monitor.trigger?.query || undefined
+        query: monitor.trigger?.query ?? undefined
       },
       message: `Created code monitor **${monitor.description}** watching for: \`${ctx.input.query}\`.`
     };
@@ -205,10 +215,7 @@ export let deleteCodeMonitor = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
     await client.deleteCodeMonitor(ctx.input.codeMonitorId);
 

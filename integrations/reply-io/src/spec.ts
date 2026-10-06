@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'replyio',
   name: 'Reply.io',
   description:
-    'Multichannel sales engagement platform that automates outreach across email, LinkedIn, calls, SMS, and WhatsApp. Manage contacts, build outreach sequences, track engagement, and analyze campaign performance.',
+    'Manage Reply.io contacts, outreach sequences and membership, email templates, private contact lists, blacklist rules and manual tasks. Discover the resolved user, sending schedules and email account statuses, and read sequence and team reporting.',
   metadata: {},
   config,
   auth

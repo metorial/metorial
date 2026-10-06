@@ -1,6 +1,12 @@
 # Loops.so
 
-Manage contacts, send emails, and track engagement for SaaS email marketing. Create, update, find, and delete contacts with custom properties. Send transactional emails using templates with dynamic data variables and attachments. Trigger automated email workflows (loops) by sending events. Manage mailing list subscriptions. List contact properties and transactional email templates. Receive webhooks for contact changes, email sends, deliveries, opens, clicks, bounces, and unsubscribes.
+Manage contacts and their mailing-list subscriptions, discover contact properties and published transactional templates, verify the connected team and check contact suppression. Send explicitly requested transactional emails or workflow events with optional idempotency keys.
+
+The API key belongs to one team and is sent as a Bearer token. No setup identifiers or OAuth scopes are required. Contact creation/update and event submission can trigger workflows or change subscriptions. Unsubscribed contacts can still receive transactional emails and critical-notice campaigns. A successful send response confirms provider acceptance, not delivery; uncertain sends are not retried automatically.
+
+Published-template discovery preserves the provider's supported deprecated `/transactional` listing and returns its continuation cursor. Draft content-authoring APIs are outside this integration. Custom property definitions must already exist; their values can be reset with null. Reserved fields and explicit inputs cannot be overwritten through property dictionaries.
+
+Email attachments use the original base64 input fields and require provider enablement. The complete JSON send request must be smaller than 4 MB. This integration does not download or export files.
 
 ## License
 

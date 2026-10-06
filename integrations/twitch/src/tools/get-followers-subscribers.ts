@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwitchClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getFollowersSubscribers = SlateTool.create(spec, {
@@ -63,7 +64,8 @@ export let getFollowersSubscribers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId);
+    validateInput('get_followers_subscribers', ctx.input, [ctx.auth.token]);
+    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId, ctx.auth.userId);
 
     if (ctx.input.type === 'followers') {
       let result = await client.getFollowers(ctx.input.broadcasterId, {
@@ -84,7 +86,7 @@ export let getFollowersSubscribers = SlateTool.create(spec, {
         message: ctx.input.checkUserId
           ? followers.length > 0
             ? `User \`${ctx.input.checkUserId}\` follows this channel`
-            : `User \`${ctx.input.checkUserId}\` does not follow this channel`
+            : `No follower details returned for user \`${ctx.input.checkUserId}\`; limited permissions can hide details, so absence is unconfirmed.`
           : `Channel has **${result.total}** followers. Returned ${followers.length} results.`
       };
     }

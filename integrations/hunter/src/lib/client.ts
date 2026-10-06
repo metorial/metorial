@@ -1,30 +1,164 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getApiErrorStatus,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
+
+export type Row = Record<string, unknown>;
+const invalidResponse = () =>
+  createApiServiceError('Hunter returned invalid response metadata.');
+export const row = (value: unknown): Row => {
+  const parsed = z.record(z.string(), z.unknown()).safeParse(value);
+  if (!parsed.success) throw invalidResponse();
+  return parsed.data;
+};
+export const rows = (value: unknown): Row[] => {
+  if (!Array.isArray(value)) throw invalidResponse();
+  return value.map(row);
+};
+export const text = (value: unknown, label = 'value'): string => {
+  if (typeof value !== 'string' || !value.trim() || /[\r\n\0]/.test(value))
+    throw createApiServiceError(`Provide a valid ${label}.`);
+  return value;
+};
+export const optionalText = (value: unknown): string | undefined => {
+  if (value == null) return undefined;
+  if (typeof value !== 'string') throw invalidResponse();
+  return value;
+};
+export const optionalNumber = (value: unknown): number | undefined => {
+  if (value == null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw invalidResponse();
+  return value;
+};
+export const optionalBoolean = (value: unknown): boolean | undefined => {
+  if (value == null) return undefined;
+  if (typeof value !== 'boolean') throw invalidResponse();
+  return value;
+};
+export const optionalRow = (value: unknown): Row => (value == null ? {} : row(value));
+export const optionalStrings = (value: unknown): string[] | undefined => {
+  if (value == null) return undefined;
+  const parsed = z.array(z.string()).safeParse(value);
+  if (!parsed.success) throw invalidResponse();
+  return parsed.data;
+};
+export const id = (value: unknown): number => {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1)
+    throw createApiServiceError('Provide a positive integer resource ID.');
+  return value;
+};
+const page = (limit: number | undefined, offset: number | undefined, maximum = 100) => {
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > maximum))
+    throw createApiServiceError(`Limit must be an integer from 1 to ${maximum}.`);
+  if (offset !== undefined && (!Number.isSafeInteger(offset) || offset < 0))
+    throw createApiServiceError('Offset must be a non-negative integer.');
+};
+const filterValues = (value: string | undefined, label: string) =>
+  value === undefined ? undefined : value.split(',').map(item => text(item.trim(), label));
+const requireCompany = (params: { domain?: string; company?: string }) => {
+  if (!params.domain?.trim() && !params.company?.trim())
+    throw createApiServiceError('Provide a domain or company name.');
+};
+export const entity = (value: unknown, expectedId?: number): Row => {
+  const result = row(value);
+  const resourceId = id(result.id);
+  if (expectedId !== undefined && resourceId !== expectedId)
+    throw createApiServiceError('Hunter returned a different resource than requested.');
+  return result;
+};
+export type HunterResponse = { data: unknown; meta: Row; httpStatus: number };
 
 export class Client {
-  private http;
-
-  constructor(private config: { token: string }) {
-    this.http = createAxios({
-      baseURL: 'https://api.hunter.io/v2'
+  private http: ReturnType<typeof createAuthenticatedAxios>;
+  constructor(config: { token: string }) {
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.hunter.io/v2',
+      authHeader: { name: 'X-API-KEY', value: text(config.token, 'API key') },
+      timeout: 45000,
+      maxRedirects: 0,
+      errorAdapter: error => {
+        const rawStatus = getApiErrorStatus(error);
+        const status =
+          typeof rawStatus === 'number' &&
+          Number.isInteger(rawStatus) &&
+          rawStatus >= 100 &&
+          rawStatus <= 599
+            ? rawStatus
+            : typeof rawStatus === 'string' && /^[1-5]\d{2}$/.test(rawStatus)
+              ? Number(rawStatus)
+              : undefined;
+        return buildApiServiceError(error, {
+          providerLabel: 'Hunter',
+          reason: 'hunter_api_error',
+          extractResponse: () => ({ status }),
+          extractMessage: () =>
+            status === 401
+              ? 'Check the API key.'
+              : status === 403
+                ? 'Check account access and rate limits before retrying.'
+                : status === 429
+                  ? 'The account usage limit was reached. Check the remaining quota.'
+                  : status === 451
+                    ? 'The provider does not permit processing this person. Do not retry or process the returned personal data.'
+                    : 'The provider rejected or could not complete the request. Check the supplied fields and resource access. Writes are not retried automatically.',
+          parent: {}
+        });
+      }
     });
   }
-
-  private get headers() {
+  private async request(
+    method: 'get' | 'post' | 'put' | 'delete',
+    path: string,
+    params?: Row,
+    data?: Row,
+    empty = false,
+    pending = false
+  ): Promise<HunterResponse> {
+    const response = await this.http.request<unknown>({
+      method,
+      url: path,
+      params: pickDefined(params ?? {}),
+      data
+    });
+    if (path === '/email-verifier' && response.status === 222)
+      throw createApiServiceError(
+        'Hunter could not complete verification because of a temporary remote mail-server response. Retry later; no verification result is available.',
+        { reason: 'hunter_verification_temporarily_unavailable', upstreamStatus: 222 }
+      );
+    if (response.status === 204 && empty)
+      return { data: undefined, meta: {}, httpStatus: 204 };
+    if (response.status === 202 && pending && (response.data === '' || response.data == null))
+      return { data: undefined, meta: {}, httpStatus: 202 };
+    if (![200, 201, ...(pending ? [202] : [])].includes(response.status))
+      throw createApiServiceError('Hunter returned an unexpected success status.', {
+        upstreamStatus: response.status
+      });
+    const envelope = row(response.data);
+    if (response.status === 202 && pending && envelope.errors === undefined)
+      return { data: envelope.data, meta: optionalRow(envelope.meta), httpStatus: 202 };
+    if (
+      (path === '/people/find' || path === '/companies/find') &&
+      !('data' in envelope) &&
+      typeof envelope.id === 'string'
+    )
+      return { data: envelope, meta: {}, httpStatus: response.status };
+    if (envelope.errors !== undefined || !('data' in envelope)) throw invalidResponse();
     return {
-      'X-API-KEY': this.config.token,
-      'Content-Type': 'application/json'
+      data: envelope.data,
+      meta: optionalRow(envelope.meta),
+      httpStatus: response.status
     };
   }
-
-  // ── Account ──────────────────────────────────────────────
-
   async getAccount() {
-    let response = await this.http.get('/account', { headers: this.headers });
-    return response.data.data;
+    return row((await this.request('get', '/account')).data);
   }
-
-  // ── Domain Search ────────────────────────────────────────
-
+  async getAccountStats() {
+    return row((await this.request('get', '/account-stats')).data);
+  }
   async domainSearch(params: {
     domain?: string;
     company?: string;
@@ -38,28 +172,37 @@ export class Client {
     location?: string;
     jobTitles?: string[];
   }) {
-    let query: Record<string, any> = {};
-    if (params.domain) query.domain = params.domain;
-    if (params.company) query.company = params.company;
-    if (params.limit) query.limit = params.limit;
-    if (params.offset) query.offset = params.offset;
-    if (params.type) query.type = params.type;
-    if (params.seniority) query.seniority = params.seniority;
-    if (params.department) query.department = params.department;
-    if (params.requiredField) query.required_field = params.requiredField;
-    if (params.verificationStatus) query.verification_status = params.verificationStatus;
-    if (params.location) query.location = params.location;
-    if (params.jobTitles && params.jobTitles.length > 0) query.job_titles = params.jobTitles;
-
-    let response = await this.http.get('/domain-search', {
-      headers: this.headers,
-      params: query
+    requireCompany(params);
+    page(params.limit, params.offset);
+    if (params.verificationStatus === 'invalid')
+      throw createApiServiceError(
+        'Hunter Domain Search supports valid, accept_all and unknown verification filters; invalid is not supported by this endpoint.'
+      );
+    const query = pickDefined({
+      domain: params.domain,
+      company: params.company,
+      limit: params.limit,
+      offset: params.offset,
+      type: params.type,
+      seniority: params.seniority,
+      department: params.department,
+      required_field: params.requiredField,
+      verification_status: params.verificationStatus,
+      job_titles: params.jobTitles?.join(',')
     });
-    return response.data;
+    if (params.location !== undefined) {
+      const countries = params.location.split(',').map(value => value.trim().toUpperCase());
+      if (!countries.length || countries.some(value => !/^[A-Z]{2}$/.test(value)))
+        throw createApiServiceError(
+          'Location must contain comma-separated two-letter country codes. Free-text locations cannot be mapped accurately to Hunter location filters.'
+        );
+      return this.request('post', '/domain-search', undefined, {
+        ...query,
+        location: { include: countries.map(country => ({ country })) }
+      });
+    }
+    return this.request('get', '/domain-search', query);
   }
-
-  // ── Email Finder ─────────────────────────────────────────
-
   async findEmail(params: {
     domain?: string;
     company?: string;
@@ -69,107 +212,89 @@ export class Client {
     linkedinHandle?: string;
     maxDuration?: number;
   }) {
-    let query: Record<string, any> = {};
-    if (params.domain) query.domain = params.domain;
-    if (params.company) query.company = params.company;
-    if (params.firstName) query.first_name = params.firstName;
-    if (params.lastName) query.last_name = params.lastName;
-    if (params.fullName) query.full_name = params.fullName;
-    if (params.linkedinHandle) query.linkedin_handle = params.linkedinHandle;
-    if (params.maxDuration) query.max_duration = params.maxDuration;
-
-    let response = await this.http.get('/email-finder', {
-      headers: this.headers,
-      params: query
+    if (
+      params.maxDuration !== undefined &&
+      (!Number.isInteger(params.maxDuration) ||
+        params.maxDuration < 3 ||
+        params.maxDuration > 20)
+    )
+      throw createApiServiceError('Max duration must be an integer from 3 to 20 seconds.');
+    if (!params.linkedinHandle?.trim()) {
+      requireCompany(params);
+      if (!params.fullName?.trim() && !(params.firstName?.trim() && params.lastName?.trim()))
+        throw createApiServiceError(
+          'Provide fullName or both firstName and lastName, or a LinkedIn handle.'
+        );
+    }
+    return this.request('get', '/email-finder', {
+      domain: params.domain,
+      company: params.company,
+      first_name: params.firstName,
+      last_name: params.lastName,
+      full_name: params.fullName,
+      linkedin_handle: params.linkedinHandle,
+      max_duration: params.maxDuration
     });
-    return response.data;
   }
-
-  // ── Email Verifier ───────────────────────────────────────
-
   async verifyEmail(email: string) {
-    let response = await this.http.get('/email-verifier', {
-      headers: this.headers,
-      params: { email }
-    });
-    return response.data;
+    return this.request(
+      'get',
+      '/email-verifier',
+      { email: text(email, 'email') },
+      undefined,
+      false,
+      true
+    );
   }
-
-  // ── Email Count ──────────────────────────────────────────
-
   async getEmailCount(params: { domain?: string; company?: string; type?: string }) {
-    let query: Record<string, any> = {};
-    if (params.domain) query.domain = params.domain;
-    if (params.company) query.company = params.company;
-    if (params.type) query.type = params.type;
-
-    let response = await this.http.get('/email-count', {
-      headers: this.headers,
-      params: query
-    });
-    return response.data;
+    requireCompany(params);
+    return this.request('get', '/email-count', params);
   }
-
-  // ── Enrichment ───────────────────────────────────────────
-
   async enrichPerson(params: { email?: string; linkedinHandle?: string }) {
-    let query: Record<string, any> = {};
-    if (params.email) query.email = params.email;
-    if (params.linkedinHandle) query.linkedin_handle = params.linkedinHandle;
-
-    let response = await this.http.get('/people/find', {
-      headers: this.headers,
-      params: query
+    if (!params.email?.trim() && !params.linkedinHandle?.trim())
+      throw createApiServiceError('Provide an email or LinkedIn handle.');
+    return this.request('get', '/people/find', {
+      email: params.email,
+      linkedin_handle: params.linkedinHandle
     });
-    return response.data;
   }
-
   async enrichCompany(domain: string) {
-    let response = await this.http.get('/companies/find', {
-      headers: this.headers,
-      params: { domain }
-    });
-    return response.data;
+    return this.request('get', '/companies/find', { domain: text(domain, 'domain') });
   }
-
-  async enrichCombined(email: string) {
-    let response = await this.http.get('/combined/find', {
-      headers: this.headers,
-      params: { email }
-    });
-    return response.data;
-  }
-
-  // ── Discover ─────────────────────────────────────────────
-
   async discoverCompanies(params: {
     query?: string;
-    organization?: Record<string, any>;
-    headquartersLocation?: Record<string, any>;
+    organization?: Row;
+    headquartersLocation?: Row;
     industry?: string[];
-    headcount?: Record<string, any>;
+    headcount?: string[];
     companyType?: string[];
     limit?: number;
     offset?: number;
   }) {
-    let body: Record<string, any> = {};
-    if (params.query) body.query = params.query;
-    if (params.organization) body.organization = params.organization;
-    if (params.headquartersLocation) body.headquarters_location = params.headquartersLocation;
-    if (params.industry) body.industry = params.industry;
-    if (params.headcount) body.headcount = params.headcount;
-    if (params.companyType) body.company_type = params.companyType;
-    if (params.limit) body.limit = params.limit;
-    if (params.offset) body.offset = params.offset;
-
-    let response = await this.http.post('/discover', body, {
-      headers: this.headers
+    page(params.limit, params.offset);
+    if (params.offset !== undefined && params.offset > 10000)
+      throw createApiServiceError('Discover offset cannot exceed 10,000.');
+    const body = pickDefined({
+      query: params.query,
+      organization: params.organization,
+      headquarters_location: params.headquartersLocation,
+      industry: params.industry ? { include: params.industry } : undefined,
+      headcount: params.headcount,
+      company_type: params.companyType ? { include: params.companyType } : undefined,
+      limit: params.limit,
+      offset: params.offset
     });
-    return response.data;
+    if (
+      !params.query?.trim() &&
+      !params.organization &&
+      !params.headquartersLocation &&
+      !params.industry?.length &&
+      !params.headcount?.length &&
+      !params.companyType?.length
+    )
+      throw createApiServiceError('Provide a Discover query or at least one filter.');
+    return this.request('post', '/discover', undefined, body);
   }
-
-  // ── Leads ────────────────────────────────────────────────
-
   async listLeads(params: {
     limit?: number;
     offset?: number;
@@ -182,169 +307,139 @@ export class Client {
     verificationStatus?: string;
     sendingStatus?: string;
   }) {
-    let query: Record<string, any> = {};
-    if (params.limit) query.limit = params.limit;
-    if (params.offset) query.offset = params.offset;
-    if (params.leadListId) query.lead_list_id = params.leadListId;
-    if (params.email) query.email = params.email;
-    if (params.firstName) query.first_name = params.firstName;
-    if (params.lastName) query.last_name = params.lastName;
-    if (params.company) query.company = params.company;
-    if (params.industry) query.industry = params.industry;
-    if (params.verificationStatus) query.verification_status = params.verificationStatus;
-    if (params.sendingStatus) query.sending_status = params.sendingStatus;
-
-    let response = await this.http.get('/leads', {
-      headers: this.headers,
-      params: query
+    page(params.limit, params.offset, 1000);
+    if (params.offset !== undefined && params.offset > 100000)
+      throw createApiServiceError('Lead offset cannot exceed 100,000.');
+    return this.request('get', '/leads', {
+      limit: params.limit,
+      offset: params.offset,
+      leads_list_id: params.leadListId === undefined ? undefined : id(params.leadListId),
+      email: params.email,
+      first_name: params.firstName,
+      last_name: params.lastName,
+      company: params.company,
+      industry: params.industry,
+      verification_status: filterValues(params.verificationStatus, 'verification status'),
+      sending_status: filterValues(params.sendingStatus, 'sending status')
     });
-    return response.data;
   }
-
   async getLead(leadId: number) {
-    let response = await this.http.get(`/leads/${leadId}`, {
-      headers: this.headers
-    });
-    return response.data;
+    const result = await this.request('get', `/leads/${id(leadId)}`);
+    entity(result.data, leadId);
+    return result;
   }
-
-  async createLead(data: Record<string, any>) {
-    let response = await this.http.post('/leads', data, {
-      headers: this.headers
-    });
-    return response.data;
+  async createLead(data: Row) {
+    text(data.email, 'email');
+    return this.request('post', '/leads', undefined, data);
   }
-
-  async updateLead(leadId: number, data: Record<string, any>) {
-    let response = await this.http.put(`/leads/${leadId}`, data, {
-      headers: this.headers
-    });
-    return response.data;
+  async updateLead(leadId: number, data: Row) {
+    if (!Object.keys(data).length)
+      throw createApiServiceError('Provide at least one lead field to update.');
+    await this.request('put', `/leads/${id(leadId)}`, undefined, data, true);
+    try {
+      return await this.getLead(leadId);
+    } catch {
+      throw createApiServiceError(
+        'Hunter accepted the lead update, but its readback failed. Retrieve the lead before deciding whether to repeat the write.',
+        { reason: 'hunter_write_accepted_readback_failed' }
+      );
+    }
   }
-
-  async upsertLead(data: Record<string, any>) {
-    let response = await this.http.put('/leads', data, {
-      headers: this.headers
-    });
-    return response.data;
+  async upsertLead(data: Row) {
+    text(data.email, 'email');
+    return this.request('put', '/leads', undefined, data);
   }
-
   async deleteLead(leadId: number) {
-    let response = await this.http.delete(`/leads/${leadId}`, {
-      headers: this.headers
-    });
-    return response.data;
+    return this.request('delete', `/leads/${id(leadId)}`, undefined, undefined, true);
   }
-
-  // ── Leads Lists ──────────────────────────────────────────
-
-  async listLeadsLists(params?: { limit?: number; offset?: number }) {
-    let query: Record<string, any> = {};
-    if (params?.limit) query.limit = params.limit;
-    if (params?.offset) query.offset = params.offset;
-
-    let response = await this.http.get('/leads_lists', {
-      headers: this.headers,
-      params: query
-    });
-    return response.data;
+  async listLeadsLists(params: { limit?: number; offset?: number } = {}) {
+    page(params.limit, params.offset);
+    return this.request('get', '/leads_lists', params);
   }
-
   async getLeadsList(listId: number) {
-    let response = await this.http.get(`/leads_lists/${listId}`, {
-      headers: this.headers
-    });
-    return response.data;
+    const result = await this.request('get', `/leads_lists/${id(listId)}`);
+    entity(result.data, listId);
+    return result;
   }
-
   async createLeadsList(name: string) {
-    let response = await this.http.post(
-      '/leads_lists',
-      { name },
-      {
-        headers: this.headers
-      }
-    );
-    return response.data;
+    return this.request('post', '/leads_lists', undefined, { name: text(name, 'list name') });
   }
-
   async updateLeadsList(listId: number, name: string) {
-    let response = await this.http.put(
-      `/leads_lists/${listId}`,
-      { name },
-      {
-        headers: this.headers
-      }
+    await this.request(
+      'put',
+      `/leads_lists/${id(listId)}`,
+      undefined,
+      { name: text(name, 'list name') },
+      true
     );
-    return response.data;
+    try {
+      return await this.getLeadsList(listId);
+    } catch {
+      throw createApiServiceError(
+        'Hunter accepted the list update, but its readback failed. Retrieve the list before deciding whether to repeat the write.',
+        { reason: 'hunter_write_accepted_readback_failed' }
+      );
+    }
   }
-
   async deleteLeadsList(listId: number) {
-    let response = await this.http.delete(`/leads_lists/${listId}`, {
-      headers: this.headers
-    });
-    return response.data;
+    return this.request(
+      'delete',
+      `/leads_lists/${id(listId)}`,
+      undefined,
+      undefined,
+      true,
+      true
+    );
   }
-
-  // ── Sequences (Campaigns) ────────────────────────────────
-
-  async listSequences(params?: { limit?: number; offset?: number }) {
-    let query: Record<string, any> = {};
-    if (params?.limit) query.limit = params.limit;
-    if (params?.offset) query.offset = params.offset;
-
-    let response = await this.http.get('/campaigns', {
-      headers: this.headers,
-      params: query
-    });
-    return response.data;
+  async listSequences(params: { limit?: number; offset?: number } = {}) {
+    page(params.limit, params.offset);
+    return this.request('get', '/sequences', params);
   }
-
+  async getSequence(sequenceId: number) {
+    const result = await this.request('get', `/sequences/${id(sequenceId)}`);
+    entity(result.data, sequenceId);
+    return result;
+  }
   async listSequenceRecipients(
     sequenceId: number,
-    params?: { limit?: number; offset?: number }
+    params: { limit?: number; offset?: number } = {}
   ) {
-    let query: Record<string, any> = {};
-    if (params?.limit) query.limit = params.limit;
-    if (params?.offset) query.offset = params.offset;
-
-    let response = await this.http.get(`/campaigns/${sequenceId}/recipients`, {
-      headers: this.headers,
-      params: query
-    });
-    return response.data;
+    page(params.limit, params.offset);
+    return this.request('get', `/campaigns/${id(sequenceId)}/recipients`, params);
   }
-
   async addSequenceRecipients(
     sequenceId: number,
     data: { emails?: string[]; leadIds?: number[] }
   ) {
-    let body: Record<string, any> = {};
-    if (data.emails) body.emails = data.emails;
-    if (data.leadIds) body.lead_ids = data.leadIds;
-
-    let response = await this.http.post(`/campaigns/${sequenceId}/recipients`, body, {
-      headers: this.headers
-    });
-    return response.data;
-  }
-
-  async cancelSequenceRecipient(sequenceId: number, recipientEmail: string) {
-    let response = await this.http.delete(`/campaigns/${sequenceId}/recipients`, {
-      headers: this.headers,
-      data: { email: recipientEmail }
-    });
-    return response.data;
-  }
-
-  async startSequence(sequenceId: number) {
-    let response = await this.http.post(
-      `/campaigns/${sequenceId}/start`,
-      {},
-      {
-        headers: this.headers
-      }
+    if (!data.emails?.length && !data.leadIds?.length)
+      throw createApiServiceError('Provide emails or leadIds for recipients.');
+    if ((data.emails?.length ?? 0) > 50 || (data.leadIds?.length ?? 0) > 50)
+      throw createApiServiceError('Provide no more than 50 emails and 50 lead IDs.');
+    data.emails?.forEach(email => text(email, 'recipient email'));
+    data.leadIds?.forEach(id);
+    return this.request(
+      'post',
+      `/campaigns/${id(sequenceId)}/recipients`,
+      undefined,
+      pickDefined({ emails: data.emails, lead_ids: data.leadIds })
     );
-    return response.data;
+  }
+  async cancelSequenceRecipient(sequenceId: number, email: string) {
+    return this.request(
+      'delete',
+      `/campaigns/${id(sequenceId)}/recipients`,
+      undefined,
+      { emails: [text(email, 'recipient email')] },
+      true
+    );
+  }
+  async startSequence(sequenceId: number) {
+    return this.request('post', `/campaigns/${id(sequenceId)}/start`, undefined, {}, true);
+  }
+  async pauseSequence(sequenceId: number) {
+    return this.request('post', `/sequences/${id(sequenceId)}/pause`, undefined, {}, true);
+  }
+  async resumeSequence(sequenceId: number) {
+    return this.request('delete', `/sequences/${id(sequenceId)}/pause`, undefined, {}, true);
   }
 }

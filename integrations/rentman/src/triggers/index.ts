@@ -1,1 +1,0 @@
-export * from './rentman-event';

@@ -12,7 +12,7 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      token: z.string().describe('Gladia API key from app.gladia.io')
+      token: z.string().min(1).describe('Gladia API key from app.gladia.io')
     }),
     getOutput: async ctx => {
       return {

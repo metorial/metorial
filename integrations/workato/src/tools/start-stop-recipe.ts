@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import { idNumber, numericId, required } from '../lib/validation';
 import { spec } from '../spec';
 
 export let startStopRecipeTool = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let startStopRecipeTool = SlateTool.create(spec, {
   key: 'start_stop_recipe',
   description: `Start or stop a Workato recipe. Also supports copying a recipe to a different folder, resetting the trigger cursor, or updating a recipe's connection.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -30,7 +31,7 @@ export let startStopRecipeTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
+      success: z.boolean().optional().describe('Whether the operation succeeded'),
       newRecipeId: z
         .number()
         .optional()
@@ -38,52 +39,29 @@ export let startStopRecipeTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let { action, recipeId, targetFolderId, adapterName, connectionId } = ctx.input;
-
-    if (action === 'start') {
-      await client.startRecipe(recipeId);
-      return {
-        output: { success: true },
-        message: `Started recipe **${recipeId}**.`
-      };
-    }
-
-    if (action === 'stop') {
-      await client.stopRecipe(recipeId);
-      return {
-        output: { success: true },
-        message: `Stopped recipe **${recipeId}**.`
-      };
-    }
-
+    const client = createClient(ctx);
+    const { action, recipeId, targetFolderId, adapterName, connectionId } = ctx.input;
     if (action === 'copy') {
-      if (!targetFolderId) throw new Error('Target folder ID is required for copy');
-      let result = await client.copyRecipe(recipeId, targetFolderId);
+      const result = await client.copyRecipe(
+        recipeId,
+        numericId(targetFolderId, 'Non-Home target folder ID')
+      );
       return {
-        output: { success: true, newRecipeId: result.new_flow_id },
-        message: `Copied recipe **${recipeId}** to folder ${targetFolderId}. New recipe ID: **${result.new_flow_id}**.`
+        output: { success: true, newRecipeId: idNumber(result.new_flow_id) },
+        message: `Copied recipe ${recipeId}.`
       };
     }
-
-    if (action === 'reset_trigger') {
-      await client.resetRecipeTrigger(recipeId);
-      return {
-        output: { success: true },
-        message: `Reset trigger for recipe **${recipeId}**.`
-      };
-    }
-
-    if (action === 'update_connection') {
-      if (!adapterName || connectionId === undefined) {
-        throw new Error('Adapter name and connection ID are required for update_connection');
-      }
-      await client.updateRecipeConnection(recipeId, adapterName, connectionId);
-      return {
-        output: { success: true },
-        message: `Updated connection for recipe **${recipeId}**: ${adapterName} -> connection ${connectionId}.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
+    if (action === 'start') await client.startRecipe(recipeId);
+    if (action === 'stop') await client.stopRecipe(recipeId);
+    if (action === 'reset_trigger') await client.resetRecipeTrigger(recipeId);
+    if (action === 'update_connection')
+      await client.updateRecipeConnection(
+        recipeId,
+        required(adapterName, 'Adapter name'),
+        idNumber(numericId(connectionId, 'connectionId'))
+      );
+    return {
+      output: { success: true },
+      message: `Recipe ${action} accepted. Starting can execute jobs; resetting can replay events. Existing external effects are retained.`
+    };
   });

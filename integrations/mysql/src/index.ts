@@ -13,8 +13,6 @@ import {
   manageUsers,
   updateRows
 } from './tools';
-import { inboundWebhook, tableChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     listDatabases,
     manageUsers
   ],
-  triggers: [inboundWebhook, tableChanges]
+  triggers: []
 });

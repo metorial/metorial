@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/azure-devops.png" height="20"> Azure Devops
 
-Manage Git repositories, branches, commits, and pull requests. Create, update, query, and delete work items (bugs, tasks, user stories, epics) using boards and backlogs. Trigger and monitor CI/CD pipeline runs, view build logs, and manage pipeline definitions. Create and manage test plans, test suites, and test results. Publish and manage package feeds for NuGet, npm, Maven, and Python via Artifacts. Create and configure projects, teams, dashboards, and wikis. Manage security permissions, access control, and service hook subscriptions for event-driven integrations. Subscribe to webhooks for build, release, pipeline, code, work item, and security alert events.
+Manage Git repositories, branches, commits, and pull requests. Create, update, query, and delete work items (bugs, tasks, user stories, epics) using boards and backlogs. Trigger and monitor CI/CD pipeline runs, view build logs, and manage pipeline definitions. Create and manage test plans, test suites, and test results. Publish and manage package feeds for NuGet, npm, Maven, and Python via Artifacts. Create and configure projects, teams, dashboards, and wikis. Manage security permissions, access control, and service hook subscriptions for event-driven integrations.
 
 ## Tools
 

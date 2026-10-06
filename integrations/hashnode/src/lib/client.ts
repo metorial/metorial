@@ -1,1026 +1,683 @@
-import { createAxios } from 'slates';
+import { ServiceError } from '@lowerdeck/error';
+import {
+  AuthConfigSecretRedactor,
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getApiErrorStatus,
+  getCurrentContext,
+  pickDefined,
+  requestAxios
+} from 'slates';
+import { cursor, first, host, identifier, objectId, token } from './schemas';
+import type {
+  Comment,
+  Draft,
+  PageInfo,
+  Post,
+  PostInput,
+  Publication,
+  Series,
+  StaticPage,
+  User
+} from './types';
 
+const userFields =
+  'id username name profilePicture tagline bio { markdown } location dateJoined availableFor socialMediaLinks { website github twitter instagram facebook stackoverflow linkedin youtube }';
+const publicationFields =
+  'id title displayTitle descriptionSEO seo { title description } about { markdown html } url canonicalURL favicon headerColor isTeam author { id username name profilePicture }';
+const postFields =
+  'id title subtitle slug url brief publishedAt updatedAt readTimeInMinutes reactionCount responseCount content { markdown html } coverImage { url } author { id username name profilePicture } publication { id title } tags { id name slug } series { id name } seo { title description } ogMetaData { image }';
+const draftFields =
+  'id title subtitle slug updatedAt content { markdown html } author { id username name } publication { id title } tags { id name slug } coverImage { url }';
+const seriesFields =
+  'id name slug description { markdown html } coverImage author { id username name }';
+const pageFields = 'pageInfo { hasNextPage endCursor totalDocuments }';
+const staticFields = 'id title slug hidden content { markdown html }';
+const commentFields =
+  'id content { markdown html } author { id username name } dateAdded totalReactions';
+const unavailable = () =>
+  createApiServiceError(
+    'This legacy write is absent from Hashnode’s current public API. Use the Hashnode dashboard for this operation; no request was sent.',
+    { reason: 'unsupported_operation' }
+  );
+const invalid = (message: string) =>
+  createApiServiceError(message, { reason: 'invalid_input' });
+const incomplete = () =>
+  createApiServiceError(
+    'Hashnode returned an incomplete or mismatched response. Inspect the exact resource before retrying a write.',
+    { reason: 'invalid_response' }
+  );
+const parse = <T>(
+  schema: { safeParse(value: unknown): { success: boolean; data?: T } },
+  value: unknown
+): T => {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success)
+    throw invalid(
+      'Provide valid resource identifiers, pagination, publication selection, and credential values.'
+    );
+  return parsed.data as T;
+};
+const record = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw incomplete();
+  return value as Record<string, unknown>;
+};
+const native = <T extends { id: string }>(
+  value: unknown,
+  expectedId?: string,
+  required: string[] = []
+): T => {
+  const item = record(value);
+  if (
+    typeof item.id !== 'string' ||
+    !identifier.safeParse(item.id).success ||
+    (expectedId !== undefined && item.id !== expectedId)
+  )
+    throw incomplete();
+  for (const name of required)
+    if (typeof item[name] !== 'string' || !item[name]) throw incomplete();
+  return item as unknown as T;
+};
+const adapt = (error: unknown) => {
+  if (error instanceof ServiceError) return error;
+  const status = getApiErrorStatus(error);
+  return buildApiServiceError(
+    { response: { status } },
+    {
+      providerLabel: 'Hashnode',
+      operation: 'request',
+      reason: 'hashnode_api',
+      parent: {},
+      extractMessage: () =>
+        status === 401
+          ? 'Reconnect with a valid personal access token.'
+          : status === 403
+            ? 'Check publication Pro entitlement and your publication role.'
+            : status === 429
+              ? 'Wait before retrying; inspect an uncertain write first.'
+              : 'The request failed. Inspect the exact resource before retrying a write.'
+    }
+  );
+};
 export class Client {
-  private token: string;
-  private publicationHost: string;
-
-  constructor(config: { token: string; publicationHost: string }) {
-    this.token = config.token;
-    this.publicationHost = config.publicationHost;
-  }
-
-  private getAxios() {
-    return createAxios({
-      baseURL: 'https://gql.hashnode.com'
+  private readonly http: ReturnType<typeof createAuthenticatedAxios>;
+  private readonly credential: string;
+  constructor(
+    private readonly config: {
+      token: string;
+      publicationHost?: string;
+      publicationId?: string;
+    }
+  ) {
+    this.credential = parse(token, config.token).replace(/^Bearer /i, '');
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://gql.hashnode.com',
+      authHeader: { value: `Bearer ${this.credential}` },
+      timeout: 30000,
+      maxRedirects: 0,
+      maxBodyLength: 100000,
+      maxContentLength: 8 * 1024 * 1024
     });
   }
-
-  async graphql<T = any>(query: string, variables?: Record<string, any>): Promise<T> {
-    let ax = this.getAxios();
-    let response = await ax.post(
-      '/',
-      {
-        query,
-        variables
-      },
-      {
-        headers: {
-          Authorization: this.token,
-          'Content-Type': 'application/json'
+  private protect(value: unknown) {
+    const redactor = new AuthConfigSecretRedactor({
+      token: this.credential,
+      authorization: `Bearer ${this.credential}`
+    });
+    const textSafe = (initial: string) => {
+      let text = initial;
+      for (let pass = 0; pass < 5; pass++) {
+        if (redactor.redactEmbedded(text) !== text) return false;
+        for (const part of text.matchAll(/[A-Za-z0-9+/_-]{8,}={0,2}/g)) {
+          const decoded = Buffer.from(part[0], 'base64').toString('utf8');
+          if (redactor.redactEmbedded(decoded) !== decoded) return false;
         }
+        const decoded = text.replace(/%([a-f0-9]{2})/gi, (_, byte: string) =>
+          String.fromCharCode(Number.parseInt(byte, 16))
+        );
+        if (decoded === text) break;
+        text = decoded;
+      }
+      return true;
+    };
+    const inspect = (item: unknown, depth = 0): boolean => {
+      if (depth > 80) return false;
+      if (typeof item === 'string') return textSafe(item);
+      if (Array.isArray(item)) return item.every(v => inspect(v, depth + 1));
+      if (item && typeof item === 'object')
+        return Object.entries(item).every(
+          ([key, itemValue]) => textSafe(key) && inspect(itemValue, depth + 1)
+        );
+      return true;
+    };
+    if (!inspect(value) || !inspect(getCurrentContext().getHttpTraces()))
+      throw createApiServiceError(
+        'Credential-bearing request or response content was refused. Inspect the resource before retrying a write.',
+        { reason: 'credential_reflection' }
+      );
+  }
+  async graphql(
+    query: string,
+    variables?: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    const body = pickDefined({ query, variables });
+    this.protect(body);
+    if (Buffer.byteLength(JSON.stringify(body), 'utf8') > 100000)
+      throw invalid(
+        'The GraphQL request exceeds the supported 100,000-byte limit. Reduce the content before retrying.'
+      );
+    const response = await requestAxios(
+      'Hashnode GraphQL request',
+      () => this.http.post<unknown>('/', body),
+      error => {
+        this.protect(undefined);
+        return adapt(error);
       }
     );
-
-    let body = response.data;
-    if (body.errors && body.errors.length > 0) {
-      throw new Error(body.errors.map((e: any) => e.message).join('; '));
+    this.protect(response.data);
+    const result = record(response.data);
+    if (response.status !== 200) throw incomplete();
+    if (result.errors !== undefined) {
+      if (!Array.isArray(result.errors)) throw incomplete();
+      if (result.errors.length) {
+        const codes = result.errors.map(item =>
+          record(item).extensions === undefined
+            ? undefined
+            : record(record(item).extensions).code
+        );
+        const code =
+          codes.find(value =>
+            ['UNAUTHENTICATED', 'FORBIDDEN', 'NOT_FOUND', 'BAD_USER_INPUT'].includes(
+              String(value)
+            )
+          ) ?? 'INTERNAL_SERVER_ERROR';
+        const status =
+          code === 'UNAUTHENTICATED'
+            ? 401
+            : code === 'FORBIDDEN'
+              ? 403
+              : code === 'NOT_FOUND'
+                ? 404
+                : code === 'BAD_USER_INPUT'
+                  ? 400
+                  : 500;
+        throw createApiServiceError(
+          code === 'UNAUTHENTICATED'
+            ? 'Hashnode requires a valid personal access token.'
+            : code === 'FORBIDDEN'
+              ? 'Check the publication’s Pro plan and your publication role before retrying.'
+              : code === 'NOT_FOUND'
+                ? 'The exact resource is unavailable or hidden from this credential.'
+                : 'Hashnode rejected the request. Check the input and inspect any uncertain write before retrying.',
+          { reason: 'hashnode_graphql', upstreamStatus: status, upstreamCode: String(code) }
+        );
+      }
     }
-
-    return body.data as T;
+    return record(result.data);
   }
-
-  // ─── Publication ───────────────────────────────────────────────
-
+  private selection() {
+    if (this.config.publicationId !== undefined && this.config.publicationHost !== undefined)
+      throw invalid('Supply either publicationId or publicationHost, not both.');
+    if (this.config.publicationId !== undefined)
+      return { id: parse(objectId, this.config.publicationId).toLowerCase() };
+    if (this.config.publicationHost !== undefined)
+      return { host: parse(host, this.config.publicationHost).toLowerCase() };
+    throw invalid(
+      'Select a publication with publicationId or publicationHost. Call list_publications for publications you own, or use the known hostname of your team publication.'
+    );
+  }
+  private async publication(
+    selectionFields: string,
+    variables: Record<string, unknown> = {},
+    declarations = ''
+  ) {
+    const selection = this.selection();
+    const data = await this.graphql(
+      `query Publication($id: ObjectId, $host: String${declarations}) { publication(id: $id, host: $host) { ${selectionFields} } }`,
+      { ...selection, ...variables }
+    );
+    if (data.publication === null)
+      throw createApiServiceError(
+        'The selected publication is unavailable. Check its exact ID or hostname and Pro entitlement.',
+        { reason: 'not_found', upstreamStatus: 404 }
+      );
+    return native<Publication>(data.publication, selection.id, ['title']);
+  }
+  private page<T extends { id: string }>(
+    value: unknown,
+    size: number,
+    after?: string,
+    required: string[] = []
+  ): { nodes: T[]; pageInfo: PageInfo; totalDocuments?: number | null } {
+    const connection = record(value);
+    const info = record(connection.pageInfo);
+    if (
+      !Array.isArray(connection.edges) ||
+      connection.edges.length > size ||
+      typeof info.hasNextPage !== 'boolean' ||
+      (info.endCursor !== null &&
+        info.endCursor !== undefined &&
+        typeof info.endCursor !== 'string') ||
+      (info.hasNextPage &&
+        (!info.endCursor || info.endCursor === after || !connection.edges.length))
+    )
+      throw incomplete();
+    if (
+      info.totalDocuments !== null &&
+      info.totalDocuments !== undefined &&
+      (typeof info.totalDocuments !== 'number' ||
+        !Number.isSafeInteger(info.totalDocuments) ||
+        info.totalDocuments < connection.edges.length)
+    )
+      throw incomplete();
+    const nodes = connection.edges.map(edge =>
+      native<T>(record(edge).node, undefined, required)
+    );
+    if (new Set(nodes.map(node => node.id)).size !== nodes.length) throw incomplete();
+    return {
+      nodes,
+      pageInfo: info as unknown as PageInfo,
+      totalDocuments: info.totalDocuments as number | null | undefined
+    };
+  }
+  private pagination(options: { first?: number; after?: string }, max = 100) {
+    const size = parse(first, options.first);
+    if (size > max) throw invalid(`Use a page size of at most ${max} for this connection.`);
+    return { first: size, after: parse(cursor, options.after) };
+  }
   async getPublication() {
-    let data = await this.graphql(
-      `
-      query Publication($host: String!) {
-        publication(host: $host) {
-          id
-          title
-          displayTitle
-          descriptionSEO
-          about { markdown html }
-          url
-          canonicalURL
-          favicon
-          headerColor
-          isTeam
-          author {
-            id
-            username
-            name
-            profilePicture
-          }
-        }
-      }
-    `,
-      { host: this.publicationHost }
+    return this.publication(publicationFields);
+  }
+  async getPublicationId() {
+    return (await this.getPublication()).id;
+  }
+  private async verifySelectedPublication(publication?: Publication | null) {
+    if (this.config.publicationHost === undefined && this.config.publicationId === undefined)
+      return;
+    const expected = await this.getPublicationId();
+    if (!publication || publication.id !== expected)
+      throw invalid(
+        'The resource does not belong to the selected publication. Use its exact publication ID or hostname.'
+      );
+  }
+  async listPublications(options: { first?: number; after?: string } = {}) {
+    const pagination = this.pagination(options);
+    const data = await this.graphql(
+      `query OwnedPublications($first: Int!, $after: String) { me { id publications(first: $first, after: $after) { edges { node { ${publicationFields} domainInfo { hashnodeSubdomain domain { host ready } } } } ${pageFields} } } }`,
+      pagination
     );
-    return data.publication;
+    const me = native<User>(data.me);
+    const result = this.page<Publication>(
+      record(data.me).publications,
+      pagination.first,
+      pagination.after,
+      ['title']
+    );
+    return { ownerId: me.id, publications: result.nodes, pageInfo: result.pageInfo };
   }
-
-  async getPublicationId(): Promise<string> {
-    let pub = await this.getPublication();
-    return pub.id;
-  }
-
-  // ─── Posts ─────────────────────────────────────────────────────
-
   async listPosts(options: { first?: number; after?: string; tagSlugs?: string[] } = {}) {
-    let { first = 10, after, tagSlugs } = options;
-    let filter = tagSlugs && tagSlugs.length > 0 ? { tagSlugs } : undefined;
-
-    let data = await this.graphql(
-      `
-      query PostsByPublication($host: String!, $first: Int!, $after: String, $filter: PublicationPostConnectionFilter) {
-        publication(host: $host) {
-          posts(first: $first, after: $after, filter: $filter) {
-            edges {
-              node {
-                id
-                title
-                slug
-                url
-                brief
-                publishedAt
-                updatedAt
-                readTimeInMinutes
-                reactionCount
-                responseCount
-                author {
-                  id
-                  username
-                  name
-                  profilePicture
-                }
-                coverImage { url }
-                tags { id name slug }
-                series { id name }
-                seo { title description }
-              }
-            }
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-            totalDocuments
-          }
-        }
-      }
-    `,
-      { host: this.publicationHost, first, after, filter }
+    const pagination = this.pagination(options);
+    const filter = options.tagSlugs?.length
+      ? { tagSlugs: options.tagSlugs.map(value => parse(identifier, value)) }
+      : undefined;
+    const publication = await this.publication(
+      `id title posts(first: $first, after: $after, filter: $filter) { edges { node { ${postFields} } } ${pageFields} }`,
+      { ...pagination, filter },
+      ', $first: Int!, $after: String, $filter: PublicationPostConnectionFilter'
     );
-
-    let connection = data.publication?.posts;
+    const result = this.page<Post>(publication.posts, pagination.first, pagination.after, [
+      'title',
+      'slug',
+      'url'
+    ]);
     return {
-      posts: (connection?.edges || []).map((e: any) => e.node),
-      pageInfo: connection?.pageInfo,
-      totalDocuments: connection?.totalDocuments
+      posts: result.nodes,
+      pageInfo: result.pageInfo,
+      totalDocuments: result.totalDocuments
     };
   }
-
   async getPost(postId: string) {
-    let data = await this.graphql(
-      `
-      query Post($id: ID!) {
-        post(id: $id) {
-          id
-          title
-          subtitle
-          slug
-          url
-          brief
-          publishedAt
-          updatedAt
-          readTimeInMinutes
-          reactionCount
-          responseCount
-          content { markdown html }
-          coverImage { url }
-          author {
-            id
-            username
-            name
-            profilePicture
-          }
-          tags { id name slug }
-          series { id name }
-          seo { title description }
-          ogMetaData { image }
-        }
-      }
-    `,
-      { id: postId }
+    const id = parse(identifier, postId);
+    const data = await this.graphql(
+      `query Post($id: ID!) { post(id: $id) { ${postFields} } }`,
+      { id }
     );
-    return data.post;
+    if (data.post === null)
+      throw createApiServiceError('Post unavailable or hidden from this credential.', {
+        reason: 'not_found',
+        upstreamStatus: 404
+      });
+    const post = native<Post>(data.post, id, ['title', 'slug', 'url']);
+    await this.verifySelectedPublication(post.publication);
+    return post;
   }
-
   async getPostBySlug(slug: string) {
-    let data = await this.graphql(
-      `
-      query PostBySlug($host: String!, $slug: String!) {
-        publication(host: $host) {
-          post(slug: $slug) {
-            id
-            title
-            subtitle
-            slug
-            url
-            brief
-            publishedAt
-            updatedAt
-            readTimeInMinutes
-            reactionCount
-            responseCount
-            content { markdown html }
-            coverImage { url }
-            author {
-              id
-              username
-              name
-              profilePicture
-            }
-            tags { id name slug }
-            series { id name }
-            seo { title description }
-            ogMetaData { image }
-          }
-        }
-      }
-    `,
-      { host: this.publicationHost, slug }
+    const publication = await this.publication(
+      `id title post(slug: $slug) { ${postFields} }`,
+      { slug: parse(identifier, slug) },
+      ', $slug: String!'
     );
-    return data.publication?.post;
+    const post = native<Post>(publication.post, undefined, ['title', 'slug', 'url']);
+    if (post.slug !== slug) throw incomplete();
+    return post;
   }
-
-  async publishPost(input: {
-    title: string;
-    contentMarkdown: string;
-    subtitle?: string;
-    slug?: string;
-    tags?: { id?: string; name?: string; slug?: string }[];
-    coverImageURL?: string;
-    originalArticleURL?: string;
-    seriesId?: string;
-    disableComments?: boolean;
-    enableTableOfContent?: boolean;
-    isNewsletterActivated?: boolean;
-    publishedAt?: string;
-  }) {
-    let publicationId = await this.getPublicationId();
-    let publishInput: Record<string, any> = {
-      publicationId,
-      title: input.title,
-      contentMarkdown: input.contentMarkdown
-    };
-
-    if (input.subtitle) publishInput.subtitle = input.subtitle;
-    if (input.slug) publishInput.slug = input.slug;
-    if (input.tags) publishInput.tags = input.tags;
-    if (input.coverImageURL)
-      publishInput.coverImageOptions = { coverImageURL: input.coverImageURL };
-    if (input.originalArticleURL) publishInput.originalArticleURL = input.originalArticleURL;
-    if (input.seriesId) publishInput.seriesId = input.seriesId;
-    if (input.disableComments !== undefined)
-      publishInput.disableComments = input.disableComments;
-    if (input.enableTableOfContent !== undefined)
-      publishInput.enableTableOfContent = input.enableTableOfContent;
+  private postInput(input: PostInput) {
     if (input.isNewsletterActivated !== undefined)
-      publishInput.isNewsletterActivated = input.isNewsletterActivated;
-    if (input.publishedAt) publishInput.publishedAt = input.publishedAt;
-
-    let data = await this.graphql(
-      `
-      mutation PublishPost($input: PublishPostInput!) {
-        publishPost(input: $input) {
-          post {
-            id
-            title
-            slug
-            url
-          }
+      throw invalid(
+        'sendNewsletter is unavailable on the current publishPost mutation. No request was sent; use the dashboard to deliver a newsletter.'
+      );
+    const tags = input.tags?.map(tag => {
+      if (tag.id !== undefined)
+        throw invalid(
+          'Current tag inputs use slug and optional name. Omit legacy tagId and provide a slug.'
+        );
+      return { slug: parse(identifier, tag.slug), ...pickDefined({ name: tag.name }) };
+    });
+    if (tags && tags.length > 15)
+      throw invalid('Hashnode accepts at most 15 tags per post or draft.');
+    if (
+      input.publishedAt !== undefined &&
+      (!Number.isFinite(Date.parse(input.publishedAt)) ||
+        !/^\d{4}-\d{2}-\d{2}T/.test(input.publishedAt) ||
+        Date.parse(input.publishedAt) > Date.now())
+    )
+      throw invalid(
+        'publishedAt must be an ISO timestamp in the past; it backdates a post and does not schedule publication.'
+      );
+    for (const value of [input.coverImageURL, input.originalArticleURL])
+      if (value !== undefined && value !== '') {
+        let address: URL;
+        try {
+          address = new URL(value);
+        } catch {
+          throw invalid('Provide an absolute HTTP or HTTPS image or canonical URL.');
         }
+        if (
+          !['http:', 'https:'].includes(address.protocol) ||
+          address.username ||
+          address.password
+        )
+          throw invalid('Provide an HTTP or HTTPS URL without credentials.');
       }
-    `,
-      { input: publishInput }
-    );
-
-    return data.publishPost?.post;
-  }
-
-  async updatePost(
-    postId: string,
-    input: {
-      title?: string;
-      contentMarkdown?: string;
-      subtitle?: string;
-      slug?: string;
-      tags?: { id?: string; name?: string; slug?: string }[];
-      coverImageURL?: string;
-      originalArticleURL?: string;
-      seriesId?: string;
-      disableComments?: boolean;
-      enableTableOfContent?: boolean;
-      publishedAt?: string;
-    }
-  ) {
-    let updateInput: Record<string, any> = { id: postId };
-
-    if (input.title !== undefined) updateInput.title = input.title;
-    if (input.contentMarkdown !== undefined)
-      updateInput.contentMarkdown = input.contentMarkdown;
-    if (input.subtitle !== undefined) updateInput.subtitle = input.subtitle;
-    if (input.slug !== undefined) updateInput.slug = input.slug;
-    if (input.tags !== undefined) updateInput.tags = input.tags;
-    if (input.coverImageURL !== undefined)
-      updateInput.coverImageOptions = { coverImageURL: input.coverImageURL };
-    if (input.originalArticleURL !== undefined)
-      updateInput.originalArticleURL = input.originalArticleURL;
-    if (input.seriesId !== undefined) updateInput.seriesId = input.seriesId;
-    if (input.disableComments !== undefined)
-      updateInput.disableComments = input.disableComments;
-    if (input.enableTableOfContent !== undefined)
-      updateInput.enableTableOfContent = input.enableTableOfContent;
-    if (input.publishedAt !== undefined) updateInput.publishedAt = input.publishedAt;
-
-    let data = await this.graphql(
-      `
-      mutation UpdatePost($input: UpdatePostInput!) {
-        updatePost(input: $input) {
-          post {
-            id
-            title
-            slug
-            url
-          }
-        }
-      }
-    `,
-      { input: updateInput }
-    );
-
-    return data.updatePost?.post;
-  }
-
-  async removePost(postId: string) {
-    let data = await this.graphql(
-      `
-      mutation RemovePost($input: RemovePostInput!) {
-        removePost(input: $input) {
-          post {
-            id
-          }
-        }
-      }
-    `,
-      { input: { id: postId } }
-    );
-
-    return data.removePost?.post;
-  }
-
-  // ─── Drafts ────────────────────────────────────────────────────
-
-  async listDrafts(options: { first?: number; after?: string } = {}) {
-    let { first = 10, after } = options;
-
-    let data = await this.graphql(
-      `
-      query Drafts($host: String!, $first: Int!, $after: String) {
-        publication(host: $host) {
-          drafts(first: $first, after: $after) {
-            edges {
-              node {
-                id
-                title
-                slug
-                updatedAt
-                author {
-                  id
-                  username
-                  name
-                }
-                tags { id name slug }
-                content { markdown }
-              }
-            }
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-          }
-        }
-      }
-    `,
-      { host: this.publicationHost, first, after }
-    );
-
-    let connection = data.publication?.drafts;
-    return {
-      drafts: (connection?.edges || []).map((e: any) => e.node),
-      pageInfo: connection?.pageInfo
-    };
-  }
-
-  async getDraft(draftId: string) {
-    let data = await this.graphql(
-      `
-      query Draft($id: ObjectId!) {
-        draft(id: $id) {
-          id
-          title
-          slug
-          updatedAt
-          content { markdown }
-          author {
-            id
-            username
-            name
-          }
-          tags { id name slug }
-        }
-      }
-    `,
-      { id: draftId }
-    );
-    return data.draft;
-  }
-
-  async createDraft(input: {
-    title: string;
-    contentMarkdown: string;
-    subtitle?: string;
-    slug?: string;
-    tags?: { id?: string; name?: string; slug?: string }[];
-    coverImageURL?: string;
-  }) {
-    let publicationId = await this.getPublicationId();
-    let draftInput: Record<string, any> = {
-      publicationId,
+    return pickDefined({
       title: input.title,
-      contentMarkdown: input.contentMarkdown
-    };
-
-    if (input.subtitle) draftInput.subtitle = input.subtitle;
-    if (input.slug) draftInput.slug = input.slug;
-    if (input.tags) draftInput.tags = input.tags;
-    if (input.coverImageURL)
-      draftInput.coverImageOptions = { coverImageURL: input.coverImageURL };
-
-    let data = await this.graphql(
-      `
-      mutation CreateDraft($input: CreateDraftInput!) {
-        createDraft(input: $input) {
-          draft {
-            id
-            title
-            slug
-          }
-        }
-      }
-    `,
-      { input: draftInput }
+      contentMarkdown: input.contentMarkdown,
+      subtitle: input.subtitle,
+      slug: input.slug,
+      tags,
+      coverImage: input.coverImageURL,
+      originalArticleURL: input.originalArticleURL,
+      seriesId: input.seriesId === undefined ? undefined : parse(objectId, input.seriesId),
+      disableComments: input.disableComments,
+      enableToc: input.enableTableOfContent,
+      publishedAt: input.publishedAt
+    });
+  }
+  async publishPost(input: PostInput & { title: string; contentMarkdown: string }) {
+    const body = this.postInput(input);
+    this.protect(body);
+    if (!input.title.trim() || !input.contentMarkdown.trim())
+      throw invalid('Provide a nonempty title and Markdown content.');
+    const publicationId = await this.getPublicationId();
+    const data = await this.graphql(
+      'mutation PublishPost($input: PublishPostInput!) { publishPost(input: $input) { post { id title slug url } } }',
+      { input: { ...body, publicationId } }
     );
-
-    return data.createDraft?.draft;
+    const receipt = native<Post>(record(data.publishPost).post, undefined, [
+      'title',
+      'slug',
+      'url'
+    ]);
+    const post = await this.getPost(receipt.id);
+    if (
+      post.publication?.id !== publicationId ||
+      post.title !== receipt.title ||
+      post.slug !== receipt.slug ||
+      post.url !== receipt.url
+    )
+      throw incomplete();
+    return post;
   }
-
-  async publishDraft(draftId: string) {
-    let data = await this.graphql(
-      `
-      mutation PublishDraft($input: PublishDraftInput!) {
-        publishDraft(input: $input) {
-          post {
-            id
-            title
-            slug
-            url
-          }
-        }
-      }
-    `,
-      { input: { draftId } }
+  async updatePost(postId: string, input: PostInput) {
+    const id = parse(identifier, postId);
+    const body = this.postInput(input);
+    if (!Object.keys(body).length)
+      throw invalid('Provide at least one supported field to update.');
+    this.protect(body);
+    await this.getPost(id);
+    const data = await this.graphql(
+      'mutation UpdatePost($input: UpdatePostInput!) { updatePost(input: $input) { post { id title slug url } } }',
+      { input: { id, ...body } }
     );
-
-    return data.publishDraft?.post;
+    return native<Post>(record(data.updatePost).post, id, ['title', 'slug', 'url']);
   }
-
-  // ─── Series ────────────────────────────────────────────────────
-
-  async listSeries(options: { first?: number; after?: string } = {}) {
-    let { first = 10, after } = options;
-
-    let data = await this.graphql(
-      `
-      query SeriesList($host: String!, $first: Int!, $after: String) {
-        publication(host: $host) {
-          seriesList(first: $first, after: $after) {
-            edges {
-              node {
-                id
-                name
-                slug
-                createdAt
-                description { markdown }
-                coverImage
-                sortOrder
-                author {
-                  id
-                  username
-                  name
-                }
-              }
-            }
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-            totalDocuments
-          }
-        }
-      }
-    `,
-      { host: this.publicationHost, first, after }
+  async removePost(postId: string) {
+    const id = parse(identifier, postId);
+    await this.getPost(id);
+    const data = await this.graphql(
+      'mutation RemovePost($input: RemovePostInput!) { removePost(input: $input) { post { id title slug url } } }',
+      { input: { id } }
     );
-
-    let connection = data.publication?.seriesList;
-    return {
-      series: (connection?.edges || []).map((e: any) => e.node),
-      pageInfo: connection?.pageInfo,
-      totalDocuments: connection?.totalDocuments
-    };
+    return native<Post>(record(data.removePost).post, id);
   }
-
-  async getSeriesBySlug(slug: string) {
-    let data = await this.graphql(
-      `
-      query SeriesBySlug($host: String!, $slug: String!) {
-        publication(host: $host) {
-          series(slug: $slug) {
-            id
-            name
-            slug
-            createdAt
-            description { markdown html }
-            coverImage
-            sortOrder
-            author {
-              id
-              username
-              name
-            }
-            posts(first: 20) {
-              edges {
-                node {
-                  id
-                  title
-                  slug
-                  url
-                }
-              }
-              totalDocuments
-            }
-          }
-        }
-      }
-    `,
-      { host: this.publicationHost, slug }
+  async listDrafts(options: { first?: number; after?: string } = {}) {
+    const pagination = this.pagination(options, 50);
+    const publication = await this.publication(
+      `id title drafts(first: $first, after: $after) { edges { node { ${draftFields} } } ${pageFields} }`,
+      pagination,
+      ', $first: Int!, $after: String'
     );
-    return data.publication?.series;
+    const result = this.page<Draft>(publication.drafts, pagination.first, pagination.after);
+    return { drafts: result.nodes, pageInfo: result.pageInfo };
   }
-
-  async createSeries(input: {
-    name: string;
-    slug?: string;
-    description?: string;
-    coverImage?: string;
-    sortOrder?: string;
-  }) {
-    let publicationId = await this.getPublicationId();
-    let seriesInput: Record<string, any> = {
-      publicationId,
-      name: input.name
-    };
-
-    if (input.slug) seriesInput.slug = input.slug;
-    if (input.description) seriesInput.description = { markdown: input.description };
-    if (input.coverImage) seriesInput.coverImage = input.coverImage;
-    if (input.sortOrder) seriesInput.sortOrder = input.sortOrder;
-
-    let data = await this.graphql(
-      `
-      mutation CreateSeries($input: CreateSeriesInput!) {
-        createSeries(input: $input) {
-          series {
-            id
-            name
-            slug
-            createdAt
-          }
-        }
-      }
-    `,
-      { input: seriesInput }
+  async getDraft(draftId: string) {
+    const id = parse(objectId, draftId).toLowerCase();
+    const data = await this.graphql(
+      `query Draft($id: ObjectId!) { draft(id: $id) { ${draftFields} } }`,
+      { id }
     );
-
-    return data.createSeries?.series;
+    const draft = native<Draft>(data.draft, id);
+    await this.verifySelectedPublication(draft.publication);
+    return draft;
   }
-
-  async updateSeries(
-    seriesId: string,
-    input: {
-      name?: string;
-      slug?: string;
-      description?: string;
-      coverImage?: string;
-      sortOrder?: string;
-    }
-  ) {
-    let seriesInput: Record<string, any> = { id: seriesId };
-
-    if (input.name !== undefined) seriesInput.name = input.name;
-    if (input.slug !== undefined) seriesInput.slug = input.slug;
-    if (input.description !== undefined)
-      seriesInput.description = { markdown: input.description };
-    if (input.coverImage !== undefined) seriesInput.coverImage = input.coverImage;
-    if (input.sortOrder !== undefined) seriesInput.sortOrder = input.sortOrder;
-
-    let data = await this.graphql(
-      `
-      mutation UpdateSeries($input: UpdateSeriesInput!) {
-        updateSeries(input: $input) {
-          series {
-            id
-            name
-            slug
-          }
-        }
-      }
-    `,
-      { input: seriesInput }
-    );
-
-    return data.updateSeries?.series;
-  }
-
-  async removeSeries(seriesId: string) {
-    let data = await this.graphql(
-      `
-      mutation RemoveSeries($input: RemoveSeriesInput!) {
-        removeSeries(input: $input) {
-          series {
-            id
-          }
-        }
-      }
-    `,
-      { input: { id: seriesId } }
-    );
-
-    return data.removeSeries?.series;
-  }
-
-  // ─── Comments ──────────────────────────────────────────────────
-
-  async getComments(postId: string, options: { first?: number; after?: string } = {}) {
-    let { first = 10, after } = options;
-
-    let data = await this.graphql(
-      `
-      query Post($id: ID!, $first: Int!, $after: String) {
-        post(id: $id) {
-          comments(first: $first, after: $after) {
-            edges {
-              node {
-                id
-                content { markdown html }
-                author {
-                  id
-                  username
-                  name
-                  profilePicture
-                }
-                dateAdded
-                totalReactions
-                replies(first: 5) {
-                  edges {
-                    node {
-                      id
-                      content { markdown html }
-                      author {
-                        id
-                        username
-                        name
-                        profilePicture
-                      }
-                      dateAdded
-                      totalReactions
-                    }
-                  }
-                }
-              }
-            }
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-            totalDocuments
-          }
-        }
-      }
-    `,
-      { id: postId, first, after }
-    );
-
-    let connection = data.post?.comments;
-    return {
-      comments: (connection?.edges || []).map((e: any) => ({
-        ...e.node,
-        replies: (e.node.replies?.edges || []).map((r: any) => r.node)
-      })),
-      pageInfo: connection?.pageInfo,
-      totalDocuments: connection?.totalDocuments
-    };
-  }
-
-  async addComment(postId: string, contentMarkdown: string) {
-    let data = await this.graphql(
-      `
-      mutation AddComment($input: AddCommentInput!) {
-        addComment(input: $input) {
-          comment {
-            id
-            content { markdown html }
-            author {
-              id
-              username
-              name
-            }
-            dateAdded
-          }
-        }
-      }
-    `,
-      { input: { postId, contentMarkdown } }
-    );
-
-    return data.addComment?.comment;
-  }
-
-  async addReply(commentId: string, contentMarkdown: string) {
-    let data = await this.graphql(
-      `
-      mutation AddReply($input: AddReplyInput!) {
-        addReply(input: $input) {
-          reply {
-            id
-            content { markdown html }
-            author {
-              id
-              username
-              name
-            }
-            dateAdded
-          }
-        }
-      }
-    `,
-      { input: { commentId, contentMarkdown } }
-    );
-
-    return data.addReply?.reply;
-  }
-
-  async removeComment(commentId: string) {
-    let data = await this.graphql(
-      `
-      mutation RemoveComment($input: RemoveCommentInput!) {
-        removeComment(input: $input) {
-          comment {
-            id
-          }
-        }
-      }
-    `,
-      { input: { id: commentId } }
-    );
-
-    return data.removeComment?.comment;
-  }
-
-  async removeReply(commentId: string, replyId: string) {
-    let data = await this.graphql(
-      `
-      mutation RemoveReply($input: RemoveReplyInput!) {
-        removeReply(input: $input) {
-          reply {
-            id
-          }
-        }
-      }
-    `,
-      { input: { commentId, replyId } }
-    );
-
-    return data.removeReply?.reply;
-  }
-
-  // ─── Static Pages ─────────────────────────────────────────────
-
-  async listStaticPages(options: { first?: number; after?: string } = {}) {
-    let { first = 10, after } = options;
-
-    let data = await this.graphql(
-      `
-      query StaticPages($host: String!, $first: Int!, $after: String) {
-        publication(host: $host) {
-          staticPages(first: $first, after: $after) {
-            edges {
-              node {
-                id
-                title
-                slug
-                hidden
-                content { markdown html }
-              }
-            }
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-          }
-        }
-      }
-    `,
-      { host: this.publicationHost, first, after }
-    );
-
-    let connection = data.publication?.staticPages;
-    return {
-      staticPages: (connection?.edges || []).map((e: any) => e.node),
-      pageInfo: connection?.pageInfo
-    };
-  }
-
-  async getStaticPageById(pageId: string) {
-    // Hashnode doesn't have a direct static page by ID query;
-    // we list and filter as a workaround.
-    let pages = await this.listStaticPages({ first: 50 });
-    return pages.staticPages.find((p: any) => p.id === pageId);
-  }
-
-  async getStaticPageBySlug(slug: string) {
-    let data = await this.graphql(
-      `
-      query StaticPage($host: String!, $slug: String!) {
-        publication(host: $host) {
-          staticPage(slug: $slug) {
-            id
-            title
-            slug
-            hidden
-            content { markdown html }
-          }
-        }
-      }
-    `,
-      { host: this.publicationHost, slug }
-    );
-
-    return data.publication?.staticPage;
-  }
-
-  // ─── User ─────────────────────────────────────────────────────
-
-  async getUser(username: string) {
-    let data = await this.graphql(
-      `
-      query User($username: String!) {
-        user(username: $username) {
-          id
-          username
-          name
-          profilePicture
-          tagline
-          bio { markdown }
-          followersCount
-          followingsCount
-          location
-          dateJoined
-          availableFor
-          socialMediaLinks {
-            website
-            github
-            twitter
-            instagram
-            facebook
-            stackoverflow
-            linkedin
-            youtube
-          }
-        }
-      }
-    `,
-      { username }
-    );
-
-    return data.user;
-  }
-
-  async getMe() {
-    let data = await this.graphql(`
-      query Me {
-        me {
-          id
-          username
-          name
-          email
-          profilePicture
-          tagline
-          bio { markdown }
-          followersCount
-          followingsCount
-          location
-          dateJoined
-          availableFor
-          socialMediaLinks {
-            website
-            github
-            twitter
-            instagram
-            facebook
-            stackoverflow
-            linkedin
-            youtube
-          }
-        }
-      }
-    `);
-
-    return data.me;
-  }
-
-  // ─── Newsletter ────────────────────────────────────────────────
-
-  async subscribeToNewsletter(email: string) {
-    let publicationId = await this.getPublicationId();
-
-    let data = await this.graphql(
-      `
-      mutation SubscribeToNewsletter($input: SubscribeToNewsletterInput!) {
-        subscribeToNewsletter(input: $input) {
-          status
-        }
-      }
-    `,
-      { input: { publicationId, email } }
-    );
-
-    return data.subscribeToNewsletter;
-  }
-
-  // ─── Webhooks ──────────────────────────────────────────────────
-
-  async createWebhook(input: { url: string; events: string[]; secret: string }) {
-    let publicationId = await this.getPublicationId();
-
-    let data = await this.graphql(
-      `
-      mutation CreateWebhook($input: CreateWebhookInput!) {
-        createWebhook(input: $input) {
-          webhook {
-            id
-            url
-            events
-            secret
-            createdAt
-          }
-        }
-      }
-    `,
+  async createDraft(input: PostInput) {
+    const { coverImage, enableToc, ...body } = this.postInput(input);
+    this.protect({ ...body, coverImage, enableToc });
+    const publicationId = await this.getPublicationId();
+    const data = await this.graphql(
+      `mutation CreateDraft($input: CreateDraftInput!) { createDraft(input: $input) { draft { ${draftFields} } } }`,
       {
         input: {
+          ...body,
           publicationId,
-          url: input.url,
-          events: input.events,
-          secret: input.secret
+          ...(coverImage === undefined
+            ? {}
+            : { coverImageOptions: { coverImageURL: coverImage } }),
+          ...(enableToc === undefined ? {} : { settings: { enableTableOfContent: enableToc } })
         }
       }
     );
-
-    return data.createWebhook?.webhook;
+    const draft = native<Draft>(record(data.createDraft).draft);
+    if (draft.publication?.id !== publicationId) throw incomplete();
+    return draft;
   }
-
-  async deleteWebhook(webhookId: string) {
-    let data = await this.graphql(
-      `
-      mutation DeleteWebhook($id: ID!) {
-        deleteWebhook(id: $id) {
-          webhook {
-            id
-          }
+  async updateDraft(draftId: string, input: PostInput) {
+    const id = parse(objectId, draftId).toLowerCase();
+    const { coverImage, enableToc, ...body } = this.postInput(input);
+    if (!Object.keys(body).length && coverImage === undefined && enableToc === undefined)
+      throw invalid('Provide at least one supported draft field to update.');
+    this.protect({ ...body, coverImage, enableToc });
+    const original = await this.getDraft(id);
+    const data = await this.graphql(
+      `mutation UpdateDraft($input: UpdateDraftInput!) { updateDraft(input: $input) { draft { ${draftFields} } } }`,
+      {
+        input: {
+          draftId: id,
+          ...body,
+          ...(coverImage === undefined
+            ? {}
+            : { coverImageOptions: { coverImageURL: coverImage } }),
+          ...(enableToc === undefined ? {} : { settings: { enableTableOfContent: enableToc } })
         }
       }
-    `,
-      { id: webhookId }
     );
-
-    return data.deleteWebhook?.webhook;
+    const draft = native<Draft>(record(data.updateDraft).draft, id);
+    if (original.publication?.id && draft.publication?.id !== original.publication.id)
+      throw incomplete();
+    return draft;
   }
-
-  // ─── Search ────────────────────────────────────────────────────
-
-  async searchPosts(query: string, options: { first?: number; after?: string } = {}) {
-    let { first = 10, after } = options;
-
-    let data = await this.graphql(
-      `
-      query SearchPosts($host: String!, $first: Int!, $after: String, $filter: SearchPostsOfPublicationFilter!) {
-        publication(host: $host) {
-          searchPostsOfPublication(first: $first, after: $after, filter: $filter) {
-            edges {
-              node {
-                id
-                title
-                slug
-                url
-                brief
-                publishedAt
-                author {
-                  id
-                  username
-                  name
-                }
-                coverImage { url }
-                tags { id name slug }
-              }
-            }
-            pageInfo {
-              hasNextPage
-              endCursor
-            }
-          }
-        }
-      }
-    `,
-      { host: this.publicationHost, first, after, filter: { query } }
+  async deleteDraft(draftId: string) {
+    const id = parse(objectId, draftId).toLowerCase();
+    await this.getDraft(id);
+    const data = await this.graphql(
+      'mutation DeleteDraft($input: DeleteDraftInput!) { deleteDraft(input: $input) { draft { id } } }',
+      { input: { draftId: id } }
     );
-
-    let connection = data.publication?.searchPostsOfPublication;
+    return native<Draft>(record(data.deleteDraft).draft, id);
+  }
+  async publishDraft(draftId: string) {
+    const id = parse(objectId, draftId).toLowerCase();
+    const draft = await this.getDraft(id);
+    const data = await this.graphql(
+      'mutation PublishDraft($input: PublishDraftInput!) { publishDraft(input: $input) { post { id title slug url } } }',
+      { input: { draftId: id } }
+    );
+    const receipt = native<Post>(record(data.publishDraft).post, undefined, [
+      'title',
+      'slug',
+      'url'
+    ]);
+    const post = await this.getPost(receipt.id);
+    if (
+      (draft.publication?.id && post.publication?.id !== draft.publication.id) ||
+      post.title !== receipt.title ||
+      post.slug !== receipt.slug ||
+      post.url !== receipt.url
+    )
+      throw incomplete();
+    return post;
+  }
+  async listSeries(options: { first?: number; after?: string } = {}) {
+    const pagination = this.pagination(options);
+    const publication = await this.publication(
+      `id title seriesList(first: $first, after: $after) { edges { node { ${seriesFields} } } ${pageFields} }`,
+      pagination,
+      ', $first: Int!, $after: String'
+    );
+    const result = this.page<Series>(
+      publication.seriesList,
+      pagination.first,
+      pagination.after,
+      ['name', 'slug']
+    );
     return {
-      posts: (connection?.edges || []).map((e: any) => e.node),
-      pageInfo: connection?.pageInfo
+      series: result.nodes,
+      pageInfo: result.pageInfo,
+      totalDocuments: result.totalDocuments
     };
+  }
+  async getSeriesBySlug(slug: string) {
+    const publication = await this.publication(
+      `id title series(slug: $slug) { ${seriesFields} posts(first: 20) { edges { node { id title slug url } } ${pageFields} } }`,
+      { slug: parse(identifier, slug) },
+      ', $slug: String!'
+    );
+    const series = native<Series>(publication.series, undefined, ['name', 'slug']);
+    if (series.slug !== slug) throw incomplete();
+    this.page<Post>(series.posts, 20, undefined, ['title', 'slug', 'url']);
+    return series;
+  }
+  async createSeries(_input: unknown): Promise<Series> {
+    throw unavailable();
+  }
+  async updateSeries(_id: string, _input: unknown): Promise<Series> {
+    throw unavailable();
+  }
+  async removeSeries(_id: string): Promise<Series> {
+    throw unavailable();
+  }
+  async getComments(postId: string, options: { first?: number; after?: string } = {}) {
+    const id = parse(identifier, postId);
+    const pagination = this.pagination(options);
+    const data = await this.graphql(
+      `query Comments($id: ID!, $first: Int!, $after: String) { post(id: $id) { id comments(first: $first, after: $after) { edges { node { ${commentFields} replies(first: 20) { edges { node { ${commentFields} } } ${pageFields} } } } ${pageFields} } } }`,
+      { id, ...pagination }
+    );
+    const post = native<Post>(data.post, id);
+    const result = this.page<Comment>(post.comments, pagination.first, pagination.after);
+    const comments = result.nodes.map(comment => {
+      const replies = this.page<Comment>(record(comment).replies, 20);
+      return { ...comment, replies: replies.nodes, repliesPageInfo: replies.pageInfo };
+    });
+    return { comments, pageInfo: result.pageInfo, totalDocuments: result.totalDocuments };
+  }
+  async addComment(_postId: string, _content: string): Promise<Comment> {
+    throw unavailable();
+  }
+  async addReply(_commentId: string, _content: string): Promise<Comment> {
+    throw unavailable();
+  }
+  async removeComment(_commentId: string): Promise<Comment> {
+    throw unavailable();
+  }
+  async removeReply(_commentId: string, _replyId: string): Promise<Comment> {
+    throw unavailable();
+  }
+  async listStaticPages(options: { first?: number; after?: string } = {}) {
+    const pagination = this.pagination(options);
+    const publication = await this.publication(
+      `id title staticPages(first: $first, after: $after) { edges { node { ${staticFields} } } ${pageFields} }`,
+      pagination,
+      ', $first: Int!, $after: String'
+    );
+    const result = this.page<StaticPage>(
+      publication.staticPages,
+      pagination.first,
+      pagination.after,
+      ['title', 'slug']
+    );
+    return { staticPages: result.nodes, pageInfo: result.pageInfo };
+  }
+  async getStaticPageBySlug(slug: string) {
+    const publication = await this.publication(
+      `id title staticPage(slug: $slug) { ${staticFields} }`,
+      { slug: parse(identifier, slug) },
+      ', $slug: String!'
+    );
+    const page = native<StaticPage>(publication.staticPage, undefined, ['title', 'slug']);
+    if (page.slug !== slug) throw incomplete();
+    return page;
+  }
+  async getUser(username: string) {
+    const data = await this.graphql(
+      `query User($username: String!) { user(username: $username) { ${userFields} followersCount followingsCount } }`,
+      { username: parse(identifier, username) }
+    );
+    const user = native<User>(data.user, undefined, ['username']);
+    if (user.username !== username) throw incomplete();
+    return user;
+  }
+  async getMe() {
+    const data = await this.graphql(`query Me { me { ${userFields} email } }`);
+    return native<User>(data.me, undefined, ['username']);
+  }
+  async subscribeToNewsletter(_email: string): Promise<{ status?: string }> {
+    throw unavailable();
+  }
+  async searchPosts(query: string, options: { first?: number; after?: string } = {}) {
+    const pagination = this.pagination(options);
+    const publicationId = await this.getPublicationId();
+    const data = await this.graphql(
+      `query SearchPosts($first: Int!, $after: String, $filter: SearchPostsOfPublicationFilter!) { searchPostsOfPublication(first: $first, after: $after, filter: $filter) { edges { node { ${postFields} } } ${pageFields} } }`,
+      { ...pagination, filter: { publicationId, query: parse(identifier, query) } }
+    );
+    const result = this.page<Post>(
+      data.searchPostsOfPublication,
+      pagination.first,
+      pagination.after,
+      ['title', 'slug', 'url']
+    );
+    return { posts: result.nodes, pageInfo: result.pageInfo };
   }
 }

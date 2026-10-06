@@ -1,12 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  Client,
+  optionalNumber,
+  optionalStrings,
+  optionalText,
+  row,
+  text
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let getTeamInfo = SlateTool.create(spec, {
   name: 'Get Team Info',
   key: 'get_team_info',
-  description: `Retrieve team information including team name, members, credit balance, and sender details. Provides a comprehensive overview of the team's account and available resources.`,
+  description: `Identify the team authenticated by this API key and retrieve its member IDs, creation metadata and available credit balance.`,
   tags: {
     readOnly: true
   }
@@ -31,31 +38,29 @@ export let getTeamInfo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let [team, credits] = await Promise.all([
-      client.getTeam(),
-      client.getTeamCredits().catch(() => null)
-    ]);
-
+    const client = new Client({ token: ctx.auth.token });
+    const team = await client.getTeam(),
+      credits = await client.getTeamCredits();
+    const remaining = credits.details == null ? undefined : row(credits.details).remaining;
+    const detail = remaining == null ? undefined : row(remaining);
     return {
       output: {
-        teamId: team._id,
-        teamName: team.name,
-        userIds: team.userIds,
-        createdAt: team.createdAt,
-        credits: credits?.credits,
-        creditDetails: credits?.details?.remaining
+        teamId: text(team._id),
+        teamName: optionalText(team.name),
+        userIds: optionalStrings(team.userIds),
+        createdAt: optionalText(team.createdAt),
+        credits: optionalNumber(credits.credits),
+        creditDetails: detail
           ? {
-              remaining: credits.details.remaining.total,
-              freemium: credits.details.remaining.freemium,
-              subscription: credits.details.remaining.subscription,
-              gifted: credits.details.remaining.gifted,
-              paid: credits.details.remaining.paid
+              remaining: optionalNumber(detail.total),
+              freemium: optionalNumber(detail.freemium),
+              subscription: optionalNumber(detail.subscription),
+              gifted: optionalNumber(detail.gifted),
+              paid: optionalNumber(detail.paid)
             }
           : undefined
       },
-      message: `Team **"${team.name}"** with ${team.userIds?.length ?? 0} member(s)${credits ? ` and **${credits.credits}** credits remaining` : ''}.`
+      message: 'Retrieved authenticated team identity and available credit metadata.'
     };
   })
   .build();

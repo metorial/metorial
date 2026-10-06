@@ -1,12 +1,4 @@
 import { SlateConfig } from 'slates';
 import { z } from 'zod';
-
-export let config = SlateConfig.create(
-  z.object({
-    instanceUrl: z
-      .string()
-      .describe(
-        'Your Coupa instance URL, e.g. https://mycompany.coupahost.com or https://mycompany.coupacloud.com'
-      )
-  })
-);
+// Retain previously stored configuration without advertising a duplicate auth field.
+export let config = SlateConfig.create(z.object({}).catchall(z.unknown()));

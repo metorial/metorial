@@ -1,13 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSourceControlConfig = SlateTool.create(spec, {
   name: 'Get Source Control Config',
   key: 'get_source_control_config',
-  description: `Retrieve the current source control configuration for the Retool organization. Shows the Git integration settings including repository URL and branch configuration.`,
-  constraints: ['Available on Enterprise Base plan and above.'],
+  description: `Retrieve the current source control configuration for the Retool organization. Returns repository, provider, branch, and selected non-secret connection metadata. Provider credentials and unsafe URLs are omitted.`,
+  constraints: ['Requires the relevant API token scope and support in this deployment.'],
   tags: {
     readOnly: true
   }
@@ -21,7 +21,7 @@ export let getSourceControlConfig = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.getSourceControlConfig();
 

@@ -4,15 +4,19 @@
   "type": "module",
   "scripts": {
     "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@types/node": "^20",
-    "slates": "1.0.0-rc.17",
-    "zod": "^4.2"
+    "slates": "1.0.0-rc.25",
+    "zod": "^4.2",
+    "@lowerdeck/error": "^1.0.5"
   },
   "devDependencies": {
-    "typescript": "^5"
+    "typescript": "^5",
+    "@slates/test": "1.0.0-rc.23",
+    "vitest": "^3.2.4"
   },
-  "version": "0.2.0-rc.6"
+  "version": "0.3.1"
 }

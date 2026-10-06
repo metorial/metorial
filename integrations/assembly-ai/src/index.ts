@@ -14,8 +14,6 @@ import {
   submitTranscription,
   uploadMediaFile
 } from './tools';
-import { inboundWebhook, transcriptionCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     createSpeechUnderstanding,
     createStreamingToken
   ],
-  triggers: [inboundWebhook, transcriptionCompleted]
+  triggers: []
 });

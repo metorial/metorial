@@ -3,12 +3,13 @@ import { spec } from './spec';
 import {
   advancedPeopleSearch,
   getAccountCredits,
+  getCompanyList,
+  listCompanyLists,
+  manageCompanyList,
   searchCompany,
   searchContact,
   submitDataFeedback
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -17,7 +18,10 @@ export let provider = Slate.create({
     searchCompany,
     advancedPeopleSearch,
     getAccountCredits,
-    submitDataFeedback
+    submitDataFeedback,
+    listCompanyLists,
+    getCompanyList,
+    manageCompanyList
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

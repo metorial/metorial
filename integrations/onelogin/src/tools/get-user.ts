@@ -35,7 +35,7 @@ export let getUser = SlateTool.create(spec, {
       directoryId: z.number().nullable().optional().describe('Directory ID'),
       managerUserId: z.number().nullable().optional().describe('Manager user ID'),
       customAttributes: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .nullable()
         .optional()
         .describe('Custom attribute key-value pairs'),
@@ -57,10 +57,7 @@ export let getUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
     let u = await client.getUser(ctx.input.userId);
 

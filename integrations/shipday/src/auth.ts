@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { text } from './lib/validation';
 
 export let auth = SlateAuth.create()
   .output(
@@ -21,7 +22,7 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: text(ctx.input.apiKey, 'API key')
         }
       };
     }

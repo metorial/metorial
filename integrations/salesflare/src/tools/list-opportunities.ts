@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let listOpportunities = SlateTool.create(spec, {
@@ -56,18 +56,18 @@ export let listOpportunities = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let params: Record<string, any> = {
+    let params: Row = {
       limit: ctx.input.limit,
       offset: ctx.input.offset
     };
     if (ctx.input.search) params.search = ctx.input.search;
     if (ctx.input.name) params.name = ctx.input.name;
-    if (ctx.input.stageId) params.stage = ctx.input.stageId;
+    if (ctx.input.stageId !== undefined) params.stage = ctx.input.stageId;
     if (ctx.input.stageName) params['stage.name'] = ctx.input.stageName;
-    if (ctx.input.ownerId) params.owner = ctx.input.ownerId;
-    if (ctx.input.accountId) params.account = ctx.input.accountId;
-    if (ctx.input.assigneeId) params.assignee = ctx.input.assigneeId;
-    if (ctx.input.pipelineId) params.pipeline = ctx.input.pipelineId;
+    if (ctx.input.ownerId !== undefined) params.owner = ctx.input.ownerId;
+    if (ctx.input.accountId !== undefined) params.account = ctx.input.accountId;
+    if (ctx.input.assigneeId !== undefined) params.assignee = ctx.input.assigneeId;
+    if (ctx.input.pipelineId !== undefined) params.pipeline = ctx.input.pipelineId;
     if (ctx.input.minValue !== undefined) params.min_value = ctx.input.minValue;
     if (ctx.input.maxValue !== undefined) params.max_value = ctx.input.maxValue;
     if (ctx.input.closeAfter) params.close_after = ctx.input.closeAfter;
@@ -76,12 +76,18 @@ export let listOpportunities = SlateTool.create(spec, {
     if (ctx.input.creationBefore) params.creation_before = ctx.input.creationBefore;
     if (ctx.input.closed !== undefined) params.closed = ctx.input.closed;
     if (ctx.input.done !== undefined) params.done = ctx.input.done;
-    if (ctx.input.tagName) params['tag.name'] = ctx.input.tagName;
+    if (ctx.input.tagName !== undefined) {
+      if (ctx.input.tagName.length !== 1)
+        throw createApiServiceError(
+          'Salesflare supports one tag-name filter per opportunity request. Provide exactly one tag name.'
+        );
+      params['tag.name'] = ctx.input.tagName[0];
+    }
     if (ctx.input.hotness !== undefined) params.hotness = ctx.input.hotness;
     if (ctx.input.orderBy) params.order_by = ctx.input.orderBy;
 
     let opportunities = await client.listOpportunities(params);
-    let list = Array.isArray(opportunities) ? opportunities : [];
+    let list = opportunities;
 
     return {
       output: {

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, customFields } from '../lib/client';
+import { mapContact } from '../lib/models';
 import { spec } from '../spec';
 
 export let manageContact = SlateTool.create(spec, {
@@ -62,7 +63,7 @@ When creating: provide leadId and at least a name. When updating: provide contac
   .output(
     z.object({
       contactId: z.string().describe('Unique contact ID'),
-      leadId: z.string().describe('Associated lead ID'),
+      leadId: z.string().optional().describe('Associated lead ID'),
       name: z.string().nullable().describe('Full name of the contact'),
       title: z.string().nullable().describe('Job title of the contact'),
       emails: z
@@ -72,7 +73,8 @@ When creating: provide leadId and at least a name. When updating: provide contac
             type: z.string().describe('Email type')
           })
         )
-        .describe('Email addresses'),
+        .optional()
+        .describe('Email addresses, when provided'),
       phones: z
         .array(
           z.object({
@@ -80,7 +82,8 @@ When creating: provide leadId and at least a name. When updating: provide contac
             type: z.string().describe('Phone type')
           })
         )
-        .describe('Phone numbers'),
+        .optional()
+        .describe('Phone numbers, when provided'),
       urls: z
         .array(
           z.object({
@@ -88,60 +91,25 @@ When creating: provide leadId and at least a name. When updating: provide contac
             type: z.string().describe('URL type')
           })
         )
-        .describe('URLs'),
+        .optional()
+        .describe('URLs, when provided'),
       dateCreated: z.string().describe('Creation timestamp'),
       dateUpdated: z.string().describe('Last update timestamp')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-    let { contactId, leadId, customFields, ...fields } = ctx.input;
-    let contact: any;
-
-    let body: Record<string, any> = {};
-    if (fields.name !== undefined) body.name = fields.name;
-    if (fields.title !== undefined) body.title = fields.title;
-    if (fields.emails !== undefined) body.emails = fields.emails;
-    if (fields.phones !== undefined) body.phones = fields.phones;
-    if (fields.urls !== undefined) body.urls = fields.urls;
-    if (customFields) {
-      Object.assign(body, customFields);
-    }
-
-    if (contactId) {
-      contact = await client.updateContact(contactId, body);
-    } else {
-      if (!leadId) {
-        throw new Error('leadId is required when creating a new contact.');
-      }
-      body.lead_id = leadId;
-      contact = await client.createContact(body);
-    }
-
+    const client = new Client(ctx.auth);
+    const { contactId, leadId, customFields: fields, ...values } = ctx.input;
+    if (contactId === undefined && leadId === undefined)
+      throw createApiServiceError('leadId is required when creating a contact.');
+    const body = pickDefined({ ...values, lead_id: leadId, ...customFields(fields) });
+    const contact =
+      contactId !== undefined
+        ? await client.updateContact(contactId, body)
+        : await client.createContact(body);
     return {
-      output: {
-        contactId: contact.id,
-        leadId: contact.lead_id,
-        name: contact.name ?? null,
-        title: contact.title ?? null,
-        emails: (contact.emails ?? []).map((e: any) => ({
-          email: e.email,
-          type: e.type
-        })),
-        phones: (contact.phones ?? []).map((p: any) => ({
-          phone: p.phone,
-          type: p.type
-        })),
-        urls: (contact.urls ?? []).map((u: any) => ({
-          url: u.url,
-          type: u.type
-        })),
-        dateCreated: contact.date_created,
-        dateUpdated: contact.date_updated
-      },
-      message: contactId
-        ? `Updated contact **${contact.name ?? contactId}** on lead **${contact.lead_id}**.`
-        : `Created contact **${contact.name ?? 'Unnamed'}** on lead **${contact.lead_id}**.`
+      output: mapContact(contact),
+      message: `${contactId !== undefined ? 'Updated' : 'Created'} contact **${contact.id}**.`
     };
   })
   .build();

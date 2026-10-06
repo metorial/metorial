@@ -1,49 +1,29 @@
-# <img src="https://provider-logos.metorial-cdn.com/wave-accounting.svg" height="20"> Wave
+# Wave
 
-Manage small business accounting, invoicing, and financial data. Create and send invoices with line items, taxes, and payment options. Manage customers, vendors, and product/service catalogs. Create and organize chart of accounts. Record financial transactions as deposits and withdrawals. Create and manage estimates for customers. Configure sales taxes with rate changes and effective dates. Query business information and user profiles.
+Work with Wave Financial businesses, customers, invoices, accounts, products, sales taxes and vendors. Start with `list_businesses` to discover a permitted business ID. This package exposes 30 tools and no event subscriptions.
 
-## Tools
+| Capability | Tools |
+| --- | --- |
+| Identity and discovery | `get_user`, `list_businesses`, `get_resource` |
+| Customers | `list_customers`, `create_customer`, `update_customer`, `delete_customer` |
+| Invoices | `list_invoices`, `create_invoice`, `update_invoice`, `delete_invoice`, `approve_invoice`, `clone_invoice`, `send_invoice`, `mark_invoice_sent`, `get_invoice_pdf` |
+| Accounts | `list_accounts`, `create_account`, `update_account`, `archive_account` |
+| Products | `list_products`, `create_product`, `update_product`, `archive_product` |
+| Sales taxes | `list_sales_taxes`, `create_sales_tax`, `update_sales_tax`, `archive_sales_tax` |
+| Vendors and accounting | `list_vendors`, `create_transaction` |
 
-### Create Transaction
+Connect with OAuth or a developer access token for your own businesses. OAuth refresh preserves the original callback URI and refresh token when Wave does not rotate it. Older connections missing the callback URI need reconnection before refresh. API eligibility depends on permissions and an active Pro or Wave Advisor subscription; write scopes do not grant read scopes, and invoice email needs `invoice:send`. Owner tokens are replaced when expired or revoked.
 
-Create a financial transaction in Wave. This is equivalent to creating a standard transaction in Wave where a deposit or withdrawal to/from a bank or credit card account is categorized to one or more accounting categories. Use **DEPOSIT** when the business receives money and **WITHDRAWAL** when the business spends money. Line items categorize the transaction using **INCREASE** or **DECREASE** balance directions. The total of line item amounts must equal the anchor amount.
+Pages are 1-based with a maximum size of 100. Legacy numeric fields remain numbers; a Decimal that cannot round-trip safely fails clearly. `get_resource` returns exact decimal strings. Missing optional provider values are omitted, while missing identities, state, amounts or pagination totals cause an error rather than a fabricated value. For example, a legacy sales tax `rate: 5` represents 5%, and is sent to Wave as `0.05`; `get_resource` returns the provider fraction. `update_sales_tax` can supply the documented effective-date `rates` schedule in percentage units.
 
-### Get Current User
+Account updates require a current `sequence`, or `businessId` for revision discovery. Currency/subtype account patches, product write flags (`isSold`/`isBought`) and tax patch flags (`isCompound`/`isRecoverable`) are retained as legacy fields but rejected because those mutations do not support them. Product flags are derived from the associated income/expense accounts. Every supplied invoice item needs a `productId`. Sending requires explicit recipients; marking sent records `MARKED_SENT` by default and does not email. PDF downloads accept secure Wave-hosted URLs read from the current invoice and never forward bearer credentials to the file URL.
 
-Retrieve the authenticated user's profile information including their name and default email address.
+`create_transaction` records an accounting entry, requires non-classic accounting, a description and explicit tax amounts when taxes are supplied. It does not move funds. Wave's public API does not provide a transaction read, update, delete or reversal for this entry. The external reference is not a promised idempotency key; do not retry an uncertain creation. Archived catalog records and invoice/email history can remain after cleanup.
 
-### List Businesses
+Estimates, invoice payments, tax rate mutation endpoints beyond the documented patch, and bank transfers are outside this package's scope.
 
-Retrieve businesses associated with the authenticated Wave account. Each business is a separate entity with its own chart of accounts, customers, and financial data. Use this to discover available businesses before performing business-scoped operations.
-
-### List Vendors
-
-List vendors for a Wave business. Returns vendor contact details, address, and currency information. Vendors are suppliers or service providers associated with the business.
-
-### List Accounts
-
-List accounts in a business's chart of accounts. Returns all account types including assets, liabilities, equity, income, and expenses with their current balances.
-
-### List Customers
-
-List customers for a specific Wave business. Supports pagination for businesses with many customers.
-
-### List Invoices
-
-List invoices for a Wave business with pagination. Optionally filter by a specific customer. Returns invoice details including status, amounts, customer, and line items.
-
-### List Products
-
-List products and services in a Wave business's catalog. Returns product details including pricing, associated accounts, and default sales taxes.
-
-### List Sales Taxes
-
-List sales tax entries for a Wave business. Returns tax details including current rates, historical rate changes, and configuration.
+See the [API reference](https://developer.waveapps.com/hc/en-us/articles/360019968212-API-Reference), [OAuth guide](https://developer.waveapps.com/hc/en-us/articles/360019493652-OAuth-Guide), [scope reference](https://developer.waveapps.com/hc/en-us/articles/360032818132-OAuth-Scopes), and [accounting entry guide](https://developer.waveapps.com/hc/en-us/articles/360057230751-Mutation-Create-Money-Transaction).
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

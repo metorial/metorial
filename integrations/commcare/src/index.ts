@@ -17,8 +17,6 @@ import {
   sendSms,
   updateCase
 } from './tools';
-import { caseUpdated, inboundWebhook, newFormSubmission } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     listLookupTables,
     sendSms
   ],
-  triggers: [inboundWebhook, newFormSubmission, caseUpdated]
+  triggers: []
 });

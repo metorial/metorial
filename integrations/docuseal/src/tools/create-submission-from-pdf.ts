@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createSubmissionFromPdf = SlateTool.create(spec, {
   name: 'Create Submission from PDF',
   key: 'create_submission_from_pdf',
-  description: `Create a one-off signature request directly from a PDF document without needing a pre-existing template. The PDF can use text tags like \`{{Field Name;role=Signer1;type=date}}\` to define fillable fields, or fields can be specified with pixel coordinates.`,
+  description: `Create a one-off signature request directly from a PDF document without needing a pre-existing template. Email invitations default to enabled; pass sendEmail=false to suppress them. The PDF can use text tags like \`{{Field Name;role=Signer1;type=date}}\` to define fillable fields, or fields can be specified with pixel coordinates.`,
   instructions: [
     'Provide at least one document with a file (base64-encoded or URL) and at least one submitter.',
     'Text field tags in the PDF will be automatically parsed into fillable fields.'
@@ -21,7 +21,7 @@ export let createSubmissionFromPdf = SlateTool.create(spec, {
             name: z.string().describe('Document name'),
             file: z.string().describe('Base64-encoded PDF content or downloadable URL'),
             fields: z
-              .array(z.record(z.string(), z.any()))
+              .array(z.record(z.string(), z.unknown()))
               .optional()
               .describe('Field definitions with pixel coordinates')
           })
@@ -32,6 +32,14 @@ export let createSubmissionFromPdf = SlateTool.create(spec, {
           z.object({
             email: z.string().describe('Submitter email address'),
             role: z.string().optional().describe('Signer role'),
+            externalId: z
+              .string()
+              .optional()
+              .describe('Application identifier for exact signer discovery'),
+            metadata: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Custom signer metadata; keys preserved'),
             name: z.string().optional().describe('Submitter name'),
             phone: z.string().optional().describe('Phone in E.164 format'),
             sendEmail: z.boolean().optional().describe('Send email notification'),
@@ -93,19 +101,17 @@ export let createSubmissionFromPdf = SlateTool.create(spec, {
       removeTags: ctx.input.removeTags
     });
 
-    let submitters = (data.submitters || (Array.isArray(data) ? data : [data])).map(
-      (s: any) => ({
-        submitterId: s.id,
-        email: s.email,
-        slug: s.slug,
-        status: s.status,
-        embedSrc: s.embed_src
-      })
-    );
+    let submitters = data.submitters.map(s => ({
+      submitterId: s.id,
+      email: s.email,
+      slug: s.slug,
+      status: s.status,
+      embedSrc: s.embed_src
+    }));
 
     return {
       output: {
-        submissionId: data.id || data.submission_id,
+        submissionId: data.id,
         submitters
       },
       message: `Created one-off PDF submission with **${submitters.length}** submitter(s).`

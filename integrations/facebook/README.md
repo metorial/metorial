@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/facebook.svg" height="20"> Facebook
 
-Manage Facebook Pages, publish posts, photos, videos, and links to Pages. Access user profile data including name, email, and birthday. Read ad accounts, list campaigns, track ad performance, and retrieve marketing insights. Read and manage comments, list reactions, and inspect shares on posts. Retrieve Page and post analytics including reach, engagement, and demographics. Subscribe to and retrieve leads from Lead Ads. Send and receive messages via Page Messenger. Search for places, pages, and public objects. Subscribe to real-time webhooks for page feed changes, new messages, lead generation events, and permission changes.
+Manage Facebook Pages, publish posts, photos, videos, and links to Pages. Access user profile data including name, email, and birthday. Read ad accounts, list campaigns, track ad performance, and retrieve marketing insights. Read and manage comments, list reactions, and inspect shares on posts. Retrieve Page and post analytics including reach, engagement, and demographics. Subscribe to and retrieve leads from Lead Ads. Send and receive messages via Page Messenger. Search for places, pages, and public objects.
 
 ## Tools
 

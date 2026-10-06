@@ -1,102 +1,34 @@
-# Slates Specification for EmailOctopus
+# EmailOctopus integration
 
-## Overview
+This integration exposes 18 tools for the current EmailOctopus API v2 at `https://api.emailoctopus.com`. It manages lists, contacts, tags and text/number/date fields; reads campaigns and reports; and starts an existing dashboard-configured automation. The API does not create or send campaigns, manage automation definitions, cancel queued execution, or expose an account identity endpoint. Lists provide discovery of authorized list IDs.
 
-EmailOctopus is an email marketing platform that provides tools for managing contact lists, sending email campaigns, and running automated email sequences. It offers a REST API (v2) at `https://api.emailoctopus.com` for programmatic access to lists, contacts, campaigns, automations, tags, and campaign reporting.
+## Authentication and limits
 
-## Authentication
+Use a current API key as a Bearer token. A key labelled legacy, created before API v2, must be replaced with a current key. Current keys also work with the legacy API; the legacy API remains available but is no longer maintained. Authentication is verified with a small read-only list request. No OAuth scopes, token refresh or account ID configuration is required. Re-enter a replacement key after rotation.
 
-All requests require a valid API key. EmailOctopus uses **Bearer Token authentication** via API keys.
+The provider documents 10 requests per second and a burst bucket of 100. Rate-limit failures preserve the HTTP status and a bounded provider retry delay when available. Requests are not automatically retried, especially after an ambiguous write or automation submission.
 
-**Generating an API key:**
-On the API documentation page, you'll find an option to create an API key. API keys can be generated in your [account settings](https://emailoctopus.com/developer/api-keys). Legacy API keys (created before API v2) are not compatible with v2 and a new key must be generated.
+## Tools and compatibility
 
-**Using the API key:**
+- `list_lists`, `get_list`, `create_list`, `update_list`, `delete_list` discover and manage lists. `counts` exposes actual provider counts, including the documented array envelope. Deletion permanently removes the list and its contacts, fields and tags.
+- `list_contacts`, `get_contact`, `create_contact`, `update_contact`, `upsert_contact`, `delete_contact`, `batch_update_contacts` manage contacts. Original uppercase subscription inputs remain accepted and are sent as lowercase API values. Explicit subscription or double opt-in can cause email and automation effects; only use authorized recipients.
+- Existing `fields` accepts string values. Optional `fieldValues` also supports numbers and null for field clearing. Do not give conflicting values for the same tag. Output `fields` preserves its text format: numbers become text and null becomes an empty string. Optional output `fieldValues` retains the provider's typed values.
+- Existing upsert `tags` adds the listed tags through the provider's boolean map; optional `tagUpdates` adds or removes individual tags. An omitted tag is preserved. Adding and removing the same tag in one upsert is rejected.
+- Contacts can be retrieved by ID or MD5 of the lowercase email address. Hash lookups verify the returned email. Updates that change email first resolve a hash to the stable contact ID. Batch requests send 1–100 `contacts` and map provider `success`/`errors` into the existing `succeeded`/`failed` outputs. Each receipt must match one requested contact. Partial failures retain successful updates: read contacts before retrying.
+- `manage_tags` creates, renames, deletes and lists tags. List results are one page, with an optional next cursor.
+- `manage_fields` retains TEXT, NUMBER and DATE inputs and normalizes their casing. Updates forward a supplied type, otherwise preserve the existing type, and read existing metadata before sending the provider's required tag, type and label. A response must confirm the requested type; check affected contact values before changing it. Omitted fallback preserves the existing value; optional `clearFallback` clears it without changing the existing string `fallback` input. Choice-specific field settings are not exposed by this tool. Output `fallback` is display text; optional `fallbackValue` preserves an actual nullable fallback.
+- `list_campaigns`, `get_campaign`, `get_campaign_report` read existing campaigns and aggregate, link or contact reports. Nested campaign target arrays are flattened into the existing list-ID output. HTML is returned as campaign content; missing provider plain text remains an empty string for compatibility. Status is the provider's string, without a restrictive enum.
+- Current contact report rows supply a contact ID, available email address and event time. The existing contact wrapper remains, while unavailable full-contact fields are optional and omitted. Missing email or event metadata is not invented. Link reports are unpaged; their existing `startingAfter` input is accepted but ignored.
+- `trigger_automation` submits `{contact_id}` to an existing automation configured with Started via API. A 204 response confirms acceptance only. Execution may send emails or modify fields/tags and retains history. Repetition requires the dashboard's Allow contacts to repeat setting. No cancellation or history-deletion capability is claimed.
 
-Include the API key in the `Authorization` header as a Bearer token:
+Paged tools accept optional `limit` (1–100) and the exact `pagingNext` cursor from a previous response. Provider `paging.next.starting_after` is extracted without decoding or following its URL. Contact date filters are inclusive ISO 8601 bounds mapped to `created_at.gte/lte` and `last_updated_at.gte/lte`.
 
-```
-Authorization: Bearer {your_api_key}
-```
+Legacy event handlers are removed. No replacement trigger or webhook registration is exposed.
 
-There are no OAuth flows, scopes, or additional credentials required. The API key provides full access to the account it belongs to.
+## Official references
 
-## Features
+- [Current API v2 documentation, displayed version 2.1.0](https://emailoctopus.com/api-documentation/v2)
+- [API versions and legacy availability](https://help.emailoctopus.com/article/94-api-documentation)
+- [API limits and campaign sending restriction](https://help.emailoctopus.com/article/91-api-limits)
 
-### List Management
-
-Create, retrieve, update, and delete contact lists. Each list is an independent collection of contacts with its own custom fields and tags. Lists include summary counts of contacts by status (pending, subscribed, unsubscribed) and can be configured for double opt-in.
-
-### Contact Management
-
-Manage contacts within lists — create, retrieve, update, and delete individual contacts. Contacts have an email address, a status (subscribed, unsubscribed, pending), custom field values, and tags. Contacts can be filtered by status, tag, and creation/update dates. An upsert operation is available to create a contact if it doesn't exist or update it if it does. Contacts can also be looked up by an MD5 hash of their lowercase email address.
-
-- Supports bulk updating of multiple contacts in a single request.
-
-### Custom Fields
-
-Define custom data fields on a per-list basis to store additional contact information. Supported field types include text, number, date, single choice, and multiple choice. Fields have a tag (identifier), label, and optional fallback value used in campaigns when no value is available.
-
-### Tags
-
-Create, update, and delete tags on a per-list basis. Tags are labels assigned to contacts for segmentation and targeting. Tags can be added to or removed from contacts during create/update operations.
-
-### Campaigns
-
-Retrieve campaign details including status (draft, sending, sent, error), subject, sender information, target lists, and HTML content. The API is read-only for campaigns — campaigns cannot be created or sent via the API.
-
-### Campaign Reporting
-
-Access detailed campaign performance reports including:
-
-- **Summary reports**: sent count, bounces (hard/soft), opens (total/unique), clicks (total/unique), complaints, and unsubscribes.
-- **Contact-level reports**: filter by status (bounced, clicked, complained, opened, sent, unsubscribed, not-opened, not-clicked) to see which contacts had each interaction.
-- **Link reports**: performance data for individual links within a campaign (total and unique clicks).
-
-### Automations
-
-Trigger automations for specific contacts via the API. The automation must be configured with a "Started via API" trigger type in the EmailOctopus dashboard. A contact can only trigger an automation once unless "Allow contacts to repeat" is enabled.
-
-- The API only supports starting automations, not creating or managing them.
-
-## Events
-
-You can receive a notification of changes to your contacts by setting up a webhook. When a contact is added to your account, updated or deleted, EmailOctopus will send an HTTPS request containing the change.
-
-Webhooks are configured through the EmailOctopus dashboard (Integrations & APIs → Webhooks). When setting up a webhook, you can specify which event types to receive. You can exclude events generated via the API or imports.
-
-Requests to your webhook endpoint contain an `EmailOctopus-Signature` header, which can be used to validate the request was genuinely sent by EmailOctopus. This signature is generated using HMAC-SHA256 algorithm with the request body as the data and a secret value as the key.
-
-### Contact Created
-
-Fires when a new contact is added to a list. Includes the contact's email address, custom fields, tags, and subscription status.
-
-### Contact Updated
-
-Fires when an existing contact's details are modified (e.g., field values, tags, or status changes). Includes the contact's current fields, tags, and status.
-
-### Contact Deleted
-
-Fires when a contact is removed from a list. Includes the contact's fields, tags, and status at the time of deletion.
-
-### Contact Bounced
-
-Fires when an email to a contact bounces. Includes the associated campaign ID.
-
-### Contact Clicked
-
-Fires when a contact clicks a link in a campaign email. Includes the associated campaign ID.
-
-### Contact Complained
-
-Fires when a contact marks an email as spam. Includes the associated campaign ID.
-
-### Contact Opened
-
-Fires when a contact opens a campaign email. Includes the associated campaign ID.
-
-### Contact Unsubscribed
-
-Fires when a contact unsubscribes from a list. Includes the associated campaign ID.
-
-**Limitations:** EmailOctopus supports a maximum of 2 webhook endpoints per team.
+The public v2 documentation was read on October 5, 2026. Runtime provider acceptance requires a connected account; local schema and build verification alone does not establish that acceptance.

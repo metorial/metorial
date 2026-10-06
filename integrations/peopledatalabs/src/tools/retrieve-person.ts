@@ -7,7 +7,7 @@ import { mapPersonData } from './enrich-person';
 export let retrievePerson = SlateTool.create(spec, {
   name: 'Retrieve Person',
   key: 'retrieve_person',
-  description: `Retrieve a specific person record using a unique PDL Person ID. PDL IDs are permanent identifiers for each record in the dataset, allowing direct retrieval of a known person's data.`,
+  description: `Retrieve a specific person record using a unique PDL Person ID. PDL IDs normally persist across dataset builds, but an ID can disappear after source changes.`,
   instructions: [
     'You must provide a valid PDL Person ID, which can be obtained from enrichment, search, or identify responses.'
   ],
@@ -94,7 +94,7 @@ export let retrievePerson = SlateTool.create(spec, {
       },
       message: mapped.fullName
         ? `Retrieved person: **${mapped.fullName}**${mapped.jobTitle ? ` - ${mapped.jobTitle}` : ''}${mapped.jobCompanyName ? ` at ${mapped.jobCompanyName}` : ''}`
-        : `Retrieved person record for ID: ${ctx.input.personId}`
+        : `No person record matched ID: ${ctx.input.personId}`
     };
   })
   .build();

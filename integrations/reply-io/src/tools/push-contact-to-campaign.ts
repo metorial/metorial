@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let pushContactToCampaign = SlateTool.create(spec, {
   name: 'Push Contact to Campaign',
   key: 'push_contact_to_campaign',
-  description: `Create or update a contact and immediately push them into a campaign. Also supports marking a contact as replied or finished for a campaign. Uses the V1 action endpoints for legacy campaign compatibility.`,
+  description: `Create or update a contact and immediately push them into a campaign. Also supports marking a contact as replied or finished for a campaign. Uses still-available but unsupported V1 actions (legacy:use scope). Marking replied or finished affects every campaign for that email; campaignId scoping is unsupported.`,
   instructions: [
     'Use "push" to add/update a contact and push to campaign.',
     'Use "markReplied" to mark a contact as having replied.',
@@ -45,7 +45,7 @@ export let pushContactToCampaign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let {
       action,
       email,
@@ -64,7 +64,7 @@ export let pushContactToCampaign = SlateTool.create(spec, {
 
     if (action === 'push') {
       if (!campaignId)
-        throw new Error('campaignId is required to push a contact to a campaign');
+        throw createApiServiceError('campaignId is required to push a contact to a campaign');
       let data: Record<string, any> = { email, campaignId };
       if (firstName) data.firstName = firstName;
       if (lastName) data.lastName = lastName;
@@ -75,11 +75,11 @@ export let pushContactToCampaign = SlateTool.create(spec, {
       if (title) data.title = title;
       if (phone) data.phone = phone;
       if (linkedInProfile) data.linkedInProfile = linkedInProfile;
-      if (customFields) {
-        for (let [key, value] of Object.entries(customFields)) {
-          data[key] = value;
-        }
-      }
+      if (customFields)
+        data.customFields = Object.entries(customFields).map(([key, value]) => ({
+          key,
+          value
+        }));
 
       let result = await client.addAndPushToCampaign(data);
       return {

@@ -1,89 +1,26 @@
-Now let me get more details on the Tally.so API endpoints and features:Now I have a comprehensive picture. Let me compile the specification. Note: The search results reveal there are multiple products called "Tally" — Tally.so (form builder), Tally.xyz (DAO governance), and Tallyfy (workflow). Given the context of "Slates" as an integration platform, and the most commonly referred-to "Tally" in integration contexts being **Tally.so** (the form builder), I'll write the spec for Tally.so.
+# Tally implementation contract
 
-# Slates Specification for Tally
+The supported public scope is the original thirteen tool keys plus exact workspace readback and submission PDF download. Legacy triggers were removed without replacements. There are no organization, folder, webhook or general file administration additions.
 
-## Overview
+## API fidelity
 
-Tally (tally.so) is an online form builder that lets users create forms, surveys, and quizzes using a document-style editor. It supports a wide range of input types including text, file uploads, signatures, payments (via Stripe), and conditional logic. The API allows programmatic management of forms, submissions, workspaces, organizations, and webhooks.
+The client sends `tally-version: 2026-08-04` to `https://api.tally.so`, Bearer authorization, a 30-second timeout and no redirects. Exact IDs reject paths, control characters and malformed Unicode. Native objects and list envelopes are validated before mapping; inconsistent accepted write replies report uncertainty and require inspection before retrying.
 
-## Authentication
+- Forms use native `id`, `name`, `workspaceId`, state, counts and timestamps. Creation defaults to DRAFT and an empty block array to preserve existing optional inputs. Native block properties outside the common UUID/type/group/payload fields are retained, including during read-and-update. PATCH blocks are complete replacement; settings merge preserves omitted current root settings. No concurrency guarantee is implied.
+- Forms forward repeated `workspaceIds`; the legacy singular input becomes one element. Forms and submissions enforce limits 1–500 and reject wrong returned page/limit, duplicate identities or inconsistent parents. Workspace paging follows the documented native page/limit response without inventing a 500-item provider limit.
+- Questions are read from `{ questions, hasResponses }` and map native `id/title/type` to the existing `key/label/type` fields. Submission listing reads native `submissions` and the selected all/completed/partial count. Exact submission read uses `{ submission, questions }`. Legacy fields are derived from actual answer/question associations; unanswered submissions omit respondentId instead of fabricating one. Multiple responses to one question remain permitted; response IDs must be distinct.
+- User identity is `/users/me`, mapping `fullName` to optional name. No timezone query or invented username/human identity is used. Workspace discovery/readback exposes minimal identity and timestamps rather than members/invites.
+- Delete actions read the exact requested parent/resource first. Form/workspace deletion is retained trash behavior; submission deletion is permanent. A successful request is not a cleanup or erasure guarantee.
+- PDF delivery accepts only the exact native signed `https://api.tally.so/forms/{formId}/submissions/{submissionId}/pdf` route, no userinfo/fragment/alternate host. No API key is supplied to that URL. Native signed capability values remain intentionally deliverable; current schema documents no expiry. There is no renewal helper.
 
-Tally supports two authentication methods:
+## Authentication and errors
 
-### 1. Personal API Key (Bearer Token)
+API-key and OAuth auth keys remain supported. New OAuth authorization uses published metadata at `https://api.tally.so/.well-known/oauth-authorization-server`, code flow, S256 PKCE, `user forms responses`, and form-encoded client-secret-post token requests. Current issuer marking is stored with the connection. Unmarked legacy callbacks/refresh keep `https://tally.so/oauth/token` and legacy JSON encoding; this is compatibility preservation, not proof of continued legacy server acceptance or retirement. Missing refresh state requires reconnection. Token normalization retains rotated or omitted refresh tokens and validates expiry/Unicode.
 
-Users can generate a personal API key by navigating to **Settings > API keys** in the Tally dashboard and clicking "Create API key." Fine-grained permissions are not currently available — the key inherits the full permissions of the user who created it.
+Request and complete native-response checks refuse known raw, percent-encoded, Base64 and Base64url configured-credential reflections before output projection. ServiceError adapters use static operations and numeric upstream status only, with a suppressed raw parent. Shared HTTP capture occurs before local response checks; independently captured internal traces may retain transformed provider reflections despite public refusal. No universal internal privacy claim is made.
 
-Include the API key as a Bearer token in the `Authorization` header of every request:
+## Official sources and limits
 
-```
-Authorization: Bearer tly-xxxx
-```
+Current [OpenAPI](https://developers.tally.so/api-reference/openapi.json), [form PATCH](https://developers.tally.so/api-reference/endpoint/forms/patch), [block guide](https://developers.tally.so/documentation/adding-blocks-to-a-form), [submission read](https://developers.tally.so/api-reference/endpoint/forms/submissions/get), [API keys](https://developers.tally.so/api-reference/api-keys), [versioning](https://developers.tally.so/api-reference/versioning), [changelog](https://developers.tally.so/api-reference/changelog) and public OAuth metadata were read. The captured OpenAPI SHA-256 is `28b98ea5fb21692746d85f8bb8110c74d3826c6e15d33dd0ccf1aa0e92f1db7b`.
 
-**Base URL:** `https://api.tally.so`
-
-### 2. OAuth 2.0 (Authorization Code Flow)
-
-For third-party applications building public integrations, Tally supports OAuth 2.0. The flow works as follows:
-
-- **Authorization URL:** `https://tally.so/oauth/authorize`
-- **Token URL:** `https://tally.so/oauth/token`
-- **Required parameters:**
-  - `client_id` — Obtained by registering your application with Tally
-  - `client_secret` — Obtained alongside the client ID
-  - `redirect_uri` — Your application's callback URL
-  - `response_type=code` — For the authorization request
-  - `grant_type=authorization_code` — When exchanging the code for a token
-
-Refresh tokens are supported via `grant_type=refresh_token` to obtain new access tokens.
-
-Access tokens are then used as Bearer tokens in the `Authorization` header, the same way as API keys.
-
-There is no documented set of granular OAuth scopes — the token provides access based on the authorizing user's permissions.
-
-## Features
-
-### Form Management
-
-Developers can programmatically create forms, update input blocks, delete or fetch submissions and more. Forms are composed of blocks (e.g., `FORM_TITLE`, input fields, layout blocks) each identified by a UUID. Forms can be created in `PUBLISHED` or draft status. You can list all forms in your account, fetch a specific form's details, update its blocks and settings, or delete it.
-
-- Forms support a wide variety of block types: text inputs, numbers, emails, phone numbers, dates, times, textareas, multiple choice, dropdowns, checkboxes, linear scales, file uploads, hidden fields, calculated fields, ratings, multi-select, matrix, ranking, signatures, and payments.
-- Form settings such as status (open/closed) can be managed via the API.
-
-### Submission Management
-
-You can retrieve a specific form submission with all its responses and the form questions. Submissions can be listed (with filtering), fetched individually, or deleted. Each submission includes the respondent ID, form field answers, and metadata such as creation date.
-
-### Form Questions
-
-You can list the questions (input blocks) defined on a form, which is useful for understanding the form's structure before processing submissions.
-
-### Workspace Management
-
-Workspaces allow grouping related forms. The API supports creating, listing, fetching, updating, and deleting workspaces.
-
-### Organization Management
-
-You can list and remove users from your organization, as well as create, list, and cancel invitations to join the organization.
-
-### User Info
-
-You can fetch information about the currently authenticated user.
-
-### Webhook Management
-
-Webhooks can be created, listed, updated, and deleted via the API. You can create a new webhook for a form to receive form events. Each webhook is configured with a target URL, event types, and an optional signing secret. You can also list webhook delivery events and retry failed deliveries through the API.
-
-## Events
-
-Tally supports webhooks that push data to a specified HTTP endpoint in real time when events occur on a form.
-
-### Form Response
-
-The event trigger is a new form submission. When someone submits a Tally form, a notification containing the response data gets sent to your URL in JSON format via a POST request. The `FORM_RESPONSE` event type is currently the only supported webhook event type.
-
-- The webhook payload includes: submission ID, respondent ID, form ID, form name, submission timestamp, and all field answers with their types and values.
-- Tally can sign each webhook request with a SHA256 signature so you can verify that the payload really came from Tally before you process it. A signing secret can be configured when creating the webhook.
-- Custom HTTP headers can be added to webhook requests.
-- You can connect unlimited webhook URLs and pause them by clicking the toggle.
-- Webhooks can be managed both through the Tally dashboard UI and programmatically via the API.
+No authenticated provider operation was performed. Actual API acceptance, legacy OAuth acceptance, block/editor normalization, trash/history, concurrent behavior, subscription restrictions and deployed signed PDF delivery remain live-unverified. No REST submission-create endpoint is documented; controlled permanent-deletion coverage requires an independently seeded current-run-owned submission and explicit authorization.

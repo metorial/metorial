@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AffinityClient } from '../lib/client';
+import { interactionDatesOutput, mapInteractionDates } from '../lib/interaction-dates';
 import { spec } from '../spec';
 
 let organizationSchema = z.object({
@@ -9,7 +10,8 @@ let organizationSchema = z.object({
   domain: z.string().nullable().describe('Primary domain'),
   domains: z.array(z.string()).describe('All associated domains'),
   global: z.boolean().describe('Whether this is a global organization from Affinity database'),
-  personIds: z.array(z.number()).describe('IDs of associated persons')
+  personIds: z.array(z.number()).describe('IDs of associated persons'),
+  interactionDates: interactionDatesOutput.optional()
 });
 
 export let searchOrganizations = SlateTool.create(spec, {
@@ -53,13 +55,16 @@ export let searchOrganizations = SlateTool.create(spec, {
       pageToken: ctx.input.pageToken
     });
 
-    let organizations = (result.organizations ?? result ?? []).map((o: any) => ({
+    let organizations = (result.organizations ?? result ?? []).map(o => ({
       organizationId: o.id,
       name: o.name ?? null,
       domain: o.domain ?? null,
       domains: o.domains ?? [],
       global: o.global ?? false,
-      personIds: o.person_ids ?? []
+      personIds: o.person_ids ?? [],
+      interactionDates: ctx.input.withInteractionDates
+        ? mapInteractionDates(o.interaction_dates)
+        : undefined
     }));
 
     return {

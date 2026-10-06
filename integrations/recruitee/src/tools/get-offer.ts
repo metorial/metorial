@@ -20,7 +20,7 @@ export let getOffer = SlateTool.create(spec, {
     z.object({
       offerId: z.number().describe('Offer ID'),
       title: z.string().describe('Title'),
-      kind: z.string().describe('Type: job or talent_pool'),
+      kind: z.string().optional().describe('Type when returned by the provider'),
       status: z.string().describe('Current status'),
       description: z.string().nullable().describe('Job description (HTML)'),
       requirements: z.string().nullable().describe('Job requirements (HTML)'),
@@ -37,16 +37,24 @@ export let getOffer = SlateTool.create(spec, {
       tags: z.array(z.string()).describe('Tags'),
       slug: z.string().nullable().describe('URL slug'),
       careersUrl: z.string().nullable().describe('Careers site URL'),
-      createdAt: z.string().describe('Creation timestamp'),
-      updatedAt: z.string().describe('Last update timestamp'),
-      publishedAt: z.string().nullable().describe('Publication timestamp')
+      createdAt: z.string().optional().describe('Creation timestamp when returned'),
+      updatedAt: z.string().optional().describe('Update timestamp when returned'),
+      publishedAt: z.string().nullable().describe('Publication timestamp'),
+      pipelineStages: z
+        .array(
+          z.object({
+            stageId: z.number(),
+            name: z.string(),
+            group: z.string().optional(),
+            category: z.string().optional()
+          })
+        )
+        .optional()
+        .describe('Actual stages for this offer; use stageId for manage_pipeline')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
+    let client = await RecruiteeClient.forContext(ctx);
 
     let result = await client.getOffer(ctx.input.offerId);
     let o = result.offer;
@@ -60,17 +68,18 @@ export let getOffer = SlateTool.create(spec, {
         description: o.description || null,
         requirements: o.requirements || null,
         department: o.department || null,
-        locations: (o.locations || []).map((l: any) => ({
+        locations: (o.locations || []).map(l => ({
           locationId: l.id,
-          fullAddress: l.full_address || `${l.city || ''}, ${l.country || ''}`.trim()
+          fullAddress: l.full_address
         })),
         remote: o.remote ?? null,
-        tags: (o.tags || []).map((t: any) => (typeof t === 'string' ? t : t.name || t)),
+        tags: o.tags,
         slug: o.slug || null,
         careersUrl: o.careers_url || null,
         createdAt: o.created_at,
         updatedAt: o.updated_at,
-        publishedAt: o.published_at || null
+        publishedAt: o.published_at || null,
+        pipelineStages: await client.pipelineStages(o)
       },
       message: `Retrieved ${o.kind === 'talent_pool' ? 'talent pool' : 'job offer'} **${o.title}** (ID: ${o.id}), status: "${o.status}".`
     };

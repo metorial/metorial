@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { organizationNameSchema } from '../lib/contracts';
 import { createClient } from '../lib/helpers';
 import { mapPagination, mapTeam } from '../lib/mappers';
 import { spec } from '../spec';
@@ -25,13 +26,14 @@ let teamSchema = z.object({
 export let listTeamsTool = SlateTool.create(spec, {
   name: 'List Teams',
   key: 'list_teams',
-  description: `List all teams in the organization. Returns team details including member count, visibility, and organization-level access permissions.`,
+  description: `Call list_organizations to select an organization or use the optional configured default. List all teams in the organization. Returns team details including member count, visibility, and organization-level access permissions.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       pageNumber: z.number().optional().describe('Page number for pagination'),
       pageSize: z.number().optional().describe('Number of results per page')
     })
@@ -67,10 +69,11 @@ export let listTeamsTool = SlateTool.create(spec, {
 export let createTeamTool = SlateTool.create(spec, {
   name: 'Create Team',
   key: 'create_team',
-  description: `Create a new team in the organization. Configure organization-level permissions to control what the team can manage (workspaces, policies, VCS, providers, modules, runs, projects).`
+  description: `Call list_organizations to select an organization or use the optional configured default. Create a new team in the organization. Configure organization-level permissions for workspaces, policies, VCS, providers, modules and projects. Grant run permissions on individual workspaces.`
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       name: z.string().describe('Name of the team'),
       visibility: z
         .enum(['secret', 'organization'])
@@ -85,7 +88,12 @@ export let createTeamTool = SlateTool.create(spec, {
           manageVcsSettings: z.boolean().optional(),
           manageProviders: z.boolean().optional(),
           manageModules: z.boolean().optional(),
-          manageRuns: z.boolean().optional(),
+          manageRuns: z
+            .boolean()
+            .optional()
+            .describe(
+              'Legacy unsupported organization permission. Set run permissions on individual workspaces; true is rejected.'
+            ),
           manageProjects: z.boolean().optional(),
           readWorkspaces: z.boolean().optional(),
           readProjects: z.boolean().optional()
@@ -139,10 +147,11 @@ export let deleteTeamTool = SlateTool.create(spec, {
 export let manageTeamMembersTool = SlateTool.create(spec, {
   name: 'Manage Team Members',
   key: 'manage_team_members',
-  description: `Add or remove users from a team. Users are specified by their Terraform Cloud usernames.`
+  description: `Call list_organizations to select an organization or use the optional configured default. Add or remove users from a team. Users are specified by their Terraform Cloud usernames.`
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       teamId: z.string().describe('The team ID to modify'),
       action: z.enum(['add', 'remove']).describe('Whether to add or remove members'),
       usernames: z.array(z.string()).describe('List of Terraform Cloud usernames')
@@ -180,7 +189,7 @@ export let manageTeamMembersTool = SlateTool.create(spec, {
 export let setTeamWorkspaceAccessTool = SlateTool.create(spec, {
   name: 'Set Team Workspace Access',
   key: 'set_team_workspace_access',
-  description: `Grant a team access to a workspace with a specific permission level. Use "custom" access for granular control over runs, variables, state versions, and other workspace features.`,
+  description: `Grant a team access to a workspace; discover grants with list_team_workspace_access and revoke them with delete_team_workspace_access. Grant access to a workspace with a specific permission level. Use "custom" access for granular control over runs, variables, state versions, and other workspace features.`,
   instructions: [
     'For "custom" access level, provide the individual permission fields.',
     'Standard access levels (read, plan, write, admin) have pre-defined permission sets.'
@@ -228,19 +237,24 @@ export let setTeamWorkspaceAccessTool = SlateTool.create(spec, {
       teamId: z.string(),
       workspaceId: z.string(),
       access: z.string(),
-      success: z.boolean()
+      success: z.boolean(),
+      teamWorkspaceAccessId: z
+        .string()
+        .optional()
+        .describe('ID returned by the provider for readback or revocation')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    await client.addTeamWorkspaceAccess(ctx.input);
+    const response = await client.addTeamWorkspaceAccess(ctx.input);
 
     return {
       output: {
         teamId: ctx.input.teamId,
         workspaceId: ctx.input.workspaceId,
         access: ctx.input.access,
-        success: true
+        success: true,
+        teamWorkspaceAccessId: response.data.id
       },
       message: `Granted **${ctx.input.access}** access to team ${ctx.input.teamId} on workspace ${ctx.input.workspaceId}.`
     };

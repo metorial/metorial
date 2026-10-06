@@ -1,17 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getPage = SlateTool.create(spec, {
   name: 'Get Page',
   key: 'get_page',
-  description: `Retrieve the status page profile and settings including name, domain, subdomain, time zone, branding, and notification preferences. Use this to inspect current page configuration.`,
+  description: `Retrieve the status page profile and settings including name, domain, subdomain, time zone and notification preferences. Use this to inspect current page configuration.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ pageId: pageIdSchema }))
   .output(
     z.object({
       pageId: z.string().describe('Unique identifier of the page'),
@@ -19,7 +20,12 @@ export let getPage = SlateTool.create(spec, {
       pageDescription: z.string().optional().describe('Description of the status page'),
       subdomain: z.string().optional().describe('Subdomain for the status page'),
       domain: z.string().optional().describe('Custom domain for the status page'),
-      url: z.string().optional().describe('Full URL of the status page'),
+      url: z
+        .string()
+        .optional()
+        .describe(
+          'Company website URL used by the page logo; use domain/subdomain to locate the status page.'
+        ),
       timeZone: z.string().optional().describe('Time zone configured for the page'),
       updatedAt: z.string().optional().describe('Last update timestamp'),
       allowEmail: z.boolean().optional().describe('Whether email subscriptions are enabled'),
@@ -32,7 +38,10 @@ export let getPage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, pageId: ctx.config.pageId });
+    let client = new Client({
+      token: ctx.auth.token,
+      pageId: ctx.input.pageId ?? ctx.config.pageId
+    });
     let page = await client.getPage();
 
     let output = {
@@ -44,15 +53,15 @@ export let getPage = SlateTool.create(spec, {
       url: page.url,
       timeZone: page.time_zone,
       updatedAt: page.updated_at,
-      allowEmail: page.allow_email,
-      allowSms: page.allow_sms,
-      allowWebhook: page.allow_webhook,
+      allowEmail: page.allow_email_subscribers,
+      allowSms: page.allow_sms_subscribers,
+      allowWebhook: page.allow_webhook_subscribers,
       allowRss: page.allow_rss_atom_feeds
     };
 
     return {
       output,
-      message: `Retrieved status page **${page.name}** (${page.url || page.subdomain}).`
+      message: `Retrieved status page **${page.name}** (${page.domain || page.subdomain || page.id}).`
     };
   })
   .build();

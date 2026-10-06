@@ -4,7 +4,10 @@ import {
   createApplicationTool,
   createCandidateTool,
   createJobTool,
+  downloadFile,
   getCandidateTool,
+  getCurrentApiKey,
+  getFileUrl,
   listApplicationsTool,
   listJobsTool,
   listOrganizationTool,
@@ -15,15 +18,6 @@ import {
   updateCandidateTool,
   updateJob
 } from './tools';
-import {
-  applicationEventsTrigger,
-  candidateEventsTrigger,
-  interviewEventsTrigger,
-  jobEventsTrigger,
-  offerEventsTrigger,
-  openingEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -39,14 +33,10 @@ export let provider = Slate.create({
     manageOfferTool,
     manageInterviewScheduleTool,
     listOrganizationTool,
-    setCustomField
+    setCustomField,
+    getCurrentApiKey,
+    downloadFile,
+    getFileUrl
   ],
-  triggers: [
-    candidateEventsTrigger,
-    applicationEventsTrigger,
-    jobEventsTrigger,
-    offerEventsTrigger,
-    interviewEventsTrigger,
-    openingEventsTrigger
-  ]
+  triggers: []
 });

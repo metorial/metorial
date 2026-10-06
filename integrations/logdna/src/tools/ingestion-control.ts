@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -12,18 +12,27 @@ export let getIngestionStatus = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      status: z.string().describe('Current ingestion status (e.g., "active" or "suspended")')
+      status: z.string().describe('Current ingestion status: active or suspended'),
+      isIngesting: z
+        .boolean()
+        .optional()
+        .describe('Whether the provider is currently accepting log ingestion')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let result = await client.getIngestionStatus();
 
     return {
       output: {
-        status: result?.status || JSON.stringify(result)
+        status: result.isIngesting ? 'active' : 'suspended',
+        isIngesting: result.isIngesting
       },
-      message: `Ingestion status: **${result?.status || 'unknown'}**.`
+      message: `Ingestion status: **${result.isIngesting ? 'active' : 'suspended'}**.`
     };
   })
   .build();
@@ -58,13 +67,24 @@ export let suspendIngestion = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
+
+    if (ctx.input.confirm && !ctx.input.suspendToken?.trim())
+      throw createApiServiceError(
+        'Supply the token from the first suspend_ingestion call when confirm is true.'
+      );
+    if (!ctx.input.confirm && ctx.input.suspendToken !== undefined)
+      throw createApiServiceError('Set confirm to true when supplying a suspend token.');
 
     if (ctx.input.confirm && ctx.input.suspendToken) {
       let result = await client.confirmSuspendIngestion(ctx.input.suspendToken);
       return {
         output: {
-          status: result?.status || 'suspended'
+          status: result.status === 'OK' ? 'suspended' : result.status
         },
         message: 'Ingestion has been **suspended**.'
       };
@@ -74,7 +94,7 @@ export let suspendIngestion = SlateTool.create(spec, {
     return {
       output: {
         status: 'pending_confirmation',
-        suspendToken: result?.token || result?.suspend_token || JSON.stringify(result)
+        suspendToken: result.token
       },
       message:
         'Suspend initiated. Use the returned **suspendToken** with `confirm=true` to complete the suspension.'
@@ -86,7 +106,7 @@ export let resumeIngestion = SlateTool.create(spec, {
   name: 'Resume Ingestion',
   key: 'resume_ingestion',
   description: `Resume data ingestion for the LogDNA instance after it has been suspended.`,
-  tags: { destructive: false, readOnly: false }
+  tags: { destructive: true, readOnly: false }
 })
   .input(z.object({}))
   .output(
@@ -95,12 +115,16 @@ export let resumeIngestion = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let result = await client.resumeIngestion();
 
     return {
       output: {
-        status: result?.status || 'active'
+        status: result.status === 'OK' ? 'active' : result.status
       },
       message: 'Ingestion has been **resumed**.'
     };

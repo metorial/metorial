@@ -27,8 +27,6 @@ import {
   updateVideo,
   uploadSubtitles
 } from './tools';
-import { inboundWebhook, teamActivity, teamNotifications } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,5 +56,5 @@ export let provider = Slate.create({
     sendMessage,
     listLanguages
   ],
-  triggers: [inboundWebhook, teamActivity, teamNotifications]
+  triggers: []
 });

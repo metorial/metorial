@@ -1,0 +1,1761 @@
+{
+  "list_accounts": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tagName": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "creationAfter": {
+          "type": "string"
+        },
+        "creationBefore": {
+          "type": "string"
+        },
+        "addressCountry": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "addressCity": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hotness": {
+          "type": "number"
+        },
+        "limit": {
+          "default": 20,
+          "type": "number"
+        },
+        "offset": {
+          "default": 0,
+          "type": "number"
+        },
+        "orderBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["limit", "offset"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": ["accounts", "count"],
+      "additionalProperties": false
+    }
+  },
+  "get_account": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "number"
+        }
+      },
+      "required": ["accountId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["account"],
+      "additionalProperties": false
+    }
+  },
+  "create_account": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "website": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "number"
+        },
+        "size": {
+          "type": "number"
+        },
+        "address": {
+          "type": "object",
+          "properties": {
+            "city": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            },
+            "stateRegion": {
+              "type": "string"
+            },
+            "street": {
+              "type": "string"
+            },
+            "zip": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "email": {
+          "type": "string"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "socialProfiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "custom": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "updateIfExists": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": ["updateIfExists"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "number"
+        },
+        "account": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["accountId", "account"],
+      "additionalProperties": false
+    }
+  },
+  "update_account": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "website": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "number"
+        },
+        "size": {
+          "type": "number"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "socialProfiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "custom": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "address": {
+          "type": "object",
+          "properties": {
+            "city": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            },
+            "stateRegion": {
+              "type": "string"
+            },
+            "street": {
+              "type": "string"
+            },
+            "zip": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "contactIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "removeContactIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "userIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "removeUserIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "required": ["accountId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["account"],
+      "additionalProperties": false
+    }
+  },
+  "delete_account": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "number"
+        }
+      },
+      "required": ["accountId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "list_contacts": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "accountId": {
+          "type": "number"
+        },
+        "tagName": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "role": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "modificationAfter": {
+          "type": "string"
+        },
+        "modificationBefore": {
+          "type": "string"
+        },
+        "creationAfter": {
+          "type": "string"
+        },
+        "creationBefore": {
+          "type": "string"
+        },
+        "includeArchived": {
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 20,
+          "type": "number"
+        },
+        "offset": {
+          "default": 0,
+          "type": "number"
+        },
+        "orderBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["limit", "offset"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": ["contacts", "count"],
+      "additionalProperties": false
+    }
+  },
+  "get_contact": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "number"
+        }
+      },
+      "required": ["contactId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "contact": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["contact"],
+      "additionalProperties": false
+    }
+  },
+  "create_contact": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "firstname": {
+          "type": "string"
+        },
+        "lastname": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "suffix": {
+          "type": "string"
+        },
+        "accountId": {
+          "type": "number"
+        },
+        "owner": {
+          "type": "number"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "mobilePhoneNumber": {
+          "type": "string"
+        },
+        "birthDate": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "address": {
+          "type": "object",
+          "properties": {
+            "city": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            },
+            "stateRegion": {
+              "type": "string"
+            },
+            "street": {
+              "type": "string"
+            },
+            "zip": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "position": {
+          "type": "object",
+          "properties": {
+            "organisation": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "socialProfiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "custom": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "force": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": ["force"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "number"
+        },
+        "contact": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["contactId", "contact"],
+      "additionalProperties": false
+    }
+  },
+  "update_contact": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "number"
+        },
+        "email": {
+          "type": "string"
+        },
+        "firstname": {
+          "type": "string"
+        },
+        "lastname": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "suffix": {
+          "type": "string"
+        },
+        "accountId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner": {
+          "type": "number"
+        },
+        "phoneNumber": {
+          "type": "string"
+        },
+        "birthDate": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "address": {
+          "type": "object",
+          "properties": {
+            "city": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            },
+            "stateRegion": {
+              "type": "string"
+            },
+            "street": {
+              "type": "string"
+            },
+            "zip": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "position": {
+          "type": "object",
+          "properties": {
+            "organisation": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "socialProfiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "custom": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "archived": {
+          "type": "boolean"
+        }
+      },
+      "required": ["contactId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "contact": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["contact"],
+      "additionalProperties": false
+    }
+  },
+  "delete_contact": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "number"
+        }
+      },
+      "required": ["contactId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "list_opportunities": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "stageId": {
+          "type": "number"
+        },
+        "stageName": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "number"
+        },
+        "accountId": {
+          "type": "number"
+        },
+        "assigneeId": {
+          "type": "number"
+        },
+        "pipelineId": {
+          "type": "number"
+        },
+        "minValue": {
+          "type": "number"
+        },
+        "maxValue": {
+          "type": "number"
+        },
+        "closeAfter": {
+          "type": "string"
+        },
+        "closeBefore": {
+          "type": "string"
+        },
+        "creationAfter": {
+          "type": "string"
+        },
+        "creationBefore": {
+          "type": "string"
+        },
+        "closed": {
+          "type": "boolean"
+        },
+        "done": {
+          "type": "boolean"
+        },
+        "tagName": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hotness": {
+          "type": "number"
+        },
+        "limit": {
+          "default": 20,
+          "type": "number"
+        },
+        "offset": {
+          "default": 0,
+          "type": "number"
+        },
+        "orderBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["limit", "offset"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "opportunities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": ["opportunities", "count"],
+      "additionalProperties": false
+    }
+  },
+  "get_opportunity": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "number"
+        }
+      },
+      "required": ["opportunityId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "opportunity": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["opportunity"],
+      "additionalProperties": false
+    }
+  },
+  "create_opportunity": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "number"
+        },
+        "stageId": {
+          "type": "number"
+        },
+        "value": {
+          "type": "number"
+        },
+        "currencyId": {
+          "type": "number"
+        },
+        "closeDate": {
+          "type": "string"
+        },
+        "probability": {
+          "type": "number"
+        },
+        "assigneeId": {
+          "type": "number"
+        },
+        "mainContactId": {
+          "type": "number"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "startDate": {
+          "type": "string"
+        },
+        "recurringPricePerUnit": {
+          "type": "number"
+        },
+        "frequency": {
+          "type": "string",
+          "enum": ["daily", "weekly", "monthly", "annually"]
+        },
+        "units": {
+          "type": "number"
+        },
+        "contractStartDate": {
+          "type": "string"
+        },
+        "contractEndDate": {
+          "type": "string"
+        },
+        "custom": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["accountId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "number"
+        },
+        "opportunity": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["opportunityId", "opportunity"],
+      "additionalProperties": false
+    }
+  },
+  "update_opportunity": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "number"
+        },
+        "stageId": {
+          "type": "number"
+        },
+        "value": {
+          "type": "number"
+        },
+        "currencyId": {
+          "type": "number"
+        },
+        "closeDate": {
+          "type": "string"
+        },
+        "probability": {
+          "type": "number"
+        },
+        "assigneeId": {
+          "type": "number"
+        },
+        "mainContactId": {
+          "type": "number"
+        },
+        "accountId": {
+          "type": "number"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "closed": {
+          "type": "boolean"
+        },
+        "done": {
+          "type": "boolean"
+        },
+        "lostReasonId": {
+          "type": "number"
+        },
+        "leadSourceId": {
+          "type": "number"
+        },
+        "recurringPricePerUnit": {
+          "type": "number"
+        },
+        "frequency": {
+          "type": "string",
+          "enum": ["daily", "weekly", "monthly", "annually"]
+        },
+        "units": {
+          "type": "number"
+        },
+        "contractStartDate": {
+          "type": "string"
+        },
+        "contractEndDate": {
+          "type": "string"
+        },
+        "custom": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["opportunityId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "opportunity": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["opportunity"],
+      "additionalProperties": false
+    }
+  },
+  "delete_opportunity": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "number"
+        }
+      },
+      "required": ["opportunityId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "list_tasks": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string"
+        },
+        "assigneeIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "accountId": {
+          "type": "number"
+        },
+        "type": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limit": {
+          "default": 20,
+          "type": "number"
+        },
+        "offset": {
+          "default": 0,
+          "type": "number"
+        },
+        "orderBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["limit", "offset"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": ["tasks", "count"],
+      "additionalProperties": false
+    }
+  },
+  "create_task": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "number"
+        },
+        "reminderDate": {
+          "type": "string"
+        },
+        "assigneeIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "required": ["description"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "number"
+        },
+        "task": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["taskId", "task"],
+      "additionalProperties": false
+    }
+  },
+  "update_task": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "number"
+        },
+        "accountId": {
+          "type": "number"
+        },
+        "reminderDate": {
+          "type": "string"
+        },
+        "assigneeIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "completed": {
+          "type": "boolean"
+        }
+      },
+      "required": ["taskId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "delete_task": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "number"
+        }
+      },
+      "required": ["taskId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "create_note": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "number"
+        },
+        "body": {
+          "type": "string"
+        },
+        "mentionUserIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "date": {
+          "type": "string"
+        }
+      },
+      "required": ["accountId", "body"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "number"
+        },
+        "note": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["noteId", "note"],
+      "additionalProperties": false
+    }
+  },
+  "update_note": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "number"
+        },
+        "accountId": {
+          "type": "number"
+        },
+        "body": {
+          "type": "string"
+        },
+        "mentionUserIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "date": {
+          "type": "string"
+        }
+      },
+      "required": ["noteId", "accountId", "body"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "note": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["note"],
+      "additionalProperties": false
+    }
+  },
+  "delete_note": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "number"
+        }
+      },
+      "required": ["noteId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "log_meeting": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "participantIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "endDate": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "type": {
+          "default": "meeting-live",
+          "type": "string",
+          "enum": ["meeting-live", "meeting-phone"]
+        }
+      },
+      "required": ["date", "participantIds", "type"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "meetingId": {
+          "type": "number"
+        },
+        "meeting": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["meetingId", "meeting"],
+      "additionalProperties": false
+    }
+  },
+  "log_call": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "participantIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "endDate": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": ["date", "participantIds"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "callId": {
+          "type": "number"
+        },
+        "call": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["callId", "call"],
+      "additionalProperties": false
+    }
+  },
+  "list_tags": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "type": "number"
+        },
+        "offset": {
+          "default": 0,
+          "type": "number"
+        }
+      },
+      "required": ["limit", "offset"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tagId": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "accountCount": {
+                "type": "number"
+              },
+              "contactCount": {
+                "type": "number"
+              },
+              "opportunityCount": {
+                "type": "number"
+              }
+            },
+            "required": ["tagId", "name"],
+            "additionalProperties": false
+          }
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": ["tags", "count"],
+      "additionalProperties": false
+    }
+  },
+  "create_tag": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "tagId": {
+          "type": "number"
+        }
+      },
+      "required": ["tagId"],
+      "additionalProperties": false
+    }
+  },
+  "update_tag": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "tagId": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": ["tagId", "name"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "delete_tag": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "tagId": {
+          "type": "number"
+        }
+      },
+      "required": ["tagId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "list_pipelines": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "pipelines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pipelineId": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "isDefault": {
+                "type": "boolean"
+              },
+              "recurring": {
+                "type": "boolean"
+              },
+              "currency": {
+                "type": "object",
+                "properties": {
+                  "currencyId": {
+                    "type": "number"
+                  },
+                  "iso": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "stages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "stageId": {
+                      "type": "number"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "probability": {
+                      "type": "number"
+                    },
+                    "order": {
+                      "type": "number"
+                    },
+                    "color": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["stageId", "name"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["pipelineId", "name", "isDefault", "recurring", "stages"],
+            "additionalProperties": false
+          }
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": ["pipelines", "count"],
+      "additionalProperties": false
+    }
+  },
+  "list_users": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "onlyEnabled": {
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 20,
+          "type": "number"
+        },
+        "offset": {
+          "default": 0,
+          "type": "number"
+        }
+      },
+      "required": ["limit", "offset"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": ["users", "count"],
+      "additionalProperties": false
+    }
+  },
+  "get_current_user": {
+    "input": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["user"],
+      "additionalProperties": false
+    }
+  },
+  "list_workflows": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "type": "number"
+        },
+        "offset": {
+          "default": 0,
+          "type": "number"
+        }
+      },
+      "required": ["limit", "offset"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": ["workflows", "count"],
+      "additionalProperties": false
+    }
+  },
+  "get_workflow": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "number"
+        }
+      },
+      "required": ["workflowId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "workflow": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["workflow"],
+      "additionalProperties": false
+    }
+  },
+  "list_currencies": {
+    "input": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "currencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "currencyId": {
+                "type": "number"
+              },
+              "iso": {
+                "type": "string"
+              },
+              "html": {
+                "type": "string"
+              }
+            },
+            "required": ["currencyId", "iso", "html"],
+            "additionalProperties": false
+          }
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": ["currencies", "count"],
+      "additionalProperties": false
+    }
+  }
+}

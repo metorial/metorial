@@ -1,3 +1,5 @@
+export * from './download-asset';
+export * from './get-current-user';
 export * from './get-document';
 export * from './list-projects';
 export * from './manage-datasets';

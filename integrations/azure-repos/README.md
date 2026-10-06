@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/azure-repos.png" height="20"> Azure Repos
 
-Manage Git repositories, branches, and pull requests in Azure DevOps. Create, list, update, and delete repositories and forks. Create and manage branches, configure branch policies (minimum reviewers, build validation, merge strategies). Create, review, comment on, and complete pull requests with support for draft PRs, auto-completion, and merge strategies. Browse commit history, view pushes, and retrieve file contents at specific versions. Search code across repositories by text, path, and file extension. Receive webhooks for code pushes, pull request lifecycle events, repository creation/deletion/renaming, and TFVC check-ins.
+Manage Git repositories, branches, and pull requests in Azure DevOps. Create, list, update, and delete repositories and forks. Create and manage branches, configure branch policies (minimum reviewers, build validation, merge strategies). Create, review, comment on, and complete pull requests with support for draft PRs, auto-completion, and merge strategies. Browse commit history, view pushes, and retrieve file contents at specific versions. Search code across repositories by text, path, and file extension.
 
 ## Tools
 

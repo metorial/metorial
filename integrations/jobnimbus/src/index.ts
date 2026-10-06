@@ -20,8 +20,6 @@ import {
   updateJob,
   updateTask
 } from './tools';
-import { contactEvents, inboundWebhook, jobEvents, taskEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     listFinancialDocuments,
     createFile
   ],
-  triggers: [inboundWebhook, contactEvents, jobEvents, taskEvents]
+  triggers: []
 });

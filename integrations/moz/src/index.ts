@@ -16,8 +16,6 @@ import {
   getUrlMetricsTool,
   getUsageAndIndexTool
 } from './tools';
-import { inboundWebhook, indexUpdatedTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     checkLinkStatusTool,
     getUsageAndIndexTool
   ],
-  triggers: [inboundWebhook, indexUpdatedTrigger]
+  triggers: []
 });

@@ -15,8 +15,6 @@ import {
   queryAuditLogs,
   triggerWorkflow
 } from './tools';
-import { workflowEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     queryAuditLogs,
     getCurrentUser
   ],
-  triggers: [workflowEvent]
+  triggers: []
 });

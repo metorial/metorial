@@ -1,6 +1,6 @@
 # Fibery
 
-Manage customizable work management workspaces with interconnected databases (Types), entities, documents, and views. Create, read, update, and delete workspace schemas, entities, and fields. Query entities with filtering, ordering, and pagination, including nested relations. Read and write rich text documents in Markdown, HTML, or JSON formats. Upload, download, and attach files to entities. Add comments to entities. Create and manage views (boards, tables, timelines). Execute GraphQL queries and mutations per space. Subscribe to entity change webhooks for create, update, and collection modifications. Run automation scripts for bulk operations and external integrations.
+Manage customizable work management workspaces with interconnected databases (Types), entities, documents, and views. Create, read, update, and delete workspace schemas, entities, and fields. Query entities with filtering, ordering, and pagination, including nested relations. Read and write rich text documents in Markdown, HTML, or JSON formats. Upload, download, and attach files to entities. Add comments to entities. Create and manage views (boards, tables, timelines). Execute GraphQL queries and mutations per space. Run automation scripts for bulk operations and external integrations.
 
 ## License
 

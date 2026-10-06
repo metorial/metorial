@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShippoClient } from '../lib/client';
+import { addDocument } from '../lib/files';
+import { invalid } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let purchaseLabel = SlateTool.create(spec, {
   name: 'Purchase Shipping Label',
   key: 'purchase_label',
-  description: `Purchase a shipping label. You can either select a rate from an existing shipment, or create a label in a single call by providing full shipment details along with carrier and service level. Returns the label URL and tracking number.`,
+  description: `Purchase a shipping label. You can either select a rate from an existing shipment, or create a label in a single call by providing full shipment details along with carrier and service level. Provides a downloadable label when successful and the tracking number. A purchase can charge the connected account; queued status does not mean a label is ready.`,
   instructions: [
     'Use **rateId** when you already have rates from a shipment and want to purchase one.',
     'Use the **single-call** approach (shipment + carrierAccount + servicelevelToken) to create a label without rate shopping.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -47,6 +49,10 @@ export let purchaseLabel = SlateTool.create(spec, {
   .output(
     z.object({
       transactionId: z.string().describe('Unique transaction (label) identifier'),
+      testMode: z
+        .boolean()
+        .optional()
+        .describe('Provider-reported test state; test labels cannot be mailed.'),
       status: z
         .string()
         .optional()
@@ -62,11 +68,20 @@ export let purchaseLabel = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
     let payload: Record<string, unknown> = {};
 
-    if (ctx.input.rateId) {
+    if (
+      ctx.input.rateId !== undefined &&
+      [ctx.input.shipment, ctx.input.carrierAccount, ctx.input.servicelevelToken].some(
+        v => v !== undefined
+      )
+    )
+      throw invalid(
+        'Choose rateId or complete single-call shipment details, without combining them.'
+      );
+    if (ctx.input.rateId !== undefined) {
       payload.rate = ctx.input.rateId;
     } else if (ctx.input.shipment) {
       payload.shipment = {
@@ -83,16 +98,38 @@ export let purchaseLabel = SlateTool.create(spec, {
     if (ctx.input.metadata) payload.metadata = ctx.input.metadata;
     if (ctx.input.async !== undefined) payload.async = ctx.input.async;
 
-    let result = (await client.createTransaction(payload)) as Record<string, any>;
+    let result = await client.createTransaction(payload);
+
+    if (result.status === 'SUCCESS') {
+      if (typeof result.label_url === 'string' && result.label_url)
+        await addDocument(
+          ctx,
+          result,
+          { kind: 'transaction', resourceId: result.object_id, documentType: 'label' },
+          true
+        );
+      if (result.commercial_invoice_url)
+        await addDocument(
+          ctx,
+          result,
+          {
+            kind: 'transaction',
+            resourceId: result.object_id,
+            documentType: 'commercial_invoice'
+          },
+          true
+        );
+    }
 
     return {
       output: {
         transactionId: result.object_id,
         status: result.status,
+        testMode: result.test,
         trackingNumber: result.tracking_number,
-        labelUrl: result.label_url,
+        labelUrl: typeof result.label_url === 'string' ? result.label_url : undefined,
         commercialInvoiceUrl: result.commercial_invoice_url,
-        rate: result.rate,
+        rate: typeof result.rate === 'string' ? result.rate : result.rate?.object_id,
         messages: result.messages
       },
       message: `Label ${result.status === 'SUCCESS' ? '✅ created' : `status: ${result.status}`}. ${result.tracking_number ? `Tracking: **${result.tracking_number}**` : ''} ${result.label_url ? `[Download label](${result.label_url})` : ''}`

@@ -8,7 +8,7 @@ export let manageIncidentNotes = SlateTool.create(spec, {
   key: 'manage_incident_notes',
   description: `Create, update, delete, or list notes on a specific incident. Notes provide a way to annotate incidents with additional context during and after incident response.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -21,11 +21,20 @@ export let manageIncidentNotes = SlateTool.create(spec, {
       noteName: z
         .string()
         .optional()
-        .describe('Name/ID of the note (required for update and delete)'),
+        .describe(
+          'Unique note name: optional for create (generated when omitted); required for update/delete'
+        ),
+      displayName: z.string().optional().describe('Human-readable note label'),
+      jsonValue: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Structured note JSON; when supplied it replaces the full note value'),
       content: z
         .string()
         .optional()
-        .describe('Content of the note (required for create and update)')
+        .describe(
+          'Text stored in json_value.content; provide content or jsonValue for create/update. A text update preserves other JSON fields.'
+        )
     })
   )
   .output(
@@ -43,7 +52,7 @@ export let manageIncidentNotes = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'list': {
         let data = await client.getIncidentNotes(ctx.input.incidentNumber);
-        let notes = data?.notes ?? [];
+        let notes = data.notes;
         return {
           output: { notes },
           message: `Found **${notes.length}** note(s) on incident #${ctx.input.incidentNumber}.`
@@ -52,7 +61,10 @@ export let manageIncidentNotes = SlateTool.create(spec, {
 
       case 'create': {
         let note = await client.createIncidentNote(ctx.input.incidentNumber, {
-          content: ctx.input.content ?? ''
+          name: ctx.input.noteName,
+          content: ctx.input.content,
+          displayName: ctx.input.displayName,
+          jsonValue: ctx.input.jsonValue
         });
         return {
           output: { note },
@@ -64,7 +76,11 @@ export let manageIncidentNotes = SlateTool.create(spec, {
         let note = await client.updateIncidentNote(
           ctx.input.incidentNumber,
           ctx.input.noteName ?? '',
-          { content: ctx.input.content ?? '' }
+          {
+            content: ctx.input.content,
+            displayName: ctx.input.displayName,
+            jsonValue: ctx.input.jsonValue
+          }
         );
         return {
           output: { note },

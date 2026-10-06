@@ -1,61 +1,13 @@
-# <img src="https://provider-logos.metorial-cdn.com/buffer.png" height="20"> Buffer
+# Buffer
 
-Schedule, publish, and manage social media posts across multiple networks (Twitter/X, Facebook, Instagram, LinkedIn, Pinterest). Create and edit updates with text, media, and link attachments. Manage posting queues by reordering, shuffling, or prioritizing updates. Retrieve pending and sent posts with engagement statistics (reach, clicks, retweets, favorites, mentions). Manage connected social media profiles and their posting schedules. Retrieve social media interactions such as mentions, retweets, likes, and comments on sent updates. Get link sharing statistics and service configuration details including character limits and supported features per network.
+Discover organizations and connected channels, read posts and posting schedules, create unpublished drafts or scheduled posts, edit and delete unpublished posts, publish an existing queued post, and move a queued post to the top. Current service configuration and queue positioning are experimental API capabilities.
 
-## Tools
+Connect a personal Buffer API key or a current OAuth application. OAuth uses PKCE and rotating refresh tokens, with account read and post read/write scopes. Post metrics require a personal API key and an explicit `includeMetrics` request. There is no required organization configuration: discover IDs with Get Organizations.
 
-### Create Update
+Existing stored credentials without an API version marker continue to use the legacy REST API. Reconnect to migrate; credentials are never silently tried against the other API after an error. Legacy tool keys and input fields remain available. The current API does not document whole-queue reorder/shuffle, schedule changes, individual interaction records or network-wide URL share counts. Their retained REST routes have not been verified against a live legacy account; this does not imply a provider shutdown.
 
-Create a new social media update (post) and add it to the queue for one or more profiles. Supports scheduling, immediate sharing, media attachments, and queue positioning.
+Use `saveToDraft: true` to create an unpublished draft. Omitting it retains the original publishing-queue behavior; `now: true` publishes immediately. Multiple profiles are processed separately and creation is not atomic. Read back any unconfirmed operation before retrying. Media photo URLs map to image assets; legacy link-preview fields require explicit current network metadata instead. Omitted edit fields preserve content and scheduling; an explicit empty assets array clears files.
 
-### Delete Update
+Current post lists use `after` cursors and return page information without a total count. `returnedCount` describes this response only. Missing counts and nullable/unavailable account or post fields are omitted rather than fabricated. Channel reads expose the actual social-account identifier, timezone and paused-queue flag. Date fields retain Unix seconds where the original tools use numeric timestamps. Deleting a Buffer update does not withdraw a published social post.
 
-Permanently delete an existing status update from the queue.
-
-### Edit Update
-
-Edit an existing pending update. Modify the text, scheduling, or media attachments of an update that has not yet been sent.
-
-### Get Service Configuration
-
-Retrieve Buffer's current service configuration. Returns supported social networks, character limits, schedule limits, supported interaction types, and analytics filters per network.
-
-### Get Interactions
-
-Retrieve social media interactions (mentions, retweets, likes, comments, etc.) for a sent update. Supported interaction types vary by social network.
-
-### Get Link Shares
-
-Get the number of times a URL has been shared using Buffer. Useful for gauging the popularity of a link across the Buffer network.
-
-### Get Profiles
-
-Retrieve connected social media profiles. Returns all profiles linked to the account, or a single profile by ID. Includes service type, username, avatar, and post counts.
-
-### Get Updates
-
-Retrieve updates (posts) for a social media profile. Supports fetching pending (queued) updates, sent updates, or a single update by ID. Sent updates include engagement statistics.
-
-### Get User
-
-Retrieve the authenticated Buffer user's account details including plan type, timezone, and profile information.
-
-### Manage Queue
-
-Manage the posting queue for a profile. Supports reordering updates, shuffling the queue randomly, or moving a specific update to the top.
-
-### Manage Posting Schedule
-
-View or update the posting schedule for a social media profile. The schedule defines which days and times Buffer will automatically publish queued updates.
-
-### Share Update Now
-
-Immediately share a pending update that is currently in the queue. The update is published right away and remaining queue times are recalculated.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Official references: [API reference](https://developers.buffer.com/reference.html), [authentication](https://developers.buffer.com/guides/authentication.html), [REST migration](https://developers.buffer.com/guides/rest-migration.html), [pagination](https://developers.buffer.com/guides/pagination.html).

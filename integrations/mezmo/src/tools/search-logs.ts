@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MezmoClient } from '../lib/client';
+import { logFilterSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let searchLogs = SlateTool.create(spec, {
@@ -8,9 +9,9 @@ export let searchLogs = SlateTool.create(spec, {
   key: 'search_logs',
   description: `Search and export log lines from Mezmo using the Export API v2. Supports filtering by query, time range, log levels, applications, and hosts. Returns results in JSON format with pagination support for large result sets.`,
   instructions: [
-    'Time range is specified as Unix timestamps in seconds.',
+    'Time range accepts Unix timestamps in seconds or milliseconds.',
     'Pass "0" for "from" to use the retention boundary, or "0" for "to" to use the current time.',
-    'Use paginationId from a previous response to retrieve the next page of results.'
+    'Use paginationId from the previous response and retain exactly the same time range, filters, order and size. For pagination, prefer fixed timestamps over relative 0 bounds.'
   ],
   constraints: [
     'Each request returns a maximum of 10,000 log lines.',
@@ -22,29 +23,11 @@ export let searchLogs = SlateTool.create(spec, {
   }
 })
   .input(
-    z.object({
-      from: z
-        .number()
-        .describe('Start time as Unix timestamp in seconds (use 0 for retention boundary)'),
-      to: z
-        .number()
-        .describe('End time as Unix timestamp in seconds (use 0 for current time)'),
-      query: z.string().optional().describe('Search query string to filter logs'),
-      levels: z
-        .string()
-        .optional()
-        .describe('Comma-separated log levels (e.g., "error,warn")'),
-      apps: z.string().optional().describe('Comma-separated application names'),
-      hosts: z.string().optional().describe('Comma-separated hostnames'),
-      prefer: z
-        .enum(['head', 'tail'])
-        .optional()
-        .describe('Return oldest (head) or newest (tail) results first'),
-      size: z.number().optional().describe('Number of log lines to return (max 10000)'),
+    logFilterSchema.extend({
       paginationId: z
         .string()
         .optional()
-        .describe('Pagination token from a previous response for fetching the next page')
+        .describe('Next-page token; retain the exact original range, filters, order and size')
     })
   )
   .output(
@@ -54,6 +37,7 @@ export let searchLogs = SlateTool.create(spec, {
         .string()
         .nullable()
         .describe('Pagination token for the next page, null if no more results'),
+      returnedCount: z.number().describe('Number of log lines returned in this page'),
       count: z.number().describe('Number of log lines returned in this page')
     })
   )
@@ -74,13 +58,14 @@ export let searchLogs = SlateTool.create(spec, {
       paginationId: ctx.input.paginationId || null
     });
 
-    let lines = result.lines || [];
+    let lines = result.lines;
 
     return {
       output: {
         lines,
         paginationId: result.pagination_id,
-        count: lines.length
+        count: lines.length,
+        returnedCount: lines.length
       },
       message: `Returned **${lines.length}** log line(s).${result.pagination_id ? ' More results available via pagination.' : ' No more results.'}`
     };

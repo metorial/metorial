@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCarriers = SlateTool.create(spec, {
@@ -30,16 +30,18 @@ export let listCarriers = SlateTool.create(spec, {
         z.object({
           carrierId: z.string().describe('Carrier ID'),
           carrierCode: z.string().describe('Carrier code (e.g. fedex, ups, usps)'),
-          nickname: z.string().describe('Account nickname'),
+          nickname: z.string().optional().describe('Account nickname'),
           friendlyName: z.string().describe('Carrier friendly name'),
-          accountNumber: z.string().describe('Account number'),
-          balance: z.number().describe('Account balance'),
-          primary: z.boolean().describe('Whether this is the primary carrier'),
+          accountNumber: z.string().optional().describe('Account number'),
+          balance: z.number().optional().describe('Account balance'),
+          primary: z.boolean().optional().describe('Whether this is the primary carrier'),
           requiresFundedAmount: z
             .boolean()
+            .optional()
             .describe('Whether the carrier requires funded amount'),
           supportsLabelMessages: z
             .boolean()
+            .optional()
             .describe('Whether the carrier supports label messages')
         })
       ),
@@ -69,10 +71,7 @@ export let listCarriers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
     let carriersResult = await client.listCarriers();
 
@@ -88,7 +87,16 @@ export let listCarriers = SlateTool.create(spec, {
       supportsLabelMessages: c.supports_label_messages
     }));
 
-    let services: any;
+    let services:
+      | {
+          carrierId: string;
+          carrierCode: string;
+          serviceCode: string;
+          name: string;
+          domestic: boolean;
+          international: boolean;
+        }[]
+      | undefined;
     if (ctx.input.includeServicesForCarrierId) {
       let servicesResult = await client.listCarrierServices(
         ctx.input.includeServicesForCarrierId
@@ -103,7 +111,9 @@ export let listCarriers = SlateTool.create(spec, {
       }));
     }
 
-    let packageTypes: any;
+    let packageTypes:
+      | { packageCode: string; name: string; description?: string }[]
+      | undefined;
     if (ctx.input.includePackagesForCarrierId) {
       let packagesResult = await client.listCarrierPackageTypes(
         ctx.input.includePackagesForCarrierId

@@ -23,8 +23,6 @@ import {
   setCustomFieldValue,
   updateTask
 } from './tools';
-import { inboundWebhook, taskUpdates } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     listSchedules,
     listUsers
   ],
-  triggers: [inboundWebhook, taskUpdates]
+  triggers: []
 });

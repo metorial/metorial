@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getFileMetadata = SlateTool.create(spec, {
   name: 'Get File Metadata',
   key: 'get_file_metadata',
-  description: `Retrieve technical metadata for an image including EXIF data, dimensions, format, quality, color profile info, transparency, and perceptual hash (pHash). Lookup by file ID or ImageKit URL.`,
+  description: `Retrieve available technical metadata for an image, audio, or video, including dimensions, format, EXIF data, duration, bitrate, and codecs. Lookup by file ID or ImageKit URL.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -24,6 +25,13 @@ export let getFileMetadata = SlateTool.create(spec, {
       width: z.number().optional().describe('Image width in pixels'),
       size: z.number().optional().describe('File size in bytes'),
       format: z.string().optional().describe('Image format, e.g. "jpg", "png"'),
+      bitRate: z.number().optional().describe('Audio or video bitrate when returned'),
+      duration: z
+        .number()
+        .optional()
+        .describe('Audio or video duration in seconds when returned'),
+      audioCodec: z.string().optional().describe('Audio codec when returned'),
+      videoCodec: z.string().optional().describe('Video codec when returned'),
       hasColorProfile: z
         .boolean()
         .optional()
@@ -33,7 +41,7 @@ export let getFileMetadata = SlateTool.create(spec, {
       hasTransparency: z.boolean().optional().describe('Whether the image has transparency'),
       pHash: z.string().optional().describe('Perceptual hash for image similarity comparison'),
       exif: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .nullable()
         .describe('EXIF metadata including camera info, GPS data, and more')
@@ -42,16 +50,13 @@ export let getFileMetadata = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    if (!ctx.input.fileId && !ctx.input.url) {
-      throw new Error('Either fileId or url must be provided');
+    if (Boolean(ctx.input.fileId) === Boolean(ctx.input.url)) {
+      throw invalid('Provide exactly one of fileId or url.');
     }
 
-    let metadata: any;
-    if (ctx.input.fileId) {
-      metadata = await client.getFileMetadata(ctx.input.fileId);
-    } else {
-      metadata = await client.getMetadataByUrl(ctx.input.url!);
-    }
+    let metadata = ctx.input.fileId
+      ? await client.getFileMetadata(ctx.input.fileId)
+      : await client.getMetadataByUrl(ctx.input.url!);
 
     return {
       output: {
@@ -59,6 +64,10 @@ export let getFileMetadata = SlateTool.create(spec, {
         width: metadata.width,
         size: metadata.size,
         format: metadata.format,
+        bitRate: metadata.bitRate,
+        duration: metadata.duration,
+        audioCodec: metadata.audioCodec,
+        videoCodec: metadata.videoCodec,
         hasColorProfile: metadata.hasColorProfile,
         quality: metadata.quality,
         density: metadata.density,
@@ -66,7 +75,7 @@ export let getFileMetadata = SlateTool.create(spec, {
         pHash: metadata.pHash,
         exif: metadata.exif
       },
-      message: `Retrieved metadata: **${metadata.width}×${metadata.height}** ${metadata.format}, ${metadata.size} bytes.`
+      message: 'Retrieved available technical file metadata.'
     };
   })
   .build();

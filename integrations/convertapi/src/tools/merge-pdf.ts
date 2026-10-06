@@ -1,18 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deliverFiles } from '../lib/files';
+import { buildFileSource, fileSourceSchema } from '../lib/validation';
 import { spec } from '../spec';
-
-let fileSourceSchema = z
-  .object({
-    url: z.string().optional().describe('Public URL of the PDF file'),
-    fileId: z.string().optional().describe('ConvertAPI file ID of a previously uploaded PDF'),
-    base64Data: z.string().optional().describe('Base64-encoded PDF content'),
-    fileName: z.string().optional().describe('File name (required when using base64Data)')
-  })
-  .describe(
-    'PDF file source — provide exactly one of: url, fileId, or base64Data (with fileName)'
-  );
 
 export let mergePdf = SlateTool.create(spec, {
   name: 'Merge PDFs',
@@ -41,7 +32,10 @@ Files are merged in the order provided. Supports URLs, file IDs, and base64-enco
   .output(
     z.object({
       conversionCost: z.number().describe('Number of conversion credits consumed'),
-      conversionTime: z.number().describe('Merge duration in seconds'),
+      conversionTime: z
+        .number()
+        .optional()
+        .describe('Provider-reported legacy duration, when present'),
       fileName: z.string().describe('Name of the merged PDF'),
       fileSize: z.number().describe('Size of the merged PDF in bytes'),
       fileId: z.string().nullable().describe('ConvertAPI file ID'),
@@ -51,17 +45,19 @@ Files are merged in the order provided. Supports URLs, file IDs, and base64-enco
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
+      masterToken: ctx.auth.masterToken,
       region: ctx.config.region
     });
 
     let fileSources = ctx.input.files.map(f => buildFileSource(f));
 
-    let result = await client.convert({
+    let rawResult = await client.convert({
       sourceFormat: 'pdf',
       destinationFormat: 'merge',
       files: fileSources,
       storeFile: ctx.input.storeFile
     });
+    let result = await deliverFiles(ctx, rawResult);
 
     let merged = result.files[0]!;
     return {
@@ -73,31 +69,7 @@ Files are merged in the order provided. Supports URLs, file IDs, and base64-enco
         fileId: merged.fileId,
         url: merged.url
       },
-      message: `Merged **${ctx.input.files.length} PDFs** into \`${merged.fileName}\` (${formatBytes(merged.fileSize)}) in ${result.conversionTime}s.`
+      message: `Merged **${ctx.input.files.length} PDFs** into \`${merged.fileName}\` (${merged.fileSize} bytes).`
     };
   })
   .build();
-
-function buildFileSource(file: {
-  url?: string;
-  fileId?: string;
-  base64Data?: string;
-  fileName?: string;
-}) {
-  if (file.url) {
-    return { type: 'url' as const, url: file.url };
-  }
-  if (file.fileId) {
-    return { type: 'fileId' as const, fileId: file.fileId };
-  }
-  if (file.base64Data && file.fileName) {
-    return { type: 'base64' as const, fileName: file.fileName, data: file.base64Data };
-  }
-  throw new Error('Provide exactly one of: url, fileId, or base64Data (with fileName)');
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}

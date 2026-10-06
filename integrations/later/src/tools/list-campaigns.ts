@@ -6,9 +6,14 @@ import { spec } from '../spec';
 export let listCampaignsTool = SlateTool.create(spec, {
   name: 'List Campaigns',
   key: 'list_campaigns',
-  description: `Retrieve campaigns associated with your Later Influence community. Optionally filter by a specific campaign ID to get details on a single campaign. Returns campaign details including status, dates, title, and description.`,
+  description:
+    'DEPRECATED — use `list_campaigns_v2` instead. Legacy Reporting API v1 campaign listing.',
+  instructions: [
+    'Use list_campaigns_v2 with Reporting API v2 credentials for current reporting.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(
@@ -38,7 +43,7 @@ export let listCampaignsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let campaigns = await client.getCampaigns({
       campaignId: ctx.input.campaignId
     });
@@ -47,11 +52,9 @@ export let listCampaignsTool = SlateTool.create(spec, {
 
     return {
       output: {
-        campaigns: campaignList as any
+        campaigns: campaignList
       },
-      message: ctx.input.campaignId
-        ? `Retrieved campaign **${ctx.input.campaignId}**.`
-        : `Retrieved **${campaignList.length}** campaign(s).`
+      message: `Retrieved ${campaignList.length} legacy campaign(s).`
     };
   })
   .build();

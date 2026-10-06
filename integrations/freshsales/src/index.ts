@@ -39,14 +39,6 @@ import {
   manageTask,
   searchRecords
 } from './tools';
-import {
-  accountChanges,
-  contactChanges,
-  dealChanges,
-  inboundWebhook,
-  leadChanges
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -88,5 +80,5 @@ export let provider = Slate.create({
     listSelectors,
     getFields
   ],
-  triggers: [inboundWebhook, contactChanges, leadChanges, dealChanges, accountChanges]
+  triggers: []
 });

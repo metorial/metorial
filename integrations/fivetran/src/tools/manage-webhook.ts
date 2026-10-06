@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FivetranClient } from '../lib/client';
+import { webhookId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let webhookOutputSchema = z.object({
-  webhookId: z.string().describe('Unique identifier of the webhook'),
+  webhookId: webhookId,
   type: z.string().optional().describe('Webhook scope: "account" or "group"'),
   url: z.string().describe('URL that receives webhook payloads'),
   events: z.array(z.string()).describe('Event types this webhook listens to'),
@@ -22,12 +23,27 @@ let mapWebhook = (w: any) => ({
   webhookId: w.id,
   type: w.type,
   url: w.url,
-  events: w.events || [],
+  events: w.events,
   active: w.active,
   groupId: w.group_id,
   createdAt: w.created_at,
   createdBy: w.created_by
 });
+
+export const getWebhook = SlateTool.create(spec, {
+  key: 'get_webhook',
+  name: 'Get Webhook',
+  description:
+    'Read an existing webhook subscription, its event types and active status. Signing secrets are omitted.',
+  tags: { readOnly: true }
+})
+  .input(z.object({ webhookId }))
+  .output(webhookOutputSchema)
+  .handleInvocation(async ctx => {
+    const webhook = await new FivetranClient(ctx.auth.token).getWebhook(ctx.input.webhookId);
+    return { output: mapWebhook(webhook), message: `Retrieved webhook ${webhook.id}.` };
+  })
+  .build();
 
 export let listWebhooks = SlateTool.create(spec, {
   name: 'List Webhooks',
@@ -62,7 +78,7 @@ export let createWebhook = SlateTool.create(spec, {
   description: `Create a new webhook to receive notifications for Fivetran events. Webhooks can be account-level (all activity) or group-level (activity within a specific group).`,
   instructions: [
     'The URL must use HTTPS.',
-    'Available events: sync_start, sync_end, status, transformation_run_start, transformation_run_succeeded, transformation_run_failed, dbt_run_start, dbt_run_succeeded, dbt_run_failed.',
+    'Use event names supported by the current provider configuration, such as sync_start or sync_end.',
     'If a secret is provided, payloads will be signed with SHA-256 HMAC.'
   ]
 })
@@ -89,7 +105,7 @@ export let createWebhook = SlateTool.create(spec, {
       events: ctx.input.events,
       active: ctx.input.active
     };
-    if (ctx.input.secret) body.secret = ctx.input.secret;
+    if (ctx.input.secret !== undefined) body.secret = ctx.input.secret;
 
     let w: any;
     if (ctx.input.groupId) {
@@ -112,7 +128,7 @@ export let updateWebhook = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      webhookId: z.string().describe('ID of the webhook to update'),
+      webhookId: webhookId,
       url: z.string().optional().describe('Updated HTTPS URL'),
       events: z.array(z.string()).optional().describe('Updated event types'),
       active: z.boolean().optional().describe('Enable or disable the webhook'),
@@ -124,10 +140,10 @@ export let updateWebhook = SlateTool.create(spec, {
     let client = new FivetranClient(ctx.auth.token);
 
     let body: Record<string, any> = {};
-    if (ctx.input.url) body.url = ctx.input.url;
-    if (ctx.input.events) body.events = ctx.input.events;
+    if (ctx.input.url !== undefined) body.url = ctx.input.url;
+    if (ctx.input.events !== undefined) body.events = ctx.input.events;
     if (ctx.input.active !== undefined) body.active = ctx.input.active;
-    if (ctx.input.secret) body.secret = ctx.input.secret;
+    if (ctx.input.secret !== undefined) body.secret = ctx.input.secret;
 
     let w = await client.updateWebhook(ctx.input.webhookId, body);
 
@@ -148,7 +164,7 @@ export let deleteWebhook = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      webhookId: z.string().describe('ID of the webhook to delete')
+      webhookId: webhookId
     })
   )
   .output(

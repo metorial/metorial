@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/one-drive.svg" height="20"> Onedrive
 
-Upload, download, create, copy, move, rename, and delete files and folders in OneDrive and SharePoint document libraries. Share files and folders via sharing links or permission grants. Search for files by name, content, or metadata. Manage drives and access storage quota information. Track file and folder changes over time using delta queries. Subscribe to webhooks for drive change notifications. Access file previews, thumbnails, and rich metadata for photos, audio, and video. Supports resumable uploads for large files up to 250 GB and PDF conversion on download.
+Upload, download, create, copy, move, rename, and delete files and folders in OneDrive and SharePoint document libraries. Share files and folders via sharing links or permission grants. Search for files by name, content, or metadata. Manage drives and access storage quota information. Track file and folder changes over time using delta queries. Access file previews, thumbnails, and rich metadata for photos, audio, and video. Supports resumable uploads for large files up to 250 GB and PDF conversion on download.
 
 ## Tools
 

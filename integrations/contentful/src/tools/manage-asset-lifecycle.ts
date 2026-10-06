@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { currentVersion, resourceId, selection, versionSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageAssetLifecycle = SlateTool.create(spec, {
@@ -13,31 +14,31 @@ export let manageAssetLifecycle = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      assetId: z.string().describe('ID of the asset.'),
+      ...selection,
+      assetId: resourceId.describe('ID of the asset.'),
       action: z
         .enum(['publish', 'unpublish', 'archive', 'unarchive', 'delete'])
         .describe('Lifecycle action to perform.'),
-      version: z
-        .number()
+      version: versionSchema
         .optional()
         .describe('Current version of the asset. Fetched automatically if omitted.')
     })
   )
   .output(
     z.object({
-      assetId: z.string().describe('ID of the asset.'),
+      assetId: resourceId.describe('ID of the asset.'),
       action: z.string().describe('The action that was performed.'),
       version: z.number().optional().describe('Version after the action, if applicable.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
     let { assetId, action } = ctx.input;
 
     let version = ctx.input.version;
-    if (!version) {
+    if (version === undefined) {
       let current = await client.getAsset(assetId);
-      version = current.sys.version;
+      version = currentVersion(current);
     }
 
     let result: any;

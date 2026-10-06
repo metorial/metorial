@@ -1,13 +1,22 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoosendClient } from '../lib/client';
+import {
+  email,
+  identifier,
+  mapSegment,
+  optionalNumber,
+  optionalText,
+  record,
+  records
+} from '../lib/data';
 import { spec } from '../spec';
 
 let criteriaSchema = z.object({
   field: z
     .string()
     .describe(
-      'Field to filter on (e.g. "DateAdded", "CampaignOpens", or a custom field name)'
+      'Documented field to filter on (e.g. "DateAdded", "RecipientName", or "RecipientEmail")'
     ),
   comparer: z
     .enum([
@@ -53,12 +62,12 @@ export let manageSegment = SlateTool.create(spec, {
   key: 'manage_segment',
   description: `Create, update, delete, or retrieve segments for a mailing list. Segments let you target specific audiences based on subscriber data and activity criteria. You can also add or update criteria (rules) within segments.`,
   instructions: [
-    'Create a segment first, then add criteria to define the audience.',
+    'Provide initial criteria when creating a segment. Add or update rules on an existing segment.',
     'Use action "add_criteria" to add filtering rules to an existing segment.',
     'Use action "get_subscribers" to see which subscribers match the segment criteria.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -112,7 +121,15 @@ export let manageSegment = SlateTool.create(spec, {
         .optional()
         .describe('Subscribers matching segment criteria (for get_subscribers)'),
       action: z.string().describe('Action performed'),
-      success: z.boolean().describe('Whether the action completed successfully')
+      success: z.boolean().describe('Whether the action completed successfully'),
+      criteriaId: z.string().optional().describe('ID of the newly added criterion'),
+      returnedCount: z.number().optional().describe('Number of rows returned'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe(
+          'Provider total; the current segment-list API does not document a page selector'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -121,11 +138,25 @@ export let manageSegment = SlateTool.create(spec, {
 
     switch (action) {
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required for creating a segment');
+        if (!ctx.input.name)
+          throw createApiServiceError('name is required for creating a segment');
         let result = await client.createSegment(
           mailingListId,
           ctx.input.name,
-          ctx.input.matchType
+          ctx.input.matchType,
+          ctx.input.criteria
+            ? {
+                Field: ctx.input.criteria.field,
+                Value: ctx.input.criteria.value,
+                ...(ctx.input.criteria.comparer
+                  ? { Comparer: ctx.input.criteria.comparer }
+                  : {}),
+                ...(ctx.input.criteria.dateFrom
+                  ? { DateFrom: ctx.input.criteria.dateFrom }
+                  : {}),
+                ...(ctx.input.criteria.dateTo ? { DateTo: ctx.input.criteria.dateTo } : {})
+              }
+            : undefined
         );
         return {
           output: {
@@ -138,8 +169,9 @@ export let manageSegment = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.segmentId)
-          throw new Error('segmentId is required for updating a segment');
-        if (!ctx.input.name) throw new Error('name is required for updating a segment');
+          throw createApiServiceError('segmentId is required for updating a segment');
+        if (!ctx.input.name)
+          throw createApiServiceError('name is required for updating a segment');
         let result = await client.updateSegment(
           mailingListId,
           ctx.input.segmentId,
@@ -157,7 +189,7 @@ export let manageSegment = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.segmentId)
-          throw new Error('segmentId is required for deleting a segment');
+          throw createApiServiceError('segmentId is required for deleting a segment');
         await client.deleteSegment(mailingListId, ctx.input.segmentId);
         return {
           output: {
@@ -169,7 +201,7 @@ export let manageSegment = SlateTool.create(spec, {
       }
       case 'get': {
         if (!ctx.input.segmentId)
-          throw new Error('segmentId is required for getting segment details');
+          throw createApiServiceError('segmentId is required for getting segment details');
         let result = await client.getSegment(mailingListId, ctx.input.segmentId);
         return {
           output: {
@@ -182,14 +214,15 @@ export let manageSegment = SlateTool.create(spec, {
       }
       case 'list': {
         let result = await client.getSegments(mailingListId);
-        let segmentsList = (
-          Array.isArray(result)
-            ? result
-            : ((result?.Segments as Record<string, unknown>[]) ?? [])
-        ) as Record<string, unknown>[];
+        let segmentsList = records(result.Segments, 'segments');
         return {
           output: {
             segments: segmentsList.map(mapSegment),
+            returnedCount: segmentsList.length,
+            totalCount:
+              result.Paging == null
+                ? undefined
+                : optionalNumber(record(result.Paging).TotalResults),
             action,
             success: true
           },
@@ -197,8 +230,10 @@ export let manageSegment = SlateTool.create(spec, {
         };
       }
       case 'add_criteria': {
-        if (!ctx.input.segmentId) throw new Error('segmentId is required for adding criteria');
-        if (!ctx.input.criteria) throw new Error('criteria is required for add_criteria');
+        if (!ctx.input.segmentId)
+          throw createApiServiceError('segmentId is required for adding criteria');
+        if (!ctx.input.criteria)
+          throw createApiServiceError('criteria is required for add_criteria');
         let body: Record<string, unknown> = {
           Field: ctx.input.criteria.field,
           Value: ctx.input.criteria.value
@@ -206,14 +241,11 @@ export let manageSegment = SlateTool.create(spec, {
         if (ctx.input.criteria.comparer) body.Comparer = ctx.input.criteria.comparer;
         if (ctx.input.criteria.dateFrom) body.DateFrom = ctx.input.criteria.dateFrom;
         if (ctx.input.criteria.dateTo) body.DateTo = ctx.input.criteria.dateTo;
-        let _result = await client.addSegmentCriteria(
-          mailingListId,
-          ctx.input.segmentId,
-          body
-        );
+        let result = await client.addSegmentCriteria(mailingListId, ctx.input.segmentId, body);
         return {
           output: {
             action,
+            criteriaId: identifier(result),
             success: true
           },
           message: `Added criteria to segment **${ctx.input.segmentId}**: ${ctx.input.criteria.field} ${ctx.input.criteria.comparer ?? ''} ${ctx.input.criteria.value}.`
@@ -221,10 +253,11 @@ export let manageSegment = SlateTool.create(spec, {
       }
       case 'update_criteria': {
         if (!ctx.input.segmentId)
-          throw new Error('segmentId is required for updating criteria');
+          throw createApiServiceError('segmentId is required for updating criteria');
         if (!ctx.input.criteriaId)
-          throw new Error('criteriaId is required for update_criteria');
-        if (!ctx.input.criteria) throw new Error('criteria is required for update_criteria');
+          throw createApiServiceError('criteriaId is required for update_criteria');
+        if (!ctx.input.criteria)
+          throw createApiServiceError('criteria is required for update_criteria');
         let body: Record<string, unknown> = {
           Field: ctx.input.criteria.field,
           Value: ctx.input.criteria.value
@@ -248,20 +281,20 @@ export let manageSegment = SlateTool.create(spec, {
       }
       case 'get_subscribers': {
         if (!ctx.input.segmentId)
-          throw new Error('segmentId is required for getting segment subscribers');
+          throw createApiServiceError('segmentId is required for getting segment subscribers');
         let result = await client.getSegmentSubscribers(
           mailingListId,
           ctx.input.segmentId,
           ctx.input.page,
           ctx.input.pageSize
         );
-        let subscribersList = (result?.Subscribers as Record<string, unknown>[]) ?? [];
+        let subscribersList = records(result.Subscribers, 'segment subscribers');
         return {
           output: {
             subscribers: subscribersList.map(s => ({
-              subscriberId: String(s?.ID ?? ''),
-              email: String(s?.Email ?? ''),
-              name: s?.Name ? String(s.Name) : undefined
+              subscriberId: identifier(s.ID),
+              email: email(s.Email),
+              name: optionalText(s.Name)
             })),
             action,
             success: true
@@ -272,19 +305,3 @@ export let manageSegment = SlateTool.create(spec, {
     }
   })
   .build();
-
-let mapSegment = (s: Record<string, unknown>) => ({
-  segmentId: String(s?.ID ?? ''),
-  name: String(s?.Name ?? ''),
-  matchType: s?.MatchType as number | undefined,
-  createdOn: s?.CreatedOn ? String(s.CreatedOn) : undefined,
-  updatedOn: s?.UpdatedOn ? String(s.UpdatedOn) : undefined,
-  criteria: Array.isArray(s?.Criteria)
-    ? (s.Criteria as Record<string, unknown>[]).map(c => ({
-        criteriaId: c?.ID ? String(c.ID) : undefined,
-        field: c?.Field ? String(c.Field) : undefined,
-        comparer: c?.Comparer ? String(c.Comparer) : undefined,
-        value: c?.Value ? String(c.Value) : undefined
-      }))
-    : undefined
-});

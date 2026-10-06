@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/google-calendar.svg" height="20"> Google Calendar
 
-Create, read, update, and delete calendar events and calendars. Manage attendees, recurring events, and reminders. Check free/busy availability for scheduling. Share calendars and control access permissions. Create events from natural language text with quick add. Manage special event types like focus time, out of office, and working location. Subscribe to or remove calendars from a user's calendar list. Sync calendar changes incrementally and receive webhook notifications for event, calendar list, ACL, and settings changes.
+Create, read, update, and delete calendar events and calendars. Manage attendees, recurring events, and reminders. Check free/busy availability for scheduling. Share calendars and control access permissions. Create events from natural language text with quick add. Manage special event types like focus time, out of office, and working location. Subscribe to or remove calendars from a user's calendar list. Sync calendar changes incrementally.
 
 ## Tools
 

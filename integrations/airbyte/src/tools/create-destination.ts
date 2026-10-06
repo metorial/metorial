@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createDestinationTool = SlateTool.create(spec, {
   name: 'Create Destination',
   key: 'create_destination',
-  description: `Create a new destination connector in Airbyte. Requires a name, workspace, destination type (e.g. "bigquery", "snowflake", "postgres"), and destination-specific configuration with credentials and connection settings.`,
+  description: `Create a new destination connector in Airbyte. Requires a name and a workspace discovered with list_workspaces, plus a connector type or custom definition ID (e.g. "bigquery", "snowflake", "postgres"), and destination-specific configuration with credentials and connection settings.`,
   instructions: [
     'The configuration object varies by destination type. Check Airbyte documentation for the specific destination type configuration schema.'
   ]
@@ -14,12 +14,21 @@ export let createDestinationTool = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Display name for the destination.'),
-      workspaceId: z.string().describe('UUID of the workspace to create the destination in.'),
+      workspaceId: z
+        .string()
+        .describe('Workspace ID. Call list_workspaces to discover authorized workspaces.'),
       destinationType: z
         .string()
+        .optional()
         .describe('The connector type (e.g. "bigquery", "snowflake", "postgres", "s3").'),
+      definitionId: z
+        .string()
+        .optional()
+        .describe(
+          'Custom connector definition ID from list_destination_definitions; omit destinationType when using it.'
+        ),
       configuration: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .describe(
           'Destination-specific configuration including credentials and connection settings.'
         )
@@ -31,7 +40,11 @@ export let createDestinationTool = SlateTool.create(spec, {
       name: z.string(),
       destinationType: z.string(),
       workspaceId: z.string(),
-      configuration: z.record(z.string(), z.any())
+      configuration: z
+        .record(z.string(), z.unknown())
+        .describe(
+          'Configuration keys with all values redacted. Never reuse these values as connector input.'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -40,6 +53,7 @@ export let createDestinationTool = SlateTool.create(spec, {
       name: ctx.input.name,
       workspaceId: ctx.input.workspaceId,
       destinationType: ctx.input.destinationType,
+      definitionId: ctx.input.definitionId,
       configuration: ctx.input.configuration
     });
 

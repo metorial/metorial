@@ -1,22 +1,16 @@
 {
   "name": "@metorial/workday",
-  "description": "Manage human capital management, financial management, payroll, and planning in Workday. Create, read, update, and delete employee records, job requisitions, time-off requests, benefits enrollments, and compensation details. Handle the full employee lifecycle including hiring, onboarding, promotions, transfers, and terminations. Manage financial data across accounts receivable, accounts payable, general ledger, and budgeting. Track worker time entries and attendance. Approve or reject inbox tasks and business process steps. Run custom reports via Report-as-a-Service (RaaS) and query Workday data using WQL (Workday Query Language). Manage organizational structures including supervisory organizations, cost centers, and positions. Create and manipulate custom objects to extend Workday's data model. Receive outbound event notifications for business events such as hires, terminations, and job changes.",
-  "categories": [
-    "financial-data-and-stock-market",
-    "hr-and-recruiting",
-    "task-and-project-management"
-  ],
+  "description": "Read authorized Workday workers, supervisory organizations, absence details, recorded time blocks and inbox tasks. Discover the connected worker and prerequisites for time-off requests and WQL queries. Request time off or act on an eligible connected-worker approval, run enabled custom reports, and manage worker-bound multi-instance custom objects. Access and available actions depend on tenant security policies.",
+  "categories": ["hr-and-recruiting", "task-and-project-management"],
   "skills": [
-    "manage employee records",
-    "handle hiring and terminations",
-    "manage job requisitions",
-    "track time and attendance",
-    "manage compensation and benefits",
-    "run custom reports",
-    "query data with WQL",
-    "approve inbox tasks",
-    "manage organizational structures",
-    "manage custom objects"
+    "read authorized workers",
+    "read supervisory organizations",
+    "read time blocks and absence details",
+    "request time off with discovered units",
+    "run enabled custom reports",
+    "query authorized data with WQL",
+    "act on connected-worker approvals",
+    "manage worker-bound custom objects"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/workday.svg"
 }

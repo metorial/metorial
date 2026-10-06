@@ -1,13 +1,38 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAuthenticatedAxios, isApiErrorRecord } from 'slates';
+import type {
+  Account,
+  CheckIn,
+  Comment,
+  Deploy,
+  Environment,
+  Fault,
+  HoneybadgerAuth,
+  Insights,
+  Invitation,
+  Member,
+  Notice,
+  Outage,
+  Page,
+  Project,
+  Site,
+  Team
+} from './types';
+import { honeybadgerError, hosts, pageUrl, pathId, validateLimit } from './validation';
 
 export class HoneybadgerClient {
   private http;
+  readonly baseUrl: string;
 
-  constructor(config: { token: string }) {
-    this.http = createAxios({
-      baseURL: 'https://app.honeybadger.io/v2',
+  constructor(config: HoneybadgerAuth) {
+    if (!config.token.trim())
+      throw createApiServiceError('A personal authentication token is required.');
+    this.baseUrl = hosts(config.region).data;
+    this.http = createAuthenticatedAxios({
+      baseURL: this.baseUrl,
+      timeout: 30_000,
+      errorAdapter: honeybadgerError,
       auth: {
-        username: config.token,
+        username: config.token.trim(),
         password: ''
       },
       headers: {
@@ -19,16 +44,19 @@ export class HoneybadgerClient {
 
   // ==================== Projects ====================
 
-  async listProjects(params?: { accountId?: string }) {
-    let response = await this.http.get('/projects', {
-      params: { account_id: params?.accountId }
-    });
-    return response.data;
+  async listProjects(params?: { accountId?: string; nextUrl?: string }) {
+    let response = await this.http.get<Page<Project>>(
+      pageUrl(this.baseUrl, '/projects', params?.nextUrl) ?? '/projects',
+      {
+        params: params?.nextUrl ? undefined : { account_id: params?.accountId }
+      }
+    );
+    return this.page(response.data, '/projects');
   }
 
   async getProject(projectId: string) {
-    let response = await this.http.get(`/projects/${projectId}`);
-    return response.data;
+    let response = await this.http.get<Project>(`/projects/${pathId(projectId)}`);
+    return this.entity(response.data);
   }
 
   async createProject(
@@ -40,7 +68,7 @@ export class HoneybadgerClient {
       disablePublicLinks?: boolean;
     }
   ) {
-    let response = await this.http.post(
+    let response = await this.http.post<Project>(
       `/projects`,
       {
         project: {
@@ -54,7 +82,7 @@ export class HoneybadgerClient {
         params: { account_id: accountId }
       }
     );
-    return response.data;
+    return this.entity(response.data);
   }
 
   async updateProject(
@@ -66,7 +94,7 @@ export class HoneybadgerClient {
       disablePublicLinks?: boolean;
     }
   ) {
-    await this.http.put(`/projects/${projectId}`, {
+    await this.http.put(`/projects/${pathId(projectId)}`, {
       project: {
         name: project.name,
         language: project.language,
@@ -77,7 +105,7 @@ export class HoneybadgerClient {
   }
 
   async deleteProject(projectId: string) {
-    await this.http.delete(`/projects/${projectId}`);
+    await this.http.delete(`/projects/${pathId(projectId)}`);
   }
 
   // ==================== Faults (Errors) ====================
@@ -85,6 +113,7 @@ export class HoneybadgerClient {
   async listFaults(
     projectId: string,
     params?: {
+      nextUrl?: string;
       q?: string;
       createdAfter?: number;
       occurredAfter?: number;
@@ -93,22 +122,31 @@ export class HoneybadgerClient {
       order?: string;
     }
   ) {
-    let response = await this.http.get(`/projects/${projectId}/faults`, {
-      params: {
-        q: params?.q,
-        created_after: params?.createdAfter,
-        occurred_after: params?.occurredAfter,
-        occurred_before: params?.occurredBefore,
-        limit: params?.limit,
-        order: params?.order
+    validateLimit(params?.limit);
+    let response = await this.http.get<Page<Fault>>(
+      pageUrl(this.baseUrl, `/projects/${pathId(projectId)}/faults`, params?.nextUrl) ??
+        `/projects/${pathId(projectId)}/faults`,
+      {
+        params: params?.nextUrl
+          ? undefined
+          : {
+              q: params?.q,
+              created_after: params?.createdAfter,
+              occurred_after: params?.occurredAfter,
+              occurred_before: params?.occurredBefore,
+              limit: params?.limit,
+              order: params?.order
+            }
       }
-    });
-    return response.data;
+    );
+    return this.page(response.data, `/projects/${pathId(projectId)}/faults`);
   }
 
   async getFault(projectId: string, faultId: string) {
-    let response = await this.http.get(`/projects/${projectId}/faults/${faultId}`);
-    return response.data;
+    let response = await this.http.get<Fault>(
+      `/projects/${pathId(projectId)}/faults/${pathId(faultId)}`
+    );
+    return this.entity(response.data);
   }
 
   async updateFault(
@@ -120,7 +158,7 @@ export class HoneybadgerClient {
       assigneeId?: number;
     }
   ) {
-    await this.http.put(`/projects/${projectId}/faults/${faultId}`, {
+    await this.http.put(`/projects/${pathId(projectId)}/faults/${pathId(faultId)}`, {
       fault: {
         resolved: fault.resolved,
         ignored: fault.ignored,
@@ -130,14 +168,18 @@ export class HoneybadgerClient {
   }
 
   async deleteFault(projectId: string, faultId: string) {
-    await this.http.delete(`/projects/${projectId}/faults/${faultId}`);
+    await this.http.delete(`/projects/${pathId(projectId)}/faults/${pathId(faultId)}`);
   }
 
   async bulkResolveFaults(projectId: string, query?: string) {
-    let response = await this.http.post(`/projects/${projectId}/faults/resolve`, null, {
-      params: { q: query }
-    });
-    return response.data;
+    let response = await this.http.post(
+      `/projects/${pathId(projectId)}/faults/resolve`,
+      null,
+      {
+        params: { q: query }
+      }
+    );
+    return { queued: response.status === 202 };
   }
 
   async pauseFault(
@@ -145,11 +187,14 @@ export class HoneybadgerClient {
     faultId: string,
     pause: { time?: string; count?: number }
   ) {
-    await this.http.post(`/projects/${projectId}/faults/${faultId}/pause`, pause);
+    await this.http.post(
+      `/projects/${pathId(projectId)}/faults/${pathId(faultId)}/pause`,
+      pause
+    );
   }
 
   async unpauseFault(projectId: string, faultId: string) {
-    await this.http.post(`/projects/${projectId}/faults/${faultId}/unpause`);
+    await this.http.post(`/projects/${pathId(projectId)}/faults/${pathId(faultId)}/unpause`);
   }
 
   // ==================== Notices ====================
@@ -158,49 +203,82 @@ export class HoneybadgerClient {
     projectId: string,
     faultId: string,
     params?: {
+      nextUrl?: string;
       createdAfter?: number;
       createdBefore?: number;
       limit?: number;
     }
   ) {
-    let response = await this.http.get(`/projects/${projectId}/faults/${faultId}/notices`, {
-      params: {
-        created_after: params?.createdAfter,
-        created_before: params?.createdBefore,
-        limit: params?.limit
+    validateLimit(params?.limit);
+    let response = await this.http.get<Page<Notice>>(
+      pageUrl(
+        this.baseUrl,
+        `/projects/${pathId(projectId)}/faults/${pathId(faultId)}/notices`,
+        params?.nextUrl
+      ) ?? `/projects/${pathId(projectId)}/faults/${pathId(faultId)}/notices`,
+      {
+        params: params?.nextUrl
+          ? undefined
+          : {
+              created_after: params?.createdAfter,
+              created_before: params?.createdBefore,
+              limit: params?.limit
+            }
       }
-    });
-    return response.data;
+    );
+    return this.page(
+      response.data,
+      `/projects/${pathId(projectId)}/faults/${pathId(faultId)}/notices`
+    );
   }
 
   // ==================== Comments ====================
 
-  async listComments(projectId: string, faultId: string) {
-    let response = await this.http.get(`/projects/${projectId}/faults/${faultId}/comments`);
-    return response.data;
+  async listComments(projectId: string, faultId: string, nextUrl?: string) {
+    let response = await this.http.get<Page<Comment>>(
+      pageUrl(
+        this.baseUrl,
+        `/projects/${pathId(projectId)}/faults/${pathId(faultId)}/comments`,
+        nextUrl
+      ) ?? `/projects/${pathId(projectId)}/faults/${pathId(faultId)}/comments`
+    );
+    return this.page(
+      response.data,
+      `/projects/${pathId(projectId)}/faults/${pathId(faultId)}/comments`
+    );
   }
 
   async createComment(projectId: string, faultId: string, body: string) {
-    let response = await this.http.post(`/projects/${projectId}/faults/${faultId}/comments`, {
-      comment: { body }
-    });
-    return response.data;
+    let response = await this.http.post<Comment>(
+      `/projects/${pathId(projectId)}/faults/${pathId(faultId)}/comments`,
+      {
+        comment: { body }
+      }
+    );
+    return this.entity(response.data);
   }
 
   async deleteComment(projectId: string, faultId: string, commentId: string) {
-    await this.http.delete(`/projects/${projectId}/faults/${faultId}/comments/${commentId}`);
+    await this.http.delete(
+      `/projects/${pathId(projectId)}/faults/${pathId(faultId)}/comments/${pathId(commentId)}`
+    );
   }
 
   // ==================== Sites (Uptime) ====================
 
-  async listSites(projectId: string) {
-    let response = await this.http.get(`/projects/${projectId}/sites`);
-    return response.data;
+  async listSites(projectId: string, nextUrl?: string) {
+    let response = await this.http.get<Page<Site>>(
+      pageUrl(this.baseUrl, `/projects/${pathId(projectId)}/sites`, nextUrl) ??
+        `/projects/${pathId(projectId)}/sites`
+    );
+    return this.page(response.data, `/projects/${pathId(projectId)}/sites`);
   }
 
   async getSite(projectId: string, siteId: string) {
-    let response = await this.http.get(`/projects/${projectId}/sites/${siteId}`);
-    return response.data;
+    let response = await this.http.get<Site>(
+      `/projects/${pathId(projectId)}/sites/${pathId(siteId)}`
+    );
+    return this.entity(response.data);
   }
 
   async createSite(
@@ -216,7 +294,7 @@ export class HoneybadgerClient {
       active?: boolean;
     }
   ) {
-    let response = await this.http.post(`/projects/${projectId}/sites`, {
+    let response = await this.http.post<Site>(`/projects/${pathId(projectId)}/sites`, {
       site: {
         name: site.name,
         url: site.url,
@@ -228,7 +306,7 @@ export class HoneybadgerClient {
         active: site.active
       }
     });
-    return response.data;
+    return this.entity(response.data);
   }
 
   async updateSite(
@@ -245,7 +323,7 @@ export class HoneybadgerClient {
       active?: boolean;
     }
   ) {
-    await this.http.put(`/projects/${projectId}/sites/${siteId}`, {
+    await this.http.put(`/projects/${pathId(projectId)}/sites/${pathId(siteId)}`, {
       site: {
         name: site.name,
         url: site.url,
@@ -260,38 +338,57 @@ export class HoneybadgerClient {
   }
 
   async deleteSite(projectId: string, siteId: string) {
-    await this.http.delete(`/projects/${projectId}/sites/${siteId}`);
+    await this.http.delete(`/projects/${pathId(projectId)}/sites/${pathId(siteId)}`);
   }
 
   async listOutages(
     projectId: string,
     siteId: string,
     params?: {
+      nextUrl?: string;
       createdAfter?: number;
       createdBefore?: number;
       limit?: number;
     }
   ) {
-    let response = await this.http.get(`/projects/${projectId}/sites/${siteId}/outages`, {
-      params: {
-        created_after: params?.createdAfter,
-        created_before: params?.createdBefore,
-        limit: params?.limit
+    validateLimit(params?.limit);
+    let response = await this.http.get<Page<Outage>>(
+      pageUrl(
+        this.baseUrl,
+        `/projects/${pathId(projectId)}/sites/${pathId(siteId)}/outages`,
+        params?.nextUrl
+      ) ?? `/projects/${pathId(projectId)}/sites/${pathId(siteId)}/outages`,
+      {
+        params: params?.nextUrl
+          ? undefined
+          : {
+              created_after: params?.createdAfter,
+              created_before: params?.createdBefore,
+              limit: params?.limit
+            }
       }
-    });
-    return response.data;
+    );
+    return this.page(
+      response.data,
+      `/projects/${pathId(projectId)}/sites/${pathId(siteId)}/outages`
+    );
   }
 
   // ==================== Check-Ins ====================
 
-  async listCheckIns(projectId: string) {
-    let response = await this.http.get(`/projects/${projectId}/check_ins`);
-    return response.data;
+  async listCheckIns(projectId: string, nextUrl?: string) {
+    let response = await this.http.get<Page<CheckIn>>(
+      pageUrl(this.baseUrl, `/projects/${pathId(projectId)}/check_ins`, nextUrl) ??
+        `/projects/${pathId(projectId)}/check_ins`
+    );
+    return this.page(response.data, `/projects/${pathId(projectId)}/check_ins`);
   }
 
   async getCheckIn(projectId: string, checkInId: string) {
-    let response = await this.http.get(`/projects/${projectId}/check_ins/${checkInId}`);
-    return response.data;
+    let response = await this.http.get<CheckIn>(
+      `/projects/${pathId(projectId)}/check_ins/${pathId(checkInId)}`
+    );
+    return this.entity(response.data);
   }
 
   async createCheckIn(
@@ -306,7 +403,7 @@ export class HoneybadgerClient {
       cronTimezone?: string;
     }
   ) {
-    let response = await this.http.post(`/projects/${projectId}/check_ins`, {
+    let response = await this.http.post<CheckIn>(`/projects/${pathId(projectId)}/check_ins`, {
       check_in: {
         name: checkIn.name,
         slug: checkIn.slug,
@@ -317,7 +414,7 @@ export class HoneybadgerClient {
         cron_timezone: checkIn.cronTimezone
       }
     });
-    return response.data;
+    return this.entity(response.data);
   }
 
   async updateCheckIn(
@@ -325,15 +422,17 @@ export class HoneybadgerClient {
     checkInId: string,
     checkIn: {
       name?: string;
+      slug?: string;
       reportPeriod?: string;
       gracePeriod?: string;
       cronSchedule?: string;
       cronTimezone?: string;
     }
   ) {
-    await this.http.put(`/projects/${projectId}/check_ins/${checkInId}`, {
+    await this.http.put(`/projects/${pathId(projectId)}/check_ins/${pathId(checkInId)}`, {
       check_in: {
         name: checkIn.name,
+        slug: checkIn.slug,
         report_period: checkIn.reportPeriod,
         grace_period: checkIn.gracePeriod,
         cron_schedule: checkIn.cronSchedule,
@@ -343,7 +442,7 @@ export class HoneybadgerClient {
   }
 
   async deleteCheckIn(projectId: string, checkInId: string) {
-    await this.http.delete(`/projects/${projectId}/check_ins/${checkInId}`);
+    await this.http.delete(`/projects/${pathId(projectId)}/check_ins/${pathId(checkInId)}`);
   }
 
   // ==================== Deployments ====================
@@ -351,6 +450,7 @@ export class HoneybadgerClient {
   async listDeploys(
     projectId: string,
     params?: {
+      nextUrl?: string;
       environment?: string;
       localUsername?: string;
       createdAfter?: number;
@@ -358,43 +458,55 @@ export class HoneybadgerClient {
       limit?: number;
     }
   ) {
-    let response = await this.http.get(`/projects/${projectId}/deploys`, {
-      params: {
-        environment: params?.environment,
-        local_username: params?.localUsername,
-        created_after: params?.createdAfter,
-        created_before: params?.createdBefore,
-        limit: params?.limit
+    validateLimit(params?.limit);
+    let response = await this.http.get<Page<Deploy>>(
+      pageUrl(this.baseUrl, `/projects/${pathId(projectId)}/deploys`, params?.nextUrl) ??
+        `/projects/${pathId(projectId)}/deploys`,
+      {
+        params: params?.nextUrl
+          ? undefined
+          : {
+              environment: params?.environment,
+              local_username: params?.localUsername,
+              created_after: params?.createdAfter,
+              created_before: params?.createdBefore,
+              limit: params?.limit
+            }
       }
-    });
-    return response.data;
+    );
+    return this.page(response.data, `/projects/${pathId(projectId)}/deploys`);
   }
 
   async getDeploy(projectId: string, deployId: string) {
-    let response = await this.http.get(`/projects/${projectId}/deploys/${deployId}`);
-    return response.data;
+    let response = await this.http.get<Deploy>(
+      `/projects/${pathId(projectId)}/deploys/${pathId(deployId)}`
+    );
+    return this.entity(response.data, true);
   }
 
   async deleteDeploy(projectId: string, deployId: string) {
-    await this.http.delete(`/projects/${projectId}/deploys/${deployId}`);
+    await this.http.delete(`/projects/${pathId(projectId)}/deploys/${pathId(deployId)}`);
   }
 
   // ==================== Teams ====================
 
-  async listTeams(params?: { accountId?: string }) {
-    let response = await this.http.get('/teams', {
-      params: { account_id: params?.accountId }
-    });
-    return response.data;
+  async listTeams(params?: { accountId?: string; nextUrl?: string }) {
+    let response = await this.http.get<Page<Team>>(
+      pageUrl(this.baseUrl, '/teams', params?.nextUrl) ?? '/teams',
+      {
+        params: params?.nextUrl ? undefined : { account_id: params?.accountId }
+      }
+    );
+    return this.page(response.data, '/teams');
   }
 
   async getTeam(teamId: string) {
-    let response = await this.http.get(`/teams/${teamId}`);
-    return response.data;
+    let response = await this.http.get<Team>(`/teams/${pathId(teamId)}`);
+    return this.entity(response.data);
   }
 
   async createTeam(accountId: string, name: string) {
-    let response = await this.http.post(
+    let response = await this.http.post<Team>(
       '/teams',
       {
         team: { name }
@@ -403,26 +515,29 @@ export class HoneybadgerClient {
         params: { account_id: accountId }
       }
     );
-    return response.data;
+    return this.entity(response.data);
   }
 
   async updateTeam(teamId: string, name: string) {
-    await this.http.put(`/teams/${teamId}`, {
+    await this.http.put(`/teams/${pathId(teamId)}`, {
       team: { name }
     });
   }
 
   async deleteTeam(teamId: string) {
-    await this.http.delete(`/teams/${teamId}`);
+    await this.http.delete(`/teams/${pathId(teamId)}`);
   }
 
-  async listTeamMembers(teamId: string) {
-    let response = await this.http.get(`/teams/${teamId}/team_members`);
-    return response.data;
+  async listTeamMembers(teamId: string, nextUrl?: string) {
+    let response = await this.http.get<Page<Member>>(
+      pageUrl(this.baseUrl, `/teams/${pathId(teamId)}/team_members`, nextUrl) ??
+        `/teams/${pathId(teamId)}/team_members`
+    );
+    return this.page(response.data, `/teams/${pathId(teamId)}/team_members`);
   }
 
   async removeTeamMember(teamId: string, memberId: string) {
-    await this.http.delete(`/teams/${teamId}/team_members/${memberId}`);
+    await this.http.delete(`/teams/${pathId(teamId)}/team_members/${pathId(memberId)}`);
   }
 
   async createTeamInvitation(
@@ -433,25 +548,33 @@ export class HoneybadgerClient {
       message?: string;
     }
   ) {
-    let response = await this.http.post(`/teams/${teamId}/team_invitations`, {
-      team_invitation: {
-        email: invitation.email,
-        admin: invitation.admin,
-        message: invitation.message
+    let response = await this.http.post<Invitation>(
+      `/teams/${pathId(teamId)}/team_invitations`,
+      {
+        team_invitation: {
+          email: invitation.email,
+          admin: invitation.admin,
+          message: invitation.message
+        }
       }
-    });
-    return response.data;
+    );
+    return this.entity(response.data);
   }
 
   async deleteTeamInvitation(teamId: string, invitationId: string) {
-    await this.http.delete(`/teams/${teamId}/team_invitations/${invitationId}`);
+    await this.http.delete(
+      `/teams/${pathId(teamId)}/team_invitations/${pathId(invitationId)}`
+    );
   }
 
   // ==================== Environments ====================
 
-  async listEnvironments(projectId: string) {
-    let response = await this.http.get(`/projects/${projectId}/environments`);
-    return response.data;
+  async listEnvironments(projectId: string, nextUrl?: string) {
+    let response = await this.http.get<Page<Environment>>(
+      pageUrl(this.baseUrl, `/projects/${pathId(projectId)}/environments`, nextUrl) ??
+        `/projects/${pathId(projectId)}/environments`
+    );
+    return this.page(response.data, `/projects/${pathId(projectId)}/environments`);
   }
 
   async createEnvironment(
@@ -461,13 +584,16 @@ export class HoneybadgerClient {
       notifications?: boolean;
     }
   ) {
-    let response = await this.http.post(`/projects/${projectId}/environments`, {
-      environment: {
-        name: environment.name,
-        notifications: environment.notifications
+    let response = await this.http.post<Environment>(
+      `/projects/${pathId(projectId)}/environments`,
+      {
+        environment: {
+          name: environment.name,
+          notifications: environment.notifications
+        }
       }
-    });
-    return response.data;
+    );
+    return this.entity(response.data);
   }
 
   async updateEnvironment(
@@ -478,16 +604,21 @@ export class HoneybadgerClient {
       notifications?: boolean;
     }
   ) {
-    await this.http.put(`/projects/${projectId}/environments/${environmentId}`, {
-      environment: {
-        name: environment.name,
-        notifications: environment.notifications
+    await this.http.put(
+      `/projects/${pathId(projectId)}/environments/${pathId(environmentId)}`,
+      {
+        environment: {
+          name: environment.name,
+          notifications: environment.notifications
+        }
       }
-    });
+    );
   }
 
   async deleteEnvironment(projectId: string, environmentId: string) {
-    await this.http.delete(`/projects/${projectId}/environments/${environmentId}`);
+    await this.http.delete(
+      `/projects/${pathId(projectId)}/environments/${pathId(environmentId)}`
+    );
   }
 
   // ==================== Insights ====================
@@ -498,61 +629,96 @@ export class HoneybadgerClient {
     params?: {
       ts?: string;
       timezone?: string;
+      streamIds?: string[];
     }
   ) {
-    let response = await this.http.post(`/projects/${projectId}/insights/queries`, {
-      query,
-      ts: params?.ts,
-      timezone: params?.timezone
-    });
-    return response.data;
-  }
-
-  // ==================== Status Pages ====================
-
-  async listStatusPages(accountId: string) {
-    let response = await this.http.get(`/accounts/${accountId}/status_pages`);
-    return response.data;
-  }
-
-  async getStatusPage(accountId: string, statusPageId: string) {
-    let response = await this.http.get(`/accounts/${accountId}/status_pages/${statusPageId}`);
-    return response.data;
-  }
-
-  async createStatusPage(
-    accountId: string,
-    statusPage: {
-      name: string;
-      domain?: string;
-    }
-  ) {
-    let response = await this.http.post(`/accounts/${accountId}/status_pages`, {
-      status_page: {
-        name: statusPage.name,
-        domain: statusPage.domain
+    let response = await this.http.post<Insights>(
+      `/projects/${pathId(projectId)}/insights/queries`,
+      {
+        query,
+        ts: params?.ts,
+        timezone: params?.timezone,
+        stream_ids: params?.streamIds
       }
-    });
+    );
+    if (
+      !isApiErrorRecord(response.data) ||
+      !Array.isArray(response.data.results) ||
+      !response.data.results.every(isApiErrorRecord)
+    )
+      throw createApiServiceError(
+        'Honeybadger returned an invalid Insights response. Retry the query; if it persists, check the provider service.'
+      );
     return response.data;
   }
 
-  async updateStatusPage(
-    accountId: string,
-    statusPageId: string,
-    statusPage: {
-      name?: string;
-      domain?: string;
-    }
-  ) {
-    await this.http.put(`/accounts/${accountId}/status_pages/${statusPageId}`, {
-      status_page: {
-        name: statusPage.name,
-        domain: statusPage.domain
-      }
-    });
+  private entity<T extends { id?: string | number }>(data: T, allowMissingId = false): T {
+    if (
+      !isApiErrorRecord(data) ||
+      (!allowMissingId && data.id === undefined) ||
+      (data.id !== undefined &&
+        !(
+          (typeof data.id === 'string' && data.id.trim()) ||
+          (typeof data.id === 'number' && Number.isSafeInteger(data.id) && data.id > 0)
+        ))
+    )
+      throw createApiServiceError(
+        'Honeybadger returned an invalid resource response. Retry the request; if it persists, check the provider service.'
+      );
+    return data;
   }
 
-  async deleteStatusPage(accountId: string, statusPageId: string) {
-    await this.http.delete(`/accounts/${accountId}/status_pages/${statusPageId}`);
+  private page<T>(data: Page<T>, endpoint: string): Page<T> {
+    if (
+      !isApiErrorRecord(data) ||
+      !Array.isArray(data.results) ||
+      !data.results.every(isApiErrorRecord)
+    )
+      throw createApiServiceError('Honeybadger returned an invalid list response.');
+    if (
+      !endpoint.endsWith('/outages') &&
+      !endpoint.endsWith('/deploys') &&
+      data.results.some(
+        row =>
+          !isApiErrorRecord(row) ||
+          !(
+            (typeof row.id === 'string' && row.id.trim()) ||
+            (typeof row.id === 'number' && Number.isSafeInteger(row.id) && row.id > 0)
+          )
+      )
+    )
+      throw createApiServiceError(
+        'Honeybadger returned a list item without a valid resource ID.'
+      );
+    return {
+      ...data,
+      links: { ...data.links, next: pageUrl(this.baseUrl, endpoint, data.links?.next) }
+    };
+  }
+  async verifyReportingProject(projectId: string, projectToken: string) {
+    const project = await this.getProject(projectId);
+    if (!project.token || project.token !== projectToken)
+      throw createApiServiceError(
+        'The configured reporting key does not match this project’s primary API key. Use a connection with that project’s primary key.'
+      );
+  }
+  async listAccounts(nextUrl?: string) {
+    const response = await this.http.get<Page<Account>>(
+      pageUrl(this.baseUrl, '/accounts', nextUrl) ?? '/accounts'
+    );
+    return this.page(response.data, '/accounts');
+  }
+  async getEnvironment(projectId: string, environmentId: string) {
+    const response = await this.http.get<Environment>(
+      `/projects/${pathId(projectId)}/environments/${pathId(environmentId)}`
+    );
+    return this.entity(response.data);
+  }
+  async listTeamInvitations(teamId: string, nextUrl?: string) {
+    const endpoint = `/teams/${pathId(teamId)}/team_invitations`;
+    const response = await this.http.get<Page<Invitation>>(
+      pageUrl(this.baseUrl, endpoint, nextUrl) ?? endpoint
+    );
+    return this.page(response.data, endpoint);
   }
 }

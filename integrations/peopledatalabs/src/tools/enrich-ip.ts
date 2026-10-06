@@ -3,6 +3,14 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+const coordinate = (geo: unknown, index: number) => {
+  if (typeof geo !== 'string') return null;
+  const part = geo.split(',')[index];
+  if (!part?.trim()) return null;
+  const value = Number(part);
+  return Number.isFinite(value) && Math.abs(value) <= (index === 0 ? 90 : 180) ? value : null;
+};
+
 export let enrichIp = SlateTool.create(spec, {
   name: 'Enrich IP Address',
   key: 'enrich_ip',
@@ -66,7 +74,7 @@ export let enrichIp = SlateTool.create(spec, {
       sandbox: ctx.config.sandbox
     });
 
-    let params: Record<string, unknown> = {};
+    let params: Record<string, unknown> = { return_ip_location: true };
     if (ctx.input.returnIfUnmatched !== undefined)
       params.return_if_unmatched = ctx.input.returnIfUnmatched;
 
@@ -87,33 +95,31 @@ export let enrichIp = SlateTool.create(spec, {
         }
       : null;
 
-    let location = data.location
+    let ipData = typeof data.ip === 'object' && data.ip ? data.ip : {};
+    let ipLocation = ipData.location ?? data.location;
+    let location = ipLocation
       ? {
-          name: data.location.name ?? null,
-          locality: data.location.locality ?? null,
-          region: data.location.region ?? null,
-          country: data.location.country ?? null,
-          continent: data.location.continent ?? null,
-          postalCode: data.location.postal_code ?? null,
-          latitude: data.location.geo
-            ? Number.parseFloat(data.location.geo.split(',')[0])
-            : null,
-          longitude: data.location.geo
-            ? Number.parseFloat(data.location.geo.split(',')[1])
-            : null,
-          metro: data.location.metro ?? null
+          name: ipLocation.name ?? null,
+          locality: ipLocation.locality ?? null,
+          region: ipLocation.region ?? null,
+          country: ipLocation.country ?? null,
+          continent: ipLocation.continent ?? null,
+          postalCode: ipLocation.postal_code ?? null,
+          latitude: ipLocation.geo ? coordinate(ipLocation.geo, 0) : null,
+          longitude: ipLocation.geo ? coordinate(ipLocation.geo, 1) : null,
+          metro: ipLocation.metro ?? null
         }
       : null;
 
     return {
       output: {
-        ip: data.ip ?? ctx.input.ip,
+        ip: ipData.address ?? (typeof data.ip === 'string' ? data.ip : ctx.input.ip),
         company,
         location,
-        confidence: data.confidence ?? null
+        confidence: data.company?.confidence ?? data.confidence ?? null
       },
       message: company?.name
-        ? `IP **${ctx.input.ip}** is associated with **${company.displayName || company.name}**${location?.name ? ` in ${location.name}` : ''}${data.confidence ? ` (${data.confidence} confidence)` : ''}`
+        ? `IP **${ctx.input.ip}** is associated with **${company.displayName || company.name}**${location?.name ? ` in ${location.name}` : ''}${data.company?.confidence ? ` (${data.company.confidence} confidence)` : ''}`
         : `IP **${ctx.input.ip}** enrichment completed.${location?.name ? ` Location: ${location.name}` : ' No company association found.'}`
     };
   })

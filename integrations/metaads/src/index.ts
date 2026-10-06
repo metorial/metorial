@@ -36,8 +36,6 @@ import {
   updateAdSet,
   updateCampaign
 } from './tools';
-import { adAccountChanges, leadSubmitted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -76,5 +74,5 @@ export let provider = Slate.create({
     listLeadForms,
     getLeads
   ],
-  triggers: [adAccountChanges, leadSubmitted]
+  triggers: []
 });

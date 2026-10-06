@@ -3,7 +3,9 @@ import { spec } from './spec';
 import {
   createConnection,
   deleteConnection,
+  downloadJobFile,
   getConnection,
+  getFileUrl,
   getFlow,
   getFlowErrors,
   getJob,
@@ -24,12 +26,12 @@ import {
   retryErrors,
   updateConnection
 } from './tools';
-import { flowErrorDetected, inboundWebhook, jobCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     getTokenInfo,
+    downloadJobFile,
+    getFileUrl,
     listConnections,
     getConnection,
     createConnection,
@@ -52,5 +54,5 @@ export let provider = Slate.create({
     manageUsers,
     manageState
   ],
-  triggers: [inboundWebhook, jobCompleted, flowErrorDetected]
+  triggers: []
 });

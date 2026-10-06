@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTimeOffRequests = SlateTool.create(spec, {
@@ -21,9 +21,9 @@ export let getTimeOffRequests = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Filter by status: "approved", "denied", "superceded", "requested", "canceled"'
+          'One or more comma-separated statuses: "approved", "denied", "superceded", "requested", "canceled"'
         ),
-      type: z.string().optional().describe('Filter by time off type ID')
+      type: z.string().optional().describe('One or more comma-separated time off type IDs')
     })
   )
   .output(
@@ -32,10 +32,7 @@ export let getTimeOffRequests = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getTimeOffRequests({
       start: ctx.input.start,
@@ -45,7 +42,7 @@ export let getTimeOffRequests = SlateTool.create(spec, {
       type: ctx.input.type
     });
 
-    let requests = Array.isArray(data) ? data : [];
+    let requests = data;
 
     return {
       output: {
@@ -81,7 +78,7 @@ export let createTimeOffRequest = SlateTool.create(spec, {
       notes: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Notes keyed by date (YYYY-MM-DD)'),
+        .describe('Notes keyed by employee or manager'),
       dates: z
         .record(z.string(), z.number())
         .optional()
@@ -90,16 +87,16 @@ export let createTimeOffRequest = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the request was created successfully')
+      success: z
+        .boolean()
+        .describe('Whether the provider returned a validated creation receipt'),
+      requestId: z.string().optional().describe('The created time off request ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
-    await client.createTimeOffRequest(ctx.input.employeeId, {
+    const receipt = await client.createTimeOffRequest(ctx.input.employeeId, {
       status: ctx.input.status,
       start: ctx.input.start,
       end: ctx.input.end,
@@ -111,7 +108,8 @@ export let createTimeOffRequest = SlateTool.create(spec, {
 
     return {
       output: {
-        success: true
+        success: true,
+        requestId: receipt.requestId
       },
       message: `Created time off request for employee **${ctx.input.employeeId}** from ${ctx.input.start} to ${ctx.input.end}.`
     };
@@ -139,14 +137,15 @@ export let updateTimeOffRequestStatus = SlateTool.create(spec, {
   .output(
     z.object({
       requestId: z.string().describe('The request ID'),
-      status: z.string().describe('The new status')
+      status: z
+        .string()
+        .describe(
+          "The status transition submitted; approval may complete only the caller's workflow step"
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     await client.updateTimeOffRequestStatus(
       ctx.input.requestId,
@@ -159,7 +158,7 @@ export let updateTimeOffRequestStatus = SlateTool.create(spec, {
         requestId: ctx.input.requestId,
         status: ctx.input.status
       },
-      message: `Updated time off request **${ctx.input.requestId}** to status **${ctx.input.status}**.`
+      message: `Submitted **${ctx.input.status}** for time off request **${ctx.input.requestId}**. An approval may complete only your current workflow step and leave the request pending.`
     };
   })
   .build();
@@ -167,7 +166,7 @@ export let updateTimeOffRequestStatus = SlateTool.create(spec, {
 export let getWhosOut = SlateTool.create(spec, {
   name: "Get Who's Out",
   key: 'get_whos_out',
-  description: `See which employees are currently out or will be out during a given date range. Returns a list of employees with their time off details. If no dates are provided, returns who is out today.`,
+  description: `List visible time off occurrences and company holidays for a date range. With dates omitted, BambooHR uses today through 14 days out. Entries are not a count of unique employees.`,
   tags: {
     readOnly: true,
     destructive: false
@@ -191,19 +190,16 @@ export let getWhosOut = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getWhosOut(ctx.input.start, ctx.input.end);
-    let entries = Array.isArray(data) ? data : [];
+    let entries = data;
 
     return {
       output: {
         entries
       },
-      message: `Found **${entries.length}** employee(s) out${ctx.input.start ? ` from ${ctx.input.start}` : ' today'}${ctx.input.end ? ` to ${ctx.input.end}` : ''}.`
+      message: `Found **${entries.length}** visible time off/holiday entries in the requested or provider-default period.`
     };
   })
   .build();
@@ -211,7 +207,7 @@ export let getWhosOut = SlateTool.create(spec, {
 export let getTimeOffBalances = SlateTool.create(spec, {
   name: 'Get Time Off Balances',
   key: 'get_time_off_balances',
-  description: `Retrieve time off balance information for an employee, showing available balances across all time off categories. Also returns assigned time off policies.`,
+  description: `Retrieve visible time off balances for an employee as of a date. Results depend on Time Off permissions and visible categories. A discretionary policy may have a zero balance while still allowing requests. Resolve caller ID 0 with get_current_user before using this tool.`,
   tags: {
     readOnly: true,
     destructive: false
@@ -233,10 +229,7 @@ export let getTimeOffBalances = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let balances = await client.getTimeOffBalances(ctx.input.employeeId, ctx.input.asOfDate);
 
@@ -266,10 +259,7 @@ export let getTimeOffTypes = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getTimeOffTypes();
 

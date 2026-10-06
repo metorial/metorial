@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapApplication } from '../lib/models';
 import { spec } from '../spec';
 
 let applicationSchema = z.object({
@@ -36,19 +37,10 @@ export let searchApplications = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = Client.fromContext(ctx);
     let results = await client.searchApplications({ name: ctx.input.name });
 
-    let applications = results.map((app: any) => ({
-      appId: app._id,
-      name: app.name,
-      url: app.url,
-      status: app.status,
-      createdAt: app.createdAt,
-      updatedAt: app.updatedAt,
-      version: app.version,
-      tenantId: app.tenantId
-    }));
+    let applications = results.map(row => mapApplication(row));
 
     return {
       output: { applications },

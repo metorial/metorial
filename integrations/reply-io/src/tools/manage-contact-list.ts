@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -34,12 +34,12 @@ export let manageContactList = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let { action, listId, name } = ctx.input;
 
     if (action === 'list') {
       let result = await client.listContactLists();
-      let contactLists = Array.isArray(result) ? result : (result?.items ?? []);
+      let contactLists = result;
       return {
         output: { contactLists },
         message: `Found **${contactLists.length}** contact list(s).`
@@ -47,7 +47,7 @@ export let manageContactList = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!listId) throw new Error('listId is required');
+      if (!listId) throw createApiServiceError('listId is required');
       let contactList = await client.getContactList(listId);
       return {
         output: { contactList },
@@ -56,7 +56,7 @@ export let manageContactList = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required to create a contact list');
+      if (!name) throw createApiServiceError('name is required to create a contact list');
       let contactList = await client.createContactList(name);
       return {
         output: { contactList },
@@ -65,8 +65,8 @@ export let manageContactList = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!listId) throw new Error('listId is required');
-      if (!name) throw new Error('name is required to update a contact list');
+      if (!listId) throw createApiServiceError('listId is required');
+      if (!name) throw createApiServiceError('name is required to update a contact list');
       let contactList = await client.updateContactList(listId, name);
       return {
         output: { contactList },
@@ -75,7 +75,7 @@ export let manageContactList = SlateTool.create(spec, {
     }
 
     // delete
-    if (!listId) throw new Error('listId is required');
+    if (!listId) throw createApiServiceError('listId is required');
     await client.deleteContactList(listId);
     return {
       output: { deleted: true },

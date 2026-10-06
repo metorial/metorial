@@ -1,20 +1,28 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, mapDeploy } from '../lib/client';
 import { spec } from '../spec';
 
 export let listDeploys = SlateTool.create(spec, {
   name: 'List Deploys',
   key: 'list_deploys',
-  description: `List deployments reported to Rollbar, optionally filtered by environment. Useful for auditing release history and correlating deploys with error spikes.`,
+  description: `List deployments reported to Rollbar, optionally filtered by environment within the requested page. An empty filtered page may have later matching deploys. Useful for auditing release history and correlating deploys with error spikes.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      projectId: z
+        .number()
+        .optional()
+        .describe('Project ID from manage_project; required with an account token.'),
       environment: z.string().optional().describe('Filter deploys by environment name'),
-      page: z.number().optional().describe('Page number for pagination')
+      page: z
+        .number()
+        .optional()
+        .describe('Page number for pagination; default page size is 20'),
+      limit: z.number().optional().describe('Page size, maximum 5000')
     })
   )
   .output(
@@ -35,34 +43,34 @@ export let listDeploys = SlateTool.create(spec, {
           })
         )
         .describe('List of deploys'),
-      page: z.number().describe('Current page number')
+      page: z.number().describe('Current page number'),
+      nextPage: z
+        .number()
+        .optional()
+        .describe(
+          'Next source page to try when the provider returned a full page, even if environment filtering produced no matches'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let result = await client.listDeploys({
       environment: ctx.input.environment,
-      page: ctx.input.page
+      page: ctx.input.page,
+      limit: ctx.input.limit
     });
 
-    let deploys = (result?.result?.deploys || []).map((d: any) => ({
-      deployId: d.id,
-      environment: d.environment,
-      revision: d.revision,
-      status: d.status,
-      localUsername: d.local_username,
-      rollbarUsername: d.rollbar_username,
-      comment: d.comment,
-      startTime: d.start_time,
-      finishTime: d.finish_time,
-      projectId: d.project_id
-    }));
+    const deploys = result.result.deploys.map(mapDeploy);
 
     return {
       output: {
         deploys,
-        page: ctx.input.page || 1
+        page: result.result.page ?? ctx.input.page ?? 1,
+        nextPage:
+          result.result.sourceCount === (ctx.input.limit ?? 20)
+            ? (result.result.page ?? ctx.input.page ?? 1) + 1
+            : undefined
       },
       message: `Found **${deploys.length}** deploys${ctx.input.environment ? ` in environment "${ctx.input.environment}"` : ''}.`
     };

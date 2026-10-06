@@ -1,11 +1,11 @@
 import { WorkatoClient } from './client';
-
-export let createClient = (ctx: {
-  auth: { token: string };
-  config: { dataCenter: string };
-}) => {
-  return new WorkatoClient({
+export const createClient = (ctx: {
+  auth: { token: string; dataCenter?: string };
+  config: Record<string, unknown>;
+}) =>
+  new WorkatoClient({
     token: ctx.auth.token,
-    dataCenter: ctx.config.dataCenter
+    dataCenter:
+      ctx.auth.dataCenter ??
+      (typeof ctx.config.dataCenter === 'string' ? ctx.config.dataCenter : 'us')
   });
-};

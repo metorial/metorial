@@ -8,7 +8,7 @@ export let listCollections = SlateTool.create(spec, {
   key: 'list_collections',
   description: `List collections from your Mem knowledge base with optional sorting and pagination.`,
   instructions: [
-    'Use the "page" field with the "nextPage" value from a previous response to paginate through results.'
+    'Reuse the unchanged nextPage cursor with the same orderBy. Omit page for the first page; null nextPage means the provider returned no continuation.'
   ],
   tags: {
     readOnly: true,
@@ -72,7 +72,7 @@ export let listCollections = SlateTool.create(spec, {
       output: {
         collections,
         total: response.total,
-        nextPage: response.next_page
+        nextPage: response.next_page ?? null
       },
       message: `Found **${response.total}** collection(s). Returned **${collections.length}** in this page.`
     };

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { WriterClient } from '../lib/client';
+import { applicationIdSchema, paginationInput, paginationOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let invokeAgent = SlateTool.create(spec, {
@@ -18,12 +19,18 @@ export let invokeAgent = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      applicationId: z.string().describe('ID (UUID) of the deployed no-code agent'),
+      applicationId: applicationIdSchema,
       inputs: z
         .array(
           z.object({
-            inputId: z.string().describe('Unique input field identifier'),
-            value: z.array(z.string()).describe('Input field values')
+            inputId: z
+              .string()
+              .describe('Input field name from get_agent_details agent.inputs[].name.'),
+            value: z
+              .array(z.string())
+              .describe(
+                'Input values. For file fields, use file IDs from upload_file or list_files.'
+              )
           })
         )
         .describe('Input values for the agent')
@@ -72,28 +79,34 @@ export let listAgents = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      offset: z.number().optional().describe('Pagination offset'),
-      limit: z.number().optional().describe('Maximum number of agents to return')
+      ...paginationInput,
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          'Legacy offset, implemented by walking cursor pages. Prefer after or before.'
+        )
     })
   )
   .output(
     z.object({
       agents: z
         .array(z.record(z.string(), z.unknown()))
-        .describe('List of agents with their metadata')
+        .describe('List of agents with their metadata'),
+      ...paginationOutput
     })
   )
   .handleInvocation(async ctx => {
     let client = new WriterClient(ctx.auth.token);
 
     ctx.progress('Listing agents...');
-    let agents = await client.listApplications({
-      offset: ctx.input.offset,
-      limit: ctx.input.limit
-    });
+    let page = await client.listApplications(ctx.input);
+    let agents = page.data;
 
     return {
-      output: { agents },
+      output: { agents, hasMore: page.hasMore, firstId: page.firstId, lastId: page.lastId },
       message: `Found **${agents.length}** agent(s)`
     };
   })
@@ -102,14 +115,14 @@ export let listAgents = SlateTool.create(spec, {
 export let getAgentDetails = SlateTool.create(spec, {
   name: 'Get Agent Details',
   key: 'get_agent_details',
-  description: `Retrieve details of a specific no-code agent (application) including its required inputs, configuration, and capabilities. Use this to understand what inputs are needed before invoking an agent.`,
+  description: `Retrieve details of a no-code agent discovered with list_agents, including its required inputs, configuration, and capabilities. Use this to understand what inputs are needed before invoking an agent.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      applicationId: z.string().describe('ID (UUID) of the no-code agent')
+      applicationId: applicationIdSchema
     })
   )
   .output(

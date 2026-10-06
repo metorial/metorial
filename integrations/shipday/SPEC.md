@@ -1,0 +1,22 @@
+# Shipday integration
+
+Eight public tools retain their existing keys and action enums. Requests use the dispatcher API at `https://api.shipday.com` with the literal documented `Authorization: Basic <API key>` header; the key is not Base64-encoded or used as a user identity. The current dispatcher reference exposes no suitable account/identity endpoint. Partner APIs require separate credentials and are outside this integration.
+
+| Tool | Current provider operations |
+| --- | --- |
+| create_delivery_order | POST `/orders`; required customer/pickup fields, native order ID and true receipt; address breakdowns use nested `address`; add-ons use arrays |
+| get_delivery_orders | GET active orders, GET exact order-number details or POST `/orders/query`; supplied cursors select query mode; exact ID filtering is additive |
+| update_delivery_order | Fresh exact detail read; hydrate the documented required edit fields, PUT `/order/edit/{id}`, and optional dedicated status/meta/assignment routes; prior accepted effects disclosed on later failure |
+| delete_delivery_order | Fresh exact ID/reference proof, DELETE `/orders/{id}`, then same-reference absence; no erasure guarantee |
+| manage_pickup_order | POST `/pickup-orders`; documented GET/PUT/DELETE `/pickup-orders/{id}`; nested `customer.phone/email`, `restaurant.phone`; partial edits preserve fresh native values |
+| manage_carriers | GET/POST `/carriers`, DELETE `/carriers/{id}` and roster readback; created carrier ID exposed, generated login password discarded |
+| track_delivery | GET `/order/progress/{trackingId}`; actual nullable tracking data and numeric/string measurements retained without conversion |
+| on_demand_delivery | Native services, estimate, assign, details and cancel routes; exact assignment identity, true cancellation receipt and observed state; charges/dispatch and incomplete cancellation disclosed |
+
+IDs are exact positive safe integers. Order IDs and order numbers are separate identifiers. For inactive delivery edits/deletions, provide the current order number when active-order discovery cannot find the exact ID. Pickup's legacy order-number lookup remains a compatibility path and verifies that exact returned reference; current documented lookup uses orderId. Query pagination uses inclusive one-based 32-bit row positions; the reference describes an end cursor of 100 while one generated default says 3, so requests explicitly send 1/100 unless supplied. Server-default query dates/status are historical; supply explicit UTC times/status for a current window. A full page does not establish a known total.
+
+Native monetary values and decimal strings are preserved without currency conversion or arithmetic; no currency is guessed. Input delivery/pickup dates and times are UTC in the documented format. Legacy string add-ons become one array entry; they are not split. Null response fields and native ETA types remain readable. Ready-to-pickup can return HTTP 202 without a documented exact completion observer, so the result reports acceptance and pending completion. Multi-step updates disclose prior requests when later requests or readbacks fail. Deletion does not promise erasure of history or earlier charges.
+
+On-demand dispatch/cancellation can trigger courier work and charges. The integration does not infer availability or billing permissions from plan marketing. Tracking is documented for Business Advanced with three requests per minute per tracking ID. No uploads, downloads, partner administration or triggers are implemented. Provider photo/tracking URLs are metadata; no file bytes are returned.
+
+Official sources: [authentication](https://docs.shipday.com/reference/authentication), [delivery create](https://docs.shipday.com/reference/insert-delivery-order), [delivery edit](https://docs.shipday.com/reference/edit-order), [query](https://docs.shipday.com/reference/delivery-orders-query), [pickup create](https://docs.shipday.com/reference/insert-pickup-order), [pickup edit](https://docs.shipday.com/reference/edit-pickup-order), [pickup lookup](https://docs.shipday.com/reference/retrieve-pickup-order-details), [carriers](https://docs.shipday.com/reference/add-a-carrier-1), [ready acceptance](https://docs.shipday.com/reference/order-ready-to-pickup), [tracking](https://docs.shipday.com/reference/order-delivery-progress), [assignment](https://docs.shipday.com/reference/assign), [cancellation](https://docs.shipday.com/reference/cancel).

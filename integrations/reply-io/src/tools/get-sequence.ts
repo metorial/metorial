@@ -15,6 +15,14 @@ export let getSequence = SlateTool.create(spec, {
     z.object({
       sequenceId: z.number().describe('ID of the sequence to retrieve'),
       includeSteps: z.boolean().optional().describe('Also fetch the sequence steps'),
+      contactsTop: z
+        .number()
+        .optional()
+        .describe('Maximum contacts in the included page (1–100).'),
+      contactsSkip: z
+        .number()
+        .optional()
+        .describe('Contacts to skip when including contacts.'),
       includeContacts: z
         .boolean()
         .optional()
@@ -28,6 +36,7 @@ export let getSequence = SlateTool.create(spec, {
         .array(z.record(z.string(), z.any()))
         .optional()
         .describe('Sequence steps, if requested'),
+      contactsHasMore: z.boolean().optional(),
       contacts: z
         .array(z.record(z.string(), z.any()))
         .optional()
@@ -35,32 +44,35 @@ export let getSequence = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let sequence = await client.getSequence(ctx.input.sequenceId);
 
     let steps: Record<string, any>[] | undefined;
     let contacts: Record<string, any>[] | undefined;
+    let contactsHasMore: boolean | undefined;
 
     if (ctx.input.includeSteps) {
       let stepsResult = await client.listSequenceSteps(ctx.input.sequenceId);
-      steps = Array.isArray(stepsResult) ? stepsResult : (stepsResult?.items ?? []);
+      steps = stepsResult;
     }
 
     if (ctx.input.includeContacts) {
       let contactsResult = await client.listSequenceContacts(ctx.input.sequenceId, {
-        additionalColumns: 'CurrentStep,LastStepCompletedAt,Status'
+        additionalColumns: 'CurrentStep,LastStepCompletedAt,Status',
+        top: ctx.input.contactsTop,
+        skip: ctx.input.contactsSkip
       });
-      contacts = Array.isArray(contactsResult)
-        ? contactsResult
-        : (contactsResult?.items ?? []);
+      contacts = contactsResult.items;
+      contactsHasMore = contactsResult.hasMore;
     }
 
     return {
       output: {
         sequence,
         steps,
-        contacts
+        contacts,
+        contactsHasMore
       },
       message: `Retrieved sequence **${sequence.name ?? ctx.input.sequenceId}**.${steps ? ` Has **${steps.length}** step(s).` : ''}${contacts ? ` Has **${contacts.length}** contact(s).` : ''}`
     };

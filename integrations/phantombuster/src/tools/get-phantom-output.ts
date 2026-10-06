@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, number, optionalId, text } from '../lib/client';
 import { spec } from '../spec';
 
 export let getPhantomOutput = SlateTool.create(spec, {
@@ -40,14 +40,14 @@ export let getPhantomOutput = SlateTool.create(spec, {
 
     return {
       output: {
-        phantomStatus: data?.agentStatus ?? undefined,
-        containerStatus: data?.containerStatus ?? undefined,
-        containerId: data?.containerId ? String(data.containerId) : undefined,
+        phantomStatus: text(data.agentStatus),
+        containerStatus: text(data.containerStatus),
+        containerId: optionalId(data.containerId),
         progress: data?.progress ?? undefined,
-        consoleOutput: data?.output ?? undefined,
+        consoleOutput: text(data.output),
         resultObject: data?.resultObject ?? undefined,
-        runningContainers: data?.runningContainers ?? undefined,
-        queuedContainers: data?.queuedContainers ?? undefined
+        runningContainers: number(data.runningContainers),
+        queuedContainers: number(data.queuedContainers)
       },
       message: `Phantom **${ctx.input.phantomId}** status: ${data?.agentStatus ?? 'unknown'}.`
     };

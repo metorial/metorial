@@ -7,7 +7,7 @@ export let getAccountInfo = SlateTool.create(spec, {
   name: 'Get Account Info',
   key: 'get_account_info',
   description: `Retrieve ConvertAPI account information including conversion balance, usage statistics, and account status.
-Useful for monitoring API consumption and checking remaining conversion credits.`,
+Requires the optional Master Token connection credential; regular API tokens cannot read account information. Legacy credentials are accepted only when the provider permits /user.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -16,7 +16,7 @@ Useful for monitoring API consumption and checking remaining conversion credits.
   .input(z.object({}))
   .output(
     z.object({
-      apiKey: z.number().describe('API key identifier'),
+      apiKey: z.number().optional().describe('API key identifier'),
       active: z.boolean().describe('Whether the account is active'),
       fullName: z.string().describe('Account holder full name'),
       email: z.string().describe('Account email address'),
@@ -28,6 +28,7 @@ Useful for monitoring API consumption and checking remaining conversion credits.
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
+      masterToken: ctx.auth.masterToken,
       region: ctx.config.region
     });
 

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, leadVerificationStatus } from '../lib/client';
 import { spec } from '../spec';
 
 export let getLead = SlateTool.create(spec, {
@@ -33,6 +33,10 @@ export let getLead = SlateTool.create(spec, {
       emailClickCount: z.number().optional().describe('Number of link clicks'),
       personalization: z.string().optional().describe('Personalization text'),
       verificationStatus: z.string().optional().describe('Email verification status'),
+      verificationStatusCode: z
+        .number()
+        .optional()
+        .describe('Provider verification status code, when available.'),
       customVariables: z.any().optional().describe('Custom variables assigned to the lead'),
       timestampCreated: z.string().optional().describe('Creation timestamp'),
       timestampUpdated: z.string().optional().describe('Last update timestamp')
@@ -46,23 +50,25 @@ export let getLead = SlateTool.create(spec, {
     return {
       output: {
         leadId: l.id,
-        email: l.email,
-        firstName: l.first_name,
-        lastName: l.last_name,
-        companyName: l.company_name,
-        phone: l.phone,
-        website: l.website,
+        email: l.email ?? undefined,
+        firstName: l.first_name ?? undefined,
+        lastName: l.last_name ?? undefined,
+        companyName: l.company_name ?? undefined,
+        phone: l.phone ?? undefined,
+        website: l.website ?? undefined,
         companyDomain: l.company_domain,
-        campaignId: l.campaign,
-        interestStatus: l.lt_interest_status,
+        campaignId: l.campaign ?? undefined,
+        interestStatus: l.lt_interest_status ?? undefined,
         emailOpenCount: l.email_open_count,
         emailReplyCount: l.email_reply_count,
         emailClickCount: l.email_click_count,
-        personalization: l.personalization,
-        verificationStatus: l.verification_status,
+        personalization: l.personalization ?? undefined,
+        verificationStatus: leadVerificationStatus(l.verification_status),
+        verificationStatusCode:
+          typeof l.verification_status === 'number' ? l.verification_status : undefined,
         customVariables: l.payload,
         timestampCreated: l.timestamp_created,
-        timestampUpdated: l.timestamp_updated
+        timestampUpdated: l.timestamp_updated ?? undefined
       },
       message: `Retrieved lead **${l.email || l.first_name || l.id}**.`
     };

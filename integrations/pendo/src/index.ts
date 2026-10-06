@@ -29,8 +29,6 @@ import {
   updateVisitorMetadata,
   verifyIntegrationKey
 } from './tools';
-import { pendoEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,5 +60,5 @@ export let provider = Slate.create({
     getReport,
     getMetadataSchema
   ],
-  triggers: [pendoEvents]
+  triggers: []
 });

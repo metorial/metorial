@@ -17,7 +17,8 @@ export let createIncident = SlateTool.create(spec, {
   description: `Declare a new incident in incident.io. Supports setting visibility, severity, status, type, mode, custom fields, role assignments, and timestamps.`,
   instructions: [
     'An idempotency key is auto-generated if not provided.',
-    'Visibility is required — choose "public" or "private".'
+    'Visibility is required — choose "public" or "private".',
+    'Standard and test incidents can create chat channels and run notifications or workflows. Retrospective incidents without a supplied channel ID do not create a Slack channel.'
   ],
   tags: {
     destructive: false
@@ -37,6 +38,20 @@ export let createIncident = SlateTool.create(spec, {
         .enum(['standard', 'retrospective', 'test', 'tutorial'])
         .optional()
         .describe('Incident mode'),
+      retrospectiveIncidentOptions: z
+        .object({
+          externalId: z
+            .number()
+            .int()
+            .optional()
+            .describe('Imported incident reference; requires prior provider enablement'),
+          postmortemDocumentUrl: z.string().optional(),
+          slackChannelId: z.string().optional()
+        })
+        .optional()
+        .describe(
+          'Options for retrospective incidents; omit slackChannelId to avoid creating a Slack channel'
+        ),
       idempotencyKey: z
         .string()
         .optional()
@@ -47,7 +62,16 @@ export let createIncident = SlateTool.create(spec, {
             customFieldId: z.string().describe('ID of the custom field'),
             values: z.array(
               z.object({
-                valueLiteral: z.string().optional(),
+                valueLiteral: z
+                  .string()
+                  .optional()
+                  .describe(
+                    'Legacy literal: resolved using the current custom field type; use valueOptionId for select options'
+                  ),
+                valueText: z.string().optional(),
+                valueNumeric: z.string().optional(),
+                valueOptionId: z.string().optional(),
+                valueTimestamp: z.string().optional(),
                 valueCatalogEntryId: z.string().optional(),
                 valueLink: z.string().optional()
               })
@@ -101,10 +125,15 @@ export let createIncident = SlateTool.create(spec, {
       incidentStatusId: ctx.input.incidentStatusId,
       incidentTypeId: ctx.input.incidentTypeId,
       mode: ctx.input.mode,
+      retrospectiveIncidentOptions: ctx.input.retrospectiveIncidentOptions,
       customFieldEntries: ctx.input.customFieldEntries?.map(e => ({
         custom_field_id: e.customFieldId,
         values: e.values.map(v => ({
           value_literal: v.valueLiteral,
+          value_text: v.valueText,
+          value_numeric: v.valueNumeric,
+          value_option_id: v.valueOptionId,
+          value_timestamp: v.valueTimestamp,
           value_catalog_entry_id: v.valueCatalogEntryId,
           value_link: v.valueLink
         }))

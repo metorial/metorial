@@ -8,8 +8,7 @@
     "extract structured web data",
     "define data extraction schemas",
     "scrape multiple pages",
-    "manage webhook subscriptions",
-    "receive job completion events"
+    "manage webhook subscriptions"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/hystruct.png"
 }

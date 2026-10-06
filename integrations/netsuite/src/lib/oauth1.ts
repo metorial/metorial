@@ -1,5 +1,5 @@
-import crypto from 'crypto';
-
+import { createHmac, randomBytes } from 'node:crypto';
+import { account, credential, requireValue } from './contracts';
 export interface OAuth1Credentials {
   accountId: string;
   consumerKey: string;
@@ -7,81 +7,58 @@ export interface OAuth1Credentials {
   tokenId: string;
   tokenSecret: string;
 }
-
-let percentEncode = (str: string): string => {
-  return encodeURIComponent(str)
-    .replace(/!/g, '%21')
-    .replace(/\*/g, '%2A')
-    .replace(/'/g, '%27')
-    .replace(/\(/g, '%28')
-    .replace(/\)/g, '%29');
-};
-
-let generateNonce = (): string => {
-  return crypto.randomBytes(16).toString('hex');
-};
-
-let generateTimestamp = (): string => {
-  return Math.floor(Date.now() / 1000).toString();
-};
-
-export let buildOAuth1Header = (
+export const percentEncode = (value: string) =>
+  encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+export function buildOAuth1Header(
   method: string,
-  url: string,
+  value: string,
   credentials: OAuth1Credentials
-): string => {
-  let nonce = generateNonce();
-  let timestamp = generateTimestamp();
-
-  let params: Record<string, string> = {
+) {
+  for (const key of [
+    credentials.consumerKey,
+    credentials.consumerSecret,
+    credentials.tokenId,
+    credentials.tokenSecret
+  ])
+    credential(key);
+  const bound = account(credentials.accountId);
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    requireValue(false, 'A valid original NetSuite request URL is required for signing.');
+  }
+  requireValue(
+    url.origin === `https://${bound.host}.suitetalk.api.netsuite.com` &&
+      url.pathname.startsWith('/services/rest/') &&
+      !url.username &&
+      !url.password &&
+      !url.hash,
+    'TBA signing is restricted to the original account REST origin.'
+  );
+  const params = {
     oauth_consumer_key: credentials.consumerKey,
-    oauth_nonce: nonce,
+    oauth_nonce: randomBytes(16).toString('hex'),
     oauth_signature_method: 'HMAC-SHA256',
-    oauth_timestamp: timestamp,
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
     oauth_token: credentials.tokenId,
     oauth_version: '1.0'
   };
-
-  // Parse URL to separate base URL from query params
-  let urlObj = new URL(url);
-  let baseUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
-
-  // Include query params in signature base
-  let allParams: Record<string, string> = { ...params };
-  urlObj.searchParams.forEach((value, key) => {
-    allParams[key] = value;
-  });
-
-  // Sort parameters alphabetically
-  let sortedKeys = Object.keys(allParams).sort();
-  let paramString = sortedKeys
-    .map(key => `${percentEncode(key)}=${percentEncode(allParams[key]!)}`)
-    .join('&');
-
-  // Build signature base string
-  let signatureBaseString = `${method.toUpperCase()}&${percentEncode(baseUrl)}&${percentEncode(paramString)}`;
-
-  // Build signing key
-  let signingKey = `${percentEncode(credentials.consumerSecret)}&${percentEncode(credentials.tokenSecret)}`;
-
-  // Compute HMAC-SHA256 signature
-  let signature = crypto
-    .createHmac('sha256', signingKey)
-    .update(signatureBaseString)
+  const pairs = [...Object.entries(params), ...url.searchParams.entries()]
+    .map(([k, v]) => [percentEncode(k), percentEncode(v)] as const)
+    .sort((a, b) =>
+      a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0
+    );
+  const normalized = pairs.map(([k, v]) => `${k}=${v}`).join('&'),
+    base = `${method.toUpperCase()}&${percentEncode(`${url.origin}${url.pathname}`)}&${percentEncode(normalized)}`;
+  const signature = createHmac(
+    'sha256',
+    `${percentEncode(credentials.consumerSecret)}&${percentEncode(credentials.tokenSecret)}`
+  )
+    .update(base)
     .digest('base64');
-
-  // Build the Authorization header
-  let realm = credentials.accountId;
-  let headerParts = [
-    `realm="${percentEncode(realm)}"`,
-    `oauth_consumer_key="${percentEncode(params.oauth_consumer_key!)}"`,
-    `oauth_token="${percentEncode(params.oauth_token!)}"`,
-    `oauth_nonce="${percentEncode(nonce)}"`,
-    `oauth_timestamp="${percentEncode(timestamp)}"`,
-    `oauth_signature_method="${percentEncode('HMAC-SHA256')}"`,
-    `oauth_version="${percentEncode('1.0')}"`,
-    `oauth_signature="${percentEncode(signature)}"`
-  ];
-
-  return `OAuth ${headerParts.join(', ')}`;
-};
+  return `OAuth ${[['realm', bound.realm], ...Object.entries(params), ['oauth_signature', signature]].map(([k, v]) => `${k}="${percentEncode(String(v))}"`).join(', ')}`;
+}

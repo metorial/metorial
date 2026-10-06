@@ -1,50 +1,36 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+import { FilesComClient } from './lib/client';
+import { nativeId, serviceOrigin } from './lib/contracts';
+export const auth = SlateAuth.create()
+  .output(z.object({ token: z.string(), baseUrl: z.string().optional() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Key',
     key: 'api_key',
-
     inputSchema: z.object({
       apiKey: z
         .string()
         .describe(
-          'Your Files.com API key. Can be a site-wide key or a user-specific key. Generate one from the Files.com web interface under API Keys.'
-        )
+          'Files.com API key; owning-user, workspace and key restrictions still apply.'
+        ),
+      subdomain: z
+        .string()
+        .optional()
+        .describe('Site subdomain, without .files.com. Omit to use app.files.com.')
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.apiKey
-        }
-      };
+    getOutput: async (ctx: { input: { apiKey: string; subdomain?: string } }) => {
+      const baseUrl = serviceOrigin(ctx.input.subdomain);
+      const client = new FilesComClient({ token: ctx.input.apiKey, baseUrl });
+      await client.getCurrentApiKey();
+      return { output: { token: ctx.input.apiKey, baseUrl } };
     },
-
-    getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let ax = createAxios({
-        baseURL: 'https://app.files.com/api/rest/v1',
-        headers: {
-          'X-FilesAPI-Key': ctx.output.token,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let response = await ax.get('/api_key.json');
-      let apiKey = response.data;
-
+    getProfile: async (ctx: { output: { token: string; baseUrl?: string } }) => {
+      const key = await new FilesComClient(ctx.output).getCurrentApiKey();
       return {
         profile: {
-          id: String(apiKey.user_id ?? apiKey.id),
-          name: apiKey.name,
-          email: apiKey.descriptive_label
+          id: String(nativeId(key.id)),
+          name: typeof key.name === 'string' ? key.name : 'Files.com API key'
         }
       };
     }

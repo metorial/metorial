@@ -47,7 +47,7 @@ export let getSummary = SlateTool.create(spec, {
       accountEmail: ctx.auth.accountEmail
     });
 
-    let result: any;
+    let result: { summary?: unknown; hoursofday?: unknown };
 
     switch (ctx.input.reportType) {
       case 'average':
@@ -87,7 +87,10 @@ export let getSummary = SlateTool.create(spec, {
 
     return {
       output: {
-        summary: result.summary || result
+        summary:
+          ctx.input.reportType === 'hoursofday'
+            ? { hoursofday: result.hoursofday }
+            : result.summary
       },
       message: `Retrieved **${ctx.input.reportType}** summary for check ${ctx.input.checkId}.`
     };

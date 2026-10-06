@@ -7,6 +7,7 @@ import {
   getConfigurationTool,
   getInteractionsTool,
   getLinkSharesTool,
+  getOrganizationsTool,
   getProfilesTool,
   getUpdatesTool,
   getUserTool,
@@ -14,12 +15,11 @@ import {
   manageScheduleTool,
   shareUpdateTool
 } from './tools';
-import { inboundWebhook, newUpdateQueuedTrigger, newUpdateSentTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     getUserTool,
+    getOrganizationsTool,
     getProfilesTool,
     createUpdateTool,
     editUpdateTool,
@@ -32,5 +32,5 @@ export let provider = Slate.create({
     getLinkSharesTool,
     getConfigurationTool
   ],
-  triggers: [inboundWebhook, newUpdateSentTrigger, newUpdateQueuedTrigger]
+  triggers: []
 });

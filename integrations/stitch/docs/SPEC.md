@@ -1,100 +1,40 @@
-Now I have a good understanding of Stitch (the ETL/data pipeline platform by Stitch Data). Let me also check the Connect API's notification/webhook management and extraction/load monitoring features more closely.
+# Stitch integration API scope
 
-# Slates Specification for Stitch
+This integration targets Stitch Data, the Qlik/Talend data pipeline product. The current developer documentation supports Connect and Import APIs. The deprecated Connect.js browser library is outside this integration's scope.
 
-## Overview
+## Credentials and region
 
-Stitch (by Talend) is a cloud-based ETL (Extract, Transform, Load) service that replicates data from SaaS applications, databases, and other sources into data warehouses such as Amazon Redshift, Google BigQuery, Snowflake, and PostgreSQL. It offers two APIs: the Connect API for programmatic account and pipeline management, and the Import API for pushing arbitrary data into a destination.
+Connect account tokens and Import source tokens both use Bearer authentication but have different scopes. The `api_token` method retains its required `token` field. Supply a Connect token for management, an Import token for import-only use, or both using optional `importToken`. Choose `us` or `eu` on the connection.
 
-## Authentication
+Connect setup validates access by listing sources. It discovers `clientId` only when the returned source metadata identifies one account; empty accounts retain the configured fallback. Import credentials have no documented read-only identity endpoint. Public Import health does not validate a credential.
 
-Stitch uses **Bearer Token authentication** for both its APIs.
+New connections retain region in authentication state. Existing stored configuration regions remain readable without presenting a second region setting. US and EU use `api.stitchdata.com` and `api.eu-central-1.stitchdata.com`, respectively.
 
-### Connect API (Account & Pipeline Management)
+## Supported operations
 
-API requests are authenticated by providing an access token in the `Authorization` header. Each access token is associated with a single Stitch client account. Access tokens do not expire, but they may be revoked by the user at any time.
+The 23 established tool keys remain, with `get_import_status` added. Sources, destinations and streams use Connect v4; notifications use the documented public v1 paths; ingestion and validation use Import v2.
 
-All requests must be made over HTTPS. There are two ways to obtain an access token:
+Source scheduling values are submitted inside connection properties. Choosing an interval clears an existing cron expression so the interval can take effect. Scheduling support and permitted frequencies depend on the source and plan. Stream listing returns object metadata; detailed schemas can contain breadcrumb metadata and an encoded JSON schema.
 
-1. **Individual Stitch Users:** Users who want to programmatically control their own Stitch client account can create, revoke, and delete API access tokens on the Account Settings page of their Stitch client account. Access to the API is available during the Free Trial or as part of an Advanced or Premium plan.
+Destination creation accepts optional `ignoreUnmappedSources`. Hook creation accepts optional `destinationId`; omission is allowed only when exactly one destination exists. The legacy destination-update `name` field remains accepted by the schema but returns an explicit explanation that renaming is unavailable through the documented endpoint.
 
-2. **Stitch Partners (OAuth):** Partners performing actions in Stitch client accounts on behalf of users who authorize their API client need to register as an API client and follow the Partner API Authentication guide. Partners can either:
-   - Create a new Stitch client account using the API, providing `partner_id` and `partner_secret` in the request body, which returns an access token in the response.
-   - Use an OAuth flow where the user is sent to Stitch from the partner application using the partner's `partner_id` as the client ID. The user authorizes the application and is redirected back with a token.
+Extraction/load pages contain up to 100 records. `nextPage` provides continuation; job-resource requests share the documented 30-per-10-minute limit. Log requests produce a downloadable file and can renew an expired download without exposing credentials in ordinary results.
 
-**Header format:**
+Source and destination properties expose a conservative non-secret subset. Notification callbacks expose URL origins. Configuration form descriptors remain available, including credential-required flags, without credential values.
 
-```
-Authorization: Bearer [ACCESS_TOKEN]
-```
+Connection-check states `running`, `succeeded` and `failed` are diagnostic outcomes rather than operation errors. Diagnostic URL user-info, query strings and fragments are removed even when embedded in a longer error description. Stream updates require a numeric status-200 acknowledgment; source deletion requires its matching deletion tombstone, destination deletion an empty response, email deletion `[1]` and hook deletion `null`. Notification enable/disable acknowledgments must reflect the requested state.
 
-**Base URL:** `https://api.stitchdata.com` (varies by data pipeline region, e.g., `https://api.eu-central-1.stitchdata.com` for EU).
+## Boundaries
 
-### Import API (Data Push)
+Partner account provisioning, session creation, source token minting and application OAuth handshakes are not offered. Use the provider dashboard or partner-specific APIs for those workflows. There is no invented account identity endpoint or provider-wide retirement.
 
-The Import API uses an API access token to authenticate requests. Import API access tokens can be generated and managed in the Integration Settings page for any Import API integration in your Stitch account.
+Import batches are accepted asynchronously. Validation does not persist records. Extraction cancellation and source deletion do not erase data already loaded into a warehouse.
 
-For some endpoints, you'll also need to include your Stitch client ID in the request body. Your Stitch client ID is the unique ID associated with your Stitch account. The client ID can be found in the Stitch dashboard URL.
+## Official references
 
-## Features
-
-### Account Management
-
-The Connect API enables users to programmatically access and manage their Stitch accounts, or partners to integrate Stitch's data pipeline functionality into their own platforms. It allows you to programmatically provision Stitch accounts, create and modify data sources, and configure destination connections.
-
-### Source (Integration) Management
-
-Create, update, delete, and list data sources (integrations) that Stitch extracts data from. Every data source available in the Connect API has a type, typically similar to `platform.<source-type>`. Sources go through a multi-step configuration process including form properties, OAuth (if applicable), and field selection. After field selection, the source becomes `fully_configured` and Stitch can begin replication using the schedule and stream/field selection data provided.
-
-### Destination Management
-
-Configure destination objects representing the data warehouses into which Stitch writes data. Only a single destination is supported per Stitch client account. Supported destinations include Amazon Redshift, Google BigQuery, PostgreSQL, Snowflake, and others.
-
-### Stream and Field Selection
-
-Select the streams (tables) and fields (columns) you want to replicate. At least one stream and one field in the stream must be selected to complete field selection. Stream and field metadata can be retrieved and updated to control what data is replicated.
-
-### Replication Scheduling
-
-Configure how often data sources are replicated. Options include frequency-based scheduling (e.g., every 30 or 60 minutes), cron expressions, and anchor times.
-
-### OAuth Configuration for Sources
-
-Configuring OAuth allows you to completely white label the source setup process. Your application handles the OAuth handshake and redirects, provides the required OAuth source properties to the Connect API, and Stitch manages OAuth and refresh tokens on an ongoing basis. Otherwise, Stitch will use its managed credentials to perform the OAuth handshake.
-
-### Extraction and Load Monitoring
-
-Monitor the status of extraction jobs and data loading operations for your sources. This allows tracking of replication progress, identifying failures, and understanding when data was last loaded.
-
-### Data Push (Import API)
-
-The Import API enables you to push arbitrary data from a source to Stitch. The Import API acts as a receiving point for data that is sent to Stitch. This allows you to push data from a source (including those Stitch doesn't currently have an integration for) and send it to Stitch.
-
-- Data is pushed in JSON format using a JSON Schema for validation and typing.
-- Stitch supports Upsert and Append-Only loading. Whether key_names specifies Primary Key fields determines the loading behavior. If Primary Keys aren't specified, data will be loaded using Append-Only loading.
-- Each record requires a sequence property to ensure correct ordering of updates.
-
-### Incoming Webhooks
-
-Stitch's Incoming Webhooks integration provides a simple and flexible method to integrate dozens of webhook APIs with Stitch. If Stitch doesn't have a native integration for the webhook you want to integrate, then Stitch webhooks is your best bet.
-
-- The data sent by the webhook API must come to Stitch in JSON format, and the payload must come via a POST request.
-
-### Notification Management
-
-Create, list, update, and delete custom email notifications and post-load webhook notifications via the Connect API. You can configure up to 10 post-load hooks.
-
-## Events
-
-Stitch supports **post-load webhook notifications** that fire when data loading completes.
-
-### Post-Load Hooks
-
-Post-load hooks allow you to configure a webhook that fires each time data is loaded into your existing destination. Using post-load hooks, you can extend Stitch and automate dependent processes. For example: Trigger downstream processing in SQL, an Amazon Web Services Lambda function, Talend Cloud jobs, or any other system that can be controlled with an HTTP request.
-
-- Post-load hooks are sent on a per-integration, per-table basis to each configured post-load webhook URL.
-- If multiple tables are set to replicate for an integration, Stitch will send a request for each table every time data is successfully loaded or rejected.
-- If the load for a table fails, a post-load webhook will not be sent.
-- The webhook payload includes metadata such as integration name, table name, number of rows loaded/rejected, primary keys, and bookmark metadata.
-- You can configure up to 10 post-load hooks.
-- Post-load hooks can be managed both through the Stitch UI and the Connect API.
+- [Current developer portal](https://help.qlik.com/en-US/stitch/developers)
+- [Connect reference](https://www.stitchdata.com/docs/developers/stitch-connect/api)
+- [Import reference](https://help.qlik.com/en-US/stitch/developers/import-api/api)
+- [Scheduling guide](https://www.stitchdata.com/docs/developers/stitch-connect/guides/replication-scheduling-for-sources)
+- [Import source setup](https://www.stitchdata.com/docs/developers/stitch-connect/guides/create-import-api-integration-with-stitch-connect)
+- [Extraction logs](https://www.stitchdata.com/docs/replication/extractions/integration-extraction-logs)

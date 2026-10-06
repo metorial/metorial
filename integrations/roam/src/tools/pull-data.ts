@@ -45,7 +45,7 @@ Use this to get detailed information about a known page or block, including its 
 
     return {
       output: { entity },
-      message: `Pulled entity data from graph **${ctx.config.graphName}**.`
+      message: 'Read the native entity data.'
     };
   })
   .build();

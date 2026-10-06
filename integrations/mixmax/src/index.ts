@@ -25,6 +25,7 @@ import {
   listRules,
   listSequenceRecipients,
   listSequences,
+  listTasks,
   listTeamMembers,
   listTeams,
   listTemplates,
@@ -35,6 +36,7 @@ import {
   manageTeamMembership,
   removeUnsubscribe,
   searchSalesforce,
+  searchSequenceRecipients,
   sendDraftMessage,
   sendEmail,
   sendTemplate,
@@ -42,17 +44,11 @@ import {
   updateRule,
   updateTemplate
 } from './tools';
-import {
-  engagementEvents,
-  meetingEvents,
-  messageEvents,
-  pollEvents,
-  unsubscribeEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    listTasks,
+    searchSequenceRecipients,
     listSequences,
     addRecipientsToSequence,
     cancelSequence,
@@ -94,5 +90,5 @@ export let provider = Slate.create({
     searchSalesforce,
     manageSalesforceRecord
   ],
-  triggers: [messageEvents, engagementEvents, pollEvents, meetingEvents, unsubscribeEvents]
+  triggers: []
 });

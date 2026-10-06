@@ -16,8 +16,6 @@ import {
   tagResponse,
   trackEvent
 } from './tools';
-import { segmentEntry, surveyInteraction, tagAdded } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     getReporting,
     getAccount
   ],
-  triggers: [surveyInteraction, segmentEntry, tagAdded]
+  triggers: []
 });

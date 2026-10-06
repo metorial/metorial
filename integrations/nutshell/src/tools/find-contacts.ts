@@ -55,11 +55,11 @@ export let findContacts = SlateTool.create(spec, {
       stubResponses: ctx.input.stubResponses
     });
 
-    let contacts = results.map((c: any) => ({
+    let contacts = results.map(c => ({
       contactId: c.id,
       name: c.name,
-      emails: c.email || c.emails,
-      phones: c.phone || c.phones,
+      emails: c.email,
+      phones: c.phone,
       entityType: c.entityType
     }));
 

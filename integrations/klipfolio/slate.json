@@ -1,6 +1,6 @@
 {
   "name": "@metorial/klipfolio",
-  "description": "Manage business dashboards, data visualizations, and analytics. Create and configure dashboards (tabs), build and update Klip visualizations with custom schemas, and connect to various data sources including REST/URL and service connectors. Manage users, roles, groups, and permissions for access control. Handle client accounts for multi-tenant setups, publish shareable dashboard links, refresh and upload data source instances, and embed PowerMetrics visualizations externally.",
+  "description": "Manage Klipfolio Klips dashboards, visualizations, data sources and stored data downloads. Discover users, roles, groups and agency clients; manage dashboard access and password-protected published links. This integration uses the Klips REST API, not the separate PowerMetrics APIs.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "manage dashboards",
@@ -10,9 +10,9 @@
     "publish shareable links",
     "manage client accounts",
     "refresh data on demand",
-    "embed analytics externally",
     "organize users into groups",
-    "control share rights"
+    "control share rights",
+    "download stored data"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/klipfolio.png"
 }

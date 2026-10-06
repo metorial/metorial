@@ -37,13 +37,6 @@ import {
   submitMetrics,
   triggerSynthetics
 } from './tools';
-import {
-  inboundWebhook,
-  incidentUpdateTrigger,
-  monitorAlertTrigger,
-  newEventTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -83,5 +76,5 @@ export let provider = Slate.create({
     getDowntime,
     cancelDowntime
   ],
-  triggers: [inboundWebhook, monitorAlertTrigger, newEventTrigger, incidentUpdateTrigger]
+  triggers: []
 });

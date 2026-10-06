@@ -1,175 +1,138 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createGoogleOAuth } from '@slates/oauth-google';
+import { createApiServiceError, createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { gmailError } from './lib/errors';
 
-let googleAxios = createAxios({
-  baseURL: 'https://oauth2.googleapis.com'
+export const GMAIL_READ = 'https://www.googleapis.com/auth/gmail.readonly';
+export const GMAIL_MODIFY = 'https://www.googleapis.com/auth/gmail.modify';
+export const GMAIL_COMPOSE = 'https://www.googleapis.com/auth/gmail.compose';
+export const GMAIL_FULL = 'https://mail.google.com/';
+
+const tokenResponseSchema = z
+  .object({
+    access_token: z.string().min(1),
+    refresh_token: z.string().min(1).optional(),
+    expires_in: z.union([z.number(), z.string()]).optional(),
+    scope: z.string().min(1).optional(),
+    token_type: z.string().optional()
+  })
+  .passthrough();
+const tokenClient = createAxios({
+  baseURL: 'https://oauth2.googleapis.com',
+  timeout: 30000,
+  maxRedirects: 0
 });
-
-let profileAxios = createAxios({
-  baseURL: 'https://www.googleapis.com'
-});
-
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string(),
-      refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
-    })
-  )
-  .addOauth({
-    type: 'auth.oauth',
-    name: 'Google OAuth',
-    key: 'google_oauth',
-    docs: [
-      {
-        type: 'docs.auth.oauth',
-        name: 'OAuth documentation',
-        url: 'https://support.google.com/cloud/answer/15544987'
+const method = (key: string, name: string, scope: string, description: string) =>
+  createGoogleOAuth({
+    key,
+    name,
+    scopes: [{ title: name, scope, description }],
+    dependencies: {
+      requestToken: async request => {
+        const fields = new URLSearchParams({
+          client_id: request.clientId,
+          client_secret: request.clientSecret,
+          grant_type: request.grantType
+        });
+        if (request.grantType === 'authorization_code') {
+          if (!request.code || !request.redirectUri)
+            throw createApiServiceError(
+              'Google authorization code and redirect URI are required.'
+            );
+          fields.set('code', request.code);
+          fields.set('redirect_uri', request.redirectUri);
+        } else {
+          if (!request.refreshToken)
+            throw createApiServiceError('Reconnect Google to obtain offline access.');
+          fields.set('refresh_token', request.refreshToken);
+        }
+        try {
+          const response = await tokenClient.post('/token', fields.toString(), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          });
+          const parsed = tokenResponseSchema.safeParse(response.data);
+          if (
+            !parsed.success ||
+            [...parsed.data.access_token].some(
+              char => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127
+            ) ||
+            (parsed.data.refresh_token !== undefined && !parsed.data.refresh_token.trim()) ||
+            (parsed.data.scope !== undefined && !parsed.data.scope.trim()) ||
+            (parsed.data.token_type !== undefined &&
+              parsed.data.token_type.toLowerCase() !== 'bearer')
+          )
+            throw createApiServiceError(
+              'Google returned an invalid OAuth token response. Reconnect Google.'
+            );
+          return parsed.data;
+        } catch (error) {
+          throw gmailError(error, 'OAuth token exchange');
+        }
       },
-      {
-        type: 'docs.auth.oauth_scopes',
-        name: 'OAuth scopes',
-        url: 'https://developers.google.com/identity/protocols/oauth2/scopes'
+      getUserInfo: async token => {
+        const profile = await new Client({ token, userId: 'me' }).getProfile();
+        return {
+          id: profile.emailAddress,
+          email: profile.emailAddress,
+          name: profile.emailAddress
+        };
       }
-    ],
-
-    scopes: [
-      {
-        title: 'Read-Only',
-        description: 'Read threads, messages, drafts, and mailbox metadata—no modifications.',
-        scope: 'https://www.googleapis.com/auth/gmail.readonly'
-      },
-      {
-        title: 'Compose',
-        description: 'Create, read, update, and delete drafts; send messages and drafts.',
-        scope: 'https://www.googleapis.com/auth/gmail.compose'
-      },
-      {
-        title: 'Modify',
-        description:
-          'Change labels, archive, trash, and restore threads (no permanent delete bypassing Trash unless combined with full mail scope).',
-        scope: 'https://www.googleapis.com/auth/gmail.modify'
-      },
-      {
-        title: 'Full Access',
-        description:
-          'Full Gmail access including permanent deletion of threads when using the delete triage action.',
-        scope: 'https://mail.google.com/'
-      },
-      {
-        title: 'User Email',
-        description: 'View your email address for connection profile.',
-        scope: 'https://www.googleapis.com/auth/userinfo.email'
-      },
-      {
-        title: 'User Profile',
-        description: 'View your name and profile picture.',
-        scope: 'https://www.googleapis.com/auth/userinfo.profile'
-      }
-    ],
-
-    getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
-        client_id: ctx.clientId,
-        redirect_uri: ctx.redirectUri,
-        response_type: 'code',
-        state: ctx.state,
-        scope: ctx.scopes.join(' '),
-        access_type: 'offline',
-        prompt: 'consent'
-      });
-
-      return {
-        url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
-      };
-    },
-
-    handleCallback: async ctx => {
-      let response = await googleAxios.post(
-        '/token',
-        new URLSearchParams({
-          code: ctx.code,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          redirect_uri: ctx.redirectUri,
-          grant_type: 'authorization_code'
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      let response = await googleAxios.post(
-        '/token',
-        new URLSearchParams({
-          refresh_token: ctx.output.refreshToken,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          grant_type: 'refresh_token'
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: ctx.output.refreshToken,
-          expiresAt
-        }
-      };
-    },
-
-    getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string };
-      input: {};
-      scopes: string[];
-    }) => {
-      let response = await profileAxios.get('/oauth2/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let data = response.data;
-
-      return {
-        profile: {
-          id: data.id,
-          email: data.email,
-          name: data.name,
-          imageUrl: data.picture
-        }
-      };
     }
   });
+
+const authOutput = z.object({
+  token: z.string(),
+  refreshToken: z.string().optional(),
+  expiresAt: z.string().optional(),
+  authMethod: z.literal('oauth').optional(),
+  grantedScopes: z.array(z.string()).optional()
+});
+export const auth = SlateAuth.create().output(authOutput);
+for (const [key, name, scope, description] of [
+  [
+    'google_oauth',
+    'Google OAuth',
+    GMAIL_MODIFY,
+    'Read mail, manage drafts and labels, trash or restore conversations, and send mail.'
+  ],
+  [
+    'google_oauth_readonly',
+    'Google OAuth Read Only',
+    GMAIL_READ,
+    'Read conversations, drafts and files without changing the mailbox.'
+  ],
+  [
+    'google_oauth_full_access',
+    'Google OAuth Full Access',
+    GMAIL_FULL,
+    'Read and manage mail, including irreversible permanent deletion of conversations.'
+  ]
+] as const) {
+  const shared = method(key, name, scope, description);
+  auth.addOauth({
+    ...shared,
+    getAuthorizationUrl: async ctx => ({
+      ...(await shared.getAuthorizationUrl(ctx)),
+      callbackState: { expectedState: ctx.state }
+    }),
+    handleCallback: async ctx => {
+      if (!ctx.state || ctx.callbackState?.expectedState !== ctx.state)
+        throw createApiServiceError(
+          'Google authorization state did not match. Restart the connection.'
+        );
+      const result = await shared.handleCallback(ctx);
+      return { ...result, output: { ...result.output, grantedScopes: result.scopes } };
+    },
+    handleTokenRefresh: async (
+      ctx: Omit<Parameters<typeof shared.handleTokenRefresh>[0], 'output'> & {
+        output: z.infer<typeof authOutput>;
+      }
+    ) => shared.handleTokenRefresh({ ...ctx, output: { ...ctx.output, authMethod: 'oauth' } }),
+    getProfile: async (
+      ctx: Omit<Parameters<typeof shared.getProfile>[0], 'output'> & {
+        output: z.infer<typeof authOutput>;
+      }
+    ) => shared.getProfile({ ...ctx, output: { ...ctx.output, authMethod: 'oauth' } })
+  });
+}

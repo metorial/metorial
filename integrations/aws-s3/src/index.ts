@@ -16,8 +16,6 @@ import {
   manageObjectTagsTool,
   putObjectTool
 } from './tools';
-import { inboundWebhook, objectChangesTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     manageBucketPolicyTool,
     manageBucketLifecycleTool
   ],
-  triggers: [inboundWebhook, objectChangesTrigger]
+  triggers: []
 });

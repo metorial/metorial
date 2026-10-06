@@ -16,8 +16,6 @@ import {
   postVideo,
   queryVideos
 } from './tools';
-import { businessWebhook, consumerWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     getAds,
     getAdReport
   ],
-  triggers: [consumerWebhook, businessWebhook]
+  triggers: []
 });

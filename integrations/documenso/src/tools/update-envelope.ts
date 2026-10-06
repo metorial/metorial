@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { clientConfig } from '../lib/validation';
 import { spec } from '../spec';
 
 export let updateEnvelopeTool = SlateTool.create(spec, {
   name: 'Update Envelope',
   key: 'update_envelope',
-  description: `Update an existing envelope's title or metadata (subject, message, signing order, redirect URL, language, etc.). Can only be applied to envelopes in DRAFT status.`
+  description: `Update an existing envelope's title or metadata (subject, message, signing order, redirect URL, language, etc.). Provider permissions and envelope status determine which changes are accepted.`
 })
   .input(
     z.object({
@@ -27,28 +28,20 @@ export let updateEnvelopeTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let meta: Record<string, unknown> = {};
-    if (ctx.input.subject) meta.subject = ctx.input.subject;
-    if (ctx.input.emailMessage) meta.message = ctx.input.emailMessage;
-    if (ctx.input.signingOrder) meta.signingOrder = ctx.input.signingOrder;
-    if (ctx.input.redirectUrl) meta.redirectUrl = ctx.input.redirectUrl;
-    if (ctx.input.language) meta.language = ctx.input.language;
-    if (ctx.input.timezone) meta.timezone = ctx.input.timezone;
-    if (ctx.input.dateFormat) meta.dateFormat = ctx.input.dateFormat;
-
-    await client.updateEnvelope(ctx.input.envelopeId, {
-      title: ctx.input.title,
-      meta: Object.keys(meta).length > 0 ? meta : undefined
-    });
-
+    const client = new Client(clientConfig(ctx));
+    const meta = {
+      subject: ctx.input.subject,
+      message: ctx.input.emailMessage,
+      signingOrder: ctx.input.signingOrder,
+      redirectUrl: ctx.input.redirectUrl,
+      language: ctx.input.language,
+      timezone: ctx.input.timezone,
+      dateFormat: ctx.input.dateFormat
+    };
+    await client.updateEnvelope(ctx.input.envelopeId, { title: ctx.input.title, meta });
     return {
       output: { success: true },
-      message: `Updated envelope \`${ctx.input.envelopeId}\`.`
+      message: 'Documenso acknowledged the envelope update.'
     };
   })
   .build();

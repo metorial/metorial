@@ -19,7 +19,18 @@ export let createAssistant = SlateTool.create(spec, {
         .describe(
           'JSON string with assistant configuration: name, model, instructions, temperature, top_p, tools (array of tool types like "function", "code_interpreter", "file_search"), tool_resources'
         ),
-      credential: z.string().optional().describe('Credential ID for LLM provider access'),
+      type: z
+        .enum(['CUSTOM', 'OPENAI', 'AZURE'])
+        .optional()
+        .describe(
+          'Assistant backend. CUSTOM stores configuration locally; OPENAI and AZURE require their configured provider credential.'
+        ),
+      credential: z
+        .string()
+        .optional()
+        .describe(
+          'Provider credential ID for OPENAI or AZURE; a client-generated UUID identifier for CUSTOM'
+        ),
       iconSrc: z.string().optional().describe('Icon source URL')
     })
   )
@@ -40,7 +51,8 @@ export let createAssistant = SlateTool.create(spec, {
     let result = await client.createAssistant({
       details: ctx.input.details,
       credential: ctx.input.credential,
-      iconSrc: ctx.input.iconSrc
+      iconSrc: ctx.input.iconSrc,
+      type: ctx.input.type
     });
 
     return {

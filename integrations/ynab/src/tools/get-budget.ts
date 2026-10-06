@@ -1,28 +1,32 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapPlan } from '../lib/models';
+import { budgetInput, deltaInput, milliunits } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getBudget = SlateTool.create(spec, {
   name: 'Get Budget',
   key: 'get_budget',
-  description: `Retrieve detailed information about a specific budget, including its settings, date/currency format, and summary. Use "last-used" or "default" as shortcuts for the budget ID.`,
+  description: `Retrieve detailed information about a specific budget, including date/currency format, summary, and provider budget records for delta merging. Use "last-used" or "default" as shortcuts for the budget ID.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      budgetId: z
-        .string()
-        .optional()
-        .describe(
-          'Budget ID. Defaults to the configured budget. Use "last-used" or "default" as shortcuts.'
-        )
+      lastKnowledgeOfServer: deltaInput,
+      budgetId: budgetInput
     })
   )
   .output(
     z.object({
+      budgetData: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Provider budget records for a full snapshot or delta merge. Monetary values remain integer milliunits.'
+        ),
       budgetId: z.string().describe('Budget unique identifier'),
       name: z.string().describe('Budget name'),
       lastModifiedOn: z
@@ -34,31 +38,24 @@ export let getBudget = SlateTool.create(spec, {
       dateFormat: z.string().optional().describe('Date format string'),
       currencyIsoCode: z.string().optional().describe('ISO currency code'),
       currencySymbol: z.string().optional().describe('Currency symbol'),
-      serverKnowledge: z
-        .number()
+      serverKnowledge: milliunits
+        .nonnegative()
         .optional()
         .describe('Server knowledge value for delta requests')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let budgetId = ctx.input.budgetId ?? ctx.config.budgetId;
-    let data = await client.getBudget(budgetId);
-    let budget = data?.budget;
-
+    const data = await new Client({ token: ctx.auth.token }).getBudget(
+      ctx.input.budgetId ?? ctx.config.budgetId,
+      ctx.input.lastKnowledgeOfServer
+    );
     return {
       output: {
-        budgetId: budget?.id,
-        name: budget?.name,
-        lastModifiedOn: budget?.last_modified_on,
-        firstMonth: budget?.first_month,
-        lastMonth: budget?.last_month,
-        dateFormat: budget?.date_format?.format,
-        currencyIsoCode: budget?.currency_format?.iso_code,
-        currencySymbol: budget?.currency_format?.currency_symbol,
-        serverKnowledge: data?.server_knowledge
+        ...mapPlan(data.budget),
+        budgetData: data.budget,
+        serverKnowledge: data.server_knowledge
       },
-      message: `Retrieved budget **${budget?.name}**`
+      message: 'Retrieved budget summary and sync knowledge.'
     };
   })
   .build();

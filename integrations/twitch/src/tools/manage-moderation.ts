@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwitchClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageModeration = SlateTool.create(spec, {
@@ -42,14 +43,15 @@ export let manageModeration = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId);
+    validateInput('manage_moderation', ctx.input, [ctx.auth.token]);
+    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId, ctx.auth.userId);
     let user = await client.getAuthenticatedUser();
     let moderatorId = user.id;
 
     switch (ctx.input.action) {
       case 'ban': {
         if (!ctx.input.targetUserId)
-          throw new Error('targetUserId is required for ban action');
+          throw createApiServiceError('targetUserId is required for ban action');
         await client.banUser(ctx.input.broadcasterId, moderatorId, {
           userId: ctx.input.targetUserId,
           duration: ctx.input.durationSeconds,
@@ -66,7 +68,7 @@ export let manageModeration = SlateTool.create(spec, {
 
       case 'unban': {
         if (!ctx.input.targetUserId)
-          throw new Error('targetUserId is required for unban action');
+          throw createApiServiceError('targetUserId is required for unban action');
         await client.unbanUser(ctx.input.broadcasterId, moderatorId, ctx.input.targetUserId);
         return {
           output: { success: true, action: 'unban' },
@@ -76,7 +78,7 @@ export let manageModeration = SlateTool.create(spec, {
 
       case 'delete_message': {
         if (!ctx.input.messageId)
-          throw new Error('messageId is required for delete_message action');
+          throw createApiServiceError('messageId is required for delete_message action');
         await client.deleteChatMessage(
           ctx.input.broadcasterId,
           moderatorId,

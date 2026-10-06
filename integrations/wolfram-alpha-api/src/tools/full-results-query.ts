@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -23,8 +23,14 @@ let podSchema = z
     title: z.string().optional(),
     scanner: z.string().optional(),
     podId: z.string().optional(),
+    id: z
+      .string()
+      .optional()
+      .describe('Provider pod ID for filtering or requesting another state'),
+    primary: z.boolean().optional(),
     position: z.number().optional(),
     numsubpods: z.number().optional(),
+    sounds: z.unknown().optional(),
     subpods: z.array(podSubpodSchema).optional()
   })
   .passthrough();
@@ -82,7 +88,9 @@ Use this when you need detailed, multi-faceted computational answers.`,
         .string()
         .optional()
         .describe('Only include pods with this ID (e.g., "Result", "Input")'),
+      includePodIds: z.array(z.string()).optional().describe('Additional pod IDs to include'),
       excludePodId: z.string().optional().describe('Exclude pods with this ID'),
+      excludePodIds: z.array(z.string()).optional().describe('Additional pod IDs to exclude'),
       podTitle: z.string().optional().describe('Only include pods with this title'),
       podIndex: z
         .string()
@@ -100,8 +108,13 @@ Use this when you need detailed, multi-faceted computational answers.`,
         .string()
         .optional()
         .describe(
-          'Request additional pod states (e.g., "Step-by-step solution", "More digits")'
+          'Pod state input token from a previous response (e.g., "DecimalApproximation__More digits")'
         ),
+      podStates: z
+        .array(z.string())
+        .optional()
+        .describe('Additional pod state input tokens from a previous response'),
+      timeout: z.number().optional().describe('Time allowed for the scan phase in seconds'),
       units: z.enum(['metric', 'imperial']).optional().describe('Unit system for results'),
       location: z
         .string()
@@ -120,7 +133,9 @@ Use this when you need detailed, multi-faceted computational answers.`,
       significantDigits: z
         .number()
         .optional()
-        .describe('Number of significant digits for numeric results')
+        .describe(
+          'Unsupported by the provider API. Use a More digits pod state token from an earlier result instead.'
+        )
     })
   )
   .output(
@@ -150,56 +165,93 @@ Use this when you need detailed, multi-faceted computational answers.`,
       input: ctx.input.query,
       format: ctx.input.format,
       includePodId: ctx.input.includePodId,
+      includePodIds: ctx.input.includePodIds,
       excludePodId: ctx.input.excludePodId,
+      excludePodIds: ctx.input.excludePodIds,
       podTitle: ctx.input.podTitle,
       podIndex: ctx.input.podIndex,
       scanner: ctx.input.scanner,
       assumption: ctx.input.assumptions,
       podState: ctx.input.podState,
+      podStates: ctx.input.podStates,
+      timeout: ctx.input.timeout,
       units: ctx.input.units ?? ctx.config.unitSystem,
       location: ctx.input.location,
       ip: ctx.input.ip,
       latLong: ctx.input.latLong,
       maxWidth: ctx.input.maxWidth,
       reinterpret: ctx.input.reinterpret,
-      sig: ctx.input.significantDigits
+      significantDigits: ctx.input.significantDigits
     });
 
-    let queryResult = result?.queryresult ?? result;
-    let success = queryResult?.success ?? false;
-    let pods = queryResult?.pods ?? [];
-    let assumptions = queryResult?.assumptions
-      ? Array.isArray(queryResult.assumptions)
-        ? queryResult.assumptions
-        : [queryResult.assumptions]
-      : [];
+    let queryResult = result;
+    if (typeof queryResult.success !== 'boolean') {
+      throw createApiServiceError('Wolfram Alpha returned an invalid query status.');
+    }
+    let success = queryResult.success;
+    let parsedPods = z.array(podSchema).safeParse(queryResult.pods ?? []);
+    let rawAssumptions = isApiErrorRecord(queryResult.assumptions)
+      ? queryResult.assumptions.count === 0
+        ? undefined
+        : (queryResult.assumptions.assumption ?? queryResult.assumptions)
+      : queryResult.assumptions;
+    let parsedAssumptions = z
+      .array(assumptionSchema)
+      .safeParse(
+        rawAssumptions
+          ? Array.isArray(rawAssumptions)
+            ? rawAssumptions
+            : [rawAssumptions]
+          : []
+      );
+    if (!parsedPods.success || !parsedAssumptions.success) {
+      throw createApiServiceError('Wolfram Alpha returned invalid pods or assumptions.');
+    }
+    let pods = parsedPods.data.map(pod => ({ ...pod, podId: pod.podId ?? pod.id }));
+    let assumptions = parsedAssumptions.data;
 
-    let podSummaries = pods.map((pod: any) => {
+    for (let pod of pods) {
+      for (let subpod of pod.subpods ?? []) {
+        if (subpod.img?.src) await ctx.addAttachment({ type: 'url', url: subpod.img.src });
+      }
+      let rawSounds = isApiErrorRecord(pod.sounds) ? pod.sounds.sound : pod.sounds;
+      for (let sound of Array.isArray(rawSounds) ? rawSounds : rawSounds ? [rawSounds] : []) {
+        if (isApiErrorRecord(sound) && typeof sound.url === 'string') {
+          await ctx.addAttachment({
+            type: 'url',
+            url: sound.url,
+            mimeType: typeof sound.type === 'string' ? sound.type : undefined
+          });
+        }
+      }
+    }
+
+    let podSummaries = pods.map(pod => {
       let title = pod.title ?? 'Untitled';
-      let texts = (pod.subpods ?? []).map((sp: any) => sp.plaintext).filter(Boolean);
+      let texts = (pod.subpods ?? []).map(sp => sp.plaintext).filter(Boolean);
       return `**${title}**: ${texts.join(', ') || '(image/non-text result)'}`;
     });
 
     let message = success
       ? `Query computed successfully with ${pods.length} pod(s):\n${podSummaries.join('\n')}`
-      : `Query did not produce results. ${(queryResult?.tips?.text ?? queryResult?.didyoumeans) ? 'See suggestions in the output.' : 'Try rephrasing or check the query.'}`;
+      : `Query did not produce results. ${queryResult.tips || queryResult.didyoumeans ? 'See suggestions in the output.' : 'Try rephrasing or check the query.'}`;
 
     return {
       output: {
         success,
-        numpods: queryResult?.numpods,
+        numpods: typeof queryResult.numpods === 'number' ? queryResult.numpods : pods.length,
         pods,
         assumptions,
-        timedout: queryResult?.timedout,
-        timing: queryResult?.timing,
-        parseTimedOut: queryResult?.parsetimedout,
+        timedout:
+          queryResult.timedout === undefined ? undefined : String(queryResult.timedout),
+        timing: typeof queryResult.timing === 'number' ? queryResult.timing : undefined,
+        parseTimedOut:
+          typeof queryResult.parsetimedout === 'boolean'
+            ? queryResult.parsetimedout
+            : undefined,
         tips: queryResult?.tips,
         didYouMeans: queryResult?.didyoumeans,
-        errorMessage: queryResult?.error
-          ? typeof queryResult.error === 'object'
-            ? queryResult.error.msg
-            : String(queryResult.error)
-          : undefined
+        errorMessage: undefined
       },
       message
     };

@@ -16,8 +16,6 @@ import {
   updateLink,
   upsertLink
 } from './tools';
-import { conversionEvents, linkClicked, linkEvents, partnerEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     getMetatags,
     listEvents
   ],
-  triggers: [linkEvents, linkClicked, conversionEvents, partnerEvents]
+  triggers: []
 });

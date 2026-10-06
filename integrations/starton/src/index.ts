@@ -12,8 +12,6 @@ import {
   manageWatchers,
   uploadToIpfs
 } from './tools';
-import { blockchainEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     getTransactions,
     listTemplates
   ],
-  triggers: [blockchainEvent]
+  triggers: []
 });

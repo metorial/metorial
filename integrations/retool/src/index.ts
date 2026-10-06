@@ -7,10 +7,13 @@ import {
   deleteApp,
   deleteGroup,
   deleteUser,
+  getApp,
   getGroup,
   getOrganization,
+  getResource,
   getSourceControlConfig,
   getUser,
+  getWorkflow,
   getWorkflowRun,
   listAccessTokens,
   listApps,
@@ -31,8 +34,6 @@ import {
   updateGroup,
   updateUser
 } from './tools';
-import { inboundWebhook, userChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,6 +45,9 @@ export let provider = Slate.create({
     manageUserAttributes,
     listGroups,
     getGroup,
+    getApp,
+    getResource,
+    getWorkflow,
     createGroup,
     updateGroup,
     deleteGroup,
@@ -66,5 +70,5 @@ export let provider = Slate.create({
     getOrganization,
     listAccessTokens
   ],
-  triggers: [inboundWebhook, userChanges]
+  triggers: []
 });

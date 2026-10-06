@@ -41,6 +41,10 @@ export let manageGroupMembership = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      warnings: z
+        .array(z.string())
+        .optional()
+        .describe('Native warnings; some requested changes may not have applied'),
       status: z.string().describe('API response status')
     })
   )
@@ -62,9 +66,13 @@ export let manageGroupMembership = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status || 'OK'
+        status: result.status,
+        warnings: result.warnings
       },
-      message: `Updated group membership for **${userCount}** user(s).`
+      message:
+        result.status === 'WARN'
+          ? 'LastPass reported warnings; verify each membership change before retrying.'
+          : `LastPass accepted group changes for **${userCount}** user(s).`
     };
   })
   .build();

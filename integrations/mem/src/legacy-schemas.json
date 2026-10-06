@@ -1,0 +1,739 @@
+{
+  "create_note": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "Markdown-formatted note content. The first line (e.g. \"# Title\") becomes the note title."
+        },
+        "noteId": {
+          "description": "Optional custom UUID for the note.",
+          "type": "string"
+        },
+        "collectionIds": {
+          "description": "Collection IDs to assign the note to.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "collectionTitles": {
+          "description": "Collection titles to assign the note to (case-insensitive exact match).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "description": "Custom creation timestamp in ISO 8601 format.",
+          "type": "string"
+        },
+        "updatedAt": {
+          "description": "Custom updated timestamp in ISO 8601 format.",
+          "type": "string"
+        }
+      },
+      "required": ["content"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "description": "Unique ID of the created note."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the created note."
+        },
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Full markdown content of the note."
+        },
+        "collectionIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IDs of collections the note belongs to."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp in ISO 8601 format."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last updated timestamp in ISO 8601 format."
+        }
+      },
+      "required": ["noteId", "title", "content", "collectionIds", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "get_note": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "description": "The UUID of the note to retrieve."
+        }
+      },
+      "required": ["noteId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "description": "Unique ID of the note."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the note."
+        },
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Full markdown content of the note."
+        },
+        "collectionIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IDs of collections the note belongs to."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp in ISO 8601 format."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last updated timestamp in ISO 8601 format."
+        }
+      },
+      "required": ["noteId", "title", "content", "collectionIds", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "list_notes": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Maximum number of notes to return (default: 50).",
+          "type": "number"
+        },
+        "page": {
+          "description": "Opaque cursor from a previous response for pagination.",
+          "type": "string"
+        },
+        "orderBy": {
+          "description": "Sort order field (default: updated_at).",
+          "type": "string",
+          "enum": ["created_at", "updated_at"]
+        },
+        "collectionId": {
+          "description": "Filter to notes in a specific collection.",
+          "type": "string"
+        },
+        "containsOpenTasks": {
+          "description": "Filter to notes with open tasks.",
+          "type": "boolean"
+        },
+        "containsTasks": {
+          "description": "Filter to notes with any tasks.",
+          "type": "boolean"
+        },
+        "containsImages": {
+          "description": "Filter to notes with images.",
+          "type": "boolean"
+        },
+        "containsFiles": {
+          "description": "Filter to notes with file attachments.",
+          "type": "boolean"
+        },
+        "includeNoteContent": {
+          "description": "Include full markdown content in results (default: false).",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "noteId": {
+                "type": "string",
+                "description": "Unique ID of the note."
+              },
+              "title": {
+                "type": "string",
+                "description": "Title of the note."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Full markdown content (null unless includeNoteContent is true)."
+              },
+              "snippet": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Preview snippet of the note content."
+              },
+              "collectionIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "IDs of collections the note belongs to."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp in ISO 8601 format."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last updated timestamp in ISO 8601 format."
+              }
+            },
+            "required": [
+              "noteId",
+              "title",
+              "content",
+              "snippet",
+              "collectionIds",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of notes matching the filters."
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of notes matching the filters."
+        },
+        "nextPage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cursor for fetching the next page of results (null if no more pages)."
+        }
+      },
+      "required": ["notes", "total", "nextPage"],
+      "additionalProperties": false
+    }
+  },
+  "search_notes": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Text query to search notes for.",
+          "type": "string"
+        },
+        "filterByCollectionIds": {
+          "description": "Only return notes belonging to these collections.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "filterByContainsOpenTasks": {
+          "description": "Only return notes with open tasks.",
+          "type": "boolean"
+        },
+        "filterByContainsTasks": {
+          "description": "Only return notes with any tasks.",
+          "type": "boolean"
+        },
+        "filterByContainsImages": {
+          "description": "Only return notes with images.",
+          "type": "boolean"
+        },
+        "filterByContainsFiles": {
+          "description": "Only return notes with file attachments.",
+          "type": "boolean"
+        },
+        "includeNoteContent": {
+          "description": "Include full markdown content in results (default: false).",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "noteId": {
+                "type": "string",
+                "description": "Unique ID of the note."
+              },
+              "title": {
+                "type": "string",
+                "description": "Title of the note."
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Full markdown content (null unless includeNoteContent is true)."
+              },
+              "snippet": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Relevance snippet from the note content."
+              },
+              "collectionIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "IDs of collections the note belongs to."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp in ISO 8601 format."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last updated timestamp in ISO 8601 format."
+              }
+            },
+            "required": [
+              "noteId",
+              "title",
+              "content",
+              "snippet",
+              "collectionIds",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Relevance-ranked list of matching notes."
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of matching notes."
+        }
+      },
+      "required": ["notes", "total"],
+      "additionalProperties": false
+    }
+  },
+  "delete_note": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "description": "The UUID of the note to delete."
+        }
+      },
+      "required": ["noteId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "The request ID confirming the deletion."
+        }
+      },
+      "required": ["requestId"],
+      "additionalProperties": false
+    }
+  },
+  "create_collection": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title of the collection (max ~1,000 characters)."
+        },
+        "description": {
+          "description": "Optional description of the collection (max ~10,000 characters).",
+          "type": "string"
+        },
+        "collectionId": {
+          "description": "Optional custom UUID for the collection.",
+          "type": "string"
+        },
+        "createdAt": {
+          "description": "Custom creation timestamp in ISO 8601 format.",
+          "type": "string"
+        },
+        "updatedAt": {
+          "description": "Custom updated timestamp in ISO 8601 format.",
+          "type": "string"
+        }
+      },
+      "required": ["title"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "collectionId": {
+          "type": "string",
+          "description": "Unique ID of the created collection."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the created collection."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Description of the created collection."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp in ISO 8601 format."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last updated timestamp in ISO 8601 format."
+        }
+      },
+      "required": ["collectionId", "title", "description", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "get_collection": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "collectionId": {
+          "type": "string",
+          "description": "The UUID of the collection to retrieve."
+        }
+      },
+      "required": ["collectionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "collectionId": {
+          "type": "string",
+          "description": "Unique ID of the collection."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the collection."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Description of the collection."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp in ISO 8601 format."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last updated timestamp in ISO 8601 format."
+        }
+      },
+      "required": ["collectionId", "title", "description", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "list_collections": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Maximum number of collections to return (default: 50).",
+          "type": "number"
+        },
+        "page": {
+          "description": "Opaque cursor from a previous response for pagination.",
+          "type": "string"
+        },
+        "orderBy": {
+          "description": "Sort order field (default: updated_at).",
+          "type": "string",
+          "enum": ["created_at", "updated_at"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "collections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "collectionId": {
+                "type": "string",
+                "description": "Unique ID of the collection."
+              },
+              "title": {
+                "type": "string",
+                "description": "Title of the collection."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Description of the collection."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp in ISO 8601 format."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last updated timestamp in ISO 8601 format."
+              }
+            },
+            "required": ["collectionId", "title", "description", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          },
+          "description": "List of collections."
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of collections."
+        },
+        "nextPage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cursor for fetching the next page of results (null if no more pages)."
+        }
+      },
+      "required": ["collections", "total", "nextPage"],
+      "additionalProperties": false
+    }
+  },
+  "search_collections": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Text query to search collections for.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "collections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "collectionId": {
+                "type": "string",
+                "description": "Unique ID of the collection."
+              },
+              "title": {
+                "type": "string",
+                "description": "Title of the collection."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Description of the collection."
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp in ISO 8601 format."
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last updated timestamp in ISO 8601 format."
+              }
+            },
+            "required": ["collectionId", "title", "description", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          },
+          "description": "Relevance-ranked list of matching collections."
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of matching collections."
+        }
+      },
+      "required": ["collections", "total"],
+      "additionalProperties": false
+    }
+  },
+  "delete_collection": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "collectionId": {
+          "type": "string",
+          "description": "The UUID of the collection to delete."
+        }
+      },
+      "required": ["collectionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "The request ID confirming the deletion."
+        }
+      },
+      "required": ["requestId"],
+      "additionalProperties": false
+    }
+  },
+  "mem_it": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "Raw content to process — web pages, emails, transcripts, articles, or plain text."
+        },
+        "instructions": {
+          "description": "Guidance on how the content should be processed (e.g. \"Extract key findings and save as a research note\").",
+          "type": "string"
+        },
+        "context": {
+          "description": "Background information to help Mem understand how the input relates to existing knowledge (e.g. \"This is related to my Project Alpha research\").",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "When the information was originally encountered, in ISO 8601 format.",
+          "type": "string"
+        }
+      },
+      "required": ["content"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "The request ID for tracking the asynchronous processing."
+        }
+      },
+      "required": ["requestId"],
+      "additionalProperties": false
+    }
+  }
+}

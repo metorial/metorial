@@ -14,12 +14,11 @@ import {
   manageAction,
   manageContact,
   manageKnowledgeBase,
+  manageKnowledgeBaseSource,
   manageSubaccount,
   runSimulation,
   updateAgent
 } from './tools';
-import { callCompletedPolling, inboundCallWebhook, postCallWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,6 +31,7 @@ export let provider = Slate.create({
     getCall,
     listCalls,
     manageKnowledgeBase,
+    manageKnowledgeBaseSource,
     listVoices,
     manageContact,
     manageAction,
@@ -40,5 +40,5 @@ export let provider = Slate.create({
     manageSubaccount,
     runSimulation
   ],
-  triggers: [postCallWebhook, inboundCallWebhook, callCompletedPolling]
+  triggers: []
 });

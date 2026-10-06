@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getSubscriber = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let getSubscriber = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       subscriberIdOrEmail: z
         .string()
         .describe('The subscriber ID, email address, or visitor UUID to look up.')
@@ -45,7 +47,7 @@ export let getSubscriber = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 

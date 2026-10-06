@@ -10,8 +10,6 @@ import {
   manageContact,
   updateParticipantStatus
 } from './tools';
-import { eventParticipant, inboundWebhook, newEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     manageContact,
     updateParticipantStatus
   ],
-  triggers: [inboundWebhook, newEvent, eventParticipant]
+  triggers: []
 });

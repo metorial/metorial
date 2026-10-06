@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateEmployee = SlateTool.create(spec, {
@@ -25,25 +25,26 @@ export let updateEmployee = SlateTool.create(spec, {
   .output(
     z.object({
       employeeId: z.string().describe('The updated employee ID'),
-      updatedFields: z.array(z.string()).describe('List of field names that were updated')
+      updatedFields: z
+        .array(z.string())
+        .describe(
+          'Fields whose exact submitted values were verified by readback; other fields may be omitted or normalized by the provider'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
-    await client.updateEmployee(ctx.input.employeeId, ctx.input.fields);
+    const verifiedFields = await client.updateEmployee(ctx.input.employeeId, ctx.input.fields);
 
     let fieldNames = Object.keys(ctx.input.fields);
 
     return {
       output: {
         employeeId: ctx.input.employeeId,
-        updatedFields: fieldNames
+        updatedFields: verifiedFields
       },
-      message: `Updated **${fieldNames.length}** field(s) on employee **${ctx.input.employeeId}**: ${fieldNames.join(', ')}.`
+      message: `BambooHR accepted the employee update. Verified exact values for **${verifiedFields.length}** of **${fieldNames.length}** submitted fields; omitted or normalized values remain unverified.`
     };
   })
   .build();

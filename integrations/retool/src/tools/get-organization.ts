@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getOrganization = SlateTool.create(spec, {
   name: 'Get Organization',
   key: 'get_organization',
-  description: `Retrieve information about the current Retool organization, including its name, plan, and configuration details.`,
+  description: `Retrieve information about the current Retool organization, including its native organization ID and selected advanced settings. This is organization context, not current-user identity.`,
   tags: {
     readOnly: true
   }
@@ -18,7 +18,7 @@ export let getOrganization = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.getOrganization();
 

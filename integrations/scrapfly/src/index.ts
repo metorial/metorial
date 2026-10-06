@@ -9,13 +9,6 @@ import {
   scrapeWebpage,
   startCrawl
 } from './tools';
-import {
-  crawlerEvent,
-  extractionCompleted,
-  scrapeCompleted,
-  screenshotCompleted
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -27,5 +20,5 @@ export let provider = Slate.create({
     getCrawlResults,
     getAccountInfo
   ],
-  triggers: [scrapeCompleted, screenshotCompleted, extractionCompleted, crawlerEvent]
+  triggers: []
 });

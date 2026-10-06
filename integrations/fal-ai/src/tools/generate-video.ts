@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FalClient } from '../lib/client';
+import { addModelFiles, publicFalFileUrl, requireFalFile } from '../lib/files';
 import { spec } from '../spec';
 
 export let generateVideo = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let generateVideo = SlateTool.create(spec, {
   key: 'generate_video',
   description: `Generate videos from text prompts, images, or other videos using Fal.ai models such as Kling, LTX, Veo, Sora, and more.
 Supports text-to-video, image-to-video, and video-to-video transformations.
-Runs synchronously and returns the generated video URL.`,
+Runs synchronously and provides a downloadable video. Prefer submit_queue_request for slow models; inspect endpoint parameters with search_models using includeSchema=true.`,
   instructions: [
     'Use the modelId parameter to select the video model, e.g. "fal-ai/kling-video/v1/standard/text-to-video" or "fal-ai/ltx-video".',
     'For image-to-video, provide an imageUrl. For video-to-video, provide a videoUrl.'
@@ -19,12 +20,22 @@ Runs synchronously and returns the generated video URL.`,
 })
   .input(
     z.object({
+      fileRetentionSeconds: z
+        .number()
+        .int()
+        .min(60)
+        .max(31536000)
+        .optional()
+        .describe(
+          'Generated file lifetime in seconds. Omit to use account defaults; expired files cannot be recovered'
+        ),
       modelId: z
         .string()
+        .min(1)
         .describe(
           'Model endpoint ID, e.g. "fal-ai/kling-video/v1/standard/text-to-video", "fal-ai/ltx-video"'
         ),
-      prompt: z.string().describe('Text prompt describing the desired video'),
+      prompt: z.string().min(1).describe('Text prompt describing the desired video'),
       negativePrompt: z
         .string()
         .optional()
@@ -51,7 +62,7 @@ Runs synchronously and returns the generated video URL.`,
   )
   .output(
     z.object({
-      videoUrl: z.string().describe('URL of the generated video on fal CDN'),
+      videoUrl: z.string().optional().describe('Provider URL when the video is hosted'),
       contentType: z.string().optional().describe('MIME type of the generated video'),
       seed: z.number().optional().describe('Seed used for generation'),
       timings: z
@@ -64,31 +75,42 @@ Runs synchronously and returns the generated video URL.`,
     let client = new FalClient(ctx.auth.token);
 
     let input: Record<string, any> = {
-      prompt: ctx.input.prompt,
-      ...(ctx.input.additionalParams || {})
+      prompt: ctx.input.prompt
     };
 
     if (ctx.input.negativePrompt) input.negative_prompt = ctx.input.negativePrompt;
     if (ctx.input.imageUrl) input.image_url = ctx.input.imageUrl;
     if (ctx.input.videoUrl) input.video_url = ctx.input.videoUrl;
     if (ctx.input.aspectRatio) input.aspect_ratio = ctx.input.aspectRatio;
-    if (ctx.input.duration !== undefined) input.duration = ctx.input.duration;
+    if (ctx.input.duration !== undefined) {
+      input.duration = ctx.input.modelId.startsWith('fal-ai/kling-video/')
+        ? String(ctx.input.duration)
+        : ctx.input.duration;
+    }
     if (ctx.input.seed !== undefined) input.seed = ctx.input.seed;
 
+    Object.assign(input, ctx.input.additionalParams ?? {});
     ctx.progress('Generating video...');
-    let result = await client.runModel(ctx.input.modelId, input);
+    let result = await client.runModel(ctx.input.modelId, input, {
+      fileRetentionSeconds: ctx.input.fileRetentionSeconds
+    });
 
-    let videoUrl = result.video?.url || result.video_url || result.videos?.[0]?.url || '';
-    let contentType = result.video?.content_type || result.content_type;
+    const video = requireFalFile(
+      result.video ?? result.video_url ?? result.videos?.[0],
+      'video'
+    );
+    const videoUrl = publicFalFileUrl(video);
+    const contentType = video.content_type ?? result.content_type ?? undefined;
+    await addModelFiles(ctx, { file: video, result });
 
     return {
       output: {
         videoUrl,
         contentType,
-        seed: result.seed,
-        timings: result.timings
+        seed: result.seed ?? undefined,
+        timings: result.timings ?? undefined
       },
-      message: `Generated video using **${ctx.input.modelId}**.\n- ${videoUrl}`
+      message: `Generated a downloadable video using **${ctx.input.modelId}**.`
     };
   })
   .build();

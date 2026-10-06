@@ -57,8 +57,8 @@ export let listContacts = SlateTool.create(spec, {
       next: ctx.input.cursor
     });
 
-    let results = data.results || data || [];
-    let contacts = results.map((c: any) => ({
+    let results = data.results;
+    let contacts = results.map(c => ({
       contactId: c._id,
       email: c.email,
       name: c.name,
@@ -83,7 +83,7 @@ export let listContacts = SlateTool.create(spec, {
 export let createContact = SlateTool.create(spec, {
   name: 'Create Contact',
   key: 'create_contact',
-  description: `Create a new contact in Mixmax. At minimum, an email address is required. Optionally, you can assign the contact to groups and set custom metadata.`,
+  description: `Create or merge a contact in the deprecated Mixmax Contacts API. A matching email can merge an existing contact. Optionally, you can assign the contact to groups and set custom metadata.`,
   tags: {
     destructive: false
   }
@@ -131,7 +131,7 @@ export let createContact = SlateTool.create(spec, {
 export let updateContact = SlateTool.create(spec, {
   name: 'Update Contact',
   key: 'update_contact',
-  description: `Update an existing contact's name, email, groups, or metadata.`,
+  description: `Update a contact's name, email, or metadata through the deprecated Contacts API. Group changes are not documented by this endpoint.`,
   tags: {
     destructive: false
   }
@@ -141,7 +141,10 @@ export let updateContact = SlateTool.create(spec, {
       contactId: z.string().describe('ID of the contact to update'),
       email: z.string().optional().describe('New email address'),
       name: z.string().optional().describe('New name'),
-      groups: z.array(z.string()).optional().describe('New group IDs'),
+      groups: z
+        .array(z.string())
+        .optional()
+        .describe('Legacy field; contact-group updates are unsupported by this endpoint.'),
       meta: z.record(z.string(), z.any()).optional().describe('Custom metadata to update')
     })
   )
@@ -149,7 +152,7 @@ export let updateContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let updates: Record<string, any> = {};
+    let updates: Record<string, unknown> = {};
     if (ctx.input.email !== undefined) updates.email = ctx.input.email;
     if (ctx.input.name !== undefined) updates.name = ctx.input.name;
     if (ctx.input.groups !== undefined) updates.groups = ctx.input.groups;
@@ -176,7 +179,7 @@ export let updateContact = SlateTool.create(spec, {
 export let deleteContact = SlateTool.create(spec, {
   name: 'Delete Contact',
   key: 'delete_contact',
-  description: `Permanently delete a contact from Mixmax.`,
+  description: `Delete a contact using the deprecated Contacts API. This does not promise erasure of previously sent messages or retained activity.`,
   tags: {
     destructive: true
   }

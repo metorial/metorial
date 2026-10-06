@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { listIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getList = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let getList = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      listId: z.string().describe('ID of the list to retrieve')
+      listId: listIdSchema
     })
   )
   .output(
@@ -27,7 +28,16 @@ export let getList = SlateTool.create(spec, {
             tag: z.string(),
             type: z.string(),
             label: z.string(),
-            fallback: z.string()
+            fallback: z
+              .string()
+              .describe(
+                'Fallback display text; absent or null provider fallback is an empty string'
+              ),
+            fallbackValue: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Original provider fallback, when supplied')
           })
         )
         .describe('Custom fields defined on the list'),

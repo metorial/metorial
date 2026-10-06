@@ -28,8 +28,6 @@ import {
   updateForm,
   updateWorkspace
 } from './tools';
-import { formEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -60,5 +58,5 @@ export let provider = Slate.create({
     removeTeamMember,
     getLogs
   ],
-  triggers: [formEvent]
+  triggers: []
 });

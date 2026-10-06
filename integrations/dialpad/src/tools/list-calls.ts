@@ -1,12 +1,30 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DialpadClient } from '../lib/client';
+import { malformed } from '../lib/contracts';
+import { invoke } from '../lib/operations';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  calls: z.array(
+    z.object({
+      callId: z.string().describe('Unique call ID'),
+      callState: z.string().optional(),
+      dateStarted: z.string().optional(),
+      dateEnded: z.string().optional(),
+      duration: z.number().optional().describe('Call duration in seconds'),
+      direction: z.string().optional(),
+      isRecording: z.boolean().optional(),
+      callerNumber: z.string().optional(),
+      calleeNumber: z.string().optional()
+    })
+  ),
+  nextCursor: z.string().optional().describe('Cursor for the next page')
+});
 
 export let listCallsTool = SlateTool.create(spec, {
   name: 'List Calls',
   key: 'list_calls',
-  description: `List calls in your Dialpad account. Filter by time range and target (user, call center, department, or office). Requires the **calls:list** scope.`,
+  description: `List completed calls in your Dialpad account. Filter by time range and target (user, call center, department, or office). Requires the **calls:list** scope.`,
   tags: {
     readOnly: true
   }
@@ -29,56 +47,11 @@ export let listCallsTool = SlateTool.create(spec, {
       cursor: z.string().optional().describe('Pagination cursor')
     })
   )
-  .output(
-    z.object({
-      calls: z.array(
-        z.object({
-          callId: z.string().describe('Unique call ID'),
-          callState: z.string().optional(),
-          dateStarted: z.string().optional(),
-          dateEnded: z.string().optional(),
-          duration: z.number().optional().describe('Call duration in seconds'),
-          direction: z.string().optional(),
-          isRecording: z.boolean().optional(),
-          callerNumber: z.string().optional(),
-          calleeNumber: z.string().optional()
-        })
-      ),
-      nextCursor: z.string().optional().describe('Cursor for the next page')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new DialpadClient({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment
-    });
-
-    let result = await client.listCalls({
-      cursor: ctx.input.cursor,
-      started_after: ctx.input.startedAfter,
-      started_before: ctx.input.startedBefore,
-      target_type: ctx.input.targetType,
-      target_id: ctx.input.targetId
-    });
-
-    let calls = (result.items || []).map((c: any) => ({
-      callId: String(c.id),
-      callState: c.call_state || c.state,
-      dateStarted: c.date_started,
-      dateEnded: c.date_ended,
-      duration: c.duration,
-      direction: c.direction,
-      isRecording: c.is_recording,
-      callerNumber: c.caller_number || c.from_number,
-      calleeNumber: c.callee_number || c.to_number
-    }));
-
-    return {
-      output: {
-        calls,
-        nextCursor: result.cursor || undefined
-      },
-      message: `Found **${calls.length}** call(s)${result.cursor ? '. More results available.' : '.'}`
-    };
+    const result = await invoke(ctx, 'list_calls');
+    const output = outputSchema.safeParse(result.output);
+    if (!output.success) malformed();
+    return { output: output.data, message: result.message };
   })
   .build();

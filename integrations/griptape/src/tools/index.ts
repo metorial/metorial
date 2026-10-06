@@ -1,4 +1,6 @@
 export * from './get-assistant';
+export * from './get-file-url';
+export * from './get-resource';
 export * from './list-assistants';
 export * from './list-data-connectors';
 export * from './list-knowledge-bases';
@@ -7,6 +9,8 @@ export * from './list-structures';
 export * from './list-tools';
 export * from './manage-assistant';
 export * from './manage-bucket';
+export * from './manage-data-job';
+export * from './manage-knowledge-base';
 export * from './manage-knowledge-base-job';
 export * from './manage-message';
 export * from './manage-ruleset';

@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import * as map from '../lib/mappers';
+import { idNumber, malformed, numericId, records, required } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageFolderTool = SlateTool.create(spec, {
@@ -27,16 +29,20 @@ export let manageFolderTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
+      success: z.boolean().optional().describe('Whether the operation succeeded'),
       folderId: z.number().optional().describe('ID of the created/affected folder'),
       folders: z
         .array(
           z.object({
-            folderId: z.number().describe('Folder ID'),
-            name: z.string().describe('Folder name'),
-            parentId: z.number().nullable().describe('Parent folder ID'),
-            projectId: z.number().nullable().describe('Project ID this folder belongs to'),
-            isProject: z.boolean().describe('Whether this folder is a project root')
+            folderId: z.number().optional().describe('Folder ID'),
+            name: z.string().optional().describe('Folder name'),
+            parentId: z.number().nullable().optional().describe('Parent folder ID'),
+            projectId: z
+              .number()
+              .nullable()
+              .optional()
+              .describe('Project ID this folder belongs to'),
+            isProject: z.boolean().optional().describe('Whether this folder is a project root')
           })
         )
         .optional()
@@ -44,48 +50,30 @@ export let manageFolderTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let { action, folderId, name, parentId, force, page, perPage } = ctx.input;
-
+    const client = createClient(ctx);
+    const { action, folderId, name, parentId, force, page, perPage } = ctx.input;
     if (action === 'list') {
-      let result = await client.listFolders({ parentId, page, perPage });
-      let items = Array.isArray(result) ? result : (result.items ?? []);
-      let folders = items.map((f: any) => ({
-        folderId: f.id,
-        name: f.name,
-        parentId: f.parent_id ?? null,
-        projectId: f.project_id ?? null,
-        isProject: f.is_project ?? false
-      }));
+      const result = await client.listFolders({ parentId, page, perPage });
+      const folders = records(result.items).map(map.folder);
       return {
         output: { success: true, folders },
-        message: `Found **${folders.length}** folders.`
+        message: `Returned ${folders.length} folders from this page.`
       };
     }
-
     if (action === 'create') {
-      if (!name) throw new Error('Name is required when creating a folder');
-      let result = await client.createFolder(name, parentId);
+      const result = await client.createFolder(required(name, 'Folder name'), parentId);
       return {
-        output: { success: true, folderId: result.id },
-        message: `Created folder **${name}** with ID ${result.id}.`
+        output: { success: true, folderId: idNumber(result.id) },
+        message: 'Created folder.'
       };
     }
-
-    if (!folderId) throw new Error('Folder ID is required for update/delete');
-
+    const id = numericId(folderId, 'folderId');
     if (action === 'update') {
-      await client.updateFolder(folderId, { name, parentId });
-      return {
-        output: { success: true, folderId: Number(folderId) },
-        message: `Updated folder **${folderId}**.`
-      };
-    }
-
-    // delete
-    await client.deleteFolder(folderId, force);
+      const result = await client.updateFolder(id, { name, parentId });
+      if (String(idNumber(result.id)) !== id) malformed();
+    } else await client.deleteFolder(id, force);
     return {
-      output: { success: true, folderId: Number(folderId) },
-      message: `Deleted folder **${folderId}**.`
+      output: { success: true, folderId: idNumber(id) },
+      message: `Folder ${action} accepted for ${id}. Force deletion removes all contents.`
     };
   });

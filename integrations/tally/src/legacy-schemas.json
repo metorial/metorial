@@ -1,0 +1,896 @@
+{
+  "list_forms": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number for pagination (starts at 1)",
+          "type": "number"
+        },
+        "limit": {
+          "description": "Number of forms per page (default varies by API)",
+          "type": "number"
+        },
+        "workspaceId": {
+          "description": "Filter forms by workspace ID",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number",
+          "description": "Current page number"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Number of items per page"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether more pages are available"
+        },
+        "forms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "formId": {
+                "type": "string",
+                "description": "Unique form identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Form name"
+              },
+              "workspaceId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Workspace the form belongs to"
+              },
+              "status": {
+                "type": "string",
+                "description": "Form status (e.g., PUBLISHED, DRAFT)"
+              },
+              "numberOfSubmissions": {
+                "type": "number",
+                "description": "Total number of submissions"
+              },
+              "isClosed": {
+                "type": "boolean",
+                "description": "Whether the form is closed for new submissions"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "ISO 8601 creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "ISO 8601 last update timestamp"
+              }
+            },
+            "required": [
+              "formId",
+              "name",
+              "workspaceId",
+              "status",
+              "numberOfSubmissions",
+              "isClosed",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of forms"
+        }
+      },
+      "required": ["page", "limit", "hasMore", "forms"],
+      "additionalProperties": false
+    }
+  },
+  "get_form": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "The unique ID of the form to retrieve"
+        }
+      },
+      "required": ["formId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "Unique form identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Form name"
+        },
+        "workspaceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Workspace the form belongs to"
+        },
+        "status": {
+          "type": "string",
+          "description": "Form status"
+        },
+        "numberOfSubmissions": {
+          "type": "number",
+          "description": "Total number of submissions"
+        },
+        "isClosed": {
+          "type": "boolean",
+          "description": "Whether the form is closed"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO 8601 creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO 8601 last update timestamp"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "Unique block identifier"
+              },
+              "type": {
+                "type": "string",
+                "description": "Block type (e.g., FORM_TITLE, INPUT_TEXT, MULTIPLE_CHOICE)"
+              },
+              "groupUuid": {
+                "type": "string",
+                "description": "Group identifier for related blocks"
+              },
+              "groupType": {
+                "type": "string",
+                "description": "Group category type"
+              },
+              "payload": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Block-specific configuration and content"
+              }
+            },
+            "required": ["uuid", "type", "groupUuid", "groupType", "payload"],
+            "additionalProperties": false
+          },
+          "description": "All blocks that make up the form"
+        },
+        "settings": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Form settings and configuration"
+        }
+      },
+      "required": [
+        "formId",
+        "name",
+        "workspaceId",
+        "status",
+        "numberOfSubmissions",
+        "isClosed",
+        "createdAt",
+        "updatedAt",
+        "blocks",
+        "settings"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "create_form": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Form status (defaults to DRAFT if not specified)",
+          "type": "string",
+          "enum": ["PUBLISHED", "DRAFT"]
+        },
+        "workspaceId": {
+          "description": "Workspace ID to place the form in",
+          "type": "string"
+        },
+        "blocks": {
+          "description": "Form blocks defining the form structure and fields",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "Unique block identifier (UUID)"
+              },
+              "type": {
+                "type": "string",
+                "description": "Block type (e.g., FORM_TITLE, INPUT_TEXT, MULTIPLE_CHOICE, DROPDOWN, CHECKBOXES, etc.)"
+              },
+              "groupUuid": {
+                "type": "string",
+                "description": "Group identifier for related blocks"
+              },
+              "groupType": {
+                "type": "string",
+                "description": "Group category type"
+              },
+              "payload": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Block-specific configuration"
+              }
+            },
+            "required": ["uuid", "type", "groupUuid", "groupType", "payload"],
+            "additionalProperties": false
+          }
+        },
+        "settings": {
+          "description": "Form settings (e.g., redirectOnCompletion, isClosed, password)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "Unique form identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Form name"
+        },
+        "status": {
+          "type": "string",
+          "description": "Form status"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO 8601 creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO 8601 last update timestamp"
+        }
+      },
+      "required": ["formId", "name", "status", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "update_form": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "The unique ID of the form to update"
+        },
+        "name": {
+          "description": "New form name",
+          "type": "string"
+        },
+        "status": {
+          "description": "New form status",
+          "type": "string",
+          "enum": ["PUBLISHED", "DRAFT"]
+        },
+        "blocks": {
+          "description": "Updated form blocks (replaces all blocks)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "description": "Unique block identifier (UUID)"
+              },
+              "type": {
+                "type": "string",
+                "description": "Block type"
+              },
+              "groupUuid": {
+                "type": "string",
+                "description": "Group identifier for related blocks"
+              },
+              "groupType": {
+                "type": "string",
+                "description": "Group category type"
+              },
+              "payload": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Block-specific configuration"
+              }
+            },
+            "required": ["uuid", "type", "groupUuid", "groupType", "payload"],
+            "additionalProperties": false
+          }
+        },
+        "settings": {
+          "description": "Updated form settings",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["formId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "ID of the updated form"
+        },
+        "updated": {
+          "type": "boolean",
+          "description": "Whether the update was successful"
+        }
+      },
+      "required": ["formId", "updated"],
+      "additionalProperties": false
+    }
+  },
+  "delete_form": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "The unique ID of the form to delete"
+        }
+      },
+      "required": ["formId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "ID of the deleted form"
+        },
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["formId", "deleted"],
+      "additionalProperties": false
+    }
+  },
+  "list_submissions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "The form ID to retrieve submissions for"
+        },
+        "page": {
+          "description": "Page number for pagination",
+          "type": "number"
+        },
+        "limit": {
+          "description": "Number of submissions per page",
+          "type": "number"
+        },
+        "startDate": {
+          "description": "Filter submissions after this ISO 8601 date",
+          "type": "string"
+        },
+        "endDate": {
+          "description": "Filter submissions before this ISO 8601 date",
+          "type": "string"
+        },
+        "afterId": {
+          "description": "Return submissions after this submission ID (cursor-based pagination)",
+          "type": "string"
+        }
+      },
+      "required": ["formId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number",
+          "description": "Current page number"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Number of items per page"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether more pages are available"
+        },
+        "totalSubmissions": {
+          "type": "number",
+          "description": "Total number of submissions matching the filter"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Question key"
+              },
+              "label": {
+                "type": "string",
+                "description": "Question label"
+              },
+              "type": {
+                "type": "string",
+                "description": "Question type"
+              }
+            },
+            "required": ["key", "label", "type"],
+            "additionalProperties": false
+          },
+          "description": "Form questions for context"
+        },
+        "submissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "submissionId": {
+                "type": "string",
+                "description": "Unique submission identifier"
+              },
+              "respondentId": {
+                "type": "string",
+                "description": "Unique respondent identifier"
+              },
+              "formId": {
+                "type": "string",
+                "description": "Form this submission belongs to"
+              },
+              "formName": {
+                "type": "string",
+                "description": "Name of the form"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "ISO 8601 submission timestamp"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "Unique question identifier"
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "Human-readable field label"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Field type (e.g., INPUT_TEXT, INPUT_EMAIL, MULTIPLE_CHOICE)"
+                    },
+                    "value": {
+                      "description": "Submitted value"
+                    }
+                  },
+                  "required": ["key", "label", "type", "value"],
+                  "additionalProperties": false
+                },
+                "description": "Submitted field values"
+              }
+            },
+            "required": [
+              "submissionId",
+              "respondentId",
+              "formId",
+              "formName",
+              "createdAt",
+              "fields"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of submissions"
+        }
+      },
+      "required": ["page", "limit", "hasMore", "totalSubmissions", "questions", "submissions"],
+      "additionalProperties": false
+    }
+  },
+  "get_submission": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "The form ID the submission belongs to"
+        },
+        "submissionId": {
+          "type": "string",
+          "description": "The submission ID to retrieve"
+        }
+      },
+      "required": ["formId", "submissionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "submissionId": {
+          "type": "string",
+          "description": "Unique submission identifier"
+        },
+        "respondentId": {
+          "type": "string",
+          "description": "Unique respondent identifier"
+        },
+        "formId": {
+          "type": "string",
+          "description": "Form this submission belongs to"
+        },
+        "formName": {
+          "type": "string",
+          "description": "Name of the form"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO 8601 submission timestamp"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Unique question identifier"
+              },
+              "label": {
+                "type": "string",
+                "description": "Human-readable field label"
+              },
+              "type": {
+                "type": "string",
+                "description": "Field type (e.g., INPUT_TEXT, INPUT_EMAIL, MULTIPLE_CHOICE)"
+              },
+              "value": {
+                "description": "Submitted value"
+              }
+            },
+            "required": ["key", "label", "type", "value"],
+            "additionalProperties": false
+          },
+          "description": "Submitted field values"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Question key"
+              },
+              "label": {
+                "type": "string",
+                "description": "Question label"
+              },
+              "type": {
+                "type": "string",
+                "description": "Question type"
+              }
+            },
+            "required": ["key", "label", "type"],
+            "additionalProperties": false
+          },
+          "description": "Form questions for context"
+        }
+      },
+      "required": [
+        "submissionId",
+        "respondentId",
+        "formId",
+        "formName",
+        "createdAt",
+        "fields",
+        "questions"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "delete_submission": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "The form ID the submission belongs to"
+        },
+        "submissionId": {
+          "type": "string",
+          "description": "The submission ID to delete"
+        }
+      },
+      "required": ["formId", "submissionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "Form the submission was deleted from"
+        },
+        "submissionId": {
+          "type": "string",
+          "description": "ID of the deleted submission"
+        },
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["formId", "submissionId", "deleted"],
+      "additionalProperties": false
+    }
+  },
+  "list_questions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "The form ID to list questions for"
+        }
+      },
+      "required": ["formId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "formId": {
+          "type": "string",
+          "description": "The form these questions belong to"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Unique question key identifier"
+              },
+              "label": {
+                "type": "string",
+                "description": "Human-readable question label"
+              },
+              "type": {
+                "type": "string",
+                "description": "Question type (e.g., INPUT_TEXT, INPUT_EMAIL, MULTIPLE_CHOICE)"
+              }
+            },
+            "required": ["key", "label", "type"],
+            "additionalProperties": false
+          },
+          "description": "List of form questions"
+        }
+      },
+      "required": ["formId", "questions"],
+      "additionalProperties": false
+    }
+  },
+  "get_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Unique user identifier"
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address"
+        },
+        "name": {
+          "description": "User display name",
+          "type": "string"
+        },
+        "username": {
+          "description": "Username",
+          "type": "string"
+        }
+      },
+      "required": ["userId", "email"],
+      "additionalProperties": false
+    }
+  },
+  "list_workspaces": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workspaceId": {
+                "type": "string",
+                "description": "Unique workspace identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Workspace name"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "ISO 8601 creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "ISO 8601 last update timestamp"
+              }
+            },
+            "required": ["workspaceId", "name", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          },
+          "description": "List of workspaces"
+        }
+      },
+      "required": ["workspaces"],
+      "additionalProperties": false
+    }
+  },
+  "create_workspace": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name for the new workspace"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "Unique workspace identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Workspace name"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO 8601 creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO 8601 last update timestamp"
+        }
+      },
+      "required": ["workspaceId", "name", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "delete_workspace": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "The workspace ID to delete"
+        }
+      },
+      "required": ["workspaceId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "ID of the deleted workspace"
+        },
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["workspaceId", "deleted"],
+      "additionalProperties": false
+    }
+  }
+}

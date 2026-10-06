@@ -1,11 +1,5 @@
 import { SlateConfig } from 'slates';
 import { z } from 'zod';
-
-export let config = SlateConfig.create(
-  z.object({
-    serverUrl: z
-      .enum(['https://api.bitwarden.com', 'https://api.bitwarden.eu'])
-      .default('https://api.bitwarden.com')
-      .describe('Bitwarden API server URL. Use the US or EU cloud endpoint.')
-  })
-);
+// The region belongs to authentication. Old stored serverUrl values are ignored;
+// all legacy tool handlers already read the saved auth serverUrl.
+export const config = SlateConfig.create(z.object({}));

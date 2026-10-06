@@ -17,7 +17,14 @@ export let listVideos = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Pagination token from a previous response to get the next page'),
-      limit: z.number().optional().describe('Maximum number of videos to return')
+      title: z.string().optional().describe('Filter by title substring'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum number of videos to return')
     })
   )
   .output(
@@ -37,21 +44,24 @@ export let listVideos = SlateTool.create(spec, {
       paginationToken: z
         .string()
         .nullable()
-        .describe('Token for fetching the next page of results')
+        .describe('Token for fetching the next page of results'),
+      hasMore: z.boolean()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HeyGenClient({ token: ctx.auth.token });
+    let client = new HeyGenClient(ctx.auth);
 
     let result = await client.listVideos({
       token: ctx.input.paginationToken,
-      limit: ctx.input.limit
+      limit: ctx.input.limit,
+      title: ctx.input.title
     });
 
     return {
       output: {
         videos: result.videos,
-        paginationToken: result.token
+        paginationToken: result.token,
+        hasMore: result.hasMore
       },
       message: `Found **${result.videos.length}** videos.${result.token ? ' More results available with pagination.' : ''}`
     };

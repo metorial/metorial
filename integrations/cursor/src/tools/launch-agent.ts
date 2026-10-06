@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CloudAgentsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -79,6 +79,17 @@ export let launchAgent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.sourceRepository && !ctx.input.sourcePrUrl)
+      throw createApiServiceError(
+        'Provide sourceRepository or sourcePrUrl. Discover GitHub repositories with list_repositories.'
+      );
+    if (
+      ctx.input.webhookSecret &&
+      (!ctx.input.webhookUrl || ctx.input.webhookSecret.length < 32)
+    )
+      throw createApiServiceError(
+        'A webhook secret requires a webhookUrl and at least 32 characters.'
+      );
     let client = new CloudAgentsClient({ token: ctx.auth.token });
 
     let result = await client.launchAgent({

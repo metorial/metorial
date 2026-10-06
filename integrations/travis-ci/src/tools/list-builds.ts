@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, pagination, TravisCIClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listBuilds = SlateTool.create(spec, {
@@ -21,7 +21,16 @@ export let listBuilds = SlateTool.create(spec, {
         ),
       branchName: z.string().optional().describe('Filter builds by branch name.'),
       state: z
-        .enum(['created', 'received', 'started', 'passed', 'failed', 'errored', 'canceled'])
+        .enum([
+          'created',
+          'queued',
+          'received',
+          'started',
+          'passed',
+          'failed',
+          'errored',
+          'canceled'
+        ])
         .optional()
         .describe('Filter builds by state.'),
       eventType: z
@@ -50,13 +59,15 @@ export let listBuilds = SlateTool.create(spec, {
           repositorySlug: z.string().optional().describe('Repository slug')
         })
       ),
-      totalCount: z.number().optional().describe('Total number of matching builds')
+      totalCount: z.number().optional().describe('Total number of matching builds'),
+      hasMore: z.boolean().optional().describe('Whether another page is available'),
+      nextOffset: z.number().optional().describe('Offset for the next page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
     let result = await client.listBuilds({
@@ -69,7 +80,7 @@ export let listBuilds = SlateTool.create(spec, {
       sortBy: ctx.input.sortBy
     });
 
-    let builds = (result.builds || []).map((build: any) => ({
+    let builds = (result.builds || []).map(build => ({
       buildId: build.id,
       buildNumber: build.number,
       state: build.state,
@@ -86,7 +97,7 @@ export let listBuilds = SlateTool.create(spec, {
     return {
       output: {
         builds,
-        totalCount: result['@pagination']?.count
+        ...pagination(result)
       },
       message: `Found **${builds.length}** builds${ctx.input.repoSlugOrId ? ` for **${ctx.input.repoSlugOrId}**` : ''}.`
     };

@@ -25,7 +25,10 @@ export let deactivateUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
     await client.deactivateUser(ctx.input.userId);
 
     return {

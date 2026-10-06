@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubActionsClient } from '../lib/client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let triggerWorkflow = SlateTool.create(spec, {
@@ -10,10 +11,15 @@ export let triggerWorkflow = SlateTool.create(spec, {
   instructions: [
     'The workflow must have `on: workflow_dispatch` configured in its YAML file.',
     'Use the workflow ID (number) or the workflow file name (e.g. "ci.yml") to identify the workflow.',
+    'The workflow file must exist on the default branch; ref selects the branch or tag to run.',
     'Custom inputs must match the inputs defined in the workflow file.'
   ],
+  constraints: [
+    'Workflow execution may consume paid runner time and perform deployment or external actions configured in the workflow.'
+  ],
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -32,12 +38,23 @@ export let triggerWorkflow = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      triggered: z.boolean().describe('Whether the workflow was successfully triggered')
+      runId: z
+        .number()
+        .optional()
+        .describe('GitHub run ID returned when dispatch is accepted'),
+      runUrl: z.string().optional().describe('API URL for the dispatched run'),
+      htmlUrl: z.string().optional().describe('GitHub URL for the dispatched run'),
+      triggered: z
+        .boolean()
+        .describe('Whether workflow dispatch was accepted; check run status for completion')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
+    if (ctx.input.inputs && Object.keys(ctx.input.inputs).length > 25)
+      throw createApiServiceError('A workflow dispatch supports at most 25 inputs.');
     let client = new GitHubActionsClient(ctx.auth.token);
-    await client.triggerWorkflowDispatch(
+    const run = await client.triggerWorkflowDispatch(
       ctx.input.owner,
       ctx.input.repo,
       ctx.input.workflowId,
@@ -47,9 +64,12 @@ export let triggerWorkflow = SlateTool.create(spec, {
 
     return {
       output: {
-        triggered: true
+        triggered: true,
+        runId: run.workflow_run_id,
+        runUrl: run.run_url,
+        htmlUrl: run.html_url
       },
-      message: `Triggered workflow **${ctx.input.workflowId}** on ref **${ctx.input.ref}** in **${ctx.input.owner}/${ctx.input.repo}**.`
+      message: `GitHub accepted dispatch for workflow **${ctx.input.workflowId}** on ref **${ctx.input.ref}** in **${ctx.input.owner}/${ctx.input.repo}**.`
     };
   })
   .build();

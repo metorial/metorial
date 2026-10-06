@@ -18,8 +18,6 @@ import {
   sendRatingRequest,
   updateTicket
 } from './tools';
-import { ticketEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     manageCannedResponses,
     manageCustomFields
   ],
-  triggers: [ticketEventsTrigger]
+  triggers: []
 });

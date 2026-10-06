@@ -13,6 +13,13 @@ export let listLists = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum results per page, 1–100'),
       startingAfter: z
         .string()
         .optional()
@@ -34,7 +41,16 @@ export let listLists = SlateTool.create(spec, {
                 tag: z.string(),
                 type: z.string(),
                 label: z.string(),
-                fallback: z.string()
+                fallback: z
+                  .string()
+                  .describe(
+                    'Fallback display text; absent or null provider fallback is an empty string'
+                  ),
+                fallbackValue: z
+                  .string()
+                  .nullable()
+                  .optional()
+                  .describe('Original provider fallback, when supplied')
               })
             )
             .describe('Custom fields defined on the list'),
@@ -57,7 +73,7 @@ export let listLists = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.getLists(ctx.input.startingAfter);
+    let result = await client.getLists(ctx.input.startingAfter, ctx.input.limit);
 
     return {
       output: {

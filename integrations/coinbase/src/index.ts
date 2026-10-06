@@ -20,8 +20,6 @@ import {
   managePortfolios,
   sendCrypto
 } from './tools';
-import { accountNotifications, commerceChargeEvents, transactionPolling } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     manageAddresses,
     manageCommerceCharges
   ],
-  triggers: [accountNotifications, commerceChargeEvents, transactionPolling]
+  triggers: []
 });

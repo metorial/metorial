@@ -1,49 +1,34 @@
-# <img src="https://provider-logos.metorial-cdn.com/workday.svg" height="20"> Workday
+# Workday
 
-Manage human capital management, financial management, payroll, and planning in Workday. Create, read, update, and delete employee records, job requisitions, time-off requests, benefits enrollments, and compensation details. Handle the full employee lifecycle including hiring, onboarding, promotions, transfers, and terminations. Manage financial data across accounts receivable, accounts payable, general ledger, and budgeting. Track worker time entries and attendance. Approve or reject inbox tasks and business process steps. Run custom reports via Report-as-a-Service (RaaS) and query Workday data using WQL (Workday Query Language). Manage organizational structures including supervisory organizations, cost centers, and positions. Create and manipulate custom objects to extend Workday's data model. Receive outbound event notifications for business events such as hires, terminations, and job changes.
+Read authorized worker, organization, absence, inbox and time-tracking data; run Workday Query Language queries and enabled custom reports; manage worker-bound multi-instance custom objects. The connected account's tenant security policies determine accessible data and actions.
+
+## Connection
+
+Register the OAuth client and use the REST service origin, tenant and authorization endpoint shown by Workday's **View API Clients** task. The authorization and REST service endpoints can use different hosts. Enter HTTPS Workday origins and the complete tenant authorization URL; do not substitute the service host for the authorization host. This connection uses authorization-code OAuth and refreshes an issued refresh token when available.
+
+The requested functional areas are Staffing, Tenant Non-Configurable, Time Off and Leave, Time Tracking and System. Grant only the corresponding tenant security permissions needed for the chosen tools. An integration system user may have no worker identity: `get_current_user` reports that limitation rather than selecting an unrelated worker.
 
 ## Tools
 
-### Execute WQL Query
+| Tools | Behavior |
+| --- | --- |
+| `list_workers`, `get_worker`, `get_current_user` | Discover authorized workers, read an exact worker and discover the connected worker's minimal ID/display name. |
+| `list_organizations`, `get_organization_workers` | List supervisory organizations and their authorized workers. |
+| `get_inbox_tasks`, `action_inbox_task` | Read worker tasks and approve or deny an eligible pending approval belonging to the connected worker. An accepted step action does not establish completion of the overall business process. |
+| `get_time_off_entries`, `request_time_off` | Read absence details and request a single day of time off with a discovered type and provider quantity unit. Submission may start a business process; it does not guarantee approval. |
+| `get_time_blocks` | Read recorded worker time blocks, with supported date and page filters. |
+| `execute_wql` | Run authorized WQL queries. Short GET queries support page arguments; long POST queries require pagination in the query itself. |
+| `get_custom_report` | Read JSON from an authorized, web-service-enabled report or obtain a downloadable CSV file. Report prompts are tenant-specific. |
+| `list_custom_objects`, `get_custom_object`, `create_custom_object`, `update_custom_object`, `delete_custom_object` | Read and manage a worker-bound multi-instance custom type. Writes require a configured reference identifier; list operations require the worker ID. |
+| `get_resource` | Read an exact supervisory organization, inbox task, time-off detail or time block. |
+| `list_resources` | Discover eligible absence types, valid dates, WQL data sources and WQL fields needed by the existing tools. |
 
-Execute a Workday Query Language (WQL) query against Workday data. WQL is a SQL-like language for high-performance querying of Workday data across functional areas. Supports **SELECT**, **FROM**, **WHERE**, **LIMIT**, and **OFFSET** clauses.
+List page sizes are integers from 1 to 100 with zero-based offsets. Preserve the discovered provider identifiers, worker association and quantity units. Custom-object deletion removes the chosen record; associated business-process or audit history can remain. Approval and absence actions can affect personnel records and require explicit authorization.
 
-### Get Custom Report
+## Documentation
 
-Retrieve data from a Workday custom report via Report-as-a-Service (RaaS). Reports must be Advanced type and web-service enabled in Workday. Supports passing prompt parameters to filter report data.
-
-### Get Time Blocks
-
-Retrieve time tracking blocks for a specific worker. Returns recorded time entries including clock-in/out times and durations. Optionally filter by date range.
-
-### Get Worker
-
-Retrieve detailed information about a specific worker by their ID. Returns the full worker profile including personal information, employment details, position, compensation, organizational assignments, and status.
-
-### List Workers
-
-Search and list workers in Workday. Returns a paginated list of worker summaries including names, emails, titles, and organization assignments. Use **search** to filter by name or other attributes.
-
-### List Custom Objects
-
-List records of a specific custom object type in Workday. Custom objects extend Workday's data model for organization-specific needs.
-
-### Get Inbox Tasks
-
-Retrieve pending inbox tasks for a specific worker. Returns business process steps awaiting action, such as approvals, reviews, and to-do items.
-
-### List Supervisory Organizations
-
-Retrieve a list of supervisory organizations in Workday. Supervisory organizations represent the management hierarchy and team structure.
-
-### Get Time Off Entries
-
-Retrieve time-off entries for a specific worker. Returns requested time-off entries with details including dates, quantities, types, and statuses. Optionally filter by date range.
+The implementation follows Workday's [REST directory](https://developer.workday.com/rest-api-explorer), current Common v1, Absence Management v5, Time Tracking v6, WQL v1 and multi-instance Custom Object Data v2 schemas. Tenant-specific authorization, field availability, reports and write permissions require verification in the connected account.
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+This integration is licensed under [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

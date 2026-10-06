@@ -1,148 +1,121 @@
-import { SlateTool } from 'slates';
-import { z } from 'zod';
+import { pickDefined, SlateTool } from 'slates';
 import { DatabaseClient } from '../lib/client';
+import {
+  dbId,
+  exact,
+  fieldOutput,
+  mappedField,
+  nativeField,
+  single,
+  tblId
+} from '../lib/schemas';
+import { connection, fail, text, z } from '../lib/validation';
 import { spec } from '../spec';
-
-let fieldOutputSchema = z.object({
-  fieldId: z.string().describe('Unique field identifier'),
-  name: z.string().describe('Field name'),
-  type: z.string().describe('Field type'),
-  description: z.string().nullable().describe('Field description'),
-  allowMultipleEntries: z
-    .boolean()
-    .optional()
-    .describe('Whether multiple entries are allowed'),
-  readonly: z.boolean().optional().describe('Whether the field is read-only'),
-  required: z.boolean().optional().describe('Whether the field is required'),
-  locked: z.boolean().optional().describe('Whether the field is locked'),
-  defaultValue: z.string().nullable().optional().describe('Default value for the field'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp')
-});
-
-export let manageTableField = SlateTool.create(spec, {
+export const manageTableField = SlateTool.create(spec, {
   name: 'Manage Table Field',
   key: 'manage_table_field',
-  description: `Add, retrieve, update, or delete a field (column) on a Softr table. Use this to manage the schema of your tables.
-- To **add**: provide \`name\` and \`type\`. Supported types include: SINGLE_LINE_TEXT, CHECKBOX, CURRENCY, DATE, DATETIME, DURATION, EMAIL, SELECT, NUMBER, ATTACHMENT, RATING, LINKED_RECORD, LONG_TEXT, URL, PERCENT, PHONE.
-- To **get**: provide \`fieldId\` only.
-- To **update**: provide \`fieldId\` with new \`name\`, \`type\`, or \`options\`.
-- To **delete**: provide \`fieldId\` and set \`delete\` to true.`,
-  tags: {
-    destructive: false,
-    readOnly: false
-  }
+  description:
+    'Add, read, update or delete an exact table field. Use list_tables to discover field IDs and native types. The documented write contract supports name, type and options. Retained description, allowMultipleEntries, required and defaultValue inputs are refused when supplied because the current write schema does not document them. Deleting a field removes its stored values; type/options changes can affect existing data.',
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
-      databaseId: z.string().describe('ID of the database'),
-      tableId: z.string().describe('ID of the table'),
-      fieldId: z
-        .string()
-        .optional()
-        .describe('ID of the field (required for get/update/delete)'),
-      name: z.string().optional().describe('Field name (required for add)'),
-      type: z.string().optional().describe('Field type (required for add)'),
-      options: z
-        .record(z.string(), z.unknown())
-        .optional()
-        .describe('Type-specific configuration options'),
-      description: z.string().optional().describe('Field description (for add)'),
-      allowMultipleEntries: z
-        .boolean()
-        .optional()
-        .describe('Whether to allow multiple entries (for add)'),
-      required: z.boolean().optional().describe('Whether the field is required (for add)'),
-      defaultValue: z.string().optional().describe('Default value (for add)'),
-      delete: z.boolean().optional().describe('Set to true to delete the field')
+      databaseId: dbId,
+      tableId: tblId,
+      fieldId: z.string().optional(),
+      name: z.string().optional(),
+      type: z.string().optional(),
+      options: z.record(z.string(), z.unknown()).optional(),
+      description: z.string().optional(),
+      allowMultipleEntries: z.boolean().optional(),
+      required: z.boolean().optional(),
+      defaultValue: z.string().optional(),
+      delete: z.boolean().optional()
     })
   )
-  .output(
-    z.object({
-      field: fieldOutputSchema.optional().describe('Field details (not returned on delete)'),
-      deleted: z.boolean().optional().describe('True if field was deleted')
-    })
-  )
+  .output(z.object({ field: fieldOutput.optional(), deleted: z.boolean().optional() }))
   .handleInvocation(async ctx => {
-    let client = new DatabaseClient({ token: ctx.auth.token });
-    let {
-      databaseId,
-      tableId,
-      fieldId,
-      name,
-      type,
-      options,
-      description,
-      allowMultipleEntries,
-      required: isRequired,
-      defaultValue
-    } = ctx.input;
-
-    let mapField = (f: any) => ({
-      fieldId: f.id,
-      name: f.name,
-      type: f.type,
-      description: f.description ?? null,
-      allowMultipleEntries: f.allowMultipleEntries,
-      readonly: f.readonly,
-      required: f.required,
-      locked: f.locked,
-      defaultValue: f.defaultValue ?? null,
-      createdAt: f.createdAt,
-      updatedAt: f.updatedAt
-    });
-
-    if (ctx.input.delete) {
-      if (!fieldId) throw new Error('fieldId is required to delete a field.');
-      await client.deleteTableField(databaseId, tableId, fieldId);
+    const i = ctx.input;
+    const c = new DatabaseClient(connection(ctx.auth, ctx.config));
+    if (
+      [i.description, i.allowMultipleEntries, i.required, i.defaultValue].some(
+        v => v !== undefined
+      )
+    )
+      fail(
+        'Current field writes document only name, type and options. Omit the retained unsupported fields and configure them in Softr instead.',
+        'unsupported_field_parameters'
+      );
+    if (i.delete) {
+      if (!i.fieldId || [i.name, i.type, i.options].some(v => v !== undefined))
+        fail('Delete accepts only databaseId, tableId, fieldId and delete:true.');
+      exact(
+        single(nativeField, await c.getTableField(i.databaseId, i.tableId, i.fieldId)),
+        i.fieldId
+      );
+      await c.deleteTableField(i.databaseId, i.tableId, i.fieldId);
       return {
         output: { deleted: true },
-        message: `Field \`${fieldId}\` deleted from table \`${tableId}\`.`
+        message:
+          'Native field absence confirmed after deletion; stored field values and retained history have separate consequences.'
       };
     }
-
-    if (!fieldId && name && type) {
-      let result = await client.addTableField(databaseId, tableId, {
-        name,
-        type,
-        options,
-        description,
-        allowMultipleEntries,
-        required: isRequired,
-        defaultValue
-      });
-      let field = mapField(result.data);
+    if (i.name !== undefined) text(i.name, 'field name');
+    if (i.type !== undefined) text(i.type, 'native field type');
+    if (i.fieldId === undefined) {
+      if (i.name === undefined || i.type === undefined)
+        fail('Adding a field requires name and type; otherwise provide fieldId.');
+      const v = single(
+        nativeField,
+        await c.addTableField(
+          i.databaseId,
+          i.tableId,
+          pickDefined({ name: i.name, type: i.type, options: i.options })
+        )
+      );
+      if (v.name !== i.name || v.type !== i.type)
+        fail(
+          'The field creation receipt differs from the requested name/type. Read its returned ID before retrying.',
+          'mutation_unverified'
+        );
       return {
-        output: { field },
-        message: `Field **${field.name}** (${field.type}) added to table.`
+        output: { field: mappedField(v) },
+        message: 'Softr returned the created field and its exact ID.'
       };
     }
-
-    if (fieldId && (name || type || options)) {
-      let updateParams: { name?: string; type?: string; options?: Record<string, unknown> } =
-        {};
-      if (name) updateParams.name = name;
-      if (type) updateParams.type = type;
-      if (options) updateParams.options = options;
-      let result = await client.updateTableField(databaseId, tableId, fieldId, updateParams);
-      let field = mapField(result.data);
-      return {
-        output: { field },
-        message: `Field **${field.name}** updated.`
-      };
-    }
-
-    if (fieldId) {
-      let result = await client.getTableField(databaseId, tableId, fieldId);
-      let field = mapField(result.data);
-      return {
-        output: { field },
-        message: `Retrieved field **${field.name}** (${field.type}).`
-      };
-    }
-
-    throw new Error(
-      'Invalid input: provide fieldId (to get/update/delete) or name + type (to add).'
+    const before = exact(
+      single(nativeField, await c.getTableField(i.databaseId, i.tableId, i.fieldId)),
+      i.fieldId
     );
+    if ([i.name, i.type, i.options].every(v => v === undefined))
+      return {
+        output: { field: mappedField(before) },
+        message: 'Returned the exact native field.'
+      };
+    const v = exact(
+      single(
+        nativeField,
+        await c.updateTableField(
+          i.databaseId,
+          i.tableId,
+          i.fieldId,
+          pickDefined({ name: i.name, type: i.type, options: i.options })
+        )
+      ),
+      i.fieldId
+    );
+    if (
+      (i.name !== undefined && v.name !== i.name) ||
+      (i.type !== undefined && v.type !== i.type)
+    )
+      fail(
+        'The field update receipt differs from requested state. Read the field before retrying.',
+        'mutation_unverified'
+      );
+    return {
+      output: { field: mappedField(v) },
+      message:
+        'Softr returned the exact updated field; provider normalization may apply to its options.'
+    };
   })
   .build();

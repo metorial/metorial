@@ -1,20 +1,83 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  requestAxios,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { safeWaveError, WaveClient } from './lib/client';
+import { invalid, text } from './lib/validation';
 
-let tokenAxios = createAxios({
-  baseURL: 'https://api.waveapps.com/oauth2'
+const scopes = [
+  'account:read',
+  'account:write',
+  'business:read',
+  'customer:read',
+  'customer:write',
+  'invoice:read',
+  'invoice:write',
+  'invoice:send',
+  'product:read',
+  'product:write',
+  'sales_tax:read',
+  'sales_tax:write',
+  'transaction:write',
+  'vendor:read',
+  'user:read'
+];
+const tokenSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().min(1).optional(),
+  expires_in: z.number().int().positive().max(31_536_000),
+  token_type: z.enum(['Bearer', 'bearer'])
 });
-
-let graphqlAxios = createAxios({
-  baseURL: 'https://gql.waveapps.com'
-});
-
-export let auth = SlateAuth.create()
+async function tokenRequest(input: Record<string, string>, previousRefreshToken?: string) {
+  const secrets = [input.client_secret, input.code, input.refresh_token].filter(
+    (value): value is string => typeof value === 'string'
+  );
+  const http = createAuthenticatedAxios({
+    baseURL: 'https://api.waveapps.com/oauth2',
+    timeout: 60_000,
+    maxRedirects: 0,
+    errorAdapter: error => safeWaveError(error, 'OAuth token request', secrets)
+  });
+  const response = await requestAxios(
+    'Wave OAuth token request',
+    () =>
+      http.post<unknown>('/token/', new URLSearchParams(input).toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }),
+    error => safeWaveError(error, 'OAuth token request', secrets)
+  );
+  if (response.status !== 200)
+    throw safeWaveError({ response }, 'OAuth token request', secrets);
+  const parsed = tokenSchema.safeParse(response.data);
+  if (!parsed.success)
+    invalid('Wave returned an invalid OAuth token response. Reconnect before continuing.');
+  return normalizeOAuthTokenResponse(parsed.data, {
+    providerLabel: 'Wave',
+    previousRefreshToken,
+    required: true,
+    expiresInType: 'number'
+  });
+}
+async function profile(token: string) {
+  const user = await new WaveClient(token).getUser();
+  return {
+    profile: {
+      id: user.id,
+      name: [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Wave account',
+      email: user.defaultEmail
+    }
+  };
+}
+export const auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string(),
+      token: z.string().min(1),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      redirectUri: z.string().optional()
     })
   )
   .addOauth({
@@ -24,215 +87,88 @@ export let auth = SlateAuth.create()
     docs: [
       {
         type: 'docs.auth.oauth',
-        name: 'OAuth documentation',
+        name: 'Wave OAuth',
         url: 'https://developer.waveapps.com/hc/en-us/articles/360019493652-OAuth-Guide'
       },
       {
         type: 'docs.auth.oauth_scopes',
-        name: 'OAuth scopes',
+        name: 'Wave scopes',
         url: 'https://developer.waveapps.com/hc/en-us/articles/360032818132-OAuth-Scopes'
       }
     ],
-
-    scopes: [
-      {
-        title: 'Account Read',
-        description: 'Read access to chart of accounts',
-        scope: 'account:read'
-      },
-      {
-        title: 'Account Write',
-        description: 'Write access to chart of accounts (create, update, archive)',
-        scope: 'account:write'
-      },
-      {
-        title: 'Business Read',
-        description: 'Read access to business information',
-        scope: 'business:read'
-      },
-      {
-        title: 'Customer Read',
-        description: 'Read access to customers',
-        scope: 'customer:read'
-      },
-      {
-        title: 'Customer Write',
-        description: 'Write access to customers (create, update, delete)',
-        scope: 'customer:write'
-      },
-      {
-        title: 'Invoice Read',
-        description: 'Read access to invoices and estimates',
-        scope: 'invoice:read'
-      },
-      {
-        title: 'Invoice Write',
-        description: 'Write access to invoices (create, update, send, delete)',
-        scope: 'invoice:write'
-      },
-      {
-        title: 'Product Read',
-        description: 'Read access to products and services',
-        scope: 'product:read'
-      },
-      {
-        title: 'Product Write',
-        description: 'Write access to products and services (create, update, archive)',
-        scope: 'product:write'
-      },
-      {
-        title: 'Sales Tax Read',
-        description: 'Read access to sales tax entries',
-        scope: 'sales_tax:read'
-      },
-      {
-        title: 'Sales Tax Write',
-        description: 'Write access to sales taxes (create, update, archive)',
-        scope: 'sales_tax:write'
-      },
-      {
-        title: 'Transaction Read',
-        description: 'Read access to financial transactions',
-        scope: 'transaction:read'
-      },
-      {
-        title: 'Transaction Write',
-        description: 'Write access to financial transactions',
-        scope: 'transaction:write'
-      },
-      {
-        title: 'Vendor Read',
-        description: 'Read access to vendors',
-        scope: 'vendor:read'
-      },
-      {
-        title: 'User Read',
-        description: 'Read access to user profile information',
-        scope: 'user:read'
-      }
-    ],
-
-    getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
-        client_id: ctx.clientId,
-        response_type: 'code',
-        redirect_uri: ctx.redirectUri,
-        state: ctx.state,
-        scope: ctx.scopes.join(' ')
-      });
-
-      return {
-        url: `https://api.waveapps.com/oauth2/authorize/?${params.toString()}`
-      };
-    },
-
-    handleCallback: async ctx => {
-      let response = await tokenAxios.post(
-        '/token/',
-        new URLSearchParams({
+    scopes: scopes.map(scope => ({
+      title: scope.replace(':', ' '),
+      description: `Permission for ${scope}. Write access does not imply read access; sending invoices requires invoice:send.`,
+      scope
+    })),
+    getAuthorizationUrl: async ctx => ({
+      url: `https://api.waveapps.com/oauth2/authorize/?${new URLSearchParams({ client_id: ctx.clientId, response_type: 'code', redirect_uri: ctx.redirectUri, state: ctx.state, scope: ctx.scopes.join(' ') })}`
+    }),
+    handleCallback: async ctx => ({
+      output: {
+        ...(await tokenRequest({
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret,
           grant_type: 'authorization_code',
           code: ctx.code,
           redirect_uri: ctx.redirectUri
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-        token_type: string;
-      };
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+        })),
+        redirectUri: ctx.redirectUri
       }
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      let response = await tokenAxios.post(
-        '/token/',
-        new URLSearchParams({
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-        token_type: string;
-      };
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
-        }
-      };
-    },
-
-    getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string };
-      input: {};
-      scopes: string[];
+    }),
+    handleTokenRefresh: async (ctx: {
+      output: { refreshToken?: string; redirectUri?: string };
+      clientId: string;
+      clientSecret: string;
     }) => {
-      let response = await graphqlAxios.post(
-        '/graphql/public',
-        {
-          query: `query { user { id firstName lastName defaultEmail } }`
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${ctx.output.token}`,
-            'Content-Type': 'application/json'
-          }
-        }
+      const refreshToken = text(
+        ctx.output.refreshToken,
+        'refresh token; reconnect if unavailable'
       );
-
-      let user = (response.data as any)?.data?.user;
-
-      let name = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || undefined;
-
+      const redirectUri = text(
+        ctx.output.redirectUri,
+        'original OAuth redirect URI; reconnect older credentials before refresh'
+      );
       return {
-        profile: {
-          id: user?.id,
-          email: user?.defaultEmail,
-          name
+        output: {
+          ...(await tokenRequest(
+            {
+              client_id: ctx.clientId,
+              client_secret: ctx.clientSecret,
+              grant_type: 'refresh_token',
+              refresh_token: refreshToken,
+              redirect_uri: redirectUri
+            },
+            refreshToken
+          )),
+          redirectUri
         }
       };
-    }
+    },
+    getProfile: async (ctx: { output: { token: string } }) => profile(ctx.output.token)
+  })
+  .addTokenAuth({
+    type: 'auth.token',
+    name: 'Own-business Access Token',
+    key: 'access_token',
+    docs: [
+      {
+        type: 'docs.auth.token',
+        name: 'Wave business-owner access tokens',
+        url: 'https://developer.waveapps.com/hc/en-us/articles/360020596571-Permitted-Use-Wave-Business-Owners'
+      }
+    ],
+    inputSchema: z.object({
+      token: z
+        .string()
+        .min(1)
+        .describe(
+          'Full-access token created in your Wave developer application for your own businesses. Replace it when expired or revoked; it is not refreshed automatically.'
+        )
+    }),
+    getOutput: async ctx => ({
+      output: { token: text(ctx.input.token, 'access token') },
+      scopes
+    }),
+    getProfile: async (ctx: { output: { token: string } }) => profile(ctx.output.token)
   });

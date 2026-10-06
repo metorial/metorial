@@ -1,21 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectUnavailableDelighted, unavailableMessage } from '../lib/unavailable';
 import { spec } from '../spec';
 
 export let sendSurvey = SlateTool.create(spec, {
   name: 'Send Survey',
   key: 'send_survey',
-  description: `Send a survey to a person by creating or updating their record in Delighted. Supports email and SMS channels with configurable delay, locale, and custom properties. You can also create a person without sending a survey by setting \`send\` to false.`,
-  instructions: [
-    'Provide either an email or phoneNumber (required for SMS channel).',
-    'Use properties to attach metadata like location or customer type for filtering on the dashboard.',
-    'Special properties like locale, question_product_name, delighted_email_subject, delighted_intro_message customize the survey experience.'
-  ],
-  constraints: [
-    'Survey throttling may prevent a survey from being sent if the person was recently surveyed.'
-  ],
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }
@@ -73,32 +68,5 @@ export let sendSurvey = SlateTool.create(spec, {
         .describe('Custom properties attached to the person')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.createPerson({
-      email: ctx.input.email,
-      phoneNumber: ctx.input.phoneNumber,
-      name: ctx.input.name,
-      channel: ctx.input.channel,
-      delay: ctx.input.delay,
-      send: ctx.input.send,
-      lastSentAt: ctx.input.lastSentAt,
-      properties: ctx.input.properties
-    });
-
-    return {
-      output: {
-        personId: result.personId,
-        email: result.email,
-        name: result.name,
-        phoneNumber: result.phoneNumber,
-        surveyScheduledAt: result.surveyScheduledAt,
-        properties: result.properties
-      },
-      message: result.surveyScheduledAt
-        ? `Survey scheduled for **${result.email || result.phoneNumber}** at ${new Date(result.surveyScheduledAt * 1000).toISOString()}.`
-        : `Person **${result.email || result.phoneNumber}** created${ctx.input.send === false ? ' without sending a survey' : ''}.`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();

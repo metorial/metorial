@@ -18,8 +18,6 @@ import {
   manageTeams,
   sendMessage
 } from './tools';
-import { incomingMessage, newComment } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     createAnalyticsReport,
     listOrganizationsAndUsers
   ],
-  triggers: [incomingMessage, newComment]
+  triggers: []
 });

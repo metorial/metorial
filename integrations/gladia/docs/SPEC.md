@@ -1,113 +1,40 @@
-# Slates Specification for Gladia
+# Gladia Integration Specification
 
-## Overview
-
-Gladia is an audio transcription and intelligence API provider. It offers both asynchronous and real-time speech-to-text transcription, along with audio intelligence add-ons, supporting 100+ languages with native code-switching and built-in features including diarization, translation, named-entity recognition, and sentiment analysis.
+Gladia provides pre-recorded and live speech-to-text APIs. This integration uses the current `/v2/pre-recorded` and `/v2/live` endpoints.
 
 ## Authentication
 
-Gladia uses API key-based authentication. You first create an account at app.gladia.io, then navigate to the API keys section where a default key is automatically generated. You can use this key or create additional ones.
+Supply a Gladia API key from https://app.gladia.io. Requests authenticate with the `x-gladia-key` header. There is no OAuth refresh flow, connection resource ID, or documented account/profile endpoint.
 
-The API key is passed in the `x-gladia-key` HTTP header with every request, for example:
+## Tools
 
-```
-x-gladia-key: YOUR_GLADIA_API_KEY
-```
+| Tool | Provider operation | Capability |
+| --- | --- | --- |
+| `upload_audio` | `POST /v2/upload` | Copy a publicly accessible audio/video URL to Gladia and inspect media metadata. |
+| `transcribe_audio` | `POST /v2/pre-recorded` | Submit a transcription, optionally wait for completion, and configure supported audio intelligence. |
+| `get_transcription` | `GET /v2/pre-recorded/{id}` | Read status, transcript, timestamps, and enabled intelligence; provide generated SRT/VTT files for download. |
+| `delete_transcription` | `DELETE /v2/pre-recorded/{id}` | Permanently remove a pre-recorded transcription and its audio. |
+| `initiate_live_session` | `POST /v2/live?region=...` | Create a session with matching encoding settings; stream audio through the returned WebSocket URL using an external client. |
+| `get_live_session_result` | `GET /v2/live/{id}` | Read live status, transcript, translation, summaries, entities, and sentiment. |
+| `list_transcriptions` | `GET /v2/pre-recorded` or `GET /v2/live` | Discover job IDs and metadata using offset pagination, status, and creation-date filters. |
+| `delete_live_session` | `DELETE /v2/live/{id}` | Remove a live transcription and recorded audio after streaming ends. |
 
-There are no OAuth flows, scopes, or additional credentials required. The base API URL is `https://api.gladia.io`.
+## Supported configuration
 
-## Features
+Pre-recorded transcription supports language detection/code switching, diarization, translation, summarization, named entities, sentiment, custom vocabulary, custom spelling, transcript prompts, sentence segmentation, subtitle generation, and per-job POST callbacks. Custom spelling is submitted as a `spelling_dictionary`. Callback URLs enable `callback` and populate `callback_config`.
 
-### Pre-recorded (Async) Transcription
+Live region is a query parameter (`eu-west` or `us-west`). Live audio supports PCM at 8/16/24/32 bits and A-law or mu-law at 8 bits, the documented sample rates, and 1-8 channels. The callback API supports POST only. Streaming is performed by the client connected to the returned WebSocket URL; these tools do not stream microphone audio themselves.
 
-Submit audio or video files (via file upload or URL) for asynchronous transcription. If working with local files, upload them first via the upload endpoint, as the transcription endpoint only accepts audio URLs. Results are retrieved by polling or via callback/webhook notification.
+Existing options for chapterization, moderation, name consistency, and structured data extraction remain in the input contract but cannot be enabled because the current request API does not support them. Use transcript prompts or spelling corrections for those workflows. Callers can retrieve status with `get_transcription` or configure their own provider callback.
 
-- Supports a wide range of audio and video formats (WAV, MP3, FLAC, AAC, M4A, etc.).
-- Language detection can be automatic, or a specific language can be set. Code switching can be enabled to handle multilingual conversations.
-- Multi-channel audio files are automatically transcribed with per-utterance channel identification.
+## Provider documentation
 
-### Live (Real-time) Transcription
-
-Initiate a live transcription session via the API, then connect to a returned WebSocket URL to stream audio chunks in real time. Supports configurable encoding, sample rate, bit depth, and number of channels.
-
-- Returns interim (partial) and final transcript results as the audio streams.
-- Provides real-time events like `speech_start`, `speech_end`, and `transcript_result` through the WebSocket.
-- Supports reconnection to the same session URL if the connection drops.
-- Available in multiple regions (e.g., `eu-west`, `us-west`).
-
-### Speaker Diarization
-
-Organizes transcripts into segments corresponding to different speakers. Mono, stereo, and multi-channel files are all supported.
-
-- Configurable with min/max speaker count or an explicit number of speakers.
-- Available for both pre-recorded and live transcription.
-
-### Translation
-
-Translation is available in one API call to one or more target languages.
-
-- Supports `base` and `enhanced` translation models.
-- Can be combined with the subtitles feature to produce subtitles in both the original and target languages.
-
-### Summarization
-
-Generates a summary of the transcript. You choose from available summary types to customize the output.
-
-- Available types: `general`, `concise`, and `bullet_points`.
-
-### Sentiment Analysis
-
-Detects sentiment and emotion for each sentence in the transcript, with speaker attribution when diarization is enabled.
-
-- Sentiments include: positive, negative, neutral, mixed, unknown.
-- Emotions include: adoration, anger, joy, fear, surprise, sadness, neutral, and more.
-
-### Named Entity Recognition (NER)
-
-Detects and classifies entities mentioned in the audio. Supports 50+ entity types across multiple categories. Useful for extracting names, companies, addresses, and other structured data.
-
-### Chapterization
-
-Automatically segments audio into logical chapters. Each chapter includes a headline, summary, and time range.
-
-### Audio-to-LLM (Custom Prompts)
-
-Allows generating answers, summaries, action items, and more from audio using custom prompts. You provide one or more prompt strings and receive LLM-generated responses based on the transcript.
-
-### Subtitles Generation
-
-Generate subtitles in SRT and/or VTT formats. Works alongside translation to produce subtitles in multiple languages.
-
-### Custom Vocabulary & Spelling
-
-The custom vocabulary feature lets you build a glossary of terms you want the transcription to recognize. Custom spelling allows mapping specific pronunciations to their correct written forms (e.g., "Sequel" → "SQL").
-
-### Content Moderation
-
-Detects and flags inappropriate or sensitive content within the audio transcript. Enabled via the `moderation` parameter.
-
-### Structured Data Extraction
-
-Extracts structured data from transcripts based on specified entity classes (e.g., person, organization). Configurable with custom class definitions.
-
-### Name Consistency
-
-Ensures consistent spelling and formatting of names throughout the transcript.
-
-## Events
-
-Gladia supports two notification mechanisms for asynchronous transcription completion:
-
-### Account-level Webhooks
-
-Webhooks can be configured at https://app.gladia.io/account to be notified when transcriptions are done. Once a transcription completes, a POST request is made to the configured endpoint containing the transcription ID. Gladia uses Svix to handle webhooks, providing reliable and secure event delivery.
-
-- Events: transcription completion.
-- Configured globally at the account level via the Gladia dashboard.
-
-### Per-request Callback URLs
-
-Instead of polling, you can provide a `callback_url` on the transcription request body, and the full results will be sent to that URL once the transcription is done.
-
-- Configured per transcription request.
-- For live sessions, various messages (transcripts, speech events, post-processing results) can be sent through the callback URL or webhooks, and you can specify which kinds of messages to receive.
+- [Authentication](https://docs.gladia.io/api-reference/authentication)
+- [Current OpenAPI contract](https://api.gladia.io/openapi.json)
+- [Pre-recorded initiation](https://docs.gladia.io/api-reference/v2/pre-recorded/init)
+- [Pre-recorded results](https://docs.gladia.io/api-reference/v2/pre-recorded/get)
+- [Pre-recorded list](https://docs.gladia.io/api-reference/v2/pre-recorded/list)
+- [Live initiation](https://docs.gladia.io/api-reference/v2/live/init)
+- [Live results](https://docs.gladia.io/api-reference/v2/live/get)
+- [Live deletion](https://docs.gladia.io/api-reference/v2/live/delete)
+- [File upload](https://docs.gladia.io/api-reference/v2/upload/audio-file)

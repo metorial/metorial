@@ -21,8 +21,6 @@ import {
   screenshotWebpage,
   signalEvent
 } from './tools';
-import { inboundWebhook, sessionStatusChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     manageIntegration,
     manageAgent
   ],
-  triggers: [inboundWebhook, sessionStatusChange]
+  triggers: []
 });

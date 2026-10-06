@@ -1,4 +1,4 @@
-# Slates Specification for Griptape
+# Griptape Integration Specification
 
 ## Overview
 
@@ -67,4 +67,12 @@ The platform provides observability capabilities for sending trace and event dat
 
 ## Events
 
-The provider does not support webhooks or event subscriptions. Griptape Cloud offers server-sent events (SSE) for streaming structure run output in real time, but this is a response streaming mechanism rather than a webhook or event subscription system. The framework itself has an internal event bus for forwarding framework events to external services via Event Listener Drivers, but this is a client-side SDK feature, not a cloud-based webhook/event subscription API.
+This integration does not expose event triggers. Griptape Cloud offers server-sent events (SSE) for streaming structure run output in real time, but this is a response streaming mechanism rather than a webhook or event subscription system. The framework itself has an internal event bus for forwarding framework events to external services via Event Listener Drivers, but this is a client-side SDK feature, not a cloud-based webhook/event subscription API.
+
+## Supported workflows
+
+The tools cover assistant configuration and runs, deployed structure execution, managed vector knowledge base lifecycle and ingestion, data source refresh jobs, knowledge base and retriever queries, rules and rulesets, conversation threads and messages, and Data Lake bucket/file operations. Resource reads expose deployment identifiers and query or activity schemas without returning connection secrets. Downloads provide a downloadable file.
+
+Knowledge base creation and updates target the managed vector store; external PostgreSQL and hybrid store provisioning are outside this integration. Structure and Tool code deployment remains in the provider console. API keys are organization-scoped; the documented API has no current-user endpoint, so the integration does not infer a personal identity from organization resources.
+
+Official reference: https://docs.griptape.ai/stable/griptape-cloud/api/api-reference/

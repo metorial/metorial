@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { StoryblokClient } from '../lib/client';
+import { pagingOutput, resolveSpace, spaceIdInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listActivities = SlateTool.create(spec, {
@@ -13,12 +14,14 @@ export let listActivities = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      spaceId: spaceIdInput,
       page: z.number().optional().describe('Page number (default: 1)'),
       perPage: z.number().optional().describe('Activities per page (default: 25)')
     })
   )
   .output(
     z.object({
+      ...pagingOutput,
       activities: z
         .array(
           z.object({
@@ -41,17 +44,20 @@ export let listActivities = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new StoryblokClient({
-      token: ctx.auth.token,
-      region: ctx.auth.region,
-      spaceId: ctx.config.spaceId
+      ...ctx.auth,
+      spaceId: resolveSpace(
+        ctx.input.spaceId,
+        ctx.config.spaceId,
+        ctx.auth.mode === 'oauth' ? ctx.auth.spaceId : undefined
+      )
     });
 
-    let activities = await client.listActivities({
+    let result = await client.listActivities({
       page: ctx.input.page,
       perPage: ctx.input.perPage
     });
 
-    let mapped = activities.map(a => ({
+    let mapped = result.activities.map(a => ({
       activityId: a.id,
       trackableId: a.trackable_id,
       trackableType: a.trackable_type,
@@ -61,7 +67,7 @@ export let listActivities = SlateTool.create(spec, {
     }));
 
     return {
-      output: { activities: mapped },
+      output: { ...result, activities: mapped },
       message: `Found **${mapped.length}** recent activities.`
     };
   })

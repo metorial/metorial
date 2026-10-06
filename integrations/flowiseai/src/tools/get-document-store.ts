@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FlowiseClient } from '../lib/client';
+import { FlowiseClient, flowiseJsonString } from '../lib/client';
 import { spec } from '../spec';
 
 export let getDocumentStore = SlateTool.create(spec, {
@@ -66,11 +66,11 @@ export let getDocumentStore = SlateTool.create(spec, {
         name: s.name,
         description: s.description,
         status: s.status,
-        loaders: s.loaders,
-        whereUsed: s.whereUsed,
-        vectorStoreConfig: s.vectorStoreConfig,
-        embeddingConfig: s.embeddingConfig,
-        recordManagerConfig: s.recordManagerConfig,
+        loaders: flowiseJsonString(s.loaders),
+        whereUsed: flowiseJsonString(s.whereUsed),
+        vectorStoreConfig: flowiseJsonString(s.vectorStoreConfig),
+        embeddingConfig: flowiseJsonString(s.embeddingConfig),
+        recordManagerConfig: flowiseJsonString(s.recordManagerConfig),
         createdDate: s.createdDate,
         updatedDate: s.updatedDate
       },

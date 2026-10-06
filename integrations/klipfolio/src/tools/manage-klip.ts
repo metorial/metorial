@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { createdId, klipSchema, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageKlip = SlateTool.create(spec, {
@@ -31,10 +32,13 @@ export let manageKlip = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
+    if (ctx.input.schema !== undefined) klipSchema(ctx.input.schema);
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required when creating a klip');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required when creating a klip');
 
       let result = await client.createKlip({
         name: ctx.input.name,
@@ -43,8 +47,7 @@ export let manageKlip = SlateTool.create(spec, {
         schema: ctx.input.schema
       });
 
-      let location = result?.meta?.location;
-      let klipId = location ? location.split('/').pop() : undefined;
+      let klipId = createdId(result, 'klips');
 
       return {
         output: {
@@ -58,7 +61,17 @@ export let manageKlip = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.klipId) throw new Error('klipId is required when updating a klip');
+      if (
+        ctx.input.name === undefined &&
+        ctx.input.description === undefined &&
+        ctx.input.schema === undefined
+      )
+        throw createApiServiceError(
+          'Provide at least one supported field or association to update.',
+          { reason: 'invalid_input' }
+        );
+      if (!ctx.input.klipId)
+        throw createApiServiceError('klipId is required when updating a klip');
 
       if (ctx.input.name !== undefined || ctx.input.description !== undefined) {
         await client.updateKlip(ctx.input.klipId, {
@@ -83,7 +96,8 @@ export let manageKlip = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.klipId) throw new Error('klipId is required when deleting a klip');
+      if (!ctx.input.klipId)
+        throw createApiServiceError('klipId is required when deleting a klip');
 
       await client.deleteKlip(ctx.input.klipId);
 
@@ -93,6 +107,6 @@ export let manageKlip = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -18,7 +18,7 @@ export let listBillCategories = SlateTool.create(spec, {
       country: z
         .string()
         .optional()
-        .describe('Filter billers by country code (e.g. NG, GH, KE)')
+        .describe('Country code; the current bill API supports NG (Nigeria)')
     })
   )
   .output(
@@ -32,7 +32,7 @@ export let listBillCategories = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
     if (ctx.input.billerCode) {
       let result = await client.getBillItems(ctx.input.billerCode);
@@ -44,7 +44,7 @@ export let listBillCategories = SlateTool.create(spec, {
       };
     }
 
-    if (ctx.input.category || ctx.input.country) {
+    if (ctx.input.category) {
       let result = await client.getBillers(ctx.input.category, ctx.input.country);
       return {
         output: {
@@ -54,7 +54,7 @@ export let listBillCategories = SlateTool.create(spec, {
       };
     }
 
-    let result = await client.getBillCategories();
+    let result = await client.getBillCategories(ctx.input.country);
     return {
       output: {
         categories: result.data

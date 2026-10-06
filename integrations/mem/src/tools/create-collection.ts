@@ -8,8 +8,8 @@ export let createCollection = SlateTool.create(spec, {
   key: 'create_collection',
   description: `Create a new collection to organize notes in your Mem knowledge base. Collections group related notes together and can have a title and description.`,
   constraints: [
-    'Collection title can be up to ~1,000 characters.',
-    'Collection description can be up to ~10,000 characters.'
+    'Collection titles allow 1,000 characters and UTF-8 bytes; descriptions allow 10,000 characters and UTF-8 bytes.',
+    'Custom UUIDs are create-only, including previously trashed collections. Inspect the exact UUID before retrying uncertain writes; a conflict is not an update.'
   ],
   tags: {
     readOnly: false,

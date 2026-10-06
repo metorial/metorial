@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MakeClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { scenarioOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageScenario = SlateTool.create(spec, {
   name: 'Manage Scenario',
   key: 'manage_scenario',
-  description: `Get details, update, activate, deactivate, run, clone, or delete an automation scenario. Supports one-off execution, cloning to another team, and retrieving blueprint or usage information.`,
+  description: `Get details, update, activate, deactivate, run, clone, or delete an automation scenario. Run is asynchronous and can cause external effects or charges; activation can immediately execute interval schedules. Clone requires target organization, team, name, and an explicit module-state choice. Delete can retain a recoverable trash entry and history.`,
   instructions: [
     'Provide a scenarioId and an action to perform.',
     'Use "get" to fetch details, "activate"/"deactivate" to toggle status, "run" for on-demand execution, "clone" to copy to another team, or "delete" to remove.',
@@ -15,6 +16,32 @@ export let manageScenario = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: z
+        .number()
+        .optional()
+        .describe('Target organization ID from list_organizations; required for clone.'),
+      cloneStates: z
+        .boolean()
+        .optional()
+        .describe('Required for clone: true copies module state; false resets it.'),
+      cloneMappings: z
+        .record(z.string(), z.record(z.string(), z.unknown()))
+        .optional()
+        .describe(
+          'Documented account/key/hook/device/udt/datastore ID maps for cross-team clones.'
+        ),
+      runData: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Native scenario inputs for an asynchronous run. Running can cause external actions and charges; never resend an uncertain run.'
+        ),
+      confirmed: z
+        .boolean()
+        .optional()
+        .describe(
+          'Explicitly acknowledge the provider confirmation for referenced resources or app installation; omission does not bypass it.'
+        ),
       scenarioId: z.number().describe('ID of the scenario to manage'),
       action: z
         .enum([
@@ -49,7 +76,12 @@ export let manageScenario = SlateTool.create(spec, {
     z.object({
       scenarioId: z.number().optional().describe('Scenario ID'),
       name: z.string().optional().describe('Scenario name'),
-      teamId: z.number().optional().describe('Team ID'),
+      teamId: z
+        .number()
+        .optional()
+        .describe(
+          'Team ID; call list_teams after list_organizations to discover authorized IDs.'
+        ),
       isActive: z.boolean().optional().describe('Whether the scenario is active'),
       createdAt: z.string().optional().describe('Creation time'),
       updatedAt: z.string().optional().describe('Last update time'),
@@ -58,143 +90,85 @@ export let manageScenario = SlateTool.create(spec, {
         .optional()
         .describe('Scenario blueprint JSON (for get_blueprint action)'),
       usage: z.any().optional().describe('Scenario usage data (for get_usage action)'),
+      executionStatus: z
+        .string()
+        .optional()
+        .describe('Native immediate execution status, if returned.'),
       executionId: z.string().optional().describe('Execution ID (for run action)'),
       deleted: z.boolean().optional().describe('Whether the scenario was deleted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MakeClient({
-      token: ctx.auth.token,
-      zoneUrl: ctx.config.zoneUrl
-    });
-
-    let { scenarioId, action } = ctx.input;
-
-    if (action === 'get') {
-      let result = await client.getScenario(scenarioId);
-      let s = result.scenario ?? result;
+    const client = clientFor(ctx);
+    const { action, scenarioId } = ctx.input;
+    if (action === 'get')
       return {
-        output: {
-          scenarioId: s.id,
-          name: s.name,
-          teamId: s.teamId,
-          isActive: s.islinked ?? s.isActive,
-          createdAt: s.created,
-          updatedAt: s.updated
-        },
-        message: `Scenario **${s.name}** (ID: ${s.id}) — ${s.islinked || s.isActive ? 'Active' : 'Inactive'}.`
+        output: scenarioOutput((await client.getScenario(scenarioId)).scenario),
+        message: 'Retrieved the exact scenario.'
+      };
+    if (action === 'update')
+      return {
+        output: scenarioOutput((await client.updateScenario(scenarioId, ctx.input)).scenario),
+        message: 'The native scenario update receipt was confirmed.'
+      };
+    if (action === 'activate' || action === 'deactivate') {
+      const result =
+        action === 'activate'
+          ? await client.activateScenario(scenarioId)
+          : await client.deactivateScenario(scenarioId);
+      return {
+        output: { scenarioId: result.scenario.id, isActive: result.scenario.isActive },
+        message:
+          action === 'activate'
+            ? 'Scenario activated. Interval schedules can execute immediately and cause external actions or charges.'
+            : 'Scenario deactivated/stopped. Previously completed actions and execution history remain.'
       };
     }
-
-    if (action === 'update') {
-      let updateData: Record<string, any> = {};
-      if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
-      if (ctx.input.scheduling !== undefined) updateData.scheduling = ctx.input.scheduling;
-      if (ctx.input.folderId !== undefined) updateData.folderId = ctx.input.folderId;
-
-      let result = await client.updateScenario(scenarioId, updateData);
-      let s = result.scenario ?? result;
-      return {
-        output: {
-          scenarioId: s.id,
-          name: s.name,
-          teamId: s.teamId,
-          isActive: s.islinked ?? s.isActive,
-          updatedAt: s.updated
-        },
-        message: `Scenario **${s.name}** updated successfully.`
-      };
-    }
-
-    if (action === 'activate') {
-      let result = await client.activateScenario(scenarioId);
-      let s = result.scenario ?? result;
-      return {
-        output: {
-          scenarioId: s.id ?? scenarioId,
-          name: s.name,
-          isActive: true
-        },
-        message: `Scenario ${scenarioId} **activated**.`
-      };
-    }
-
-    if (action === 'deactivate') {
-      let result = await client.deactivateScenario(scenarioId);
-      let s = result.scenario ?? result;
-      return {
-        output: {
-          scenarioId: s.id ?? scenarioId,
-          name: s.name,
-          isActive: false
-        },
-        message: `Scenario ${scenarioId} **deactivated**.`
-      };
-    }
-
     if (action === 'run') {
-      let result = await client.runScenario(scenarioId);
+      const result = await client.runScenario(scenarioId, ctx.input.runData);
       return {
         output: {
           scenarioId,
-          executionId: result.executionId ?? String(result.id ?? '')
+          executionId: result.executionId,
+          executionStatus: result.status
         },
-        message: `Scenario ${scenarioId} executed. Execution ID: ${result.executionId ?? result.id ?? 'N/A'}.`
+        message: `Execution ${result.executionId} was accepted asynchronously. Call get_execution_status; completion is not confirmed. Do not resend an uncertain execution.`
       };
     }
-
     if (action === 'clone') {
-      if (!ctx.input.targetTeamId) {
-        throw new Error('targetTeamId is required for clone action');
-      }
-      let result = await client.cloneScenario(scenarioId, {
+      const result = await client.cloneScenario(scenarioId, {
         targetTeamId: ctx.input.targetTeamId,
-        name: ctx.input.cloneName
+        organizationId: ctx.input.organizationId,
+        name: ctx.input.cloneName,
+        states: ctx.input.cloneStates,
+        confirmed: ctx.input.confirmed,
+        mappings: ctx.input.cloneMappings
       });
-      let s = result.scenario ?? result;
       return {
-        output: {
-          scenarioId: s.id,
-          name: s.name,
-          teamId: s.teamId
-        },
-        message: `Scenario cloned as **${s.name}** (ID: ${s.id}) to team ${ctx.input.targetTeamId}.`
+        output: scenarioOutput(result.scenario),
+        message:
+          'Created the native scenario clone. Review referenced connections, module states, scheduling, and active status before activation.'
       };
     }
-
     if (action === 'get_blueprint') {
-      let result = await client.getScenarioBlueprint(scenarioId);
+      const result = await client.getScenarioBlueprint(scenarioId);
       return {
-        output: {
-          scenarioId,
-          blueprint: result.response?.blueprint ?? result.blueprint ?? result
-        },
-        message: `Retrieved blueprint for scenario ${scenarioId}.`
+        output: { scenarioId, blueprint: result.response.blueprint },
+        message: 'Retrieved the existing scenario blueprint configuration.'
       };
     }
-
     if (action === 'get_usage') {
-      let result = await client.getScenarioUsage(scenarioId);
+      const usage = await client.getScenarioUsage(scenarioId);
       return {
-        output: {
-          scenarioId,
-          usage: result
-        },
-        message: `Retrieved usage statistics for scenario ${scenarioId}.`
+        output: { scenarioId, usage },
+        message: 'Retrieved native daily scenario usage for the past 30 days.'
       };
     }
-
-    if (action === 'delete') {
-      await client.deleteScenario(scenarioId);
-      return {
-        output: {
-          scenarioId,
-          deleted: true
-        },
-        message: `Scenario ${scenarioId} **deleted**.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
+    await client.deleteScenario(scenarioId);
+    return {
+      output: { scenarioId, deleted: true },
+      message:
+        'Make acknowledged scenario deletion. With scenario trash enabled this stops the scenario and retains it for a 30-day recovery window; history and prior external effects are not erased.'
+    };
   })
   .build();

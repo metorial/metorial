@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { stateMessage } from '../lib/contracts';
+import { deliverGeneratedFiles, gifOutput } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let generateAnimatedGif = SlateTool.create(spec, {
@@ -8,7 +11,7 @@ export let generateAnimatedGif = SlateTool.create(spec, {
   key: 'generate_animated_gif',
   description: `Create a slideshow-style animated GIF from a Bannerbear template by providing multiple frames of modifications. Each frame applies different content to the same template. Configurable frame rate, per-frame durations, and looping.`,
   instructions: [
-    'Each frame is a list of modifications applied to the template. Provide at least 2 frames.',
+    'Each frame is a list of modifications applied to the template. Provide between 1 and 30 frames.',
     'Optionally provide an input video URL to auto-generate frame thumbnails instead of manually specifying frames.'
   ],
   constraints: ['Maximum of 30 frames per animated GIF.', 'GIF generation is asynchronous.'],
@@ -19,6 +22,7 @@ export let generateAnimatedGif = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       templateUid: z.string().describe('UID of the template to use for each frame'),
       frames: z
         .array(
@@ -36,7 +40,10 @@ export let generateAnimatedGif = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('URL of a video to auto-generate frame thumbnails from'),
-      fps: z.number().optional().describe('Frames per second (default varies)'),
+      fps: z
+        .number()
+        .optional()
+        .describe('Positive integer frames per second (provider default 1)'),
       frameDurations: z
         .array(z.number())
         .optional()
@@ -58,9 +65,8 @@ export let generateAnimatedGif = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.createAnimatedGif({
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const result = await client.createAnimatedGif({
       template: ctx.input.templateUid,
       frames: ctx.input.frames,
       input_media_url: ctx.input.inputMediaUrl,
@@ -70,15 +76,11 @@ export let generateAnimatedGif = SlateTool.create(spec, {
       metadata: ctx.input.metadata,
       webhook_url: ctx.input.webhookUrl
     });
-
+    const output = gifOutput(result);
+    await deliverGeneratedFiles(ctx, 'animated_gif', result);
     return {
-      output: {
-        gifUid: result.uid,
-        status: result.status,
-        imageUrl: result.image_url || null,
-        createdAt: result.created_at
-      },
-      message: `Animated GIF generation ${result.status === 'completed' ? 'completed' : 'initiated'} (UID: ${result.uid}) with ${ctx.input.frames.length} frames. ${result.image_url ? `[View GIF](${result.image_url})` : 'GIF is still rendering.'}`
+      output,
+      message: `Animated GIF generation ${stateMessage(result.status)} (UID: ${output.gifUid}). Read its status with get_resource.`
     };
   })
   .build();

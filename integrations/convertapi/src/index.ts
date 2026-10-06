@@ -5,7 +5,9 @@ import {
   convertFile,
   convertFileAsync,
   decryptPdf,
+  deleteAsyncJob,
   deleteFile,
+  downloadFile,
   extractText,
   getAccountInfo,
   getAsyncJobResult,
@@ -17,8 +19,6 @@ import {
   uploadFile,
   watermarkPdf
 } from './tools';
-import { asyncConversionComplete } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,7 +36,9 @@ export let provider = Slate.create({
     listSupportedConversions,
     uploadFile,
     deleteFile,
+    deleteAsyncJob,
+    downloadFile,
     pdfToPdfa
   ],
-  triggers: [asyncConversionComplete]
+  triggers: []
 });

@@ -15,7 +15,7 @@ export let createMonitorTool = SlateTool.create(spec, {
   name: 'Create Monitor',
   key: 'create_monitor',
   description: `Create a monitor on a Webset to automatically keep it updated on a schedule.
-**Search** behavior runs new searches to find fresh content with automatic deduplication. **Refresh** behavior updates existing items by re-running enrichments.
+**Search** behavior runs recurring, billable searches with automatic deduplication. The retained refresh input is unsupported by the current native endpoint and is refused before creation.
 Schedules use cron expressions.`,
   tags: {
     destructive: false
@@ -26,7 +26,15 @@ Schedules use cron expressions.`,
       websetId: z.string().describe('The Webset ID to monitor'),
       behaviorType: z
         .enum(['search', 'refresh'])
-        .describe('search: find new content, refresh: update existing items'),
+        .describe(
+          'search: find new content; refresh is a retained unsupported compatibility value'
+        ),
+      searchCount: z
+        .number()
+        .optional()
+        .describe('Required positive target count for native search behavior'),
+      searchQuery: z.string().optional().describe('Optional native search query override'),
+      timezone: z.string().optional().describe('Optional IANA timezone for cadence'),
       cronSchedule: z
         .string()
         .describe(
@@ -36,17 +44,23 @@ Schedules use cron expressions.`,
   )
   .output(monitorSchema)
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
     let result = await client.createMonitor(ctx.input.websetId, {
-      behavior: { type: ctx.input.behaviorType },
-      cadence: { cron: ctx.input.cronSchedule }
+      behavior: {
+        type: ctx.input.behaviorType,
+        config:
+          ctx.input.searchCount !== undefined
+            ? { count: ctx.input.searchCount, query: ctx.input.searchQuery }
+            : undefined
+      },
+      cadence: { cron: ctx.input.cronSchedule, timezone: ctx.input.timezone }
     });
 
     return {
       output: {
         monitorId: result.id,
-        behaviorType: result.behavior?.type ?? ctx.input.behaviorType,
-        cronSchedule: result.cadence?.cron ?? ctx.input.cronSchedule,
+        behaviorType: result.behavior.type,
+        cronSchedule: result.cadence.cron,
         createdAt: result.createdAt,
         updatedAt: result.updatedAt
       },
@@ -75,7 +89,7 @@ export let deleteMonitorTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
     await client.deleteMonitor(ctx.input.websetId, ctx.input.monitorId);
 
     return {

@@ -15,8 +15,6 @@ import {
   searchOrders,
   searchProducts
 } from './tools';
-import { customerChange, inboundWebhook, newOrder, productChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     manageCms,
     getStoreInfo
   ],
-  triggers: [inboundWebhook, newOrder, productChange, customerChange]
+  triggers: []
 });

@@ -1,22 +1,22 @@
 {
   "name": "@metorial/botpress",
-  "description": "Build, deploy, and manage AI-powered chatbots and conversational agents. Create and configure bots, manage conversations and messages across channels (WhatsApp, Slack, Telegram), handle users and participants, and store structured data in tables. Send and receive messages in various formats (text, image, audio, video, carousel, card, dropdown). Manage knowledge base files, trigger bot events via webhooks, execute bot actions, and maintain persistent state across conversations. Administer workspaces, collaborators, integrations, analytics, logs, and issue tracking.",
+  "description": "Manage Botpress bots, conversations, participants, messages, users, structured tables, and knowledge files. Discover accounts and workspaces, configure installed integrations and declared states/events, upload and download text files, and inspect bot analytics, logs, and issues.",
   "categories": [
     "apis-and-http-requests",
     "email-and-messaging",
     "task-and-project-management"
   ],
   "skills": [
-    "create and deploy bots",
-    "send and receive messages",
-    "manage conversations",
+    "manage bots",
+    "discover workspaces and accounts",
+    "manage conversations and participants",
+    "send and manage messages",
+    "manage runtime users",
     "manage structured data tables",
-    "upload and manage files",
-    "configure webhook integrations",
-    "manage bot users",
-    "track analytics and logs",
-    "maintain conversation state",
-    "administer workspaces"
+    "upload and download text files",
+    "search indexed files",
+    "inspect analytics logs and issues",
+    "maintain declared bot state"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/botpress.svg"
 }

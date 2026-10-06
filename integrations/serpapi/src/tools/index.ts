@@ -1,6 +1,7 @@
 export * from './account-info';
 export * from './autocomplete';
 export * from './flights-search';
+export * from './get-search';
 export * from './image-search';
 export * from './jobs-search';
 export * from './locations-lookup';

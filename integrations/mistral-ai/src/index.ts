@@ -27,8 +27,6 @@ import {
   transcribeAudioTool,
   uploadFileTool
 } from './tools';
-import { batchJobStatusTrigger, fineTuningJobStatusTrigger, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,5 +56,5 @@ export let provider = Slate.create({
     cancelBatchJobTool,
     deleteModelTool
   ],
-  triggers: [inboundWebhook, fineTuningJobStatusTrigger, batchJobStatusTrigger]
+  triggers: []
 });

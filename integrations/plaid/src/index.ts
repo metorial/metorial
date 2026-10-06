@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  cancelTransferTool,
   createAssetReportTool,
   createLinkTokenTool,
   createTransferTool,
@@ -20,18 +21,12 @@ import {
   getTransactionsTool,
   getTransferTool,
   listTransfersTool,
+  manageTransferAuthorizationTool,
+  removeAssetReportTool,
   removeItemTool,
   searchInstitutionsTool,
   syncTransactionsTool
 } from './tools';
-import {
-  assetsWebhookTrigger,
-  holdingsWebhookTrigger,
-  itemWebhookTrigger,
-  transactionsWebhookTrigger,
-  transferWebhookTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -56,13 +51,10 @@ export let provider = Slate.create({
     evaluateSignalTool,
     enrichTransactionsTool,
     createAssetReportTool,
-    getAssetReportTool
+    getAssetReportTool,
+    manageTransferAuthorizationTool,
+    cancelTransferTool,
+    removeAssetReportTool
   ],
-  triggers: [
-    itemWebhookTrigger,
-    transactionsWebhookTrigger,
-    transferWebhookTrigger,
-    holdingsWebhookTrigger,
-    assetsWebhookTrigger
-  ]
+  triggers: []
 });

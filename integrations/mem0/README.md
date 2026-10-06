@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Mem 0
 
-Store, retrieve, search, and manage persistent memories for AI applications across users, agents, and sessions. Add memories from conversations with automatic fact extraction or direct storage. Search memories using natural language with semantic similarity and advanced filtering. Manage graph-based memories with entity relationships and multi-hop reasoning. Organize memories with custom categories and instructions. Support multimodal content including images, PDFs, and markdown. Manage entities (users, agents, apps, runs), export memory data, and configure webhooks for memory event notifications.
+Store, retrieve, search, update, and delete persistent memories for AI applications across users, agents, apps, and sessions. Extract facts from conversations or store messages directly. Browse and search memories with entity and metadata filters, inspect change history, manage entities, and track asynchronous processing. Memory operations use the project associated with your API key. Call `get_current_user` to inspect the connected identity and `get_event` to track queued operations.
 
 ## License
 

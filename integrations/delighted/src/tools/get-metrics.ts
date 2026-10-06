@@ -1,13 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectUnavailableDelighted, unavailableMessage } from '../lib/unavailable';
 import { spec } from '../spec';
 
 export let getMetrics = SlateTool.create(spec, {
   name: 'Get Metrics',
   key: 'get_metrics',
-  description: `Retrieve aggregated survey metrics including NPS score, promoter/passive/detractor counts and percentages, and total response count. Useful for dashboard reporting and analytics.`,
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }
@@ -37,18 +40,5 @@ export let getMetrics = SlateTool.create(spec, {
       responseCount: z.number().describe('Total number of responses')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let metrics = await client.getMetrics({
-      since: ctx.input.since,
-      until: ctx.input.until,
-      trend: ctx.input.trend
-    });
-
-    return {
-      output: metrics,
-      message: `NPS: **${metrics.nps}** (${metrics.responseCount} responses) — Promoters: ${metrics.promoterPercent}%, Passives: ${metrics.passivePercent}%, Detractors: ${metrics.detractorPercent}%`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();

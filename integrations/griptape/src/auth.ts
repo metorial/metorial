@@ -4,7 +4,7 @@ import { z } from 'zod';
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string().min(1)
     })
   )
   .addTokenAuth({
@@ -14,6 +14,7 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .min(1)
         .describe(
           'Griptape Cloud API Key. Generate one at https://cloud.griptape.ai/configuration/api-keys'
         )

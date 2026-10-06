@@ -1,20 +1,24 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import type { GiteaFileResponse } from '../lib/types';
+import { validateBase64 } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getFileContent = SlateTool.create(spec, {
   name: 'Get File Content',
   key: 'get_file_content',
-  description: `Read a file's content from a repository. Returns the file metadata and base64-encoded content. Supports reading from a specific branch or commit ref.`,
+  description: `DEPRECATED — use \`download_file\` instead. Read a file's content from a repository. Returns the file metadata and base64-encoded content. Supports reading from a specific branch or commit ref.`,
+  instructions: ['Use download_file to receive a downloadable file and its current blob SHA.'],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       path: z.string().describe('File path within the repository (e.g., "src/main.ts")'),
       ref: z
         .string()
@@ -37,7 +41,7 @@ export let getFileContent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let f = await client.getFileContent(
       ctx.input.owner,
       ctx.input.repo,
@@ -76,8 +80,8 @@ export let createOrUpdateFile = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       path: z.string().describe('File path within the repository'),
       content: z.string().describe('Base64-encoded file content'),
       message: z.string().describe('Commit message for the file change'),
@@ -100,16 +104,19 @@ export let createOrUpdateFile = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
+    if ((ctx.input.authorName === undefined) !== (ctx.input.authorEmail === undefined))
+      throw createApiServiceError('Provide authorName and authorEmail together.');
+    const content = validateBase64(ctx.input.content);
     let author =
       ctx.input.authorName && ctx.input.authorEmail
         ? { name: ctx.input.authorName, email: ctx.input.authorEmail }
         : undefined;
 
-    let result: any;
+    let result: GiteaFileResponse;
     if (ctx.input.fileSha) {
       result = await client.updateFile(ctx.input.owner, ctx.input.repo, ctx.input.path, {
-        content: ctx.input.content,
+        content,
         message: ctx.input.message,
         sha: ctx.input.fileSha,
         branch: ctx.input.branch,
@@ -117,7 +124,7 @@ export let createOrUpdateFile = SlateTool.create(spec, {
       });
     } else {
       result = await client.createFile(ctx.input.owner, ctx.input.repo, ctx.input.path, {
-        content: ctx.input.content,
+        content,
         message: ctx.input.message,
         branch: ctx.input.branch,
         author
@@ -147,8 +154,8 @@ export let deleteFile = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       path: z.string().describe('File path to delete'),
       fileSha: z
         .string()
@@ -166,7 +173,7 @@ export let deleteFile = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     await client.deleteFile(ctx.input.owner, ctx.input.repo, ctx.input.path, {
       message: ctx.input.message,
       sha: ctx.input.fileSha,

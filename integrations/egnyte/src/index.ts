@@ -15,16 +15,20 @@ import {
   deleteItemTool,
   deleteLinkTool,
   deleteUserTool,
+  downloadFileTool,
   emptyTrashTool,
   getAuditReportTool,
+  getCurrentUserTool,
   getFileInfoTool,
   getPermissionsTool,
+  getResourceTool,
   getUserTool,
   getWorkflowTool,
   listCommentsTool,
   listFolderTool,
   listGroupsTool,
   listLinksTool,
+  listResourcesTool,
   listTrashTool,
   listUsersTool,
   listWorkflowTasksTool,
@@ -35,13 +39,17 @@ import {
   setMetadataTool,
   setPermissionsTool,
   updateGroupTool,
-  updateUserTool
+  updateUserTool,
+  uploadFileTool
 } from './tools';
-import { contentEventsTrigger, fileActivityTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUserTool,
+    getResourceTool,
+    listResourcesTool,
+    uploadFileTool,
+    downloadFileTool,
     listFolderTool,
     getFileInfoTool,
     createFolderTool,
@@ -78,5 +86,5 @@ export let provider = Slate.create({
     createAuditReportTool,
     getAuditReportTool
   ],
-  triggers: [contentEventsTrigger, fileActivityTrigger]
+  triggers: []
 });

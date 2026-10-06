@@ -4,7 +4,9 @@ import {
   createConnectSession,
   getRecords,
   listConnections,
+  listFunctions,
   listIntegrations,
+  listProviders,
   manageConnection,
   manageConnectionMetadata,
   manageIntegration,
@@ -12,12 +14,12 @@ import {
   proxyRequest,
   triggerAction
 } from './tools';
-import { connectionEvents, inboundWebhook, syncEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     listIntegrations,
+    listFunctions,
+    listProviders,
     manageIntegration,
     listConnections,
     manageConnection,
@@ -28,5 +30,5 @@ export let provider = Slate.create({
     createConnectSession,
     manageConnectionMetadata
   ],
-  triggers: [inboundWebhook, connectionEvents, syncEvents]
+  triggers: []
 });

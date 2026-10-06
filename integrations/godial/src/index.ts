@@ -9,8 +9,6 @@ import {
   listTeams,
   removeAccount
 } from './tools';
-import { callCompleted, contactUpdated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     removeAccount,
     listTeams
   ],
-  triggers: [callCompleted, contactUpdated]
+  triggers: []
 });

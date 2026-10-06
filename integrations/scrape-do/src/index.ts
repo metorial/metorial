@@ -10,8 +10,6 @@ import {
   scrapeWebpage,
   takeScreenshot
 } from './tools';
-import { scrapeResult } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     getAsyncJob,
     getAccountStats
   ],
-  triggers: [scrapeResult]
+  triggers: []
 });

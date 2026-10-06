@@ -4,7 +4,7 @@ import { z } from 'zod';
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string().min(1)
     })
   )
   .addTokenAuth({
@@ -15,6 +15,8 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .trim()
+        .min(1)
         .describe(
           'Your TextCortex API key. Generate one at https://app.textcortex.com/user/dashboard/settings/api-key'
         )
@@ -23,7 +25,7 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token.trim()
         }
       };
     }

@@ -1,13 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageProject = SlateTool.create(spec, {
   name: 'Manage Project',
   key: 'manage_project',
   description: `Create, retrieve, list, or delete Rollbar projects. Projects represent individual deployable apps or services. Use the \`action\` field to specify the operation.
-Requires an **account-level** access token for create, list, and delete operations.`,
+Requires an **account-level** access token for every operation.`,
   instructions: [
     'Use action "list" to see all projects in the account.',
     'Use action "get" with a projectId to get details of a specific project.',
@@ -15,7 +15,7 @@ Requires an **account-level** access token for create, list, and delete operatio
     'Use action "delete" with a projectId to delete a project.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -58,9 +58,16 @@ Requires an **account-level** access token for create, list, and delete operatio
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
-    let mapProject = (p: any) => ({
+    let mapProject = (p: {
+      id: number;
+      name: string;
+      status?: string;
+      account_id?: number;
+      date_created?: number;
+      date_modified?: number;
+    }) => ({
       projectId: p.id,
       name: p.name,
       status: p.status,
@@ -79,7 +86,8 @@ Requires an **account-level** access token for create, list, and delete operatio
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.projectId) throw new Error('projectId is required for "get" action');
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required for "get" action');
       let result = await client.getProject(ctx.input.projectId);
       let project = mapProject(result?.result);
       return {
@@ -89,7 +97,7 @@ Requires an **account-level** access token for create, list, and delete operatio
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for "create" action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for "create" action');
       let result = await client.createProject({ name: ctx.input.name });
       let project = mapProject(result?.result);
       return {
@@ -99,7 +107,8 @@ Requires an **account-level** access token for create, list, and delete operatio
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.projectId) throw new Error('projectId is required for "delete" action');
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required for "delete" action');
       await client.deleteProject(ctx.input.projectId);
       return {
         output: { deleted: true },
@@ -107,6 +116,6 @@ Requires an **account-level** access token for create, list, and delete operatio
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { address, nullableText, uid } from '../lib/contracts';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createSignedUrl = SlateTool.create(spec, {
@@ -14,11 +16,13 @@ export let createSignedUrl = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       templateUid: z.string().describe('UID of the template to create a signed base for')
     })
   )
   .output(
     z.object({
+      signedBaseUid: z.string().optional().describe('UID of the created signed base'),
       baseUrl: z.string().describe('The signed base URL for generating images on-demand'),
       exampleUrl: z
         .string()
@@ -28,17 +32,18 @@ export let createSignedUrl = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.createSignedBase(ctx.input.templateUid);
-
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const result = await client.createSignedBase(ctx.input.templateUid);
+    const output = {
+      baseUrl: address(result.base_url, true),
+      exampleUrl: nullableText(result.example_url),
+      templateUid: ctx.input.templateUid,
+      signedBaseUid: uid(result.uid)
+    };
+    if (output.exampleUrl !== null) address(output.exampleUrl, true);
     return {
-      output: {
-        baseUrl: result.base_url,
-        exampleUrl: result.example_url || null,
-        templateUid: ctx.input.templateUid
-      },
-      message: `Signed base URL created for template ${ctx.input.templateUid}. Base URL: \`${result.base_url}\``
+      output,
+      message: `Signed base created for the exact template (UID: ${output.signedBaseUid}). Opening a render URL consumes generation quota.`
     };
   })
   .build();

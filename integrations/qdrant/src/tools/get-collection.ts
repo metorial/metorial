@@ -21,16 +21,25 @@ export let getCollection = SlateTool.create(spec, {
       collectionName: z.string().describe('Name of the collection'),
       status: z.string().describe('Collection status: green, yellow, grey, or red'),
       optimizerStatus: z.any().describe('Current optimizer status'),
-      pointsCount: z.number().describe('Total number of points in the collection'),
-      indexedVectorsCount: z.number().describe('Number of indexed vectors'),
+      pointsCount: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Approximate number of points in the collection, when available'),
+      indexedVectorsCount: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Approximate number of indexed vectors, when available'),
       segmentsCount: z.number().describe('Number of segments'),
       vectorConfig: z.any().describe('Vector configuration of the collection'),
+      config: z.any().optional().describe('Complete collection configuration'),
       payloadSchema: z.any().describe('Schema of indexed payload fields')
     })
   )
   .handleInvocation(async ctx => {
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 
@@ -45,9 +54,10 @@ export let getCollection = SlateTool.create(spec, {
         indexedVectorsCount: info.indexed_vectors_count,
         segmentsCount: info.segments_count,
         vectorConfig: info.config?.params?.vectors,
+        config: info.config,
         payloadSchema: info.payload_schema
       },
-      message: `Collection \`${ctx.input.collectionName}\` is **${info.status}** with **${info.points_count}** points and **${info.indexed_vectors_count}** indexed vectors.`
+      message: `Collection \`${ctx.input.collectionName}\` is **${info.status}** with **${info.points_count ?? 'unknown'}** points and **${info.indexed_vectors_count ?? 'unknown'}** indexed vectors.`
     };
   })
   .build();

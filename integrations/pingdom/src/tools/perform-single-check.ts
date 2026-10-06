@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let performSingleCheck = SlateTool.create(spec, {
   name: 'Perform Single Check',
   key: 'perform_single_check',
-  description: `Performs a one-time ad-hoc probe check against a host without creating a persistent check. Useful for quick availability tests and diagnostics.`,
+  description: `Performs a one-time ad-hoc probe check against a host without creating a persistent check. Sends network requests to the target; only probe systems you are authorized to test.`,
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -17,7 +17,19 @@ export let performSingleCheck = SlateTool.create(spec, {
       type: z
         .enum(['http', 'httpcustom', 'tcp', 'udp', 'ping', 'dns', 'smtp', 'pop3', 'imap'])
         .describe('Type of check to perform'),
-      probeId: z.number().optional().describe('Specific probe server ID to use for the check')
+      probeId: z.number().optional().describe('Specific probe server ID to use for the check'),
+      url: z.string().optional().describe('HTTP path or required httpcustom XML path'),
+      port: z.number().optional().describe('Required target port for TCP/UDP'),
+      encryption: z.boolean().optional().describe('Use TLS for HTTP/SMTP'),
+      expectedIp: z.string().optional().describe('Required expected resolved IP for DNS'),
+      nameServer: z.string().optional().describe('Required DNS server for DNS'),
+      stringToSend: z.string().optional().describe('Data sent to TCP/UDP target'),
+      stringToExpect: z
+        .string()
+        .optional()
+        .describe('Expected TCP/UDP/SMTP/POP3/IMAP response'),
+      shouldContain: z.string().optional().describe('Required HTTP response text'),
+      shouldNotContain: z.string().optional().describe('Forbidden HTTP response text')
     })
   )
   .output(
@@ -46,10 +58,19 @@ export let performSingleCheck = SlateTool.create(spec, {
     let result = await client.performSingleCheck({
       host: ctx.input.hostname,
       type: ctx.input.type,
-      probeid: ctx.input.probeId
+      probeid: ctx.input.probeId,
+      url: ctx.input.url,
+      port: ctx.input.port,
+      encryption: ctx.input.encryption,
+      expectedip: ctx.input.expectedIp,
+      nameserver: ctx.input.nameServer,
+      stringtosend: ctx.input.stringToSend,
+      stringtoexpect: ctx.input.stringToExpect,
+      shouldcontain: ctx.input.shouldContain,
+      shouldnotcontain: ctx.input.shouldNotContain
     });
 
-    let r = result.result || result;
+    let r = result.result;
 
     return {
       output: {

@@ -1,0 +1,795 @@
+{
+  "get_report": {
+    "type": "object",
+    "properties": {
+      "reportToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      },
+      "archived": {
+        "type": "boolean"
+      },
+      "spaceToken": {
+        "type": "string"
+      },
+      "lastRunAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "reportToken",
+      "name",
+      "description",
+      "createdAt",
+      "updatedAt",
+      "archived",
+      "spaceToken",
+      "lastRunAt"
+    ],
+    "additionalProperties": false
+  },
+  "list_data_sources": {
+    "type": "object",
+    "properties": {
+      "dataSources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "dataSourceToken": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "adapter": {
+              "type": "string"
+            },
+            "host": {
+              "type": "string"
+            },
+            "database": {
+              "type": "string"
+            },
+            "port": {
+              "type": "number"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "dataSourceToken",
+            "name",
+            "description",
+            "adapter",
+            "host",
+            "database",
+            "port",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["dataSources"],
+    "additionalProperties": false
+  },
+  "list_members": {
+    "type": "object",
+    "properties": {
+      "members": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "membershipToken": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "memberUsername": {
+              "type": "string"
+            },
+            "memberEmail": {
+              "type": "string"
+            },
+            "memberName": {
+              "type": "string"
+            },
+            "admin": {
+              "type": "boolean"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "membershipToken",
+            "state",
+            "memberUsername",
+            "memberEmail",
+            "memberName",
+            "admin",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["members"],
+    "additionalProperties": false
+  },
+  "list_reports": {
+    "type": "object",
+    "properties": {
+      "reports": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "reportToken": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            },
+            "archived": {
+              "type": "boolean"
+            },
+            "spaceToken": {
+              "type": "string"
+            },
+            "lastRunAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reportToken",
+            "name",
+            "description",
+            "createdAt",
+            "updatedAt",
+            "archived",
+            "spaceToken",
+            "lastRunAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["reports"],
+    "additionalProperties": false
+  },
+  "list_collections": {
+    "type": "object",
+    "properties": {
+      "collections": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "collectionToken": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "spaceType": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "restricted": {
+              "type": "boolean"
+            },
+            "freeDefault": {
+              "type": "boolean"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "collectionToken",
+            "name",
+            "description",
+            "spaceType",
+            "state",
+            "restricted",
+            "freeDefault",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["collections"],
+    "additionalProperties": false
+  },
+  "manage_collection": {
+    "type": "object",
+    "properties": {
+      "collectionToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "spaceType": {
+        "type": "string"
+      },
+      "state": {
+        "type": "string"
+      },
+      "restricted": {
+        "type": "boolean"
+      },
+      "freeDefault": {
+        "type": "boolean"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "collectionToken",
+      "name",
+      "description",
+      "spaceType",
+      "state",
+      "restricted",
+      "freeDefault",
+      "createdAt",
+      "updatedAt"
+    ],
+    "additionalProperties": false
+  },
+  "list_datasets": {
+    "type": "object",
+    "properties": {
+      "datasets": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "datasetToken": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          },
+          "required": ["datasetToken", "name", "description", "createdAt", "updatedAt"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["datasets"],
+    "additionalProperties": false
+  },
+  "manage_dataset": {
+    "type": "object",
+    "properties": {
+      "datasetToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    },
+    "required": ["datasetToken", "name", "description", "createdAt", "updatedAt"],
+    "additionalProperties": false
+  },
+  "list_definitions": {
+    "type": "object",
+    "properties": {
+      "definitions": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "definitionToken": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          },
+          "required": ["definitionToken", "name", "description", "createdAt", "updatedAt"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["definitions"],
+    "additionalProperties": false
+  },
+  "manage_definition": {
+    "type": "object",
+    "properties": {
+      "definitionToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    },
+    "required": ["definitionToken", "name", "description", "createdAt", "updatedAt"],
+    "additionalProperties": false
+  },
+  "manage_query": {
+    "type": "object",
+    "properties": {
+      "queries": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "queryToken": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "rawQuery": {
+              "type": "string"
+            },
+            "dataSourceId": {
+              "type": "number"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "queryToken",
+            "name",
+            "rawQuery",
+            "dataSourceId",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "query": {
+        "type": "object",
+        "properties": {
+          "queryToken": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rawQuery": {
+            "type": "string"
+          },
+          "dataSourceId": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "queryToken",
+          "name",
+          "rawQuery",
+          "dataSourceId",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  },
+  "manage_report": {
+    "type": "object",
+    "properties": {
+      "reportToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "archived": {
+        "type": "boolean"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      },
+      "spaceToken": {
+        "type": "string"
+      },
+      "lastRunAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "reportToken",
+      "name",
+      "description",
+      "archived",
+      "createdAt",
+      "updatedAt",
+      "spaceToken",
+      "lastRunAt"
+    ],
+    "additionalProperties": false
+  },
+  "list_report_schedules": {
+    "type": "object",
+    "properties": {
+      "schedules": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "scheduleToken": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "frequency": {
+              "type": "string"
+            },
+            "hour": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "minute": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dayOfWeek": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "dayOfMonth": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timeZone": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "scheduleToken",
+            "name",
+            "frequency",
+            "hour",
+            "minute",
+            "dayOfWeek",
+            "dayOfMonth",
+            "timeZone",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["schedules"],
+    "additionalProperties": false
+  },
+  "manage_report_schedule": {
+    "type": "object",
+    "properties": {
+      "scheduleToken": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "frequency": {
+        "type": "string"
+      },
+      "hour": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "minute": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "dayOfWeek": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "dayOfMonth": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "timeZone": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "scheduleToken",
+      "name",
+      "frequency",
+      "hour",
+      "minute",
+      "dayOfWeek",
+      "dayOfMonth",
+      "timeZone",
+      "createdAt",
+      "updatedAt"
+    ],
+    "additionalProperties": false
+  },
+  "get_report_run": {
+    "type": "object",
+    "properties": {
+      "runToken": {
+        "type": "string"
+      },
+      "state": {
+        "type": "string"
+      },
+      "pythonState": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      },
+      "completedAt": {
+        "type": "string"
+      },
+      "parameters": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      },
+      "queryRuns": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "queryRunToken": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "queryToken": {
+              "type": "string"
+            },
+            "queryName": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "completedAt": {
+              "type": "string"
+            },
+            "dataSourceId": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "queryRunToken",
+            "state",
+            "queryToken",
+            "queryName",
+            "createdAt",
+            "completedAt",
+            "dataSourceId"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "runToken",
+      "state",
+      "pythonState",
+      "createdAt",
+      "updatedAt",
+      "completedAt",
+      "parameters"
+    ],
+    "additionalProperties": false
+  },
+  "list_report_runs": {
+    "type": "object",
+    "properties": {
+      "runs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "runToken": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            },
+            "completedAt": {
+              "type": "string"
+            },
+            "parameters": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "required": [
+            "runToken",
+            "state",
+            "createdAt",
+            "updatedAt",
+            "completedAt",
+            "parameters"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["runs"],
+    "additionalProperties": false
+  },
+  "run_report": {
+    "type": "object",
+    "properties": {
+      "runToken": {
+        "type": "string"
+      },
+      "state": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "parameters": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": ["runToken", "state", "createdAt", "parameters"],
+    "additionalProperties": false
+  }
+}

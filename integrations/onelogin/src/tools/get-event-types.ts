@@ -31,15 +31,12 @@ export let getEventTypes = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
     let response = await client.getEventTypes();
-    let types = response.data || [];
+    let types = response;
 
-    let mapped = types.map((t: any) => ({
+    let mapped = types.map(t => ({
       eventTypeId: t.id,
       name: t.name,
       description: t.description

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import type { Customer } from '../lib/types';
 import { spec } from '../spec';
 
 let exemptRegionSchema = z.object({
@@ -25,7 +26,7 @@ let customerOutput = z.object({
   street: z.string().optional()
 });
 
-let mapCustomerOutput = (customer: any) => ({
+let mapCustomerOutput = (customer: Customer) => ({
   customerId: customer.customer_id,
   exemptionType: customer.exemption_type,
   name: customer.name,
@@ -42,7 +43,7 @@ let mapCustomerOutput = (customer: any) => ({
 export let listCustomers = SlateTool.create(spec, {
   name: 'List Exempt Customers',
   key: 'list_customers',
-  description: `List all exempt customers configured in TaxJar. Returns customer details including exemption type and exempt regions.`,
+  description: `List customers configured in TaxJar with their exemption type and regions. Customer IDs from the list endpoint are resolved through individual customer lookups.`,
   tags: {
     readOnly: true
   }
@@ -54,11 +55,7 @@ export let listCustomers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let customers = await client.listCustomers();
 
@@ -86,11 +83,7 @@ export let getCustomer = SlateTool.create(spec, {
   )
   .output(customerOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let customer = await client.showCustomer(ctx.input.customerId);
 
@@ -134,11 +127,7 @@ export let createCustomer = SlateTool.create(spec, {
   )
   .output(customerOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let customer = await client.createCustomer({
       customer_id: ctx.input.customerId,
@@ -164,7 +153,7 @@ export let createCustomer = SlateTool.create(spec, {
 export let updateCustomer = SlateTool.create(spec, {
   name: 'Update Exempt Customer',
   key: 'update_customer',
-  description: `Update an existing exempt customer in TaxJar. Provide only the fields you want to change.`,
+  description: `Update an existing exempt customer in TaxJar. Provide only the fields you want to change. Omitted name and exemption type are read from the existing customer and preserved.`,
   tags: {
     destructive: false
   }
@@ -184,11 +173,7 @@ export let updateCustomer = SlateTool.create(spec, {
   )
   .output(customerOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let customer = await client.updateCustomer({
       customer_id: ctx.input.customerId,
@@ -226,17 +211,13 @@ export let deleteCustomer = SlateTool.create(spec, {
   )
   .output(customerOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let customer = await client.deleteCustomer(ctx.input.customerId);
 
     return {
       output: mapCustomerOutput(customer),
-      message: `Deleted customer **${customer.customer_id}**.`
+      message: `TaxJar accepted deletion of customer **${customer.customer_id}**. Returned details describe the customer before deletion.`
     };
   })
   .build();

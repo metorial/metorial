@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'The environment to target for deployments (e.g. "default", "staging", "production"). If not set, the default environment is used.'
+        'Legacy deployment environment, retained for compatibility. Humanloop retired on September 8, 2025; this setting cannot enable API operations.'
       )
   })
 );

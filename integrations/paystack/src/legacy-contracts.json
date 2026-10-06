@@ -1,0 +1,2855 @@
+{
+  "initialize_transaction": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Customer email address"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount in smallest currency unit (e.g., kobo). NGN 100 = 10000"
+        },
+        "currency": {
+          "description": "Currency code (e.g., NGN, GHS, ZAR, KES, USD)",
+          "type": "string"
+        },
+        "reference": {
+          "description": "Unique transaction reference. Auto-generated if not provided",
+          "type": "string"
+        },
+        "callbackUrl": {
+          "description": "URL to redirect to after payment",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom metadata to attach to the transaction",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "channels": {
+          "description": "Payment channels to use (e.g., card, bank, ussd, qr, mobile_money, bank_transfer)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "subaccount": {
+          "description": "Subaccount code to split payment to",
+          "type": "string"
+        },
+        "splitCode": {
+          "description": "Split code for transaction splits",
+          "type": "string"
+        },
+        "transactionCharge": {
+          "description": "Flat fee (in smallest currency unit) to charge the subaccount for this transaction",
+          "type": "number"
+        },
+        "bearer": {
+          "description": "Who bears the Paystack charges",
+          "type": "string",
+          "enum": ["account", "subaccount"]
+        }
+      },
+      "required": ["email", "amount"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "authorizationUrl": {
+          "type": "string",
+          "description": "URL for customer to complete payment"
+        },
+        "accessCode": {
+          "type": "string",
+          "description": "Access code for the transaction"
+        },
+        "reference": {
+          "type": "string",
+          "description": "Transaction reference"
+        }
+      },
+      "required": ["authorizationUrl", "accessCode", "reference"],
+      "additionalProperties": false
+    }
+  },
+  "verify_transaction": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reference": {
+          "type": "string",
+          "description": "Transaction reference to verify"
+        }
+      },
+      "required": ["reference"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transactionId": {
+          "type": "number",
+          "description": "Paystack transaction ID"
+        },
+        "status": {
+          "type": "string",
+          "description": "Transaction status (e.g., success, failed, abandoned)"
+        },
+        "reference": {
+          "type": "string",
+          "description": "Transaction reference"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount in smallest currency unit"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code"
+        },
+        "channel": {
+          "type": "string",
+          "description": "Payment channel used"
+        },
+        "customerEmail": {
+          "type": "string",
+          "description": "Customer email"
+        },
+        "customerCode": {
+          "type": "string",
+          "description": "Customer code"
+        },
+        "paidAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "When the transaction was paid"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "When the transaction was created"
+        },
+        "gatewayResponse": {
+          "type": "string",
+          "description": "Response from the payment gateway"
+        },
+        "metadata": {
+          "description": "Transaction metadata"
+        }
+      },
+      "required": [
+        "transactionId",
+        "status",
+        "reference",
+        "amount",
+        "currency",
+        "channel",
+        "customerEmail",
+        "customerCode",
+        "paidAt",
+        "createdAt",
+        "gatewayResponse"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "list_transactions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Number of records per page (default 50)",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number to retrieve",
+          "type": "number"
+        },
+        "customer": {
+          "description": "Filter by customer ID",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter by transaction status",
+          "type": "string",
+          "enum": ["success", "failed", "abandoned"]
+        },
+        "from": {
+          "description": "Start date for filtering (ISO 8601 format)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date for filtering (ISO 8601 format)",
+          "type": "string"
+        },
+        "amount": {
+          "description": "Filter by amount (in smallest currency unit)",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "transactionId": {
+                "type": "number",
+                "description": "Transaction ID"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Transaction reference"
+              },
+              "status": {
+                "type": "string",
+                "description": "Transaction status"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Amount in smallest currency unit"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Currency code"
+              },
+              "channel": {
+                "type": "string",
+                "description": "Payment channel"
+              },
+              "customerEmail": {
+                "type": "string",
+                "description": "Customer email"
+              },
+              "paidAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Payment timestamp"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              }
+            },
+            "required": [
+              "transactionId",
+              "reference",
+              "status",
+              "amount",
+              "currency",
+              "channel",
+              "customerEmail",
+              "paidAt",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of transactions matching the filter"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page number"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total number of pages"
+        }
+      },
+      "required": ["transactions", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "charge_authorization": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Customer email"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount in smallest currency unit"
+        },
+        "authorizationCode": {
+          "type": "string",
+          "description": "Authorization code from a previous transaction (e.g., AUTH_xxx)"
+        },
+        "currency": {
+          "description": "Currency code",
+          "type": "string"
+        },
+        "reference": {
+          "description": "Unique reference. Auto-generated if not provided",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom metadata",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["email", "amount", "authorizationCode"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transactionId": {
+          "type": "number",
+          "description": "Transaction ID"
+        },
+        "reference": {
+          "type": "string",
+          "description": "Transaction reference"
+        },
+        "status": {
+          "type": "string",
+          "description": "Transaction status"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount charged"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency"
+        },
+        "gatewayResponse": {
+          "type": "string",
+          "description": "Gateway response message"
+        }
+      },
+      "required": [
+        "transactionId",
+        "reference",
+        "status",
+        "amount",
+        "currency",
+        "gatewayResponse"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "create_customer": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Customer email address"
+        },
+        "firstName": {
+          "description": "Customer first name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Customer last name",
+          "type": "string"
+        },
+        "phone": {
+          "description": "Customer phone number",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom metadata for the customer",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["email"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "customerCode": {
+          "type": "string",
+          "description": "Unique customer code"
+        },
+        "customerId": {
+          "type": "number",
+          "description": "Customer ID"
+        },
+        "email": {
+          "type": "string",
+          "description": "Customer email"
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Customer first name"
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Customer last name"
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Customer phone"
+        }
+      },
+      "required": ["customerCode", "customerId", "email", "firstName", "lastName", "phone"],
+      "additionalProperties": false
+    }
+  },
+  "get_customer": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "emailOrCode": {
+          "type": "string",
+          "description": "Customer email address or customer code"
+        }
+      },
+      "required": ["emailOrCode"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "customerCode": {
+          "type": "string",
+          "description": "Unique customer code"
+        },
+        "customerId": {
+          "type": "number",
+          "description": "Customer ID"
+        },
+        "email": {
+          "type": "string",
+          "description": "Customer email"
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Customer first name"
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Customer last name"
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Customer phone"
+        },
+        "riskAction": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Risk action (default, allow, deny)"
+        },
+        "metadata": {
+          "description": "Customer metadata"
+        },
+        "totalTransactions": {
+          "description": "Total number of transactions",
+          "type": "number"
+        },
+        "totalTransactionValue": {
+          "description": "Total transaction values per currency",
+          "type": "array",
+          "items": {}
+        }
+      },
+      "required": [
+        "customerCode",
+        "customerId",
+        "email",
+        "firstName",
+        "lastName",
+        "phone",
+        "riskAction"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "update_customer": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "customerCode": {
+          "type": "string",
+          "description": "Customer code of the customer to update"
+        },
+        "firstName": {
+          "description": "Updated first name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Updated last name",
+          "type": "string"
+        },
+        "phone": {
+          "description": "Updated phone number",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Updated metadata",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "riskAction": {
+          "description": "Set risk action: allow (whitelist), deny (blacklist), or default",
+          "type": "string",
+          "enum": ["default", "allow", "deny"]
+        }
+      },
+      "required": ["customerCode"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "customerCode": {
+          "type": "string",
+          "description": "Customer code"
+        },
+        "email": {
+          "type": "string",
+          "description": "Customer email"
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Customer first name"
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Customer last name"
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Customer phone"
+        }
+      },
+      "required": ["customerCode", "email", "firstName", "lastName", "phone"],
+      "additionalProperties": false
+    }
+  },
+  "list_customers": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Number of records per page (default 50)",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number",
+          "type": "number"
+        },
+        "from": {
+          "description": "Start date (ISO 8601)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date (ISO 8601)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "customers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "customerCode": {
+                "type": "string",
+                "description": "Customer code"
+              },
+              "customerId": {
+                "type": "number",
+                "description": "Customer ID"
+              },
+              "email": {
+                "type": "string",
+                "description": "Customer email"
+              },
+              "firstName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "First name"
+              },
+              "lastName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Last name"
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Phone"
+              },
+              "riskAction": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Risk action"
+              }
+            },
+            "required": [
+              "customerCode",
+              "customerId",
+              "email",
+              "firstName",
+              "lastName",
+              "phone",
+              "riskAction"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total customers"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total pages"
+        }
+      },
+      "required": ["customers", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "create_plan": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Plan name"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount in smallest currency unit"
+        },
+        "interval": {
+          "type": "string",
+          "enum": [
+            "hourly",
+            "daily",
+            "weekly",
+            "monthly",
+            "quarterly",
+            "biannually",
+            "annually"
+          ],
+          "description": "Billing interval"
+        },
+        "description": {
+          "description": "Plan description",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Currency code (default NGN)",
+          "type": "string"
+        },
+        "invoiceLimit": {
+          "description": "Number of times to charge. Leave empty for infinite",
+          "type": "number"
+        },
+        "sendInvoices": {
+          "description": "Whether to send invoices to customer",
+          "type": "boolean"
+        },
+        "sendSms": {
+          "description": "Whether to send SMS notifications",
+          "type": "boolean"
+        }
+      },
+      "required": ["name", "amount", "interval"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "planCode": {
+          "type": "string",
+          "description": "Plan code"
+        },
+        "planId": {
+          "type": "number",
+          "description": "Plan ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Plan name"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Plan amount"
+        },
+        "interval": {
+          "type": "string",
+          "description": "Billing interval"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency"
+        }
+      },
+      "required": ["planCode", "planId", "name", "amount", "interval", "currency"],
+      "additionalProperties": false
+    }
+  },
+  "list_plans": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Records per page",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number",
+          "type": "number"
+        },
+        "status": {
+          "description": "Filter by plan status",
+          "type": "string"
+        },
+        "interval": {
+          "description": "Filter by billing interval",
+          "type": "string"
+        },
+        "amount": {
+          "description": "Filter by amount",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "plans": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "planCode": {
+                "type": "string",
+                "description": "Plan code"
+              },
+              "planId": {
+                "type": "number",
+                "description": "Plan ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Plan name"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Amount"
+              },
+              "interval": {
+                "type": "string",
+                "description": "Billing interval"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Currency"
+              },
+              "subscriptionCount": {
+                "type": "number",
+                "description": "Number of subscriptions"
+              }
+            },
+            "required": [
+              "planCode",
+              "planId",
+              "name",
+              "amount",
+              "interval",
+              "currency",
+              "subscriptionCount"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total plans"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total pages"
+        }
+      },
+      "required": ["plans", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "update_plan": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "planIdOrCode": {
+          "type": "string",
+          "description": "Plan ID or plan code to update"
+        },
+        "name": {
+          "description": "Updated plan name",
+          "type": "string"
+        },
+        "amount": {
+          "description": "Updated amount in smallest currency unit",
+          "type": "number"
+        },
+        "interval": {
+          "description": "Updated billing interval",
+          "type": "string",
+          "enum": [
+            "hourly",
+            "daily",
+            "weekly",
+            "monthly",
+            "quarterly",
+            "biannually",
+            "annually"
+          ]
+        },
+        "description": {
+          "description": "Updated description",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Updated currency",
+          "type": "string"
+        },
+        "invoiceLimit": {
+          "description": "Updated invoice limit",
+          "type": "number"
+        },
+        "sendInvoices": {
+          "description": "Whether to send invoices",
+          "type": "boolean"
+        },
+        "sendSms": {
+          "description": "Whether to send SMS",
+          "type": "boolean"
+        }
+      },
+      "required": ["planIdOrCode"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the update succeeded"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "create_subscription": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "customer": {
+          "type": "string",
+          "description": "Customer email or customer code"
+        },
+        "plan": {
+          "type": "string",
+          "description": "Plan code to subscribe the customer to"
+        },
+        "authorization": {
+          "description": "Authorization code from a previous successful transaction. Required if the customer has multiple authorizations",
+          "type": "string"
+        },
+        "startDate": {
+          "description": "When to start the subscription (ISO 8601). Defaults to now",
+          "type": "string"
+        }
+      },
+      "required": ["customer", "plan"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "subscriptionCode": {
+          "type": "string",
+          "description": "Subscription code"
+        },
+        "emailToken": {
+          "type": "string",
+          "description": "Email token for managing the subscription"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Subscription amount"
+        },
+        "status": {
+          "type": "string",
+          "description": "Subscription status"
+        }
+      },
+      "required": ["subscriptionCode", "emailToken", "amount", "status"],
+      "additionalProperties": false
+    }
+  },
+  "get_subscription": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "subscriptionIdOrCode": {
+          "type": "string",
+          "description": "Subscription ID or subscription code"
+        }
+      },
+      "required": ["subscriptionIdOrCode"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "subscriptionCode": {
+          "type": "string",
+          "description": "Subscription code"
+        },
+        "status": {
+          "type": "string",
+          "description": "Subscription status (active, non-renewing, attention, completed, cancelled)"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Subscription amount"
+        },
+        "planCode": {
+          "type": "string",
+          "description": "Plan code"
+        },
+        "customerCode": {
+          "type": "string",
+          "description": "Customer code"
+        },
+        "nextPaymentDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Next billing date"
+        },
+        "emailToken": {
+          "type": "string",
+          "description": "Token for managing the subscription via email"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": [
+        "subscriptionCode",
+        "status",
+        "amount",
+        "planCode",
+        "customerCode",
+        "nextPaymentDate",
+        "emailToken",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "list_subscriptions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Records per page",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number",
+          "type": "number"
+        },
+        "customer": {
+          "description": "Filter by customer ID",
+          "type": "string"
+        },
+        "plan": {
+          "description": "Filter by plan ID",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "subscriptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "subscriptionCode": {
+                "type": "string",
+                "description": "Subscription code"
+              },
+              "status": {
+                "type": "string",
+                "description": "Status"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Amount"
+              },
+              "planCode": {
+                "type": "string",
+                "description": "Plan code"
+              },
+              "customerEmail": {
+                "type": "string",
+                "description": "Customer email"
+              },
+              "nextPaymentDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Next payment date"
+              }
+            },
+            "required": [
+              "subscriptionCode",
+              "status",
+              "amount",
+              "planCode",
+              "customerEmail",
+              "nextPaymentDate"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total subscriptions"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total pages"
+        }
+      },
+      "required": ["subscriptions", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "disable_subscription": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "subscriptionCode": {
+          "type": "string",
+          "description": "Subscription code to disable"
+        },
+        "emailToken": {
+          "type": "string",
+          "description": "Email token for the subscription"
+        }
+      },
+      "required": ["subscriptionCode", "emailToken"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the subscription was disabled"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "enable_subscription": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "subscriptionCode": {
+          "type": "string",
+          "description": "Subscription code to enable"
+        },
+        "emailToken": {
+          "type": "string",
+          "description": "Email token for the subscription"
+        }
+      },
+      "required": ["subscriptionCode", "emailToken"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the subscription was enabled"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "initiate_transfer": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number",
+          "description": "Amount in smallest currency unit"
+        },
+        "recipientCode": {
+          "type": "string",
+          "description": "Recipient code (from creating a transfer recipient)"
+        },
+        "reason": {
+          "description": "Reason for the transfer",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Currency code",
+          "type": "string"
+        },
+        "reference": {
+          "description": "Unique transfer reference. Auto-generated if not provided",
+          "type": "string"
+        }
+      },
+      "required": ["amount", "recipientCode"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transferCode": {
+          "type": "string",
+          "description": "Transfer code"
+        },
+        "reference": {
+          "type": "string",
+          "description": "Transfer reference"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Transfer amount"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency"
+        },
+        "status": {
+          "type": "string",
+          "description": "Transfer status"
+        }
+      },
+      "required": ["transferCode", "reference", "amount", "currency", "status"],
+      "additionalProperties": false
+    }
+  },
+  "create_transfer_recipient": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["nuban", "mobile_money", "basa", "authorization"],
+          "description": "Recipient type: nuban (Nigerian bank), mobile_money, basa (South African bank), authorization"
+        },
+        "name": {
+          "type": "string",
+          "description": "Recipient name"
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Account number or mobile money number"
+        },
+        "bankCode": {
+          "type": "string",
+          "description": "Bank code (use List Banks tool or verify bank account to find this)"
+        },
+        "currency": {
+          "description": "Currency code (NGN, GHS, ZAR, KES)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description for the recipient",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom metadata",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["type", "name", "accountNumber", "bankCode"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recipientCode": {
+          "type": "string",
+          "description": "Recipient code for initiating transfers"
+        },
+        "recipientId": {
+          "type": "number",
+          "description": "Recipient ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Recipient name"
+        },
+        "type": {
+          "type": "string",
+          "description": "Recipient type"
+        },
+        "bankName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Bank name"
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Account number"
+        }
+      },
+      "required": [
+        "recipientCode",
+        "recipientId",
+        "name",
+        "type",
+        "bankName",
+        "accountNumber"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "list_transfers": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Records per page",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number",
+          "type": "number"
+        },
+        "from": {
+          "description": "Start date (ISO 8601)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date (ISO 8601)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transfers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "transferCode": {
+                "type": "string",
+                "description": "Transfer code"
+              },
+              "reference": {
+                "type": "string",
+                "description": "Transfer reference"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Amount"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Currency"
+              },
+              "status": {
+                "type": "string",
+                "description": "Status"
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Transfer reason"
+              },
+              "recipientCode": {
+                "type": "string",
+                "description": "Recipient code"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              }
+            },
+            "required": [
+              "transferCode",
+              "reference",
+              "amount",
+              "currency",
+              "status",
+              "reason",
+              "recipientCode",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total transfers"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total pages"
+        }
+      },
+      "required": ["transfers", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "create_refund": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transactionReference": {
+          "type": "string",
+          "description": "Transaction reference or transaction ID to refund"
+        },
+        "amount": {
+          "description": "Amount to refund in smallest currency unit. Defaults to full transaction amount if not specified",
+          "type": "number"
+        },
+        "currency": {
+          "description": "Currency code",
+          "type": "string"
+        },
+        "customerNote": {
+          "description": "Note to send to the customer about the refund",
+          "type": "string"
+        },
+        "merchantNote": {
+          "description": "Internal note about the refund reason",
+          "type": "string"
+        }
+      },
+      "required": ["transactionReference"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "refundId": {
+          "type": "number",
+          "description": "Refund ID"
+        },
+        "transactionReference": {
+          "type": "string",
+          "description": "Original transaction reference"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Refund amount"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency"
+        },
+        "status": {
+          "type": "string",
+          "description": "Refund status"
+        }
+      },
+      "required": ["refundId", "transactionReference", "amount", "currency", "status"],
+      "additionalProperties": false
+    }
+  },
+  "list_refunds": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Records per page",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number",
+          "type": "number"
+        },
+        "reference": {
+          "description": "Filter by transaction reference",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Filter by currency",
+          "type": "string"
+        },
+        "from": {
+          "description": "Start date (ISO 8601)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date (ISO 8601)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "refunds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "refundId": {
+                "type": "number",
+                "description": "Refund ID"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Refund amount"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Currency"
+              },
+              "status": {
+                "type": "string",
+                "description": "Refund status"
+              },
+              "transactionReference": {
+                "type": "string",
+                "description": "Transaction reference"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              }
+            },
+            "required": [
+              "refundId",
+              "amount",
+              "currency",
+              "status",
+              "transactionReference",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total refunds"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total pages"
+        }
+      },
+      "required": ["refunds", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "list_settlements": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Records per page",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number",
+          "type": "number"
+        },
+        "from": {
+          "description": "Start date (ISO 8601)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date (ISO 8601)",
+          "type": "string"
+        },
+        "subaccount": {
+          "description": "Filter by subaccount code",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "settlements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "settlementId": {
+                "type": "number",
+                "description": "Settlement ID"
+              },
+              "totalAmount": {
+                "type": "number",
+                "description": "Total settlement amount"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Currency"
+              },
+              "status": {
+                "type": "string",
+                "description": "Settlement status"
+              },
+              "settledAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Settlement date"
+              }
+            },
+            "required": ["settlementId", "totalAmount", "currency", "status", "settledAt"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total settlements"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total pages"
+        }
+      },
+      "required": ["settlements", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "create_payment_page": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Page name/title"
+        },
+        "description": {
+          "description": "Page description shown to customers",
+          "type": "string"
+        },
+        "amount": {
+          "description": "Fixed amount in smallest currency unit. Leave empty for customer-entered amount",
+          "type": "number"
+        },
+        "slug": {
+          "description": "URL slug for the page. Auto-generated from name if not provided",
+          "type": "string"
+        },
+        "redirectUrl": {
+          "description": "URL to redirect customers to after payment",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom metadata",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pageId": {
+          "type": "number",
+          "description": "Page ID"
+        },
+        "slug": {
+          "type": "string",
+          "description": "Page URL slug"
+        },
+        "pageUrl": {
+          "type": "string",
+          "description": "Full URL for the payment page"
+        },
+        "name": {
+          "type": "string",
+          "description": "Page name"
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Fixed amount if set"
+        }
+      },
+      "required": ["pageId", "slug", "pageUrl", "name", "amount"],
+      "additionalProperties": false
+    }
+  },
+  "list_payment_pages": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Records per page",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number",
+          "type": "number"
+        },
+        "from": {
+          "description": "Start date (ISO 8601)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date (ISO 8601)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pageId": {
+                "type": "number",
+                "description": "Page ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Page name"
+              },
+              "slug": {
+                "type": "string",
+                "description": "URL slug"
+              },
+              "pageUrl": {
+                "type": "string",
+                "description": "Full payment page URL"
+              },
+              "amount": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Fixed amount if set"
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the page is active"
+              }
+            },
+            "required": ["pageId", "name", "slug", "pageUrl", "amount", "active"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total pages"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page number"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total page count"
+        }
+      },
+      "required": ["pages", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "update_payment_page": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pageIdOrSlug": {
+          "type": "string",
+          "description": "Page ID or URL slug"
+        },
+        "name": {
+          "description": "Updated page name",
+          "type": "string"
+        },
+        "description": {
+          "description": "Updated description",
+          "type": "string"
+        },
+        "amount": {
+          "description": "Updated fixed amount in smallest currency unit",
+          "type": "number"
+        },
+        "active": {
+          "description": "Whether the page is active",
+          "type": "boolean"
+        }
+      },
+      "required": ["pageIdOrSlug"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the update succeeded"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "create_payment_request": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "customer": {
+          "type": "string",
+          "description": "Customer code or customer ID"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Total amount in smallest currency unit"
+        },
+        "dueDate": {
+          "description": "Due date (ISO 8601 format)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Payment request description",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Currency code (default NGN)",
+          "type": "string"
+        },
+        "lineItems": {
+          "description": "Line items for the invoice",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Item name"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Item amount"
+              },
+              "quantity": {
+                "type": "number",
+                "description": "Item quantity"
+              }
+            },
+            "required": ["name", "amount", "quantity"],
+            "additionalProperties": false
+          }
+        },
+        "tax": {
+          "description": "Tax entries",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Tax name"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Tax amount"
+              }
+            },
+            "required": ["name", "amount"],
+            "additionalProperties": false
+          }
+        },
+        "sendNotification": {
+          "description": "Whether to email the customer",
+          "type": "boolean"
+        },
+        "draft": {
+          "description": "Create as draft (not sent to customer)",
+          "type": "boolean"
+        }
+      },
+      "required": ["customer", "amount"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestCode": {
+          "type": "string",
+          "description": "Payment request code"
+        },
+        "requestId": {
+          "type": "number",
+          "description": "Payment request ID"
+        },
+        "status": {
+          "type": "string",
+          "description": "Payment request status"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Total amount"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency"
+        }
+      },
+      "required": ["requestCode", "requestId", "status", "amount", "currency"],
+      "additionalProperties": false
+    }
+  },
+  "list_payment_requests": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Records per page",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number",
+          "type": "number"
+        },
+        "customer": {
+          "description": "Filter by customer code",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter by status (draft, success, pending, failed)",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Filter by currency",
+          "type": "string"
+        },
+        "from": {
+          "description": "Start date (ISO 8601)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date (ISO 8601)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requestCode": {
+                "type": "string",
+                "description": "Payment request code"
+              },
+              "requestId": {
+                "type": "number",
+                "description": "Payment request ID"
+              },
+              "status": {
+                "type": "string",
+                "description": "Status"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Amount"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Currency"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Description"
+              },
+              "customerEmail": {
+                "type": "string",
+                "description": "Customer email"
+              },
+              "dueDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Due date"
+              }
+            },
+            "required": [
+              "requestCode",
+              "requestId",
+              "status",
+              "amount",
+              "currency",
+              "description",
+              "customerEmail",
+              "dueDate"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total requests"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total pages"
+        }
+      },
+      "required": ["requests", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "create_subaccount": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "businessName": {
+          "type": "string",
+          "description": "Business name for the subaccount"
+        },
+        "settlementBank": {
+          "type": "string",
+          "description": "Bank code for settlement"
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Bank account number"
+        },
+        "percentageCharge": {
+          "type": "number",
+          "description": "Percentage of transaction to charge (0-100)"
+        },
+        "description": {
+          "description": "Subaccount description",
+          "type": "string"
+        },
+        "primaryContactEmail": {
+          "description": "Primary contact email",
+          "type": "string"
+        },
+        "primaryContactName": {
+          "description": "Primary contact name",
+          "type": "string"
+        },
+        "primaryContactPhone": {
+          "description": "Primary contact phone",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom metadata",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["businessName", "settlementBank", "accountNumber", "percentageCharge"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "subaccountCode": {
+          "type": "string",
+          "description": "Subaccount code for use in transactions"
+        },
+        "subaccountId": {
+          "type": "number",
+          "description": "Subaccount ID"
+        },
+        "businessName": {
+          "type": "string",
+          "description": "Business name"
+        },
+        "percentageCharge": {
+          "type": "number",
+          "description": "Charge percentage"
+        },
+        "settlementBank": {
+          "type": "string",
+          "description": "Settlement bank"
+        }
+      },
+      "required": [
+        "subaccountCode",
+        "subaccountId",
+        "businessName",
+        "percentageCharge",
+        "settlementBank"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "list_subaccounts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Records per page",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number",
+          "type": "number"
+        },
+        "from": {
+          "description": "Start date (ISO 8601)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date (ISO 8601)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "subaccounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "subaccountCode": {
+                "type": "string",
+                "description": "Subaccount code"
+              },
+              "subaccountId": {
+                "type": "number",
+                "description": "Subaccount ID"
+              },
+              "businessName": {
+                "type": "string",
+                "description": "Business name"
+              },
+              "percentageCharge": {
+                "type": "number",
+                "description": "Charge percentage"
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether active"
+              }
+            },
+            "required": [
+              "subaccountCode",
+              "subaccountId",
+              "businessName",
+              "percentageCharge",
+              "active"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total subaccounts"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total pages"
+        }
+      },
+      "required": ["subaccounts", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "create_dedicated_virtual_account": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "customer": {
+          "type": "string",
+          "description": "Customer ID or customer code"
+        },
+        "preferredBank": {
+          "description": "Preferred bank slug (e.g., wema-bank, titan-paystack)",
+          "type": "string"
+        },
+        "subaccount": {
+          "description": "Subaccount code for split payments",
+          "type": "string"
+        },
+        "splitCode": {
+          "description": "Split code for transaction splits",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "Customer first name override",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Customer last name override",
+          "type": "string"
+        },
+        "phone": {
+          "description": "Customer phone override",
+          "type": "string"
+        }
+      },
+      "required": ["customer"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountName": {
+          "type": "string",
+          "description": "Name on the virtual account"
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Virtual account number"
+        },
+        "bankName": {
+          "type": "string",
+          "description": "Bank providing the virtual account"
+        },
+        "bankCode": {
+          "type": "string",
+          "description": "Bank code"
+        },
+        "customerCode": {
+          "type": "string",
+          "description": "Associated customer code"
+        },
+        "dedicatedAccountId": {
+          "type": "number",
+          "description": "Dedicated account ID"
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether the account is active"
+        }
+      },
+      "required": [
+        "accountName",
+        "accountNumber",
+        "bankName",
+        "bankCode",
+        "customerCode",
+        "dedicatedAccountId",
+        "active"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "list_dedicated_virtual_accounts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "active": {
+          "description": "Filter by active status",
+          "type": "boolean"
+        },
+        "currency": {
+          "description": "Filter by currency",
+          "type": "string"
+        },
+        "customer": {
+          "description": "Filter by customer ID",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dedicatedAccountId": {
+                "type": "number",
+                "description": "Account ID"
+              },
+              "accountName": {
+                "type": "string",
+                "description": "Account name"
+              },
+              "accountNumber": {
+                "type": "string",
+                "description": "Account number"
+              },
+              "bankName": {
+                "type": "string",
+                "description": "Bank name"
+              },
+              "customerCode": {
+                "type": "string",
+                "description": "Customer code"
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether active"
+              }
+            },
+            "required": [
+              "dedicatedAccountId",
+              "accountName",
+              "accountNumber",
+              "bankName",
+              "customerCode",
+              "active"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["accounts"],
+      "additionalProperties": false
+    }
+  },
+  "list_disputes": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Records per page",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number",
+          "type": "number"
+        },
+        "status": {
+          "description": "Filter by dispute status (e.g., awaiting-merchant-feedback, resolved)",
+          "type": "string"
+        },
+        "transaction": {
+          "description": "Filter by transaction ID",
+          "type": "string"
+        },
+        "from": {
+          "description": "Start date (ISO 8601)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date (ISO 8601)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "disputes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "disputeId": {
+                "type": "number",
+                "description": "Dispute ID"
+              },
+              "status": {
+                "type": "string",
+                "description": "Dispute status"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Disputed amount"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Currency"
+              },
+              "transactionReference": {
+                "type": "string",
+                "description": "Transaction reference"
+              },
+              "category": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Dispute category"
+              },
+              "dueDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Response due date"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              }
+            },
+            "required": [
+              "disputeId",
+              "status",
+              "amount",
+              "currency",
+              "transactionReference",
+              "category",
+              "dueDate",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total disputes"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total pages"
+        }
+      },
+      "required": ["disputes", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "resolve_dispute": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "disputeId": {
+          "type": "string",
+          "description": "Dispute ID to resolve"
+        },
+        "resolution": {
+          "type": "string",
+          "enum": ["merchant-accepted", "declined"],
+          "description": "Resolution: merchant-accepted (accept with refund) or declined (reject with evidence)"
+        },
+        "message": {
+          "type": "string",
+          "description": "Message/evidence for the resolution"
+        },
+        "refundAmount": {
+          "description": "Refund amount if accepting (in smallest currency unit)",
+          "type": "number"
+        },
+        "uploadedFilename": {
+          "description": "Filename of uploaded evidence",
+          "type": "string"
+        }
+      },
+      "required": ["disputeId", "resolution", "message"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "disputeId": {
+          "type": "number",
+          "description": "Dispute ID"
+        },
+        "status": {
+          "type": "string",
+          "description": "Updated dispute status"
+        },
+        "message": {
+          "type": "string",
+          "description": "Resolution message"
+        }
+      },
+      "required": ["disputeId", "status", "message"],
+      "additionalProperties": false
+    }
+  },
+  "verify_bank_account": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountNumber": {
+          "type": "string",
+          "description": "Bank account number to verify"
+        },
+        "bankCode": {
+          "type": "string",
+          "description": "Bank code (use List Banks tool to find this)"
+        }
+      },
+      "required": ["accountNumber", "bankCode"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountNumber": {
+          "type": "string",
+          "description": "Verified account number"
+        },
+        "accountName": {
+          "type": "string",
+          "description": "Name on the bank account"
+        },
+        "bankId": {
+          "type": "number",
+          "description": "Bank ID"
+        }
+      },
+      "required": ["accountNumber", "accountName", "bankId"],
+      "additionalProperties": false
+    }
+  },
+  "list_banks": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "country": {
+          "description": "Country code (e.g., nigeria, ghana, south-africa, kenya)",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Filter by currency (e.g., NGN, GHS, ZAR, KES)",
+          "type": "string"
+        },
+        "type": {
+          "description": "Filter by bank type (e.g., nuban, mobile_money, ghipss)",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Records per page (default 50)",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "banks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "bankName": {
+                "type": "string",
+                "description": "Bank name"
+              },
+              "bankCode": {
+                "type": "string",
+                "description": "Bank code for API operations"
+              },
+              "bankSlug": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Bank slug"
+              },
+              "country": {
+                "type": "string",
+                "description": "Country"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Currency"
+              },
+              "type": {
+                "type": "string",
+                "description": "Bank type"
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the bank is active"
+              }
+            },
+            "required": [
+              "bankName",
+              "bankCode",
+              "bankSlug",
+              "country",
+              "currency",
+              "type",
+              "active"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["banks"],
+      "additionalProperties": false
+    }
+  },
+  "resolve_card_bin": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "bin": {
+          "type": "string",
+          "description": "First 6 digits of the card number"
+        }
+      },
+      "required": ["bin"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "bin": {
+          "type": "string",
+          "description": "Card BIN"
+        },
+        "brand": {
+          "type": "string",
+          "description": "Card brand (e.g., visa, mastercard)"
+        },
+        "cardType": {
+          "type": "string",
+          "description": "Card type (e.g., debit, credit)"
+        },
+        "bank": {
+          "type": "string",
+          "description": "Issuing bank name"
+        },
+        "countryCode": {
+          "type": "string",
+          "description": "Country code"
+        },
+        "countryName": {
+          "type": "string",
+          "description": "Country name"
+        }
+      },
+      "required": ["bin", "brand", "cardType", "bank", "countryCode", "countryName"],
+      "additionalProperties": false
+    }
+  }
+}

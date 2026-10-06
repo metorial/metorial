@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubActionsClient } from '../lib/client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listWorkflows = SlateTool.create(spec, {
   name: 'List Workflows',
   key: 'list_workflows',
-  description: `List GitHub Actions workflows defined in a repository. Returns workflow definitions including their state (active/disabled), trigger events, and file paths. Use this to discover available workflows before triggering or inspecting runs.`,
+  description: `List GitHub Actions workflows defined in a repository. Returns workflow definitions including their state (active/disabled), and file paths. Use this to discover available workflows before triggering or inspecting runs.`,
   tags: {
     readOnly: true
   }
@@ -43,13 +44,14 @@ export let listWorkflows = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new GitHubActionsClient(ctx.auth.token);
     let data = await client.listWorkflows(ctx.input.owner, ctx.input.repo, {
       perPage: ctx.input.perPage,
       page: ctx.input.page
     });
 
-    let workflows = (data.workflows ?? []).map((w: any) => ({
+    let workflows = (data.workflows ?? []).map(w => ({
       workflowId: w.id,
       name: w.name,
       path: w.path,

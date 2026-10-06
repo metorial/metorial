@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getStatistics = SlateTool.create(spec, {
   name: 'Get Statistics',
   key: 'get_statistics',
-  description: `Retrieve performance statistics for sequences, including email metrics (sent, opened, clicked, replied, bounced) and contact engagement data. Can fetch stats for a specific sequence or across all sequences.`,
+  description: `Retrieve current sequence email and LinkedIn engagement statistics, email step statistics, or the enrolled-contact count. The contacts report requires sequenceId. Global overview/email results cover the provider default last-week window (maximum supported window: 31 days).`,
   tags: {
     readOnly: true
   }
@@ -29,11 +29,11 @@ export let getStatistics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let { sequenceId, reportType } = ctx.input;
     let type = reportType ?? 'overview';
 
-    let params = sequenceId ? { sequenceId } : undefined;
+    let params = sequenceId !== undefined ? { sequenceId } : undefined;
     let statistics: any;
 
     if (type === 'emails') {

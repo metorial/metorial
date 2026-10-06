@@ -21,8 +21,6 @@ import {
   transferLicenses,
   validateLicensee
 } from './tools';
-import { licensingEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     listTransactions,
     getTransaction
   ],
-  triggers: [licensingEvents]
+  triggers: []
 });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugsnagClient } from '../lib/client';
+import { pageInput, pageOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let organizationSchema = z.object({
@@ -18,33 +19,39 @@ let organizationSchema = z.object({
 export let listOrganizations = SlateTool.create(spec, {
   name: 'List Organizations',
   key: 'list_organizations',
-  description: `List all Bugsnag organizations the authenticated user belongs to. Returns organization names, IDs, and metadata. Use this to discover organization IDs needed by other tools.`,
+  description: `List a page of Bugsnag organizations the authenticated user belongs to. Returns organization names, IDs, and metadata. Use this to discover organization IDs needed by other tools.`,
   tags: {
     destructive: false,
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      ...pageInput,
+      perPage: z.number().optional().describe('Results per page (1 to 100)')
+    })
+  )
   .output(
     z.object({
+      ...pageOutput,
       organizations: z.array(organizationSchema).describe('List of organizations')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
-    let orgs = await client.listOrganizations();
+    let client = new BugsnagClient(ctx.auth);
+    let orgs = await client.listOrganizations(ctx.input);
 
-    let organizations = orgs.map((org: any) => ({
-      organizationId: org.id,
-      name: org.name,
-      slug: org.slug,
-      createdAt: org.created_at,
-      autoUpgrade: org.auto_upgrade,
-      billingEmails: org.billing_emails
+    let organizations = orgs.map(org => ({
+      organizationId: org.id ?? undefined,
+      name: org.name ?? undefined,
+      slug: org.slug ?? undefined,
+      createdAt: org.created_at ?? undefined,
+      autoUpgrade: org.auto_upgrade ?? undefined,
+      billingEmails: org.billing_emails?.join(', ')
     }));
 
     return {
-      output: { organizations },
+      output: { organizations, ...client.pageInfo },
       message: `Found **${organizations.length}** organization(s): ${organizations.map(o => o.name).join(', ')}`
     };
   })

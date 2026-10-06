@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, companyAssociations } from '../lib/client';
 import { spec } from '../spec';
 
 export let createPerson = SlateTool.create(spec, {
@@ -8,12 +8,18 @@ export let createPerson = SlateTool.create(spec, {
   key: 'create_person',
   description: `Creates a new person contact in your Folk workspace. Supports setting name, job title, emails, phones, addresses, URLs, birthday, description, company associations, and group memberships. Folk automatically checks for duplicates and merges if a match is found.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe(
+          'Optional unique retry key. Reuse the same key and identical input after an uncertain response; Folk retains completed keys for 24 hours.'
+        ),
       firstName: z.string().optional().describe('First name of the person'),
       lastName: z.string().optional().describe('Last name of the person'),
       fullName: z.string().optional().describe('Full name (used if first/last not provided)'),
@@ -76,28 +82,26 @@ export let createPerson = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let input: Record<string, unknown> = {};
-    if (ctx.input.firstName) input.firstName = ctx.input.firstName;
-    if (ctx.input.lastName) input.lastName = ctx.input.lastName;
-    if (ctx.input.fullName) input.fullName = ctx.input.fullName;
-    if (ctx.input.description) input.description = ctx.input.description;
-    if (ctx.input.birthday) input.birthday = ctx.input.birthday;
-    if (ctx.input.jobTitle) input.jobTitle = ctx.input.jobTitle;
-    if (ctx.input.emails) input.emails = ctx.input.emails;
-    if (ctx.input.phones) input.phones = ctx.input.phones;
-    if (ctx.input.addresses) input.addresses = ctx.input.addresses;
-    if (ctx.input.urls) input.urls = ctx.input.urls;
-    if (ctx.input.customFieldValues) input.customFieldValues = ctx.input.customFieldValues;
-    if (ctx.input.groupIds) {
+    if (ctx.input.firstName !== undefined) input.firstName = ctx.input.firstName;
+    if (ctx.input.lastName !== undefined) input.lastName = ctx.input.lastName;
+    if (ctx.input.fullName !== undefined) input.fullName = ctx.input.fullName;
+    if (ctx.input.description !== undefined) input.description = ctx.input.description;
+    if (ctx.input.birthday !== undefined) input.birthday = ctx.input.birthday;
+    if (ctx.input.jobTitle !== undefined) input.jobTitle = ctx.input.jobTitle;
+    if (ctx.input.emails !== undefined) input.emails = ctx.input.emails;
+    if (ctx.input.phones !== undefined) input.phones = ctx.input.phones;
+    if (ctx.input.addresses !== undefined) input.addresses = ctx.input.addresses;
+    if (ctx.input.urls !== undefined) input.urls = ctx.input.urls;
+    if (ctx.input.customFieldValues !== undefined)
+      input.customFieldValues = ctx.input.customFieldValues;
+    if (ctx.input.groupIds !== undefined) {
       input.groups = ctx.input.groupIds.map(id => ({ id }));
     }
-    if (ctx.input.companies) {
-      input.companies = ctx.input.companies.map(c => {
-        if (c.companyId) return { id: c.companyId };
-        return { name: c.companyName };
-      });
+    if (ctx.input.companies !== undefined) {
+      input.companies = companyAssociations(ctx.input.companies);
     }
 
-    let person = await client.createPerson(input);
+    let person = await client.createPerson(input, ctx.input.idempotencyKey);
 
     return {
       output: {

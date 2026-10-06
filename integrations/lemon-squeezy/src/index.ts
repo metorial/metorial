@@ -27,13 +27,6 @@ import {
   manageWebhookTool,
   refundOrderTool
 } from './tools';
-import {
-  licenseKeyEventsTrigger,
-  orderEventsTrigger,
-  subscriptionEventsTrigger,
-  subscriptionPaymentEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -63,10 +56,5 @@ export let provider = Slate.create({
     manageLicenseKeyTool,
     listLicenseKeysTool
   ],
-  triggers: [
-    orderEventsTrigger,
-    subscriptionEventsTrigger,
-    subscriptionPaymentEventsTrigger,
-    licenseKeyEventsTrigger
-  ]
+  triggers: []
 });

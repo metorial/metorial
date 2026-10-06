@@ -1,5 +1,6 @@
 export * from './create-draft-post';
 export * from './get-cases';
+export * from './get-current-user';
 export * from './get-listening-messages';
 export * from './get-listening-metrics';
 export * from './get-messages';
@@ -7,4 +8,5 @@ export * from './get-metadata';
 export * from './get-post-analytics';
 export * from './get-profile-analytics';
 export * from './get-publishing-post';
+export * from './list-customers';
 export * from './upload-media';

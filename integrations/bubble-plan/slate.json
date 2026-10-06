@@ -1,6 +1,6 @@
 {
   "name": "@metorial/bubble-plan",
-  "description": "Manage projects, tasks, and subtasks for team collaboration. Create and update projects, organize task lists, track time and budgets, manage calendar events, and handle file sharing. Supports client management, comments on tasks, and user/team organization. Receive webhook notifications for new projects, tasks, subtasks, events, and clients.",
+  "description": "Manage projects, tasks, and subtasks for team collaboration. Create and update projects, organize task lists, track time and budgets, manage calendar events, and handle file sharing. Supports client management, comments on tasks, and user/team organization.",
   "categories": [
     "email-and-messaging",
     "scheduling-and-calendars",
@@ -14,8 +14,7 @@
     "share and manage files",
     "manage client records",
     "create and delete comments",
-    "retrieve users and teams",
-    "subscribe to webhooks"
+    "retrieve users and teams"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/project-bubble.png"
 }

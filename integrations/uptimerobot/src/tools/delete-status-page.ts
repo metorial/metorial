@@ -6,8 +6,9 @@ import { spec } from '../spec';
 export let deleteStatusPage = SlateTool.create(spec, {
   name: 'Delete Status Page',
   key: 'delete_status_page',
-  description: `Permanently delete a public status page. The page URL will no longer be accessible.`,
+  description: `Use a Legacy API Key connection (API v2). Permanently delete a public status page. The page URL will no longer be accessible.`,
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
@@ -22,7 +23,7 @@ export let deleteStatusPage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.deletePSP(ctx.input.statusPageId);
 

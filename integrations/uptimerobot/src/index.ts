@@ -10,14 +10,17 @@ import {
   deleteMonitor,
   deleteStatusPage,
   getAccountDetails,
+  getMonitor,
   listAlertContacts,
+  listCurrentMonitors,
+  listIncidents,
   listMaintenanceWindows,
   listMonitors,
   listStatusPages,
-  updateMonitor
+  manageMonitor,
+  updateMonitor,
+  whoAmI
 } from './tools';
-import { inboundWebhook, monitorStatusChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,7 +37,12 @@ export let provider = Slate.create({
     listMaintenanceWindows,
     createMaintenanceWindow,
     deleteMaintenanceWindow,
-    getAccountDetails
+    getAccountDetails,
+    whoAmI,
+    listCurrentMonitors,
+    getMonitor,
+    manageMonitor,
+    listIncidents
   ],
-  triggers: [inboundWebhook, monitorStatusChanges]
+  triggers: []
 });

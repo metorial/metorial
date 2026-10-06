@@ -1,33 +1,33 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { StoryblokClient } from '../lib/client';
+import { errorData, own, resolveSpace, spaceIdInput } from '../lib/validation';
 import { spec } from '../spec';
 
-export let getSpaceInfo = SlateTool.create(spec, {
+export const getSpaceInfo = SlateTool.create(spec, {
   name: 'Get Space Info',
   key: 'get_space_info',
-  description: `Retrieve information about the current space, including its name, plan, environments, workflows, roles, and tags. Useful for understanding the space configuration.`,
-  tags: {
-    readOnly: true
-  }
+  description:
+    'Read an exact space and its available workflows, stages, custom roles and one page of tags. Permission failures omit unavailable collections and return a warning.',
+  tags: { readOnly: true }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      spaceId: spaceIdInput,
+      tagsPage: z.number().optional().describe('Tag page; default 1'),
+      tagsPerPage: z.number().optional().describe('Tags per page; default 25, maximum 1000')
+    })
+  )
   .output(
     z.object({
-      spaceId: z.number().optional().describe('Numeric ID of the space'),
-      name: z.string().optional().describe('Name of the space'),
-      domain: z.string().optional().describe('Domain of the space'),
-      plan: z.string().optional().describe('Current plan name'),
-      createdAt: z.string().optional().describe('Space creation timestamp'),
+      spaceId: z.number().optional(),
+      name: z.string().optional(),
+      domain: z.string().optional(),
+      plan: z.string().optional(),
+      createdAt: z.string().optional(),
       workflows: z
-        .array(
-          z.object({
-            workflowId: z.number().optional(),
-            name: z.string().optional()
-          })
-        )
-        .optional()
-        .describe('Available workflows'),
+        .array(z.object({ workflowId: z.number().optional(), name: z.string().optional() }))
+        .optional(),
       workflowStages: z
         .array(
           z.object({
@@ -37,43 +37,50 @@ export let getSpaceInfo = SlateTool.create(spec, {
             workflowId: z.number().optional()
           })
         )
-        .optional()
-        .describe('Workflow stages'),
+        .optional(),
       roles: z
-        .array(
-          z.object({
-            roleId: z.number().optional(),
-            name: z.string().optional()
-          })
-        )
-        .optional()
-        .describe('Space roles'),
+        .array(z.object({ roleId: z.number().optional(), name: z.string().optional() }))
+        .optional(),
       tags: z
-        .array(
-          z.object({
-            name: z.string().optional(),
-            count: z.number().optional()
-          })
-        )
-        .optional()
-        .describe('Content tags')
+        .array(z.object({ name: z.string().optional(), count: z.number().optional() }))
+        .optional(),
+      tagsPage: z.number().optional(),
+      tagsTotal: z.number().optional(),
+      tagsNextPage: z.number().optional(),
+      warnings: z.array(z.string()).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new StoryblokClient({
-      token: ctx.auth.token,
-      region: ctx.auth.region,
-      spaceId: ctx.config.spaceId
+    const client = new StoryblokClient({
+      ...ctx.auth,
+      spaceId: resolveSpace(
+        ctx.input.spaceId,
+        ctx.config.spaceId,
+        ctx.auth.mode === 'oauth' ? ctx.auth.spaceId : undefined
+      )
     });
-
-    let [space, workflows, workflowStages, roles, tags] = await Promise.all([
-      client.getSpace(),
-      client.listWorkflows().catch(() => []),
-      client.listWorkflowStages().catch(() => []),
-      client.listSpaceRoles().catch(() => []),
-      client.listTags().catch(() => [])
-    ]);
-
+    const space = await client.getSpace();
+    const warnings: string[] = [];
+    async function permitted<T>(
+      label: string,
+      request: () => Promise<T>
+    ): Promise<T | undefined> {
+      try {
+        return await request();
+      } catch (error) {
+        if (own(errorData(error), 'upstreamStatus') !== 403) throw error;
+        warnings.push(
+          `${label} is unavailable with this credential or plan; the collection was omitted.`
+        );
+        return undefined;
+      }
+    }
+    const workflows = await permitted('Workflows', () => client.listWorkflows());
+    const stages = await permitted('Workflow stages', () => client.listWorkflowStages());
+    const roles = await permitted('Space roles', () => client.listSpaceRoles());
+    const tags = await permitted('Tags', () =>
+      client.listTags({ page: ctx.input.tagsPage, perPage: ctx.input.tagsPerPage })
+    );
     return {
       output: {
         spaceId: space.id,
@@ -81,17 +88,21 @@ export let getSpaceInfo = SlateTool.create(spec, {
         domain: space.domain,
         plan: space.plan,
         createdAt: space.created_at,
-        workflows: workflows.map(w => ({ workflowId: w.id, name: w.name })),
-        workflowStages: workflowStages.map(s => ({
+        workflows: workflows?.map(w => ({ workflowId: w.id, name: w.name })),
+        workflowStages: stages?.map(s => ({
           stageId: s.id,
           name: s.name,
           color: s.color,
           workflowId: s.workflow_id
         })),
-        roles: roles.map(r => ({ roleId: r.id, name: r.role })),
-        tags: tags.map(t => ({ name: t.name, count: t.taggings_count }))
+        roles: roles?.map(r => ({ roleId: r.id, name: r.role })),
+        tags: tags?.tags.map(t => ({ name: t.name, count: t.taggings_count })),
+        tagsPage: tags?.page,
+        tagsTotal: tags?.total,
+        tagsNextPage: tags?.nextPage,
+        warnings: warnings.length ? warnings : undefined
       },
-      message: `Space **${space.name}** on the **${space.plan}** plan.`
+      message: 'Retrieved the exact space and available configuration data.'
     };
   })
   .build();

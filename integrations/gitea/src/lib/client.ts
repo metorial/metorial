@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 import type {
   GiteaBranch,
   GiteaComment,
@@ -10,26 +16,40 @@ import type {
   GiteaMilestone,
   GiteaOrganization,
   GiteaPullRequest,
+  GiteaPullReview,
   GiteaRelease,
   GiteaRepository,
   GiteaTag,
   GiteaTeam,
   GiteaUser,
-  GiteaWebhook,
   GiteaWikiPage
 } from './types';
+import { encodeFilePath, normalizeBaseUrl } from './validation';
 
 export class GiteaClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  readonly baseUrl: string;
+  readonly authorizationHeader: string;
 
-  constructor(opts: { token: string; baseUrl: string }) {
-    let baseUrl = opts.baseUrl.replace(/\/+$/, '');
-    this.axios = createAxios({
+  constructor(opts: {
+    token: string;
+    baseUrl: string;
+    authorizationType?: 'token' | 'Bearer';
+  }) {
+    let baseUrl = normalizeBaseUrl(opts.baseUrl);
+    this.baseUrl = baseUrl;
+    this.authorizationHeader = `${opts.authorizationType ?? (opts.token.split('.').length === 3 ? 'Bearer' : 'token')} ${opts.token}`;
+    if (!opts.token.trim())
+      throw createApiServiceError('Reconnect Gitea with a non-empty access token.');
+    this.axios = createAuthenticatedAxios({
       baseURL: `${baseUrl}/api/v1`,
-      headers: {
-        Authorization: `token ${opts.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: this.authorizationHeader },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Gitea',
+          reason: 'gitea_api_error'
+        })
     });
   }
 
@@ -37,7 +57,13 @@ export class GiteaClient {
 
   async getAuthenticatedUser(): Promise<GiteaUser> {
     let response = await this.axios.get('/user');
-    return response.data as GiteaUser;
+    if (
+      !isApiErrorRecord(response.data) ||
+      typeof response.data.id !== 'number' ||
+      typeof response.data.login !== 'string'
+    )
+      throw createApiServiceError('Gitea returned an invalid current-user response.');
+    return response.data as unknown as GiteaUser;
   }
 
   async getUserByUsername(username: string): Promise<GiteaUser> {
@@ -64,10 +90,15 @@ export class GiteaClient {
     limit?: number;
     sort?: string;
     order?: string;
+    uid?: number;
+    exclusive?: boolean;
+    includeDesc?: boolean;
   }): Promise<GiteaRepository[]> {
     let response = await this.axios.get('/repos/search', { params });
-    let data = response.data as { ok: boolean; data: GiteaRepository[] };
-    return data.data || (response.data as GiteaRepository[]);
+    const data = isApiErrorRecord(response.data) ? response.data.data : response.data;
+    if (!Array.isArray(data))
+      throw createApiServiceError('Gitea returned an invalid repository search response.');
+    return data as GiteaRepository[];
   }
 
   async getRepo(owner: string, repo: string): Promise<GiteaRepository> {
@@ -108,6 +139,8 @@ export class GiteaClient {
       private?: boolean;
       autoInit?: boolean;
       defaultBranch?: string;
+      gitignores?: string;
+      license?: string;
     }
   ): Promise<GiteaRepository> {
     let response = await this.axios.post(`/orgs/${encodeURIComponent(org)}/repos`, {
@@ -115,7 +148,9 @@ export class GiteaClient {
       description: opts.description,
       private: opts.private,
       auto_init: opts.autoInit,
-      default_branch: opts.defaultBranch
+      default_branch: opts.defaultBranch,
+      gitignores: opts.gitignores,
+      license: opts.license
     });
     return response.data as GiteaRepository;
   }
@@ -276,7 +311,7 @@ export class GiteaClient {
     params?: { sha?: string; page?: number; limit?: number; path?: string }
   ): Promise<GiteaCommit[]> {
     let response = await this.axios.get(
-      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/commits`,
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits`,
       { params }
     );
     return response.data as GiteaCommit[];
@@ -300,10 +335,27 @@ export class GiteaClient {
     let params: Record<string, string> = {};
     if (ref) params.ref = ref;
     let response = await this.axios.get(
-      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${filepath}`,
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeFilePath(filepath)}`,
       { params }
     );
-    return response.data as GiteaFileContent;
+    if (
+      !isApiErrorRecord(response.data) ||
+      response.data.type !== 'file' ||
+      typeof response.data.sha !== 'string' ||
+      typeof response.data.path !== 'string'
+    )
+      throw createApiServiceError(
+        'The repository path is not a downloadable file. Provide a file path instead of a directory, symlink, or submodule.'
+      );
+    return response.data as unknown as GiteaFileContent;
+  }
+
+  fileDownloadUrl(owner: string, repo: string, path: string, ref?: string): string {
+    const url = new URL(
+      `${this.baseUrl}/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/raw/${encodeFilePath(path)}`
+    );
+    if (ref !== undefined) url.searchParams.set('ref', ref);
+    return url.toString();
   }
 
   async createFile(
@@ -318,7 +370,7 @@ export class GiteaClient {
     }
   ): Promise<GiteaFileResponse> {
     let response = await this.axios.post(
-      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${filepath}`,
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeFilePath(filepath)}`,
       {
         content: opts.content,
         message: opts.message,
@@ -342,7 +394,7 @@ export class GiteaClient {
     }
   ): Promise<GiteaFileResponse> {
     let response = await this.axios.put(
-      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${filepath}`,
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeFilePath(filepath)}`,
       {
         content: opts.content,
         message: opts.message,
@@ -365,7 +417,7 @@ export class GiteaClient {
     }
   ): Promise<void> {
     await this.axios.delete(
-      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${filepath}`,
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeFilePath(filepath)}`,
       {
         data: {
           message: opts.message,
@@ -394,7 +446,13 @@ export class GiteaClient {
   ): Promise<GiteaIssue[]> {
     let response = await this.axios.get(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`,
-      { params }
+      {
+        params: pickDefined({
+          ...params,
+          assigned_by: params?.assignedBy,
+          assignedBy: undefined
+        })
+      }
     );
     return response.data as GiteaIssue[];
   }
@@ -629,6 +687,7 @@ export class GiteaClient {
       head: string;
       base: string;
       assignees?: string[];
+      reviewers?: string[];
       labels?: number[];
       milestone?: number;
     }
@@ -641,6 +700,7 @@ export class GiteaClient {
         head: opts.head,
         base: opts.base,
         assignees: opts.assignees,
+        reviewers: opts.reviewers,
         labels: opts.labels,
         milestone: opts.milestone
       }
@@ -687,15 +747,22 @@ export class GiteaClient {
       mergeCommitMessage?: string;
       mergeMessageField?: string;
       deleteBranchAfterMerge?: boolean;
+      headCommitId?: string;
+      mergeCommitId?: string;
     }
   ): Promise<void> {
+    if (opts?.mergeMethod === 'manually-merged' && !opts.mergeCommitId)
+      throw createApiServiceError(
+        'Provide mergeCommitId when marking a pull request as manually merged.'
+      );
     await this.axios.post(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${prNumber}/merge`,
       {
-        Do: opts?.mergeMethod || 'merge',
-        merge_message_field: opts?.mergeMessageField,
-        merge_commit_message: opts?.mergeCommitMessage,
-        delete_branch_after_merge: opts?.deleteBranchAfterMerge
+        do: opts?.mergeMethod || 'merge',
+        merge_message_field: opts?.mergeMessageField ?? opts?.mergeCommitMessage,
+        delete_branch_after_merge: opts?.deleteBranchAfterMerge,
+        head_commit_id: opts?.headCommitId,
+        merge_commit_id: opts?.mergeCommitId
       }
     );
   }
@@ -705,30 +772,12 @@ export class GiteaClient {
     repo: string,
     prNumber: number,
     params?: { page?: number; limit?: number }
-  ): Promise<
-    Array<{
-      id: number;
-      body: string;
-      state: string;
-      user: GiteaUser;
-      html_url: string;
-      submitted_at: string;
-      commit_id: string;
-    }>
-  > {
+  ): Promise<GiteaPullReview[]> {
     let response = await this.axios.get(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${prNumber}/reviews`,
       { params }
     );
-    return response.data as Array<{
-      id: number;
-      body: string;
-      state: string;
-      user: GiteaUser;
-      html_url: string;
-      submitted_at: string;
-      commit_id: string;
-    }>;
+    return response.data as GiteaPullReview[];
   }
 
   async createPullRequestReview(
@@ -745,15 +794,7 @@ export class GiteaClient {
         old_position?: number;
       }>;
     }
-  ): Promise<{
-    id: number;
-    body: string;
-    state: string;
-    user: GiteaUser;
-    html_url: string;
-    submitted_at: string;
-    commit_id: string;
-  }> {
+  ): Promise<GiteaPullReview> {
     let response = await this.axios.post(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${prNumber}/reviews`,
       {
@@ -762,15 +803,7 @@ export class GiteaClient {
         comments: opts.comments
       }
     );
-    return response.data as {
-      id: number;
-      body: string;
-      state: string;
-      user: GiteaUser;
-      html_url: string;
-      submitted_at: string;
-      commit_id: string;
-    };
+    return response.data as GiteaPullReview;
   }
 
   // ─── Release ───────────────────────────────────────────────────────
@@ -863,6 +896,10 @@ export class GiteaClient {
     return response.data as GiteaOrganization;
   }
 
+  async deleteTeam(teamId: number): Promise<void> {
+    await this.axios.delete(`/teams/${teamId}`);
+  }
+
   async createOrg(opts: {
     username: string;
     fullName?: string;
@@ -940,6 +977,7 @@ export class GiteaClient {
       description?: string;
       permission?: string;
       units?: string[];
+      unitsMap?: Record<string, string>;
       includesAllRepositories?: boolean;
     }
   ): Promise<GiteaTeam> {
@@ -948,6 +986,7 @@ export class GiteaClient {
       description: opts.description,
       permission: opts.permission,
       units: opts.units,
+      units_map: opts.unitsMap,
       includes_all_repositories: opts.includesAllRepositories
     });
     return response.data as GiteaTeam;
@@ -1046,11 +1085,17 @@ export class GiteaClient {
     pageName: string,
     opts: { title?: string; contentBase64?: string; message?: string }
   ): Promise<GiteaWikiPage> {
+    const content =
+      opts.contentBase64 ?? (await this.getWikiPage(owner, repo, pageName)).content_base64;
+    if (typeof content !== 'string')
+      throw createApiServiceError(
+        'Gitea did not return the current wiki content. Provide contentBase64 explicitly to update this page.'
+      );
     let response = await this.axios.patch(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/wiki/page/${encodeURIComponent(pageName)}`,
       {
         title: opts.title,
-        content_base64: opts.contentBase64,
+        content_base64: content,
         message: opts.message
       }
     );
@@ -1061,80 +1106,6 @@ export class GiteaClient {
     await this.axios.delete(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/wiki/page/${encodeURIComponent(pageName)}`
     );
-  }
-
-  // ─── Webhook ───────────────────────────────────────────────────────
-
-  async listRepoWebhooks(
-    owner: string,
-    repo: string,
-    params?: { page?: number; limit?: number }
-  ): Promise<GiteaWebhook[]> {
-    let response = await this.axios.get(
-      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/hooks`,
-      { params }
-    );
-    return response.data as GiteaWebhook[];
-  }
-
-  async createRepoWebhook(
-    owner: string,
-    repo: string,
-    opts: {
-      url: string;
-      contentType?: string;
-      secret?: string;
-      events: string[];
-      active?: boolean;
-    }
-  ): Promise<GiteaWebhook> {
-    let response = await this.axios.post(
-      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/hooks`,
-      {
-        type: 'gitea',
-        config: {
-          url: opts.url,
-          content_type: opts.contentType || 'json',
-          secret: opts.secret || ''
-        },
-        events: opts.events,
-        active: opts.active !== false
-      }
-    );
-    return response.data as GiteaWebhook;
-  }
-
-  async deleteRepoWebhook(owner: string, repo: string, hookId: number): Promise<void> {
-    await this.axios.delete(
-      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/hooks/${hookId}`
-    );
-  }
-
-  async createOrgWebhook(
-    orgName: string,
-    opts: {
-      url: string;
-      contentType?: string;
-      secret?: string;
-      events: string[];
-      active?: boolean;
-    }
-  ): Promise<GiteaWebhook> {
-    let response = await this.axios.post(`/orgs/${encodeURIComponent(orgName)}/hooks`, {
-      type: 'gitea',
-      config: {
-        url: opts.url,
-        content_type: opts.contentType || 'json',
-        secret: opts.secret || ''
-      },
-      events: opts.events,
-      active: opts.active !== false
-    });
-    return response.data as GiteaWebhook;
-  }
-
-  async deleteOrgWebhook(orgName: string, hookId: number): Promise<void> {
-    await this.axios.delete(`/orgs/${encodeURIComponent(orgName)}/hooks/${hookId}`);
   }
 
   // ─── Topics ────────────────────────────────────────────────────────

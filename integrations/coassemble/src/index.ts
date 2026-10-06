@@ -17,8 +17,6 @@ import {
   updateClient,
   updateUser
 } from './tools';
-import { courseProgress, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     updateUser,
     deleteUser
   ],
-  triggers: [inboundWebhook, courseProgress]
+  triggers: []
 });

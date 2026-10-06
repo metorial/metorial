@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/sendgrid.png" height="20"> Twilio Sendgrid
 
-Send transactional and marketing emails at scale. Create and manage dynamic email templates with Handlebars syntax. Manage contacts, lists, and segments for targeted campaigns. Validate email addresses in real-time or bulk. Monitor email delivery with detailed statistics on opens, clicks, bounces, and more. Manage suppressions including bounces, blocks, spam reports, and unsubscribes. Configure inbound email parsing to receive and process incoming emails. Authenticate sender domains (DKIM, SPF) and manage dedicated IP addresses and IP pools. Create and automate marketing campaigns with A/B testing. Manage subusers, teammates, and API keys with granular permissions. Receive real-time webhook events for delivery status, engagement tracking, and account changes.
+Send transactional and marketing emails at scale. Create and manage dynamic email templates with Handlebars syntax. Manage contacts, lists, and segments for targeted campaigns. Validate email addresses in real-time or bulk. Monitor email delivery with detailed statistics on opens, clicks, bounces, and more. Manage suppressions including bounces, blocks, spam reports, and unsubscribes. Configure inbound email parsing to receive and process incoming emails. Authenticate sender domains (DKIM, SPF) and manage dedicated IP addresses and IP pools. Create and automate marketing campaigns with A/B testing. Manage subusers, teammates, and API keys with granular permissions.
 
 ## Tools
 

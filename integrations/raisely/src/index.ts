@@ -15,15 +15,6 @@ import {
   sendMessage,
   upsertUser
 } from './tools';
-import {
-  donationEvents,
-  orderEvents,
-  postEvents,
-  profileEvents,
-  subscriptionEvents,
-  userEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -41,12 +32,5 @@ export let provider = Slate.create({
     managePost,
     sendMessage
   ],
-  triggers: [
-    donationEvents,
-    subscriptionEvents,
-    profileEvents,
-    userEvents,
-    orderEvents,
-    postEvents
-  ]
+  triggers: []
 });

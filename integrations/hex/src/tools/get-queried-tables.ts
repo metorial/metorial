@@ -21,7 +21,8 @@ export let getQueriedTables = SlateTool.create(spec, {
         .max(100)
         .optional()
         .describe('Number of results per page (1-100)'),
-      after: z.string().optional().describe('Pagination cursor for the next page')
+      after: z.string().optional().describe('Pagination cursor for the next page'),
+      before: z.string().optional().describe('Previous-page cursor; do not combine with after')
     })
   )
   .output(
@@ -33,23 +34,31 @@ export let getQueriedTables = SlateTool.create(spec, {
           tableName: z.string()
         })
       ),
+      returnedCount: z.number().optional(),
+      previousCursor: z.string().optional(),
       nextCursor: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
 
     let result = await client.getQueriedTables(ctx.input.projectId, {
       limit: ctx.input.limit,
-      after: ctx.input.after
+      after: ctx.input.after,
+      before: ctx.input.before
     });
 
-    let tables = result.values ?? [];
+    let tables = result.values;
 
     return {
       output: {
         tables,
-        nextCursor: result.pagination?.after
+        returnedCount: result.values.length,
+        previousCursor: result.pagination.before,
+        nextCursor: result.pagination.after
       },
       message: `Found **${tables.length}** queried table(s) for project ${ctx.input.projectId}.`
     };

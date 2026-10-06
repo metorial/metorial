@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, optionalNumber, optionalRow, row } from '../lib/client';
 import { spec } from '../spec';
 
 export let emailCount = SlateTool.create(spec, {
@@ -47,35 +47,33 @@ export let emailCount = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.getEmailCount({
+    const result = await new Client({ token: ctx.auth.token }).getEmailCount({
       domain: ctx.input.domain,
       company: ctx.input.companyName,
       type: ctx.input.type
     });
-
-    let data = result.data;
-
-    let departments = Object.entries(data.department || {}).map(([department, count]) => ({
-      department,
-      count: count as number
-    }));
-
-    let seniorities = Object.entries(data.seniority || {}).map(([seniority, count]) => ({
-      seniority,
-      count: count as number
-    }));
-
+    const data = row(result.data);
+    const count = (value: unknown) => {
+      const result = optionalNumber(value);
+      if (result === undefined)
+        throw createApiServiceError('Hunter omitted required count metadata.');
+      return result;
+    };
+    const departments = Object.entries(optionalRow(data.department)).map(
+      ([department, value]) => ({ department, count: count(value) })
+    );
+    const seniorities = Object.entries(optionalRow(data.seniority)).map(
+      ([seniority, value]) => ({ seniority, count: count(value) })
+    );
     return {
       output: {
-        total: data.total ?? 0,
-        personalEmails: data.personal_emails ?? 0,
-        genericEmails: data.generic_emails ?? 0,
+        total: count(data.total),
+        personalEmails: count(data.personal_emails),
+        genericEmails: count(data.generic_emails),
         departments,
         seniorities
       },
-      message: `Found **${data.total ?? 0}** email addresses for **${ctx.input.domain || ctx.input.companyName}** (${data.personal_emails ?? 0} personal, ${data.generic_emails ?? 0} generic).`
+      message: `Hunter reports **${count(data.total)}** available email addresses.`
     };
   })
   .build();

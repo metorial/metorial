@@ -1,67 +1,109 @@
-import { SlateTool } from 'slates';
+import { pickDefined } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { spec } from '../spec';
-
-export let createEmployment = SlateTool.create(spec, {
-  name: 'Create Employment',
-  key: 'create_employment',
-  description: `Create a new employment record in Remote for onboarding an employee. Requires country-specific fields which vary by country (use the country form schema tool to discover required fields). After creation, the employee can be invited to complete self-enrollment.`,
-  instructions: [
-    'Country-specific fields are required and vary by country. Use the "Get Country Form Schema" tool first to discover required fields for the target country.',
-    'The basicInformation object must include country_code, full_name, job_title, and provisional_start_date at minimum.'
-  ],
-  tags: {
-    destructive: false
-  }
-})
-  .input(
-    z.object({
-      countryCode: z.string().describe('ISO country code for the employment (e.g., GBR, DEU)'),
-      fullName: z.string().describe('Full legal name of the employee'),
-      jobTitle: z.string().describe('Job title for the employment'),
-      provisionalStartDate: z.string().describe('Planned start date (YYYY-MM-DD)'),
-      basicInformation: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe('Additional country-specific basic information fields'),
-      companyId: z.string().optional().describe('Company ID if managing multiple companies'),
-      type: z.string().optional().describe('Employment type (e.g., employee, contractor)'),
-      seniorityDate: z.string().optional().describe('Seniority date (YYYY-MM-DD)')
-    })
-  )
-  .output(
-    z.object({
-      employment: z.record(z.string(), z.any()).describe('Created employment record')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment ?? 'production'
-    });
-
-    let data: Record<string, any> = {
-      country_code: ctx.input.countryCode,
-      basic_information: {
-        full_name: ctx.input.fullName,
-        job_title: ctx.input.jobTitle,
-        provisional_start_date: ctx.input.provisionalStartDate,
-        ...ctx.input.basicInformation
+import { single } from '../lib/client';
+import { countryForm, validateForm } from '../lib/forms';
+import { remoteTool } from '../lib/tool';
+import {
+  country,
+  date,
+  fail,
+  id,
+  isRecord,
+  type RecordData,
+  recordSchema,
+  required
+} from '../lib/validation';
+export let createEmployment = remoteTool(
+  {
+    name: 'Create Employment',
+    key: 'create_employment',
+    description:
+      'Create a country-specific employment record. Discover requirements with get_country_form_schema first. Creation does not complete onboarding or send an enrollment invitation.',
+    tags: { destructive: false }
+  },
+  z.object({
+    countryCode: z.string(),
+    fullName: z.string().optional(),
+    jobTitle: z.string().optional(),
+    provisionalStartDate: z.string().optional(),
+    basicInformation: recordSchema.optional(),
+    companyId: z.string().optional(),
+    type: z.string().optional(),
+    seniorityDate: z.string().optional(),
+    externalId: z.string().optional(),
+    engagedByLegalEntityId: z.string().optional(),
+    billToLegalEntityId: z.string().optional()
+  }),
+  z.object({ employment: recordSchema }),
+  async (client, input) => {
+    let code = country(input.countryCode);
+    let basic: RecordData = { ...input.basicInformation };
+    for (let [key, value] of [
+      ['name', input.fullName],
+      ['job_title', input.jobTitle],
+      ['provisional_start_date', input.provisionalStartDate]
+    ] as const)
+      if (value !== undefined) {
+        if (basic[key] !== undefined && basic[key] !== value)
+          fail(
+            `Conflicting basicInformation.${key} and dedicated field. Provide one consistent value.`
+          );
+        basic[key] = value;
       }
-    };
-
-    if (ctx.input.companyId) data.company_id = ctx.input.companyId;
-    if (ctx.input.type) data.type = ctx.input.type;
-    if (ctx.input.seniorityDate) data.seniority_date = ctx.input.seniorityDate;
-
-    let result = await client.createEmployment(data);
-    let employment = result?.data ?? result?.employment ?? result;
-
+    if (input.provisionalStartDate !== undefined)
+      date(input.provisionalStartDate, 'Provisional start date');
+    if (input.seniorityDate !== undefined) {
+      basic.seniority_date = date(input.seniorityDate, 'Seniority date');
+      basic.has_seniority_date = 'yes';
+    }
+    let type = input.type ?? 'employee';
+    if (!['employee', 'contractor', 'global_payroll_employee', 'hris'].includes(type))
+      fail(
+        'Use a documented employment type: employee, contractor, global_payroll_employee, or hris.'
+      );
+    let { identity } = await client.getIdentity();
+    if (!isRecord(identity.company))
+      fail('Employment creation requires a company-scoped connection.');
+    if (input.companyId !== undefined && id(input.companyId) !== identity.company.id)
+      fail(
+        'companyId does not match the currently authorized company. Reconnect to the intended company.'
+      );
+    if (type === 'global_payroll_employee' && !input.engagedByLegalEntityId)
+      fail(
+        'Global Payroll employees require engagedByLegalEntityId for an enabled company legal entity.'
+      );
+    let form =
+      type === 'contractor'
+        ? 'contractor_basic_information'
+        : type === 'global_payroll_employee'
+          ? 'global_payroll_basic_information'
+          : 'employment_basic_information';
+    let current = await countryForm(client, code, form);
+    basic = validateForm(basic, current.schema, 'Basic information');
+    let body = pickDefined({
+      country_code: code,
+      basic_information: basic,
+      company_id: input.companyId,
+      type,
+      external_id: input.externalId,
+      engaged_by_legal_entity_id:
+        input.engagedByLegalEntityId === undefined
+          ? undefined
+          : id(input.engagedByLegalEntityId),
+      bill_to_legal_entity_id:
+        input.billToLegalEntityId === undefined ? undefined : id(input.billToLegalEntityId)
+    });
+    let employment = single(
+      await client.request('post', '/employments', body, {
+        json_schema_version: current.version
+      }),
+      'employment'
+    );
+    required(employment.id, 'Created employment ID');
     return {
-      output: {
-        employment
-      },
-      message: `Created employment for **${ctx.input.fullName}** in ${ctx.input.countryCode}.`
+      output: { employment },
+      message:
+        'Remote created the employment record. Onboarding and enrollment remain separate steps.'
     };
-  });
+  }
+);

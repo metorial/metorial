@@ -1,29 +1,30 @@
-import { createAxios } from 'slates';
 import { encodeFormBody } from './client';
+import { createTwilioAxios } from './http';
+import { pathId } from './validation';
 
 export class ConversationsClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createTwilioAxios>;
 
-  constructor(token: string) {
-    this.axios = createAxios({
-      baseURL: 'https://conversations.twilio.com/v1',
-      headers: {
-        Authorization: `Basic ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
+  constructor(token: string, accountSid?: string, pageToken?: string) {
+    this.axios = createTwilioAxios('conversations', token, accountSid, pageToken);
+  }
+
+  private async conversationId(value: string): Promise<string> {
+    if (/^CH[0-9a-fA-F]{32}$/.test(value)) return pathId(value);
+    const resolved = await this.axios.get(`/Conversations/${pathId(value)}`);
+    return pathId(resolved.data.sid);
   }
 
   // Conversations
   async listConversations(pageSize?: number): Promise<any> {
     let response = await this.axios.get('/Conversations', {
-      params: { PageSize: pageSize || 50 }
+      params: { PageSize: pageSize ?? 50 }
     });
     return response.data;
   }
 
   async getConversation(conversationSid: string): Promise<any> {
-    let response = await this.axios.get(`/Conversations/${conversationSid}`);
+    let response = await this.axios.get(`/Conversations/${pathId(conversationSid)}`);
     return response.data;
   }
 
@@ -37,27 +38,30 @@ export class ConversationsClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/Conversations/${conversationSid}`,
+      `/Conversations/${pathId(conversationSid)}`,
       encodeFormBody(params)
     );
     return response.data;
   }
 
   async deleteConversation(conversationSid: string): Promise<void> {
-    await this.axios.delete(`/Conversations/${conversationSid}`);
+    await this.axios.delete(`/Conversations/${pathId(conversationSid)}`);
   }
 
   // Participants
   async listParticipants(conversationSid: string, pageSize?: number): Promise<any> {
-    let response = await this.axios.get(`/Conversations/${conversationSid}/Participants`, {
-      params: { PageSize: pageSize || 50 }
-    });
+    let response = await this.axios.get(
+      `/Conversations/${await this.conversationId(conversationSid)}/Participants`,
+      {
+        params: { PageSize: pageSize ?? 50 }
+      }
+    );
     return response.data;
   }
 
   async getParticipant(conversationSid: string, participantSid: string): Promise<any> {
     let response = await this.axios.get(
-      `/Conversations/${conversationSid}/Participants/${participantSid}`
+      `/Conversations/${await this.conversationId(conversationSid)}/Participants/${pathId(participantSid)}`
     );
     return response.data;
   }
@@ -67,7 +71,7 @@ export class ConversationsClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/Conversations/${conversationSid}/Participants`,
+      `/Conversations/${await this.conversationId(conversationSid)}/Participants`,
       encodeFormBody(params)
     );
     return response.data;
@@ -79,7 +83,7 @@ export class ConversationsClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/Conversations/${conversationSid}/Participants/${participantSid}`,
+      `/Conversations/${await this.conversationId(conversationSid)}/Participants/${pathId(participantSid)}`,
       encodeFormBody(params)
     );
     return response.data;
@@ -87,7 +91,7 @@ export class ConversationsClient {
 
   async removeParticipant(conversationSid: string, participantSid: string): Promise<void> {
     await this.axios.delete(
-      `/Conversations/${conversationSid}/Participants/${participantSid}`
+      `/Conversations/${await this.conversationId(conversationSid)}/Participants/${pathId(participantSid)}`
     );
   }
 
@@ -97,15 +101,18 @@ export class ConversationsClient {
     pageSize?: number,
     order?: string
   ): Promise<any> {
-    let response = await this.axios.get(`/Conversations/${conversationSid}/Messages`, {
-      params: { PageSize: pageSize || 50, Order: order }
-    });
+    let response = await this.axios.get(
+      `/Conversations/${await this.conversationId(conversationSid)}/Messages`,
+      {
+        params: { PageSize: pageSize ?? 50, Order: order }
+      }
+    );
     return response.data;
   }
 
   async getMessage(conversationSid: string, messageSid: string): Promise<any> {
     let response = await this.axios.get(
-      `/Conversations/${conversationSid}/Messages/${messageSid}`
+      `/Conversations/${await this.conversationId(conversationSid)}/Messages/${pathId(messageSid)}`
     );
     return response.data;
   }
@@ -115,7 +122,7 @@ export class ConversationsClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/Conversations/${conversationSid}/Messages`,
+      `/Conversations/${await this.conversationId(conversationSid)}/Messages`,
       encodeFormBody(params)
     );
     return response.data;
@@ -127,34 +134,15 @@ export class ConversationsClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/Conversations/${conversationSid}/Messages/${messageSid}`,
+      `/Conversations/${await this.conversationId(conversationSid)}/Messages/${pathId(messageSid)}`,
       encodeFormBody(params)
     );
     return response.data;
   }
 
   async deleteMessage(conversationSid: string, messageSid: string): Promise<void> {
-    await this.axios.delete(`/Conversations/${conversationSid}/Messages/${messageSid}`);
-  }
-
-  // Webhooks
-  async listWebhooks(conversationSid: string): Promise<any> {
-    let response = await this.axios.get(`/Conversations/${conversationSid}/Webhooks`);
-    return response.data;
-  }
-
-  async createWebhook(
-    conversationSid: string,
-    params: Record<string, string | undefined>
-  ): Promise<any> {
-    let response = await this.axios.post(
-      `/Conversations/${conversationSid}/Webhooks`,
-      encodeFormBody(params)
+    await this.axios.delete(
+      `/Conversations/${await this.conversationId(conversationSid)}/Messages/${pathId(messageSid)}`
     );
-    return response.data;
-  }
-
-  async deleteWebhook(conversationSid: string, webhookSid: string): Promise<void> {
-    await this.axios.delete(`/Conversations/${conversationSid}/Webhooks/${webhookSid}`);
   }
 }

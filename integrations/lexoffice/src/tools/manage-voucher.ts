@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { voucherPayload } from '../lib/payloads';
+import { mapVoucher } from '../lib/schemas';
+import { fail, required } from '../lib/validation';
 import { spec } from '../spec';
 
 let voucherItemInputSchema = z
@@ -37,29 +40,6 @@ let voucherOutputSchema = z.object({
   updatedDate: z.string().optional().describe('Last updated date')
 });
 
-let mapVoucher = (voucher: any) => ({
-  id: voucher.id,
-  resourceUri: voucher.resourceUri,
-  type: voucher.type,
-  voucherNumber: voucher.voucherNumber,
-  voucherDate: voucher.voucherDate,
-  dueDate: voucher.dueDate,
-  totalGrossAmount: voucher.totalGrossAmount,
-  totalTaxAmount: voucher.totalTaxAmount,
-  taxType: voucher.taxType,
-  voucherStatus: voucher.voucherStatus,
-  contactId: voucher.contactId,
-  voucherItems: voucher.voucherItems?.map((item: any) => ({
-    amount: item.amount,
-    taxAmount: item.taxAmount,
-    taxRatePercentage: item.taxRatePercentage,
-    categoryId: item.categoryId
-  })),
-  version: voucher.version,
-  createdDate: voucher.createdDate,
-  updatedDate: voucher.updatedDate
-});
-
 export let manageVoucher = SlateTool.create(spec, {
   name: 'Manage Voucher',
   key: 'manage_voucher',
@@ -67,7 +47,7 @@ export let manageVoucher = SlateTool.create(spec, {
   instructions: [
     'Use action "create" to add a new voucher — type, voucherNumber, voucherDate, totalGrossAmount, totalTaxAmount, taxType, and voucherItems are required.',
     'Use action "get" to retrieve full details of a voucher by its ID.',
-    'Use action "update" to modify an existing voucher — voucherId is required.',
+    'Updates read the current version and preserve existing file IDs and omitted fields. A status change is supported only from unchecked to open; conflicts are not automatically retried.',
     'Supported voucher types: salesinvoice, salescreditnote, purchaseinvoice, purchasecreditnote.'
   ],
   tags: {
@@ -80,6 +60,14 @@ export let manageVoucher = SlateTool.create(spec, {
       action: z
         .enum(['create', 'get', 'update'])
         .describe('Operation to perform on the voucher'),
+      useCollectiveContact: z
+        .boolean()
+        .optional()
+        .describe('Explicitly use the collective customer or vendor instead of contactId'),
+      expectedVersion: z
+        .number()
+        .optional()
+        .describe('Expected current voucher version; refuse the update if it changed'),
       voucherId: z.string().optional().describe('Voucher ID (required for get and update)'),
       type: z
         .enum(['salesinvoice', 'salescreditnote', 'purchaseinvoice', 'purchasecreditnote'])
@@ -113,108 +101,29 @@ export let manageVoucher = SlateTool.create(spec, {
   )
   .output(voucherOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let { action } = ctx.input;
-
+    const client = new Client({ token: ctx.auth.token });
+    const { action, voucherId, ...input } = ctx.input;
     if (action === 'create') {
-      if (!ctx.input.type) throw new Error('type is required for voucher creation');
-      if (!ctx.input.voucherNumber)
-        throw new Error('voucherNumber is required for voucher creation');
-      if (!ctx.input.voucherDate)
-        throw new Error('voucherDate is required for voucher creation');
-      if (ctx.input.totalGrossAmount === undefined)
-        throw new Error('totalGrossAmount is required for voucher creation');
-      if (ctx.input.totalTaxAmount === undefined)
-        throw new Error('totalTaxAmount is required for voucher creation');
-      if (!ctx.input.taxType) throw new Error('taxType is required for voucher creation');
-      if (!ctx.input.voucherItems || ctx.input.voucherItems.length === 0)
-        throw new Error('voucherItems are required for voucher creation');
-
-      let voucherData: Record<string, any> = {
-        type: ctx.input.type,
-        voucherNumber: ctx.input.voucherNumber,
-        voucherDate: ctx.input.voucherDate,
-        totalGrossAmount: ctx.input.totalGrossAmount,
-        totalTaxAmount: ctx.input.totalTaxAmount,
-        taxType: ctx.input.taxType,
-        voucherItems: ctx.input.voucherItems.map(item => ({
-          amount: item.amount,
-          taxAmount: item.taxAmount,
-          taxRatePercentage: item.taxRatePercentage,
-          categoryId: item.categoryId
-        }))
-      };
-      if (ctx.input.dueDate) voucherData.dueDate = ctx.input.dueDate;
-      if (ctx.input.contactId) voucherData.contactId = ctx.input.contactId;
-      if (ctx.input.voucherStatus) voucherData.voucherStatus = ctx.input.voucherStatus;
-
-      let result = await client.createVoucher(voucherData);
-
+      const result = await client.createVoucher(voucherPayload(input));
+      return { output: result, message: `Created bookkeeping voucher **${result.id}**.` };
+    }
+    const id = required(voucherId, 'voucherId');
+    const current = await client.getVoucher(id);
+    if (action === 'get')
       return {
-        output: {
-          id: result.id,
-          resourceUri: result.resourceUri,
-          type: ctx.input.type,
-          voucherNumber: ctx.input.voucherNumber,
-          voucherDate: ctx.input.voucherDate,
-          totalGrossAmount: ctx.input.totalGrossAmount,
-          totalTaxAmount: ctx.input.totalTaxAmount,
-          taxType: ctx.input.taxType,
-          version: result.version,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
-        },
-        message: `Created ${ctx.input.type} voucher **${ctx.input.voucherNumber}** (${result.id}) for **${ctx.input.totalGrossAmount}** gross.`
+        output: mapVoucher(current),
+        message: `Retrieved bookkeeping voucher **${current.id}**, status: ${current.voucherStatus ?? 'not supplied'}.`
       };
-    }
-
-    if (action === 'get') {
-      if (!ctx.input.voucherId) throw new Error('voucherId is required for get action');
-
-      let voucher = await client.getVoucher(ctx.input.voucherId);
-      let output = mapVoucher(voucher);
-
-      return {
-        output,
-        message: `Retrieved voucher **${output.voucherNumber}** (${output.id}) — ${output.type}, status: **${output.voucherStatus}**, gross: **${output.totalGrossAmount}**.`
-      };
-    }
-
-    // update
-    if (!ctx.input.voucherId) throw new Error('voucherId is required for update action');
-
-    let voucherData: Record<string, any> = {};
-    if (ctx.input.type) voucherData.type = ctx.input.type;
-    if (ctx.input.voucherNumber) voucherData.voucherNumber = ctx.input.voucherNumber;
-    if (ctx.input.voucherDate) voucherData.voucherDate = ctx.input.voucherDate;
-    if (ctx.input.dueDate) voucherData.dueDate = ctx.input.dueDate;
-    if (ctx.input.totalGrossAmount !== undefined)
-      voucherData.totalGrossAmount = ctx.input.totalGrossAmount;
-    if (ctx.input.totalTaxAmount !== undefined)
-      voucherData.totalTaxAmount = ctx.input.totalTaxAmount;
-    if (ctx.input.taxType) voucherData.taxType = ctx.input.taxType;
-    if (ctx.input.contactId) voucherData.contactId = ctx.input.contactId;
-    if (ctx.input.voucherStatus) voucherData.voucherStatus = ctx.input.voucherStatus;
-    if (ctx.input.voucherItems) {
-      voucherData.voucherItems = ctx.input.voucherItems.map(item => ({
-        amount: item.amount,
-        taxAmount: item.taxAmount,
-        taxRatePercentage: item.taxRatePercentage,
-        categoryId: item.categoryId
-      }));
-    }
-
-    let result = await client.updateVoucher(ctx.input.voucherId, voucherData);
-
+    if (
+      !Object.entries(input).some(
+        ([key, value]) => key !== 'expectedVersion' && value !== undefined
+      )
+    )
+      fail('Provide at least one voucher field to update.');
+    const result = await client.updateVoucher(id, voucherPayload(input, current));
     return {
-      output: {
-        id: result.id,
-        resourceUri: result.resourceUri,
-        version: result.version,
-        createdDate: result.createdDate,
-        updatedDate: result.updatedDate
-      },
-      message: `Updated voucher **${ctx.input.voucherNumber || result.id}**.`
+      output: result,
+      message: `Updated bookkeeping voucher **${result.id}**; existing file associations were preserved.`
     };
   })
   .build();

@@ -1,14 +1,12 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let httpClient = createAxios({
-  baseURL: 'https://api.vapi.ai'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      region: z.enum(['us', 'eu']).optional()
     })
   )
   .addTokenAuth({
@@ -16,24 +14,24 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      token: z.string().describe('Your Vapi API key from the dashboard')
+      token: z.string().min(1).describe('Your private Vapi API key from the dashboard'),
+      region: z
+        .enum(['us', 'eu'])
+        .optional()
+        .describe(
+          'Region of your Vapi organization; defaults to us. EU keys require the EU API.'
+        )
     }),
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          region: ctx.input.region ?? 'us'
         }
       };
     },
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let _response = await httpClient.get('/call', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        },
-        params: {
-          limit: 1
-        }
-      });
+    getProfile: async (ctx: { output: { token: string; region?: 'us' | 'eu' } }) => {
+      await new Client(ctx.output.token, ctx.output.region).listAssistants({ limit: 1 });
 
       return {
         profile: {

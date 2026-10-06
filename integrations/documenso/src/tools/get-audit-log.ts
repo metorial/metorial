@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageMap } from '../lib/schemas';
+import { clientConfig } from '../lib/validation';
 import { spec } from '../spec';
 
 let auditLogEntrySchema = z.object({
@@ -32,35 +34,33 @@ export let getAuditLogTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      entries: z.array(auditLogEntrySchema).describe('Audit log entries')
+      entries: z.array(auditLogEntrySchema).describe('Audit log entries'),
+      totalCount: z.number().optional(),
+      currentPage: z.number().optional(),
+      perPage: z.number().optional(),
+      totalPages: z.number().optional(),
+      nextPage: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let result = await client.getEnvelopeAuditLog(ctx.input.envelopeId, {
-      page: ctx.input.page,
-      perPage: ctx.input.perPage
-    });
-
-    let items = Array.isArray(result) ? result : (result.data ?? result.logs ?? []);
-
+    const r = await new Client(clientConfig(ctx)).getEnvelopeAuditLog(
+      ctx.input.envelopeId,
+      ctx.input
+    );
     return {
       output: {
-        entries: items.map((entry: Record<string, unknown>) => ({
-          logId: String(entry.id ?? ''),
-          type: String(entry.type ?? ''),
-          createdAt: String(entry.createdAt ?? ''),
-          userAgent: entry.userAgent ? String(entry.userAgent) : undefined,
-          ipAddress: entry.ipAddress ? String(entry.ipAddress) : undefined,
-          name: entry.name ? String(entry.name) : undefined,
-          email: entry.email ? String(entry.email) : undefined
-        }))
+        entries: r.data.map(e => ({
+          logId: e.id,
+          type: e.type,
+          createdAt: e.createdAt,
+          userAgent: e.userAgent ?? undefined,
+          ipAddress: e.ipAddress ?? undefined,
+          name: e.name ?? undefined,
+          email: e.email ?? undefined
+        })),
+        ...pageMap(r)
       },
-      message: `Retrieved ${items.length} audit log entries for envelope \`${ctx.input.envelopeId}\`.`
+      message: `Retrieved ${r.data.length} audit entries on this page.`
     };
   })
   .build();

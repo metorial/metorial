@@ -93,7 +93,11 @@ export let getCheck = SlateTool.create(spec, {
     });
 
     let result = await client.getCheck(ctx.input.checkId, { include_teams: true });
-    let c = result.check || result;
+    let c = result.check;
+    const type =
+      typeof c.type === 'string'
+        ? { name: c.type, http: undefined, tcp: undefined, dns: undefined }
+        : c.type;
 
     return {
       output: {
@@ -101,34 +105,41 @@ export let getCheck = SlateTool.create(spec, {
         name: c.name,
         hostname: c.hostname,
         status: c.status,
-        type: c.type
+        type: type
           ? {
-              name: c.type.name || (typeof c.type === 'string' ? c.type : undefined),
-              http: c.type.http
+              name: type.name,
+              http: type.http
                 ? {
-                    url: c.type.http.url,
-                    encryption: c.type.http.encryption,
-                    port: c.type.http.port,
-                    username: c.type.http.username,
-                    shouldContain: c.type.http.shouldcontain,
-                    shouldNotContain: c.type.http.shouldnotcontain,
-                    postData: c.type.http.postdata,
-                    requestHeaders: c.type.http.requestheaders,
-                    verifyCertificate: c.type.http.verify_certificate,
-                    sslDownDaysBefore: c.type.http.ssl_down_days_before
+                    url: type.http.url,
+                    encryption: type.http.encryption,
+                    port: type.http.port,
+                    username: type.http.username,
+                    shouldContain: type.http.shouldcontain,
+                    shouldNotContain: type.http.shouldnotcontain,
+                    postData: type.http.postdata,
+                    requestHeaders: Array.isArray(type.http.requestheaders)
+                      ? Object.fromEntries(
+                          type.http.requestheaders.map((header: string) => {
+                            const separator = header.indexOf(':');
+                            return [header.slice(0, separator), header.slice(separator + 1)];
+                          })
+                        )
+                      : type.http.requestheaders,
+                    verifyCertificate: type.http.verify_certificate,
+                    sslDownDaysBefore: type.http.ssl_down_days_before
                   }
                 : undefined,
-              tcp: c.type.tcp
+              tcp: type.tcp
                 ? {
-                    port: c.type.tcp.port,
-                    stringToSend: c.type.tcp.stringtosend,
-                    stringToExpect: c.type.tcp.stringtoexpect
+                    port: type.tcp.port,
+                    stringToSend: type.tcp.stringtosend,
+                    stringToExpect: type.tcp.stringtoexpect
                   }
                 : undefined,
-              dns: c.type.dns
+              dns: type.dns
                 ? {
-                    expectedIp: c.type.dns.expectedip,
-                    nameServer: c.type.dns.nameserver
+                    expectedIp: type.dns.expectedip,
+                    nameServer: type.dns.nameserver
                   }
                 : undefined
             }
@@ -147,7 +158,7 @@ export let getCheck = SlateTool.create(spec, {
         customMessage: c.custom_message,
         integrationIds: c.integrationids,
         userIds: c.userids,
-        teamIds: c.teams?.map((t: any) => t.id),
+        teamIds: c.teams?.map(t => t.id),
         tags: c.tags,
         probeFilters: c.probe_filters,
         severityLevel: c.severity_level

@@ -15,7 +15,7 @@ Use **List Transformation Versions** or **List Library Versions** to find the ve
   ],
   tags: {
     readOnly: false,
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -27,7 +27,7 @@ Use **List Transformation Versions** or **List Library Versions** to find the ve
               .string()
               .describe('Version ID of the transformation revision to publish'),
             testInput: z
-              .array(z.any())
+              .array(z.unknown())
               .optional()
               .describe('Optional array of test event payloads to validate before publishing')
           })
@@ -68,7 +68,7 @@ Use **List Transformation Versions** or **List Library Versions** to find the ve
 
     return {
       output: { success: true },
-      message: `Published ${parts.join(' and ')}.`
+      message: `Publication request accepted for ${parts.join(' and ')}. Read the published resources back to confirm their selected versions.`
     };
   })
   .build();

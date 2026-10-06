@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { requireValue, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let updateUser = SlateTool.create(spec, {
@@ -45,65 +46,87 @@ export let updateUser = SlateTool.create(spec, {
       groupsAdded: z.number().optional(),
       groupsRemoved: z.number().optional(),
       phonesAdded: z.number().optional(),
-      phonesRemoved: z.number().optional()
+      phonesRemoved: z.number().optional(),
+      confirmed: z.boolean().optional(),
+      partial: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('update_user', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let profileUpdates: Record<string, any> = {};
-    if (ctx.input.username) profileUpdates.username = ctx.input.username;
-    if (ctx.input.email) profileUpdates.email = ctx.input.email;
-    if (ctx.input.realname) profileUpdates.realname = ctx.input.realname;
-    if (ctx.input.firstname) profileUpdates.firstname = ctx.input.firstname;
-    if (ctx.input.lastname) profileUpdates.lastname = ctx.input.lastname;
-    if (ctx.input.status) profileUpdates.status = ctx.input.status;
+    if (ctx.input.username !== undefined) profileUpdates.username = ctx.input.username;
+    if (ctx.input.email !== undefined) profileUpdates.email = ctx.input.email;
+    if (ctx.input.realname !== undefined) profileUpdates.realname = ctx.input.realname;
+    if (ctx.input.firstname !== undefined) profileUpdates.firstname = ctx.input.firstname;
+    if (ctx.input.lastname !== undefined) profileUpdates.lastname = ctx.input.lastname;
+    if (ctx.input.status !== undefined) profileUpdates.status = ctx.input.status;
     if (ctx.input.notes !== undefined) profileUpdates.notes = ctx.input.notes;
 
-    let user: any;
-    if (Object.keys(profileUpdates).length > 0) {
-      let result = await client.updateUser(ctx.input.userId, profileUpdates);
-      user = result.response;
-    } else {
-      let result = await client.getUser(ctx.input.userId);
-      user = result.response;
-    }
-
-    let groupsAdded = 0;
-    let groupsRemoved = 0;
-    let phonesAdded = 0;
-    let phonesRemoved = 0;
-
-    if (ctx.input.addGroupIds) {
-      for (let groupId of ctx.input.addGroupIds) {
-        await client.associateUserGroup(ctx.input.userId, groupId);
+    requireValue(
+      Object.keys(profileUpdates).length > 0 ||
+        ['addGroupIds', 'removeGroupIds', 'addPhoneIds', 'removePhoneIds'].some(
+          key => (ctx.input as Record<string, unknown>)[key] !== undefined
+        ),
+      'Provide profile fields or explicit relationship changes.'
+    );
+    let user = (await client.getUser(ctx.input.userId)).response;
+    for (const id of [...(ctx.input.addGroupIds ?? []), ...(ctx.input.removeGroupIds ?? [])])
+      await client.getGroup(id);
+    for (const id of [...(ctx.input.addPhoneIds ?? []), ...(ctx.input.removePhoneIds ?? [])])
+      await client.getPhone(id);
+    let groupsAdded = 0,
+      groupsRemoved = 0,
+      phonesAdded = 0,
+      phonesRemoved = 0,
+      partial = false,
+      confirmed = false;
+    try {
+      if (Object.keys(profileUpdates).length > 0)
+        user = (await client.updateUser(ctx.input.userId, profileUpdates)).response;
+      for (const id of ctx.input.addGroupIds ?? []) {
+        await client.associateUserGroup(ctx.input.userId, id);
         groupsAdded++;
       }
-    }
-
-    if (ctx.input.removeGroupIds) {
-      for (let groupId of ctx.input.removeGroupIds) {
-        await client.disassociateUserGroup(ctx.input.userId, groupId);
+      for (const id of ctx.input.removeGroupIds ?? []) {
+        await client.disassociateUserGroup(ctx.input.userId, id);
         groupsRemoved++;
       }
-    }
-
-    if (ctx.input.addPhoneIds) {
-      for (let phoneId of ctx.input.addPhoneIds) {
-        await client.associateUserPhone(ctx.input.userId, phoneId);
+      for (const id of ctx.input.addPhoneIds ?? []) {
+        await client.associateUserPhone(ctx.input.userId, id);
         phonesAdded++;
       }
-    }
-
-    if (ctx.input.removePhoneIds) {
-      for (let phoneId of ctx.input.removePhoneIds) {
-        await client.disassociateUserPhone(ctx.input.userId, phoneId);
+      for (const id of ctx.input.removePhoneIds ?? []) {
+        await client.disassociateUserPhone(ctx.input.userId, id);
         phonesRemoved++;
       }
+      user = (await client.getUser(ctx.input.userId)).response;
+      confirmed =
+        Object.entries(profileUpdates).every(([key, value]) => user[key] === value) &&
+        (ctx.input.addGroupIds ?? []).every(id =>
+          user.groups?.some((g: { group_id: string }) => g.group_id === id)
+        ) &&
+        (ctx.input.removeGroupIds ?? []).every(
+          id =>
+            Array.isArray(user.groups) &&
+            !user.groups.some((g: { group_id: string }) => g.group_id === id)
+        ) &&
+        (ctx.input.addPhoneIds ?? []).every(id =>
+          user.phones?.some((p: { phone_id: string }) => p.phone_id === id)
+        ) &&
+        (ctx.input.removePhoneIds ?? []).every(
+          id =>
+            Array.isArray(user.phones) &&
+            !user.phones.some((p: { phone_id: string }) => p.phone_id === id)
+        );
+    } catch {
+      partial = true;
     }
 
     return {
@@ -115,9 +138,13 @@ export let updateUser = SlateTool.create(spec, {
         groupsAdded: groupsAdded > 0 ? groupsAdded : undefined,
         groupsRemoved: groupsRemoved > 0 ? groupsRemoved : undefined,
         phonesAdded: phonesAdded > 0 ? phonesAdded : undefined,
-        phonesRemoved: phonesRemoved > 0 ? phonesRemoved : undefined
+        phonesRemoved: phonesRemoved > 0 ? phonesRemoved : undefined,
+        confirmed,
+        partial
       },
-      message: `Updated user **${user.username}**.`
+      message: confirmed
+        ? `Confirmed user update **${user.username}** (${user.user_id}).`
+        : `User ${ctx.input.userId} update is unconfirmed${partial ? ' after a request failed' : ''}. Earlier steps may already have succeeded; read the user and reconcile profile/relationship state before retrying. No rollback occurred.`
     };
   })
   .build();

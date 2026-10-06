@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/braintree.svg" height="20"> Braintree
 
-Process payments and manage transactions across credit/debit cards, PayPal, Venmo, Apple Pay, Google Pay, and ACH Direct Debit. Create, void, refund, and search transactions. Store customer payment methods securely in the Vault for repeat billing. Manage recurring subscriptions with add-ons and discounts. Handle disputes by adding evidence, accepting, or finalizing. Create and manage customers, addresses, and sub-merchant accounts. Run credit card verifications, generate settlement batch summaries, and forward payment data to third parties. Receive webhook notifications for subscription lifecycle changes, transaction settlements, disbursements, dispute updates, account updater card refreshes, and fraud protection alerts.
+Process payments and manage transactions across credit/debit cards, PayPal, Venmo, Apple Pay, Google Pay, and ACH Direct Debit. Create, void, refund, and search transactions. Store customer payment methods securely in the Vault for repeat billing. Manage recurring subscriptions with add-ons and discounts. Handle disputes by adding evidence, accepting, or finalizing. Create and manage customers, addresses, and sub-merchant accounts. Run credit card verifications, generate settlement batch summaries, and forward payment data to third parties.
 
 ## Tools
 

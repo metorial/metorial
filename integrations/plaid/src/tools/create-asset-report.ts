@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createAssetReportTool = SlateTool.create(spec, {
   name: 'Create Asset Report',
   key: 'create_asset_report',
-  description: `Initiate an asynchronous Asset Report that summarizes a user's financial history across one or more Items. The report is generated in the background — use the returned token to poll for the completed report. Useful for loan underwriting and financial verification. A webhook will fire when the report is ready.`,
+  description: `Initiate an asynchronous Asset Report that summarizes a user's financial history across one or more Items. The report is generated in the background — use the returned token to poll for the completed report. Useful for loan underwriting and financial verification. A configured report webhook can notify readiness; otherwise poll the report and handle PRODUCT_NOT_READY.`,
   instructions: [
     'Reports are generated asynchronously. The assetReportToken can be used with Get Asset Report once the report is ready.',
     'Set up a webhook to be notified when the report is complete.'

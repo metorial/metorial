@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'serpapi',
   name: 'SerpApi',
   description:
-    'Real-time search engine results API that extracts structured JSON data from Google, Bing, YouTube, Amazon, and 100+ other search engines and platforms.',
+    'Search supported web, image, news, video, shopping, Maps, Flights, Scholar, Trends and Jobs engines. Retrieve autocomplete, locations, account usage and exact search archives.',
   metadata: {},
   config,
   auth

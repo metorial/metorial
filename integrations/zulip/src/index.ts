@@ -20,8 +20,6 @@ import {
   updateChannel,
   updateMessage
 } from './tools';
-import { channelEvents, inboundWebhook, messageEvents, reactionEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     manageUserGroups,
     sendInvitation
   ],
-  triggers: [inboundWebhook, messageEvents, channelEvents, reactionEvents]
+  triggers: []
 });

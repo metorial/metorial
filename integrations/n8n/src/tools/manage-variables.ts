@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid } from '../lib/connection';
 import { spec } from '../spec';
 
 export let manageVariables = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let manageVariables = SlateTool.create(spec, {
   key: 'manage_variables',
   description: `Create, update, delete, or list variables stored in your n8n instance. Variables provide fixed data accessible across all workflows. Requires Pro or Enterprise plan.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -29,6 +30,7 @@ export let manageVariables = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Project ID to scope the variable to (for create and list)'),
+      state: z.enum(['empty']).optional().describe('Native empty-value filter for list'),
       limit: z.number().optional().describe('Max results for list action'),
       cursor: z.string().optional().describe('Pagination cursor for list action')
     })
@@ -53,6 +55,12 @@ export let manageVariables = SlateTool.create(spec, {
         })
         .optional()
         .describe('Single variable result (for create, update actions)'),
+      accepted: z
+        .boolean()
+        .optional()
+        .describe(
+          'Native request acceptance; list variables separately to observe the resulting state'
+        ),
       deleted: z
         .boolean()
         .optional()
@@ -61,15 +69,12 @@ export let manageVariables = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
-    let mapVar = (v: any) => ({
+    let mapVar = (v: Awaited<ReturnType<typeof client.listVariables>>['data'][number]) => ({
       variableId: String(v.id),
       key: v.key || '',
-      value: v.value || ''
+      value: v.value
     });
 
     switch (ctx.input.action) {
@@ -77,7 +82,8 @@ export let manageVariables = SlateTool.create(spec, {
         let result = await client.listVariables({
           limit: ctx.input.limit,
           cursor: ctx.input.cursor,
-          projectId: ctx.input.projectId
+          projectId: ctx.input.projectId,
+          state: ctx.input.state
         });
         let variables = (result.data || []).map(mapVar);
         return {
@@ -86,35 +92,37 @@ export let manageVariables = SlateTool.create(spec, {
         };
       }
       case 'create': {
-        if (!ctx.input.key) throw new Error('Key is required for creating a variable');
-        if (!ctx.input.value) throw new Error('Value is required for creating a variable');
-        let variable = await client.createVariable({
+        if (!ctx.input.key) throw invalid('Key is required for creating a variable');
+        if (ctx.input.value === undefined)
+          throw invalid('Value is required for creating a variable');
+        await client.createVariable({
           key: ctx.input.key,
           value: ctx.input.value,
           projectId: ctx.input.projectId
         });
         return {
-          output: { variable: mapVar(variable) },
+          output: { accepted: true },
           message: `Created variable **"${ctx.input.key}"**.`
         };
       }
       case 'update': {
         if (!ctx.input.variableId)
-          throw new Error('variableId is required for updating a variable');
-        if (!ctx.input.key) throw new Error('Key is required for updating a variable');
-        if (!ctx.input.value) throw new Error('Value is required for updating a variable');
-        let variable = await client.updateVariable(ctx.input.variableId, {
+          throw invalid('variableId is required for updating a variable');
+        if (!ctx.input.key) throw invalid('Key is required for updating a variable');
+        if (ctx.input.value === undefined)
+          throw invalid('Value is required for updating a variable');
+        await client.updateVariable(ctx.input.variableId, {
           key: ctx.input.key,
           value: ctx.input.value
         });
         return {
-          output: { variable: mapVar(variable) },
+          output: { accepted: true },
           message: `Updated variable **${ctx.input.variableId}** to key **"${ctx.input.key}"**.`
         };
       }
       case 'delete': {
         if (!ctx.input.variableId)
-          throw new Error('variableId is required for deleting a variable');
+          throw invalid('variableId is required for deleting a variable');
         await client.deleteVariable(ctx.input.variableId);
         return {
           output: { deleted: true },

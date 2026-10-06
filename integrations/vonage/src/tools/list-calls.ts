@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VonageRestClient } from '../lib/client';
+import { protect } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listCalls = SlateTool.create(spec, {
@@ -31,7 +32,8 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
           'failed',
           'rejected',
           'cancelled',
-          'busy'
+          'busy',
+          'unanswered'
         ])
         .optional()
         .describe('Filter by call status'),
@@ -51,6 +53,9 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
   )
   .output(
     z.object({
+      pageSize: z.number().optional().describe('Native page size'),
+      recordIndex: z.number().optional().describe('Native record offset'),
+      nextRecordIndex: z.number().optional().describe('Next offset; absent when complete'),
       count: z.number().optional().describe('Total number of matching calls'),
       calls: z
         .array(
@@ -73,6 +78,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
     })
   )
   .handleInvocation(async ctx => {
+    protect(ctx.input, [ctx.auth.apiSecret, ctx.auth.privateKey ?? '']);
     let client = new VonageRestClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret,
@@ -99,7 +105,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
     });
 
     return {
-      output: { count: result.count, calls: result.calls },
+      output: { ...result },
       message: `Found **${result.count}** call(s). Showing **${result.calls.length}** results.`
     };
   })

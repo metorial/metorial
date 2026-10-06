@@ -61,11 +61,11 @@ export let listEmailAccounts = SlateTool.create(spec, {
 
     let accounts = result.items.map((a: any) => ({
       email: a.email,
-      firstName: a.first_name,
-      lastName: a.last_name,
+      firstName: a.first_name ?? undefined,
+      lastName: a.last_name ?? undefined,
       status: a.status,
-      dailyLimit: a.daily_limit,
-      warmupScore: a.stat_warmup_score,
+      dailyLimit: a.daily_limit ?? undefined,
+      warmupScore: a.stat_warmup_score ?? undefined,
       providerCode: a.provider_code,
       setupPending: a.setup_pending,
       timestampCreated: a.timestamp_created

@@ -4,6 +4,7 @@ import {
   accountInfoTool,
   autocompleteTool,
   flightsSearchTool,
+  getSearchTool,
   imageSearchTool,
   jobsSearchTool,
   locationsLookupTool,
@@ -15,8 +16,6 @@ import {
   videoSearchTool,
   webSearchTool
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -33,7 +32,8 @@ export let provider = Slate.create({
     jobsSearchTool,
     autocompleteTool,
     locationsLookupTool,
-    accountInfoTool
+    accountInfoTool,
+    getSearchTool
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

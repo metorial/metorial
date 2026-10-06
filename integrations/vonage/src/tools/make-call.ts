@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VonageRestClient } from '../lib/client';
+import { protect } from '../lib/validation';
 import { spec } from '../spec';
 
 let nccoActionSchema = z
@@ -11,7 +12,7 @@ export let makeCall = SlateTool.create(spec, {
   name: 'Make Call',
   key: 'make_call',
   description: `Initiate an outbound voice call using the Vonage Voice API. Control call flow with NCCO (Nexmo Call Control Objects) actions or a remote answer URL.
-Supports calling phone numbers (PSTN), SIP endpoints, and WebSocket connections.
+This tool calls one phone number. Acceptance can incur charges and trigger external callbacks.
 Requires the **API Key, Secret & Application JWT** auth method.`,
   instructions: [
     'Provide either an inline "ncco" array or an "answerUrl" - not both.',
@@ -49,7 +50,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
       lengthTimer: z
         .number()
         .optional()
-        .describe('Maximum call duration in seconds (default: 7200)'),
+        .describe('Maximum call duration from 1 to 86400 seconds (default: 7200)'),
       ringingTimer: z.number().optional().describe('Ringing timeout in seconds (default: 60)')
     })
   )
@@ -62,6 +63,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
     })
   )
   .handleInvocation(async ctx => {
+    protect(ctx.input, [ctx.auth.apiSecret, ctx.auth.privateKey ?? '']);
     let client = new VonageRestClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret,

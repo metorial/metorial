@@ -1,7 +1,9 @@
 export { createConnectSession } from './create-connect-session';
 export { getRecords } from './get-records';
 export { listConnections } from './list-connections';
+export * from './list-functions';
 export { listIntegrations } from './list-integrations';
+export * from './list-providers';
 export { manageConnection } from './manage-connection';
 export { manageConnectionMetadata } from './manage-connection-metadata';
 export { manageIntegration } from './manage-integration';

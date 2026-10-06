@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/spotify.svg" height="20"> Spotify
 
-Search and browse Spotify's music catalog for tracks, artists, albums, playlists, podcasts, and episodes. Create, edit, and manage playlists including adding, removing, and reordering items. Control playback across devices: play, pause, skip, seek, set volume, toggle shuffle and repeat, and transfer playback. Save and remove items from the user's library. Retrieve user profiles, top artists and tracks, and recently played history. Follow and unfollow artists, users, and playlists. Access audio features and analysis data for tracks. Upload custom playlist cover images.
+Search tracks, artists, albums and playlists; read authenticated account context; manage playlists, track/album library and following; inspect listening history and control supported playback devices. Endpoint access depends on application quota mode and retained access. See [the specification](docs/SPEC.md) for explicit current/legacy selection and prerequisites. Playlist history is retained after unfollowing.
 
 ## Tools
 
@@ -10,11 +10,11 @@ Control Spotify playback on any connected device. Play, pause, skip, seek, adjus
 
 ### Get Album
 
-Retrieve detailed information about an album including its metadata, track listing, and artwork. Also supports browsing new album releases.
+Retrieve detailed information about an album including its metadata, track listing, and artwork. New-release browsing requires confirmed legacy endpoint access.
 
 ### Get Artist
 
-Retrieve detailed information about an artist including their profile, top tracks, albums, and related artists. Combine multiple aspects of artist data in a single call by selecting what to include.
+Retrieve detailed information about an artist including their profile, top tracks, albums, and related artists. Albums support explicit paging; top tracks and related artists require confirmed legacy endpoint access.
 
 ### Get Recently Played
 
@@ -22,15 +22,15 @@ Retrieve the user's recently played tracks with timestamps and context informati
 
 ### Get Top Items
 
-Retrieve the current user's most listened-to artists or tracks based on calculated affinity. Supports three time ranges: short-term (last 4 weeks), medium-term (last 6 months), and long-term (several years of data).
+Retrieve the current user's most listened-to artists or tracks based on calculated affinity. Supports three time ranges: short-term (last 4 weeks), medium-term (last 6 months), and long-term (approximately one year).
 
 ### Get Track
 
-Retrieve detailed information about one or more tracks including metadata, audio features (danceability, energy, tempo, etc.), and album info. Supports fetching up to 50 tracks at once.
+Retrieve detailed information about one or more tracks including metadata, audio features (danceability, energy, tempo, etc.), and album info. Accepts up to 50 track IDs. Current endpoint mode performs bounded individual reads; audio features require confirmed legacy endpoint access.
 
 ### Get User Profile
 
-Retrieve a Spotify user profile. Fetch the current authenticated user's full profile (including email, subscription, and country if scoped) or any user's public profile by their user ID.
+Retrieve a Spotify user profile. Fetch the current authenticated user's full profile (including email, subscription, and country if scoped) or another user's public profile when confirmed legacy endpoint access permits it.
 
 ### Manage Following
 

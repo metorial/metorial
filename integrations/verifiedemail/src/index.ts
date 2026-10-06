@@ -12,8 +12,6 @@ import {
   verifyEmail,
   verifyEmailList
 } from './tools';
-import { verificationEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     listWebhooks,
     deleteWebhook
   ],
-  triggers: [verificationEvents]
+  triggers: []
 });

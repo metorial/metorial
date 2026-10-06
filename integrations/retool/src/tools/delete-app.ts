@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let deleteApp = SlateTool.create(spec, {
   name: 'Delete App',
   key: 'delete_app',
-  description: `Permanently delete a Retool application. This action cannot be undone.`,
+  description: `Request deletion of an exact Retool application. A successful native receipt does not prove permanent erasure of history, trash, or caches.`,
   tags: {
     destructive: true
   }
@@ -23,7 +23,7 @@ export let deleteApp = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     await client.deleteApp(ctx.input.appId);
 

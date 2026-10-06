@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let orgOutputSchema = z.object({
@@ -24,8 +25,8 @@ export let listOrganizations = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page')
     })
   )
   .output(
@@ -34,14 +35,14 @@ export let listOrganizations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let orgs = await client.listMyOrgs({ page: ctx.input.page, limit: ctx.input.limit });
 
     return {
       output: {
         organizations: orgs.map(o => ({
           organizationId: o.id,
-          name: o.name,
+          name: o.name || o.username || '',
           fullName: o.full_name || '',
           description: o.description || '',
           avatarUrl: o.avatar_url || '',
@@ -58,25 +59,25 @@ export let listOrganizations = SlateTool.create(spec, {
 export let getOrganization = SlateTool.create(spec, {
   name: 'Get Organization',
   key: 'get_organization',
-  description: `Retrieve detailed information about an organization including its teams and repositories.`,
+  description: `Retrieve detailed information about an organization including its display name, description, and visibility. Use list_teams and search_repos for related resources.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      orgName: z.string().describe('Organization username')
+      orgName: z.string().min(1).describe('Organization username')
     })
   )
   .output(orgOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let o = await client.getOrg(ctx.input.orgName);
 
     return {
       output: {
         organizationId: o.id,
-        name: o.name,
+        name: o.name || o.username || '',
         fullName: o.full_name || '',
         description: o.description || '',
         avatarUrl: o.avatar_url || '',
@@ -84,7 +85,7 @@ export let getOrganization = SlateTool.create(spec, {
         location: o.location || '',
         visibility: o.visibility || 'public'
       },
-      message: `Retrieved organization **${o.name}**`
+      message: `Retrieved organization **${o.name || o.username || ''}**`
     };
   })
   .build();
@@ -99,7 +100,7 @@ export let createOrganization = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      username: z.string().describe('Organization username (unique identifier)'),
+      username: z.string().min(1).describe('Organization username (unique identifier)'),
       fullName: z.string().optional().describe('Display name'),
       description: z.string().optional().describe('Organization description'),
       website: z.string().optional().describe('Website URL'),
@@ -112,7 +113,7 @@ export let createOrganization = SlateTool.create(spec, {
   )
   .output(orgOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let o = await client.createOrg({
       username: ctx.input.username,
       fullName: ctx.input.fullName,
@@ -125,7 +126,7 @@ export let createOrganization = SlateTool.create(spec, {
     return {
       output: {
         organizationId: o.id,
-        name: o.name,
+        name: o.name || o.username || '',
         fullName: o.full_name || '',
         description: o.description || '',
         avatarUrl: o.avatar_url || '',
@@ -133,7 +134,7 @@ export let createOrganization = SlateTool.create(spec, {
         location: o.location || '',
         visibility: o.visibility || 'public'
       },
-      message: `Created organization **${o.name}**`
+      message: `Created organization **${o.name || o.username || ''}**`
     };
   })
   .build();
@@ -148,7 +149,7 @@ export let updateOrganization = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgName: z.string().describe('Organization username'),
+      orgName: z.string().min(1).describe('Organization username'),
       fullName: z.string().optional().describe('New display name'),
       description: z.string().optional().describe('New description'),
       website: z.string().optional().describe('New website URL'),
@@ -161,7 +162,13 @@ export let updateOrganization = SlateTool.create(spec, {
   )
   .output(orgOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    if (
+      !Object.entries(ctx.input).some(
+        ([key, value]) => !['orgName'].includes(key) && value !== undefined
+      )
+    )
+      throw createApiServiceError('Provide an organization field to update.');
+    let client = new GiteaClient(ctx.auth);
     let o = await client.updateOrg(ctx.input.orgName, {
       fullName: ctx.input.fullName,
       description: ctx.input.description,
@@ -173,7 +180,7 @@ export let updateOrganization = SlateTool.create(spec, {
     return {
       output: {
         organizationId: o.id,
-        name: o.name,
+        name: o.name || o.username || '',
         fullName: o.full_name || '',
         description: o.description || '',
         avatarUrl: o.avatar_url || '',
@@ -181,7 +188,7 @@ export let updateOrganization = SlateTool.create(spec, {
         location: o.location || '',
         visibility: o.visibility || 'public'
       },
-      message: `Updated organization **${o.name}**`
+      message: `Updated organization **${o.name || o.username || ''}**`
     };
   })
   .build();

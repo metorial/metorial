@@ -17,14 +17,6 @@ import {
   manageTeamTool,
   updateIssueTool
 } from './tools';
-import {
-  alertEventsTrigger,
-  commentEventsTrigger,
-  errorEventsTrigger,
-  installationEventsTrigger,
-  issueEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,11 +36,5 @@ export let provider = Slate.create({
     getOrganizationTool,
     listMembersTool
   ],
-  triggers: [
-    issueEventsTrigger,
-    errorEventsTrigger,
-    alertEventsTrigger,
-    commentEventsTrigger,
-    installationEventsTrigger
-  ]
+  triggers: []
 });

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createBatch = SlateTool.create(spec, {
   name: 'Create Batch',
   key: 'create_batch',
-  description: `Create a new batch within a Scale AI project. Batches organize tasks into groups — for example, by dataset or weekly submission. New batches start in "staging" status and must be finalized before tasks are sent to annotators.`,
+  description: `Create a batch within a Scale AI project to organize tasks by dataset or submission. Rapid and Studio batches must be finalized before their tasks can be worked on.`,
   tags: {
     destructive: false,
     readOnly: false

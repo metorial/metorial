@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client, identifier, text } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,6 +20,12 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (
+        !ctx.input.apiKey.trim() ||
+        !ctx.input.apiKey.isWellFormed() ||
+        /\s/.test(ctx.input.apiKey)
+      )
+        throw createApiServiceError('Enter a valid workspace API key.');
       return {
         output: {
           token: ctx.input.apiKey
@@ -27,20 +34,11 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.phantombuster.com/api/v2'
-      });
-
-      let response = await axios.get('/orgs/fetch', {
-        headers: {
-          'X-Phantombuster-Key-1': ctx.output.token
-        }
-      });
-
+      const org = await new Client({ token: ctx.output.token }).fetchOrg();
       return {
         profile: {
-          id: response.data.id,
-          name: response.data.name
+          id: identifier(org.id, 'Workspace ID'),
+          name: text(org.name) ?? identifier(org.id, 'Workspace ID')
         }
       };
     }

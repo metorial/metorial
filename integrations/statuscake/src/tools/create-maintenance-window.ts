@@ -17,8 +17,14 @@ export let createMaintenanceWindow = SlateTool.create(spec, {
       name: z.string().describe('Name of the maintenance window'),
       startAt: z
         .string()
-        .describe('Start time in ISO 8601 format (e.g. "2024-01-15T02:00:00Z")'),
-      endAt: z.string().describe('End time in ISO 8601 format'),
+        .describe(
+          'Start local clock time in RFC3339 format; timezone determines the actual zone and the UTC offset is ignored'
+        ),
+      endAt: z
+        .string()
+        .describe(
+          'End local clock time in RFC3339 format; timezone determines the actual zone and the UTC offset is ignored'
+        ),
       timezone: z
         .string()
         .describe('Timezone for the schedule (e.g. "UTC", "America/New_York")'),
@@ -31,11 +37,15 @@ export let createMaintenanceWindow = SlateTool.create(spec, {
       tests: z
         .array(z.string())
         .optional()
-        .describe('List of uptime test IDs to suppress alerts for'),
+        .describe(
+          'Uptime test IDs to suppress alerts for; at least one test or tag is required'
+        ),
       tags: z
         .array(z.string())
         .optional()
-        .describe('Tags to match uptime tests for alert suppression')
+        .describe(
+          'Tags to match uptime tests for alert suppression; at least one test or tag is required'
+        )
     })
   )
   .output(
@@ -47,7 +57,7 @@ export let createMaintenanceWindow = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { startAt, endAt, repeatInterval, ...rest } = ctx.input;
 
-    let data: Record<string, any> = {
+    let data: Record<string, unknown> = {
       ...rest,
       start_at: startAt,
       end_at: endAt
@@ -56,7 +66,7 @@ export let createMaintenanceWindow = SlateTool.create(spec, {
     if (repeatInterval !== undefined) data.repeat_interval = repeatInterval;
 
     let result = await client.createMaintenanceWindow(data);
-    let windowId = String(result?.data?.new_id ?? result?.new_id ?? '');
+    let windowId = result.data.new_id;
 
     return {
       output: { windowId },

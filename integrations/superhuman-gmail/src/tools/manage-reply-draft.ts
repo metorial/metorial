@@ -1,7 +1,10 @@
-import { SlateTool } from 'slates';
+import { anyOf, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client, parseMessage } from '../lib/client';
+import { GMAIL_COMPOSE, GMAIL_FULL, GMAIL_MODIFY, GMAIL_READ } from '../auth';
+import { Client, parseMessage, requireIdentifier } from '../lib/client';
+import { encodeBase64Url, replaceRawHeaders, validateComposeInput } from '../lib/mime';
 import {
+  assertReplySubject,
   buildReplyHeaders,
   defaultReplySubject,
   defaultReplyTo,
@@ -17,12 +20,15 @@ export let manageReplyDraft = SlateTool.create(spec, {
   instructions: [
     'For **create**, pass **threadId**, **body**, and optionally **replyToMessageId**; **to** / **subject** default from the message you reply to.',
     'Reuse **inReplyTo** and **references** from **get_conversation_context** if you already fetched them.',
+    'Update preserves omitted recipients, reply headers and the original MIME body. An explicit body change preserves files; unsupported complex MIME must be edited in Gmail.',
     '**send** sends the draft via Gmail immediately; **delete** discards it.'
   ],
   tags: {
-    readOnly: false
+    readOnly: false,
+    destructive: true
   }
 })
+  .scopes(anyOf(GMAIL_FULL, GMAIL_MODIFY, GMAIL_COMPOSE, GMAIL_READ))
   .input(
     z.object({
       action: z
@@ -79,137 +85,177 @@ export let manageReplyDraft = SlateTool.create(spec, {
           })
         )
         .optional(),
-      nextPageToken: z.string().optional()
+      nextPageToken: z.string().optional(),
+      resultSizeEstimate: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      userId: ctx.config.userId
+    const { action } = ctx.input;
+    if (action === 'create' || action === 'update') validateComposeInput(ctx.input);
+    if (
+      action !== 'get' &&
+      action !== 'list' &&
+      ctx.auth.grantedScopes &&
+      !ctx.auth.grantedScopes.some(scope =>
+        [GMAIL_FULL, GMAIL_MODIFY, GMAIL_COMPOSE].includes(scope)
+      )
+    )
+      throw createApiServiceError(
+        'This operation changes the mailbox. Reconnect with Google OAuth or Full Access.'
+      );
+    const client = new Client({ token: ctx.auth.token, userId: ctx.config.userId });
+    const draftResult = (draft: Awaited<ReturnType<Client['getDraft']>>) => ({
+      output: {
+        draftId: draft.id,
+        messageId: draft.message.id,
+        threadId: draft.message.threadId
+      },
+      message: 'Saved the Gmail reply draft.'
     });
-
-    let { action } = ctx.input;
-
     if (action === 'create') {
-      if (!ctx.input.threadId) {
-        throw new Error('threadId is required for create.');
-      }
-      let thread = await client.getThread(ctx.input.threadId, 'full');
-      let rawMessages = thread.messages || [];
-      let targetRaw = pickReplyTarget(rawMessages, ctx.input.replyToMessageId);
-      let targetParsed = parseMessage(targetRaw);
-
-      let { inReplyTo, references } =
-        ctx.input.inReplyTo && ctx.input.references
-          ? { inReplyTo: ctx.input.inReplyTo, references: ctx.input.references }
-          : buildReplyHeaders(targetRaw);
-
-      let to =
-        ctx.input.to && ctx.input.to.length > 0 ? ctx.input.to : defaultReplyTo(targetParsed);
-      if (to.length === 0) {
-        throw new Error('Could not infer recipients; provide **to** explicitly.');
-      }
-
-      let subject = ctx.input.subject ?? defaultReplySubject(targetParsed.subject);
-      let body = ctx.input.body ?? '';
-
-      let draft = await client.createDraft({
+      const threadId = requireIdentifier(ctx.input.threadId, 'threadId');
+      const thread = await client.getThread(threadId);
+      const target = pickReplyTarget(thread.messages ?? [], ctx.input.replyToMessageId);
+      const parsed = parseMessage(target);
+      const built =
+        ctx.input.inReplyTo && ctx.input.references ? undefined : buildReplyHeaders(target);
+      const profile = await client.getProfile();
+      const to = ctx.input.to ?? defaultReplyTo(parsed, profile.emailAddress);
+      if (!to.length)
+        throw createApiServiceError('Could not infer recipients; provide to explicitly.');
+      const subject = ctx.input.subject ?? defaultReplySubject(parsed.subject);
+      assertReplySubject(subject, parsed.subject);
+      const draft = await client.createDraft({
+        from: profile.emailAddress,
         to,
         cc: ctx.input.cc,
         bcc: ctx.input.bcc,
         subject,
-        body,
-        isHtml: ctx.input.isHtml,
-        threadId: ctx.input.threadId,
-        inReplyTo,
-        references
-      });
-
-      return {
-        output: {
-          draftId: draft.id,
-          messageId: draft.message.id,
-          threadId: draft.message.threadId
-        },
-        message: `Created reply draft **${draft.id}** in thread **${draft.message.threadId}**.`
-      };
-    }
-
-    if (action === 'update') {
-      if (!ctx.input.draftId) {
-        throw new Error('draftId is required for update.');
-      }
-
-      let existing = await client.getDraft(ctx.input.draftId, 'full');
-      let parsed = parseMessage(existing.message);
-      let threadId = ctx.input.threadId ?? existing.message.threadId;
-
-      let inReplyTo = ctx.input.inReplyTo;
-      let references = ctx.input.references;
-      if (!inReplyTo || !references) {
-        let thread = await client.getThread(threadId, 'full');
-        let rawMessages = thread.messages || [];
-        let targetRaw = pickReplyTarget(rawMessages, ctx.input.replyToMessageId);
-        let built = buildReplyHeaders(targetRaw);
-        inReplyTo = inReplyTo ?? built.inReplyTo;
-        references = references ?? built.references;
-      }
-
-      let to =
-        ctx.input.to && ctx.input.to.length > 0 ? ctx.input.to : parsed.to ? [parsed.to] : [];
-      if (to.length === 0) {
-        throw new Error('Could not infer recipients for update; provide **to**.');
-      }
-
-      let subject = ctx.input.subject ?? parsed.subject ?? '';
-      let body = ctx.input.body ?? parsed.bodyText ?? parsed.bodyHtml ?? '';
-
-      let draft = await client.updateDraft(ctx.input.draftId, {
-        to,
-        cc: ctx.input.cc,
-        bcc: ctx.input.bcc,
-        subject,
-        body,
+        body: ctx.input.body ?? '',
         isHtml: ctx.input.isHtml,
         threadId,
-        inReplyTo,
-        references
+        inReplyTo: ctx.input.inReplyTo ?? built?.inReplyTo,
+        references: ctx.input.references ?? built?.references
       });
-
-      return {
-        output: {
-          draftId: draft.id,
-          messageId: draft.message.id,
-          threadId: draft.message.threadId
-        },
-        message: `Updated draft **${ctx.input.draftId}**.`
-      };
+      if (draft.message.threadId !== threadId)
+        throw createApiServiceError(
+          'Gmail saved the draft in a different conversation. Inspect the saved draft before retrying.'
+        );
+      return draftResult(draft);
     }
-
-    if (action === 'send') {
-      if (!ctx.input.draftId) {
-        throw new Error('draftId is required for send.');
+    if (action === 'update') {
+      const draftId = requireIdentifier(ctx.input.draftId, 'draftId');
+      const existing = await client.getDraft(draftId);
+      const parsed = parseMessage(existing.message);
+      const threadId = ctx.input.threadId ?? existing.message.threadId;
+      let inReplyTo = ctx.input.inReplyTo ?? parsed.inReplyTo;
+      let references = ctx.input.references ?? parsed.references;
+      let subject = ctx.input.subject ?? parsed.subject ?? '';
+      const resolveParent =
+        !!ctx.input.replyToMessageId ||
+        threadId !== existing.message.threadId ||
+        !inReplyTo ||
+        !references ||
+        ctx.input.subject !== undefined;
+      if (resolveParent) {
+        const thread = await client.getThread(threadId);
+        const messages = (thread.messages ?? []).filter(
+          message => message.id !== existing.message.id
+        );
+        const originalParent = messages.find(
+          message => parseMessage(message).mimeMessageId === parsed.inReplyTo
+        );
+        const target = pickReplyTarget(
+          messages,
+          ctx.input.replyToMessageId ??
+            (threadId === existing.message.threadId ? originalParent?.id : undefined)
+        );
+        const changedParent =
+          !!ctx.input.replyToMessageId || threadId !== existing.message.threadId;
+        const needsDerivedHeaders = changedParent
+          ? !ctx.input.inReplyTo || !ctx.input.references
+          : !inReplyTo || !references;
+        const built = needsDerivedHeaders ? buildReplyHeaders(target) : undefined;
+        if (ctx.input.replyToMessageId || threadId !== existing.message.threadId) {
+          inReplyTo = ctx.input.inReplyTo ?? built?.inReplyTo;
+          references = ctx.input.references ?? built?.references;
+          if (threadId !== existing.message.threadId)
+            subject = ctx.input.subject ?? defaultReplySubject(parseMessage(target).subject);
+        } else {
+          inReplyTo ??= built?.inReplyTo;
+          references ??= built?.references;
+        }
+        assertReplySubject(subject, parseMessage(target).subject);
       }
-      let message = await client.sendDraft(ctx.input.draftId);
-      let parsed = parseMessage(message);
-      return {
-        output: {
-          messageId: message.id,
-          threadId: message.threadId,
-          subject: parsed.subject,
+      const to = ctx.input.to ?? (parsed.to ? [parsed.to] : []);
+      if (!to.length)
+        throw createApiServiceError('The draft has no recipients. Provide to explicitly.');
+      let draft: Awaited<ReturnType<Client['getDraft']>>;
+      if (ctx.input.body === undefined) {
+        const raw = await client.getDraft(draftId, 'raw');
+        if (raw.message.id !== existing.message.id || raw.message.raw === undefined)
+          throw createApiServiceError(
+            'The draft changed during this read, or its MIME content is unavailable. Read it again before editing.'
+          );
+        const replacements: Record<string, string | undefined> = {};
+        for (const key of ['to', 'cc', 'bcc'] as const)
+          if (ctx.input[key] !== undefined)
+            replacements[key] = ctx.input[key]?.length
+              ? ctx.input[key]?.join(', ')
+              : undefined;
+        if (ctx.input.subject !== undefined || threadId !== existing.message.threadId)
+          replacements.subject = subject;
+        if (inReplyTo !== parsed.inReplyTo) replacements['in-reply-to'] = inReplyTo;
+        if (references !== parsed.references) replacements.references = references;
+        draft = await client.updateDraftRaw(
+          draftId,
+          threadId,
+          encodeBase64Url(replaceRawHeaders(raw.message.raw, replacements))
+        );
+      } else {
+        if (!existing.message.payload)
+          throw createApiServiceError(
+            'The existing draft MIME structure is unavailable. Read it again before editing.'
+          );
+        draft = await client.updateDraft(draftId, {
           from: parsed.from,
-          to: parsed.to
+          to,
+          cc: ctx.input.cc ?? (parsed.cc ? [parsed.cc] : undefined),
+          bcc: ctx.input.bcc ?? (parsed.bcc ? [parsed.bcc] : undefined),
+          subject,
+          body: ctx.input.body,
+          isHtml: ctx.input.isHtml,
+          threadId,
+          inReplyTo,
+          references,
+          attachments: await client.draftFiles(existing.message)
+        });
+      }
+      if (draft.message.threadId !== threadId)
+        throw createApiServiceError(
+          'Gmail saved the draft in a different conversation. Inspect the saved draft before retrying.'
+        );
+      return draftResult(draft);
+    }
+    if (action === 'list') {
+      const result = await client.listDrafts(ctx.input);
+      return {
+        output: {
+          drafts: result.drafts.map(draft => ({
+            draftId: draft.id,
+            messageId: draft.message.id,
+            threadId: draft.message.threadId
+          })),
+          nextPageToken: result.nextPageToken,
+          resultSizeEstimate: result.resultSizeEstimate
         },
-        message: `Sent draft **${ctx.input.draftId}** as message **${message.id}**.`
+        message: `Returned ${result.drafts.length} Gmail drafts.`
       };
     }
-
+    const draftId = requireIdentifier(ctx.input.draftId, 'draftId');
     if (action === 'get') {
-      if (!ctx.input.draftId) {
-        throw new Error('draftId is required for get.');
-      }
-      let draft = await client.getDraft(ctx.input.draftId, 'full');
-      let parsed = parseMessage(draft.message);
+      const draft = await client.getDraft(draftId);
+      const parsed = parseMessage(draft.message);
       return {
         output: {
           draftId: draft.id,
@@ -220,39 +266,23 @@ export let manageReplyDraft = SlateTool.create(spec, {
           to: parsed.to,
           snippet: parsed.snippet
         },
-        message: `Retrieved draft **${ctx.input.draftId}**.`
+        message: 'Retrieved the Gmail draft.'
       };
     }
-
-    if (action === 'list') {
-      let result = await client.listDrafts({
-        maxResults: ctx.input.maxResults,
-        pageToken: ctx.input.pageToken,
-        query: ctx.input.query
-      });
+    if (action === 'send') {
+      const sent = await client.sendDraft(draftId);
+      const parsed = parseMessage(sent);
       return {
         output: {
-          drafts: result.drafts.map(d => ({
-            draftId: d.id,
-            messageId: d.message.id,
-            threadId: d.message.threadId
-          })),
-          nextPageToken: result.nextPageToken
+          messageId: sent.id,
+          threadId: sent.threadId,
+          subject: parsed.subject,
+          from: parsed.from,
+          to: parsed.to
         },
-        message: `Listed **${result.drafts.length}** draft(s).`
+        message: 'Gmail accepted the draft for sending. Do not retry automatically.'
       };
     }
-
-    if (action === 'delete') {
-      if (!ctx.input.draftId) {
-        throw new Error('draftId is required for delete.');
-      }
-      await client.deleteDraft(ctx.input.draftId);
-      return {
-        output: { draftId: ctx.input.draftId },
-        message: `Deleted draft **${ctx.input.draftId}**.`
-      };
-    }
-
-    throw new Error(`Unsupported action: ${action}`);
+    await client.deleteDraft(draftId);
+    return { output: { draftId }, message: 'Deleted the Gmail draft.' };
   });

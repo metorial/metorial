@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { QdrantClient } from '../lib/client';
 import { spec } from '../spec';
@@ -12,7 +12,7 @@ export let managePayloadIndex = SlateTool.create(spec, {
     'For `delete`: provide only `fieldName`.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -37,7 +37,7 @@ export let managePayloadIndex = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 
@@ -45,7 +45,8 @@ export let managePayloadIndex = SlateTool.create(spec, {
     let result: any;
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.fieldSchema) throw new Error('fieldSchema is required for create action');
+      if (!ctx.input.fieldSchema)
+        throw createApiServiceError('fieldSchema is required for create action');
       result = await client.createPayloadIndex(
         ctx.input.collectionName,
         ctx.input.fieldName,
@@ -62,13 +63,10 @@ export let managePayloadIndex = SlateTool.create(spec, {
 
     return {
       output: {
-        operationId: result.result?.operation_id,
+        operationId: result.result?.operation_id ?? undefined,
         status: result.result?.status ?? 'completed'
       },
-      message:
-        ctx.input.action === 'create'
-          ? `Created payload index on \`${ctx.input.fieldName}\` in \`${ctx.input.collectionName}\`. Status: **${result.result?.status ?? 'completed'}**.`
-          : `Deleted payload index on \`${ctx.input.fieldName}\` from \`${ctx.input.collectionName}\`. Status: **${result.result?.status ?? 'completed'}**.`
+      message: `Payload index **${ctx.input.action}** operation for \`${ctx.input.fieldName}\` in \`${ctx.input.collectionName}\`. Status: **${result.result?.status ?? 'completed'}**.`
     };
   })
   .build();

@@ -1,0 +1,1444 @@
+{
+  "list_folder": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "default": "",
+          "description": "Folder path to list. Use empty string or \"/\" for root.",
+          "type": "string"
+        },
+        "search": {
+          "description": "Search text to filter results across all fields",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Pagination cursor from a previous response",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Number of items per page (default 100, max 10000)",
+          "type": "number"
+        }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "Full path of the file or folder"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Display name"
+              },
+              "type": {
+                "type": "string",
+                "description": "\"file\" or \"directory\""
+              },
+              "size": {
+                "description": "Size in bytes",
+                "type": "number"
+              },
+              "mimeType": {
+                "description": "MIME type of the file",
+                "type": "string"
+              },
+              "mtime": {
+                "description": "Last modified timestamp",
+                "type": "string"
+              },
+              "permissions": {
+                "description": "Permission flags (r=read, w=write, d=delete, l=list)",
+                "type": "string"
+              },
+              "crc32": {
+                "description": "CRC32 checksum",
+                "type": "string"
+              },
+              "md5": {
+                "description": "MD5 checksum",
+                "type": "string"
+              },
+              "region": {
+                "description": "Storage region",
+                "type": "string"
+              }
+            },
+            "required": ["path", "displayName", "type"],
+            "additionalProperties": false
+          },
+          "description": "List of files and folders"
+        },
+        "nextCursor": {
+          "description": "Cursor for the next page of results",
+          "type": "string"
+        }
+      },
+      "required": ["entries"],
+      "additionalProperties": false
+    }
+  },
+  "get_file_info": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Full path to the file or folder"
+        }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Full path"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name"
+        },
+        "type": {
+          "type": "string",
+          "description": "\"file\" or \"directory\""
+        },
+        "size": {
+          "description": "Size in bytes",
+          "type": "number"
+        },
+        "mimeType": {
+          "description": "MIME type",
+          "type": "string"
+        },
+        "mtime": {
+          "description": "Last modified timestamp",
+          "type": "string"
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "type": "string"
+        },
+        "permissions": {
+          "description": "Permission flags",
+          "type": "string"
+        },
+        "crc32": {
+          "description": "CRC32 checksum",
+          "type": "string"
+        },
+        "md5": {
+          "description": "MD5 checksum",
+          "type": "string"
+        },
+        "sha1": {
+          "description": "SHA1 checksum",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "SHA256 checksum",
+          "type": "string"
+        },
+        "region": {
+          "description": "Storage region",
+          "type": "string"
+        },
+        "downloadUri": {
+          "description": "Temporary download URL",
+          "type": "string"
+        },
+        "previewStatus": {
+          "description": "Preview generation status",
+          "type": "string"
+        }
+      },
+      "required": ["path", "displayName", "type"],
+      "additionalProperties": false
+    }
+  },
+  "manage_file": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["copy", "move", "delete"],
+          "description": "Action to perform"
+        },
+        "path": {
+          "type": "string",
+          "description": "Source file or folder path"
+        },
+        "destination": {
+          "description": "Destination path (required for copy and move)",
+          "type": "string"
+        },
+        "overwrite": {
+          "description": "Overwrite existing file at destination (default false)",
+          "type": "boolean"
+        },
+        "recursive": {
+          "description": "For delete: recursively delete folder contents (default false)",
+          "type": "boolean"
+        },
+        "structure": {
+          "description": "For copy: copy only the folder structure, not file contents (default false)",
+          "type": "boolean"
+        }
+      },
+      "required": ["action", "path"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the operation succeeded"
+        },
+        "path": {
+          "description": "Path of the resulting file/folder",
+          "type": "string"
+        },
+        "type": {
+          "description": "\"file\" or \"directory\"",
+          "type": "string"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "create_folder": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Full path for the new folder (e.g. \"documents/reports/2024\")"
+        },
+        "mkdirParents": {
+          "default": true,
+          "description": "Create parent directories automatically (default true)",
+          "type": "boolean"
+        }
+      },
+      "required": ["path", "mkdirParents"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Full path of the created folder"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name of the folder"
+        },
+        "type": {
+          "type": "string",
+          "description": "Always \"directory\""
+        }
+      },
+      "required": ["path", "displayName", "type"],
+      "additionalProperties": false
+    }
+  },
+  "list_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "search": {
+          "description": "Search by name, username, or email",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Results per page (default 100)",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "number",
+                "description": "User ID"
+              },
+              "username": {
+                "type": "string",
+                "description": "Username"
+              },
+              "email": {
+                "description": "Email address",
+                "type": "string"
+              },
+              "name": {
+                "description": "Full name",
+                "type": "string"
+              },
+              "siteAdmin": {
+                "description": "Whether user is a site admin",
+                "type": "boolean"
+              },
+              "disabled": {
+                "description": "Whether account is disabled",
+                "type": "boolean"
+              },
+              "authenticationMethod": {
+                "description": "Authentication method",
+                "type": "string"
+              },
+              "lastLoginAt": {
+                "description": "Last login timestamp",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Account creation timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["userId", "username"],
+            "additionalProperties": false
+          },
+          "description": "List of users"
+        },
+        "nextCursor": {
+          "description": "Cursor for next page",
+          "type": "string"
+        }
+      },
+      "required": ["users"],
+      "additionalProperties": false
+    }
+  },
+  "manage_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "userId": {
+          "description": "User ID (required for update and delete)",
+          "type": "number"
+        },
+        "username": {
+          "description": "Username (required for create)",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address",
+          "type": "string"
+        },
+        "name": {
+          "description": "Full name",
+          "type": "string"
+        },
+        "password": {
+          "description": "Password (for create or update)",
+          "type": "string"
+        },
+        "company": {
+          "description": "Company name",
+          "type": "string"
+        },
+        "notes": {
+          "description": "Internal notes about the user",
+          "type": "string"
+        },
+        "authenticationMethod": {
+          "description": "Authentication method",
+          "type": "string",
+          "enum": ["password", "email_signup", "sso", "none", "password_and_ssh_key"]
+        },
+        "siteAdmin": {
+          "description": "Grant site admin access",
+          "type": "boolean"
+        },
+        "disabled": {
+          "description": "Disable the user account",
+          "type": "boolean"
+        },
+        "sftpPermission": {
+          "description": "Allow SFTP access",
+          "type": "boolean"
+        },
+        "ftpPermission": {
+          "description": "Allow FTP/FTPS access",
+          "type": "boolean"
+        },
+        "davPermission": {
+          "description": "Allow WebDAV access",
+          "type": "boolean"
+        },
+        "restapiPermission": {
+          "description": "Allow REST API access",
+          "type": "boolean"
+        },
+        "groupIds": {
+          "description": "Comma-separated group IDs to assign",
+          "type": "string"
+        },
+        "userRoot": {
+          "description": "Root folder for FTP/SFTP",
+          "type": "string"
+        },
+        "grantPermission": {
+          "description": "Initial folder permissions (create only)",
+          "type": "string",
+          "enum": ["full", "read", "write", "list", "read+write", "none"]
+        },
+        "requirePasswordChange": {
+          "description": "Require password change on next login",
+          "type": "boolean"
+        },
+        "require2fa": {
+          "description": "Two-factor authentication requirement",
+          "type": "string",
+          "enum": ["always_require", "none"]
+        },
+        "allowedIps": {
+          "description": "Newline-delimited list of allowed IP addresses",
+          "type": "string"
+        },
+        "authenticateUntil": {
+          "description": "Date after which user access expires (ISO 8601)",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "description": "User ID",
+          "type": "number"
+        },
+        "username": {
+          "description": "Username",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address",
+          "type": "string"
+        },
+        "name": {
+          "description": "Full name",
+          "type": "string"
+        },
+        "siteAdmin": {
+          "description": "Site admin status",
+          "type": "boolean"
+        },
+        "deleted": {
+          "description": "Whether the user was deleted",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_group": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "groupId": {
+          "description": "Group ID (required for update and delete)",
+          "type": "number"
+        },
+        "name": {
+          "description": "Group name (required for create)",
+          "type": "string"
+        },
+        "notes": {
+          "description": "Notes about the group",
+          "type": "string"
+        },
+        "userIds": {
+          "description": "Comma-separated user IDs to add as members",
+          "type": "string"
+        },
+        "adminIds": {
+          "description": "Comma-separated user IDs to add as group admins",
+          "type": "string"
+        },
+        "sftpPermission": {
+          "description": "Allow SFTP access for group members",
+          "type": "boolean"
+        },
+        "ftpPermission": {
+          "description": "Allow FTP/FTPS access for group members",
+          "type": "boolean"
+        },
+        "davPermission": {
+          "description": "Allow WebDAV access for group members",
+          "type": "boolean"
+        },
+        "restapiPermission": {
+          "description": "Allow REST API access for group members",
+          "type": "boolean"
+        },
+        "allowedIps": {
+          "description": "Newline-delimited list of allowed IPs",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Pagination cursor (for list)",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Results per page (for list)",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groups": {
+          "description": "List of groups (for list action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "groupId": {
+                "type": "number",
+                "description": "Group ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Group name"
+              },
+              "notes": {
+                "description": "Group notes",
+                "type": "string"
+              },
+              "userIds": {
+                "description": "Member user IDs",
+                "type": "string"
+              },
+              "adminIds": {
+                "description": "Admin user IDs",
+                "type": "string"
+              }
+            },
+            "required": ["groupId", "name"],
+            "additionalProperties": false
+          }
+        },
+        "group": {
+          "description": "Created or updated group",
+          "type": "object",
+          "properties": {
+            "groupId": {
+              "type": "number",
+              "description": "Group ID"
+            },
+            "name": {
+              "type": "string",
+              "description": "Group name"
+            },
+            "notes": {
+              "description": "Group notes",
+              "type": "string"
+            }
+          },
+          "required": ["groupId", "name"],
+          "additionalProperties": false
+        },
+        "deleted": {
+          "description": "Whether the group was deleted",
+          "type": "boolean"
+        },
+        "nextCursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_permission": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "create", "delete"],
+          "description": "Action to perform"
+        },
+        "permissionId": {
+          "description": "Permission ID (required for delete)",
+          "type": "number"
+        },
+        "path": {
+          "description": "Folder path to set permission on (required for create, optional filter for list)",
+          "type": "string"
+        },
+        "permission": {
+          "description": "Permission level (required for create)",
+          "type": "string",
+          "enum": ["admin", "full", "readonly", "writeonly", "list", "history"]
+        },
+        "recursive": {
+          "description": "Apply to subfolders (for create)",
+          "type": "boolean"
+        },
+        "userId": {
+          "description": "User ID to grant permission to",
+          "type": "number"
+        },
+        "groupId": {
+          "description": "Group ID to grant permission to",
+          "type": "number"
+        },
+        "username": {
+          "description": "Username to grant permission to",
+          "type": "string"
+        },
+        "includeGroups": {
+          "description": "Include inherited group permissions (for list)",
+          "type": "boolean"
+        },
+        "cursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Results per page",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "description": "List of permissions",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "permissionId": {
+                "type": "number",
+                "description": "Permission ID"
+              },
+              "path": {
+                "type": "string",
+                "description": "Folder path"
+              },
+              "permission": {
+                "type": "string",
+                "description": "Permission level"
+              },
+              "recursive": {
+                "description": "Applies to subfolders",
+                "type": "boolean"
+              },
+              "userId": {
+                "description": "User ID",
+                "type": "number"
+              },
+              "username": {
+                "description": "Username",
+                "type": "string"
+              },
+              "groupId": {
+                "description": "Group ID",
+                "type": "number"
+              },
+              "groupName": {
+                "description": "Group name",
+                "type": "string"
+              }
+            },
+            "required": ["permissionId", "path", "permission"],
+            "additionalProperties": false
+          }
+        },
+        "created": {
+          "description": "Created permission",
+          "type": "object",
+          "properties": {
+            "permissionId": {
+              "type": "number",
+              "description": "Permission ID"
+            },
+            "path": {
+              "type": "string",
+              "description": "Folder path"
+            },
+            "permission": {
+              "type": "string",
+              "description": "Permission level"
+            }
+          },
+          "required": ["permissionId", "path", "permission"],
+          "additionalProperties": false
+        },
+        "deleted": {
+          "description": "Whether permission was deleted",
+          "type": "boolean"
+        },
+        "nextCursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_share_link": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "get", "create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "bundleId": {
+          "description": "Share link ID (required for get, update, delete)",
+          "type": "number"
+        },
+        "paths": {
+          "description": "File or folder paths to include (required for create)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "password": {
+          "description": "Password to protect the share link",
+          "type": "string"
+        },
+        "expiresAt": {
+          "description": "Expiration date/time (ISO 8601)",
+          "type": "string"
+        },
+        "maxUses": {
+          "description": "Maximum number of accesses allowed",
+          "type": "number"
+        },
+        "description": {
+          "description": "Public-facing description",
+          "type": "string"
+        },
+        "note": {
+          "description": "Internal note (not visible to recipients)",
+          "type": "string"
+        },
+        "code": {
+          "description": "Custom URL code for the share link",
+          "type": "string"
+        },
+        "permissions": {
+          "description": "Access level for shared folders",
+          "type": "string",
+          "enum": ["download", "upload", "full"]
+        },
+        "requireRegistration": {
+          "description": "Require name and email to access",
+          "type": "boolean"
+        },
+        "requireShareRecipient": {
+          "description": "Only allow access to explicitly invited recipients",
+          "type": "boolean"
+        },
+        "previewOnly": {
+          "description": "Allow preview only, no downloads",
+          "type": "boolean"
+        },
+        "startAccessOnDate": {
+          "description": "Date when access becomes available (ISO 8601)",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Pagination cursor (for list)",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Results per page (for list)",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "bundles": {
+          "description": "List of share links",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "bundleId": {
+                "type": "number",
+                "description": "Share link ID"
+              },
+              "url": {
+                "description": "Public share URL",
+                "type": "string"
+              },
+              "code": {
+                "description": "URL code",
+                "type": "string"
+              },
+              "description": {
+                "description": "Description",
+                "type": "string"
+              },
+              "expiresAt": {
+                "description": "Expiration date",
+                "type": "string"
+              },
+              "maxUses": {
+                "description": "Max uses",
+                "type": "number"
+              },
+              "passwordProtected": {
+                "description": "Whether password is set",
+                "type": "boolean"
+              },
+              "requireRegistration": {
+                "description": "Requires registration",
+                "type": "boolean"
+              },
+              "permissions": {
+                "description": "Access level",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Creation date",
+                "type": "string"
+              },
+              "username": {
+                "description": "Creator username",
+                "type": "string"
+              }
+            },
+            "required": ["bundleId"],
+            "additionalProperties": false
+          }
+        },
+        "bundle": {
+          "description": "Single share link details",
+          "type": "object",
+          "properties": {
+            "bundleId": {
+              "type": "number",
+              "description": "Share link ID"
+            },
+            "url": {
+              "description": "Public share URL",
+              "type": "string"
+            },
+            "code": {
+              "description": "URL code",
+              "type": "string"
+            },
+            "description": {
+              "description": "Description",
+              "type": "string"
+            },
+            "paths": {
+              "description": "Included file/folder paths",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "expiresAt": {
+              "description": "Expiration date",
+              "type": "string"
+            },
+            "maxUses": {
+              "description": "Max uses",
+              "type": "number"
+            },
+            "passwordProtected": {
+              "description": "Whether password is set",
+              "type": "boolean"
+            },
+            "requireRegistration": {
+              "description": "Requires registration",
+              "type": "boolean"
+            },
+            "permissions": {
+              "description": "Access level",
+              "type": "string"
+            },
+            "createdAt": {
+              "description": "Creation date",
+              "type": "string"
+            }
+          },
+          "required": ["bundleId"],
+          "additionalProperties": false
+        },
+        "deleted": {
+          "description": "Whether the share link was deleted",
+          "type": "boolean"
+        },
+        "nextCursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_automation": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "get", "create", "update", "delete", "run"],
+          "description": "Action to perform"
+        },
+        "automationId": {
+          "description": "Automation ID (required for get, update, delete, run)",
+          "type": "number"
+        },
+        "automationType": {
+          "description": "Type of automation (required for create)",
+          "type": "string",
+          "enum": ["create_folder", "copy", "move", "delete", "import", "run_sync"]
+        },
+        "trigger": {
+          "description": "Trigger type",
+          "type": "string",
+          "enum": ["daily", "custom_schedule", "action", "webhook"]
+        },
+        "triggerActions": {
+          "description": "File actions that trigger automation (for \"action\" trigger type)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["create", "read", "update", "destroy", "move", "copy"]
+          }
+        },
+        "name": {
+          "description": "Automation name",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description",
+          "type": "string"
+        },
+        "path": {
+          "description": "Source path (supports globs)",
+          "type": "string"
+        },
+        "source": {
+          "description": "Source filter pattern",
+          "type": "string"
+        },
+        "destinations": {
+          "description": "Destination paths",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "interval": {
+          "description": "Schedule interval: day, week, month, quarter, year",
+          "type": "string"
+        },
+        "scheduleTimesOfDay": {
+          "description": "Times to run in HH:MM format",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scheduleDaysOfWeek": {
+          "description": "Days to run (0=Sunday through 6=Saturday)",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "scheduleTimeZone": {
+          "description": "Timezone for schedule",
+          "type": "string"
+        },
+        "disabled": {
+          "description": "Disable the automation",
+          "type": "boolean"
+        },
+        "overwriteFiles": {
+          "description": "Overwrite existing files at destination",
+          "type": "boolean"
+        },
+        "excludePattern": {
+          "description": "Glob pattern for files to skip",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Pagination cursor (for list)",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Results per page (for list)",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "automations": {
+          "description": "List of automations",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "automationId": {
+                "type": "number",
+                "description": "Automation ID"
+              },
+              "automationType": {
+                "description": "Automation type",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name",
+                "type": "string"
+              },
+              "trigger": {
+                "description": "Trigger type",
+                "type": "string"
+              },
+              "path": {
+                "description": "Source path",
+                "type": "string"
+              },
+              "disabled": {
+                "description": "Whether disabled",
+                "type": "boolean"
+              },
+              "lastModifiedAt": {
+                "description": "Last modified timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["automationId"],
+            "additionalProperties": false
+          }
+        },
+        "automation": {
+          "description": "Single automation details",
+          "type": "object",
+          "properties": {
+            "automationId": {
+              "type": "number",
+              "description": "Automation ID"
+            },
+            "automationType": {
+              "description": "Automation type",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name",
+              "type": "string"
+            },
+            "description": {
+              "description": "Description",
+              "type": "string"
+            },
+            "trigger": {
+              "description": "Trigger type",
+              "type": "string"
+            },
+            "path": {
+              "description": "Source path",
+              "type": "string"
+            },
+            "destinations": {
+              "description": "Destination paths",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "disabled": {
+              "description": "Whether disabled",
+              "type": "boolean"
+            },
+            "scheduleDescription": {
+              "description": "Human-readable schedule",
+              "type": "string"
+            }
+          },
+          "required": ["automationId"],
+          "additionalProperties": false
+        },
+        "deleted": {
+          "description": "Whether deleted",
+          "type": "boolean"
+        },
+        "triggered": {
+          "description": "Whether manually triggered",
+          "type": "boolean"
+        },
+        "nextCursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_notification": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "notificationId": {
+          "description": "Notification ID (required for update and delete)",
+          "type": "number"
+        },
+        "path": {
+          "description": "Folder path to monitor (required for create, optional filter for list)",
+          "type": "string"
+        },
+        "userId": {
+          "description": "User ID to receive notification (one of userId, username, or groupId required for create)",
+          "type": "number"
+        },
+        "username": {
+          "description": "Username to receive notification",
+          "type": "string"
+        },
+        "groupId": {
+          "description": "Group ID to receive notification",
+          "type": "number"
+        },
+        "notifyOnUpload": {
+          "description": "Notify on file uploads",
+          "type": "boolean"
+        },
+        "notifyOnDownload": {
+          "description": "Notify on file downloads",
+          "type": "boolean"
+        },
+        "notifyOnCopy": {
+          "description": "Notify on file copies",
+          "type": "boolean"
+        },
+        "notifyOnMove": {
+          "description": "Notify on file moves",
+          "type": "boolean"
+        },
+        "notifyOnDelete": {
+          "description": "Notify on file deletes",
+          "type": "boolean"
+        },
+        "recursive": {
+          "description": "Apply to subfolders",
+          "type": "boolean"
+        },
+        "sendInterval": {
+          "description": "How often to send notification summaries",
+          "type": "string",
+          "enum": ["five_minutes", "fifteen_minutes", "hourly", "daily"]
+        },
+        "message": {
+          "description": "Custom notification message text",
+          "type": "string"
+        },
+        "triggeringFilenames": {
+          "description": "File patterns to trigger on (supports wildcards)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cursor": {
+          "description": "Pagination cursor (for list)",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Results per page (for list)",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "notifications": {
+          "description": "List of notifications",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "notificationId": {
+                "type": "number",
+                "description": "Notification ID"
+              },
+              "path": {
+                "description": "Monitored folder path",
+                "type": "string"
+              },
+              "userId": {
+                "description": "Notified user ID",
+                "type": "number"
+              },
+              "username": {
+                "description": "Notified username",
+                "type": "string"
+              },
+              "groupId": {
+                "description": "Notified group ID",
+                "type": "number"
+              },
+              "groupName": {
+                "description": "Notified group name",
+                "type": "string"
+              },
+              "sendInterval": {
+                "description": "Send interval",
+                "type": "string"
+              },
+              "recursive": {
+                "description": "Applies to subfolders",
+                "type": "boolean"
+              },
+              "notifyOnUpload": {
+                "description": "Upload notifications",
+                "type": "boolean"
+              },
+              "notifyOnDownload": {
+                "description": "Download notifications",
+                "type": "boolean"
+              }
+            },
+            "required": ["notificationId"],
+            "additionalProperties": false
+          }
+        },
+        "notification": {
+          "description": "Created or updated notification",
+          "type": "object",
+          "properties": {
+            "notificationId": {
+              "type": "number",
+              "description": "Notification ID"
+            },
+            "path": {
+              "description": "Monitored folder path",
+              "type": "string"
+            },
+            "userId": {
+              "description": "Notified user ID",
+              "type": "number"
+            },
+            "username": {
+              "description": "Notified username",
+              "type": "string"
+            },
+            "groupId": {
+              "description": "Notified group ID",
+              "type": "number"
+            },
+            "sendInterval": {
+              "description": "Send interval",
+              "type": "string"
+            }
+          },
+          "required": ["notificationId"],
+          "additionalProperties": false
+        },
+        "deleted": {
+          "description": "Whether notification was deleted",
+          "type": "boolean"
+        },
+        "nextCursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "search_history": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "Filter by exact file path",
+          "type": "string"
+        },
+        "folder": {
+          "description": "Filter by folder path",
+          "type": "string"
+        },
+        "userId": {
+          "description": "Filter by user ID",
+          "type": "number"
+        },
+        "username": {
+          "description": "Filter by username",
+          "type": "string"
+        },
+        "startAt": {
+          "description": "Show events after this date/time (ISO 8601)",
+          "type": "string"
+        },
+        "endAt": {
+          "description": "Show events before this date/time (ISO 8601)",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Results per page (default 100)",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "logs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "description": "Action type (create, read, update, delete, move, copy, etc.)"
+              },
+              "path": {
+                "description": "File/folder path",
+                "type": "string"
+              },
+              "folder": {
+                "description": "Containing folder",
+                "type": "string"
+              },
+              "source": {
+                "description": "Source path (for move/copy)",
+                "type": "string"
+              },
+              "destination": {
+                "description": "Destination path (for move/copy)",
+                "type": "string"
+              },
+              "username": {
+                "description": "User who performed the action",
+                "type": "string"
+              },
+              "userId": {
+                "description": "User ID",
+                "type": "number"
+              },
+              "interface": {
+                "description": "Interface used (web, api, ftp, sftp, dav, etc.)",
+                "type": "string"
+              },
+              "ip": {
+                "description": "Source IP address",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "When the action occurred",
+                "type": "string"
+              },
+              "failureType": {
+                "description": "Failure type if action failed",
+                "type": "string"
+              }
+            },
+            "required": ["action"],
+            "additionalProperties": false
+          },
+          "description": "Action log entries"
+        },
+        "nextCursor": {
+          "description": "Cursor for next page",
+          "type": "string"
+        }
+      },
+      "required": ["logs"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -26,8 +26,6 @@ import {
   verifyDomain,
   verifySingleEmail
 } from './tools';
-import { emailEvents, smsEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -56,5 +54,5 @@ export let provider = Slate.create({
     getRecipient,
     deleteRecipient
   ],
-  triggers: [emailEvents, smsEvents]
+  triggers: []
 });

@@ -59,12 +59,12 @@ let contactOutputSchema = z.object({
 export let createContact = SlateTool.create(spec, {
   name: 'Create or Update Contact',
   key: 'create_contact',
-  description: `Create a new contact in Omnisend or update an existing one if identifiers match. Supports setting email/SMS subscription statuses, custom properties, tags, and consent data. If a contact with the same email or phone already exists, it will be updated.`,
+  description: `Create a contact or update an existing matching email contact. Conflicting identifiers can be ignored by the provider. Subscription changes can activate automations. Tags append in v5 but replace the entire tag set in API version 2026-03-15; changing API version deliberately changes that behavior. Contact history cannot be erased through this integration.`,
   instructions: [
     'Use identifiers to specify email and/or phone with their subscription statuses.',
-    'Set sendWelcomeEmail to true to trigger the welcome automation workflow.'
+    'Welcome messaging is suppressed unless sendWelcomeEmail is explicitly true; other configured automations may still run.'
   ],
-  tags: { destructive: false, readOnly: false }
+  tags: { destructive: true, readOnly: false }
 })
   .input(
     z.object({
@@ -87,7 +87,12 @@ export let createContact = SlateTool.create(spec, {
       countryCode: z.string().optional().describe('ISO country code (e.g., "US")'),
       birthdate: z.string().optional().describe('Birthdate in YYYY-MM-DD format'),
       gender: z.enum(['m', 'f']).optional().describe('"m" for male, "f" for female'),
-      tags: z.array(z.string()).optional().describe('Tags for organizing contacts (max 100)'),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Contact tags (max 100): v5 appends; 2026-03-15 replaces the complete tag set'
+        ),
       customProperties: z
         .record(z.string(), z.any())
         .optional()
@@ -97,46 +102,12 @@ export let createContact = SlateTool.create(spec, {
   )
   .output(contactOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new OmnisendClient(ctx.auth.token);
-
-    let body: Record<string, any> = {};
-    if (ctx.input.identifiers) body.identifiers = ctx.input.identifiers;
-    if (ctx.input.email) body.email = ctx.input.email;
-    if (ctx.input.firstName) body.firstName = ctx.input.firstName;
-    if (ctx.input.lastName) body.lastName = ctx.input.lastName;
-    if (ctx.input.phone) body.phone = ctx.input.phone;
-    if (ctx.input.address) body.address = ctx.input.address;
-    if (ctx.input.city) body.city = ctx.input.city;
-    if (ctx.input.state) body.state = ctx.input.state;
-    if (ctx.input.postalCode) body.postalCode = ctx.input.postalCode;
-    if (ctx.input.country) body.country = ctx.input.country;
-    if (ctx.input.countryCode) body.countryCode = ctx.input.countryCode;
-    if (ctx.input.birthdate) body.birthdate = ctx.input.birthdate;
-    if (ctx.input.gender) body.gender = ctx.input.gender;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.customProperties) body.customProperties = ctx.input.customProperties;
-    if (ctx.input.sendWelcomeEmail !== undefined)
-      body.sendWelcomeEmail = ctx.input.sendWelcomeEmail;
-
-    let result = await client.createOrUpdateContact(body);
-
+    let client = new OmnisendClient(ctx.auth, ctx.config.apiVersion);
+    let output = await client.createOrUpdateContact(ctx.input);
     return {
-      output: {
-        contactId: result.contactID,
-        email: result.email,
-        firstName: result.firstName,
-        lastName: result.lastName,
-        phone: result.phone,
-        tags: result.tags,
-        country: result.country,
-        countryCode: result.countryCode,
-        city: result.city,
-        state: result.state,
-        postalCode: result.postalCode,
-        createdAt: result.createdAt,
-        updatedAt: result.updatedAt
-      },
-      message: `Contact **${result.email || result.contactID}** created or updated successfully.`
+      output,
+      message:
+        'Contact creation or update accepted. Subscription changes can activate workflows; no contact deletion is available here.'
     };
   })
   .build();

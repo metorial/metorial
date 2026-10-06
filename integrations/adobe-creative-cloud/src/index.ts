@@ -17,13 +17,6 @@ import {
   removeBackground,
   searchStock
 } from './tools';
-import {
-  assetEvents,
-  cloudDocumentEvents,
-  libraryEvents,
-  photoshopJobEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -43,5 +36,5 @@ export let provider = Slate.create({
     indesignDataMerge,
     checkJobStatus
   ],
-  triggers: [assetEvents, libraryEvents, cloudDocumentEvents, photoshopJobEvents]
+  triggers: []
 });

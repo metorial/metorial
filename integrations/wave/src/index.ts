@@ -14,6 +14,8 @@ import {
   createTransaction,
   deleteCustomer,
   deleteInvoice,
+  getInvoicePdf,
+  getResource,
   getUser,
   listAccounts,
   listBusinesses,
@@ -30,8 +32,6 @@ import {
   updateProduct,
   updateSalesTax
 } from './tools';
-import { customerChanges, inboundWebhook, invoiceChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,7 +62,9 @@ export let provider = Slate.create({
     archiveSalesTax,
     createTransaction,
     listVendors,
-    getUser
+    getUser,
+    getResource,
+    getInvoicePdf
   ],
-  triggers: [inboundWebhook, invoiceChanges, customerChanges]
+  triggers: []
 });

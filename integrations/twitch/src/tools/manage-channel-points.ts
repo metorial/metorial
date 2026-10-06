@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwitchClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageChannelPoints = SlateTool.create(spec, {
@@ -11,6 +12,10 @@ export let manageChannelPoints = SlateTool.create(spec, {
     'Use action "create" to create new rewards, "update" to modify, "delete" to remove, "get" to list rewards.',
     'Use action "get_redemptions" to view pending redemptions for a reward.',
     'Use action "update_redemption" to fulfill or cancel a redemption.'
+  ],
+  constraints: [
+    'Deleting a reward marks its outstanding UNFULFILLED redemptions as FULFILLED. Review them before deletion; do not assume cancellation or refunds.',
+    'Canceled and fulfilled redemption history is returned only for a few days; an empty list does not prove the reward has never been redeemed.'
   ],
   tags: {
     destructive: false
@@ -105,12 +110,13 @@ export let manageChannelPoints = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId);
+    validateInput('manage_channel_points', ctx.input, [ctx.auth.token]);
+    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId, ctx.auth.userId);
 
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.title || ctx.input.cost === undefined) {
-          throw new Error('title and cost are required to create a reward');
+          throw createApiServiceError('title and cost are required to create a reward');
         }
         let reward = await client.createCustomReward(ctx.input.broadcasterId, {
           title: ctx.input.title,
@@ -149,7 +155,8 @@ export let manageChannelPoints = SlateTool.create(spec, {
       }
 
       case 'update': {
-        if (!ctx.input.rewardId) throw new Error('rewardId is required for update');
+        if (!ctx.input.rewardId)
+          throw createApiServiceError('rewardId is required for update');
         let reward = await client.updateCustomReward(
           ctx.input.broadcasterId,
           ctx.input.rewardId,
@@ -195,7 +202,8 @@ export let manageChannelPoints = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!ctx.input.rewardId) throw new Error('rewardId is required for delete');
+        if (!ctx.input.rewardId)
+          throw createApiServiceError('rewardId is required for delete');
         await client.deleteCustomReward(ctx.input.broadcasterId, ctx.input.rewardId);
         return {
           output: { deleted: true },
@@ -223,7 +231,8 @@ export let manageChannelPoints = SlateTool.create(spec, {
       }
 
       case 'get_redemptions': {
-        if (!ctx.input.rewardId) throw new Error('rewardId is required for get_redemptions');
+        if (!ctx.input.rewardId)
+          throw createApiServiceError('rewardId is required for get_redemptions');
         let result = await client.getRedemptions(ctx.input.broadcasterId, ctx.input.rewardId, {
           status: ctx.input.redemptionFilter,
           first: ctx.input.maxResults,
@@ -250,7 +259,9 @@ export let manageChannelPoints = SlateTool.create(spec, {
 
       case 'update_redemption': {
         if (!ctx.input.rewardId || !ctx.input.redemptionIds || !ctx.input.redemptionStatus) {
-          throw new Error('rewardId, redemptionIds, and redemptionStatus are required');
+          throw createApiServiceError(
+            'rewardId, redemptionIds, and redemptionStatus are required'
+          );
         }
         let redemptions = await client.updateRedemptionStatus(
           ctx.input.broadcasterId,

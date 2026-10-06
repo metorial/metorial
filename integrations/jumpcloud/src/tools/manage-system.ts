@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageSystem = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let manageSystem = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       action: z.enum(['update', 'delete']).describe('Action to perform'),
       systemId: z.string().describe('JumpCloud system ID'),
       displayName: z.string().optional().describe('New display name for the system'),
@@ -41,42 +43,42 @@ export let manageSystem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      let system: any;
+      let actionMessage: string;
 
-    let system: any;
-    let actionMessage: string;
+      if (ctx.input.action === 'update') {
+        let data: Record<string, any> = {};
+        if (ctx.input.displayName !== undefined) data.displayName = ctx.input.displayName;
+        if (ctx.input.allowMultiFactorAuthentication !== undefined)
+          data.allowMultiFactorAuthentication = ctx.input.allowMultiFactorAuthentication;
+        if (ctx.input.allowPublicKeyAuthentication !== undefined)
+          data.allowPublicKeyAuthentication = ctx.input.allowPublicKeyAuthentication;
+        if (ctx.input.allowSshPasswordAuthentication !== undefined)
+          data.allowSshPasswordAuthentication = ctx.input.allowSshPasswordAuthentication;
+        if (ctx.input.allowSshRootLogin !== undefined)
+          data.allowSshRootLogin = ctx.input.allowSshRootLogin;
 
-    if (ctx.input.action === 'update') {
-      let data: Record<string, any> = {};
-      if (ctx.input.displayName !== undefined) data.displayName = ctx.input.displayName;
-      if (ctx.input.allowMultiFactorAuthentication !== undefined)
-        data.allowMultiFactorAuthentication = ctx.input.allowMultiFactorAuthentication;
-      if (ctx.input.allowPublicKeyAuthentication !== undefined)
-        data.allowPublicKeyAuthentication = ctx.input.allowPublicKeyAuthentication;
-      if (ctx.input.allowSshPasswordAuthentication !== undefined)
-        data.allowSshPasswordAuthentication = ctx.input.allowSshPasswordAuthentication;
-      if (ctx.input.allowSshRootLogin !== undefined)
-        data.allowSshRootLogin = ctx.input.allowSshRootLogin;
+        system = await client.updateSystem(ctx.input.systemId, data);
+        actionMessage = `Updated system **${system.displayName ?? system.hostname}**`;
+      } else {
+        system = await client.deleteSystem(ctx.input.systemId);
+        actionMessage = `Deletion accepted for system **${system.displayName ?? system.hostname}**`;
+      }
 
-      system = await client.updateSystem(ctx.input.systemId, data);
-      actionMessage = `Updated system **${system.displayName ?? system.hostname}**`;
-    } else {
-      system = await client.deleteSystem(ctx.input.systemId);
-      actionMessage = `Deleted system **${system.displayName ?? system.hostname}**`;
+      return {
+        output: {
+          systemId: system._id,
+          displayName: system.displayName,
+          hostname: system.hostname,
+          os: system.os,
+          active: system.active
+        },
+        message: actionMessage
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
     }
-
-    return {
-      output: {
-        systemId: system._id,
-        displayName: system.displayName,
-        hostname: system.hostname,
-        os: system.os,
-        active: system.active
-      },
-      message: actionMessage
-    };
   })
   .build();

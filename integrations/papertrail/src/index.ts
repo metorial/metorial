@@ -7,8 +7,13 @@ import {
   deleteGroup,
   deleteSavedSearch,
   deleteSystem,
+  downloadArchive,
   getAccountUsage,
+  getDestination,
   getGroup,
+  getSavedSearch,
+  getSystem,
+  getUsage,
   inviteUser,
   listArchives,
   listDestinations,
@@ -23,11 +28,14 @@ import {
   updateSavedSearch,
   updateSystem
 } from './tools';
-import { savedSearchAlert } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    downloadArchive,
+    getSystem,
+    getSavedSearch,
+    getDestination,
+    getUsage,
     searchEvents,
     listSystems,
     createSystem,
@@ -50,5 +58,5 @@ export let provider = Slate.create({
     getAccountUsage,
     listDestinations
   ],
-  triggers: [savedSearchAlert]
+  triggers: []
 });

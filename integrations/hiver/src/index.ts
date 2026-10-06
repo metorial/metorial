@@ -9,14 +9,6 @@ import {
   searchUsers,
   updateConversation
 } from './tools';
-import {
-  conversationUpdated,
-  csatReceived,
-  newConversation,
-  newEmail,
-  noteCreated
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,11 +20,5 @@ export let provider = Slate.create({
     searchUsers.build(),
     searchTags.build()
   ],
-  triggers: [
-    conversationUpdated.build(),
-    newEmail.build(),
-    newConversation.build(),
-    noteCreated.build(),
-    csatReceived.build()
-  ]
+  triggers: []
 });

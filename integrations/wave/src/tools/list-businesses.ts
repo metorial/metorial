@@ -1,10 +1,14 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaveClient } from '../lib/client';
 import { spec } from '../spec';
 
 let businessSchema = z.object({
-  businessId: z.string().describe('Unique identifier of the business'),
+  businessId: z
+    .string()
+    .describe(
+      'Unique identifier of the business. Call list_businesses to discover a permitted business ID.'
+    ),
   name: z.string().describe('Name of the business'),
   isPersonal: z.boolean().optional().describe('Whether this is a personal business'),
   organizationType: z.string().optional().describe('Organization type'),
@@ -59,6 +63,7 @@ export let listBusinesses = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('business:read'))
   .input(
     z.object({
       page: z.number().optional().describe('Page number (starts at 1, default: 1)'),
@@ -78,13 +83,13 @@ export let listBusinesses = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new WaveClient(ctx.auth.token);
-    let result = await client.listBusinesses(ctx.input.page || 1, ctx.input.pageSize || 20);
+    let result = await client.listBusinesses(ctx.input.page ?? 1, ctx.input.pageSize ?? 20);
 
-    let businesses = result.items.map((b: any) => ({
+    let businesses = result.items.map(b => ({
       businessId: b.id,
       name: b.name,
       isPersonal: b.isPersonal,
-      organizationType: b.organizationType,
+      organizationType: b.organizationalType,
       type: b.type,
       subtype: b.subtype,
       currency: b.currency,

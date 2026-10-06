@@ -19,8 +19,6 @@ import {
   manageWebhook,
   sendMessage
 } from './tools';
-import { inboundWebhook, newContact, newConversation, newFormSubmission } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     listWebhooks,
     manageCampaign
   ],
-  triggers: [inboundWebhook, newConversation, newContact, newFormSubmission]
+  triggers: []
 });

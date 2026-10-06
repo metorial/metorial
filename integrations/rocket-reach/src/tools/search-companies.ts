@@ -78,7 +78,14 @@ Useful for market research, prospecting, and finding companies that match specif
         .object({
           start: z.number().optional().describe('Current start index'),
           pageSize: z.number().optional().describe('Results per page'),
-          totalResults: z.number().optional().describe('Total matching companies')
+          totalResults: z.number().optional().describe('Total matching companies'),
+          nextStart: z
+            .number()
+            .nullable()
+            .optional()
+            .describe(
+              'Provider continuation index; pass it as start with the same filters. Null or 0 means no further page.'
+            )
         })
         .optional()
         .describe('Pagination information')
@@ -87,7 +94,7 @@ Useful for market research, prospecting, and finding companies that match specif
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let query: Record<string, any> = {};
+    let query: Record<string, string[]> = {};
     if (ctx.input.name) query.name = [ctx.input.name];
     if (ctx.input.domain) query.domain = [ctx.input.domain];
     if (ctx.input.industry) query.industry = [ctx.input.industry];
@@ -107,27 +114,23 @@ Useful for market research, prospecting, and finding companies that match specif
       orderBy: ctx.input.orderBy
     });
 
-    let companies = (result.companies || result.profiles || result || []).map((c: any) => ({
+    let companies = result.records.map(c => ({
       companyId: c.id,
       name: c.name,
       domain: c.email_domain ?? c.domain,
       tickerSymbol: c.ticker_symbol,
-      industry: c.industry_str ?? c.industry,
+      industry: c.industry_str ?? (typeof c.industry === 'string' ? c.industry : undefined),
       city: c.city,
       region: c.region,
       countryCode: c.country_code
     }));
 
-    let totalResults = result.pagination?.total ?? result.total ?? undefined;
+    let totalResults = result.pagination.totalResults;
 
     return {
       output: {
         companies,
-        pagination: {
-          start: ctx.input.start ?? 1,
-          pageSize: ctx.input.pageSize ?? 10,
-          totalResults
-        }
+        pagination: result.pagination
       },
       message: `Found ${companies.length} matching companies${totalResults !== undefined ? ` out of ${totalResults} total` : ''}.`
     };

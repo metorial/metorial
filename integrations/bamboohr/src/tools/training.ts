@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid, responseId } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getTrainingTypes = SlateTool.create(spec, {
   name: 'Get Training Types',
   key: 'get_training_types',
-  description: `Retrieve all training types configured in BambooHR, including their IDs, names, categories, and whether they are required. Also returns associated categories.`,
+  description: `Retrieve visible training types, including their IDs, names, assigned categories and required status.`,
   tags: {
     readOnly: true,
     destructive: false
@@ -19,13 +20,10 @@ export let getTrainingTypes = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getTrainingTypes();
-    let trainingTypes = Array.isArray(data) ? data : [];
+    let trainingTypes = data;
 
     return {
       output: {
@@ -60,16 +58,13 @@ export let getEmployeeTrainingRecords = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getTrainingRecordsForEmployee(
       ctx.input.employeeId,
       ctx.input.trainingTypeId
     );
-    let trainingRecords = Array.isArray(data) ? data : [];
+    let trainingRecords = data;
 
     return {
       output: {
@@ -107,21 +102,24 @@ export let addTrainingRecord = SlateTool.create(spec, {
     z.object({
       employeeId: z.string().describe('The employee ID'),
       trainingTypeId: z.string().describe('The training type ID'),
-      completed: z.string().describe('Completion date')
+      completed: z.string().describe('Completion date'),
+      trainingRecordId: z
+        .string()
+        .optional()
+        .describe('The provider-assigned training record ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
+    if ((ctx.input.costAmount === undefined) !== (ctx.input.costCurrency === undefined))
+      invalid('Supply costAmount and costCurrency together.');
     let cost =
-      ctx.input.costAmount && ctx.input.costCurrency
+      ctx.input.costAmount !== undefined && ctx.input.costCurrency !== undefined
         ? { currency: ctx.input.costCurrency, cost: ctx.input.costAmount }
         : undefined;
 
-    await client.addTrainingRecord(ctx.input.employeeId, {
+    const result = await client.addTrainingRecord(ctx.input.employeeId, {
       trainingTypeId: ctx.input.trainingTypeId,
       completed: ctx.input.completed,
       instructor: ctx.input.instructor,
@@ -135,7 +133,8 @@ export let addTrainingRecord = SlateTool.create(spec, {
       output: {
         employeeId: ctx.input.employeeId,
         trainingTypeId: ctx.input.trainingTypeId,
-        completed: ctx.input.completed
+        completed: ctx.input.completed,
+        trainingRecordId: responseId(result.id)
       },
       message: `Added training record for employee **${ctx.input.employeeId}** completed on ${ctx.input.completed}.`
     };

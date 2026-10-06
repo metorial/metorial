@@ -9,11 +9,11 @@ export let makeCall = SlateTool.create(spec, {
   description: `Initiate an outbound phone call from a Bolna Voice AI agent to a recipient. Supports scheduling, dynamic context variables, custom caller ID, and retry configuration.`,
   instructions: [
     'Phone numbers must be in E.164 format (e.g., +14155551234).',
-    'Use userData to pass dynamic variables referenced in the agent prompt with {variable} syntax.',
+    'Use userData to pass dynamic variables referenced in the agent prompt with {{variable}} syntax.',
     'Scheduled calls require ISO 8601 datetime with timezone (e.g., 2024-06-05T16:35:00.000+05:30).'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -38,7 +38,13 @@ export let makeCall = SlateTool.create(spec, {
       retryConfig: z
         .object({
           enabled: z.boolean().optional().describe('Enable auto-retry'),
-          maxRetries: z.number().optional().describe('Maximum retry attempts (1-3)'),
+          maxRetries: z
+            .number()
+            .int()
+            .min(1)
+            .max(3)
+            .optional()
+            .describe('Maximum retry attempts (1-3)'),
           retryOnStatuses: z
             .array(z.enum(['no-answer', 'busy', 'failed', 'error']))
             .optional()

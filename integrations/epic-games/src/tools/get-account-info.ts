@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EosAccountServicesClient } from '../lib/client';
+import { accountClient } from '../lib/client';
 import { spec } from '../spec';
 
 let accountInfoSchema = z.object({
@@ -45,17 +45,10 @@ Supports batch lookups of up to 50 accounts in a single request. Requires the **
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EosAccountServicesClient({
-      token: ctx.auth.token,
-      accountId: ctx.auth.accountId
-    });
-
-    let data = await client.getAccounts(ctx.input.accountIds);
-    let accounts = Array.isArray(data) ? data : [data];
-
+    const accounts = await accountClient(ctx).getAccounts(ctx.input.accountIds);
     return {
       output: { accounts },
-      message: `Retrieved account info for **${accounts.length}** Epic Games account(s).`
+      message: `Returned ${accounts.length} application-consented account record(s). Unresolved IDs may lack consent.`
     };
   })
   .build();

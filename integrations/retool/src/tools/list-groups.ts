@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listGroups = SlateTool.create(spec, {
@@ -16,7 +16,8 @@ export let listGroups = SlateTool.create(spec, {
     z.object({
       groups: z.array(
         z.object({
-          groupId: z.number(),
+          groupId: z.number().nullable(),
+          legacyGroupId: z.number().nullable().optional(),
           groupName: z.string(),
           universalAppAccess: z.string().optional(),
           universalResourceAccess: z.string().optional(),
@@ -27,12 +28,13 @@ export let listGroups = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.listGroups();
 
     let groups = result.data.map(g => ({
       groupId: g.id,
+      legacyGroupId: g.legacy_id,
       groupName: g.name,
       universalAppAccess: g.universal_app_access,
       universalResourceAccess: g.universal_resource_access,

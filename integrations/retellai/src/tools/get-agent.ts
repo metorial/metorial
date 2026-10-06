@@ -25,8 +25,12 @@ export let getAgent = SlateTool.create(spec, {
       agentId: z.string().describe('Unique identifier of the agent'),
       agentName: z.string().nullable().optional().describe('Name of the agent'),
       version: z.number().describe('Version number'),
-      isPublished: z.boolean().describe('Whether the agent is published'),
+      isPublished: z.boolean().optional().describe('Whether the agent is published'),
       voiceId: z.string().optional().describe('Voice ID used by the agent'),
+      languages: z
+        .array(z.string())
+        .optional()
+        .describe('Locale codes for a multilingual agent'),
       language: z.string().optional().describe('Language/dialect'),
       webhookUrl: z.string().nullable().optional().describe('Webhook URL for call events'),
       responsiveness: z.number().optional().describe('Responsiveness value (0-1)'),
@@ -52,7 +56,8 @@ export let getAgent = SlateTool.create(spec, {
         version: agent.version,
         isPublished: agent.is_published,
         voiceId: agent.voice_id,
-        language: agent.language,
+        language: typeof agent.language === 'string' ? agent.language : undefined,
+        languages: Array.isArray(agent.language) ? agent.language : undefined,
         webhookUrl: agent.webhook_url,
         responsiveness: agent.responsiveness,
         interruptionSensitivity: agent.interruption_sensitivity,

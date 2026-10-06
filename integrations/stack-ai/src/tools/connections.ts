@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listConnections = SlateTool.create(spec, {
@@ -14,8 +14,18 @@ export let listConnections = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Maximum number of connections to return'),
-      offset: z.number().optional().describe('Offset for pagination')
+      limit: z
+        .number()
+        .multipleOf(1)
+        .positive()
+        .optional()
+        .describe('Maximum number of connections to return'),
+      offset: z
+        .number()
+        .multipleOf(1)
+        .nonnegative()
+        .optional()
+        .describe('Offset for pagination')
     })
   )
   .output(
@@ -26,10 +36,7 @@ export let listConnections = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let connections = await client.listConnections(ctx.input.limit, ctx.input.offset);
 
@@ -67,10 +74,7 @@ export let getConnection = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let connection = await client.getConnection(ctx.input.connectionId);
     let health: Record<string, unknown> | undefined;
@@ -109,10 +113,7 @@ export let deleteConnection = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     await client.deleteConnection(ctx.input.connectionId);
 
@@ -151,10 +152,7 @@ export let browseConnectionResources = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let resources: Record<string, unknown>[];
     if (ctx.input.query) {

@@ -1,6 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShipdayClient } from '../lib/client';
+import type { Row } from '../lib/validation';
+import {
+  fail,
+  id,
+  optionalBoolean,
+  optionalNumber,
+  optionalString,
+  parse
+} from '../lib/validation';
 import { spec } from '../spec';
 
 let serviceSchema = z.object({
@@ -10,31 +19,31 @@ let serviceSchema = z.object({
 });
 
 let estimateSchema = z.object({
-  estimateId: z.string().optional().describe('Estimate identifier'),
-  providerName: z.string().optional().describe('Service provider name'),
-  fee: z.number().optional().describe('Delivery fee'),
-  pickupTime: z.string().optional().describe('Estimated pickup time (ISO 8601)'),
-  deliveryTime: z.string().optional().describe('Estimated delivery time (ISO 8601)'),
-  pickupDurationMinutes: z.number().optional().describe('Pickup duration in minutes'),
-  deliveryDurationMinutes: z.number().optional().describe('Delivery duration in minutes'),
-  hasError: z.boolean().optional().describe('Whether an error occurred'),
-  errorCode: z.string().optional().describe('Error code if applicable'),
-  errorMessage: z.string().optional().describe('Error message if applicable')
+  estimateId: z.string().nullish().describe('Estimate identifier'),
+  providerName: z.string().nullish().describe('Service provider name'),
+  fee: z.number().nullish().describe('Delivery fee'),
+  pickupTime: z.string().nullish().describe('Estimated pickup time (ISO 8601)'),
+  deliveryTime: z.string().nullish().describe('Estimated delivery time (ISO 8601)'),
+  pickupDurationMinutes: z.number().nullish().describe('Pickup duration in minutes'),
+  deliveryDurationMinutes: z.number().nullish().describe('Delivery duration in minutes'),
+  hasError: z.boolean().nullish().describe('Whether an error occurred'),
+  errorCode: z.string().nullish().describe('Error code if applicable'),
+  errorMessage: z.string().nullish().describe('Error message if applicable')
 });
 
 let assignmentSchema = z.object({
-  assignmentId: z.number().optional().describe('Assignment record ID'),
-  orderId: z.number().optional().describe('Order ID'),
-  thirdPartyName: z.string().optional().describe('Provider name'),
-  referenceId: z.string().optional().describe('Third-party reference ID'),
-  thirdPartyFee: z.number().optional().describe('Provider fee'),
-  status: z.string().optional().describe('Delivery status'),
-  driverName: z.string().optional().describe('Driver name'),
-  driverPhone: z.string().optional().describe('Driver phone'),
-  driverLatitude: z.number().optional().describe('Driver latitude'),
-  driverLongitude: z.number().optional().describe('Driver longitude'),
-  trackingUrl: z.string().optional().describe('Tracking URL'),
-  tip: z.number().optional().describe('Tip amount')
+  assignmentId: z.number().nullish().describe('Assignment record ID'),
+  orderId: z.number().nullish().describe('Order ID'),
+  thirdPartyName: z.string().nullish().describe('Provider name'),
+  referenceId: z.string().nullish().describe('Third-party reference ID'),
+  thirdPartyFee: z.number().nullish().describe('Provider fee'),
+  status: z.string().nullish().describe('Delivery status'),
+  driverName: z.string().nullish().describe('Driver name'),
+  driverPhone: z.string().nullish().describe('Driver phone'),
+  driverLatitude: z.number().nullish().describe('Driver latitude'),
+  driverLongitude: z.number().nullish().describe('Driver longitude'),
+  trackingUrl: z.string().nullish().describe('Tracking URL'),
+  tip: z.number().nullish().describe('Tip amount')
 });
 
 export let onDemandDelivery = SlateTool.create(spec, {
@@ -48,7 +57,9 @@ export let onDemandDelivery = SlateTool.create(spec, {
     'Use action "details" with an orderId to get assignment details.',
     'Use action "cancel" with an orderId to cancel an on-demand assignment.'
   ],
-  constraints: ['Requires Professional plan, US location, and valid credit card on file.'],
+  constraints: [
+    'Availability, account billing setup, cancellation fees and provider restrictions depend on your Shipday account. Assignment can dispatch a courier and incur charges.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -88,112 +99,141 @@ export let onDemandDelivery = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShipdayClient({ token: ctx.auth.token });
-
-    if (ctx.input.action === 'services') {
-      let result = await client.getOnDemandServices();
-      let services = Array.isArray(result) ? result : [];
+    const input = ctx.input,
+      client = new ShipdayClient({ token: ctx.auth.token });
+    if (input.action === 'services') {
+      if (
+        input.orderId !== undefined ||
+        input.providerName !== undefined ||
+        input.tip !== undefined ||
+        input.estimateReference !== undefined ||
+        input.contactlessDelivery !== undefined ||
+        input.proofOfDeliveryType !== undefined
+      )
+        fail('Service discovery does not accept order or assignment fields.');
+      const services = (await client.getOnDemandServices()).map(value =>
+        parse(serviceSchema, value)
+      );
       return {
         output: { services },
-        message: `Found **${services.length}** on-demand delivery service(s): ${services.map((s: Record<string, unknown>) => s.name).join(', ')}.`
+        message: `Retrieved ${services.length} on-demand services.`
       };
     }
-
-    if (ctx.input.action === 'estimate') {
-      if (!ctx.input.orderId) throw new Error('orderId is required for estimate');
-      let result = await client.getOnDemandEstimate(ctx.input.orderId);
-      let estimate = {
-        estimateId: result.id,
-        providerName: result.name,
-        fee: result.fee,
-        pickupTime: result.pickupTime,
-        deliveryTime: result.deliveryTime,
-        pickupDurationMinutes: result.pickupDuration,
-        deliveryDurationMinutes: result.deliveryDuration,
-        hasError: result.error,
-        errorCode: result.errorCode,
-        errorMessage: result.errorMessage
-      };
+    const orderId = id(input.orderId, 'Order ID');
+    if (
+      input.action !== 'assign' &&
+      [
+        input.providerName,
+        input.tip,
+        input.estimateReference,
+        input.contactlessDelivery,
+        input.proofOfDeliveryType
+      ].some(value => value !== undefined)
+    )
+      fail('Assignment fields are only accepted with action assign.');
+    if (input.action === 'estimate') {
+      const result = await client.getOnDemandEstimate(orderId);
+      const estimate = parse(estimateSchema, {
+        estimateId: optionalString(result.id),
+        providerName: optionalString(result.name),
+        fee: optionalNumber(result.fee),
+        pickupTime: optionalString(result.pickupTime),
+        deliveryTime: optionalString(result.deliveryTime),
+        pickupDurationMinutes: optionalNumber(result.pickupDuration),
+        deliveryDurationMinutes: optionalNumber(result.deliveryDuration),
+        hasError: optionalBoolean(result.error),
+        errorCode: optionalString(result.errorCode),
+        errorMessage: optionalString(result.errorMessage)
+      });
+      if (estimate.estimateId == null && estimate.hasError !== true)
+        fail('Shipday returned neither an estimate ID nor an explicit estimate error.');
       return {
         output: { estimate },
-        message: `Estimate from **${estimate.providerName}**: $${estimate.fee} fee, pickup in ${estimate.pickupDurationMinutes}min, delivery in ${estimate.deliveryDurationMinutes}min.`
+        message: estimate.hasError
+          ? 'Shipday returned an estimate error; no courier was assigned.'
+          : 'Retrieved the native fee and duration estimate. Currency is not inferred.'
       };
     }
-
-    if (ctx.input.action === 'assign') {
-      if (!ctx.input.orderId || !ctx.input.providerName) {
-        throw new Error('orderId and providerName are required for assign');
+    const mapAssignment = (result: Record<string, unknown>) =>
+      parse(assignmentSchema, {
+        assignmentId: optionalNumber(result.id),
+        orderId: optionalNumber(result.orderId),
+        thirdPartyName: optionalString(result.thirdPartyName),
+        referenceId: optionalString(result.referenceId),
+        thirdPartyFee: optionalNumber(result.thirdPartyFee),
+        status: optionalString(result.status),
+        driverName: optionalString(result.driverName),
+        driverPhone: optionalString(result.driverPhone),
+        driverLatitude: optionalNumber(result.driverLat),
+        driverLongitude: optionalNumber(result.driverLng),
+        trackingUrl: optionalString(result.trackingUrl),
+        tip: optionalNumber(result.tip)
+      });
+    if (input.action === 'assign') {
+      if (!input.providerName) fail('providerName is required for assignment.');
+      const accepted = await client.assignOnDemandDelivery({
+        orderId,
+        name: input.providerName,
+        tip: input.tip,
+        estimateReference: input.estimateReference,
+        contactlessDelivery: input.contactlessDelivery,
+        podType: input.proofOfDeliveryType
+      });
+      let current: Row;
+      try {
+        current = await client.getOnDemandDetails(orderId);
+      } catch {
+        return client.partial(orderId, [
+          `On-demand assignment ${accepted.id} accepted; courier dispatch or charges may remain`
+        ]);
       }
-      let params: {
-        orderId: number;
-        name: string;
-        tip?: number;
-        estimateReference?: string;
-        contactlessDelivery?: boolean;
-        podType?: string;
-      } = {
-        orderId: ctx.input.orderId,
-        name: ctx.input.providerName
-      };
-      if (ctx.input.tip !== undefined) params.tip = ctx.input.tip;
-      if (ctx.input.estimateReference) params.estimateReference = ctx.input.estimateReference;
-      if (ctx.input.contactlessDelivery !== undefined)
-        params.contactlessDelivery = ctx.input.contactlessDelivery;
-      if (ctx.input.proofOfDeliveryType) params.podType = ctx.input.proofOfDeliveryType;
-
-      let result = await client.assignOnDemandDelivery(params);
-      let assignment = {
-        assignmentId: result.id,
-        orderId: result.orderId,
-        thirdPartyName: result.thirdPartyName,
-        referenceId: result.referenceId,
-        thirdPartyFee: result.thirdPartyFee,
-        status: result.status,
-        driverName: result.driverName,
-        driverPhone: result.driverPhone,
-        driverLatitude: result.driverLat,
-        driverLongitude: result.driverLng,
-        trackingUrl: result.trackingUrl,
-        tip: result.tip
-      };
+      if (
+        current.id !== accepted.id ||
+        accepted.thirdPartyName !== input.providerName ||
+        current.thirdPartyName !== input.providerName ||
+        (accepted.referenceId != null && current.referenceId !== accepted.referenceId)
+      )
+        return client.partial(orderId, [
+          `On-demand assignment ${accepted.id} accepted; exact assignment/provider readback differed`
+        ]);
+      const assignment = mapAssignment(current);
       return {
         output: { assignment },
-        message: `Assigned order **${ctx.input.orderId}** to **${ctx.input.providerName}**. Status: ${assignment.status}.`
+        message: `On-demand assignment ${accepted.id} accepted; observed state: ${assignment.status ?? 'not provided'}. Dispatch and charges may apply.`
       };
     }
-
-    if (ctx.input.action === 'details') {
-      if (!ctx.input.orderId) throw new Error('orderId is required for details');
-      let result = await client.getOnDemandDetails(ctx.input.orderId);
-      let assignment = {
-        assignmentId: result.id,
-        orderId: result.orderId,
-        thirdPartyName: result.thirdPartyName,
-        referenceId: result.referenceId,
-        thirdPartyFee: result.thirdPartyFee,
-        status: result.status,
-        driverName: result.driverName,
-        driverPhone: result.driverPhone,
-        driverLatitude: result.driverLat,
-        driverLongitude: result.driverLng,
-        trackingUrl: result.trackingUrl,
-        tip: result.tip
-      };
+    if (input.action === 'details') {
+      const assignment = mapAssignment(await client.getOnDemandDetails(orderId));
       return {
         output: { assignment },
-        message: `On-demand delivery for order **${ctx.input.orderId}** via **${assignment.thirdPartyName}**: Status **${assignment.status}**.`
+        message: `Retrieved on-demand state: ${assignment.status ?? 'not provided'}.`
       };
     }
-
-    if (ctx.input.action === 'cancel') {
-      if (!ctx.input.orderId) throw new Error('orderId is required for cancel');
-      let result = await client.cancelOnDemandDelivery(ctx.input.orderId);
-      return {
-        output: { cancelled: result.success ?? true },
-        message: `Cancelled on-demand delivery for order **${ctx.input.orderId}**.`
-      };
+    const before = await client.getOnDemandDetails(orderId);
+    await client.cancelOnDemandDelivery(orderId);
+    let current: Row;
+    try {
+      current = await client.getOnDemandDetails(orderId);
+    } catch {
+      return client.partial(orderId, [
+        'Cancellation accepted; completion and any charges are unconfirmed'
+      ]);
     }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    if (
+      current.id !== before.id ||
+      (before.thirdPartyName != null && current.thirdPartyName !== before.thirdPartyName) ||
+      (before.referenceId != null && current.referenceId !== before.referenceId)
+    )
+      return client.partial(orderId, [
+        `Cancellation accepted for assignment ${before.id}; exact assignment readback differed`
+      ]);
+    const assignment = mapAssignment(current),
+      cancelled = assignment.status === 'CANCELLED';
+    return {
+      output: { cancelled, assignment },
+      message: cancelled
+        ? 'Cancellation accepted and CANCELLED state observed. Prior charges may remain.'
+        : 'Cancellation accepted; CANCELLED state has not yet been observed. Read details before retrying; prior charges may remain.'
+    };
   })
   .build();

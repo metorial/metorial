@@ -40,10 +40,10 @@ export let getOEmbed = SlateTool.create(spec, {
     z.object({
       html: z.string().describe('HTML embed code for the player'),
       title: z.string().describe('Title of the embedded resource'),
-      description: z.string().describe('Description of the resource'),
-      authorName: z.string().describe('Name of the content author'),
-      authorUrl: z.string().describe('URL to the author profile'),
-      thumbnailUrl: z.string().nullable().describe('Thumbnail image URL'),
+      description: z.string().nullable().optional().describe('Description of the resource'),
+      authorName: z.string().nullable().optional().describe('Name of the content author'),
+      authorUrl: z.string().nullable().optional().describe('URL to the author profile'),
+      thumbnailUrl: z.string().nullable().optional().describe('Thumbnail image URL'),
       width: z.string().describe('Player width'),
       height: z.number().describe('Player height in pixels'),
       providerName: z.string().describe('Provider name (SoundCloud)'),
@@ -51,7 +51,7 @@ export let getOEmbed = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let oembed = await client.getOEmbed(ctx.input.url, {
       maxWidth: ctx.input.maxWidth,
@@ -69,7 +69,7 @@ export let getOEmbed = SlateTool.create(spec, {
         authorName: oembed.author_name,
         authorUrl: oembed.author_url,
         thumbnailUrl: oembed.thumbnail_url,
-        width: oembed.width,
+        width: String(oembed.width),
         height: oembed.height,
         providerName: oembed.provider_name,
         providerUrl: oembed.provider_url

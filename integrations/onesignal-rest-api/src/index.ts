@@ -26,8 +26,6 @@ import {
   updateUser,
   viewNotifications
 } from './tools';
-import { notificationEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -56,5 +54,5 @@ export let provider = Slate.create({
     updateApp,
     exportData
   ],
-  triggers: [notificationEvents]
+  triggers: []
 });

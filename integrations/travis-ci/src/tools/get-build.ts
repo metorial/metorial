@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, TravisCIClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getBuild = SlateTool.create(spec, {
@@ -55,12 +55,12 @@ export let getBuild = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
     let build = await client.getBuild(ctx.input.buildId);
 
-    let jobs = (build.jobs || []).map((job: any) => ({
+    let jobs = (build.jobs || []).map(job => ({
       jobId: job.id,
       state: job.state
     }));

@@ -3,13 +3,15 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let blockSchema = z.object({
-  uuid: z.string().describe('Unique block identifier'),
-  type: z.string().describe('Block type (e.g., FORM_TITLE, INPUT_TEXT, MULTIPLE_CHOICE)'),
-  groupUuid: z.string().describe('Group identifier for related blocks'),
-  groupType: z.string().describe('Group category type'),
-  payload: z.record(z.string(), z.any()).describe('Block-specific configuration and content')
-});
+let blockSchema = z
+  .object({
+    uuid: z.string().describe('Unique block identifier'),
+    type: z.string().describe('Block type (e.g., FORM_TITLE, INPUT_TEXT, MULTIPLE_CHOICE)'),
+    groupUuid: z.string().describe('Group identifier for related blocks'),
+    groupType: z.string().describe('Group category type'),
+    payload: z.record(z.string(), z.any()).describe('Block-specific configuration and content')
+  })
+  .passthrough();
 
 export let getForm = SlateTool.create(spec, {
   name: 'Get Form',

@@ -28,35 +28,30 @@ export let listUsers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextSkip: z.number().optional().describe('Offset for the next page, when available.'),
+      hasMore: z.boolean().optional().describe('Whether more users are available.'),
       users: z.array(userSchema).describe('List of users in the organization'),
-      totalResults: z.number().describe('Total number of users in the organization')
+      totalResults: z.number().optional().describe('Total number of users in the organization')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-
-    let result = await client.listUsers({
-      limit: ctx.input.limit,
-      skip: ctx.input.skip
-    });
-
-    let users = (result.data ?? []).map((u: any) => ({
+    const result = await new Client(ctx.auth).listUsers(ctx.input);
+    const users = result.data.map(u => ({
       userId: u.id,
       email: u.email,
-      firstName: u.first_name,
-      lastName: u.last_name,
-      image: u.image,
-      dateCreated: u.date_created
+      firstName: u.first_name ?? undefined,
+      lastName: u.last_name ?? undefined,
+      image: u.image ?? undefined,
+      dateCreated: u.date_created ?? undefined
     }));
-
-    let totalResults = result.total_results ?? users.length;
-
     return {
       output: {
         users,
-        totalResults
+        totalResults: result.total_results ?? undefined,
+        hasMore: result.has_more,
+        nextSkip: result.has_more ? (ctx.input.skip ?? 0) + users.length : undefined
       },
-      message: `Found **${totalResults}** user(s) in the organization (returning ${users.length}).`
+      message: `Returned ${users.length} organization user(s)${result.has_more ? '; more available' : ''}.`
     };
   })
   .build();

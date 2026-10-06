@@ -6,8 +6,10 @@ import { spec } from '../spec';
 export let deleteVoice = SlateTool.create(spec, {
   name: 'Delete Voice',
   key: 'delete_voice',
-  description: `Permanently deletes a voice from your LMNT account. This action cannot be undone.`,
+  description:
+    'DEPRECATED — LMNT has shut down. This tool is retained for existing workflows and cannot perform provider operations.',
   tags: {
+    deprecated: true,
     destructive: true
   }
 })

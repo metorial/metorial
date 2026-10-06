@@ -16,7 +16,10 @@ export let updateNote = SlateTool.create(spec, {
       noteId: z.number().describe('ID of the note to update'),
       accountId: z.number().describe('Account ID the note belongs to'),
       body: z.string().describe('Updated note content (supports HTML)'),
-      mentionUserIds: z.array(z.number()).optional().describe('Updated user IDs to mention'),
+      mentionUserIds: z
+        .array(z.number())
+        .optional()
+        .describe('Updated user IDs to mention; this can notify those users'),
       date: z.string().optional().describe('Updated note date (ISO 8601)')
     })
   )

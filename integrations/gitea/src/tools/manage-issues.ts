@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let issueOutputSchema = z.object({
@@ -31,15 +32,15 @@ let issueOutputSchema = z.object({
 export let listIssues = SlateTool.create(spec, {
   name: 'List Issues',
   key: 'list_issues',
-  description: `List issues in a repository with filtering by state, labels, milestone, and type. Returns issues excluding pull requests by default.`,
+  description: `List issues in a repository with filtering by state and labels. Returns issues excluding pull requests.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       state: z
         .enum(['open', 'closed', 'all'])
         .optional()
@@ -48,8 +49,8 @@ export let listIssues = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Comma-separated list of label names to filter by'),
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page'),
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page'),
       sort: z
         .enum([
           'oldest',
@@ -60,7 +61,7 @@ export let listIssues = SlateTool.create(spec, {
           'priority'
         ])
         .optional()
-        .describe('Sort order')
+        .describe('Legacy unsupported option; omit it to use the provider default ordering')
     })
   )
   .output(
@@ -69,14 +70,17 @@ export let listIssues = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    if (ctx.input.sort !== undefined)
+      throw createApiServiceError(
+        'Gitea does not support sorting repository issues through this API endpoint. Omit sort to use the provider default ordering.'
+      );
+    let client = new GiteaClient(ctx.auth);
     let issues = await client.listRepoIssues(ctx.input.owner, ctx.input.repo, {
       state: ctx.input.state,
       type: 'issues',
       labels: ctx.input.labels,
       page: ctx.input.page,
-      limit: ctx.input.limit,
-      sort: ctx.input.sort
+      limit: ctx.input.limit
     });
 
     let mapped = issues.map(i => ({
@@ -113,14 +117,14 @@ export let getIssue = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      issueNumber: z.number().describe('Issue number')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      issueNumber: integerInput(1).describe('Issue number')
     })
   )
   .output(issueOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let i = await client.getIssue(ctx.input.owner, ctx.input.repo, ctx.input.issueNumber);
 
     return {
@@ -155,8 +159,8 @@ export let createIssue = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       title: z.string().describe('Issue title'),
       body: z.string().optional().describe('Issue description (supports Markdown)'),
       assignees: z.array(z.string()).optional().describe('Usernames to assign to the issue'),
@@ -167,7 +171,7 @@ export let createIssue = SlateTool.create(spec, {
   )
   .output(issueOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let i = await client.createIssue(ctx.input.owner, ctx.input.repo, {
       title: ctx.input.title,
       body: ctx.input.body,
@@ -209,9 +213,9 @@ export let updateIssue = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      issueNumber: z.number().describe('Issue number to update'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      issueNumber: integerInput(1).describe('Issue number to update'),
       title: z.string().optional().describe('New title'),
       body: z.string().optional().describe('New description'),
       state: z.enum(['open', 'closed']).optional().describe('Set issue state'),
@@ -230,19 +234,23 @@ export let updateIssue = SlateTool.create(spec, {
   )
   .output(issueOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    if (
+      !Object.entries(ctx.input).some(
+        ([key, value]) =>
+          !['owner', 'repo', 'issueNumber'].includes(key) && value !== undefined
+      )
+    )
+      throw createApiServiceError(
+        'Provide an issue field, label change, milestone, or due date to update.'
+      );
+    let client = new GiteaClient(ctx.auth);
 
     let i = await client.updateIssue(ctx.input.owner, ctx.input.repo, ctx.input.issueNumber, {
       title: ctx.input.title,
       body: ctx.input.body,
       state: ctx.input.state,
       assignees: ctx.input.assignees,
-      milestone:
-        ctx.input.milestoneId !== undefined
-          ? ctx.input.milestoneId === 0
-            ? null
-            : ctx.input.milestoneId
-          : undefined,
+      milestone: ctx.input.milestoneId,
       dueDate: ctx.input.dueDate
     });
 

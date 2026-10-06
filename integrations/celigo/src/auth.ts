@@ -1,48 +1,31 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { id, regionFor, regions, token } from './lib/validation';
 
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+export const auth = SlateAuth.create()
+  .output(z.object({ token: z.string(), region: regions.optional() }))
   .addTokenAuth({
     type: 'auth.token',
-    name: 'API Token',
     key: 'api_token',
+    name: 'API Token',
     inputSchema: z.object({
       token: z
         .string()
         .describe(
-          'Celigo API token. Generate one in integrator.io under Resources → API tokens.'
-        )
+          'An integrator.io service token or personal access token. Its permissions and environment are determined by Celigo.'
+        ),
+      region: regions
+        .optional()
+        .describe('Region where this token was issued: US, EU, Australia, or Canada.')
     }),
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let ax = createAxios({
-        baseURL: 'https://api.integrator.io/v1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let response = await ax.get('/tokenInfo');
-      let tokenInfo = response.data;
-
-      return {
-        profile: {
-          id: tokenInfo._userId,
-          name: tokenInfo._userId,
-          scope: tokenInfo.scope
-        }
-      };
+    getOutput: async ctx => ({
+      output: { token: token(ctx.input.token), region: regionFor(ctx.input, ctx.config) }
+    }),
+    getProfile: async (ctx: {
+      output: { token: string; region?: 'us' | 'eu' | 'au' | 'ca' };
+    }) => {
+      const info = await new Client(ctx.output).tokenInfo();
+      return { profile: { id: id(info._userId, 'token owner ID') } };
     }
   });

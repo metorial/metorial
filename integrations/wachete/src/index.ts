@@ -12,8 +12,6 @@ import {
   searchMonitors,
   updateMonitor
 } from './tools';
-import { contentChange, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     manageFolder,
     getCrawlerPages
   ],
-  triggers: [inboundWebhook, contentChange]
+  triggers: []
 });

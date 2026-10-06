@@ -21,10 +21,10 @@ export let updateBlock = SlateTool.create(spec, {
         .describe('Whether the block is expanded (true) or collapsed (false)'),
       heading: z
         .number()
+        .min(0)
+        .max(3)
         .optional()
-        .describe(
-          'Heading level: 1, 2, or 3. Note: once set, headings cannot be removed via the API.'
-        ),
+        .describe('Heading level 0, 1, 2, or 3; 0 requests normal text.'),
       textAlign: z
         .enum(['left', 'center', 'right', 'justify'])
         .optional()
@@ -37,6 +37,10 @@ export let updateBlock = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      blockUid: z.string().describe('Exact target UID for independent reads and recovery'),
+      verified: z
+        .boolean()
+        .describe('Whether the requested outcome was confirmed by an exact read'),
       success: z.boolean().describe('Whether the block was updated successfully')
     })
   )
@@ -55,8 +59,12 @@ export let updateBlock = SlateTool.create(spec, {
     });
 
     return {
-      output: { success: result.success },
-      message: `Block **${ctx.input.blockUid}** updated in graph **${ctx.config.graphName}**.`
+      output: {
+        success: result.success,
+        blockUid: result.targetUid,
+        verified: result.verified
+      },
+      message: 'Updated the block and confirmed the supplied properties.'
     };
   })
   .build();

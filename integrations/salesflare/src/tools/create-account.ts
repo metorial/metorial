@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 let addressSchema = z
@@ -16,9 +16,9 @@ let addressSchema = z
 export let createAccount = SlateTool.create(spec, {
   name: 'Create Account',
   key: 'create_account',
-  description: `Create a new account (company) in Salesflare. You can set name, domain, website, description, addresses, phone numbers, tags, and custom fields. Optionally update an existing account if one with the same domain already exists.`,
+  description: `Create a new account (company) in Salesflare. You can set name, domain, website, description, addresses, phone numbers, tags, and custom fields. Setting updateIfExists can modify an existing account matched by domain. Check for duplicates before creating or upserting.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -51,13 +51,13 @@ export let createAccount = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let data: Record<string, any> = {};
+    let data: Row = {};
     if (ctx.input.name) data.name = ctx.input.name;
     if (ctx.input.domain) data.domain = ctx.input.domain;
     if (ctx.input.website) data.website = ctx.input.website;
     if (ctx.input.description) data.description = ctx.input.description;
-    if (ctx.input.owner) data.owner = ctx.input.owner;
-    if (ctx.input.size) data.size = ctx.input.size;
+    if (ctx.input.owner !== undefined) data.owner = ctx.input.owner;
+    if (ctx.input.size !== undefined) data.size = ctx.input.size;
     if (ctx.input.email) data.email = ctx.input.email;
     if (ctx.input.phoneNumber) data.phone_number = ctx.input.phoneNumber;
     if (ctx.input.socialProfiles) data.social_profiles = ctx.input.socialProfiles;
@@ -74,7 +74,7 @@ export let createAccount = SlateTool.create(spec, {
     }
 
     let result = await client.createAccount(data, ctx.input.updateIfExists);
-    let accountId = result.id ?? result.accountId ?? 0;
+    let accountId = result.id;
 
     return {
       output: {

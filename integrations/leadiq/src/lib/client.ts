@@ -1,34 +1,101 @@
-import { createAxios } from 'slates';
+import {
+  AUTH_CONFIG_SECRET_PLACEHOLDER_PREFIX,
+  AuthConfigSecretRedactor,
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  getApiErrorStatus,
+  isApiErrorRecord
+} from 'slates';
 
 export class Client {
   private http;
+  private redactor: AuthConfigSecretRedactor;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim() || /[\r\n]/.test(config.token))
+      throw createApiServiceError(
+        'Provide the Secret Base64 API key from LeadIQ Settings > API Keys.',
+        { reason: 'invalid_credentials' }
+      );
+    this.redactor = new AuthConfigSecretRedactor({ token: config.token.trim() });
     this.http = createAxios({
       baseURL: 'https://api.leadiq.com',
+      timeout: 45000,
+      maxRedirects: 0,
       headers: {
         'Content-Type': 'application/json',
 
-        Authorization: `Basic ${Buffer.from(`${config.token}:`).toString('base64')}`
+        Authorization: `Basic ${config.token.trim()}`
       }
     });
   }
 
-  private async graphql<T = any>(query: string, variables?: Record<string, any>): Promise<T> {
-    let body: Record<string, any> = { query };
-    if (variables) {
-      body.variables = variables;
+  private async graphql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+    try {
+      let response = await this.http.post('/graphql', {
+        query,
+        ...(variables ? { variables } : {})
+      });
+      if (response.status !== 200 || !isApiErrorRecord(response.data))
+        throw createApiServiceError('LeadIQ did not return a completed GraphQL response.', {
+          reason: 'invalid_api_response',
+          upstreamStatus: response.status
+        });
+      if (response.data.errors !== undefined && !Array.isArray(response.data.errors))
+        throw createApiServiceError('LeadIQ returned an invalid GraphQL error envelope.', {
+          reason: 'invalid_api_response'
+        });
+      if (Array.isArray(response.data.errors) && response.data.errors.length > 0) {
+        // Provider messages can echo submitted contact data or credentials; expose only safe status metadata.
+        throw createApiServiceError(
+          'LeadIQ rejected the GraphQL operation. Check the input, enabled API features and credit balance; submitted values are omitted.',
+          { reason: 'graphql_error', upstreamStatus: response.status }
+        );
+      }
+      if (!isApiErrorRecord(response.data.data))
+        throw createApiServiceError('LeadIQ returned no GraphQL data.', {
+          reason: 'invalid_api_response'
+        });
+      return normalizeNulls(this.sanitize(response.data.data)) as T;
+    } catch (error) {
+      const details =
+        isApiErrorRecord(error) && isApiErrorRecord(error.data) ? error.data : {};
+      const rawStatus = getApiErrorStatus(error) ?? details.upstreamStatus;
+      const status =
+        typeof rawStatus === 'number' &&
+        Number.isInteger(rawStatus) &&
+        rawStatus >= 100 &&
+        rawStatus <= 599
+          ? rawStatus
+          : undefined;
+      const reason =
+        details.reason === 'invalid_api_response' || details.reason === 'graphql_error'
+          ? details.reason
+          : 'api_request_failed';
+      // The shared builder returns existing ServiceErrors unchanged. Rebuild from status only.
+      throw buildApiServiceError(status === undefined ? {} : { response: { status } }, {
+        providerLabel: 'LeadIQ',
+        reason,
+        parent: {},
+        extractMessage: () =>
+          'Check the API key, account permissions, quota and request inputs; transport details are omitted.'
+      });
     }
+  }
 
-    let response = await this.http.post('/graphql', body);
-    let data = response.data;
-
-    if (data.errors && data.errors.length > 0) {
-      let errorMessages = data.errors.map((e: any) => e.message).join('; ');
-      throw new Error(`LeadIQ API error: ${errorMessages}`);
-    }
-
-    return data.data;
+  private sanitize(value: unknown): unknown {
+    if (typeof value === 'string')
+      return this.redactor
+        .redactEmbedded(value)
+        .replaceAll(`${AUTH_CONFIG_SECRET_PLACEHOLDER_PREFIX}token$$`, '[redacted]')
+        .replaceAll(`${AUTH_CONFIG_SECRET_PLACEHOLDER_PREFIX}token`, '[redacted]');
+    if (Array.isArray(value)) return value.map(item => this.sanitize(item));
+    if (isApiErrorRecord(value))
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [this.sanitize(key), this.sanitize(item)])
+      );
+    return value;
   }
 
   async searchPeople(input: SearchPeopleInput): Promise<any> {
@@ -38,7 +105,7 @@ export class Client {
           totalResults
           hasMore
           results {
-            _id
+            id
             name {
               first
               middle
@@ -58,6 +125,7 @@ export class Client {
             personalPhones {
               value
               type
+              verificationStatus
               status
               updatedAt
             }
@@ -78,6 +146,7 @@ export class Client {
               phones {
                 value
                 type
+                verificationStatus
                 status
                 updatedAt
               }
@@ -114,6 +183,7 @@ export class Client {
               phones {
                 value
                 type
+                verificationStatus
                 status
                 updatedAt
               }
@@ -129,7 +199,7 @@ export class Client {
       }
     `;
 
-    let result = await this.graphql(query, { input });
+    let result = await this.graphql<Record<string, any>>(query, { input });
     return result.searchPeople;
   }
 
@@ -169,6 +239,7 @@ export class Client {
             specialities
             fundingInfo {
               fundingRounds
+              fundingRoundsText: fundingRounds
               fundingTotalUsd
               lastFundingOn
               lastFundingType
@@ -218,7 +289,7 @@ export class Client {
       }
     `;
 
-    let result = await this.graphql(query, { input });
+    let result = await this.graphql<Record<string, any>>(query, { input });
     return result.searchCompany;
   }
 
@@ -227,6 +298,7 @@ export class Client {
       query FlatAdvancedSearch($input: FlatSearchInput!) {
         flatAdvancedSearch(input: $input) {
           totalPeople
+          after { key value }
           people {
             id
             companyId
@@ -244,12 +316,6 @@ export class Client {
             country
             countryCode2
             countryCode3
-            workEmails
-            verifiedWorkEmails
-            verifiedLikelyWorkEmails
-            workPhones
-            personalEmails
-            personalPhones
             updatedAt
             currentPositionStartDate
             picture
@@ -259,7 +325,6 @@ export class Client {
               domain
               industry
               employeeCount
-              employeeRange
               city
               state
               country
@@ -270,6 +335,7 @@ export class Client {
               }
               fundingInfo {
                 fundingRounds
+              fundingRoundsText: fundingRounds
                 fundingTotalUsd
                 lastFundingOn
                 lastFundingType
@@ -289,7 +355,7 @@ export class Client {
       }
     `;
 
-    let result = await this.graphql(query, { input });
+    let result = await this.graphql<Record<string, any>>(query, { input });
     return result.flatAdvancedSearch;
   }
 
@@ -298,6 +364,7 @@ export class Client {
       query GroupedAdvancedSearch($input: GroupedSearchInput!) {
         groupedAdvancedSearch(input: $input) {
           totalCompanies
+          after { key value }
           companies {
             totalContactsInCompany
             company {
@@ -306,7 +373,6 @@ export class Client {
               domain
               industry
               employeeCount
-              employeeRange
               city
               state
               country
@@ -317,6 +383,7 @@ export class Client {
               }
               fundingInfo {
                 fundingRounds
+              fundingRoundsText: fundingRounds
                 fundingTotalUsd
                 lastFundingOn
                 lastFundingType
@@ -346,13 +413,7 @@ export class Client {
               city
               state
               country
-              workEmails
-              verifiedWorkEmails
-              verifiedLikelyWorkEmails
-              workPhones
-              personalEmails
-              personalPhones
-              updatedAt
+                          updatedAt
               currentPositionStartDate
               picture
             }
@@ -361,31 +422,21 @@ export class Client {
       }
     `;
 
-    let result = await this.graphql(query, { input });
+    let result = await this.graphql<Record<string, any>>(query, { input });
     return result.groupedAdvancedSearch;
   }
 
   async getAccount(): Promise<any> {
-    let query = `
-      {
-        account {
-          plans {
-            name
-            productType
-            status
-            nextBillingPeriod
-            availableCredits
-            usedCredits
-            costPerDataPoint {
-              type
-              cost
-            }
-          }
-        }
-      }
-    `;
-
-    let result = await this.graphql(query);
+    let query = `query Account { account {
+      plans { name product status nextBillingPeriod }
+      dataHubPlan { name product status nextBillingPeriod available used visibility { sku dataPoints } costs { sku costs { dataPoint cost costInDecimals } } }
+      universalPlan { name product status nextBillingPeriod available used visibility { sku dataPoints } costs { sku costs { dataPoint cost costInDecimals } } }
+    } }`;
+    let result = await this.graphql<Record<string, any>>(query);
+    if (!isApiErrorRecord(result.account) || !Array.isArray(result.account.plans))
+      throw createApiServiceError('LeadIQ returned no current account plans.', {
+        reason: 'invalid_api_response'
+      });
     return result.account;
   }
 
@@ -396,8 +447,69 @@ export class Client {
       }
     `;
 
-    let result = await this.graphql(query, { input });
+    let result = await this.graphql<Record<string, any>>(query, { input });
     return result.submitPersonFeedback;
+  }
+  async listCompanyLists(limit?: number, cursor?: string): Promise<any> {
+    let result = await this.graphql<Record<string, any>>(
+      `query CompanyLists($limit: Int, $cursor: ID) { companyLists(limit: $limit, cursor: $cursor) { items { ${listFields} } nextCursor } }`,
+      { limit, cursor }
+    );
+    return requireObject(result.companyLists, 'company list page');
+  }
+
+  async getCompanyList(id: string, limit?: number, cursor?: string): Promise<any> {
+    let result = await this.graphql<Record<string, any>>(
+      `query CompanyList($id: ID!, $limit: Int, $cursor: ID) { companyList(id: $id) { ${listMetadataFields} companies(limit: $limit, cursor: $cursor) { items { ${entryFields} } nextCursor } } }`,
+      { id, limit, cursor }
+    );
+    return requireObject(result.companyList, 'company list');
+  }
+
+  async createCompanyList(input: { name: string; description?: string }): Promise<any> {
+    let result = await this.graphql<Record<string, any>>(
+      `mutation CreateCompanyList($input: CreateCompanyListInput!) { createCompanyList(input: $input) { ${listFields} } }`,
+      { input }
+    );
+    return requireObject(result.createCompanyList, 'created company list');
+  }
+
+  async updateCompanyList(
+    id: string,
+    input: { name?: string; description?: string }
+  ): Promise<any> {
+    let result = await this.graphql<Record<string, any>>(
+      `mutation UpdateCompanyList($id: ID!, $input: UpdateCompanyListInput!) { updateCompanyList(id: $id, input: $input) { ${listFields} } }`,
+      { id, input }
+    );
+    return requireObject(result.updateCompanyList, 'updated company list');
+  }
+
+  async deleteCompanyList(id: string): Promise<any> {
+    let result = await this.graphql<Record<string, any>>(
+      `mutation DeleteCompanyList($id: ID!) { deleteCompanyList(id: $id) { id name deletedCompanies } }`,
+      { id }
+    );
+    return requireObject(result.deleteCompanyList, 'deleted company list confirmation');
+  }
+
+  async addCompaniesToCompanyList(
+    listId: string,
+    companies: SaveCompanyInput[]
+  ): Promise<any> {
+    let result = await this.graphql<Record<string, any>>(
+      `mutation AddCompaniesToCompanyList($listId: ID!, $companies: [SaveCompanyInput!]!) { addCompaniesToCompanyList(listId: $listId, companies: $companies) { succeeded { ${entryFields} } created updated failed { index reason } } }`,
+      { listId, companies }
+    );
+    return requireObject(result.addCompaniesToCompanyList, 'saved company results');
+  }
+
+  async removeCompanyFromCompanyList(listId: string, companyEntryId: string): Promise<any> {
+    let result = await this.graphql<Record<string, any>>(
+      `mutation RemoveCompanyFromCompanyList($listId: ID!, $companyEntryId: ID!) { removeCompanyFromCompanyList(listId: $listId, companyEntryId: $companyEntryId) { ${entryFields} } }`,
+      { listId, companyEntryId }
+    );
+    return requireObject(result.removeCompanyFromCompanyList, 'removed company entry');
   }
 }
 
@@ -412,6 +524,7 @@ export interface SearchPeopleInput {
     domain?: string;
     linkedinId?: string;
     country?: string;
+    searchInPastCompanies?: boolean;
   };
   linkedinId?: string;
   linkedinUrl?: string;
@@ -422,7 +535,7 @@ export interface SearchPeopleInput {
   containsWorkContactInfo?: boolean;
   profileFilter?: string[];
   includeInvalid?: boolean;
-  qualityFilter?: string;
+  qualityFilter?: { phone?: string };
   minConfidence?: number;
   skip?: number;
   limit?: number;
@@ -475,11 +588,11 @@ export interface ContactFilter {
   linkedinUrls?: string[];
   seniorities?: string[];
   roles?: string[];
-  locations?: LocationFilterInput;
+  locations?: { city?: string; areaLevel1?: string; country?: string; postalCode?: string }[];
   containsWorkEmails?: string[];
-  updatedAt?: DateRangeFilter;
-  newHireFrom?: string;
-  newPromotionFrom?: string;
+  updatedAt?: { start?: number; end?: number };
+  newHireFrom?: number;
+  newPromotionFrom?: number;
 }
 
 export interface CompanyFilter {
@@ -489,14 +602,18 @@ export interface CompanyFilter {
   linkedinIds?: string[];
   industries?: string[];
   sizes?: CompanySizeFilter[];
-  locations?: LocationFilterInput;
+  locations?: { city?: string; areaLevel1?: string; country?: string; postalCode?: string }[];
   descriptions?: string[];
   technologies?: string[];
   technologyCategories?: string[];
-  revenueRanges?: RangeFilter[];
-  fundingInfoFilters?: FundingInfoFilter[];
-  naicsCodeFilters?: string[];
-  sicCodeFilters?: string[];
+  revenueRanges?: { start?: number; end?: number }[];
+  fundingInfoFilters?: {
+    totalFundingRange?: { start?: number; end?: number };
+    lastFundingRange?: { start?: number; end?: number };
+    lastFundingDateRange?: { start?: number; end?: number };
+  }[];
+  naicsCodeFilters?: { code?: string; description?: string }[];
+  sicCodeFilters?: { code?: string; description?: string }[];
 }
 
 export interface FlatSearchInput {
@@ -506,6 +623,7 @@ export interface FlatSearchInput {
   contactExcludedFilter?: ContactFilter;
   skip?: number;
   limit?: number;
+  after?: { key: string; value: string }[];
   sortContactsBy?: string[];
 }
 
@@ -518,6 +636,7 @@ export interface GroupedSearchInput {
   limit?: number;
   limitPerCompany?: number;
   sortCompaniesBy?: string[];
+  after?: { key: string; value: string }[];
   sortContactsBy?: string[];
 }
 
@@ -535,4 +654,40 @@ export interface PersonFeedbackInput {
   invalidReason?: string;
   type?: string;
   lastSeen?: string;
+}
+
+const entryFields = 'id companyId name domain linkedinUrl notes createdAt updatedAt';
+const listMetadataFields = 'id name description createdAt updatedAt';
+const listFields = `${listMetadataFields} companies { items { ${entryFields} } nextCursor }`;
+
+// Optional GraphQL fields are nullable; omit unavailable values without inventing empty data.
+function normalizeNulls(value: unknown): unknown {
+  if (value === null) return undefined;
+  if (Array.isArray(value)) return value.map(normalizeNulls);
+  if (isApiErrorRecord(value))
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => {
+        if (key === 'fundingRounds' && typeof item === 'string')
+          return [
+            key,
+            /^\d+$/.test(item) && Number.isSafeInteger(Number(item)) ? Number(item) : undefined
+          ];
+        return [key, normalizeNulls(item)];
+      })
+    );
+  return value;
+}
+function requireObject(value: unknown, label: string): Record<string, unknown> {
+  if (!isApiErrorRecord(value))
+    throw createApiServiceError(`LeadIQ returned no ${label}; completion is unconfirmed.`, {
+      reason: 'invalid_api_response'
+    });
+  return value;
+}
+export interface SaveCompanyInput {
+  companyId?: string;
+  name?: string;
+  domain?: string;
+  linkedinUrl?: string;
+  notes?: string;
 }

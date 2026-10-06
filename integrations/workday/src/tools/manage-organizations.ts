@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { WorkdayClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { workerIdSchema } from '../lib/contracts';
 import { spec } from '../spec';
 
 let workdayReferenceSchema = z.object({
@@ -38,11 +39,7 @@ export let listOrganizations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let result = await client.listSupervisoryOrganizations({
       limit: ctx.input.limit,
@@ -82,7 +79,7 @@ export let getOrganizationWorkers = SlateTool.create(spec, {
       workers: z
         .array(
           z.object({
-            workerId: z.string().describe('Worker ID'),
+            workerId: workerIdSchema,
             displayName: z.string().describe('Worker display name'),
             href: z.string().optional().describe('API href'),
             primaryWorkEmail: z.string().optional().describe('Primary work email'),
@@ -97,11 +94,7 @@ export let getOrganizationWorkers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let result = await client.getOrganizationWorkers(ctx.input.organizationId, {
       limit: ctx.input.limit,

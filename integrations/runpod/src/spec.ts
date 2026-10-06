@@ -4,7 +4,7 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'runpod',
-  name: 'RunPod',
+  name: 'Runpod',
   description:
     'Cloud computing platform providing on-demand GPU and CPU infrastructure for AI/ML workloads. Manage persistent GPU Pods, deploy auto-scaling Serverless endpoints, and handle network volumes and templates.',
   metadata: {},

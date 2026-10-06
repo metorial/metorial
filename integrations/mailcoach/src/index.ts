@@ -17,8 +17,6 @@ import {
   sendCampaign,
   sendTransactionalEmail
 } from './tools';
-import { mailcoachEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     manageSuppression.build(),
     importSubscribers.build()
   ],
-  triggers: [mailcoachEvents.build()]
+  triggers: []
 });

@@ -168,7 +168,7 @@ export let manageTraitValues = SlateTool.create(spec, {
   key: 'manage_trait_values',
   description: `Add or remove possible values for an existing trait.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(

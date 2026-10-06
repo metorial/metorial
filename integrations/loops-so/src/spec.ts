@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'loopsso',
   name: 'Loops.so',
   description:
-    'Email platform for SaaS companies. Manage contacts, send transactional and marketing emails, trigger automated workflows, and track email engagement.',
+    'Manage Loops contacts and mailing-list subscriptions, discover published transactional templates, verify team identity, check suppression, and submit requested emails or workflow events.',
   metadata: {},
   config,
   auth

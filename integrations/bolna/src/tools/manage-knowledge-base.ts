@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,10 +9,10 @@ export let manageKnowledgeBase = SlateTool.create(spec, {
   description: `Create, retrieve, list, or delete knowledge bases used by agents for RAG (Retrieval-Augmented Generation). Knowledge bases allow agents to reference external content during conversations.`,
   instructions: [
     'To create a knowledge base from a URL, provide the sourceUrl.',
-    'Only PDF files and URLs are supported as knowledge base sources.'
+    'This tool ingests public URLs.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -24,18 +24,27 @@ export let manageKnowledgeBase = SlateTool.create(spec, {
         .optional()
         .describe('Knowledge base ID (required for "get" and "delete")'),
       sourceUrl: z
-        .string()
+        .url()
         .optional()
         .describe('URL to ingest as knowledge base (required for "create")'),
       chunkSize: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Chunk size for document splitting (default: 512)'),
       similarityTopK: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Number of similar chunks to retrieve (default: 15)'),
-      overlapping: z.number().optional().describe('Chunk overlap size (default: 128)'),
+      overlapping: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Chunk overlap size (default: 128)'),
       languageSupport: z
         .enum(['multilingual'])
         .optional()
@@ -48,12 +57,13 @@ export let manageKnowledgeBase = SlateTool.create(spec, {
         .array(
           z.object({
             knowledgeBaseId: z.string().describe('Knowledge base ID'),
+            vectorId: z.string().optional().describe('Processed knowledge base vector ID'),
             fileName: z.string().optional().describe('File or source name'),
             sourceType: z.string().optional().describe('Source type (pdf or url)'),
             status: z.string().optional().describe('Processing status'),
             chunkSize: z.number().optional(),
             similarityTopK: z.number().optional(),
-            overlapping: z.number().optional(),
+            overlapping: z.number().int().min(0).optional(),
             languageSupport: z.string().optional(),
             createdAt: z.string().optional(),
             updatedAt: z.string().optional()
@@ -69,7 +79,7 @@ export let manageKnowledgeBase = SlateTool.create(spec, {
 
     if (input.action === 'create') {
       if (!input.sourceUrl)
-        throw new Error('sourceUrl is required to create a knowledge base');
+        throw createApiServiceError('sourceUrl is required to create a knowledge base');
 
       let result = await client.createKnowledgeBaseFromUrl(input.sourceUrl, {
         chunkSize: input.chunkSize,
@@ -83,10 +93,11 @@ export let manageKnowledgeBase = SlateTool.create(spec, {
           knowledgeBases: [
             {
               knowledgeBaseId: result.rag_id,
-              fileName: result.file_name,
-              sourceType: result.source_type,
-              status: result.status,
-              languageSupport: result.language_support
+              vectorId: result.vector_id ?? undefined,
+              fileName: result.file_name ?? undefined,
+              sourceType: result.source_type ?? undefined,
+              status: result.status ?? undefined,
+              languageSupport: result.language_support ?? undefined
             }
           ],
           operationStatus: 'created'
@@ -96,7 +107,7 @@ export let manageKnowledgeBase = SlateTool.create(spec, {
     }
 
     if (input.action === 'get') {
-      if (!input.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
+      if (!input.knowledgeBaseId) throw createApiServiceError('knowledgeBaseId is required');
 
       let kb = await client.getKnowledgeBase(input.knowledgeBaseId);
 
@@ -105,14 +116,15 @@ export let manageKnowledgeBase = SlateTool.create(spec, {
           knowledgeBases: [
             {
               knowledgeBaseId: kb.rag_id,
-              fileName: kb.file_name,
-              status: kb.status,
-              chunkSize: kb.chunk_size,
-              similarityTopK: kb.similarity_top_k,
-              overlapping: kb.overlapping,
-              languageSupport: kb.language_support,
-              createdAt: kb.created_at,
-              updatedAt: kb.updated_at
+              vectorId: kb.vector_id ?? undefined,
+              fileName: kb.file_name ?? undefined,
+              status: kb.status ?? undefined,
+              chunkSize: kb.chunk_size ?? undefined,
+              similarityTopK: kb.similarity_top_k ?? undefined,
+              overlapping: kb.overlapping ?? undefined,
+              languageSupport: kb.language_support ?? undefined,
+              createdAt: kb.created_at ?? undefined,
+              updatedAt: kb.updated_at ?? undefined
             }
           ]
         },
@@ -128,14 +140,15 @@ export let manageKnowledgeBase = SlateTool.create(spec, {
         output: {
           knowledgeBases: kbList.map((kb: any) => ({
             knowledgeBaseId: kb.rag_id,
-            fileName: kb.file_name,
-            status: kb.status,
-            chunkSize: kb.chunk_size,
-            similarityTopK: kb.similarity_top_k,
-            overlapping: kb.overlapping,
-            languageSupport: kb.language_support,
-            createdAt: kb.created_at,
-            updatedAt: kb.updated_at
+            vectorId: kb.vector_id ?? undefined,
+            fileName: kb.file_name ?? undefined,
+            status: kb.status ?? undefined,
+            chunkSize: kb.chunk_size ?? undefined,
+            similarityTopK: kb.similarity_top_k ?? undefined,
+            overlapping: kb.overlapping ?? undefined,
+            languageSupport: kb.language_support ?? undefined,
+            createdAt: kb.created_at ?? undefined,
+            updatedAt: kb.updated_at ?? undefined
           }))
         },
         message: `Found **${kbList.length}** knowledge base(s).`
@@ -143,7 +156,7 @@ export let manageKnowledgeBase = SlateTool.create(spec, {
     }
 
     if (input.action === 'delete') {
-      if (!input.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
+      if (!input.knowledgeBaseId) throw createApiServiceError('knowledgeBaseId is required');
 
       await client.deleteKnowledgeBase(input.knowledgeBaseId);
 
@@ -156,6 +169,6 @@ export let manageKnowledgeBase = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

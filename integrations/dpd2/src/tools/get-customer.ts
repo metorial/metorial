@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { customerSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getCustomer = SlateTool.create(spec, {
@@ -16,17 +17,7 @@ export let getCustomer = SlateTool.create(spec, {
       customerId: z.number().describe('The unique ID of the customer to retrieve')
     })
   )
-  .output(
-    z.object({
-      customerId: z.number().describe('Unique customer ID'),
-      firstname: z.string().describe('Customer first name'),
-      lastname: z.string().describe('Customer last name'),
-      email: z.string().describe('Customer email address'),
-      receivesEmail: z.boolean().describe('Whether the customer receives newsletters'),
-      createdAt: z.number().describe('Creation timestamp (UNIX)'),
-      updatedAt: z.number().describe('Last updated timestamp (UNIX)')
-    })
-  )
+  .output(customerSchema)
   .handleInvocation(async ctx => {
     let client = new Client({
       username: ctx.auth.username,
@@ -37,7 +28,7 @@ export let getCustomer = SlateTool.create(spec, {
 
     return {
       output: customer,
-      message: `Retrieved customer **${customer.firstname} ${customer.lastname}** (ID: ${customer.customerId}, email: ${customer.email}).`
+      message: `Retrieved customer #${customer.customerId}.`
     };
   })
   .build();

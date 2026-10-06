@@ -1,20 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HootsuiteClient } from '../lib/client';
+import type { SocialProfile } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listSocialProfilesTool = SlateTool.create(spec, {
   name: 'List Social Profiles',
   key: 'list_social_profiles',
   description: `Retrieve social profiles accessible to the authenticated user, or fetch details for a specific social profile.
-Social profiles represent connected social media accounts (Twitter, Facebook, Instagram, LinkedIn, Pinterest).`,
+Social profiles represent connected social accounts. Use the returned cursor to retrieve another page.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      socialProfileId: z.string().optional().describe('Fetch a specific social profile by ID')
+      socialProfileId: z.string().optional().describe('Fetch a specific social profile by ID'),
+      cursor: z.string().optional().describe('Next-page cursor from a previous list response')
     })
   )
   .output(
@@ -32,9 +34,18 @@ Social profiles represent connected social media accounts (Twitter, Facebook, In
             .optional()
             .describe('Username on the social network'),
           avatarUrl: z.string().optional().describe('Profile avatar URL'),
-          ownerId: z.string().optional().describe('Hootsuite member ID who owns this profile')
+          ownerId: z
+            .string()
+            .optional()
+            .describe('Hootsuite member or organization ID that owns this profile'),
+          ownerType: z.string().optional().describe('Owner type reported by Hootsuite'),
+          requiresReauthentication: z
+            .boolean()
+            .optional()
+            .describe('Whether Hootsuite reports that the connection needs reauthentication')
         })
-      )
+      ),
+      cursor: z.string().optional().describe('Cursor for the next page, absent at the end')
     })
   )
   .handleInvocation(async ctx => {
@@ -42,38 +53,36 @@ Social profiles represent connected social media accounts (Twitter, Facebook, In
 
     if (ctx.input.socialProfileId) {
       let profile = await client.getSocialProfile(ctx.input.socialProfileId);
-      let socialProfiles = [
-        {
-          socialProfileId: String(profile.id),
-          type: profile.type,
-          socialNetworkId: profile.socialNetworkId
-            ? String(profile.socialNetworkId)
-            : undefined,
-          socialNetworkUsername: profile.socialNetworkUsername,
-          avatarUrl: profile.avatarUrl,
-          ownerId: profile.owner?.id ? String(profile.owner.id) : undefined
-        }
-      ];
+      let socialProfiles = [mapProfile(profile)];
 
       return {
         output: { socialProfiles },
-        message: `Retrieved social profile **${profile.socialNetworkUsername || profile.id}** (${profile.type}).`
+        message: `Retrieved social profile **${profile.socialNetworkUsername || profile.id}**.`
       };
     }
 
-    let profiles = await client.getSocialProfiles();
-    let socialProfiles = profiles.map((p: any) => ({
-      socialProfileId: String(p.id),
-      type: p.type,
-      socialNetworkId: p.socialNetworkId ? String(p.socialNetworkId) : undefined,
-      socialNetworkUsername: p.socialNetworkUsername,
-      avatarUrl: p.avatarUrl,
-      ownerId: p.owner?.id ? String(p.owner.id) : undefined
-    }));
+    let result = await client.getSocialProfiles(ctx.input.cursor);
+    let socialProfiles = result.profiles.map(mapProfile);
 
     return {
-      output: { socialProfiles },
+      output: { socialProfiles, cursor: result.cursor },
       message: `Found **${socialProfiles.length}** social profile(s).`
     };
   })
   .build();
+
+let mapProfile = (profile: SocialProfile) => ({
+  socialProfileId: profile.id,
+  type: profile.type,
+  socialNetworkId: profile.socialNetworkId,
+  socialNetworkUsername: profile.socialNetworkUsername,
+  avatarUrl: profile.avatarUrl,
+  ownerId:
+    profile.ownerId ??
+    (typeof profile.owner === 'object' && profile.owner ? profile.owner.id : undefined),
+  ownerType: typeof profile.owner === 'string' ? profile.owner : undefined,
+  requiresReauthentication:
+    profile.isReauthRequired === undefined || profile.isReauthRequired === null
+      ? undefined
+      : Boolean(profile.isReauthRequired)
+});

@@ -13,7 +13,7 @@ export let deleteAgent = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      agentId: z.string().describe('The model ID of the agent to delete')
+      agentId: z.string().min(1).describe('Agent model ID from list_agents')
     })
   )
   .output(
@@ -22,7 +22,7 @@ export let deleteAgent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.deleteAgent(ctx.input.agentId);
 
     return {

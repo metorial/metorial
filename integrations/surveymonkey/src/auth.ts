@@ -1,5 +1,8 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createAxios, requestAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { adaptError, apiOrigin, US_API, validateToken } from './lib/http';
+import { malformed } from './lib/response';
 
 export let auth = SlateAuth.create()
   .output(
@@ -16,87 +19,42 @@ export let auth = SlateAuth.create()
       {
         type: 'docs.auth.oauth',
         name: 'OAuth documentation',
-        url: 'https://api.surveymonkey.com/v3/docs/authentication'
+        url: 'https://api.surveymonkey.com/v3/docs#authentication'
       },
       {
         type: 'docs.auth.oauth_scopes',
         name: 'OAuth scopes',
-        url: 'https://api.surveymonkey.com/v3/docs/scopes'
+        url: 'https://api.surveymonkey.com/v3/docs#scopes'
       }
     ],
 
     scopes: [
-      { title: 'View Users', description: 'View user account details', scope: 'users_read' },
-      { title: 'View Surveys', description: 'View surveys', scope: 'surveys_read' },
+      { title: 'View Users', description: 'View Users', scope: 'users_read' },
+      { title: 'View Surveys', description: 'View Surveys', scope: 'surveys_read' },
       {
         title: 'Create/Modify Surveys',
-        description: 'Create and modify surveys',
+        description: 'Create/Modify Surveys',
         scope: 'surveys_write'
       },
-      {
-        title: 'View Collectors',
-        description: 'View survey collectors',
-        scope: 'collectors_read'
-      },
+      { title: 'View Collectors', description: 'View Collectors', scope: 'collectors_read' },
       {
         title: 'Create/Modify Collectors',
-        description: 'Create and modify collectors',
+        description: 'Create/Modify Collectors',
         scope: 'collectors_write'
       },
-      {
-        title: 'View Contacts',
-        description: 'View contacts and contact lists',
-        scope: 'contacts_read'
-      },
+      { title: 'View Contacts', description: 'View Contacts', scope: 'contacts_read' },
       {
         title: 'Create/Modify Contacts',
-        description: 'Create and modify contacts and contact lists',
+        description: 'Create/Modify Contacts',
         scope: 'contacts_write'
       },
-      {
-        title: 'View Responses',
-        description: 'View survey responses (summary)',
-        scope: 'responses_read'
-      },
+      { title: 'View Responses', description: 'View Responses', scope: 'responses_read' },
       {
         title: 'View Response Details',
-        description: 'View full survey response details',
+        description: 'View Response Details',
         scope: 'responses_read_detail'
       },
-      {
-        title: 'Create/Modify Responses',
-        description: 'Create and modify survey responses',
-        scope: 'responses_write'
-      },
-      { title: 'View Groups', description: 'View team groups', scope: 'groups_read' },
-      { title: 'Manage Groups', description: 'Manage team groups', scope: 'groups_write' },
-      { title: 'View Webhooks', description: 'View webhooks', scope: 'webhooks_read' },
-      {
-        title: 'Create/Modify Webhooks',
-        description: 'Create and modify webhooks',
-        scope: 'webhooks_write'
-      },
-      {
-        title: 'View Library',
-        description: 'View survey template library',
-        scope: 'library_read'
-      },
-      { title: 'View Workgroups', description: 'View workgroups', scope: 'workgroups_read' },
-      {
-        title: 'Manage Workgroups',
-        description: 'Manage workgroups',
-        scope: 'workgroups_write'
-      },
-      {
-        title: 'View Workgroup Shares',
-        description: 'View shared workgroup resources',
-        scope: 'workgroups_shares_read'
-      },
-      {
-        title: 'Manage Workgroup Shares',
-        description: 'Manage shared workgroup resources',
-        scope: 'workgroups_shares_write'
-      }
+      { title: 'View Library', description: 'View Library', scope: 'library_read' }
     ],
 
     getAuthorizationUrl: async ctx => {
@@ -118,7 +76,10 @@ export let auth = SlateAuth.create()
 
     handleCallback: async ctx => {
       let http = createAxios({
-        baseURL: 'https://api.surveymonkey.com'
+        baseURL: US_API,
+        timeout: 30000,
+        maxRedirects: 0,
+        maxContentLength: 1024 * 1024
       });
 
       let body = new URLSearchParams({
@@ -129,17 +90,25 @@ export let auth = SlateAuth.create()
         grant_type: 'authorization_code'
       });
 
-      let response = await http.post('/oauth/token', body.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
-
-      let accessUrl = response.data.access_url || 'https://api.surveymonkey.com';
+      let response = await requestAxios(
+        'authorization-code exchange',
+        () =>
+          http.post<unknown>('/oauth/token', body.toString(), {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          }),
+        adaptError
+      );
+      let result = z
+        .object({ access_token: z.string().min(1), access_url: z.string().optional() })
+        .safeParse(response.data);
+      if (response.status !== 200 || !result.success) throw malformed();
+      let accessUrl = apiOrigin(result.data.access_url);
 
       return {
         output: {
-          token: response.data.access_token,
+          token: validateToken(result.data.access_token),
           accessUrl
         }
       };
@@ -150,22 +119,16 @@ export let auth = SlateAuth.create()
       input: Record<string, never>;
       scopes: string[];
     }) => {
-      let baseUrl = ctx.output.accessUrl || 'https://api.surveymonkey.com';
-      let http = createAxios({
-        baseURL: baseUrl,
-        headers: {
-          Authorization: `bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await http.get('/v3/users/me');
-      let user = response.data;
+      let user = await new Client(ctx.output).getCurrentUser();
 
       return {
         profile: {
           id: user.id,
           email: user.email,
-          name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+          name:
+            `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() ||
+            user.username ||
+            user.id,
           username: user.username,
           accountType: user.account_type
         }
@@ -190,8 +153,8 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token,
-          accessUrl: ctx.input.accessUrl || 'https://api.surveymonkey.com'
+          token: validateToken(ctx.input.token),
+          accessUrl: apiOrigin(ctx.input.accessUrl)
         }
       };
     },
@@ -200,22 +163,16 @@ export let auth = SlateAuth.create()
       output: { token: string; accessUrl?: string };
       input: { token: string; accessUrl?: string };
     }) => {
-      let baseUrl = ctx.output.accessUrl || 'https://api.surveymonkey.com';
-      let http = createAxios({
-        baseURL: baseUrl,
-        headers: {
-          Authorization: `bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await http.get('/v3/users/me');
-      let user = response.data;
+      let user = await new Client(ctx.output).getCurrentUser();
 
       return {
         profile: {
           id: user.id,
           email: user.email,
-          name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+          name:
+            `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() ||
+            user.username ||
+            user.id,
           username: user.username,
           accountType: user.account_type
         }

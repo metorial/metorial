@@ -6,13 +6,12 @@ import { spec } from '../spec';
 export let chatQuery = SlateTool.create(spec, {
   name: 'Chat with Codebase',
   key: 'chat_query',
-  description: `Query your codebase using natural language through Entelligence's AI-powered chat. Ask questions about code structure, pull requests, issues, and team contributions. Supports specialized agent modes for different types of analysis.
-
-Use this to understand code, find implementations, explain architecture, list PRs, generate summaries, and more. Supports slash commands like \`/findCode\`, \`/explain\`, \`/listPRs\`, \`/issueThemes\`, \`/onboard\`, and \`/visualize\`.`,
+  description:
+    'Ask a natural-language question about the repository indexed for your Entelligence chat widget. Returns the generated answer and any source URLs included in the response.',
   instructions: [
     'Provide a clear, specific question for best results.',
     'Use conversation history for multi-turn follow-up questions.',
-    'Enable advancedAgent for complex reasoning tasks that span multiple sources.'
+    'Options depend on the capabilities enabled for the configured repository.'
   ],
   tags: {
     readOnly: true
@@ -20,7 +19,11 @@ Use this to understand code, find implementations, explain architecture, list PR
 })
   .input(
     z.object({
-      question: z.string().describe('Natural language question to ask about the codebase'),
+      question: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Natural language question to ask about the codebase'),
       conversationHistory: z
         .array(
           z.object({
@@ -37,9 +40,7 @@ Use this to understand code, find implementations, explain architecture, list PR
       advancedAgent: z
         .boolean()
         .optional()
-        .describe(
-          'Enable advanced agent mode for complex cross-source reasoning across PRs, issues, and code'
-        ),
+        .describe('Request the provider’s advanced agent mode when available'),
       enableDocs: z
         .boolean()
         .optional()
@@ -47,6 +48,7 @@ Use this to understand code, find implementations, explain architecture, list PR
         .describe('Include documentation context in responses'),
       limitSources: z
         .number()
+        .nonnegative()
         .optional()
         .describe('Maximum number of source references to include (default: 5)')
     })

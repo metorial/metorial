@@ -1,37 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { modelSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let modelSchema = z.object({
-  modelId: z.number().describe('Unique ID of the model'),
-  name: z.string().describe('Name of the model'),
-  slug: z.string().describe('URL-friendly slug for the model'),
-  sourceId: z.number().describe('ID of the source this model queries'),
-  primaryKey: z
-    .string()
-    .nullable()
-    .describe('Primary key column used for change data capture'),
-  queryType: z.string().describe('Query type: custom, raw_sql, table, dbt, or visual'),
-  isSchema: z.boolean().describe('Whether this model is used as a base for other models'),
-  syncs: z.array(z.number()).optional().describe('IDs of syncs using this model'),
-  tags: z.record(z.string(), z.string()).optional().describe('Key-value metadata tags'),
-  raw: z.object({ sql: z.string() }).optional().describe('Raw SQL query definition'),
-  table: z
-    .object({ name: z.string() })
-    .optional()
-    .describe('Table name for table-based queries'),
-  dbt: z.object({ modelId: z.string() }).optional().describe('dbt model reference'),
-  custom: z
-    .record(z.string(), z.any())
-    .optional()
-    .describe('Custom query for non-SQL sources'),
-  visual: z.record(z.string(), z.any()).optional().describe('Visual query definition'),
-  folderId: z.string().optional().nullable().describe('Folder ID for organizing models'),
-  workspaceId: z.number().describe('ID of the workspace'),
-  createdAt: z.string().describe('ISO timestamp when the model was created'),
-  updatedAt: z.string().describe('ISO timestamp when the model was last updated')
-});
 
 export let listModels = SlateTool.create(spec, {
   name: 'List Models',
@@ -56,7 +27,8 @@ export let listModels = SlateTool.create(spec, {
   .output(
     z.object({
       models: z.array(modelSchema).describe('List of models'),
-      hasMore: z.boolean().describe('Whether more results are available')
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextOffset: z.number().optional().describe('Offset for the next page, when available')
     })
   )
   .handleInvocation(async ctx => {
@@ -66,7 +38,8 @@ export let listModels = SlateTool.create(spec, {
     return {
       output: {
         models: result.data,
-        hasMore: result.hasMore
+        hasMore: result.hasMore,
+        nextOffset: result.nextOffset
       },
       message: `Found **${result.data.length}** model(s).${result.hasMore ? ' More results available.' : ''}`
     };
@@ -105,10 +78,12 @@ export let createModel = SlateTool.create(spec, {
   instructions: [
     'Set queryType to "raw_sql" and provide the raw.sql field for SQL-based models.',
     'Set queryType to "table" and provide the table.name field for table-based models.',
-    'Set queryType to "dbt" and provide the dbt.modelId field for dbt model references.'
+    'Set queryType to "dbt" and provide the dbt.modelId field with a numeric ID encoded as a string for dbt model references.',
+    'For visual models, provide visual.filter as a JSON filter object encoded as a string and visual.parentId as a numeric ID encoded as a string.',
+    'Creating or updating a model can validate or query its source and incur warehouse costs.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -149,7 +124,13 @@ export let createModel = SlateTool.create(spec, {
         })
         .optional()
         .describe('Visual query definition'),
-      folderId: z.string().optional().describe('Folder ID for organization')
+      folderId: z.string().optional().describe('Folder ID for organization'),
+      skipColumnQuery: z
+        .boolean()
+        .optional()
+        .describe(
+          'Skip the model column query during creation. Other validation and later executions may still query the source.'
+        )
     })
   )
   .output(modelSchema)
@@ -168,8 +149,11 @@ export let updateModel = SlateTool.create(spec, {
   name: 'Update Model',
   key: 'update_model',
   description: `Update an existing model's name, primary key, query definition, or other properties.`,
+  instructions: [
+    'Changing a query can affect every sync that uses the model, including scheduled destination writes. Model validation can query the source and incur warehouse costs.'
+  ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(

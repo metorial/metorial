@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listCustomFieldDefinitions = SlateTool.create(spec, {
@@ -32,6 +33,7 @@ export let listCustomFieldDefinitions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'list_custom_field_definitions');
     let client = new Client(ctx.auth);
     let fields = await client.listCustomFieldDefinitions();
 
@@ -70,6 +72,7 @@ export let listContactTypes = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'list_contact_types');
     let client = new Client(ctx.auth);
     let types = await client.listContactTypes();
 
@@ -105,6 +108,7 @@ export let listCustomerSources = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'list_customer_sources');
     let client = new Client(ctx.auth);
     let sources = await client.listCustomerSources();
 
@@ -140,6 +144,7 @@ export let listLossReasons = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'list_loss_reasons');
     let client = new Client(ctx.auth);
     let reasons = await client.listLossReasons();
 
@@ -176,6 +181,7 @@ export let listUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'list_users');
     let client = new Client(ctx.auth);
     let users = await client.listUsers();
 
@@ -188,6 +194,45 @@ export let listUsers = SlateTool.create(spec, {
         }))
       },
       message: `Retrieved **${users.length}** users.`
+    };
+  })
+  .build();
+
+export const listLeadStatuses = SlateTool.create(spec, {
+  key: 'list_lead_statuses',
+  name: 'List Lead Statuses',
+  description:
+    'Discover lead status IDs and names for interpreting leads and filtering searches.',
+  tags: { readOnly: true, destructive: false }
+})
+  .input(z.object({}))
+  .output(
+    z.object({
+      leadStatuses: z.array(
+        z.object({
+          statusId: z.number().describe('Lead status ID'),
+          name: z.string().describe('Lead status name'),
+          order: z.number().optional().describe('Display ordering'),
+          isDefault: z
+            .boolean()
+            .optional()
+            .describe('Whether new leads default to this status')
+        })
+      )
+    })
+  )
+  .handleInvocation(async ctx => {
+    const statuses = await new Client(ctx.auth).listLeadStatuses();
+    return {
+      output: {
+        leadStatuses: statuses.map(status => ({
+          statusId: status.id,
+          name: status.name,
+          order: typeof status.order === 'number' ? status.order : undefined,
+          isDefault: typeof status.is_default === 'boolean' ? status.is_default : undefined
+        }))
+      },
+      message: `Retrieved ${statuses.length} lead statuses.`
     };
   })
   .build();

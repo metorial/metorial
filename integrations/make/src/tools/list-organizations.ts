@@ -1,19 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MakeClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { paging } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listOrganizations = SlateTool.create(spec, {
   name: 'List Organizations',
   key: 'list_organizations',
-  description: `Retrieve all organizations that the authenticated user is a member of. Returns organization IDs, names, and zone information.`,
+  description: `Retrieve a bounded page of organizations that the authenticated user is a member of. Returns organization IDs, names, and zone information.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ limit: z.number().optional(), offset: z.number().optional() }))
   .output(
     z.object({
+      page: paging.optional(),
       organizations: z.array(
         z.object({
           organizationId: z.number().describe('Organization ID'),
@@ -26,23 +28,18 @@ export let listOrganizations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MakeClient({
-      token: ctx.auth.token,
-      zoneUrl: ctx.config.zoneUrl
-    });
-
-    let result = await client.listOrganizations();
-    let orgs = (result.organizations ?? result ?? []).map((o: any) => ({
+    const client = clientFor(ctx);
+    const result = await client.listOrganizations(ctx.input);
+    const organizations = result.organizations.map(o => ({
       organizationId: o.id,
       name: o.name,
       zone: o.zone,
       countryId: o.countryId,
       timezoneId: o.timezoneId
     }));
-
     return {
-      output: { organizations: orgs },
-      message: `Found **${orgs.length}** organization(s).`
+      output: { organizations, page: result.pg },
+      message: `Returned ${organizations.length} authorized organizations in this region and page.`
     };
   })
   .build();

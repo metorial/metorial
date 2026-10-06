@@ -30,7 +30,12 @@ export let verifyCode = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Verification result status (e.g., "accepted", "rejected")'),
-      verifyProfileId: z.string().optional().describe('Verify Profile ID used')
+      verifyProfileId: z
+        .string()
+        .nullish()
+        .describe(
+          'Requested Verify Profile ID; the native verification result does not repeat its association'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -42,14 +47,11 @@ export let verifyCode = SlateTool.create(spec, {
       ctx.input.verifyProfileId
     );
 
-    let status =
-      result?.response_code === 'accepted'
-        ? 'accepted'
-        : (result?.response_code ?? result?.status ?? 'unknown');
+    const status = result.response_code;
 
     return {
       output: {
-        phoneNumber: result.phone_number ?? ctx.input.phoneNumber,
+        phoneNumber: result.phone_number,
         status,
         verifyProfileId: ctx.input.verifyProfileId
       },

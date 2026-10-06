@@ -1,89 +1,17 @@
-# <img src="https://provider-logos.metorial-cdn.com/bitwarden_logo.svg" height="20"> Bitwarden
+# Bitwarden
 
-Manage organization members, groups, collections, and policies in Bitwarden. Invite, update, and remove members, assign roles and group memberships, and configure collection access permissions. Enforce organization-wide security policies such as two-step login and master password requirements. Query and export event logs to track user actions and organization activity. Store, retrieve, create, update, and delete developer secrets (API keys, database credentials) organized into projects with granular access control. Supports SCIM provisioning for automatic user and group syncing from identity providers.
+Manage organization members, groups, collection permissions, policies and event logs through Bitwarden's organization Public API. All 19 existing tools remain available, with exact collection and policy reads added for safe discovery and readback.
 
-## Tools
+Connect with an organization API key from the admin console and choose the matching US or EU identity region. Personal `user.*` keys, Secrets Manager machine tokens, SCIM keys and local vault sessions are separate products and are not accepted. This integration does not read vault passwords, export vaults, run the CLI, manage developer secrets or expose a person identity. The organization ID is bound to authentication. Organizations require the provider's applicable Teams/Enterprise features.
 
-### Create Group
+Organization access tokens expire after the provider-specified lifetime (normally 60 minutes). Renewal repeats the native client-credentials exchange under the original organization, client credentials and region. Existing unmarked connections can use their still-valid saved token but must reconnect once before automatic renewal; no identity is invented for them. Region configuration is owned by authentication.
 
-Create a new group in the Bitwarden organization. Groups can be assigned to collections and have members added to simplify permission management.
+Available tools cover members (list, get, invite, update, remove, reinvite, revoke/restore), groups (list, get, create, update, delete), collections (list, get, update, delete), policies (list, get, update), event queries and directory import. Collection creation, user account confirmation and vault/secret CRUD are outside this API's supported surface. Policy routes use numeric policy types; an existing policy UUID passed to update_policy is resolved through list_policies first.
 
-### Delete Collection
+The current published API no longer accepts `accessAll` or legacy Manager role 3. Legacy Boolean inputs remain accepted as false for compatibility; true is refused before effects. Legacy output flags are null when absent from the native response. Use explicit collection assignments. Updates preserve omitted external IDs, assignments, hide-password/manage flags and existing Custom-role permissions before the provider's replacement PUT. Explicit assignment arrays replace that entire set; explicit permission objects replace Custom permissions. Updates refuse before replacement when the existing field needed for preservation is not exposed. Read results include optional association/configuration availability flags: a false flag means the current value is unknown, even when the legacy array is empty or configuration is null. Avoid concurrent changes: there is no documented atomic compare-and-swap. Native mutation receipts are checked against the requested state, and exact group readback precedes a dependent membership change. Group membership is a second write, so an acknowledged group followed by association failure is reported as a partial effect requiring exact-ID reconciliation.
 
-Permanently delete a collection from the Bitwarden organization. All items in the collection will lose this collection assignment.
+Event queries preserve native date defaults, refuse conflicting selectors and repeated cursors, and stop with an error rather than truncate beyond 100 pages or 10,000 records. Responses are bounded to 4 MiB. Import counts describe submitted entries; native acknowledgment does not independently prove every downstream invitation, removal or directory effect. Invitation email, access changes, policy enforcement and audit retention require explicit authorization in a controlled organization.
 
-### Delete Group
+No live provider operation was performed during this refresh. The private suite is active with safe read scenarios and gated exact-owned group/invitation lifecycles; collection deletion, policy enforcement, bulk import and accepted-user access changes require independently controlled prerequisites.
 
-Permanently delete a group from the Bitwarden organization. Members in the group will lose any permissions granted through the group.
-
-### Get Group
-
-Retrieve detailed information about a specific group, including its collection assignments and member IDs.
-
-### Get Member
-
-Retrieve detailed information about a specific organization member, including their role, status, collection assignments, and group memberships.
-
-### Import Organization Data
-
-Bulk import members and groups from an external directory or system. This is useful for directory synchronization scenarios where you need to sync users and groups from an identity provider into Bitwarden.
-
-### Invite Member
-
-Invite a new member to the Bitwarden organization by email. You can assign a role, grant access to all collections, or specify individual collection assignments.
-
-### List Collections
-
-List all collections in the Bitwarden organization. Returns each collection's external ID and group assignments.
-
-### List Groups
-
-List all groups in the Bitwarden organization. Returns each group's name, access settings, external ID, and collection assignments.
-
-### List Members
-
-List all members of the Bitwarden organization. Returns each member's role, status, email, two-factor authentication state, and collection assignments.
-
-### List Policies
-
-List all organization policies and their current state. Policies control organization-wide behaviors such as requiring two-step login, enforcing master password strength, and restricting vault exports.
-
-### Query Event Logs
-
-Query the organization's event logs. Filter by date range, acting user, or related item. Returns timestamped records of user actions, vault operations, collection changes, and more. Supports up to 367 days of history.
-
-### Reinvite Member
-
-Resend the invitation email to an organization member who has not yet accepted. Useful when the original invitation expired or was missed.
-
-### Remove Member
-
-Remove a member from the Bitwarden organization. This revokes their access to all shared collections but does not delete their Bitwarden user account.
-
-### Revoke or Restore Member
-
-Revoke or restore organization access for a member. Revoking suspends the member's access without removing them; restoring re-enables their access.
-
-### Update Collection
-
-Update a collection's external ID and group assignments. Collections cannot be created via the Public API, only updated or deleted.
-
-### Update Group
-
-Update an existing group's name, access settings, collection assignments, and/or member list.
-
-### Update Member
-
-Update an organization member's role, collection assignments, external ID, and/or group memberships. Provide only the fields you wish to change; unchanged fields should match current values.
-
-### Update Policy
-
-Enable, disable, or configure an organization policy. Policies enforce behaviors like requiring two-step login, setting master password requirements, and restricting vault exports. Available for Enterprise organizations.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Official sources: [Public API guide](https://bitwarden.com/help/public-api/), [published API schema](https://bitwarden.com/help/api/), [API product boundaries](https://bitwarden.com/help/bitwarden-apis/).

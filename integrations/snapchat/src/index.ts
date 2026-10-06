@@ -23,8 +23,6 @@ import {
   managePixel,
   sendConversionEvent
 } from './tools';
-import { adStatusChange, campaignStatusChange, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     getAudienceSize,
     getBidEstimate
   ],
-  triggers: [inboundWebhook, campaignStatusChange, adStatusChange]
+  triggers: []
 });

@@ -32,7 +32,12 @@ export let createContact = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('ID of the account (company) to associate with this contact'),
-      title: z.string().optional().describe('Job title of the contact'),
+      title: z
+        .string()
+        .optional()
+        .describe(
+          'Job title stored in the custom field named Job Title; discover available fields with list_custom_fields'
+        ),
       description: z.string().optional().describe('Description or notes about the contact'),
       customFields: z
         .record(z.string(), z.any())
@@ -54,17 +59,17 @@ export let createContact = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let contactData: Record<string, any> = {
+    let contactData: Record<string, unknown> = {
       name: ctx.input.name
     };
 
     if (ctx.input.emails) contactData.email = ctx.input.emails;
     if (ctx.input.phones) contactData.phone = ctx.input.phones;
     if (ctx.input.address) contactData.address = ctx.input.address;
-    if (ctx.input.accountId)
+    if (ctx.input.accountId !== undefined)
       contactData.accounts = [{ entityType: 'Accounts', id: ctx.input.accountId }];
-    if (ctx.input.title) contactData.title = ctx.input.title;
-    if (ctx.input.description) contactData.description = ctx.input.description;
+    if (ctx.input.title !== undefined) contactData.title = ctx.input.title;
+    if (ctx.input.description !== undefined) contactData.description = ctx.input.description;
     if (ctx.input.customFields) contactData.customFields = ctx.input.customFields;
 
     let result = await client.newContact(contactData);

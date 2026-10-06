@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateGroup = SlateTool.create(spec, {
@@ -17,7 +17,7 @@ export let updateGroup = SlateTool.create(spec, {
         .optional()
         .describe('Default access level for all apps'),
       universalResourceAccess: z
-        .enum(['none', 'user', 'admin'])
+        .enum(['none', 'user', 'admin', 'use', 'edit', 'own'])
         .optional()
         .describe('Default access level for all resources'),
       universalWorkflowAccess: z
@@ -53,12 +53,13 @@ export let updateGroup = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      groupId: z.number(),
+      groupId: z.number().nullable(),
+      legacyGroupId: z.number().nullable().optional(),
       groupName: z.string()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.updateGroup(ctx.input.groupId, {
       name: ctx.input.groupName,
@@ -79,6 +80,7 @@ export let updateGroup = SlateTool.create(spec, {
     return {
       output: {
         groupId: g.id,
+        legacyGroupId: g.legacy_id,
         groupName: g.name
       },
       message: `Updated group **${g.name}** (ID: \`${g.id}\`).`

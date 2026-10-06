@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SerpApiClient } from '../lib/client';
+import { receiptMessage, receiptOutput, SerpApiClient } from '../lib/client';
+import { searchMetadataSchema } from '../lib/contracts';
+import { searchParams } from '../lib/params';
 import { spec } from '../spec';
 
 let jobResultSchema = z.object({
@@ -45,17 +47,48 @@ export let jobsSearchTool = SlateTool.create(spec, {
       chips: z
         .string()
         .optional()
-        .describe('Filter chips for refining results (e.g., date posted, job type)'),
+        .describe('Legacy chips field is deprecated by Google; use filterToken instead.'),
       startIndex: z
         .number()
         .optional()
-        .describe('Start index for pagination (increments of 10)'),
+        .describe('Legacy start index is discontinued by Google; use nextPageToken instead.'),
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Exact Google Jobs next_page_token from the preceding response.'),
+      filterToken: z
+        .string()
+        .optional()
+        .describe('Exact native uds token from Google Jobs filters.'),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Submit asynchronously and return the native search ID/status. Not compatible with noCache or Ludicrous Speed accounts.'
+        ),
       noCache: z.boolean().optional().describe('Force fresh results')
     })
   )
   .output(
     z.object({
+      isComplete: z
+        .boolean()
+        .describe(
+          'Whether native search status is Success; queued/processing receipts are incomplete.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Native pagination metadata; follow native offsets/tokens without inferring a total.'
+        ),
+      searchMetadata: searchMetadataSchema.optional(),
       jobs: z.array(jobResultSchema).describe('Job listing results'),
+      filters: z
+        .array(z.unknown())
+        .optional()
+        .describe('Native filters including uds tokens for filterToken.'),
+      nextPageToken: z.string().optional(),
       chipsFilters: z
         .array(
           z.object({
@@ -76,19 +109,9 @@ export let jobsSearchTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SerpApiClient({ apiKey: ctx.auth.token });
+    let client = new SerpApiClient({ apiKey: ctx.auth.token, accountId: ctx.auth.accountId });
 
-    let params: Record<string, any> = {
-      engine: 'google_jobs',
-      q: ctx.input.query
-    };
-
-    if (ctx.input.location) params.location = ctx.input.location;
-    if (ctx.input.language) params.hl = ctx.input.language;
-    if (ctx.input.country) params.gl = ctx.input.country;
-    if (ctx.input.chips) params.chips = ctx.input.chips;
-    if (ctx.input.startIndex !== undefined) params.start = ctx.input.startIndex;
-    if (ctx.input.noCache) params.no_cache = ctx.input.noCache;
+    let params = searchParams('jobs_search', ctx.input);
 
     let data = await client.search(params);
 
@@ -121,10 +144,16 @@ export let jobsSearchTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...receiptOutput(data),
         jobs,
+        filters: data.filters,
+        nextPageToken: data.serpapi_pagination?.next_page_token,
         chipsFilters: chipsFilters.length > 0 ? chipsFilters : undefined
       },
-      message: `Jobs search for "${ctx.input.query}"${ctx.input.location ? ` in ${ctx.input.location}` : ''} returned **${jobs.length}** job listings.`
+      message: receiptMessage(
+        data,
+        `Jobs search for "${ctx.input.query}"${ctx.input.location ? ` in ${ctx.input.location}` : ''} returned **${jobs.length}** job listings.`
+      )
     };
   })
   .build();

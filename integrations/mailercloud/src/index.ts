@@ -12,8 +12,6 @@ import {
   searchLists,
   updateContact
 } from './tools';
-import { emailEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     getAccountPlan,
     manageWebhook
   ],
-  triggers: [emailEvent]
+  triggers: []
 });

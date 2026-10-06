@@ -9,7 +9,6 @@
     "read temperature and humidity",
     "read wind speed and direction",
     "read barometric pressure",
-    "read rain and UV levels",
-    "subscribe to device updates"
+    "read rain and UV levels"
   ]
 }

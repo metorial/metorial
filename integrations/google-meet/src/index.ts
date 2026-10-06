@@ -24,14 +24,6 @@ import {
   removeMemberTool,
   updateSpaceTool
 } from './tools';
-import {
-  conferenceEventsTrigger,
-  inboundWebhook,
-  participantEventsTrigger,
-  recordingEventsTrigger,
-  transcriptEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,11 +50,5 @@ export let provider = Slate.create({
     getTranscriptEntryTool,
     listTranscriptEntriesTool
   ],
-  triggers: [
-    inboundWebhook,
-    conferenceEventsTrigger,
-    participantEventsTrigger,
-    recordingEventsTrigger,
-    transcriptEventsTrigger
-  ]
+  triggers: []
 });

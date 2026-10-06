@@ -16,7 +16,10 @@ let logLineSchema = z.object({
     .record(z.string(), z.any())
     .optional()
     .describe('Custom metadata key-value pairs associated with this log line'),
-  file: z.string().optional().describe('File name or path associated with the log line')
+  file: z
+    .string()
+    .optional()
+    .describe('Legacy undocumented option; put the file path in meta.file instead')
 });
 
 export let ingestLogs = SlateTool.create(spec, {
@@ -25,11 +28,12 @@ export let ingestLogs = SlateTool.create(spec, {
   description: `Send log lines to LogDNA for ingestion. Supports sending one or more log lines in a single request, each with optional metadata, app name, log level, and environment. Requires a hostname to identify the source. The ingestion key must be configured in authentication settings.`,
   instructions: [
     'Use consistent value types in the meta field across log lines to ensure proper metadata parsing.',
-    'Request body is limited to 10 MB per request.'
+    'Request body is limited to 10 MB per request.',
+    'Acceptance precedes indexing. A partial-success error means some lines may already be stored; avoid blindly resending the whole batch.'
   ],
   constraints: [
     'Maximum 10 MB per request.',
-    'Requires an ingestion key (configured as ingestionToken in auth).'
+    'Requires a separately configured ingestion key; management credentials do not replace it.'
   ],
   tags: {
     destructive: false,
@@ -53,6 +57,8 @@ export let ingestLogs = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint,
       ingestionKey: ctx.auth.ingestionToken
     });
 
@@ -76,9 +82,9 @@ export let ingestLogs = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result?.status || 'ok'
+        status: result.status
       },
-      message: `Successfully ingested **${ctx.input.lines.length}** log line(s) from hostname **${ctx.input.hostname}**.`
+      message: `Accepted **${ctx.input.lines.length}** log line(s) from hostname **${ctx.input.hostname}**.`
     };
   })
   .build();

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCurrentUser = SlateTool.create(spec, {
@@ -25,22 +25,19 @@ export let getCurrentUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
     let user = await client.getCurrentUser();
 
     return {
       output: {
-        userId: user.id ?? '',
+        userId: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
         isAnonymous: user.isAnonymous
       },
-      message: `Current user: **${user.name ?? user.email ?? 'Unknown'}** (ID: ${user.id ?? 'unknown'}).`
+      message: `Current user: **${user.name ?? user.email}** (ID: ${user.id}).`
     };
   })
   .build();

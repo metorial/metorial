@@ -5,8 +5,9 @@ export let config = SlateConfig.create(
   z.object({
     customerId: z
       .string()
+      .optional()
       .describe(
-        'Your Sprout Social customer ID. Retrieve this via the /v1/metadata/client endpoint or from your Sprout Social account settings.'
+        'Legacy default customer ID. Prefer list_customers and pass customerId to each operation.'
       )
   })
 );

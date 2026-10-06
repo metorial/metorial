@@ -1,4 +1,13 @@
 import { z } from 'zod';
+import {
+  nativeChannel,
+  nativeFolder,
+  nativeShowcase,
+  nativeUser,
+  nativeVideo,
+  parse,
+  uriId
+} from './native';
 
 export let videoSchema = z.object({
   videoId: z.string().describe('Vimeo video ID'),
@@ -86,79 +95,100 @@ export let paginationInputSchema = z.object({
 export let paginationOutputSchema = z.object({
   total: z.number().describe('Total number of results'),
   page: z.number().describe('Current page number'),
-  perPage: z.number().describe('Number of results per page')
+  perPage: z.number().describe('Number of results per page'),
+  paging: z
+    .object({
+      next: z.string().nullish(),
+      previous: z.string().nullish(),
+      first: z.string().nullish(),
+      last: z.string().nullish()
+    })
+    .optional()
+    .describe('Native page navigation; absent links do not imply invented end markers')
 });
 
-// ─── Mapping helpers ──────────────────────────────────────
-
-export let mapVideo = (v: any) => ({
-  videoId: v.uri?.replace('/videos/', '') ?? '',
-  uri: v.uri ?? '',
-  name: v.name ?? '',
-  description: v.description ?? null,
-  link: v.link ?? '',
-  duration: v.duration ?? 0,
-  width: v.width ?? null,
-  height: v.height ?? null,
-  createdTime: v.created_time ?? '',
-  modifiedTime: v.modified_time ?? '',
-  status: v.status ?? v.transcode?.status ?? 'unknown',
-  privacy: v.privacy
-    ? {
-        view: v.privacy.view,
-        embed: v.privacy.embed,
-        download: v.privacy.download,
-        comments: v.privacy.comments
-      }
-    : undefined,
-  tags: v.tags?.map((t: any) => t.canonical ?? t.name ?? t.tag) ?? [],
-  embedHtml: v.embed?.html ?? null,
-  pictures: v.pictures?.sizes?.[v.pictures.sizes.length - 1]?.link ?? null,
-  stats: v.stats ? { plays: v.stats.plays ?? null } : undefined
-});
-
-export let mapUser = (u: any) => ({
-  userId: u.uri?.replace('/users/', '') ?? '',
-  uri: u.uri ?? '',
-  name: u.name ?? '',
-  bio: u.bio ?? null,
-  link: u.link ?? '',
-  location: u.location ?? null,
-  email: u.email ?? null,
-  pictureUrl: u.pictures?.sizes?.[u.pictures.sizes.length - 1]?.link ?? null,
-  accountType: u.account ?? undefined,
-  createdTime: u.created_time ?? undefined
-});
-
-export let mapShowcase = (s: any) => ({
-  showcaseId: s.uri?.replace(/.*\/albums\//, '') ?? '',
-  uri: s.uri ?? '',
-  name: s.name ?? '',
-  description: s.description ?? null,
-  link: s.link ?? '',
-  privacy: s.privacy?.view ?? undefined,
-  createdTime: s.created_time ?? undefined,
-  modifiedTime: s.modified_time ?? undefined,
-  videoCount: s.metadata?.connections?.videos?.total ?? undefined
-});
-
-export let mapFolder = (f: any) => ({
-  folderId: f.uri?.replace(/.*\/folders\//, '') ?? '',
-  uri: f.uri ?? '',
-  name: f.name ?? '',
-  createdTime: f.created_time ?? undefined,
-  modifiedTime: f.modified_time ?? undefined,
-  videoCount: f.metadata?.connections?.videos?.total ?? undefined
-});
-
-export let mapChannel = (c: any) => ({
-  channelId: c.uri?.replace('/channels/', '') ?? '',
-  uri: c.uri ?? '',
-  name: c.name ?? '',
-  description: c.description ?? null,
-  link: c.link ?? '',
-  privacy: c.privacy?.view ?? undefined,
-  createdTime: c.created_time ?? undefined,
-  modifiedTime: c.modified_time ?? undefined,
-  videoCount: c.metadata?.connections?.videos?.total ?? undefined
-});
+// Native validators prevent malformed receipts from becoming invented IDs, timestamps or totals.
+export const mapVideo = (value: unknown) => {
+  const v = parse(nativeVideo, value);
+  return {
+    videoId: uriId(v.uri, 'videos'),
+    uri: v.uri,
+    name: v.name,
+    description: v.description,
+    link: v.link,
+    duration: v.duration,
+    width: v.width,
+    height: v.height,
+    createdTime: v.created_time,
+    modifiedTime: v.modified_time,
+    status: v.status,
+    privacy: v.privacy
+      ? {
+          view: v.privacy.view,
+          embed: v.privacy.embed,
+          download: v.privacy.download,
+          comments: v.privacy.comments
+        }
+      : undefined,
+    tags: v.tags
+      ?.map(t => t.name ?? t.tag ?? t.canonical)
+      .filter((v): v is string => v !== undefined),
+    embedHtml: v.embed?.html,
+    pictures: v.pictures?.sizes.at(-1)?.link,
+    stats: v.stats ? { plays: v.stats.plays } : undefined
+  };
+};
+export const mapUser = (value: unknown) => {
+  const u = parse(nativeUser, value);
+  return {
+    userId: uriId(u.uri, 'users'),
+    uri: u.uri,
+    name: u.name,
+    bio: u.bio,
+    link: u.link,
+    location: u.location,
+    email: u.email,
+    pictureUrl: u.pictures?.sizes.at(-1)?.link,
+    accountType: u.account,
+    createdTime: u.created_time
+  };
+};
+export const mapShowcase = (value: unknown) => {
+  const s = parse(nativeShowcase, value);
+  return {
+    showcaseId: uriId(s.uri, 'albums'),
+    uri: s.uri,
+    name: s.name,
+    description: s.description,
+    link: s.link,
+    privacy: s.privacy?.view,
+    createdTime: s.created_time,
+    modifiedTime: s.modified_time,
+    videoCount: s.metadata?.connections?.videos?.total
+  };
+};
+export const mapFolder = (value: unknown) => {
+  const f = parse(nativeFolder, value);
+  return {
+    folderId: uriId(f.uri, 'projects'),
+    uri: f.uri,
+    name: f.name,
+    createdTime: f.created_time,
+    modifiedTime: f.modified_time,
+    videoCount: f.metadata?.connections?.videos?.total
+  };
+};
+export const mapChannel = (value: unknown) => {
+  const c = parse(nativeChannel, value);
+  return {
+    channelId: uriId(c.uri, 'channels'),
+    uri: c.uri,
+    name: c.name,
+    description: c.description,
+    link: c.link,
+    privacy: c.privacy?.view,
+    createdTime: c.created_time,
+    modifiedTime: c.modified_time,
+    videoCount: c.metadata?.connections?.videos?.total
+  };
+};

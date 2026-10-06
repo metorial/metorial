@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { nativeId, optionalText, reject, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let managePermission = SlateTool.create(spec, {
@@ -68,10 +69,7 @@ export let managePermission = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let { action } = ctx.input;
 
@@ -86,14 +84,17 @@ export let managePermission = SlateTool.create(spec, {
       });
 
       let permissions = result.permissions.map((p: Record<string, unknown>) => ({
-        permissionId: Number(p.id),
-        path: String(p.path ?? ''),
-        permission: String(p.permission ?? ''),
+        permissionId: nativeId(p.id),
+        path:
+          typeof p.path === 'string'
+            ? p.path
+            : reject('Files.com returned an invalid permission path.'),
+        permission: text(p.permission),
         recursive: typeof p.recursive === 'boolean' ? p.recursive : undefined,
         userId: typeof p.user_id === 'number' ? p.user_id : undefined,
-        username: p.username ? String(p.username) : undefined,
+        username: optionalText(p.username),
         groupId: typeof p.group_id === 'number' ? p.group_id : undefined,
-        groupName: p.group_name ? String(p.group_name) : undefined
+        groupName: optionalText(p.group_name)
       }));
 
       return {
@@ -103,7 +104,7 @@ export let managePermission = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.permissionId) throw new Error('permissionId is required for delete');
+      if (!ctx.input.permissionId) reject('permissionId is required for delete');
       await client.deletePermission(ctx.input.permissionId);
       return {
         output: { deleted: true },
@@ -112,8 +113,8 @@ export let managePermission = SlateTool.create(spec, {
     }
 
     // create
-    if (!ctx.input.path) throw new Error('path is required for create');
-    if (!ctx.input.permission) throw new Error('permission is required for create');
+    if (ctx.input.path === undefined) reject('path is required for create');
+    if (!ctx.input.permission) reject('permission is required for create');
 
     let data: Record<string, unknown> = {
       path: ctx.input.path,
@@ -128,9 +129,12 @@ export let managePermission = SlateTool.create(spec, {
     return {
       output: {
         created: {
-          permissionId: Number(result.id),
-          path: String(result.path ?? ctx.input.path),
-          permission: String(result.permission ?? ctx.input.permission)
+          permissionId: nativeId(result.id),
+          path:
+            typeof result.path === 'string'
+              ? result.path
+              : reject('Files.com returned an invalid permission path.'),
+          permission: text(result.permission)
         }
       },
       message: `Created **${ctx.input.permission}** permission on \`${ctx.input.path}\``

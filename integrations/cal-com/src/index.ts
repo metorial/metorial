@@ -18,8 +18,6 @@ import {
   manageSlotReservation,
   updateEventType
 } from './tools';
-import { bookingEvents, formEvents, meetingEvents, noShowEvents, oooEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     listCalendars,
     getBusyTimes
   ],
-  triggers: [bookingEvents, meetingEvents, noShowEvents, formEvents, oooEvents]
+  triggers: []
 });

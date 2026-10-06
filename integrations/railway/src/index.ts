@@ -48,8 +48,6 @@ import {
   updateServiceTool,
   updateVolumeTool
 } from './tools';
-import { projectWebhookTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -100,5 +98,5 @@ export let provider = Slate.create({
     createTcpProxyTool,
     deleteTcpProxyTool
   ],
-  triggers: [projectWebhookTrigger]
+  triggers: []
 });

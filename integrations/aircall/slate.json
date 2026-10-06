@@ -1,6 +1,6 @@
 {
   "name": "@metorial/aircall",
-  "description": "Manage cloud-based business phone system including calls, SMS/MMS messaging, contacts, users, teams, and phone numbers. Retrieve call recordings, notes, and metadata. Transfer calls to users, teams, or external numbers. Create and manage contacts with phone numbers and emails. Send SMS/MMS messages from Aircall numbers. Display contextual insight cards during live calls. Manage tags on calls, configure webhooks for real-time call, message, contact, and user events. Automate outbound dialing with Power Dialer. Monitor user availability and initiate outbound calls on behalf of agents.",
+  "description": "Manage calls, shared contacts, users and teams; discover numbers, tags and company context; send text messages and download existing call audio. Native acceptance and queued lifecycle outcomes remain explicit.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "manage calls and recordings",
@@ -11,8 +11,8 @@
     "manage teams and numbers",
     "tag and comment on calls",
     "display insight cards",
-    "configure webhooks",
-    "automate outbound dialing"
+    "discover company context",
+    "download existing call audio"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/aircall.png"
 }

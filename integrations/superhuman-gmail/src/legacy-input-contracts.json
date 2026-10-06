@@ -1,0 +1,223 @@
+{
+  "get_conversation_context": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "threadId": {
+        "type": "string",
+        "description": "Gmail thread ID."
+      },
+      "replyToMessageId": {
+        "description": "Message ID to build reply headers for; defaults to the latest message in the thread.",
+        "type": "string"
+      },
+      "format": {
+        "default": "full",
+        "description": "Gmail API format for each message (`full` includes body parts).",
+        "type": "string",
+        "enum": ["full", "metadata", "minimal"]
+      }
+    },
+    "required": ["threadId", "format"],
+    "additionalProperties": false
+  },
+  "search_conversations": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "query": {
+        "description": "Gmail search query (same syntax as gmail.com search).",
+        "type": "string"
+      },
+      "labelIds": {
+        "description": "Restrict to threads that have all of these label IDs (system or custom).",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "maxResults": {
+        "default": 20,
+        "description": "Maximum threads to return (max 500 per Gmail API page).",
+        "type": "number"
+      },
+      "pageToken": {
+        "description": "Pagination token from a prior call.",
+        "type": "string"
+      },
+      "includeSpamTrash": {
+        "default": false,
+        "description": "Include threads in SPAM or TRASH.",
+        "type": "boolean"
+      }
+    },
+    "required": ["maxResults", "includeSpamTrash"],
+    "additionalProperties": false
+  },
+  "manage_reply_draft": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["create", "update", "send", "get", "list", "delete"],
+        "description": "Draft operation."
+      },
+      "draftId": {
+        "description": "Draft ID (update, send, get, delete).",
+        "type": "string"
+      },
+      "threadId": {
+        "description": "Thread ID (create, update). Required for create.",
+        "type": "string"
+      },
+      "replyToMessageId": {
+        "description": "Message being replied to; defaults to latest in thread when resolving headers.",
+        "type": "string"
+      },
+      "inReplyTo": {
+        "description": "Override In-Reply-To header (Message-ID of parent).",
+        "type": "string"
+      },
+      "references": {
+        "description": "Override References header chain.",
+        "type": "string"
+      },
+      "to": {
+        "description": "Recipients; defaults from Reply-To/From of target message.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "cc": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "bcc": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "subject": {
+        "description": "Subject line; defaults to Re: … from target message.",
+        "type": "string"
+      },
+      "body": {
+        "description": "Plain text or HTML body (create/update).",
+        "type": "string"
+      },
+      "isHtml": {
+        "default": false,
+        "type": "boolean"
+      },
+      "query": {
+        "description": "Filter when listing drafts.",
+        "type": "string"
+      },
+      "maxResults": {
+        "default": 20,
+        "type": "number"
+      },
+      "pageToken": {
+        "type": "string"
+      }
+    },
+    "required": ["action", "isHtml", "maxResults"],
+    "additionalProperties": false
+  },
+  "triage_conversation": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "threadId": {
+        "type": "string",
+        "description": "Thread to triage."
+      },
+      "action": {
+        "type": "string",
+        "enum": [
+          "archive",
+          "unarchive",
+          "mark_read",
+          "mark_unread",
+          "star",
+          "unstar",
+          "apply_labels",
+          "remove_labels",
+          "trash",
+          "restore",
+          "delete"
+        ],
+        "description": "Triage operation to perform on the whole thread."
+      },
+      "labelIds": {
+        "description": "Label IDs for apply_labels / remove_labels.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": ["threadId", "action"],
+    "additionalProperties": false
+  },
+  "send_reply": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "threadId": {
+        "type": "string",
+        "description": "Thread to reply in."
+      },
+      "replyToMessageId": {
+        "description": "Parent message ID; defaults to the latest message in the thread.",
+        "type": "string"
+      },
+      "body": {
+        "type": "string",
+        "description": "Reply body (plain text or HTML)."
+      },
+      "isHtml": {
+        "default": false,
+        "type": "boolean"
+      },
+      "to": {
+        "description": "Recipients; defaults from Reply-To/From of the parent message.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "cc": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "bcc": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "subject": {
+        "description": "Subject; defaults to Re: … from the parent.",
+        "type": "string"
+      },
+      "inReplyTo": {
+        "description": "Override In-Reply-To (Message-ID).",
+        "type": "string"
+      },
+      "references": {
+        "description": "Override References header.",
+        "type": "string"
+      }
+    },
+    "required": ["threadId", "body", "isHtml"],
+    "additionalProperties": false
+  }
+}

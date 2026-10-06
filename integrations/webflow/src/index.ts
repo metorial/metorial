@@ -30,15 +30,6 @@ import {
   updateOrder,
   updatePageSettings
 } from './tools';
-import {
-  collectionItemEventsTrigger,
-  ecommerceEventsTrigger,
-  formSubmissionTrigger,
-  pageEventsTrigger,
-  sitePublishTrigger,
-  userAccountEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -71,12 +62,5 @@ export let provider = Slate.create({
     listAssets,
     manageWebhook
   ],
-  triggers: [
-    formSubmissionTrigger,
-    sitePublishTrigger,
-    pageEventsTrigger,
-    ecommerceEventsTrigger,
-    userAccountEventsTrigger,
-    collectionItemEventsTrigger
-  ]
+  triggers: []
 });

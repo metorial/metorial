@@ -44,20 +44,6 @@ import {
   updateUserGroup
 } from './tools';
 
-import {
-  approvalEvents,
-  clientEvents,
-  expenseEvents,
-  invoiceEvents,
-  projectEvents,
-  schedulingEvents,
-  tagEvents,
-  taskEvents,
-  timeEntryEvents,
-  timeOffEvents,
-  userEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -102,17 +88,5 @@ export let provider = Slate.create({
     getTimeOffPolicies,
     getWorkspace
   ],
-  triggers: [
-    timeEntryEvents,
-    projectEvents,
-    taskEvents,
-    clientEvents,
-    tagEvents,
-    userEvents,
-    invoiceEvents,
-    approvalEvents,
-    timeOffEvents,
-    expenseEvents,
-    schedulingEvents
-  ]
+  triggers: []
 });

@@ -1,18 +1,16 @@
 {
   "name": "@metorial/surveymonkey",
-  "description": "Create, distribute, and analyze online surveys. Manage surveys with multiple question types, pages, and languages. Distribute surveys via email, SMS, weblink, and popup collectors. Retrieve and filter survey responses with full answer details. Manage contact lists and send invite messages to recipients. Share survey results publicly or with specific users. Organize team collaboration through workgroups and groups. Set up webhooks for real-time response event notifications.",
+  "description": "Manage surveys, collectors, contacts and invitation messages; read response details and generate bounded downloadable JSON or CSV files.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
   "skills": [
     "create and manage surveys",
     "distribute surveys via collectors",
-    "retrieve survey responses",
+    "retrieve response details",
     "manage contacts and contact lists",
-    "send email and SMS invitations",
-    "share survey results",
-    "manage team workgroups",
-    "configure response webhooks",
-    "access survey template library",
-    "filter and analyze responses"
+    "prepare and explicitly resume survey invitations",
+    "discover survey reference data",
+    "export response data as JSON or CSV",
+    "download existing uploaded response files"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/surveymonkey.png"
 }

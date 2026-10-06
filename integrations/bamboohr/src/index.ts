@@ -11,6 +11,7 @@ import {
   createTimeOffRequest,
   deleteFile,
   deleteTableRow,
+  downloadFile,
   generateCustomReport,
   getAccountFields,
   getAccountMetadata,
@@ -18,6 +19,7 @@ import {
   getApplications,
   getBenefitsOverview,
   getCompanyReport,
+  getCurrentUser,
   getEmployee,
   getEmployeeDirectory,
   getEmployeeTrainingRecords,
@@ -31,6 +33,7 @@ import {
   getTrainingTypes,
   getWhosOut,
   listFiles,
+  listResources,
   updateApplicationStatus,
   updateEmployee,
   updateGoal,
@@ -38,8 +41,6 @@ import {
   uploadFile,
   upsertTableRow
 } from './tools';
-import { employeeChanged } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -78,7 +79,10 @@ export let provider = Slate.create({
     updateApplicationStatus,
     addApplicationComment,
     getAccountFields,
-    getAccountMetadata
+    getAccountMetadata,
+    getCurrentUser,
+    listResources,
+    downloadFile
   ],
-  triggers: [employeeChanged]
+  triggers: []
 });

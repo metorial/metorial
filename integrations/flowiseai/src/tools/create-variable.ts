@@ -16,7 +16,12 @@ export let createVariable = SlateTool.create(spec, {
     z.object({
       name: z.string().describe('Name for the variable'),
       value: z.string().optional().describe('Value for the variable'),
-      type: z.string().optional().describe('Type of variable (e.g. string, number, secret)')
+      type: z
+        .string()
+        .optional()
+        .describe(
+          'Variable mode: static stores the supplied value; runtime is supplied at prediction time'
+        )
     })
   )
   .output(

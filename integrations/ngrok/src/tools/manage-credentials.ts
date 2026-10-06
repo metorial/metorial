@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import type { Credential } from '../lib/models';
 import { spec } from '../spec';
 
 let credentialOutputSchema = z.object({
@@ -15,16 +16,16 @@ let credentialOutputSchema = z.object({
     .nullable()
     .describe('Authtoken value (only at creation)'),
   acl: z.array(z.string()).describe('ACL rules restricting what the token can bind'),
-  ownerId: z.string().describe('Owner user or bot user ID')
+  ownerId: z.string().describe('Owner user or service user ID')
 });
 
-let mapCredential = (c: any) => ({
+let mapCredential = (c: Credential, includeToken = false) => ({
   credentialId: c.id,
   uri: c.uri || '',
   createdAt: c.created_at || '',
   description: c.description || '',
   metadata: c.metadata || '',
-  authtokenValue: c.token || null,
+  authtokenValue: includeToken ? (c.token ?? null) : null,
   acl: c.acl || [],
   ownerId: c.owner_id || ''
 });
@@ -37,8 +38,17 @@ export let listCredentials = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -50,10 +60,11 @@ export let listCredentials = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listCredentials({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
-    let credentials = (result.credentials || []).map(mapCredential);
+    let credentials = (result.credentials || []).map(value => mapCredential(value));
     return {
       output: { credentials, nextPageUri: result.next_page_uri || null },
       message: `Found **${credentials.length}** credential(s).`
@@ -101,7 +112,7 @@ export let createCredential = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('ACL bind rules (e.g., ["bind:example.ngrok.io"])'),
-      ownerId: z.string().optional().describe('Owner user or bot user ID')
+      ownerId: z.string().optional().describe('Owner user or service user ID')
     })
   )
   .output(credentialOutputSchema)
@@ -114,7 +125,7 @@ export let createCredential = SlateTool.create(spec, {
       ownerId: ctx.input.ownerId
     });
     return {
-      output: mapCredential(c),
+      output: mapCredential(c, true),
       message: `Created credential **${c.id}**. ⚠️ Save the authtoken now — it won't be shown again.`
     };
   })
@@ -124,7 +135,7 @@ export let updateCredential = SlateTool.create(spec, {
   name: 'Update Tunnel Credential',
   key: 'update_credential',
   description: `Update a tunnel credential's description, metadata, or ACL rules.`,
-  tags: { destructive: false }
+  tags: { destructive: true }
 })
   .input(
     z.object({

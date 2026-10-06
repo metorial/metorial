@@ -34,8 +34,6 @@ import {
   lookupPrediction,
   updateCohort
 } from './tools';
-import { resourceEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -72,5 +70,5 @@ export let provider = Slate.create({
     getAccount,
     getDependencyGraph
   ],
-  triggers: [resourceEvent]
+  triggers: []
 });

@@ -16,8 +16,6 @@ import {
   updateProfile,
   uploadOfflineConversions
 } from './tools';
-import { campaignStatusChange, inboundWebhook, newAttachment, newLink } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     getProfile,
     updateProfile
   ],
-  triggers: [inboundWebhook, campaignStatusChange, newLink, newAttachment]
+  triggers: []
 });

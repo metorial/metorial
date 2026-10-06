@@ -22,8 +22,6 @@ import {
   transferAssetTool,
   updateTemplateTool
 } from './tools';
-import { shotstackEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     generateAssetTool,
     getGeneratedAssetTool
   ],
-  triggers: [shotstackEventsTrigger]
+  triggers: []
 });

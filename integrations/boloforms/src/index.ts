@@ -6,14 +6,8 @@ import {
   listDocuments,
   sendTemplate
 } from './tools';
-import {
-  documentSignatureTrigger,
-  formResponseTrigger,
-  templateResponseTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [listDocuments, sendTemplate, getTemplateRespondents, getFormResponses],
-  triggers: [documentSignatureTrigger, templateResponseTrigger, formResponseTrigger]
+  triggers: []
 });

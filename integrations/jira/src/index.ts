@@ -34,16 +34,6 @@ import {
   updateVersionTool,
   updateWorklogTool
 } from './tools';
-import {
-  boardEventsTrigger,
-  commentEventsTrigger,
-  issueEventsTrigger,
-  projectEventsTrigger,
-  sprintEventsTrigger,
-  versionEventsTrigger,
-  worklogEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -80,13 +70,5 @@ export let provider = Slate.create({
     searchUsersTool,
     getTransitionsTool
   ],
-  triggers: [
-    issueEventsTrigger,
-    commentEventsTrigger,
-    sprintEventsTrigger,
-    projectEventsTrigger,
-    versionEventsTrigger,
-    worklogEventsTrigger,
-    boardEventsTrigger
-  ]
+  triggers: []
 });

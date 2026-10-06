@@ -15,8 +15,6 @@ import {
   searchLeaguesTool,
   searchTeamsTool
 } from './tools';
-import { fixtureResultsTrigger, fixtureStatusChangeTrigger, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     getCoachesTool,
     getCountriesTool
   ],
-  triggers: [inboundWebhook, fixtureStatusChangeTrigger, fixtureResultsTrigger]
+  triggers: []
 });

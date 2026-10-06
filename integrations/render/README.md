@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/render-logo.svg" height="20"> Render
 
-Deploy and manage cloud infrastructure including web services, APIs, background workers, static sites, and cron jobs. Trigger, cancel, and roll back deployments. Create and manage Postgres databases and Redis-compatible key value stores. Configure autoscaling rules, persistent disks, custom domains, and environment variables. Monitor services with logs and metrics (CPU, memory, HTTP requests, bandwidth). Manage projects, environments, blueprints (infrastructure as code), environment groups, registry credentials, and workspace members. Run one-off jobs and workflows. Receive webhook notifications for deployment lifecycle, service availability, scaling, database, and infrastructure events.
+Deploy and manage cloud infrastructure including web services, APIs, background workers, static sites, and cron jobs. Trigger, cancel, and roll back deployments. Create and manage Postgres databases and Redis-compatible key value stores. Configure autoscaling rules, persistent disks, custom domains, and environment variables. Monitor services with logs and metrics (CPU, memory, HTTP requests, bandwidth). Manage projects, environments, blueprints (infrastructure as code), environment groups, registry credentials, and workspace members. Run one-off jobs and workflows.
 
 ## Tools
 

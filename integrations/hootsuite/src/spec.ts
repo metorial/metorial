@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'hootsuite',
   name: 'Hootsuite',
   description:
-    'Social media management platform for scheduling, publishing, analytics, and team collaboration across social networks.',
+    'Manage Hootsuite posts, connected social accounts, media, organizations, teams and members.',
   metadata: {},
   config,
   auth

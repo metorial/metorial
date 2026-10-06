@@ -1,20 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTransfer } from '../lib/schemas';
+import { fail, integerAmount, keyedMutation, required } from '../lib/validation';
 import { spec } from '../spec';
 
 export let createTransfer = SlateTool.create(spec, {
   name: 'Create Transfer',
   key: 'create_transfer',
-  description: `Initiate a payment transfer from a Brex cash account. Supports ACH, wire, check, and book transfers.
+  description: `Initiate a vendor payment transfer from a Brex cash account. Supports vendor ACH, wire and check payment instruments.
 Use this to pay vendors, send wire transfers, or mail checks programmatically from your Brex business accounts.`,
   instructions: [
-    'Provide the counterparty as either a vendor payment instrument ID or inline routing details.',
-    'The originating account defaults to the primary Brex cash account if not specified.',
+    'VENDOR uses an independently verified vendor payment instrument ID. The legacy BREX_CASH value is unsupported as a counterparty and is rejected.',
+    'externalMemo is required. Omit originatingAccountId to read the provider primary cash account. Omitted idempotencyKey generates one invocation key retained in receipt/error metadata; reuse it after ambiguous failures. No automatic retry is performed.',
     'Amounts are in cents — e.g., 100000 = $1,000.00.'
   ],
   constraints: [
-    'Only outgoing payments are supported. Receiving payments (ACH debits) is not available via API.'
+    'This tool initiates outgoing vendor transfers. Creation does not prove settlement and financial history cannot be deleted.'
   ],
   tags: {
     destructive: true
@@ -53,7 +55,7 @@ Use this to pay vendors, send wire transfers, or mail checks programmatically fr
   .output(
     z.object({
       transferId: z.string().describe('ID of the created transfer'),
-      status: z.string().optional().describe('Current transfer status'),
+      status: z.string().nullish().describe('Current transfer status'),
       amount: z
         .object({
           amount: z.number().describe('Amount in cents'),
@@ -61,51 +63,51 @@ Use this to pay vendors, send wire transfers, or mail checks programmatically fr
         })
         .optional()
         .describe('Transfer amount'),
-      description: z.string().nullable().optional().describe('Transfer description')
+      description: z.string().nullable().optional().describe('Transfer description'),
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe('The exact key to reuse after an ambiguous outcome.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let transferData: Record<string, any> = {
-      amount: {
-        amount: ctx.input.amount.amount,
-        currency: ctx.input.amount.currency ?? 'USD'
-      },
+    if (ctx.input.counterpartyType !== 'VENDOR')
+      fail(
+        'BREX_CASH is an originating-account type, not a documented counterparty type. This tool supports VENDOR payment instruments only.'
+      );
+    const amount = integerAmount(ctx.input.amount, true);
+    if (amount.currency !== 'USD') fail('Brex transfer creation currently supports USD only.');
+    const externalMemo = required(ctx.input.externalMemo, 'externalMemo');
+    if (externalMemo.length > 90)
+      fail(
+        'externalMemo must be at most 90 characters; cheque instruments require at most 40.'
+      );
+    const client = new Client({ token: ctx.auth.token });
+    const originatingId =
+      ctx.input.originatingAccountId === undefined
+        ? (await client.getPrimaryCashAccount()).id
+        : required(ctx.input.originatingAccountId, 'originatingAccountId');
+    const data = {
+      amount,
       counterparty: {
-        type: ctx.input.counterpartyType,
-        payment_instrument_id: ctx.input.paymentInstrumentId
+        type: 'VENDOR',
+        payment_instrument_id: required(ctx.input.paymentInstrumentId, 'paymentInstrumentId')
       },
-      description: ctx.input.description,
-      external_memo: ctx.input.externalMemo
+      description: required(ctx.input.description, 'description'),
+      external_memo: externalMemo,
+      originating_account: { type: 'BREX_CASH', id: originatingId },
+      approval_type: ctx.input.approvalType
     };
-
-    if (ctx.input.originatingAccountId) {
-      transferData.originating_account = {
-        type: 'BREX_CASH',
-        id: ctx.input.originatingAccountId
-      };
-    }
-
-    if (ctx.input.approvalType) {
-      transferData.approval_type = ctx.input.approvalType;
-    }
-
-    let key = ctx.input.idempotencyKey ?? crypto.randomUUID();
-    let transfer = await client.createTransfer(transferData, key);
-
-    let amountFormatted = (ctx.input.amount.amount / 100).toFixed(2);
-
+    const receipt = await keyedMutation(
+      ctx.input.idempotencyKey,
+      [ctx.auth.token, ctx.auth.refreshToken],
+      key => client.createTransfer(data, key)
+    );
+    const result = receipt.value;
     return {
-      output: {
-        transferId: transfer.id,
-        status: transfer.status,
-        amount: transfer.amount
-          ? { amount: transfer.amount.amount, currency: transfer.amount.currency }
-          : undefined,
-        description: transfer.description
-      },
-      message: `Transfer of **$${amountFormatted}** created (${transfer.id}). Status: ${transfer.status ?? 'pending'}.`
+      output: { ...mapTransfer(result), idempotencyKey: receipt.idempotencyKey },
+      message:
+        'Transfer created. Inspect its actual status with get_resource; creation does not prove payment settlement. Reuse the same idempotency key after an ambiguous failure.'
     };
   })
   .build();

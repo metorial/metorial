@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -19,31 +19,38 @@ let memberSchema = z.object({
 export let listTeams = SlateTool.create(spec, {
   name: 'List Teams',
   key: 'list_teams',
-  description: `List teams you are a member of within the Mixmax workspace.`,
+  description: `List a page of teams you are a member of within the Mixmax workspace. Use nextCursor while hasNext is true to read more results.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      limit: z.number().optional().describe('Maximum results in one page, from 1 to 300.'),
+      cursor: z.string().optional().describe('Cursor returned as nextCursor on a prior page.')
+    })
+  )
   .output(
     z.object({
-      teams: z.array(teamSchema).describe('List of teams')
+      teams: z.array(teamSchema).describe('List of teams'),
+      nextCursor: z.string().optional().describe('Provider cursor for the next page'),
+      hasNext: z.boolean().optional().describe('Whether another page currently exists')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let data = await client.listTeams();
-    let results = data.results || data || [];
-    let teams = results.map((t: any) => ({
+    let data = await client.listTeams({ limit: ctx.input.limit, next: ctx.input.cursor });
+    let results = data.results;
+    let teams = results.map(t => ({
       teamId: t._id,
       name: t.name,
       createdAt: t.createdAt,
-      updatedAt: t.updatedAt
+      updatedAt: t.modifiedAt
     }));
 
     return {
-      output: { teams },
+      output: { teams, nextCursor: data.next, hasNext: data.hasNext },
       message: `Found ${teams.length} team(s).`
     };
   })
@@ -74,7 +81,7 @@ export let manageTeam = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create');
       let result = await client.createTeam({ name: ctx.input.name });
       return {
         output: { teamId: result._id, success: true },
@@ -83,9 +90,9 @@ export let manageTeam = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for update');
-      let updates: Record<string, any> = {};
-      if (ctx.input.name) updates.name = ctx.input.name;
+      if (!ctx.input.teamId) throw createApiServiceError('teamId is required for update');
+      let updates: Record<string, unknown> = {};
+      if (ctx.input.name !== undefined) updates.name = ctx.input.name;
       await client.updateTeam(ctx.input.teamId, updates);
       return {
         output: { teamId: ctx.input.teamId, success: true },
@@ -94,7 +101,7 @@ export let manageTeam = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for delete');
+      if (!ctx.input.teamId) throw createApiServiceError('teamId is required for delete');
       await client.deleteTeam(ctx.input.teamId);
       return {
         output: { teamId: ctx.input.teamId, success: true },
@@ -102,14 +109,14 @@ export let manageTeam = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();
 
 export let listTeamMembers = SlateTool.create(spec, {
   name: 'List Team Members',
   key: 'list_team_members',
-  description: `List all members of a specific team.`,
+  description: `List all members of a specific team. This endpoint returns the complete member collection and does not support paging.`,
   tags: {
     readOnly: true
   }
@@ -128,9 +135,9 @@ export let listTeamMembers = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let data = await client.listTeamMembers(ctx.input.teamId);
-    let results = data.results || data || [];
-    let members = results.map((m: any) => ({
-      memberId: m._id || m.userId,
+    let results = data.results;
+    let members = results.map(m => ({
+      memberId: m._id,
       email: m.email,
       name: m.name
     }));
@@ -145,7 +152,7 @@ export let listTeamMembers = SlateTool.create(spec, {
 export let manageTeamMembership = SlateTool.create(spec, {
   name: 'Manage Team Membership',
   key: 'manage_team_membership',
-  description: `Add or remove members from a team. Provide either an email address or user ID to identify the member.`,
+  description: `Invite a member by email or remove a member by membership ID. Invitations send email and may affect billing; adding by userId is unsupported.`,
   tags: {
     destructive: true
   }
@@ -155,7 +162,12 @@ export let manageTeamMembership = SlateTool.create(spec, {
       action: z.enum(['add', 'remove']).describe('Whether to add or remove the member'),
       teamId: z.string().describe('ID of the team'),
       email: z.string().optional().describe('Email of the member (for adding)'),
-      userId: z.string().optional().describe('User ID of the member (for adding)'),
+      userId: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy field; invitations require email and do not support adding by user ID.'
+        ),
       memberId: z.string().optional().describe('Member ID to remove (for removing)')
     })
   )
@@ -179,7 +191,7 @@ export let manageTeamMembership = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'remove') {
-      if (!ctx.input.memberId) throw new Error('memberId is required for remove');
+      if (!ctx.input.memberId) throw createApiServiceError('memberId is required for remove');
       await client.removeTeamMember(ctx.input.teamId, ctx.input.memberId);
       return {
         output: { success: true },
@@ -187,6 +199,6 @@ export let manageTeamMembership = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

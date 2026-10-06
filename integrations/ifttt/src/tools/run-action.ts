@@ -37,7 +37,7 @@ export let runActionTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ConnectClient(ctx.auth.token);
+    let client = new ConnectClient(ctx.auth);
     let result = await client.runAction(
       ctx.input.connectionId,
       ctx.input.actionId,
@@ -52,7 +52,7 @@ export let runActionTool = SlateTool.create(spec, {
         actionId: ctx.input.actionId,
         result
       },
-      message: `Executed action **${ctx.input.actionId}** on connection **${ctx.input.connectionId}** for user **${ctx.input.userId}**.`
+      message: `IFTTT accepted action **${ctx.input.actionId}** on connection **${ctx.input.connectionId}** for user **${ctx.input.userId}**. Downstream completion and effects are not confirmed.`
     };
   })
   .build();

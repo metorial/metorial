@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateContact = SlateTool.create(spec, {
@@ -58,7 +58,7 @@ export let updateContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let data: Record<string, any> = {};
+    let data: Row = {};
     if (ctx.input.email !== undefined) data.email = ctx.input.email;
     if (ctx.input.firstname !== undefined) data.firstname = ctx.input.firstname;
     if (ctx.input.lastname !== undefined) data.lastname = ctx.input.lastname;

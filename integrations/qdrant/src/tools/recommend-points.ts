@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { QdrantClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let recommendPoints = SlateTool.create(spec, {
   key: 'recommend_points',
   description: `Finds similar points based on positive and negative examples. Positive examples define what you're looking for; negative examples define what to avoid. Examples can be point IDs or raw vectors. Supports two strategies: \`average_vector\` (averages all examples) and \`best_score\` (evaluates each candidate against all examples).`,
   instructions: [
-    'Provide at least one positive example (point ID or vector).',
+    'For average_vector, provide a positive example. best_score also supports negative-only examples.',
     'Negative examples are optional but help refine results.'
   ],
   tags: {
@@ -32,9 +32,19 @@ export let recommendPoints = SlateTool.create(spec, {
         .optional()
         .describe('Scoring strategy (default: average_vector)'),
       filter: z.any().optional().describe('Filter conditions (Qdrant filter syntax)'),
-      limit: z.number().optional().describe('Maximum number of results (default: 10)'),
-      offset: z.number().optional().describe('Number of results to skip'),
-      scoreThreshold: z.number().optional().describe('Minimum score threshold'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum number of results (default: 10)'),
+      offset: z.number().int().nonnegative().optional().describe('Number of results to skip'),
+      scoreThreshold: z
+        .number()
+        .optional()
+        .describe(
+          'Return scores better than this threshold; the comparison direction depends on the distance metric.'
+        ),
       vectorName: z.string().optional().describe('Named vector space to use'),
       withPayload: z.boolean().optional().describe('Include payloads (default: true)'),
       withVector: z.boolean().optional().describe('Include vectors (default: false)')
@@ -56,8 +66,16 @@ export let recommendPoints = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.positive.length === 0 &&
+      (ctx.input.strategy !== 'best_score' || !ctx.input.negative?.length)
+    ) {
+      throw createApiServiceError(
+        'Provide a positive example, or use best_score with at least one negative example.'
+      );
+    }
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 

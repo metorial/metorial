@@ -1,11 +1,15 @@
-# <img src="logo.png" height="20"> Moneybird
+# Moneybird
 
-Create, send, and manage sales invoices, recurring invoices, and estimates/quotes. Track expenses with purchase invoices, receipts, and general journal documents. Manage contacts (customers and suppliers) with detailed company information, addresses, and custom fields. Register and reconcile payments against invoices and bank transactions. Import bank statements and link financial mutations to invoices and ledger accounts. Track time entries on projects and convert them into invoices. Manage products, tax rates, ledger accounts (chart of accounts), and subscriptions. Send invoices via email, postal mail, or Peppol electronic invoicing. Create credit notes, send payment reminders, and handle SEPA direct debit transactions. Manage workflows, document styles, and identities for outgoing documents. Synchronize data incrementally across all major resources.
+Manage accounting records in authorized Moneybird administrations. Connect with OAuth or a personal bearer token, call `list_administrations`, and pass the chosen `administrationId` to subsequent tools. An optional saved default remains available for existing connections.
 
-## License
+The integration provides 21 public tools: administration discovery; contact search, lookup, creation and updates; sales invoice listing, detail, draft creation, lifecycle actions and PDF/UBL downloads; recurring invoices; estimates; products; ledger accounts; tax rates; projects; time entries; bank transactions and booking reconciliation.
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
+Monetary amounts use exact decimal strings. Line quantities retain provider display text, such as `1 x`, with a separate exact decimal quantity when supplied. Resource IDs are returned as strings. List results expose the provider's next and previous page when its response supplies a continuation; no total is guessed.
 
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+`manage_sales_invoice` sends or finalizes invoices, records payments, creates credit drafts, and controls workflow pause/resume. These operations can retain financial and audit history. Reconcile an ambiguous outcome before retrying: writes are never automatically retried. Email, postal and electronic delivery depend on your administration's available channels.
+
+Removal is verified by reading the exact resource afterward. Used recurring invoices and ledger accounts can remain deactivated, and used projects can remain archived. `deleted` means the resource is absent; `retired`, `deactivated` and `archived` distinguish retained records.
+
+The PDF download uses Moneybird's authenticated endpoint, which creates a fresh short-lived storage redirect. UBL downloads provide XML. Refreshing a prepared download validates the same invoice and administration again. No signed storage URL or file bytes are exposed in ordinary tool output.
+
+See [Moneybird's API documentation](https://developer.moneybird.com/) for scopes, supported lifecycle transitions and administration-specific requirements.

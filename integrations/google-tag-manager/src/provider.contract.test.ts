@@ -27,7 +27,7 @@ describe('google-tag-manager provider contract', () => {
         'manage_folder',
         'manage_user_permission'
       ],
-      triggerIds: ['inbound_webhook', 'version_published', 'workspace_changed'],
+      triggerIds: [],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'list_accounts', readOnly: true, destructive: false },
@@ -42,14 +42,10 @@ describe('google-tag-manager provider contract', () => {
         { id: 'manage_folder', readOnly: false, destructive: false },
         { id: 'manage_user_permission', readOnly: false, destructive: false }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'version_published', invocationType: 'polling' },
-        { id: 'workspace_changed', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(14);
+    expect(contract.actions).toHaveLength(11);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -63,10 +59,7 @@ describe('google-tag-manager provider contract', () => {
       manage_version: googleTagManagerActionScopes.manageVersion,
       manage_environment: googleTagManagerActionScopes.manageEnvironment,
       manage_folder: googleTagManagerActionScopes.manageFolder,
-      manage_user_permission: googleTagManagerActionScopes.manageUserPermission,
-      inbound_webhook: googleTagManagerActionScopes.inboundWebhook,
-      version_published: googleTagManagerActionScopes.versionPublished,
-      workspace_changed: googleTagManagerActionScopes.workspaceChanged
+      manage_user_permission: googleTagManagerActionScopes.manageUserPermission
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConversationsClient } from '../lib/conversations-client';
+import { fail, validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let participantSchema = z.object({
@@ -25,12 +26,18 @@ export let manageConversationParticipantsTool = SlateTool.create(spec, {
   key: 'manage_conversation_participants',
   description: `Add, remove, update, or list participants in a Twilio Conversation. Participants can be chat-based (identity) or SMS/WhatsApp-based (phone number). Use this to manage who is part of a conversation.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque continuation from nextPageToken; retain the same resource and filters.'
+        ),
       action: z.enum(['add', 'remove', 'update', 'list', 'get']).describe('Action to perform'),
       conversationSid: z.string().describe('Conversation SID'),
       participantSid: z
@@ -56,11 +63,21 @@ export let manageConversationParticipantsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Native continuation; omitted when this page is exhausted.'),
+      hasMore: z.boolean().optional().describe('Whether a next page is available.'),
       participants: z.array(participantSchema).describe('Participant records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ConversationsClient(ctx.auth.token);
+    validateInput('manage_conversation_participants', ctx.input);
+    let client = new ConversationsClient(
+      ctx.auth.token,
+      ctx.auth.accountSid,
+      ctx.input.pageToken
+    );
 
     if (ctx.input.action === 'list') {
       let result = await client.listParticipants(
@@ -71,20 +88,20 @@ export let manageConversationParticipantsTool = SlateTool.create(spec, {
         participantSid: p.sid,
         conversationSid: p.conversation_sid,
         identity: p.identity,
-        messagingBindingAddress: p.messaging_binding?.address,
-        messagingBindingProxyAddress: p.messaging_binding?.proxy_address,
+        messagingBindingAddress: p.messaging_binding?.address ?? undefined,
+        messagingBindingProxyAddress: p.messaging_binding?.proxy_address ?? undefined,
         roleSid: p.role_sid,
         dateCreated: p.date_created,
         dateUpdated: p.date_updated
       }));
       return {
-        output: { participants },
+        output: { participants, nextPageToken: result.nextPageToken, hasMore: result.hasMore },
         message: `Found **${participants.length}** participants in conversation.`
       };
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.participantSid) throw new Error('participantSid is required');
+      if (!ctx.input.participantSid) throw fail('participantSid is required');
       let p = await client.getParticipant(ctx.input.conversationSid, ctx.input.participantSid);
       return {
         output: {
@@ -93,8 +110,8 @@ export let manageConversationParticipantsTool = SlateTool.create(spec, {
               participantSid: p.sid,
               conversationSid: p.conversation_sid,
               identity: p.identity,
-              messagingBindingAddress: p.messaging_binding?.address,
-              messagingBindingProxyAddress: p.messaging_binding?.proxy_address,
+              messagingBindingAddress: p.messaging_binding?.address ?? undefined,
+              messagingBindingProxyAddress: p.messaging_binding?.proxy_address ?? undefined,
               roleSid: p.role_sid,
               dateCreated: p.date_created,
               dateUpdated: p.date_updated
@@ -121,8 +138,8 @@ export let manageConversationParticipantsTool = SlateTool.create(spec, {
               participantSid: p.sid,
               conversationSid: p.conversation_sid,
               identity: p.identity,
-              messagingBindingAddress: p.messaging_binding?.address,
-              messagingBindingProxyAddress: p.messaging_binding?.proxy_address,
+              messagingBindingAddress: p.messaging_binding?.address ?? undefined,
+              messagingBindingProxyAddress: p.messaging_binding?.proxy_address ?? undefined,
               roleSid: p.role_sid,
               dateCreated: p.date_created,
               dateUpdated: p.date_updated
@@ -134,8 +151,9 @@ export let manageConversationParticipantsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.participantSid) throw new Error('participantSid is required');
+      if (!ctx.input.participantSid) throw fail('participantSid is required');
       let params: Record<string, string | undefined> = {
+        Identity: ctx.input.identity,
         RoleSid: ctx.input.roleSid,
         Attributes: ctx.input.attributes,
         'MessagingBinding.ProxyAddress': ctx.input.messagingBindingProxyAddress
@@ -152,8 +170,8 @@ export let manageConversationParticipantsTool = SlateTool.create(spec, {
               participantSid: p.sid,
               conversationSid: p.conversation_sid,
               identity: p.identity,
-              messagingBindingAddress: p.messaging_binding?.address,
-              messagingBindingProxyAddress: p.messaging_binding?.proxy_address,
+              messagingBindingAddress: p.messaging_binding?.address ?? undefined,
+              messagingBindingProxyAddress: p.messaging_binding?.proxy_address ?? undefined,
               roleSid: p.role_sid,
               dateCreated: p.date_created,
               dateUpdated: p.date_updated
@@ -165,7 +183,7 @@ export let manageConversationParticipantsTool = SlateTool.create(spec, {
     }
 
     // remove
-    if (!ctx.input.participantSid) throw new Error('participantSid is required');
+    if (!ctx.input.participantSid) throw fail('participantSid is required');
     await client.removeParticipant(ctx.input.conversationSid, ctx.input.participantSid);
     return {
       output: {

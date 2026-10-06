@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, leadOutput, warningOutput } from '../lib/client';
 import { spec } from '../spec';
 
 export let addLeadToCampaign = SlateTool.create(spec, {
@@ -9,8 +9,11 @@ export let addLeadToCampaign = SlateTool.create(spec, {
   description: `Add a new lead to a specific campaign. Supports setting lead details like name, email, company, job title, LinkedIn URL, and phone. Optionally enable deduplication, enrichment, email finding, and verification.`,
   instructions: [
     'The email field is typically required but can be omitted if findEmail enrichment is enabled.',
-    'Custom variables can be passed as additional key-value pairs in customVariables.'
-  ]
+    'Custom variables can be passed as additional key-value pairs in customVariables; they cannot replace standard lead fields or request options.',
+    'This creates a campaign lead and can create or update a global contact and company. Company fields affect shared company records. It never updates an existing campaign lead.',
+    'Enrichment options can spend credits, and a campaign with automatic review may launch the new lead immediately. Provider warnings describe fields left unchanged or company writes skipped.'
+  ],
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
@@ -61,13 +64,15 @@ export let addLeadToCampaign = SlateTool.create(spec, {
       lastName: z.string().optional(),
       companyName: z.string().optional(),
       isPaused: z.boolean().optional(),
-      contactId: z.string().optional()
+      contactId: z.string().optional(),
+      warnings: z
+        .array(z.object({ code: z.string().optional(), message: z.string().optional() }))
+        .optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let {
+    const client = new Client({ token: ctx.auth.token });
+    const {
       campaignId,
       deduplicate,
       findEmail,
@@ -77,33 +82,65 @@ export let addLeadToCampaign = SlateTool.create(spec, {
       customVariables,
       ...leadData
     } = ctx.input;
-
-    let body: Record<string, unknown> = { ...leadData };
-    if (customVariables) {
-      Object.assign(body, customVariables);
-    }
-
-    let result = await client.addLeadToCampaign(campaignId, body, {
-      deduplicate,
-      findEmail,
-      verifyEmail,
-      findPhone,
-      linkedinEnrichment
-    });
-
+    const reserved = new Set([
+      'campaignId',
+      'email',
+      'firstName',
+      'lastName',
+      'companyName',
+      'jobTitle',
+      'linkedinUrl',
+      'phone',
+      'companyDomain',
+      'timezone',
+      'contactOwner',
+      'icebreaker',
+      'picture',
+      '_id',
+      'contactId',
+      'deduplicate',
+      'findEmail',
+      'verifyEmail',
+      'findPhone',
+      'linkedinEnrichment',
+      '__proto__',
+      'constructor',
+      'prototype'
+    ]);
+    for (const key of Object.keys(customVariables ?? {}))
+      if (!key.trim() || reserved.has(key))
+        throw createApiServiceError(
+          'Custom variables cannot replace standard lead fields or request options.'
+        );
+    if (
+      !leadData.email?.trim() &&
+      !leadData.linkedinUrl?.trim() &&
+      !leadData.phone?.trim() &&
+      !findEmail
+    )
+      throw createApiServiceError(
+        'Provide an email, LinkedIn URL, phone number, or email-finding inputs.'
+      );
+    const result = await client.addLeadToCampaign(
+      campaignId,
+      { ...leadData, ...customVariables },
+      { deduplicate, findEmail, verifyEmail, findPhone, linkedinEnrichment }
+    );
+    const mapped = leadOutput(result);
     return {
       output: {
-        leadId: result._id,
-        campaignId: result.campaignId,
-        campaignName: result.campaignName,
-        email: result.email,
-        firstName: result.firstName,
-        lastName: result.lastName,
-        companyName: result.companyName,
-        isPaused: result.isPaused,
-        contactId: result.contactId
+        leadId: mapped.leadId,
+        campaignId: mapped.campaignId,
+        campaignName: mapped.campaignName,
+        email: mapped.email,
+        firstName: mapped.firstName,
+        lastName: mapped.lastName,
+        companyName: mapped.companyName,
+        isPaused: mapped.isPaused,
+        contactId: mapped.contactId,
+        warnings: warningOutput(result.warnings)
       },
-      message: `Added lead **${result.email || result.firstName || result._id}** to campaign "${result.campaignName || campaignId}".`
+      message: `Created lead \`${mapped.leadId}\`. Review any provider warnings and the campaign's automatic launch settings.`
     };
   })
   .build();

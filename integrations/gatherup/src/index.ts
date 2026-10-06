@@ -23,8 +23,6 @@ import {
   updateBusiness,
   updateCustomer
 } from './tools';
-import { inboundWebhook, newFeedback, newOnlineReview } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     configureAutoFeedback,
     createUser
   ],
-  triggers: [inboundWebhook, newFeedback, newOnlineReview]
+  triggers: []
 });

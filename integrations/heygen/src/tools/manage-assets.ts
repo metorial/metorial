@@ -13,7 +13,20 @@ export let listAssets = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      type: z.enum(['image', 'video', 'audio']).optional().describe('Filter by asset type')
+      type: z
+        .enum(['image', 'video', 'audio'])
+        .optional()
+        .describe(
+          'Filter the returned page by asset type; an empty page may still have a next cursor'
+        ),
+      paginationToken: z.string().optional().describe('Cursor from a previous page'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum assets per provider page')
     })
   )
   .output(
@@ -27,16 +40,18 @@ export let listAssets = SlateTool.create(spec, {
             url: z.string().nullable().describe('Asset URL')
           })
         )
-        .describe('List of assets')
+        .describe('List of assets'),
+      paginationToken: z.string().nullable(),
+      hasMore: z.boolean()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HeyGenClient({ token: ctx.auth.token });
+    let client = new HeyGenClient(ctx.auth);
 
-    let result = await client.listAssets({ type: ctx.input.type });
+    let result = await client.listAssets({ ...ctx.input, token: ctx.input.paginationToken });
 
     return {
-      output: result,
+      output: { ...result, paginationToken: result.token },
       message: `Found **${result.assets.length}** asset(s)${ctx.input.type ? ` of type "${ctx.input.type}"` : ''}.`
     };
   })
@@ -53,11 +68,11 @@ export let uploadAsset = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      url: z.string().describe('Public URL of the file to upload'),
+      url: z.url().describe('Public HTTPS URL of the file to upload; maximum 32 MB'),
       type: z
         .enum(['image', 'video', 'audio'])
         .optional()
-        .describe('Type of asset being uploaded')
+        .describe('Expected asset type; the provider detects the uploaded file type')
     })
   )
   .output(
@@ -66,7 +81,7 @@ export let uploadAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HeyGenClient({ token: ctx.auth.token });
+    let client = new HeyGenClient(ctx.auth);
 
     let result = await client.uploadAsset({
       url: ctx.input.url,
@@ -100,7 +115,7 @@ export let deleteAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HeyGenClient({ token: ctx.auth.token });
+    let client = new HeyGenClient(ctx.auth);
 
     await client.deleteAsset(ctx.input.assetId);
 

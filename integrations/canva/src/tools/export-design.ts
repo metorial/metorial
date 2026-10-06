@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type ExportFormat } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let exportDesign = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let exportDesign = SlateTool.create(spec, {
   key: 'export_design',
   description: `Export a Canva design to a downloadable file. Supports PDF, JPG, PNG, GIF, PPTX, and MP4 formats. This starts an asynchronous export job. If the job completes immediately, download URLs are returned; otherwise use the job ID to poll for completion.`,
   instructions: [
-    'Download URLs are valid for 24 hours.',
+    'Download URLs expire 24 hours after export completion; polling does not renew them. Start a new export explicitly if the result has expired.',
     'Multi-page designs return multiple URLs sorted by page order.'
   ],
   constraints: [
@@ -62,7 +63,7 @@ export let exportDesign = SlateTool.create(spec, {
       pages: z
         .array(z.number())
         .optional()
-        .describe('Specific page indices to export (0-based)')
+        .describe('Specific one-based page numbers to export; the first page is 1')
     })
   )
   .output(
@@ -78,42 +79,95 @@ export let exportDesign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
 
-    let format: Record<string, unknown> = { type: ctx.input.formatType };
-
-    if (ctx.input.formatType === 'jpg') {
-      if (ctx.input.quality) format.quality = ctx.input.quality;
-      if (ctx.input.width) format.width = ctx.input.width;
-      if (ctx.input.height) format.height = ctx.input.height;
-      if (ctx.input.exportQuality) format.export_quality = ctx.input.exportQuality;
-    } else if (ctx.input.formatType === 'png') {
-      if (ctx.input.width) format.width = ctx.input.width;
-      if (ctx.input.height) format.height = ctx.input.height;
-      if (ctx.input.lossless !== undefined) format.lossless = ctx.input.lossless;
-      if (ctx.input.transparentBackground !== undefined)
-        format.transparent_background = ctx.input.transparentBackground;
-      if (ctx.input.asSingleImage !== undefined)
-        format.as_single_image = ctx.input.asSingleImage;
-      if (ctx.input.exportQuality) format.export_quality = ctx.input.exportQuality;
-    } else if (ctx.input.formatType === 'pdf') {
-      if (ctx.input.exportQuality) format.export_quality = ctx.input.exportQuality;
-      if (ctx.input.pdfSize) format.size = ctx.input.pdfSize;
-    } else if (ctx.input.formatType === 'gif') {
-      if (ctx.input.width) format.width = ctx.input.width;
-      if (ctx.input.height) format.height = ctx.input.height;
-      if (ctx.input.exportQuality) format.export_quality = ctx.input.exportQuality;
-    } else if (ctx.input.formatType === 'mp4') {
-      if (ctx.input.mp4Quality) format.quality = ctx.input.mp4Quality;
-      if (ctx.input.exportQuality) format.export_quality = ctx.input.exportQuality;
+    const input = ctx.input;
+    const allowed: Record<string, string[]> = {
+      pdf: ['exportQuality', 'pdfSize'],
+      jpg: ['quality', 'width', 'height', 'exportQuality'],
+      png: [
+        'width',
+        'height',
+        'lossless',
+        'transparentBackground',
+        'asSingleImage',
+        'exportQuality'
+      ],
+      gif: ['width', 'height', 'exportQuality'],
+      pptx: [],
+      mp4: ['mp4Quality', 'exportQuality']
+    };
+    for (const field of [
+      'quality',
+      'width',
+      'height',
+      'lossless',
+      'transparentBackground',
+      'asSingleImage',
+      'exportQuality',
+      'pdfSize',
+      'mp4Quality'
+    ] as const) {
+      if (input[field] !== undefined && !allowed[input.formatType]?.includes(field))
+        fail(
+          `The ${field} option is not supported for ${input.formatType} exports. Remove it before exporting.`
+        );
     }
-
-    if (ctx.input.pages) format.pages = ctx.input.pages;
+    let format: ExportFormat;
+    const pages = input.pages;
+    const export_quality = input.exportQuality;
+    switch (input.formatType) {
+      case 'jpg':
+        if (input.quality === undefined) fail('JPG export requires quality from 1 to 100.');
+        format = {
+          type: 'jpg',
+          quality: input.quality,
+          width: input.width,
+          height: input.height,
+          export_quality,
+          pages
+        };
+        break;
+      case 'png':
+        format = {
+          type: 'png',
+          width: input.width,
+          height: input.height,
+          lossless: input.lossless,
+          transparent_background: input.transparentBackground,
+          as_single_image: input.asSingleImage,
+          export_quality,
+          pages
+        };
+        break;
+      case 'gif':
+        format = {
+          type: 'gif',
+          width: input.width,
+          height: input.height,
+          export_quality,
+          pages
+        };
+        break;
+      case 'pdf':
+        format = { type: 'pdf', size: input.pdfSize, export_quality, pages };
+        break;
+      case 'pptx':
+        format = { type: 'pptx', pages };
+        break;
+      case 'mp4':
+        if (input.mp4Quality === undefined)
+          fail('MP4 export requires a documented horizontal or vertical quality.');
+        format = { type: 'mp4', quality: input.mp4Quality, export_quality, pages };
+        break;
+    }
 
     let job = await client.createExportJob({
       designId: ctx.input.designId,
-      format: format as any
+      format
     });
+
+    for (const url of job.downloadUrls ?? []) await ctx.addAttachment({ type: 'url', url });
 
     let statusMsg =
       job.status === 'success'
@@ -132,7 +186,7 @@ export let exportDesign = SlateTool.create(spec, {
 export let getExportJob = SlateTool.create(spec, {
   name: 'Get Export Job',
   key: 'get_export_job',
-  description: `Check the status of a design export job. Returns download URLs when the export is complete.`,
+  description: `Check the status of a design export job. Returns downloadable files and legacy download URLs when complete. URLs expire 24 hours after completion; polling cannot renew an expired result.`,
   tags: {
     readOnly: true
   }
@@ -155,8 +209,9 @@ export let getExportJob = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let job = await client.getExportJob(ctx.input.jobId);
+    for (const url of job.downloadUrls ?? []) await ctx.addAttachment({ type: 'url', url });
 
     return {
       output: job,

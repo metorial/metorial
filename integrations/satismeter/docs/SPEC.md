@@ -1,67 +1,17 @@
-# Slates Specification for Satismeter
+# SatisMeter API integration
 
-## Overview
+The twelve tools cover exact project and survey metadata, survey listings, cursor-paged responses, survey statistics, user lookup/upsert/deletion, event acceptance, response insertion and whole-list email unsubscribe management. Survey and project creation, question discovery, human account identity and project listing are not documented API capabilities. Get Project verifies access to a project, not the identity of a human account owner.
 
-SatisMeter is a customer feedback platform that collects satisfaction data through in-app, email, and mobile surveys. It supports survey templates including NPS, CSAT, CES, and custom micro surveys. Users can send custom traits (attributes) to SatisMeter, which are stored and used for survey targeting and response segmentation.
+Provide the exact Project ID from dashboard Settings > Integrations > API on each tool. Existing connections retain their saved project as a fallback; an explicitly supplied project takes precedence. Use List Surveys for survey IDs. Question IDs and response-targeting prerequisites must come from the dashboard.
 
-## Authentication
+The API key is sent as a Bearer token to the documented v3 project/campaign routes, legacy `/api/users` routes and v2 unsubscribe routes. An optional Write Key is required only for `/api/responses` insertion and is sent in that request body without the API key. A separate campaign read confirms API-key access; Write Key/project association still requires independently matching the dashboard credentials.
 
-SatisMeter uses two authentication mechanisms depending on the API being used:
+Responses use the native data/page envelope and a page size from 1 through 100. Missing dates use the provider's documented last-30-days/current-time defaults. Cursor consistency is checked, but the API does not provide a snapshot across pages. Statistics preserve the native statistics/questions data. User listings use the documented users envelope, including exact internal IDs needed for deletion.
 
-### API Key (Bearer Token)
+Upsert sends the project, external user ID and optional traits using Bearer auth. Optional surveyDate can defer the next eligible survey. Event success means the provider accepted the event; it does not establish survey delivery or expose an event-history receipt. Response insertion requires exactly one external user or anonymous ID and distinct question IDs; targeting or duplicate rules can reject it. No automatic retry or force-survey behavior is added.
 
-SatisMeter API uses token-based authentication. In order to use the API, you need to authenticate requests using an API Key. You can manage your project's API Keys in your project's settings, by navigating to Settings > Integrations > API. Add an `Authorization` header to the request with the content `Bearer API_KEY`, replacing `API_KEY` with your API Key.
+Deleting a user removes personal data and anonymizes existing responses; it does not erase response history. Unsubscribe updates replace the whole list and independently read the resulting list. There is no atomic concurrency guarantee. Inspect an uncertain write before retrying.
 
-This method is used for the REST API v3 endpoints (responses, statistics, users, events).
+No downloadable export endpoint is exposed: native response data is returned as structured records. Legacy trigger handlers remain removed without replacement.
 
-When using this API you'll be querying data about a project or survey referencing it by its ID. Navigate to Settings > Integrations > API to find the Project ID and any survey's ID.
-
-### Write Key
-
-The Write Key is used to identify the project and authorize requests for inserting responses. It is found in SatisMeter > Settings > Integrations > API keys. This key is used specifically for the insert-response endpoint.
-
-### Basic Auth (Legacy)
-
-The unsubscribe email API uses basic auth (username, password) along with the Project ID. The API Key serves as the username with an empty password.
-
-## Features
-
-### Survey Response Export
-
-SatisMeter uses a REST API to export a list of responses in either CSV or JSON format. Responses can be filtered by date range (startDate, endDate) and are scoped to a specific project and optionally a specific survey (campaign).
-
-### Survey Response Statistics
-
-You can get statistics calculated from responses recorded in a specific survey, identified by its ID. This provides aggregated dashboard-level metrics for a given project and campaign.
-
-### User Management
-
-Users can be created, updated, listed, and deleted via the API. User traits (properties/attributes like name, email, or custom fields) are stored in SatisMeter's record and help target surveys and segment/filter responses. Supported trait types include Text, Date, Number, and Yes/No (boolean).
-
-### Event Tracking
-
-The REST API allows you to track events by making an HTTP call. If there is a live survey configured to be triggered on a certain event, a call to that endpoint will make SatisMeter display the survey to the user. Events require a userId, event name, and project ID.
-
-### Insert Survey Responses
-
-You can use the API to post responses from your server. Each response is associated with a specific survey (campaign) and includes answers to survey questions. The delivery method can be specified as "In-App", "Mobile", or "Email". Anonymous responses are supported using an `anonymousId` field instead of `userId`.
-
-### Email Unsubscribe Management
-
-The API allows you to read and update the list of unsubscribed emails. You can retrieve the current unsubscribe list and add new emails to it for a given project.
-
-## Events
-
-SatisMeter supports webhooks for receiving real-time notifications about survey interactions.
-
-### Survey Response Events
-
-Webhooks can be configured in the Integrations section of SatisMeter settings. You just enter a URL of your web service and SatisMeter will send data to this URL.
-
-A webhook can be configured to trigger on the following scenarios:
-
-- **Answered** (`"event": "answered"`): Fires when a user rates on the 0-10 scale (i.e., answers the first question).
-- **Completed** (`"event": "completed"`): Fires when a user fills in all survey questions (submits a full response).
-- **Dismissed** (`"event": "dismissed"`): Fires when a user closes the survey without completing it.
-
-The webhook payload includes the full response data: rating, feedback text, answers array, user information (name, email, userId, traits), location data, survey delivery method, response category (e.g., promoter/detractor), and timestamp.
+Official references: [REST API](https://support.satismeter.com/hc/en-us/articles/48846544018323-REST-API-for-SatisMeter), [current v3 reference](https://app.satismeter.com/apidoc), [upsert](https://support.satismeter.com/hc/en-us/articles/6980457910163-Insert-Update-user-API), [list users](https://support.satismeter.com/hc/en-us/articles/6980473872531-List-users-API), [delete user](https://support.satismeter.com/hc/en-us/articles/6980450524179-Delete-user-API), [event](https://support.satismeter.com/hc/en-us/articles/6980481518227-Track-event-API), [insert response](https://support.satismeter.com/hc/en-us/articles/6980464243475-Insert-response-API), [unsubscribe list](https://support.satismeter.com/hc/en-us/articles/6980458958995-Unsubscribe-email-API).

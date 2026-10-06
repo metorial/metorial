@@ -1,10 +1,17 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
+import { z } from 'zod';
+import {
+  formMetadataSchema,
+  formSummarySchema,
+  submissionListResponseSchema,
+  submissionSchema
+} from './types';
+import { apiError, baseUrl, date, id, jsonValue, parse, privacy, text } from './validation';
 
 export interface ClientConfig {
   token: string;
   baseUrl?: string;
 }
-
 export interface ListSubmissionsParams {
   limit?: number;
   offset?: number;
@@ -16,94 +23,192 @@ export interface ListSubmissionsParams {
   includeEditLink?: boolean;
   includePreview?: boolean;
 }
-
 export interface CreateSubmissionInput {
-  questions: Array<{ id: string; value: any }>;
-  urlParameters?: Array<{ id: string; value: any }>;
+  questions: Array<{ id: string; value?: unknown }>;
+  urlParameters?: Array<{ id: string; name?: string; value?: unknown }>;
   submissionTime?: string;
   lastUpdatedAt?: string;
-  scheduling?: Array<{ id: string; value: any }>;
-  payments?: Array<{ id: string; value: any }>;
+  scheduling?: Array<{ id: string; value?: unknown }>;
+  payments?: Array<{ id: string; value?: unknown }>;
   login?: { email: string };
 }
-
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
-
+  private axios;
+  private token: string;
   constructor(config: ClientConfig) {
-    let baseUrl = config.baseUrl || 'https://api.fillout.com';
+    this.token = text(config.token, 'Fillout credential');
     this.axios = createAxios({
-      baseURL: `${baseUrl}/v1/api`,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
+      baseURL: `${baseUrl(config.baseUrl)}/v1/api`,
+      headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+      timeout: 30000,
+      maxRedirects: 0,
+      maxContentLength: 16 * 1024 * 1024,
+      maxBodyLength: 16 * 1024 * 1024
+    });
+  }
+  private async request(
+    method: 'GET' | 'POST' | 'DELETE',
+    path: string,
+    operation: string,
+    params?: Record<string, string>,
+    data?: unknown
+  ): Promise<unknown> {
+    let response: { status: number; data: unknown };
+    try {
+      response = await this.axios.request({ method, url: path, params, data });
+    } catch (error) {
+      throw apiError(error, operation);
+    }
+    if (response.status !== 200)
+      throw apiError({ response: { status: response.status } }, operation);
+    return privacy(response.data, [this.token]);
+  }
+  async listForms() {
+    return parse(
+      z.array(formSummarySchema),
+      await this.request('GET', '/forms', 'list forms'),
+      'forms'
+    );
+  }
+  async getForm(formId: string) {
+    const form = parse(
+      formMetadataSchema,
+      await this.request('GET', `/forms/${id(formId, 'Form ID')}`, 'get form'),
+      'form'
+    );
+    if (form.id !== formId)
+      throw createApiServiceError(
+        'The returned form ID does not match the requested form. No write was attempted.',
+        { parent: {} }
+      );
+    return form;
+  }
+  async listSubmissions(formId: string, params: ListSubmissionsParams = {}) {
+    const formPath = id(formId, 'Form ID');
+    if (
+      (params.limit !== undefined &&
+        (!Number.isSafeInteger(params.limit) || params.limit < 1 || params.limit > 150)) ||
+      (params.offset !== undefined &&
+        (!Number.isSafeInteger(params.offset) || params.offset < 0))
+    )
+      throw createApiServiceError(
+        'Use an integer limit from 1 to 150 and a nonnegative integer offset.',
+        { parent: {} }
+      );
+    date(params.afterDate, 'afterDate');
+    date(params.beforeDate, 'beforeDate');
+    if (
+      params.afterDate &&
+      params.beforeDate &&
+      Date.parse(params.afterDate) >= Date.parse(params.beforeDate)
+    )
+      throw createApiServiceError('afterDate must precede beforeDate.', { parent: {} });
+    const query = Object.fromEntries(
+      Object.entries(params)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => [key, String(value)])
+    );
+    return parse(
+      submissionListResponseSchema,
+      await this.request('GET', `/forms/${formPath}/submissions`, 'list submissions', query),
+      'submission list'
+    );
+  }
+  async getSubmission(formId: string, submissionId: string, includeEditLink?: boolean) {
+    const result = await this.request(
+      'GET',
+      `/forms/${id(formId, 'Form ID')}/submissions/${id(submissionId, 'Submission ID')}`,
+      'get submission',
+      includeEditLink === undefined ? undefined : { includeEditLink: String(includeEditLink) }
+    );
+    const wrapped = z.object({ submission: z.unknown() }).safeParse(result);
+    const submission = parse(
+      submissionSchema,
+      wrapped.success ? wrapped.data.submission : result,
+      'submission'
+    );
+    if (submission.submissionId !== submissionId)
+      throw createApiServiceError(
+        'The returned submission ID does not match the requested submission.',
+        { parent: {} }
+      );
+    return submission;
+  }
+  async createSubmissions(formId: string, submissions: CreateSubmissionInput[]) {
+    id(formId, 'Form ID');
+    if (!Array.isArray(submissions) || submissions.length < 1 || submissions.length > 10)
+      throw createApiServiceError('Provide between one and ten submissions.', { parent: {} });
+    for (const submission of submissions) {
+      date(submission.submissionTime, 'submissionTime');
+      date(submission.lastUpdatedAt, 'lastUpdatedAt');
+      for (const values of [
+        submission.questions,
+        submission.urlParameters,
+        submission.scheduling,
+        submission.payments
+      ]) {
+        if (!values) continue;
+        const seen = new Set<string>();
+        for (const field of values) {
+          text(field.id, 'Field ID');
+          if (seen.has(field.id) || !jsonValue(field.value))
+            throw createApiServiceError(
+              'Use each field ID once per submission and provide JSON response values; omit unsupported values before importing.',
+              { parent: {} }
+            );
+          seen.add(field.id);
+        }
       }
-    });
+    }
+    const form = await this.getForm(formId);
+    for (const submission of submissions)
+      for (const [fields, definitions] of [
+        [submission.questions, form.questions],
+        [submission.urlParameters, form.urlParameters ?? []],
+        [submission.scheduling, form.scheduling ?? []],
+        [submission.payments, form.payments ?? []]
+      ] as const)
+        for (const field of fields ?? [])
+          if (!definitions.some(definition => definition.id === field.id))
+            throw createApiServiceError(
+              'A field ID is absent from the current form definition. Call get_form and correct the import before creating submissions.',
+              { parent: {} }
+            );
+    const raw = await this.request(
+      'POST',
+      `/forms/${id(formId, 'Form ID')}/submissions`,
+      'create submissions',
+      undefined,
+      { submissions }
+    );
+    const wrapped = z.object({ submissions: z.unknown() }).safeParse(raw);
+    const created = parse(
+      z.array(submissionSchema),
+      wrapped.success ? wrapped.data.submissions : raw,
+      'created submissions (changes may already exist)'
+    );
+    if (
+      new Set(created.map(item => item.submissionId)).size !== created.length ||
+      created.some(item => !item.submissionId)
+    )
+      throw createApiServiceError(
+        'The import returned ambiguous submission IDs. Changes may already exist; inspect the form before retrying. No automatic retry was attempted.',
+        { reason: 'fillout_create_uncertain', parent: {} }
+      );
+    return {
+      submissions: created,
+      requestedCount: submissions.length,
+      createdCount: created.length,
+      complete: created.length === submissions.length
+    };
   }
-
-  async listForms(): Promise<Array<{ formId: string; name: string }>> {
-    let response = await this.axios.get('/forms');
-    return response.data;
-  }
-
-  async getForm(formId: string): Promise<any> {
-    let response = await this.axios.get(`/forms/${formId}`);
-    return response.data;
-  }
-
-  async listSubmissions(formId: string, params?: ListSubmissionsParams): Promise<any> {
-    let queryParams: Record<string, string> = {};
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.afterDate) queryParams.afterDate = params.afterDate;
-    if (params?.beforeDate) queryParams.beforeDate = params.beforeDate;
-    if (params?.status) queryParams.status = params.status;
-    if (params?.sort) queryParams.sort = params.sort;
-    if (params?.search) queryParams.search = params.search;
-    if (params?.includeEditLink !== undefined)
-      queryParams.includeEditLink = String(params.includeEditLink);
-    if (params?.includePreview !== undefined)
-      queryParams.includePreview = String(params.includePreview);
-
-    let response = await this.axios.get(`/forms/${formId}/submissions`, {
-      params: queryParams
-    });
-    return response.data;
-  }
-
-  async getSubmission(
-    formId: string,
-    submissionId: string,
-    includeEditLink?: boolean
-  ): Promise<any> {
-    let params: Record<string, string> = {};
-    if (includeEditLink !== undefined) params.includeEditLink = String(includeEditLink);
-
-    let response = await this.axios.get(`/forms/${formId}/submissions/${submissionId}`, {
-      params
-    });
-    return response.data;
-  }
-
-  async createSubmissions(formId: string, submissions: CreateSubmissionInput[]): Promise<any> {
-    let response = await this.axios.post(`/forms/${formId}/submissions`, {
-      submissions
-    });
-    return response.data;
-  }
-
-  async deleteSubmission(formId: string, submissionId: string): Promise<any> {
-    let response = await this.axios.delete(`/forms/${formId}/submissions/${submissionId}`);
-    return response.data;
-  }
-
-  async createWebhook(formId: string, url: string): Promise<{ id: number }> {
-    let response = await this.axios.post('/webhook/create', { formId, url });
-    return response.data;
-  }
-
-  async deleteWebhook(webhookId: string): Promise<any> {
-    let response = await this.axios.post('/webhook/delete', { webhookId });
-    return response.data;
+  async deleteSubmission(formId: string, submissionId: string) {
+    await this.getSubmission(formId, submissionId);
+    await this.request(
+      'DELETE',
+      `/forms/${id(formId, 'Form ID')}/submissions/${id(submissionId, 'Submission ID')}`,
+      'delete submission'
+    );
+    return { success: true, formId, submissionId };
   }
 }

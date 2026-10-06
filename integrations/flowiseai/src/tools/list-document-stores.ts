@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FlowiseClient } from '../lib/client';
+import { FlowiseClient, flowiseJsonString, parseFlowiseList } from '../lib/client';
+import { paginationOutputShape, paginationShape } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listDocumentStores = SlateTool.create(spec, {
@@ -12,9 +13,10 @@ export let listDocumentStores = SlateTool.create(spec, {
     destructive: false
   }
 })
-  .input(z.object({}))
+  .input(z.object({ ...paginationShape }))
   .output(
     z.object({
+      ...paginationOutputShape,
       documentStores: z
         .array(
           z.object({
@@ -52,18 +54,19 @@ export let listDocumentStores = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let result = await client.listDocumentStores();
-    let stores = Array.isArray(result) ? result : [];
+    let result = await client.listDocumentStores(ctx.input);
+    let { items: stores, ...pagination } = parseFlowiseList(result, ctx.input);
 
     return {
       output: {
+        ...pagination,
         documentStores: stores.map((s: any) => ({
           storeId: s.id,
           name: s.name,
           description: s.description,
           status: s.status,
-          loaders: s.loaders,
-          whereUsed: s.whereUsed,
+          loaders: flowiseJsonString(s.loaders),
+          whereUsed: flowiseJsonString(s.whereUsed),
           createdDate: s.createdDate,
           updatedDate: s.updatedDate
         }))

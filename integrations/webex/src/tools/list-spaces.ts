@@ -13,6 +13,12 @@ export let listSpaces = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Native next-page URL returned by this tool. Use alone; do not add filters.'
+        ),
       teamId: z.string().optional().describe('Filter spaces by team ID'),
       type: z.enum(['direct', 'group']).optional().describe('Filter by space type'),
       sortBy: z
@@ -27,6 +33,7 @@ export let listSpaces = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: z.string().optional().describe('URL for the next native page, if present'),
       spaces: z
         .array(
           z.object({
@@ -50,11 +57,12 @@ export let listSpaces = SlateTool.create(spec, {
       teamId: ctx.input.teamId,
       type: ctx.input.type,
       sortBy: ctx.input.sortBy,
-      max: ctx.input.max
+      max: ctx.input.max,
+      nextPageUrl: ctx.input.nextPageUrl
     });
 
     let items = result.items || [];
-    let spaces = items.map((r: any) => ({
+    let spaces = items.map(r => ({
       spaceId: r.id,
       title: r.title,
       type: r.type,
@@ -66,7 +74,7 @@ export let listSpaces = SlateTool.create(spec, {
     }));
 
     return {
-      output: { spaces },
+      output: { spaces, nextPageUrl: result.nextPageUrl },
       message: `Found **${spaces.length}** space(s).`
     };
   })

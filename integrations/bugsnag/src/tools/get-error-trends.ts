@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugsnagClient } from '../lib/client';
+import type { Trend } from '../lib/types';
 import { spec } from '../spec';
 
 let trendBucketSchema = z.object({
@@ -26,9 +27,23 @@ export let getErrorTrends = SlateTool.create(spec, {
         .optional()
         .describe('Error ID for error-specific trends (omit for project-level trends)'),
       resolution: z
-        .enum(['1h', '2h', '6h', '12h', '1d', '2d', '7d'])
+        .enum(['1h', '2h', '6h', '12h', '1d', '2d', '7d', '1m', '5m', '30m'])
         .optional()
-        .describe('Time bucket resolution')
+        .describe(
+          'Supported resolutions: 1m, 5m, 30m, 2h, 12h. Other legacy enum values are rejected with guidance.'
+        ),
+      bucketsCount: z
+        .number()
+        .optional()
+        .describe('Number of time buckets (1 to 50; default 30 when resolution is omitted)'),
+      since: z
+        .string()
+        .optional()
+        .describe('UTC ISO 8601 start time or relative time such as 7d'),
+      before: z
+        .string()
+        .optional()
+        .describe('UTC ISO 8601 end time or relative time such as 1h')
     })
   )
   .output(
@@ -37,23 +52,42 @@ export let getErrorTrends = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
+    let client = new BugsnagClient(ctx.auth);
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('Project ID is required.');
+    if (!projectId) throw createApiServiceError('Project ID is required.');
 
-    let trends: any[];
-    if (ctx.input.errorId) {
-      trends = await client.getErrorTrends(projectId, ctx.input.errorId);
-    } else {
-      trends = await client.getProjectTrends(projectId, {
-        resolution: ctx.input.resolution
-      });
-    }
+    if (
+      ctx.input.resolution &&
+      !['1m', '5m', '30m', '2h', '12h'].includes(ctx.input.resolution)
+    )
+      throw createApiServiceError(
+        'This legacy resolution is unsupported by the current Bugsnag API. Use 1m, 5m, 30m, 2h, or 12h, or omit resolution and supply bucketsCount.',
+        { reason: 'unsupported_parameter' }
+      );
+    if (
+      ctx.input.bucketsCount !== undefined &&
+      (!Number.isInteger(ctx.input.bucketsCount) ||
+        ctx.input.bucketsCount < 1 ||
+        ctx.input.bucketsCount > 50)
+    )
+      throw createApiServiceError('Bucket count must be an integer from 1 to 50.');
+    const trends: Trend[] = await client.getTrends(projectId, ctx.input.errorId, {
+      resolution: ctx.input.resolution,
+      bucketsCount: ctx.input.bucketsCount,
+      filters: {
+        ...(ctx.input.since
+          ? { 'event.since': [{ type: 'eq', value: ctx.input.since }] }
+          : {}),
+        ...(ctx.input.before
+          ? { 'event.before': [{ type: 'eq', value: ctx.input.before }] }
+          : {})
+      }
+    });
 
-    let trendBuckets = trends.map((t: any) => ({
-      from: t.from,
-      to: t.to,
-      eventsCount: t.events_count ?? t.events
+    let trendBuckets = trends.map(t => ({
+      from: t.from ?? undefined,
+      to: t.to ?? undefined,
+      eventsCount: t.events_count ?? undefined
     }));
 
     return {

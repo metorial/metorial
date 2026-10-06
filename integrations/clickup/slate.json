@@ -1,6 +1,6 @@
 {
   "name": "@metorial/clickup",
-  "description": "Connect once to work across every ClickUp Workspace authorized for the account. Discover Workspace IDs, then create, update, delete, and search tasks across Spaces, Folders, and Lists. Manage comments, checklists, values on existing custom fields, Goals, Space tags, and time entries and timers. Organize Spaces, Folders, and Lists, retrieve Workspace members, and subscribe to task and Workspace event triggers across every authorized Workspace.",
+  "description": "Connect once to work across every ClickUp Workspace authorized for the account. Discover Workspace IDs, then create, update, delete, and search tasks across Spaces, Folders, and Lists. Manage comments, checklists, values on existing custom fields, Goals, Space tags, and time entries and timers. Retrieve Workspace members and organize Spaces, Folders, and Lists.",
   "categories": ["email-and-messaging", "task-and-project-management"],
   "skills": [
     "create and manage tasks",
@@ -11,7 +11,6 @@
     "organize spaces, folders, and lists",
     "filter and search tasks",
     "retrieve workspace members",
-    "subscribe to webhook events",
     "manage task tags and priorities"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/clickup.png"

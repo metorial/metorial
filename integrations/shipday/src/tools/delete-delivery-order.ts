@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteDeliveryOrder = SlateTool.create(spec, {
   name: 'Delete Delivery Order',
   key: 'delete_delivery_order',
-  description: `Permanently removes a delivery order from Shipday. This action cannot be undone.`,
+  description: `Delete an exact delivery order and confirm it is no longer returned by its order-number lookup. This does not guarantee erasure of delivery history or charges.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,7 +14,11 @@ export let deleteDeliveryOrder = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orderId: z.number().describe('Unique Shipday order ID to delete')
+      orderId: z.number().describe('Unique Shipday order ID to delete'),
+      currentOrderNumber: z
+        .string()
+        .optional()
+        .describe('Current reference required when the order is absent from active orders')
     })
   )
   .output(
@@ -25,7 +29,7 @@ export let deleteDeliveryOrder = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ShipdayClient({ token: ctx.auth.token });
 
-    await client.deleteOrder(ctx.input.orderId);
+    await client.deleteOrder(ctx.input.orderId, ctx.input.currentOrderNumber);
 
     return {
       output: {

@@ -14,8 +14,6 @@ import {
   sendEmail,
   updateObject
 } from './tools';
-import { dataChanges, inboundWebhook, newUser } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     manageCounter,
     manageCache
   ],
-  triggers: [inboundWebhook, dataChanges, newUser]
+  triggers: []
 });

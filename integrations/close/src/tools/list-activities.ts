@@ -6,7 +6,10 @@ import { spec } from '../spec';
 let activitySchema = z.object({
   activityId: z.string().describe('Unique identifier for the activity'),
   type: z.string().describe('Activity type (e.g. Call, Email, Meeting, Note, SMS)'),
-  leadId: z.string().describe('Lead ID associated with this activity'),
+  leadId: z
+    .string()
+    .optional()
+    .describe('Lead ID associated with this activity, when attached'),
   userId: z.string().optional().describe('User ID who performed the activity'),
   contactId: z.string().optional().describe('Contact ID associated with this activity'),
   dateCreated: z.string().describe('ISO 8601 timestamp when the activity was created'),
@@ -63,19 +66,19 @@ export let listActivities = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextSkip: z.number().optional().describe('Offset for the next page, when available.'),
       activities: z.array(activitySchema).describe('List of activities matching the filters'),
-      totalResults: z.number().describe('Total number of activities matching the filters'),
+      totalResults: z
+        .number()
+        .optional()
+        .describe('Total number of activities matching the filters'),
       hasMore: z
         .boolean()
         .describe('Whether there are more results available beyond this page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-
-    let limit = ctx.input.limit ?? 100;
-
-    let result = await client.listActivities({
+    const result = await new Client(ctx.auth).listActivities({
       leadId: ctx.input.leadId,
       userId: ctx.input.userId,
       contactId: ctx.input.contactId,
@@ -83,36 +86,34 @@ export let listActivities = SlateTool.create(spec, {
       typeIn: ctx.input.activityTypes,
       dateCreatedGt: ctx.input.dateCreatedAfter,
       dateCreatedLt: ctx.input.dateCreatedBefore,
-      limit,
+      limit: ctx.input.limit,
       skip: ctx.input.skip
     });
-
-    let activities = (result.data || []).map((a: any) => ({
-      activityId: a.id,
-      type: a._type || a.type,
-      leadId: a.lead_id,
-      userId: a.user_id,
-      contactId: a.contact_id,
-      dateCreated: a.date_created,
-      activityAt: a.activity_at,
-      subject: a.subject,
-      bodyPreview: a.body_text
-        ? a.body_text.substring(0, 200) + (a.body_text.length > 200 ? '...' : '')
-        : a.note
-          ? a.note.substring(0, 200) + (a.note.length > 200 ? '...' : '')
-          : undefined
-    }));
-
-    let totalResults = result.total_results ?? activities.length;
-    let hasMore = (ctx.input.skip ?? 0) + activities.length < totalResults;
-
+    const activities = result.data.map(a => {
+      const preview = a.body_text ?? a.note;
+      return {
+        activityId: a.id,
+        type: a._type,
+        leadId: a.lead_id ?? undefined,
+        userId: a.user_id ?? undefined,
+        contactId: a.contact_id ?? undefined,
+        dateCreated: a.date_created,
+        activityAt: a.activity_at ?? undefined,
+        subject: a.subject ?? undefined,
+        bodyPreview:
+          preview === null || preview === undefined
+            ? undefined
+            : preview.slice(0, 200) + (preview.length > 200 ? '...' : '')
+      };
+    });
     return {
       output: {
         activities,
-        totalResults,
-        hasMore
+        totalResults: result.total_results ?? undefined,
+        hasMore: result.has_more,
+        nextSkip: result.has_more ? (ctx.input.skip ?? 0) + activities.length : undefined
       },
-      message: `Listed ${activities.length} activities${totalResults > activities.length ? ` (${totalResults} total)` : ''}.`
+      message: `Returned ${activities.length} activity record(s)${result.has_more ? '; more available' : ''}.`
     };
   })
   .build();

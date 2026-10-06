@@ -14,13 +14,6 @@ import {
   sendNotecard,
   sendPostcard
 } from './tools';
-import {
-  mailDeliveryEvents,
-  mailStatusEvents,
-  orderStatusEvents,
-  qrScanEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -37,5 +30,5 @@ export let provider = Slate.create({
     manageSubAccounts,
     radiusSearch
   ],
-  triggers: [orderStatusEvents, mailDeliveryEvents, mailStatusEvents, qrScanEvents]
+  triggers: []
 });

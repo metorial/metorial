@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdInput } from '../lib/models';
 import { spec } from '../spec';
 
 export let deleteDataset = SlateTool.create(spec, {
@@ -13,7 +14,12 @@ export let deleteDataset = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      datasetId: z.string().describe('UUID of the dataset to delete')
+      accountId: accountIdInput,
+      datasetId: z
+        .string()
+        .describe(
+          'Identifier of the dataset (v1 UUID or v2 decimal ID encoded as text) to delete'
+        )
     })
   )
   .output(
@@ -23,8 +29,10 @@ export let deleteDataset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.deleteDataset(ctx.input.datasetId);
+    let client = new Client({ token: ctx.auth.token, apiVersion: ctx.config.apiVersion });
+    let result = await client.deleteDataset(ctx.input.datasetId, {
+      accountId: ctx.input.accountId
+    });
 
     return {
       output: {

@@ -17,13 +17,6 @@ import {
   updateSigner,
   uploadDocumentContent
 } from './tools';
-import {
-  signatureEvents,
-  signatureProofEvents,
-  signatureRequestEvents,
-  signerEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -43,5 +36,5 @@ export let provider = Slate.create({
     sealDocument,
     getApplicationContext
   ],
-  triggers: [signatureRequestEvents, signatureEvents, signerEvents, signatureProofEvents]
+  triggers: []
 });

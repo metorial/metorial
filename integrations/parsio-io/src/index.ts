@@ -20,8 +20,6 @@ import {
   submitDocument,
   updateMailbox
 } from './tools';
-import { documentEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     createWebhook,
     deleteWebhooks
   ],
-  triggers: [documentEvent]
+  triggers: []
 });

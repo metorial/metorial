@@ -13,8 +13,6 @@ import {
   manageWallet,
   refundInvoice
 } from './tools';
-import { invoiceEvents, payoutEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     getNotifications,
     getServerInfo
   ],
-  triggers: [invoiceEvents, payoutEvents]
+  triggers: []
 });

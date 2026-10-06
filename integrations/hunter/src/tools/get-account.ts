@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, optionalNumber, optionalRow, optionalText } from '../lib/client';
 import { spec } from '../spec';
 
 export let getAccount = SlateTool.create(spec, {
@@ -23,28 +23,43 @@ export let getAccount = SlateTool.create(spec, {
       searchesUsed: z.number().nullable().describe('Number of searches used'),
       searchesAvailable: z.number().nullable().describe('Total searches available'),
       verificationsUsed: z.number().nullable().describe('Number of verifications used'),
-      verificationsAvailable: z.number().nullable().describe('Total verifications available')
+      verificationsAvailable: z
+        .number()
+        .nullable()
+        .describe('Total period allocation, including extra packs'),
+      searchesRemaining: z.number().optional(),
+      verificationsRemaining: z.number().optional(),
+      creditsUsed: z.number().optional(),
+      creditsAvailable: z.number().optional(),
+      creditsRemaining: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let data = await client.getAccount();
-
+    const data = await new Client({ token: ctx.auth.token }).getAccount();
+    const requests = optionalRow(data.requests),
+      searches = optionalRow(requests.searches),
+      verifications = optionalRow(requests.verifications),
+      credits = optionalRow(requests.credits);
     return {
       output: {
-        email: data.email ?? null,
-        firstName: data.first_name ?? null,
-        lastName: data.last_name ?? null,
-        planName: data.plan_name ?? null,
-        resetDate: data.reset_date ?? null,
-        teamId: data.team_id ?? null,
-        searchesUsed: data.requests?.searches?.used ?? null,
-        searchesAvailable: data.requests?.searches?.available ?? null,
-        verificationsUsed: data.requests?.verifications?.used ?? null,
-        verificationsAvailable: data.requests?.verifications?.available ?? null
+        email: optionalText(data.email) ?? null,
+        firstName: optionalText(data.first_name) ?? null,
+        lastName: optionalText(data.last_name) ?? null,
+        planName: optionalText(data.plan_name) ?? null,
+        resetDate: optionalText(data.reset_date) ?? null,
+        teamId: optionalNumber(data.team_id) ?? null,
+        searchesUsed: optionalNumber(searches.used) ?? null,
+        searchesAvailable: optionalNumber(searches.available) ?? null,
+        verificationsUsed: optionalNumber(verifications.used) ?? null,
+        verificationsAvailable: optionalNumber(verifications.available) ?? null,
+        searchesRemaining: optionalNumber(searches.remaining),
+        verificationsRemaining: optionalNumber(verifications.remaining),
+        creditsUsed: optionalNumber(credits.used),
+        creditsAvailable: optionalNumber(credits.available),
+        creditsRemaining: optionalNumber(credits.remaining)
       },
-      message: `Account: **${data.email}** on **${data.plan_name}** plan. Searches: ${data.requests?.searches?.used ?? 0}/${data.requests?.searches?.available ?? 0}. Verifications: ${data.requests?.verifications?.used ?? 0}/${data.requests?.verifications?.available ?? 0}.`
+      message:
+        'Retrieved the authenticated Hunter account and provider-reported quota balances.'
     };
   })
   .build();

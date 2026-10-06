@@ -18,16 +18,6 @@ import {
   searchOffers,
   triggerNightAudit
 } from './tools';
-import {
-  blockEvents,
-  bookingEvents,
-  folioEvents,
-  invoiceEvents,
-  nightAuditEvents,
-  propertyEvents,
-  reservationEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,13 +38,5 @@ export let provider = Slate.create({
     listBlocks,
     triggerNightAudit
   ],
-  triggers: [
-    reservationEvents,
-    bookingEvents,
-    folioEvents,
-    invoiceEvents,
-    propertyEvents,
-    nightAuditEvents,
-    blockEvents
-  ]
+  triggers: []
 });

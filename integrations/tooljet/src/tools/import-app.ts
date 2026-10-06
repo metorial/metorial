@@ -1,52 +1,62 @@
 import { SlateTool } from 'slates';
-import { z } from 'zod';
 import { Client } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
+import { fail, jsonBytes, record, text, z } from '../lib/validation';
 import { spec } from '../spec';
-
-export let importApp = SlateTool.create(spec, {
+export const importApp = SlateTool.create(spec, {
   name: 'Import App',
   key: 'import_app',
-  description: `Import a ToolJet application JSON into a workspace. The import data should be the JSON previously exported from a ToolJet instance. Optionally specify a custom app name to override the original.`,
-  constraints: [
-    'Maximum import size is 50 MB by default (configurable via MAX_JSON_SIZE on the server).'
-  ],
-  tags: {
-    destructive: false
-  }
+  description:
+    'Import an application JSON into a workspace discovered with list_workspaces. This may create apps, data sources and database schemas; no public app-delete route is documented for rollback. A native acknowledgment does not identify the created app.',
+  constraints: ['Local request size bound: 8 MiB; the server may impose another limit.'],
+  tags: { destructive: true }
 })
-  .input(
-    z.object({
-      workspaceId: z
-        .string()
-        .describe('UUID of the target workspace to import the application into'),
-      appName: z
-        .string()
-        .optional()
-        .describe('Custom name for the imported application (overrides the original name)'),
-      exportData: z.any().describe('The full application JSON data from a previous export')
-    })
-  )
+  .input(z.object({ workspaceId, appName: z.string().optional(), exportData: z.any() }))
   .output(
     z.object({
-      success: z.boolean().describe('Whether the import was successful')
+      success: z.boolean(),
+      accepted: z.boolean().optional(),
+      verified: z.boolean().optional(),
+      workspaceId: z.string().optional(),
+      reconciliationRequired: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
-
-    let body = { ...ctx.input.exportData };
-    if (ctx.input.appName) {
-      body.appName = ctx.input.appName;
-    }
-
-    await client.importApp(ctx.input.workspaceId, body);
-
+    if (
+      !record(ctx.input.exportData) ||
+      typeof ctx.input.exportData.tooljet_version !== 'string' ||
+      !Array.isArray(ctx.input.exportData.app) ||
+      !ctx.input.exportData.app.length
+    )
+      fail(
+        'Provide the complete application JSON from export_app, including tooljet_version and app. Modules use a separate native endpoint.'
+      );
+    if (ctx.input.appName !== undefined) text(ctx.input.appName, 'app name');
+    const body = {
+      ...ctx.input.exportData,
+      ...(ctx.input.appName === undefined ? {} : { appName: ctx.input.appName })
+    };
+    jsonBytes(body);
+    const receipt = await new Client(ctx.auth, ctx.config).importApp(
+      ctx.input.workspaceId,
+      body
+    );
+    if (!record(receipt) || typeof receipt.message !== 'string' || !receipt.message.trim())
+      fail(
+        'The import may have taken effect but its native acknowledgment is incomplete. Inspect this workspace with list_apps and reconcile app, data-source and database effects before retrying.',
+        'import_unverified',
+        { workspaceId: ctx.input.workspaceId }
+      );
     return {
-      output: { success: true },
-      message: `Imported application into workspace ${ctx.input.workspaceId}${ctx.input.appName ? ` as **${ctx.input.appName}**` : ''}.`
+      output: {
+        success: true,
+        accepted: true,
+        verified: false,
+        workspaceId: ctx.input.workspaceId,
+        reconciliationRequired: true
+      },
+      message:
+        'ToolJet accepted the import. Discover the resulting applications with list_apps and reconcile any app, data-source or database effects before retrying.'
     };
   })
   .build();

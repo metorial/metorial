@@ -42,13 +42,6 @@ import {
   updateReleaseTool,
   updateUserTool
 } from './tools';
-import {
-  componentEventsTrigger,
-  featureEventsTrigger,
-  noteEventsTrigger,
-  productEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -93,10 +86,5 @@ export let provider = Slate.create({
     getCustomFieldValuesTool,
     setCustomFieldValueTool
   ],
-  triggers: [
-    featureEventsTrigger,
-    noteEventsTrigger,
-    componentEventsTrigger,
-    productEventsTrigger
-  ]
+  triggers: []
 });

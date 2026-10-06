@@ -40,7 +40,16 @@ export let editIncident = SlateTool.create(spec, {
             customFieldId: z.string().describe('ID of the custom field'),
             values: z.array(
               z.object({
-                valueLiteral: z.string().optional(),
+                valueLiteral: z
+                  .string()
+                  .optional()
+                  .describe(
+                    'Legacy literal: resolved using the current custom field type; use valueOptionId for select options'
+                  ),
+                valueText: z.string().optional(),
+                valueNumeric: z.string().optional(),
+                valueOptionId: z.string().optional(),
+                valueTimestamp: z.string().optional(),
                 valueCatalogEntryId: z.string().optional(),
                 valueLink: z.string().optional()
               })
@@ -94,6 +103,10 @@ export let editIncident = SlateTool.create(spec, {
           custom_field_id: e.customFieldId,
           values: e.values.map(v => ({
             value_literal: v.valueLiteral,
+            value_text: v.valueText,
+            value_numeric: v.valueNumeric,
+            value_option_id: v.valueOptionId,
+            value_timestamp: v.valueTimestamp,
             value_catalog_entry_id: v.valueCatalogEntryId,
             value_link: v.valueLink
           }))

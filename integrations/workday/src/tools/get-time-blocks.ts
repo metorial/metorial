@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { WorkdayClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { workerIdSchema } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getTimeBlocks = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let getTimeBlocks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workerId: z.string().describe('The Workday worker ID'),
+      workerId: workerIdSchema,
       fromDate: z.string().optional().describe('Start date filter in YYYY-MM-DD format'),
       toDate: z.string().optional().describe('End date filter in YYYY-MM-DD format'),
       limit: z.number().optional().describe('Maximum number of results (default: 20)'),
@@ -29,11 +30,7 @@ export let getTimeBlocks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let result = await client.getWorkerTimeBlocks(ctx.input.workerId, {
       fromDate: ctx.input.fromDate,

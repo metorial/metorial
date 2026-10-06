@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,17 +13,47 @@ export let listCalls = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      agentId: z.string().describe('The model ID of the agent to list calls for'),
-      limit: z.number().optional().describe('Number of calls per page (default: 20)'),
-      offset: z.number().optional().describe('Starting index for pagination'),
-      fromDate: z.number().optional().describe('Start timestamp in milliseconds'),
-      toDate: z.number().optional().describe('End timestamp in milliseconds'),
+      agentId: z.string().min(1).describe('Agent model ID from list_agents'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Number of calls per page (default: 20)'),
+      offset: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Starting index for pagination'),
+      fromDate: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Start timestamp in milliseconds'),
+      toDate: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('End timestamp in milliseconds'),
       callStatus: z
         .string()
         .optional()
         .describe('Filter by call status (e.g., "completed", "busy", "failed", "no-answer")'),
-      durationMin: z.number().optional().describe('Minimum call duration in seconds'),
-      durationMax: z.number().optional().describe('Maximum call duration in seconds'),
+      durationMin: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Minimum call duration in seconds'),
+      durationMax: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Maximum call duration in seconds'),
       leadPhoneNumber: z
         .string()
         .optional()
@@ -44,7 +74,19 @@ export let listCalls = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    if (
+      ctx.input.fromDate !== undefined &&
+      ctx.input.toDate !== undefined &&
+      ctx.input.fromDate > ctx.input.toDate
+    )
+      throw createApiServiceError('fromDate must be before or equal to toDate.');
+    if (
+      ctx.input.durationMin !== undefined &&
+      ctx.input.durationMax !== undefined &&
+      ctx.input.durationMin > ctx.input.durationMax
+    )
+      throw createApiServiceError('durationMin must be less than or equal to durationMax.');
+    let client = new Client(ctx.auth);
     let result = await client.listCalls({
       model_id: ctx.input.agentId,
       limit: ctx.input.limit,

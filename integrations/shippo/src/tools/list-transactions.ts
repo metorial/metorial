@@ -14,6 +14,12 @@ export let listTransactions = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPage: z
+        .string()
+        .optional()
+        .describe(
+          'Exact nextLink from the preceding result. Omit page and keep any supplied filters and page size unchanged.'
+        ),
       page: z.number().optional().describe('Page number for pagination'),
       resultsPerPage: z.number().optional().describe('Number of results per page'),
       rateId: z.string().optional().describe('Filter by rate ID'),
@@ -22,7 +28,13 @@ export let listTransactions = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      totalCount: z.number().describe('Total number of transactions'),
+      nextLink: z
+        .string()
+        .optional()
+        .describe('Exact provider continuation; pass as nextPage to this tool.'),
+      previousLink: z.string().optional(),
+      hasMore: z.boolean().optional(),
+      totalCount: z.number().optional().describe('Total number of transactions'),
       transactions: z.array(
         z.object({
           transactionId: z.string(),
@@ -36,30 +48,34 @@ export let listTransactions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
     let result = await client.listTransactions({
+      nextPage: ctx.input.nextPage,
       page: ctx.input.page,
       results: ctx.input.resultsPerPage,
       rate: ctx.input.rateId,
       tracking_status: ctx.input.trackingStatus
     });
 
-    let transactions = result.results.map((t: any) => ({
+    let transactions = result.results.map(t => ({
       transactionId: t.object_id,
       status: t.status,
       trackingNumber: t.tracking_number,
-      labelUrl: t.label_url,
-      rate: t.rate,
+      labelUrl: typeof t.label_url === 'string' ? t.label_url : undefined,
+      rate: typeof t.rate === 'string' ? t.rate : t.rate?.object_id,
       createdAt: t.object_created
     }));
 
     return {
       output: {
         totalCount: result.count,
+        nextLink: result.next,
+        previousLink: result.previous,
+        hasMore: !!result.next,
         transactions
       },
-      message: `Found **${result.count}** transactions. Showing ${transactions.length} on this page.`
+      message: `Retrieved this page of transactions. Showing ${transactions.length} on this page.`
     };
   })
   .build();

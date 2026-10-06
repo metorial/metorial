@@ -7,9 +7,11 @@ export let schedulePickup = SlateTool.create(spec, {
   name: 'Schedule Pickup',
   key: 'schedule_pickup',
   description: `Schedule a carrier pickup for eligible shipments. Currently supported for USPS and DHL Express. Specify the pickup location, time window, and the transactions (labels) to be picked up.`,
-  constraints: ['Only supported for USPS and DHL Express carriers.'],
+  constraints: [
+    'Only supported for USPS and DHL Express carriers. Editing or cancelling requires contacting the carrier; a confirmation may cause carrier communications.'
+  ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -29,15 +31,23 @@ export let schedulePickup = SlateTool.create(spec, {
               'Office',
               'Reception',
               'In/At Mailbox',
+              'Security Deck',
+              'Shipping Dock',
               'Other'
             ])
             .optional()
-            .describe('Where the package is located'),
+            .describe(
+              'Required pickup location. Security Deck and Shipping Dock are DHL Express only.'
+            ),
           buildingType: z
             .enum(['apartment', 'building', 'department', 'floor', 'room', 'suite'])
             .optional(),
           instructions: z.string().optional().describe('Special instructions for the carrier'),
-          address: z.any().describe('Pickup address (object ID or inline address)')
+          address: z
+            .any()
+            .describe(
+              'Complete inline pickup address, including country and phone. An address ID is not supported here.'
+            )
         })
         .describe('Pickup location details'),
       requestedStartTime: z.string().describe('Earliest pickup time (ISO 8601 datetime)'),
@@ -55,9 +65,9 @@ export let schedulePickup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
-    let result = (await client.createPickup({
+    let result = await client.createPickup({
       carrier_account: ctx.input.carrierAccount,
       location: {
         building_location_type: ctx.input.location.buildingLocationType,
@@ -69,7 +79,7 @@ export let schedulePickup = SlateTool.create(spec, {
       requested_end_time: ctx.input.requestedEndTime,
       transactions: ctx.input.transactions,
       is_test: ctx.input.isTest
-    })) as Record<string, any>;
+    });
 
     return {
       output: {

@@ -21,13 +21,6 @@ import {
   manageWorkspaceTool,
   runMonitorTool
 } from './tools';
-import {
-  collectionUpdatedTrigger,
-  inboundWebhook,
-  monitorRunCompletedTrigger,
-  workspaceUpdatedTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -51,10 +44,5 @@ export let provider = Slate.create({
     manageTagsTool,
     createWebhookTool
   ],
-  triggers: [
-    inboundWebhook,
-    collectionUpdatedTrigger,
-    monitorRunCompletedTrigger,
-    workspaceUpdatedTrigger
-  ]
+  triggers: []
 });

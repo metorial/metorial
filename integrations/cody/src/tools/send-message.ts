@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { conversationIdSchema, messageSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let sendMessage = SlateTool.create(spec, {
   name: 'Send Message',
   key: 'send_message',
-  description: `Send a message within a conversation and receive the AI-generated response based on the bot's knowledge base. Returns the full response in a single call.`,
+  description: `Send a message within a conversation discovered with list_conversations and receive the AI-generated response based on the bot's knowledge base. Returns the full response in a single call.`,
   constraints: [
     'Message content must be 2,000 characters or less.',
     'Subject to subscription plan 30-day message limits.'
@@ -14,21 +15,11 @@ export let sendMessage = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      conversationId: z.string().describe('ID of the conversation to send the message in'),
-      content: z.string().describe('Message content (up to 2,000 characters)')
+      conversationId: conversationIdSchema,
+      content: z.string().min(1).max(2000).describe('Message content (up to 2,000 characters)')
     })
   )
-  .output(
-    z.object({
-      messageId: z.string().describe('Unique message identifier'),
-      content: z.string().describe('AI-generated response content'),
-      conversationId: z.string().describe('Conversation the message belongs to'),
-      machine: z.boolean().describe('Whether this is an AI-generated message'),
-      failedResponding: z.boolean().describe('Whether response generation failed'),
-      flagged: z.boolean().describe('Whether the message violates usage policy'),
-      createdAt: z.number().describe('Unix timestamp of creation in seconds')
-    })
-  )
+  .output(messageSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -52,7 +43,7 @@ export let sendMessage = SlateTool.create(spec, {
 export let sendMessageForStream = SlateTool.create(spec, {
   name: 'Send Message for Stream',
   key: 'send_message_stream',
-  description: `Send a message and get a streaming URL for receiving the AI response as Server-Sent Events (SSE). Useful for real-time progressive rendering of responses.`,
+  description: `Send a message in a conversation discovered with list_conversations and get a streaming URL for receiving the AI response as Server-Sent Events (SSE). Useful for real-time progressive rendering of responses.`,
   instructions: [
     'Connect to the returned stream URL to receive SSE events.',
     'Events contain JSON with a "chunk" field for response text segments.',
@@ -65,8 +56,8 @@ export let sendMessageForStream = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      conversationId: z.string().describe('ID of the conversation to send the message in'),
-      content: z.string().describe('Message content (up to 2,000 characters)')
+      conversationId: conversationIdSchema,
+      content: z.string().min(1).max(2000).describe('Message content (up to 2,000 characters)')
     })
   )
   .output(

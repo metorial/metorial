@@ -30,7 +30,7 @@ export let testTriggerTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ConnectClient(ctx.auth.token);
+    let client = new ConnectClient(ctx.auth);
     await client.testTrigger(
       ctx.input.connectionId,
       ctx.input.triggerId,
@@ -44,7 +44,7 @@ export let testTriggerTool = SlateTool.create(spec, {
         triggerId: ctx.input.triggerId,
         success: true
       },
-      message: `Sent test trigger for **${ctx.input.triggerId}** on connection **${ctx.input.connectionId}** for user **${ctx.input.userId}**.`
+      message: `IFTTT accepted a test trigger for **${ctx.input.triggerId}** on connection **${ctx.input.connectionId}** for user **${ctx.input.userId}**. Delivery and downstream effects are not confirmed.`
     };
   })
   .build();

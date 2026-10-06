@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let verifyTransaction = SlateTool.create(spec, {
   name: 'Verify Transaction',
   key: 'verify_transaction',
-  description: `Verify the status and details of a payment transaction. You can verify by either the Flutterwave transaction ID or your unique transaction reference (tx_ref). Use this to confirm that a payment was successful, check the charged amount and currency, and retrieve card token for future tokenized charges.`,
+  description: `Verify the status and details of a payment transaction. You can verify by either the Flutterwave transaction ID or your unique transaction reference (tx_ref). Use this to confirm that a payment was successful, check the charged amount and currency, and inspect the payment method.`,
   tags: {
     readOnly: true
   }
@@ -32,7 +32,12 @@ export let verifyTransaction = SlateTool.create(spec, {
       customerEmail: z.string().optional().describe('Customer email'),
       customerName: z.string().optional().describe('Customer name'),
       customerPhone: z.string().optional().describe('Customer phone number'),
-      cardToken: z.string().optional().describe('Card token for future tokenized charges'),
+      cardToken: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy field retained for compatibility; reusable payment credentials are not returned'
+        ),
       cardFirst6: z.string().optional().describe('First 6 digits of the card'),
       cardLast4: z.string().optional().describe('Last 4 digits of the card'),
       cardType: z.string().optional().describe('Card brand (VISA, MASTERCARD, etc.)'),
@@ -40,11 +45,14 @@ export let verifyTransaction = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
     if (!ctx.input.transactionId && !ctx.input.txRef) {
-      throw new Error('Either transactionId or txRef must be provided');
+      throw createApiServiceError('Either transactionId or txRef must be provided');
     }
+
+    if (ctx.input.transactionId !== undefined && ctx.input.txRef !== undefined)
+      throw createApiServiceError('Provide exactly one transactionId or txRef.');
 
     let result: any;
     if (ctx.input.transactionId) {
@@ -70,7 +78,7 @@ export let verifyTransaction = SlateTool.create(spec, {
         customerEmail: t.customer?.email,
         customerName: t.customer?.name,
         customerPhone: t.customer?.phone_number,
-        cardToken: t.card?.token,
+        cardToken: undefined,
         cardFirst6: t.card?.first_6digits,
         cardLast4: t.card?.last_4digits,
         cardType: t.card?.type,

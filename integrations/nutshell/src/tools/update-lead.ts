@@ -9,7 +9,7 @@ export let updateLead = SlateTool.create(spec, {
   description: `Update an existing lead in Nutshell CRM. Supports changing status, value, confidence, stage, assignee, contacts, accounts, and custom fields. Can be used to move leads between stages or mark outcomes.`,
   instructions: [
     'To move a lead to a new stage, provide the milestoneId field.',
-    'To mark a lead as won or lost, update the status field accordingly.'
+    'Closing statuses require a matching outcomeId when multiple outcomes of that type exist. Relationships you supply replace their existing lists.'
   ],
   tags: {
     destructive: false,
@@ -29,7 +29,15 @@ export let updateLead = SlateTool.create(spec, {
       status: z
         .number()
         .optional()
-        .describe('Updated status (0=canceled, 1=open, 2=won, 3=lost)'),
+        .describe(
+          'Updated status (0=open, 1=pending, 10=won, 11=lost, 12=canceled); closing selects a configured outcome'
+        ),
+      outcomeId: z
+        .number()
+        .optional()
+        .describe(
+          'Outcome ID from list_pipelines_stages matching closing status 10, 11, or 12. Required when more than one matching outcome exists.'
+        ),
       value: z
         .object({
           amount: z.number().describe('Monetary value'),
@@ -76,9 +84,10 @@ export let updateLead = SlateTool.create(spec, {
       rev = String(existing.rev);
     }
 
-    let leadData: Record<string, any> = {};
+    let leadData: Record<string, unknown> = {};
     if (ctx.input.description !== undefined) leadData.description = ctx.input.description;
     if (ctx.input.status !== undefined) leadData.status = ctx.input.status;
+    if (ctx.input.outcomeId !== undefined) leadData.outcomeId = ctx.input.outcomeId;
     if (ctx.input.value !== undefined) leadData.value = ctx.input.value;
     if (ctx.input.confidence !== undefined) leadData.confidence = ctx.input.confidence;
     if (ctx.input.assigneeId !== undefined)

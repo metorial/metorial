@@ -1,26 +1,33 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AdminClient } from '../lib/client';
+import { resolveWorkspaceId, workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listIntegrationsTool = SlateTool.create(spec, {
   name: 'List Integrations',
   key: 'list_integrations',
-  description: `List available integrations in a Botpress workspace. Search by name, filter by visibility (public/private), or retrieve a specific integration by ID or name.`,
+  description: `List available integrations in a Botpress workspace. Search by name, filter by visibility (public/private), or retrieve a specific integration by ID or name. Call list_workspaces to discover workspace IDs, then list_bots to discover bot IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      workspaceId: z
-        .string()
-        .optional()
-        .describe('Workspace ID. Falls back to config workspaceId.'),
+      workspaceId: workspaceIdSchema,
       integrationId: z.string().optional().describe('Get a specific integration by ID'),
       integrationName: z.string().optional().describe('Get a specific integration by name'),
+      integrationVersion: z
+        .string()
+        .optional()
+        .describe(
+          'Version or semver range for lookup by integrationName; defaults to latest.'
+        ),
       search: z.string().optional().describe('Search integrations by keyword'),
-      visibility: z.enum(['public', 'private']).optional().describe('Filter by visibility'),
+      visibility: z
+        .enum(['public', 'private', 'unlisted'])
+        .optional()
+        .describe('Filter by visibility'),
       nextToken: z.string().optional().describe('Pagination token')
     })
   )
@@ -52,9 +59,13 @@ export let listIntegrationsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.integrationId && ctx.input.integrationName)
+      throw createApiServiceError('Provide only one of integrationId or integrationName.');
+    if (ctx.input.integrationVersion && !ctx.input.integrationName)
+      throw createApiServiceError('integrationVersion requires integrationName.');
     let client = new AdminClient({
       token: ctx.auth.token,
-      workspaceId: ctx.input.workspaceId || ctx.config.workspaceId
+      workspaceId: resolveWorkspaceId(ctx.input.workspaceId, ctx.config)
     });
 
     if (ctx.input.integrationId) {
@@ -76,7 +87,10 @@ export let listIntegrationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.integrationName) {
-      let result = await client.getIntegrationByName(ctx.input.integrationName);
+      let result = await client.getIntegrationByName(
+        ctx.input.integrationName,
+        ctx.input.integrationVersion
+      );
       let i = result.integration;
       return {
         output: {

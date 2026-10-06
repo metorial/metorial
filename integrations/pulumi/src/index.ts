@@ -4,6 +4,7 @@ import {
   cancelDeployment,
   createStack,
   deleteStack,
+  getCurrentUser,
   getDeployment,
   getStack,
   listAuditLogs,
@@ -21,12 +22,11 @@ import {
   searchResources,
   triggerDeployment
 } from './tools';
-import { deploymentEvents, driftEvents, policyViolationEvents, stackEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     listStacks,
+    getCurrentUser,
     getStack,
     createStack,
     deleteStack,
@@ -46,5 +46,5 @@ export let provider = Slate.create({
     listPolicyPacks,
     manageWebhooks
   ],
-  triggers: [stackEvents, deploymentEvents, driftEvents, policyViolationEvents]
+  triggers: []
 });

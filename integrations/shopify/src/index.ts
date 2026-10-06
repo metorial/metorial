@@ -24,14 +24,6 @@ import {
   updateCustomer,
   updateProduct
 } from './tools';
-import {
-  customerEvents,
-  fulfillmentEvents,
-  inventoryEvents,
-  orderEvents,
-  productEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,5 +50,5 @@ export let provider = Slate.create({
     managePages,
     manageMetafields
   ],
-  triggers: [orderEvents, productEvents, customerEvents, inventoryEvents, fulfillmentEvents]
+  triggers: []
 });

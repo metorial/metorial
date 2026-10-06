@@ -1,131 +1,15 @@
-# Slates Specification for Cloudinary
+# Cloudinary integration specification
 
-## Overview
+The public surface has eleven tools: upload_asset, search_assets, get_asset, update_asset, delete_assets, manage_tags, list_assets, manage_folders, get_usage, get_environment_context and download_asset. The first nine retain their existing input fields, types, defaults and command enums. Missing native asset details and usage metrics are omitted. Arbitrary context and structured metadata keys retain their spelling.
 
-Cloudinary is a cloud-based media management platform that provides APIs for uploading, storing, transforming, optimizing, and delivering images, videos, and other files. It offers an Admin API for asset management, an Upload API for ingesting media, and a Provisioning API for account-level management. Assets are delivered via a global CDN.
+HTTP Basic authentication uses the product environment's API key and secret. Cloud name and data-center region select the API route; they do not identify a person. Environment context reads native `/config?settings=true`, exposes only environment/folder settings and checks a returned cloud name when present. Key permissions govern access.
 
-## Authentication
+Admin mutations use form encoding; Search uses JSON; uploads use multipart form fields. Public IDs, tags, asset IDs and folder paths are encoded as complete route parameters. Context and metadata delimiter characters are escaped. Asset updates retain immutable identity across rename/update and verify requested state through an exact ID readback. The historical pending moderation enum remains accepted by the schema, but an invocation rejects it before any request: native moderation updates permit approved or rejected. A later failure can follow an accepted earlier write; read current state before retrying.
 
-Cloudinary uses **HTTP Basic Authentication** over HTTPS for both its Admin API and Upload API. Three credentials are required:
+Lists and search preserve native cursors. Root and subfolder listing forward SDK-documented max_results and next_cursor; page size is 1–500 and these endpoints are limited to 2000 results. Prefix filtering uses public ID paths, whereas dynamic folders use asset_folder in search. Bulk deletion preserves status maps, optional partial flags and continuation cursors; not_found is not counted as a deletion. Tag commands include the historical SDK-supported set_exclusive operation, which can remove matching tags from other assets.
 
-- **Cloud Name**: Identifies your specific Cloudinary product environment. It is part of every API endpoint URL (e.g., `https://api.cloudinary.com/v1_1/{cloud_name}/...`). Safe to expose in client-side code.
-- **API Key**: Used to identify your account. Safe to expose in client-side code.
-- **API Secret**: Used for authentication. Must never be exposed in client-side code.
+Original downloads use the documented GET `/asset/download` endpoint and immutable asset ID, with no transformation or signing invention. Fresh auth outputs include a derived Basic authorization value that file delivery substitutes using current connection credentials. Existing connections without it use a bounded 64 MiB content download, prohibit redirects and require the exact native asset size. HTML and JSON are valid raw originals; HTTP status handles documented errors, and configured credential bytes are refused in returned content. No expiring URL is issued, so renewal tooling is unnecessary. Actual deployed downloads and credential rotation need live verification.
 
-All three credentials can be found on the **API Keys** page of the Cloudinary Console Settings. Paid accounts can have multiple product environments, each with their own set of credentials.
+No triggers are registered. The package does not expose account provisioning, AI analysis, generated archives or other broader administration.
 
-**Basic Authentication** is the recommended method. You pass the API Key and API Secret either in the request URL or via an `Authorization` header:
-
-```
-Authorization: Basic base64(API_KEY:API_SECRET)
-```
-
-The endpoint format is:
-
-```
-https://api.cloudinary.com/v1_1/{cloud_name}/{resource_type}/{action}
-```
-
-For EU or Asia Pacific data centers, the base URL changes to `https://api-eu.cloudinary.com/...` or `https://api-ap.cloudinary.com/...`.
-
-**Signature-based authentication** is an alternative for the Upload API. You generate an SHA-1 or SHA-256 HMAC signature from the sorted request parameters and your API Secret, along with a Unix timestamp. This is primarily used for client-side uploads where you generate the signature server-side and pass it to the client.
-
-**Unsigned uploads** are also supported for client-side upload scenarios using upload presets, but with a limited set of allowed parameters.
-
-**Provisioning API** (Enterprise only) uses separate API keys and secrets from the standard ones, also authenticated via Basic Authentication.
-
-## Features
-
-### Asset Upload
-
-Upload images, videos, raw files, and other media from various sources (local files, remote URLs, S3, base64 data). Supports configuring public IDs, folders, tags, metadata, access control, and applying incoming transformations at upload time. Upload presets allow pre-configuring upload parameters for reuse.
-
-### Image and Video Transformations
-
-Apply a comprehensive set of on-the-fly transformations via URL parameters, including resizing, cropping, format conversion, effects, overlays/watermarks, background removal, and generative AI features (generative fill, object removal, generative replace). Supports named transformations for reuse and conditional transformations.
-
-### Media Optimization and Delivery
-
-Automatic format selection (WebP, AVIF, JPEG XL, etc.) and quality optimization based on the requesting device and browser. Assets are delivered through a global CDN. Supports responsive images and adaptive bitrate streaming (HLS/MPEG-DASH) for video.
-
-### Asset Management
-
-Full CRUD operations on assets: list, update, delete, rename, and relate assets. Manage folders, tags, contextual metadata, and structured metadata fields. Supports backup and version management, and restoring previous asset versions.
-
-### Search
-
-A powerful Search API that lets you find assets using search expressions across various fields including tags, metadata, format, size, dates, and more. Supports AI-powered Visual and Natural Language Search for finding images by description or using another image as reference (Enterprise only).
-
-### AI and Analysis
-
-Built-in and add-on AI capabilities including auto-tagging, content analysis, OCR text extraction, facial detection, image quality analysis, accessibility analysis, and content moderation (manual and AI-based via add-ons like Amazon Rekognition and WebPurify).
-
-### Media Access Control
-
-Control access to delivered assets via signed delivery URLs, token-based authentication (IP restrictions, time-limited URLs), and cookie-based authentication. Supports strict transformations mode to prevent unauthorized transformation generation.
-
-### Video Features
-
-Video-specific capabilities including trimming, concatenation, adaptive bitrate streaming, video transcription, video analytics, and live streaming. Includes an embeddable Video Player widget with customization options.
-
-### Account and User Provisioning
-
-The Provisioning API (Enterprise) allows managing product environments, users, user groups, and API keys programmatically. Supports SAML SSO for user authentication.
-
-### Programmatic Asset Creation
-
-Generate new assets programmatically including animated images/GIFs, ZIP archives, sprites, image collages, PDF files from images, and text-to-image generation.
-
-## Events
-
-Cloudinary supports webhook notifications that send HTTP POST requests to configured URLs when certain events occur.
-
-### Upload Events
-
-Notifications sent when an asset upload completes, including all details about the uploaded asset. Supports per-request notification URLs via the `notification_url` parameter and separate eager transformation completion notifications via `eager_notification_url`.
-
-### Asset Modification Events
-
-Notifications for asset changes including:
-
-- **Rename**: When an asset's public ID is changed.
-- **Delete**: When an asset is deleted.
-- **Display name change**: When an asset's display name is updated.
-- **Move**: When an asset is moved between folders.
-- **Tags**: When tags are added or removed from an asset.
-- **Context metadata**: When contextual metadata is added, updated, or removed.
-- **Structured metadata**: When structured metadata is added, updated, or removed.
-- **Access control**: When an asset's access control settings are updated.
-- **Related assets**: When asset relationships are added or removed.
-- **Version restore**: When a previous asset version is restored.
-
-### Folder Events
-
-Notifications when asset folders are created or deleted.
-
-### Moderation Events
-
-Notifications when moderation status changes on an asset (manual or AI-based moderation results).
-
-### Eager Transformation Events
-
-Notifications when asynchronous eager transformations complete, including the status and URLs of the generated derived assets.
-
-### Explode Events
-
-Notification when all derived assets from an explode operation (e.g., multi-page PDF to individual images) have been generated.
-
-### Multi/Archive Generation Events
-
-Notifications when multi-image or archive generation operations complete.
-
-### Creative Approval Events
-
-Notifications when the status of a proof changes during the creative approval flow (Enterprise/DAM feature).
-
-### Configuration
-
-- Global notification URLs can be configured in the Console Settings or programmatically via the Admin API's triggers method.
-- Up to 30 notification URLs per product environment, each assignable to specific event types.
-- Per-request notification URLs can override or supplement global URLs.
-- All notifications include `X-Cld-Signature` and `X-Cld-Timestamp` headers for signature verification using your API Secret.
+Sources: [Admin API](https://cloudinary.com/documentation/admin_api), [Upload API including asset download](https://cloudinary.com/documentation/image_upload_api_reference), [Search](https://cloudinary.com/documentation/search_method), [Contextual metadata](https://cloudinary.com/documentation/contextual_metadata), [Folder modes](https://cloudinary.com/documentation/dam_folder_modes), [Official Node tag implementation](https://github.com/cloudinary/cloudinary_npm/blob/master/lib/uploader.js), [Official Node folder paging](https://github.com/cloudinary/cloudinary_npm/blob/master/lib/api.js).

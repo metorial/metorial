@@ -148,7 +148,6 @@ import {
   listShipments,
   listWarehouses
 } from './tools/supply-chain';
-import { inboundWebhook, recordChanged } from './triggers';
 
 let action = relabelDynamicsAction;
 
@@ -290,8 +289,5 @@ export let provider = Slate.create({
     action(listBusinessCentralJournals, 'business_central_list_journals'),
     action(listDocumentAttachments, 'business_central_list_document_attachments')
   ],
-  triggers: [
-    action(inboundWebhook, 'dataverse_inbound_webhook'),
-    action(recordChanged, 'dataverse_record_changed')
-  ]
+  triggers: []
 });

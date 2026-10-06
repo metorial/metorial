@@ -1,10 +1,12 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  cancelRegulation,
   getAuditLogs,
   getEventAudit,
   listLibraries,
   listRegulations,
+  listTrackingPlanEvents,
   listTrackingPlans,
   listTransformations,
   manageLibrary,
@@ -17,8 +19,6 @@ import {
   suppressUser,
   testEventDelivery
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -37,7 +37,9 @@ export let provider = Slate.create({
     manageRetlSync,
     testEventDelivery,
     getEventAudit,
-    getAuditLogs
+    getAuditLogs,
+    listTrackingPlanEvents,
+    cancelRegulation
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

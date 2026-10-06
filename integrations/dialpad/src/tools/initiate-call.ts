@@ -1,7 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DialpadClient } from '../lib/client';
+import { malformed } from '../lib/contracts';
+import { invoke } from '../lib/operations';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  callId: z
+    .string()
+    .optional()
+    .describe(
+      'Call ID only when supplied by the provider; device initiation does not return one.'
+    ),
+  accepted: z
+    .boolean()
+    .describe('Whether the native device accepted initiation, without confirming connection.'),
+  deviceId: z.string(),
+  callerUserId: z.string(),
+  callState: z.string().optional().describe('Current state of the call'),
+  isRecording: z.boolean().optional().describe('Whether the call is being recorded')
+});
 
 export let initiateCallTool = SlateTool.create(spec, {
   name: 'Initiate Call',
@@ -16,43 +33,27 @@ export let initiateCallTool = SlateTool.create(spec, {
     z.object({
       callerUserId: z.string().describe('User ID of the person making the call'),
       phoneNumber: z.string().optional().describe('Phone number to call (E.164 format)'),
-      targetUserId: z.number().optional().describe('Dialpad user ID to call internally'),
+      targetUserId: z
+        .number()
+        .optional()
+        .describe(
+          'Destination user ID; resolved only when the user has one unique phone number.'
+        ),
       groupType: z
         .string()
         .optional()
-        .describe('Group type for group calls (e.g., "department", "callcenter")'),
+        .describe(
+          'Outbound caller identity group type: office, department or callcenter; not the destination.'
+        ),
       groupId: z.number().optional().describe('Group ID for group calls'),
       customData: z.string().optional().describe('Custom data to attach to the call')
     })
   )
-  .output(
-    z.object({
-      callId: z.string().describe('Unique call ID'),
-      callState: z.string().optional().describe('Current state of the call'),
-      isRecording: z.boolean().optional().describe('Whether the call is being recorded')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new DialpadClient({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment
-    });
-
-    let call = await client.initiateCall(ctx.input.callerUserId, {
-      phone_number: ctx.input.phoneNumber,
-      user_id: ctx.input.targetUserId,
-      group_type: ctx.input.groupType,
-      group_id: ctx.input.groupId,
-      custom_data: ctx.input.customData
-    });
-
-    return {
-      output: {
-        callId: String(call.id),
-        callState: call.call_state,
-        isRecording: call.is_recording
-      },
-      message: `Initiated call **${call.id}** for user ${ctx.input.callerUserId}${ctx.input.phoneNumber ? ` to ${ctx.input.phoneNumber}` : ''}`
-    };
+    const result = await invoke(ctx, 'initiate_call');
+    const output = outputSchema.safeParse(result.output);
+    if (!output.success) malformed();
+    return { output: output.data, message: result.message };
   })
   .build();

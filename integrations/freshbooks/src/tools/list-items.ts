@@ -1,7 +1,30 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FreshBooksClient } from '../lib/client';
+import { scopeInput } from '../lib/contracts';
+import { invoke } from '../lib/operations';
 import { spec } from '../spec';
+
+const outputSchema = z
+  .object({
+    items: z.array(
+      z.object({
+        itemId: z.number(),
+        name: z.string().nullable().optional(),
+        description: z.string().nullable().optional(),
+        unitCost: z.any().optional(),
+        inventory: z.string().nullable().optional(),
+        sku: z.string().nullable().optional()
+      })
+    ),
+    totalCount: z.number(),
+    currentPage: z.number(),
+    totalPages: z.number()
+  })
+  .extend({
+    raw: z.record(z.string(), z.unknown()).optional(),
+    acknowledged: z.boolean().optional(),
+    readbackRequired: z.boolean().optional()
+  });
 
 export let listItems = SlateTool.create(spec, {
   name: 'List Items',
@@ -14,57 +37,11 @@ export let listItems = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...scopeInput,
       page: z.number().optional().describe('Page number (default: 1)'),
       perPage: z.number().optional().describe('Results per page')
     })
   )
-  .output(
-    z.object({
-      items: z.array(
-        z.object({
-          itemId: z.number(),
-          name: z.string().nullable().optional(),
-          description: z.string().nullable().optional(),
-          unitCost: z.any().optional(),
-          inventory: z.string().nullable().optional(),
-          sku: z.string().nullable().optional()
-        })
-      ),
-      totalCount: z.number(),
-      currentPage: z.number(),
-      totalPages: z.number()
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new FreshBooksClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId,
-      businessId: ctx.config.businessId
-    });
-
-    let params: Record<string, string | number> = {};
-    if (ctx.input.page) params.page = ctx.input.page;
-    if (ctx.input.perPage) params.per_page = ctx.input.perPage;
-
-    let result = await client.listItems(params);
-
-    let items = (result.items || []).map((i: any) => ({
-      itemId: i.id || i.itemid,
-      name: i.name,
-      description: i.description,
-      unitCost: i.unit_cost,
-      inventory: i.inventory,
-      sku: i.sku
-    }));
-
-    return {
-      output: {
-        items,
-        totalCount: result.total || items.length,
-        currentPage: result.page || 1,
-        totalPages: result.pages || 1
-      },
-      message: `Found **${result.total || items.length}** items.`
-    };
-  })
+  .output(outputSchema)
+  .handleInvocation(async ctx => invoke('list_items', ctx, outputSchema))
   .build();

@@ -1,15 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { connection } from '../lib/client';
 import { spec } from '../spec';
 
 export let getRecord = SlateTool.create(spec, {
   name: 'Get Record',
   key: 'get_record',
-  description: `Retrieve a single NetSuite record by its type and internal ID. Supports all standard and custom record types (e.g., customer, salesOrder, invoice, vendor, inventoryItem, journalEntry, employee, etc.).
+  description: `Retrieve a NetSuite record by its internal ID or eid:<externalId>. Discover types available to your role with list_record_types and supported reads with get_record_metadata.
 Optionally expand sub-resources (like line items) and select specific fields to return.`,
   instructions: [
-    'Use the exact NetSuite record type name in camelCase (e.g., "salesOrder", "inventoryItem", "journalEntry").',
+    'Use the exact native type name returned by list_record_types.',
     'Set expandSubResources to true to include sublists and related data inline.'
   ],
   tags: {
@@ -18,12 +18,10 @@ Optionally expand sub-resources (like line items) and select specific fields to 
 })
   .input(
     z.object({
-      recordType: z
+      recordType: z.string().describe('Exact native record type from list_record_types'),
+      recordId: z
         .string()
-        .describe(
-          'NetSuite record type in camelCase (e.g., "customer", "salesOrder", "invoice", "vendor", "inventoryItem")'
-        ),
-      recordId: z.string().describe('Internal ID of the record to retrieve'),
+        .describe('Exact internal ID or eid:<externalId> of the record to retrieve'),
       expandSubResources: z
         .boolean()
         .optional()
@@ -40,10 +38,7 @@ Optionally expand sub-resources (like line items) and select specific fields to 
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      ...ctx.auth,
-      accountId: ctx.config.accountId
-    });
+    const client = connection(ctx.auth, ctx.config);
 
     let record = await client.getRecord(ctx.input.recordType, ctx.input.recordId, {
       expandSubResources: ctx.input.expandSubResources,

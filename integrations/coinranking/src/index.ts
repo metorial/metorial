@@ -10,8 +10,6 @@ import {
   listReferenceCurrencies,
   searchCoins
 } from './tools';
-import { coinPriceChangeTrigger, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     getGlobalStats,
     listReferenceCurrencies
   ],
-  triggers: [inboundWebhook, coinPriceChangeTrigger]
+  triggers: []
 });

@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getEmployeeDirectory = SlateTool.create(spec, {
   name: 'Get Employee Directory',
   key: 'get_employee_directory',
-  description: `Retrieve the full company employee directory, including all employees' names, contact information, job titles, departments, and other directory fields. Useful for getting an overview of the entire organization.`,
+  description: `Retrieve employee directory entries visible under the company's directory sharing settings. This is a permission-limited directory, not a complete employee roster or headcount.`,
   tags: {
     readOnly: true,
     destructive: false
@@ -22,19 +22,16 @@ export let getEmployeeDirectory = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getEmployeeDirectory();
 
     return {
       output: {
-        fieldNames: data.fields || [],
-        employees: data.employees || []
+        fieldNames: data.fields,
+        employees: data.employees
       },
-      message: `Retrieved directory with **${(data.employees || []).length}** employees.`
+      message: `Retrieved directory with **${data.employees.length}** employees.`
     };
   })
   .build();

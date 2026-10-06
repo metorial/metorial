@@ -1,17 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageIdSchema, paginationFields } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listIncidentTemplates = SlateTool.create(spec, {
   name: 'List Incident Templates',
   key: 'list_incident_templates',
-  description: `List all incident templates configured for the status page. Templates contain pre-filled incident names, messages, statuses, and component associations for quick incident creation.`,
+  description: `List a page of incident templates configured for the status page. Templates contain pre-filled incident names, messages, statuses, and component associations for quick incident creation.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ pageId: pageIdSchema, ...paginationFields }))
   .output(
     z.object({
       templates: z
@@ -42,10 +43,13 @@ export let listIncidentTemplates = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, pageId: ctx.config.pageId });
-    let raw = await client.listIncidentTemplates();
+    let client = new Client({
+      token: ctx.auth.token,
+      pageId: ctx.input.pageId ?? ctx.config.pageId
+    });
+    let raw = await client.listIncidentTemplates(ctx.input);
 
-    let templates = raw.map((t: any) => ({
+    let templates = raw.map(t => ({
       templateId: t.id,
       name: t.name,
       title: t.title,
@@ -53,8 +57,8 @@ export let listIncidentTemplates = SlateTool.create(spec, {
       groupId: t.group_id,
       updateStatus: t.update_status,
       shouldTweet: t.should_tweet,
-      shouldNotifySubscribers: t.should_notify_subscribers,
-      componentIds: t.component_ids
+      shouldNotifySubscribers: t.should_send_notifications,
+      componentIds: t.components?.map(component => component.id)
     }));
 
     return {

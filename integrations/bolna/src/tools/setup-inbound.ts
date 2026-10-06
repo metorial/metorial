@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let setupInbound = SlateTool.create(spec, {
   key: 'setup_inbound',
   description: `Link or unlink a Bolna agent to a phone number for handling inbound calls. When linked, the agent automatically answers incoming calls to that number.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -37,7 +37,8 @@ export let setupInbound = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
 
     if (ctx.input.action === 'link') {
-      if (!ctx.input.agentId) throw new Error('agentId is required to link an agent');
+      if (!ctx.input.agentId)
+        throw createApiServiceError('agentId is required to link an agent');
 
       let result = await client.setupInbound(ctx.input.agentId, ctx.input.phoneNumberId);
 

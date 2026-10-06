@@ -34,7 +34,8 @@ export let listSurveys = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     let surveys = await client.listSurveys({
@@ -42,13 +43,13 @@ export let listSurveys = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let mapped = surveys.map((s: any) => ({
+    let mapped = surveys.map(s => ({
       surveyId: s.id,
-      name: s.name ?? '',
-      status: s.status ?? '',
-      type: s.type ?? '',
-      createdAt: s.createdAt ?? '',
-      updatedAt: s.updatedAt ?? ''
+      name: s.name,
+      status: s.status,
+      type: s.type,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt
     }));
 
     return {

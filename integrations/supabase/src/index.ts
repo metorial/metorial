@@ -19,8 +19,6 @@ import {
   queryTable,
   runQuery
 } from './tools';
-import { databaseChangesTrigger, databaseWebhookTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     getProjectLogs,
     getDatabaseSchema
   ],
-  triggers: [databaseChangesTrigger, databaseWebhookTrigger]
+  triggers: []
 });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { transactionFields, transactionPayload } from '../lib/schemas';
 import { spec } from '../spec';
 
 let tmsCheckSummarySchema = z.object({
@@ -34,6 +35,7 @@ export let listTmsChecks = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of records returned in this response'),
       checks: z.array(tmsCheckSummarySchema).describe('List of transaction checks')
     })
   )
@@ -48,10 +50,10 @@ export let listTmsChecks = SlateTool.create(spec, {
       type: ctx.input.type,
       limit: ctx.input.limit,
       offset: ctx.input.offset,
-      extended_tags: true
+      extended_tags: false
     });
 
-    let checks = (result.checks || []).map((c: any) => ({
+    let checks = result.checks.map(c => ({
       checkId: c.id,
       name: c.name,
       type: c.type,
@@ -65,7 +67,7 @@ export let listTmsChecks = SlateTool.create(spec, {
     }));
 
     return {
-      output: { checks },
+      output: { checks, returnedCount: checks.length },
       message: `Found **${checks.length}** transaction check(s).`
     };
   })
@@ -109,7 +111,7 @@ export let getTmsCheck = SlateTool.create(spec, {
     });
 
     let result = await client.getTmsCheck(ctx.input.checkId);
-    let c = result.check || result;
+    let c = result;
 
     return {
       output: {
@@ -160,8 +162,73 @@ export let deleteTmsCheck = SlateTool.create(spec, {
     let result = await client.deleteTmsCheck(ctx.input.checkId);
 
     return {
-      output: { message: result.message || 'Transaction check deleted successfully' },
+      output: {
+        message:
+          ('message' in result && typeof result.message === 'string'
+            ? result.message
+            : undefined) || 'Transaction check deleted successfully'
+      },
       message: `Deleted transaction check **${ctx.input.checkId}**.`
+    };
+  })
+  .build();
+
+export const createTmsCheck = SlateTool.create(spec, {
+  name: 'Create Transaction Check',
+  key: 'create_tms_check',
+  description:
+    'Creates a transaction check that executes a sequence of browser steps. Active checks can access the specified targets and send alerts; use active false for an inactive check.',
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      ...transactionFields,
+      name: transactionFields.name.unwrap(),
+      steps: transactionFields.steps.unwrap()
+    })
+  )
+  .output(z.object({ checkId: z.number(), name: z.string().optional() }))
+  .handleInvocation(async ctx => {
+    const result = await new Client(ctx.auth).createTmsCheck(transactionPayload(ctx.input));
+    return {
+      output: { checkId: result.id, name: result.name ?? ctx.input.name },
+      message: `Created transaction check ${result.id}.`
+    };
+  })
+  .build();
+
+export const updateTmsCheck = SlateTool.create(spec, {
+  name: 'Update Transaction Check',
+  key: 'update_tms_check',
+  description:
+    'Updates a transaction check configuration, steps, active state or alert recipients. Fields omitted from the request remain unchanged.',
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      checkId: z
+        .number()
+        .int()
+        .positive()
+        .describe('Transaction check ID from list_tms_checks'),
+      ...transactionFields
+    })
+  )
+  .output(
+    z.object({
+      checkId: z.number(),
+      name: z.string().optional(),
+      active: z.boolean().optional()
+    })
+  )
+  .handleInvocation(async ctx => {
+    const result = await new Client(ctx.auth).updateTmsCheck(
+      ctx.input.checkId,
+      transactionPayload(ctx.input)
+    );
+    return {
+      output: { checkId: ctx.input.checkId, name: result.name, active: result.active },
+      message: `Updated transaction check ${ctx.input.checkId}.`
     };
   })
   .build();

@@ -1,81 +1,55 @@
-The search results for webhooks were about different products (TheHive, Hive, Honeycomb), not HoneyHive. Let me look at HoneyHive's API reference and alerts feature more closely.Now I have a good picture of HoneyHive. Let me also check for their alerts feature and any webhook/event support specifically from HoneyHive (not other products).Now I have enough information to write the specification. Based on my research, HoneyHive does not appear to support outbound webhooks or event subscriptions via its API. Its "Alerts" feature seems to be an internal monitoring/notification system (likely Slack/email notifications from the dashboard), not a webhook API. Let me compile the specification.
+# HoneyHive integration
 
-# Slates Specification for Honeyhive
+Manage trace sessions and events, evaluation datasets and datapoints, prompt configurations, metrics, and experiment runs in the project authorized by the connection API key.
 
-## Overview
+## Authentication and migration
 
-HoneyHive is an AI observability and evaluation platform for tracing, monitoring, and evaluating LLM applications and AI agents. It provides distributed tracing, offline experimentation, online evaluations, prompt management, dataset curation, and annotation queues across the AI development lifecycle. The platform is built on OpenTelemetry and supports Python and TypeScript SDKs as well as a REST API.
+Use a project-scoped HoneyHive data-plane API key as a Bearer token. The managed-cloud default is `https://api.dp1.us.honeyhive.ai`. Dedicated and self-hosted deployments can specify their data-plane URL. Stored connections using the former managed-cloud URL `https://api.honeyhive.ai` automatically use the new default host, but their classic API keys must be replaced with current project-scoped keys.
 
-## Authentication
+The optional legacy `project` configuration and tool fields remain accepted for compatibility. They do not select or override a project: the API key determines the project. Use separate connections and project-scoped keys for separate projects. Control-plane and ingestion-only credentials do not grant these resource-management operations.
 
-HoneyHive uses **Bearer Token authentication** via API keys.
+Project administration requires separate control-plane credentials. The existing `list_projects`, `create_project`, `update_project`, and `delete_project` keys are retained and marked deprecated; they return an explicit provider limitation without sending an API request. Manage projects in HoneyHive administration. This connection does not add organization or workspace provisioning.
 
-- Obtain an API key from the HoneyHive Account Settings page within the application.
-- Include the API key as a Bearer token in the `Authorization` header of all REST API requests:
-  ```
-  Authorization: Bearer <YOUR_API_KEY>
-  ```
-- The base API URL for the managed cloud is `https://api.honeyhive.ai`.
-- For self-hosted or dedicated deployments, a custom `server_url` is required, available from the Settings page in the HoneyHive app.
+The data-plane API has no documented current-user/profile endpoint. No identity tool or OAuth refresh flow is invented.
 
-There are no OAuth flows or scopes. Authentication is solely API key-based. All API keys are scoped to a workspace/team.
+## Capabilities
 
-## Features
+| Resource | Supported operations |
+| --- | --- |
+| Sessions | Start a session and retrieve the session event by correlation ID |
+| Events | Log one event or a batch, query by structured filters and date range, retrieve an event by row ID, update trace fields, post feedback |
+| Datasets | List by dataset ID, create, update name/description/datapoint membership, delete, import mapped records |
+| Datapoints | List by IDs or dataset name, create, retrieve, update, delete |
+| Prompt configurations | List by name/environment, create, update, delete |
+| Metrics | List, create, update, delete; legacy custom/model/human values map to PYTHON/LLM/HUMAN |
+| Experiment runs | List by IDs/dataset/name/status with sorting and pagination; create, retrieve, update, delete; retrieve results and compare runs |
 
-### Project Management
+Session correlation IDs differ from event row IDs. `start_session` and `get_session` return `sessionId` for associating child events and `eventId` for updating or enriching the session event. Session reads query for a session-typed event with the requested correlation ID; they never treat the correlation ID as an event row ID.
 
-Create and manage projects, which serve as the top-level organizational unit for all traces, evaluations, datasets, and prompts. Projects group related AI application data together.
+`delete_event` and `delete_session` retain their keys and schemas and are marked deprecated. They return an explicit provider limitation because the data-plane API has no individual trace deletion endpoint. There are no triggers.
 
-### Tracing (Sessions & Events)
+## Compatibility details
 
-Log and manage distributed traces of AI application execution. A trace consists of a root session event and nested child events (model, tool, and chain types). Traces capture inputs, outputs, errors, duration, metadata, user properties, and feedback. Events can be created individually or in batches.
+Requests follow the [current data-plane OpenAPI specification](https://github.com/honeyhiveai/honeyhive-openapi/blob/main/data_plane_openapi.json), version 1.9.0, and the [current TypeScript migration guide](https://docs.honeyhive.ai/v2/sdk-reference/typescript-logger-to-api-sdk-migration). Session and event creation use bare bodies at `/v1/sessions` and `/v1/events`; batch creation translates `isSingleSession` to `single_session`. Event updates put the row ID in the URL. Resource updates and deletes use documented `/v1/` paths.
 
-- Sessions represent complete interactions or requests.
-- Model events track LLM inference calls.
-- Tool events track external API calls, database queries, etc.
-- Chain events group multiple steps into composable units.
+The documented `/v1/events/export`, `/v1/runs/{run_id}/result`, and `/v1/runs/{new_run_id}/compare-with/{old_run_id}` compatibility routes preserve the existing query/result/comparison tool contracts. Trace queries return structured event data, not a generated file. Event filters require scalar values and documented operators; legacy `id` type maps to `string`. Date ranges require both `from` and `to`. Query counts map from the provider's `count` field.
 
-### Monitoring & Dashboards
+Run filters and pagination use the provider API. Page sizes above the provider's 100-result maximum are assembled from provider pages to preserve existing tool input limits. Legacy `run_id` sorting loads and sorts the complete filtered collection, so it can require several requests. Other sorting is performed by the provider. Optional legacy result/comparison `projectId` fields do not override API-key scope.
 
-Query and analyze production traces with custom charts and filters. Aggregate cost, latency, token usage, and custom quality metrics across traces. Build custom queries to explore data and validate hypotheses about system behavior.
+Current provider contracts no longer support session-creation `error`, dataset metadata, dataset type filters, fine-tuning/session-pipeline dataset settings, or run-update `datasetId`. These existing schema fields remain present and return explicit validation errors when unsupported values are supplied. The legacy dataset creation defaults `evaluation` and `event` are accepted for compatibility without sending obsolete fields. Set a run dataset during creation and log errors on child events.
 
-### Evaluations & Experiments
+For custom metrics, `codeSnippet` maps to evaluator `criteria`; for model metrics, `prompt` maps to `criteria`. Human metrics use `criteria` directly. `passWhen` belongs inside `threshold`, and event selectors map to provider filters. Partial threshold/filter updates preserve unrelated existing settings. Creation outputs include the prompt/metric ID so subsequent calls and cleanup can use the created resource directly.
 
-Run offline experiments to evaluate AI application performance against curated datasets. Supports programmatic evaluation via SDK with custom evaluator functions. Compare experiment results across multiple runs to detect regressions.
+## Live verification boundaries
 
-- Evaluators can be code-based or LLM-as-a-judge.
-- Experiments can use local datasets or server-managed datasets referenced by ID.
-- Online evaluations can run against live production traces.
+The live suite creates and deletes only resources with documented deletion APIs and confirms changes by reading them back. It registers recovery cleanup before mutation-readback assertions and also deletes datapoints created by dataset imports. It does not assume dataset deletion cascades datapoints or project deletion cascades traces.
 
-### Datasets
+Trace creation/enrichment scenarios are gated because current project-scoped credentials cannot provision a disposable isolated project or delete individual traces. Optional existing session/event IDs support read-only scenarios. The suite remains active when local credentials are unavailable; missing credentials are reported as setup failures.
 
-Create, manage, and version datasets for use in experiments and evaluations. Datasets consist of input/output pairs with optional ground truths. They can be uploaded via the UI (JSON, JSONL, CSV) or via the SDK/API. Production traces can be converted into datasets for iterative improvement.
+## Official references
 
-### Prompt Management
-
-Centrally manage and version prompts outside of application code. Prompts can be deployed to specific environments (dev, staging, prod) and fetched dynamically at runtime via the API. Supports YAML export for local use. Domain experts can iterate on prompts independently through the UI.
-
-- Prompts are scoped to projects and environments.
-- Configurations can be retrieved by project, environment, and name.
-
-### Annotation Queues
-
-Collect human feedback from domain experts on traces. Turn qualitative insights into labeled datasets for evaluation or fine-tuning.
-
-### Feedback & Metrics
-
-Post user feedback and custom metrics against specific sessions or events. This data can be used for monitoring quality and building evaluation datasets.
-
-### Alerts
-
-Set up alerts to monitor critical failures or metric drift over time. Alerts trigger when quality metrics degrade based on configured conditions.
-
-- Alerts are configured in the HoneyHive dashboard.
-
-### Administration
-
-Manage workspace settings, invite teammates, and configure role-based access control (RBAC). Supports SSO and SAML for enterprise authentication.
-
-## Events
-
-The provider does not support webhooks or event subscriptions through its API. HoneyHive's alerting system is configured through the platform dashboard and delivers notifications internally (e.g., via Slack or email integrations configured in the UI), but it does not expose a webhook registration or event subscription API for external consumers.
+- [Current TypeScript SDK](https://docs.honeyhive.ai/v2/sdk-reference/typescript)
+- [Logger-to-current-SDK migration](https://docs.honeyhive.ai/v2/sdk-reference/typescript-logger-to-api-sdk-migration)
+- [Data-plane OpenAPI](https://github.com/honeyhiveai/honeyhive-openapi/blob/main/data_plane_openapi.json)
+- [API key types](https://docs.honeyhive.ai/v2/workspace/api-keys)
+- [Platform architecture](https://docs.honeyhive.ai/v2/platform-architecture)

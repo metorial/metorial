@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'emailoctopus',
   name: 'EmailOctopus',
   description:
-    'Email marketing platform for managing contact lists, sending campaigns, and running automated email sequences.',
+    'Email marketing platform for managing contact lists and fields, reviewing campaign reports, and starting configured automations.',
   metadata: {},
   config,
   auth

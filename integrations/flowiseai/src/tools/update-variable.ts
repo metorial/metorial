@@ -17,7 +17,7 @@ export let updateVariable = SlateTool.create(spec, {
       variableId: z.string().describe('ID of the variable to update'),
       name: z.string().optional().describe('Updated variable name'),
       value: z.string().optional().describe('Updated variable value'),
-      type: z.string().optional().describe('Updated variable type')
+      type: z.string().optional().describe('Updated variable mode: static or runtime')
     })
   )
   .output(

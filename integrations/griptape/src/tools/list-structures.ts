@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listStructures = SlateTool.create(spec, {
@@ -14,8 +15,8 @@ export let listStructures = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number to retrieve'),
-      pageSize: z.number().optional().describe('Number of items per page')
+      page: z.number().int().min(1).optional().describe('Page number to retrieve'),
+      pageSize: z.number().int().min(1).optional().describe('Number of items per page')
     })
   )
   .output(
@@ -26,11 +27,13 @@ export let listStructures = SlateTool.create(spec, {
             structureId: z.string().describe('ID of the structure'),
             name: z.string().describe('Name of the structure'),
             description: z.string().optional().describe('Description of the structure'),
+            deploymentId: z.string().optional().describe('Latest deployment ID'),
             createdAt: z.string().describe('Creation timestamp'),
             updatedAt: z.string().describe('Last update timestamp')
           })
         )
         .describe('List of structures'),
+      pagination: paginationSchema.optional().describe('Page navigation metadata'),
       totalCount: z.number().describe('Total number of structures'),
       totalPages: z.number().describe('Total number of pages')
     })
@@ -46,6 +49,7 @@ export let listStructures = SlateTool.create(spec, {
       structureId: s.structure_id,
       name: s.name,
       description: s.description,
+      deploymentId: s.latest_deployment_id,
       createdAt: s.created_at,
       updatedAt: s.updated_at
     }));
@@ -53,6 +57,7 @@ export let listStructures = SlateTool.create(spec, {
     return {
       output: {
         structures,
+        pagination: result.pagination,
         totalCount: result.pagination.totalCount,
         totalPages: result.pagination.totalPages
       },

@@ -20,8 +20,6 @@ import {
   sendMessage,
   updateAgent
 } from './tools';
-import { inboundWebhook, newConversation, newMessage } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     getCitation,
     getAccountInfo
   ],
-  triggers: [inboundWebhook, newConversation, newMessage]
+  triggers: []
 });

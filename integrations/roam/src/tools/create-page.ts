@@ -26,6 +26,10 @@ After creation, blocks can be added to the page using the Create Block tool.`,
   )
   .output(
     z.object({
+      pageUid: z.string().describe('Exact target UID for independent reads and recovery'),
+      verified: z
+        .boolean()
+        .describe('Whether the requested outcome was confirmed by an exact read'),
       success: z.boolean().describe('Whether the page was created successfully')
     })
   )
@@ -38,8 +42,12 @@ After creation, blocks can be added to the page using the Create Block tool.`,
     let result = await client.createPage(ctx.input.title, ctx.input.pageUid);
 
     return {
-      output: { success: result.success },
-      message: `Page **"${ctx.input.title}"** created successfully in graph **${ctx.config.graphName}**.`
+      output: {
+        success: result.success,
+        pageUid: result.targetUid,
+        verified: result.verified
+      },
+      message: 'Created the page and confirmed its exact UID and title.'
     };
   })
   .build();

@@ -24,8 +24,6 @@ import {
   updateDeal,
   updatePerson
 } from './tools';
-import { companyChanges, dealChanges, inboundWebhook, personChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -52,5 +50,5 @@ export let provider = Slate.create({
     listDealStages,
     listCustomFieldLabels
   ],
-  triggers: [inboundWebhook, dealChanges, personChanges, companyChanges]
+  triggers: []
 });

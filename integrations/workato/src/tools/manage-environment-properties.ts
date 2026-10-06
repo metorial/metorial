@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import { invalid, native } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageEnvironmentPropertiesTool = SlateTool.create(spec, {
@@ -23,7 +24,7 @@ export let manageEnvironmentPropertiesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
+      success: z.boolean().optional().describe('Whether the operation succeeded'),
       properties: z
         .record(z.string(), z.string())
         .optional()
@@ -31,27 +32,20 @@ export let manageEnvironmentPropertiesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-
+    const client = createClient(ctx);
     if (ctx.input.action === 'list') {
-      let result = await client.listProperties(ctx.input.prefix);
-      let props = result.properties ?? result;
+      const result = await client.listProperties(ctx.input.prefix);
+      const properties = native(result, z.record(z.string(), z.string()));
       return {
-        output: {
-          success: true,
-          properties: typeof props === 'object' ? props : {}
-        },
-        message: `Retrieved environment properties${ctx.input.prefix ? ` with prefix "${ctx.input.prefix}"` : ''}.`
+        output: { success: true, properties },
+        message: 'Retrieved properties matching the explicit prefix.'
       };
     }
-
-    // upsert
-    if (!ctx.input.properties || Object.keys(ctx.input.properties).length === 0) {
-      throw new Error('Properties are required for upsert');
-    }
+    if (!ctx.input.properties) invalid('Properties are required for upsert.');
     await client.upsertProperties(ctx.input.properties);
     return {
       output: { success: true },
-      message: `Upserted **${Object.keys(ctx.input.properties).length}** environment properties.`
+      message:
+        'Properties upsert accepted. No deletion API is provided by this tool; configuration and recipe effects are retained.'
     };
   });

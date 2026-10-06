@@ -13,10 +13,10 @@ import {
   manageTool,
   runEvaluation
 } from './tools';
-import { inboundWebhook, newEvaluations, newLogs } from './triggers';
 
 export let provider = Slate.create({
   spec,
+  triggers: [],
   tools: [
     managePrompt,
     callPrompt,
@@ -29,6 +29,5 @@ export let provider = Slate.create({
     logPromptResult,
     deployPrompt,
     manageDirectory
-  ],
-  triggers: [inboundWebhook, newLogs, newEvaluations]
+  ]
 });

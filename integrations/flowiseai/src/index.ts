@@ -12,12 +12,15 @@ import {
   deleteChatflow,
   deleteChatMessages,
   deleteDocumentStore,
+  deleteDocumentStoreVectors,
   deleteTool,
   deleteVariable,
   getAssistant,
   getChatflow,
   getChatMessages,
   getDocumentStore,
+  getDocumentStoreChunks,
+  getTool,
   getUpsertHistory,
   listAssistants,
   listChatflows,
@@ -31,12 +34,12 @@ import {
   sendPrediction,
   updateAssistant,
   updateChatflow,
+  updateDocumentStore,
   updateTool,
   updateVariable,
+  upsertDocumentStore,
   upsertVectorData
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -54,8 +57,11 @@ export let provider = Slate.create({
     deleteAssistant,
     listDocumentStores,
     getDocumentStore,
+    getDocumentStoreChunks,
+    getTool,
     createDocumentStore,
     deleteDocumentStore,
+    deleteDocumentStoreVectors,
     queryVectorStore,
     upsertVectorData,
     getChatMessages,
@@ -67,6 +73,8 @@ export let provider = Slate.create({
     listTools,
     createTool,
     updateTool,
+    updateDocumentStore,
+    upsertDocumentStore,
     deleteTool,
     listVariables,
     createVariable,
@@ -75,5 +83,5 @@ export let provider = Slate.create({
     getUpsertHistory,
     ping
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

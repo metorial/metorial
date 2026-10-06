@@ -29,13 +29,6 @@ import {
   updateInvoice,
   voidInvoice
 } from './tools';
-import {
-  contactChanges,
-  inboundWebhook,
-  invoiceChanges,
-  paymentReceivedChanges
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -67,5 +60,5 @@ export let provider = Slate.create({
     listDocumentTypes,
     listTaxes
   ],
-  triggers: [inboundWebhook, invoiceChanges, contactChanges, paymentReceivedChanges]
+  triggers: []
 });

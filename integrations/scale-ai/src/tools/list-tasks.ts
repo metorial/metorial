@@ -21,6 +21,14 @@ export let listTasks = SlateTool.create(spec, {
         .describe('Filter by task status'),
       taskType: z.string().optional().describe('Filter by task type (e.g., imageannotation)'),
       tags: z.string().optional().describe('Filter by tags (comma-separated)'),
+      uniqueId: z
+        .string()
+        .optional()
+        .describe('Filter by deduplication identifier (comma-separated for multiple)'),
+      includeAttachmentUrl: z
+        .boolean()
+        .optional()
+        .describe('Include temporary URLs for the task source files'),
       customerReviewStatus: z
         .string()
         .optional()
@@ -53,6 +61,7 @@ export let listTasks = SlateTool.create(spec, {
         .describe('Filter tasks updated before this ISO 8601 timestamp'),
       limit: z
         .number()
+        .int()
         .min(1)
         .max(100)
         .optional()
@@ -90,6 +99,8 @@ export let listTasks = SlateTool.create(spec, {
       status: ctx.input.status,
       type: ctx.input.taskType,
       tags: ctx.input.tags,
+      uniqueId: ctx.input.uniqueId,
+      includeAttachmentUrl: ctx.input.includeAttachmentUrl,
       customerReviewStatus: ctx.input.customerReviewStatus,
       completedAfter: ctx.input.completedAfter,
       completedBefore: ctx.input.completedBefore,
@@ -116,7 +127,7 @@ export let listTasks = SlateTool.create(spec, {
         tasks,
         total: result.total,
         hasMore: result.has_more,
-        nextToken: result.next_token
+        nextToken: result.next_token ?? undefined
       },
       message: `Found **${tasks.length}** task(s)${result.total ? ` out of ${result.total} total` : ''}.${result.has_more ? ' More results available.' : ''}`
     };

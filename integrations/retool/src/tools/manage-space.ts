@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageSpace = SlateTool.create(spec, {
@@ -42,11 +42,11 @@ export let manageSpace = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.spaceName || !ctx.input.domain) {
-        throw new Error('spaceName and domain are required for the create action');
+        throw invalid('spaceName and domain are required for the create action');
       }
       let result = await client.createSpace({
         name: ctx.input.spaceName,
@@ -72,7 +72,7 @@ export let manageSpace = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.spaceId) {
-        throw new Error('spaceId is required for the update action');
+        throw invalid('spaceId is required for the update action');
       }
       let result = await client.updateSpace(ctx.input.spaceId, {
         name: ctx.input.spaceName,
@@ -93,7 +93,7 @@ export let manageSpace = SlateTool.create(spec, {
 
     // delete
     if (!ctx.input.spaceId) {
-      throw new Error('spaceId is required for the delete action');
+      throw invalid('spaceId is required for the delete action');
     }
     await client.deleteSpace(ctx.input.spaceId);
     return {

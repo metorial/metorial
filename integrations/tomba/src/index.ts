@@ -21,8 +21,6 @@ import {
   updateLead,
   updateLeadList
 } from './tools';
-import { leadSaved } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     getAccount,
     getUsage
   ],
-  triggers: [leadSaved]
+  triggers: []
 });

@@ -12,8 +12,6 @@ import {
   listTemplates,
   updateProspect
 } from './tools';
-import { inboundWebhook, newImageImpression } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     listImpressions,
     createClientAccount
   ],
-  triggers: [inboundWebhook, newImageImpression]
+  triggers: []
 });

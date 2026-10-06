@@ -14,8 +14,6 @@ import {
   searchSerp,
   searchTrends
 } from './tools';
-import { scheduledTaskCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     listDomains,
     getAccountInfo
   ],
-  triggers: [scheduledTaskCompleted]
+  triggers: []
 });

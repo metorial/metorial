@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { WorkdayClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { workerIdSchema } from '../lib/contracts';
 import { spec } from '../spec';
 
 let workdayReferenceSchema = z
@@ -14,7 +15,7 @@ let workdayReferenceSchema = z
 export let listWorkers = SlateTool.create(spec, {
   name: 'List Workers',
   key: 'list_workers',
-  description: `Search and list workers in Workday. Returns a paginated list of worker summaries including names, emails, titles, and organization assignments. Use **search** to filter by name or other attributes.`,
+  description: `Search and list workers in Workday. Returns a paginated list of worker summaries including names, emails, titles, and organization assignments. Use **search** for a name prefix of at least three consecutive characters.`,
   tags: {
     readOnly: true
   }
@@ -24,7 +25,7 @@ export let listWorkers = SlateTool.create(spec, {
       search: z
         .string()
         .optional()
-        .describe('Search term to filter workers by name or other attributes'),
+        .describe('Name prefix containing at least three consecutive characters'),
       limit: z
         .number()
         .optional()
@@ -40,7 +41,7 @@ export let listWorkers = SlateTool.create(spec, {
       workers: z
         .array(
           z.object({
-            workerId: z.string().describe('Unique worker ID'),
+            workerId: workerIdSchema,
             displayName: z.string().describe('Worker display name'),
             href: z.string().optional().describe('API href for this worker'),
             primaryWorkEmail: z.string().optional().describe('Primary work email address'),
@@ -55,11 +56,7 @@ export let listWorkers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let result = await client.listWorkers({
       search: ctx.input.search,

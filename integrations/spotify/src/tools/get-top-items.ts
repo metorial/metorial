@@ -1,12 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SpotifyClient } from '../lib/client';
+import {
+  artistSchema,
+  fullTrackSchema,
+  paging,
+  pagingOutputSchema,
+  parse
+} from '../lib/types';
 import { spec } from '../spec';
 
 export let getTopItems = SlateTool.create(spec, {
   name: 'Get Top Items',
   key: 'get_top_items',
-  description: `Retrieve the current user's most listened-to artists or tracks based on calculated affinity. Supports three time ranges: short-term (last 4 weeks), medium-term (last 6 months), and long-term (several years of data).`,
+  description: `Retrieve the current user's most listened-to artists or tracks based on calculated affinity. Supports three time ranges: short-term (last 4 weeks), medium-term (last 6 months), and long-term (approximately one year, including new data).`,
   tags: {
     readOnly: true
   }
@@ -18,7 +25,7 @@ export let getTopItems = SlateTool.create(spec, {
         .enum(['short_term', 'medium_term', 'long_term'])
         .optional()
         .describe(
-          'Time range: short_term (4 weeks), medium_term (6 months), long_term (several years). Defaults to medium_term.'
+          'Time range: short_term (4 weeks), medium_term (6 months), long_term (approximately one year). Defaults to medium_term.'
         ),
       limit: z
         .number()
@@ -36,9 +43,9 @@ export let getTopItems = SlateTool.create(spec, {
           z.object({
             artistId: z.string(),
             name: z.string(),
-            genres: z.array(z.string()),
-            popularity: z.number(),
-            followers: z.number(),
+            genres: z.array(z.string()).optional(),
+            popularity: z.number().optional(),
+            followers: z.number().optional(),
             imageUrl: z.string().nullable(),
             spotifyUrl: z.string(),
             uri: z.string()
@@ -51,7 +58,7 @@ export let getTopItems = SlateTool.create(spec, {
             trackId: z.string(),
             name: z.string(),
             durationMs: z.number(),
-            popularity: z.number(),
+            popularity: z.number().optional(),
             explicit: z.boolean(),
             artists: z.array(
               z.object({
@@ -65,13 +72,17 @@ export let getTopItems = SlateTool.create(spec, {
           })
         )
         .optional(),
+      paging: pagingOutputSchema,
       total: z.number()
     })
   )
   .handleInvocation(async ctx => {
     let client = new SpotifyClient({
       token: ctx.auth.token,
-      market: ctx.config.market
+      refreshToken: ctx.auth.refreshToken,
+      input: ctx.input,
+      market: ctx.config.market,
+      endpointCompatibility: ctx.config.endpointCompatibility
     });
 
     let result = await client.getTopItems(ctx.input.type, {
@@ -82,12 +93,12 @@ export let getTopItems = SlateTool.create(spec, {
 
     let topArtists =
       ctx.input.type === 'artists'
-        ? result.items.map((item: any) => ({
+        ? parse(z.array(artistSchema), result.items).map(item => ({
             artistId: item.id,
             name: item.name,
             genres: item.genres,
             popularity: item.popularity,
-            followers: item.followers.total,
+            followers: item.followers?.total,
             imageUrl: item.images?.[0]?.url ?? null,
             spotifyUrl: item.external_urls.spotify,
             uri: item.uri
@@ -96,13 +107,13 @@ export let getTopItems = SlateTool.create(spec, {
 
     let topTracks =
       ctx.input.type === 'tracks'
-        ? result.items.map((item: any) => ({
+        ? parse(z.array(fullTrackSchema), result.items).map(item => ({
             trackId: item.id,
             name: item.name,
             durationMs: item.duration_ms,
             popularity: item.popularity,
             explicit: item.explicit,
-            artists: item.artists.map((a: any) => ({ artistId: a.id, name: a.name })),
+            artists: item.artists.map(a => ({ artistId: a.id, name: a.name })),
             albumName: item.album.name,
             spotifyUrl: item.external_urls.spotify,
             uri: item.uri
@@ -113,14 +124,15 @@ export let getTopItems = SlateTool.create(spec, {
       ctx.input.timeRange === 'short_term'
         ? '4 weeks'
         : ctx.input.timeRange === 'long_term'
-          ? 'all time'
+          ? 'approximately one year'
           : '6 months';
     let itemCount = (topArtists ?? topTracks ?? []).length;
     return {
       output: {
         topArtists,
         topTracks,
-        total: result.total
+        total: result.total,
+        paging: paging(result)
       },
       message: `Retrieved top ${itemCount} ${ctx.input.type} (${timeLabel}).`
     };

@@ -1,12 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageQueueTool = SlateTool.create(spec, {
   name: 'Manage Queue',
   key: 'manage_queue',
-  description: `Manage the posting queue for a profile. Supports reordering updates, shuffling the queue randomly, or moving a specific update to the top.`,
+  description: `Move an existing queued update to the top. The current API exposes this as an experimental operation. Full reorder and shuffle remain legacy REST operations with unverified current availability.`,
+  tags: { readOnly: false },
+  constraints: [
+    'Queue changes can advance automatic publication. Verify the selected profile and update before changing the queue.'
+  ],
   instructions: [
     'Use `action: "reorder"` with an `order` array to set a specific order for queued updates.',
     'Use `action: "shuffle"` to randomly reorder all queued updates.',
@@ -35,15 +40,17 @@ export let manageQueueTool = SlateTool.create(spec, {
       success: z.boolean().describe('Whether the action completed successfully'),
       updatedUpdateIds: z
         .array(z.string())
-        .describe('IDs of updates in the resulting queue order')
+        .describe(
+          'IDs acknowledged by the operation; move_to_top returns only the moved update, not a full queue listing.'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let { action } = ctx.input;
 
     if (action === 'move_to_top') {
-      if (!ctx.input.updateId) throw new Error('updateId is required for move_to_top action');
+      if (!ctx.input.updateId) throw invalid('updateId is required for move_to_top action');
       let result = await client.moveUpdateToTop(ctx.input.updateId);
       return {
         output: {
@@ -55,7 +62,7 @@ export let manageQueueTool = SlateTool.create(spec, {
     }
 
     if (!ctx.input.profileId)
-      throw new Error('profileId is required for reorder and shuffle actions');
+      throw invalid('profileId is required for reorder and shuffle actions');
 
     if (action === 'shuffle') {
       let result = await client.shuffleUpdates(ctx.input.profileId);
@@ -71,7 +78,7 @@ export let manageQueueTool = SlateTool.create(spec, {
 
     // reorder
     if (!ctx.input.order || ctx.input.order.length === 0) {
-      throw new Error('order array is required for reorder action');
+      throw invalid('order array is required for reorder action');
     }
     let result = await client.reorderUpdates(ctx.input.profileId, ctx.input.order, {
       offset: ctx.input.offset

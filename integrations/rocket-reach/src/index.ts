@@ -8,8 +8,6 @@ import {
   searchCompanies,
   searchPeople
 } from './tools';
-import { lookupCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -20,5 +18,5 @@ export let provider = Slate.create({
     lookupCompany,
     getAccount
   ],
-  triggers: [lookupCompleted]
+  triggers: []
 });

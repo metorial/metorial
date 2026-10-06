@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let runCommand = SlateTool.create(spec, {
@@ -17,6 +18,7 @@ export let runCommand = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       triggerName: z.string().describe('The trigger name configured on the command'),
       environmentVars: z
         .record(z.string(), z.string())
@@ -26,24 +28,31 @@ export let runCommand = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      triggered: z.boolean().describe('Whether the command was triggered successfully'),
+      triggered: z
+        .boolean()
+        .describe(
+          'Native triggered flag; acceptance does not confirm execution or completion'
+        ),
       triggerName: z.string().describe('Trigger name used')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      const result = await client.runCommandByTrigger(
+        ctx.input.triggerName,
+        ctx.input.environmentVars
+      );
 
-    await client.runCommandByTrigger(ctx.input.triggerName, ctx.input.environmentVars);
-
-    return {
-      output: {
-        triggered: true,
-        triggerName: ctx.input.triggerName
-      },
-      message: `Triggered command via trigger **${ctx.input.triggerName}**. Command is executing on target systems.`
-    };
+      return {
+        output: {
+          triggered: result.triggered,
+          triggerName: ctx.input.triggerName
+        },
+        message: `Triggered command via trigger **${ctx.input.triggerName}**. Native triggered flag: **${result.triggered}**. This can target multiple matching commands; inspect results before any retry.`
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
+    }
   })
   .build();

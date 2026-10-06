@@ -2,6 +2,8 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getBuild,
+  getBuildRequest,
+  getCurrentUser,
   getJobLog,
   getRepository,
   lintTravisYml,
@@ -14,10 +16,10 @@ import {
   manageCrons,
   manageEnvVars,
   manageJob,
+  manageJobLog,
+  manageRepositorySettings,
   triggerBuild
 } from './tools';
-import { buildEvents, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,7 +36,11 @@ export let provider = Slate.create({
     manageCaches,
     listBranches,
     lintTravisYml,
-    listBuildRequests
+    listBuildRequests,
+    getCurrentUser,
+    getBuildRequest,
+    manageRepositorySettings,
+    manageJobLog
   ],
-  triggers: [inboundWebhook, buildEvents]
+  triggers: []
 });

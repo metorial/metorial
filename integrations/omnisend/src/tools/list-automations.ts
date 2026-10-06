@@ -9,7 +9,24 @@ export let listAutomations = SlateTool.create(spec, {
   description: `List automation workflows configured in Omnisend. Returns details about each automation including name, status, and trigger type.`,
   tags: { readOnly: true }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      updatedAfter: z
+        .string()
+        .optional()
+        .describe('Filter workflows updated after this RFC3339 timestamp'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Page size, 1-250; requires API version 2026-03-15'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque next-page cursor; requires API version 2026-03-15 and unchanged filters'
+        )
+    })
+  )
   .output(
     z.object({
       automations: z
@@ -23,25 +40,19 @@ export let listAutomations = SlateTool.create(spec, {
             updatedAt: z.string().optional().describe('Last updated timestamp')
           })
         )
-        .describe('List of automations')
+        .describe('List of automations'),
+      nextCursor: z.string().optional().describe('Provider-issued next-page cursor'),
+      previousCursor: z.string().optional().describe('Provider-issued previous-page cursor'),
+      hasMore: z.boolean().optional().describe('Whether the provider reports another page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OmnisendClient(ctx.auth.token);
-    let result = await client.listAutomations();
-
-    let automations = (result.automations || []).map((a: any) => ({
-      automationId: a.id || a.automationID,
-      name: a.name,
-      status: a.status,
-      triggerType: a.triggerType,
-      createdAt: a.createdAt,
-      updatedAt: a.updatedAt
-    }));
-
-    return {
-      output: { automations },
-      message: `Retrieved **${automations.length}** automations.`
-    };
+    let client = new OmnisendClient(ctx.auth, ctx.config.apiVersion);
+    let output = await client.listAutomations({
+      updatedAtFrom: ctx.input.updatedAfter,
+      limit: ctx.input.limit,
+      after: ctx.input.cursor
+    });
+    return { output, message: 'Retrieved automations.' };
   })
   .build();

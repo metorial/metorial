@@ -7,6 +7,8 @@ import {
   deleteSource,
   getDestination,
   getExtractionLogs,
+  getFileUrl,
+  getImportStatus,
   getSource,
   getStream,
   listExtractions,
@@ -25,8 +27,6 @@ import {
   updateStreamSelection,
   validateData
 } from './tools';
-import { extractionStatusTrigger, postLoadTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -52,7 +52,9 @@ export let provider = Slate.create({
     manageCustomEmail,
     managePostLoadHook,
     pushData,
-    validateData
+    validateData,
+    getImportStatus,
+    getFileUrl
   ],
-  triggers: [postLoadTrigger, extractionStatusTrigger]
+  triggers: []
 });

@@ -30,10 +30,7 @@ export let addCommentTool = SlateTool.create(spec, {
   )
   .output(commentSchema)
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.createComment(ctx.input.filePath, ctx.input.message)) as Record<
       string,
@@ -78,10 +75,7 @@ export let listCommentsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.listComments(ctx.input.filePath, {
       offset: ctx.input.offset,
@@ -131,10 +125,7 @@ export let deleteCommentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     await client.deleteComment(ctx.input.commentId);
 

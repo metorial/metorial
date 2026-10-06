@@ -1,20 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getJobLog = SlateTool.create(spec, {
   name: 'Get Job Log',
   key: 'get_job_log',
-  description: `Retrieve the output log for a specific job in a Buildkite build. Useful for debugging failed builds or inspecting command output. Also supports retrieving job environment variables.`,
-  instructions: ['Use the "Get Build" tool first to find the job ID you want to inspect.'],
+  description: `DEPRECATED — use \`download_job_log\` instead. Retrieve the output log for a specific job in a Buildkite build. Useful for debugging failed builds or inspecting command output. Also supports retrieving job environment variables.`,
+  instructions: [
+    'Use download_job_log for a downloadable log; this tool preserves legacy inline inspection.',
+    'Use the "Get Build" tool first to find the job ID you want to inspect.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(
     z.object({
-      pipelineSlug: z.string().describe('Slug of the pipeline'),
+      ...organizationInput,
+      pipelineSlug: z.string().describe('Pipeline slug from list_pipelines'),
       buildNumber: z.number().describe('Build number'),
       jobId: z.string().describe('UUID of the job'),
       includeEnvironment: z
@@ -35,10 +41,7 @@ export let getJobLog = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     let log = await client.getJobLog(
       ctx.input.pipelineSlug,

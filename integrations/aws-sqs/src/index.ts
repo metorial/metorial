@@ -15,8 +15,6 @@ import {
   sendMessage,
   sendMessageBatch
 } from './tools';
-import { inboundWebhook, newMessage } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     changeMessageVisibility,
     manageMessageMoveTask
   ],
-  triggers: [inboundWebhook, newMessage]
+  triggers: []
 });

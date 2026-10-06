@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ContentApiClient } from '../lib/client';
+import { predicateString } from '../lib/content-api';
+import { protect } from '../lib/contracts';
 import { spec } from '../spec';
 
 let documentSchema = z.object({
@@ -18,13 +20,13 @@ let documentSchema = z.object({
     .array(
       z.object({
         documentId: z.string(),
-        uid: z.string(),
+        uid: z.string().nullable(),
         type: z.string(),
         lang: z.string()
       })
     )
     .describe('Alternate language versions'),
-  data: z.record(z.string(), z.any()).describe('Document field data')
+  data: z.record(z.string(), z.unknown()).describe('Document field data')
 });
 
 export let queryDocuments = SlateTool.create(spec, {
@@ -34,7 +36,7 @@ export let queryDocuments = SlateTool.create(spec, {
 Supports filtering by document type, tags, full-text search, and custom predicates. Results are paginated.`,
   instructions: [
     'Use the "documentType" field to filter by a specific custom type.',
-    'Use "predicates" for advanced queries — each predicate follows Prismic syntax, e.g., \'[:d = at(document.type, "blog_post")]\'.',
+    'Use "predicates" for advanced queries — each predicate follows Prismic syntax, e.g., \'[at(document.type, "blog_post")]\'.',
     'Set "lang" to "*" to query across all languages.'
   ],
   constraints: [
@@ -100,25 +102,30 @@ Supports filtering by document type, tags, full-text search, and custom predicat
     })
   )
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     let client = new ContentApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       accessToken: ctx.auth.token
     });
 
     let predicates: string[] = [];
 
     if (ctx.input.documentType) {
-      predicates.push(`[:d = at(document.type, "${ctx.input.documentType}")]`);
+      predicates.push(`[at(document.type, ${predicateString(ctx.input.documentType)})]`);
     }
 
     if (ctx.input.tags && ctx.input.tags.length > 0) {
-      predicates.push(
-        `[:d = at(document.tags, [${ctx.input.tags.map(t => `"${t}"`).join(',')}])]`
-      );
+      predicates.push(`[at(document.tags, ${JSON.stringify(ctx.input.tags)})]`);
     }
 
     if (ctx.input.fullTextSearch) {
-      predicates.push(`[:d = fulltext(document, "${ctx.input.fullTextSearch}")]`);
+      predicates.push(`[fulltext(document, ${predicateString(ctx.input.fullTextSearch)})]`);
     }
 
     if (ctx.input.predicates) {

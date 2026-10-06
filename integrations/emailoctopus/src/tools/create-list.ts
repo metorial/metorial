@@ -8,7 +8,8 @@ export let createList = SlateTool.create(spec, {
   key: 'create_list',
   description: `Create a new contact list. Each list is an independent collection of contacts with its own custom fields and tags.`,
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -26,7 +27,16 @@ export let createList = SlateTool.create(spec, {
           tag: z.string(),
           type: z.string(),
           label: z.string(),
-          fallback: z.string()
+          fallback: z
+            .string()
+            .describe(
+              'Fallback display text; absent or null provider fallback is an empty string'
+            ),
+          fallbackValue: z
+            .string()
+            .nullable()
+            .optional()
+            .describe('Original provider fallback, when supplied')
         })
       ),
       tags: z.array(z.string()),

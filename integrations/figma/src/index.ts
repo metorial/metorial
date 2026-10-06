@@ -19,8 +19,6 @@ import {
   postComment,
   updateVariables
 } from './tools';
-import { commentEvents, devModeStatusEvents, fileEvents, libraryPublish } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     createDevResource,
     deleteDevResource
   ],
-  triggers: [fileEvents, commentEvents, libraryPublish, devModeStatusEvents]
+  triggers: []
 });

@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SerpApiClient } from '../lib/client';
+import { receiptMessage, receiptOutput, SerpApiClient } from '../lib/client';
+import { searchMetadataSchema } from '../lib/contracts';
+import { searchParams } from '../lib/params';
 import { spec } from '../spec';
 
 export let autocompleteTool = SlateTool.create(spec, {
@@ -16,11 +18,29 @@ export let autocompleteTool = SlateTool.create(spec, {
       query: z.string().describe('Partial search query to get suggestions for'),
       language: z.string().optional().describe('Language code (e.g., "en")'),
       country: z.string().optional().describe('Country code (e.g., "us")'),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Submit asynchronously and return the native search ID/status. Not compatible with noCache or Ludicrous Speed accounts.'
+        ),
       noCache: z.boolean().optional().describe('Force fresh results')
     })
   )
   .output(
     z.object({
+      isComplete: z
+        .boolean()
+        .describe(
+          'Whether native search status is Success; queued/processing receipts are incomplete.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Native pagination metadata; follow native offsets/tokens without inferring a total.'
+        ),
+      searchMetadata: searchMetadataSchema.optional(),
       suggestions: z
         .array(
           z.object({
@@ -32,16 +52,9 @@ export let autocompleteTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SerpApiClient({ apiKey: ctx.auth.token });
+    let client = new SerpApiClient({ apiKey: ctx.auth.token, accountId: ctx.auth.accountId });
 
-    let params: Record<string, any> = {
-      engine: 'google_autocomplete',
-      q: ctx.input.query
-    };
-
-    if (ctx.input.language) params.hl = ctx.input.language;
-    if (ctx.input.country) params.gl = ctx.input.country;
-    if (ctx.input.noCache) params.no_cache = ctx.input.noCache;
+    let params = searchParams('autocomplete', ctx.input);
 
     let data = await client.search(params);
 
@@ -52,9 +65,13 @@ export let autocompleteTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...receiptOutput(data),
         suggestions
       },
-      message: `Autocomplete for "${ctx.input.query}" returned **${suggestions.length}** suggestions.`
+      message: receiptMessage(
+        data,
+        `Autocomplete for "${ctx.input.query}" returned **${suggestions.length}** suggestions.`
+      )
     };
   })
   .build();

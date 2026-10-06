@@ -175,6 +175,7 @@ export interface GiteaReleaseAsset {
 }
 
 export interface GiteaOrganization {
+  username?: string;
   id: number;
   name: string;
   full_name: string;
@@ -192,6 +193,7 @@ export interface GiteaTeam {
   organization: GiteaOrganization | null;
   permission: string;
   units: string[];
+  units_map?: Record<string, string>;
   includes_all_repositories: boolean;
 }
 
@@ -249,21 +251,6 @@ export interface GiteaTag {
   tarball_url: string;
 }
 
-export interface GiteaWebhook {
-  id: number;
-  type: string;
-  url: string;
-  config: {
-    url: string;
-    content_type: string;
-    secret?: string;
-  };
-  events: string[];
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface GiteaNotification {
   id: number;
   repository: GiteaRepository;
@@ -294,4 +281,16 @@ export interface GiteaWikiPage {
   };
   sidebar?: string;
   footer?: string;
+}
+
+export interface GiteaPullReview {
+  id: number;
+  body: string;
+  state: string;
+  user: GiteaUser | null;
+  team?: GiteaTeam | null;
+  html_url: string;
+  submitted_at: string;
+  commit_id: string;
+  comments_count?: number;
 }

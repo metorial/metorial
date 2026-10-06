@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, companyAssociations } from '../lib/client';
 import { spec } from '../spec';
 
 export let updatePerson = SlateTool.create(spec, {
@@ -8,10 +8,11 @@ export let updatePerson = SlateTool.create(spec, {
   key: 'update_person',
   description: `Updates an existing person in your Folk workspace. Supports partial updates to any field including name, job title, emails, phones, addresses, URLs, birthday, description, company associations, and group memberships.`,
   instructions: [
-    'Array fields (emails, phones, addresses, urls, companies, groups) replace the entire list when provided — include all desired values, not just changes.'
+    'Array fields (emails, phones, addresses, urls, companies, groups) replace the entire list when provided — include all desired values, not just changes.',
+    'Removing a group also removes its custom field values. To set group-specific custom fields, include that group in groupIds; use null or an empty array to clear a field as appropriate for its type.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -99,10 +100,7 @@ export let updatePerson = SlateTool.create(spec, {
       input.groups = ctx.input.groupIds.map(id => ({ id }));
     }
     if (ctx.input.companies !== undefined) {
-      input.companies = ctx.input.companies.map(c => {
-        if (c.companyId) return { id: c.companyId };
-        return { name: c.companyName };
-      });
+      input.companies = companyAssociations(ctx.input.companies);
     }
 
     let person = await client.updatePerson(ctx.input.personId, input);

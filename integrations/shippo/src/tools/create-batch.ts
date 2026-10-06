@@ -1,14 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShippoClient } from '../lib/client';
+import { addDocument } from '../lib/files';
 import { spec } from '../spec';
 
 export let createBatch = SlateTool.create(spec, {
   name: 'Create Batch Labels',
   key: 'create_batch',
-  description: `Create a batch of shipping labels for multiple shipments at once. Provide a default carrier account and service level, along with the batch shipments. After creation, purchase the batch to generate all labels.`,
+  description: `Create a batch by copying the details of existing shipments into new batch shipments. Provide a default carrier account and service level, along with the batch shipments. After creation, purchase the batch to generate all labels.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -28,7 +29,11 @@ export let createBatch = SlateTool.create(spec, {
       batchShipments: z
         .array(
           z.object({
-            shipmentId: z.string().describe('Existing shipment ID to include in the batch')
+            shipmentId: z
+              .string()
+              .describe(
+                'Existing shipment ID whose supported details will be copied into a new batch shipment'
+              )
           })
         )
         .describe('Shipments to include in the batch')
@@ -46,19 +51,19 @@ export let createBatch = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
     let batchShipments = ctx.input.batchShipments.map(s => ({
       shipment: s.shipmentId
     }));
 
-    let result = (await client.createBatch({
+    let result = await client.createBatch({
       default_carrier_account: ctx.input.defaultCarrierAccount,
       default_servicelevel_token: ctx.input.defaultServicelevelToken,
       label_filetype: ctx.input.labelFiletype,
       metadata: ctx.input.metadata,
       batch_shipments: batchShipments
-    })) as Record<string, any>;
+    });
 
     return {
       output: {
@@ -67,7 +72,7 @@ export let createBatch = SlateTool.create(spec, {
         shipmentCount: result.batch_shipments?.count,
         createdAt: result.object_created
       },
-      message: `Batch created (${result.object_id}) with status: ${result.status}. ${result.batch_shipments?.count || 0} shipments.`
+      message: `Batch created (${result.object_id}) with status: ${result.status}. ${ctx.input.batchShipments.length} shipment copies submitted.`
     };
   })
   .build();
@@ -77,7 +82,7 @@ export let purchaseBatch = SlateTool.create(spec, {
   key: 'purchase_batch',
   description: `Purchase all labels in an existing batch. The batch must be in VALID status. After purchasing, labels and tracking numbers will be generated for all shipments in the batch.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -93,9 +98,23 @@ export let purchaseBatch = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
-    let result = (await client.purchaseBatch(ctx.input.batchId)) as Record<string, any>;
+    let result = await client.purchaseBatch(ctx.input.batchId);
+
+    if (result.status === 'PURCHASED' && Array.isArray(result.label_url))
+      for (let documentIndex = 0; documentIndex < result.label_url.length; documentIndex++)
+        await addDocument(
+          ctx,
+          result,
+          {
+            kind: 'batch',
+            resourceId: result.object_id,
+            documentType: 'batch_labels',
+            documentIndex
+          },
+          true
+        );
 
     return {
       output: {

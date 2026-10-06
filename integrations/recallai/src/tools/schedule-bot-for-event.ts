@@ -15,6 +15,12 @@ export let scheduleBotForEventTool = SlateTool.create(spec, {
   .input(
     z.object({
       eventId: z.string().describe('Calendar event ID to schedule the bot for'),
+      deduplicationKey: z
+        .string()
+        .min(1)
+        .max(2000)
+        .optional()
+        .describe('Stable deduplication key for shared events; defaults to this event ID'),
       botConfig: z
         .record(z.string(), z.unknown())
         .optional()
@@ -37,7 +43,8 @@ export let scheduleBotForEventTool = SlateTool.create(spec, {
     });
 
     let response = await client.scheduleBotForCalendarEvent(ctx.input.eventId, {
-      botConfig: ctx.input.botConfig
+      botConfig: ctx.input.botConfig,
+      deduplicationKey: ctx.input.deduplicationKey
     });
 
     return {

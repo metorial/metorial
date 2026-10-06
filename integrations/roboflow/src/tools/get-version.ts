@@ -1,7 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema, versionNumberSchema } from '../lib/schemas';
 import { spec } from '../spec';
+
+const finiteNumber = (value: unknown) => {
+  if (value == null || value === '') return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+};
+const trainingTime = (value: unknown) => {
+  if (value == null) return undefined;
+  const date =
+    typeof value === 'number'
+      ? new Date(value * 1000)
+      : typeof value === 'string'
+        ? new Date(value)
+        : undefined;
+  return date && Number.isFinite(date.getTime()) ? date.toISOString() : undefined;
+};
 
 export let getVersionTool = SlateTool.create(spec, {
   name: 'Get Version',
@@ -13,8 +30,8 @@ export let getVersionTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project URL slug'),
-      versionNumber: z.number().describe('Version number to retrieve')
+      projectId: projectIdSchema,
+      versionNumber: versionNumberSchema
     })
   )
   .output(
@@ -71,11 +88,11 @@ export let getVersionTool = SlateTool.create(spec, {
       ? {
           modelId: model.id,
           endpoint: model.endpoint,
-          map: model.map,
-          precision: model.precision,
-          recall: model.recall,
-          trainingStartedAt: model.fromAgent || model.startedAt,
-          trainingCompletedAt: model.toAgent || model.completedAt
+          map: finiteNumber(model.map),
+          precision: finiteNumber(model.precision),
+          recall: finiteNumber(model.recall),
+          trainingStartedAt: trainingTime(model.start ?? model.startedAt),
+          trainingCompletedAt: trainingTime(model.end ?? model.completedAt)
         }
       : undefined;
 
@@ -92,7 +109,11 @@ export let getVersionTool = SlateTool.create(spec, {
         isGenerating: version.generating || false,
         progress: version.progress,
         model: modelOutput,
-        exportFormats: version.exports ? Object.keys(version.exports) : undefined,
+        exportFormats: Array.isArray(version.exports)
+          ? version.exports
+          : version.exports
+            ? Object.keys(version.exports)
+            : undefined,
         createdAt: version.created
       },
       message: model

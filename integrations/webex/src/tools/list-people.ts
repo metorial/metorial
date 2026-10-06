@@ -24,7 +24,7 @@ export let listPeople = SlateTool.create(spec, {
   key: 'list_people',
   description: `Search and list people in the Webex organization directory. Filter by email, display name, or person ID. Returns profile information including name, email, status, and organization.`,
   instructions: [
-    'At least one filter (email, displayName, or personIds) is required by the API.',
+    'Ordinary user connections require an email, displayName or personIds filter; authorized administrators may list an organization without one.',
     'Use displayName for partial name searches.'
   ],
   tags: {
@@ -33,6 +33,12 @@ export let listPeople = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Native next-page URL returned by this tool. Use alone; do not add filters.'
+        ),
       email: z.string().optional().describe('Filter by exact email address'),
       displayName: z.string().optional().describe('Filter by display name (partial match)'),
       personIds: z.string().optional().describe('Comma-separated person IDs to look up'),
@@ -42,6 +48,7 @@ export let listPeople = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: z.string().optional().describe('URL for the next native page, if present'),
       people: z.array(personSchema).describe('List of people')
     })
   )
@@ -53,11 +60,12 @@ export let listPeople = SlateTool.create(spec, {
       displayName: ctx.input.displayName,
       id: ctx.input.personIds,
       orgId: ctx.input.orgId,
-      max: ctx.input.max
+      max: ctx.input.max,
+      nextPageUrl: ctx.input.nextPageUrl
     });
 
     let items = result.items || [];
-    let people = items.map((p: any) => ({
+    let people = items.map(p => ({
       personId: p.id,
       emails: p.emails,
       displayName: p.displayName,
@@ -74,7 +82,7 @@ export let listPeople = SlateTool.create(spec, {
     }));
 
     return {
-      output: { people },
+      output: { people, nextPageUrl: result.nextPageUrl },
       message: `Found **${people.length}** person(s).`
     };
   })
@@ -100,9 +108,10 @@ export let getPersonDetails = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new WebexClient({ token: ctx.auth.token });
 
-    let result = ctx.input.personId
-      ? await client.getPerson(ctx.input.personId)
-      : await client.getMe();
+    let result =
+      ctx.input.personId !== undefined
+        ? await client.getPerson(ctx.input.personId)
+        : await client.getMe();
 
     return {
       output: {

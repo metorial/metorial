@@ -19,14 +19,21 @@ export let listSubmissions = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      formId: z.string().describe('Public identifier of the form'),
+      formId: z.string().describe('Form ID. Call list_forms to discover forms.'),
       limit: z
         .number()
+        .int()
         .min(1)
         .max(150)
         .optional()
         .describe('Max submissions per request (1-150, default 50)'),
-      offset: z.number().optional().describe('Starting position for pagination (default 0)'),
+      offset: z
+        .number()
+        .int()
+        .nonnegative()
+        .safe()
+        .optional()
+        .describe('Starting position for pagination (default 0)'),
       afterDate: z.string().optional().describe('Filter submissions after this ISO 8601 date'),
       beforeDate: z
         .string()
@@ -66,7 +73,7 @@ export let listSubmissions = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `Retrieved **${result.responses.length}** of **${result.totalResponses}** total submission(s) for form \`${formId}\` (page ${Math.floor((ctx.input.offset ?? 0) / (ctx.input.limit ?? 50)) + 1} of ${result.pageCount}).`
+      message: `Retrieved **${result.responses.length}** of **${result.totalResponses}** matching submission(s). Use offset to request subsequent results; provider page count is **${result.pageCount}**.`
     };
   })
   .build();

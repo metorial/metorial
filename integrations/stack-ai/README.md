@@ -1,6 +1,14 @@
-# Stack Ai
+# Stack AI
 
-Build, deploy, and run AI agent workflows programmatically. Execute published AI flows via API with text, audio, URL, and file inputs. Manage knowledge bases with document upload, listing, downloading, and deletion for RAG-powered retrieval. Configure knowledge base search with semantic, keyword, or hybrid query strategies. Manage connections to external services (SharePoint, Salesforce, Slack, etc.) with OAuth and credential-based authentication and RBAC. Run action tools to interact with external systems, send data, update databases, and trigger web searches. Retrieve conversation histories and messages for chat-based deployments. Query project analytics including run logs, error counts, token usage, and storage metrics. Set up event-driven triggers from emails, form submissions, GitHub pull requests, and other third-party services. Organize projects into folders and manage platform notifications.
+Run published Stack AI workflows, upload files to workflow Files Nodes and knowledge bases, and retrieve project and organization run analytics. Existing tools also manage knowledge bases, connections, conversations, folders, feedback, storage usage, and configured external actions.
+
+Connect with a bearer API key from **Settings > API Keys**. Optionally supply the deployed workflow API URL copied from **Export View > API** to identify the organization and default workflow. `run_flow` also accepts that URL per invocation. Existing saved organization configuration remains supported.
+
+Workflow input keys depend on the deployed workflow. A Files Node must exist before uploading workflow documents. Knowledge-base uploads return a resource ID and an accepted status; indexing may continue afterward. List tools expose their pagination controls and return the provider's available continuation metadata.
+
+The current public API reference confirms workflow execution, analytics, knowledge-base resource listing/upload, and workflow file upload. Other established management routes remain available in this integration, but their current account permissions and API contracts could not be independently verified from public documentation. They require provider acceptance testing with a suitable account. No download, workflow-creation, knowledge-base search, connection OAuth setup, or notification tools are exposed.
+
+See [the capability and API specification](docs/SPEC.md) for official sources and setup requirements.
 
 ## License
 

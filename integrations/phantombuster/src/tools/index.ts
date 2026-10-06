@@ -1,4 +1,5 @@
 export { deletePhantom } from './delete-phantom';
+export { downloadResults } from './download-results';
 export { getExecution } from './get-execution';
 export { getPhantom } from './get-phantom';
 export { getPhantomOutput } from './get-phantom-output';

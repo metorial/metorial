@@ -35,8 +35,6 @@ import {
   updateProduct,
   updateStoreSetting
 } from './tools';
-import { couponEvents, customerEvents, orderEvents, productEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -74,5 +72,5 @@ export let provider = Slate.create({
     manageWebhooks,
     getSystemStatus
   ],
-  triggers: [orderEvents, productEvents, customerEvents, couponEvents]
+  triggers: []
 });

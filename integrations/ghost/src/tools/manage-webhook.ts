@@ -1,19 +1,23 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GhostAdminClient } from '../lib/client';
+import { getClient } from '../lib/client';
+import { invalid, resourceId } from '../lib/schemas';
 import { spec } from '../spec';
 
-let webhookOutputSchema = z.object({
-  webhookId: z.string().describe('Unique webhook ID'),
-  event: z.string().describe('Event that triggers the webhook'),
-  targetUrl: z.string().describe('URL that receives webhook payloads'),
-  name: z.string().nullable().describe('Webhook name'),
-  status: z.string().describe('Webhook status'),
-  apiVersion: z.string().describe('Ghost API version for the webhook'),
-  lastTriggeredAt: z.string().nullable().describe('Last trigger timestamp'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp')
-});
+let webhookOutputSchema = z
+  .object({
+    webhookId: z.string().describe('Unique webhook ID'),
+    event: z.string().optional().describe('Event that triggers the webhook'),
+    targetUrl: z.string().optional().describe('URL that receives webhook payloads'),
+    name: z.string().nullable().optional().describe('Webhook name'),
+    status: z.string().optional().describe('Webhook status'),
+    apiVersion: z.string().optional().describe('Ghost API version for the webhook'),
+    lastTriggeredAt: z.string().nullable().optional().describe('Last trigger timestamp'),
+    createdAt: z.string().optional().describe('Creation timestamp'),
+    updatedAt: z.string().optional().describe('Last update timestamp')
+  })
+  .partial()
+  .required({ webhookId: true });
 
 export let manageWebhook = SlateTool.create(spec, {
   name: 'Manage Webhook',
@@ -30,7 +34,7 @@ export let manageWebhook = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['create', 'update', 'delete']).describe('Operation to perform'),
-      webhookId: z.string().optional().describe('Webhook ID (required for update/delete)'),
+      webhookId: resourceId.optional().describe('Webhook ID (required for update/delete)'),
       event: z
         .string()
         .optional()
@@ -43,16 +47,22 @@ export let manageWebhook = SlateTool.create(spec, {
   )
   .output(webhookOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GhostAdminClient({
-      domain: ctx.config.adminDomain,
-      apiKey: ctx.auth.token
-    });
+    let client = getClient(ctx);
 
     let { action } = ctx.input;
+    if (ctx.input.targetUrl !== undefined) {
+      let url: URL;
+      try {
+        url = new URL(ctx.input.targetUrl);
+      } catch {
+        throw invalid('Provide an HTTPS webhook target URL.');
+      }
+      if (url.protocol !== 'https:' || url.username || url.password)
+        throw invalid('Provide an HTTPS webhook target URL without credentials.');
+    }
 
     if (action === 'delete') {
-      if (!ctx.input.webhookId)
-        throw new Error('webhookId is required for deleting a webhook');
+      if (!ctx.input.webhookId) throw invalid('webhookId is required for deleting a webhook');
       await client.deleteWebhook(ctx.input.webhookId);
       return {
         output: {
@@ -71,9 +81,8 @@ export let manageWebhook = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.event) throw new Error('event is required for creating a webhook');
-      if (!ctx.input.targetUrl)
-        throw new Error('targetUrl is required for creating a webhook');
+      if (!ctx.input.event) throw invalid('event is required for creating a webhook');
+      if (!ctx.input.targetUrl) throw invalid('targetUrl is required for creating a webhook');
 
       let result = await client.createWebhook({
         event: ctx.input.event,
@@ -91,21 +100,21 @@ export let manageWebhook = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.webhookId)
-        throw new Error('webhookId is required for updating a webhook');
+      if (!ctx.input.webhookId) throw invalid('webhookId is required for updating a webhook');
 
       let data: Record<string, any> = {};
       if (ctx.input.event !== undefined) data.event = ctx.input.event;
       if (ctx.input.targetUrl !== undefined) data.target_url = ctx.input.targetUrl;
       if (ctx.input.name !== undefined) data.name = ctx.input.name;
       if (ctx.input.secret !== undefined) data.secret = ctx.input.secret;
+      if (ctx.input.apiVersion !== undefined) data.api_version = ctx.input.apiVersion;
 
       let result = await client.updateWebhook(ctx.input.webhookId, data);
       let w = result.webhooks[0];
       return { output: mapWebhook(w), message: `Updated webhook for event **${w.event}**.` };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw invalid(`Unknown action: ${action}`);
   })
   .build();
 
@@ -113,10 +122,10 @@ let mapWebhook = (w: any) => ({
   webhookId: w.id,
   event: w.event,
   targetUrl: w.target_url,
-  name: w.name ?? null,
-  status: w.status ?? 'available',
-  apiVersion: w.api_version ?? 'v5',
-  lastTriggeredAt: w.last_triggered_at ?? null,
+  name: w.name,
+  status: w.status,
+  apiVersion: w.api_version,
+  lastTriggeredAt: w.last_triggered_at,
   createdAt: w.created_at,
   updatedAt: w.updated_at
 });

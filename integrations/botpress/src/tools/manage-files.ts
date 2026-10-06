@@ -1,14 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FilesClient } from '../lib/client';
+import { botIdSchema, resolveBotId } from '../lib/schemas';
 import { spec } from '../spec';
+import { fileUrlExpiry } from './get-file-url';
 
 export let manageFilesTool = SlateTool.create(spec, {
   name: 'Manage Files',
   key: 'manage_files',
-  description: `List, retrieve, delete, or search files in a bot's file storage. Use **search** for semantic/RAG search across indexed knowledge base files. Use **upsert** to create or update file metadata (returns an upload URL for content upload).`,
+  description: `List, retrieve, download, delete, or search files in a bot's file storage. Use search for indexed knowledge files. Upsert creates or updates file metadata and can upload UTF-8 text content. Call list_workspaces to discover workspace IDs, then list_bots to discover bot IDs.`,
   instructions: [
-    'The upsert action creates file metadata and returns an uploadUrl. Upload actual file content by making a PUT request to that URL separately.',
+    'For upsert, provide content to upload UTF-8 text immediately, or provide size and upload bytes with PUT to the returned uploadUrl.',
+    'For get, set download to true to prepare the file for download.',
     'Set index to true when upserting files that should be searchable via semantic search.'
   ],
   tags: {
@@ -20,13 +23,26 @@ export let manageFilesTool = SlateTool.create(spec, {
       action: z
         .enum(['list', 'get', 'delete', 'search', 'upsert'])
         .describe('Operation to perform'),
-      botId: z.string().optional().describe('Bot ID. Falls back to config botId.'),
+      botId: botIdSchema,
       fileId: z.string().optional().describe('File ID (required for get, delete)'),
       key: z
         .string()
         .optional()
         .describe('Unique file key within the bot (required for upsert)'),
-      size: z.number().optional().describe('File size in bytes (required for upsert)'),
+      size: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          'File size in bytes. Required for upsert when content is omitted; otherwise calculated from the UTF-8 content.'
+        ),
+      content: z.string().optional().describe('UTF-8 text content to upload during upsert.'),
+      contentType: z.string().optional().describe('MIME type for upsert, such as text/plain.'),
+      download: z
+        .boolean()
+        .optional()
+        .describe('For get, prepare the retrieved file for download.'),
       index: z
         .boolean()
         .optional()
@@ -43,7 +59,7 @@ export let manageFilesTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Natural language search query (required for search action)'),
-      searchLimit: z.number().optional().describe('Max results for search'),
+      searchLimit: z.number().int().min(1).optional().describe('Max results for search'),
       nextToken: z.string().optional().describe('Pagination token for list'),
       sortField: z
         .string()
@@ -94,8 +110,7 @@ export let manageFilesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let botId = ctx.input.botId || ctx.config.botId;
-    if (!botId) throw new Error('botId is required (provide in input or config)');
+    let botId = resolveBotId(ctx.input.botId, ctx.config);
 
     let client = new FilesClient({ token: ctx.auth.token, botId });
 
@@ -109,7 +124,7 @@ export let manageFilesTool = SlateTool.create(spec, {
         fileId: f.id as string,
         key: f.key as string | undefined,
         url: f.url as string | undefined,
-        size: f.size as number | undefined,
+        size: (f.size ?? undefined) as number | undefined,
         status: f.status as string | undefined,
         contentType: f.contentType as string | undefined
       }));
@@ -120,16 +135,33 @@ export let manageFilesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.fileId) throw new Error('fileId is required for get action');
+      if (!ctx.input.fileId) throw createApiServiceError('fileId is required for get action');
       let result = await client.getFile(ctx.input.fileId);
       let f = result.file;
+      if (ctx.input.download) {
+        if (!f.url)
+          throw createApiServiceError('Botpress did not return a download URL for this file.');
+        if (f.status === 'upload_pending' || f.status === 'upload_failed')
+          throw createApiServiceError(
+            'The file has not uploaded successfully. Upload its content before downloading.'
+          );
+        const isPublic = f.accessPolicies?.includes('public_content');
+        await ctx.addAttachment({
+          type: 'url',
+          url: f.url,
+          mimeType: f.contentType,
+          ...(isPublic
+            ? {}
+            : { refreshReference: { botId, fileId: f.id }, refreshAt: fileUrlExpiry(f.url) })
+        });
+      }
       return {
         output: {
           file: {
             fileId: f.id,
             key: f.key,
             url: f.url,
-            size: f.size,
+            size: f.size ?? undefined,
             contentType: f.contentType,
             status: f.status,
             createdAt: f.createdAt,
@@ -141,7 +173,8 @@ export let manageFilesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.fileId) throw new Error('fileId is required for delete action');
+      if (!ctx.input.fileId)
+        throw createApiServiceError('fileId is required for delete action');
       await client.deleteFile(ctx.input.fileId);
       return {
         output: { deleted: true },
@@ -150,7 +183,8 @@ export let manageFilesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'search') {
-      if (!ctx.input.searchQuery) throw new Error('searchQuery is required for search action');
+      if (!ctx.input.searchQuery)
+        throw createApiServiceError('searchQuery is required for search action');
       let result = await client.searchFiles(ctx.input.searchQuery, {
         limit: ctx.input.searchLimit
       });
@@ -167,29 +201,63 @@ export let manageFilesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'upsert') {
-      if (!ctx.input.key) throw new Error('key is required for upsert action');
-      if (ctx.input.size === undefined) throw new Error('size is required for upsert action');
+      if (!ctx.input.key) throw createApiServiceError('key is required for upsert action');
+      const contentSize =
+        ctx.input.content === undefined
+          ? undefined
+          : Buffer.byteLength(ctx.input.content, 'utf8');
+      const size = ctx.input.size ?? contentSize;
+      if (size === undefined)
+        throw createApiServiceError('size is required for upsert when content is omitted.');
+      if (contentSize !== undefined && size !== contentSize)
+        throw createApiServiceError(
+          'size must match the UTF-8 byte length of content, or omit size to calculate it automatically.'
+        );
+      if (
+        ctx.input.accessPolicies?.some(
+          policy => !['integrations', 'public_content'].includes(policy)
+        )
+      )
+        throw createApiServiceError(
+          'accessPolicies only supports integrations and public_content.'
+        );
       let result = await client.upsertFile({
         key: ctx.input.key,
-        size: ctx.input.size,
+        size,
         index: ctx.input.index,
         tags: ctx.input.fileTags,
-        accessPolicies: ctx.input.accessPolicies
+        accessPolicies: ctx.input.accessPolicies,
+        contentType: ctx.input.contentType
       });
       let f = result.file;
+      if (ctx.input.content !== undefined) {
+        if (!f.uploadUrl)
+          throw createApiServiceError('Botpress did not return an upload URL.');
+        await client.uploadContent(
+          f.uploadUrl,
+          ctx.input.content,
+          ctx.input.contentType ?? 'text/plain; charset=utf-8'
+        );
+      }
       return {
         output: {
           file: {
-            fileId: f.id || '',
+            fileId: f.id,
             key: ctx.input.key,
             url: f.url,
-            uploadUrl: f.uploadUrl
+            uploadUrl: f.uploadUrl,
+            size,
+            contentType: f.contentType,
+            status: f.status
           }
         },
-        message: `Upserted file metadata for **${ctx.input.key}**. Upload content to the returned uploadUrl.`
+        message:
+          ctx.input.content === undefined
+            ? `Prepared file **${ctx.input.key}**. Upload content to the returned uploadUrl.`
+            : `Uploaded UTF-8 content for file **${ctx.input.key}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

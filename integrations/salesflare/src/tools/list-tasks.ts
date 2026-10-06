@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let listTasks = SlateTool.create(spec, {
@@ -13,6 +13,10 @@ export let listTasks = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      taskIds: z
+        .array(z.number())
+        .optional()
+        .describe('Filter by exact task IDs, including for task readback'),
       search: z.string().optional().describe('Full-text search across task fields'),
       assigneeIds: z
         .array(z.number())
@@ -34,18 +38,19 @@ export let listTasks = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let params: Record<string, any> = {
+    let params: Row = {
       limit: ctx.input.limit,
       offset: ctx.input.offset
     };
+    if (ctx.input.taskIds !== undefined) params.id = ctx.input.taskIds;
     if (ctx.input.search) params.search = ctx.input.search;
     if (ctx.input.assigneeIds) params.assignees = ctx.input.assigneeIds;
-    if (ctx.input.accountId) params.account = ctx.input.accountId;
+    if (ctx.input.accountId !== undefined) params.account = ctx.input.accountId;
     if (ctx.input.type) params.type = ctx.input.type;
     if (ctx.input.orderBy) params.order_by = ctx.input.orderBy;
 
     let tasks = await client.listTasks(params);
-    let list = Array.isArray(tasks) ? tasks : [];
+    let list = tasks;
 
     return {
       output: {

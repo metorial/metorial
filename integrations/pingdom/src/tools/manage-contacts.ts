@@ -59,6 +59,7 @@ export let listContacts = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of records returned in this response'),
       contacts: z.array(contactOutputSchema).describe('List of alerting contacts')
     })
   )
@@ -69,17 +70,17 @@ export let listContacts = SlateTool.create(spec, {
     });
 
     let result = await client.listContacts();
-    let contacts = (result.contacts || []).map((c: any) => ({
+    let contacts = result.contacts.map(c => ({
       contactId: c.id,
       name: c.name,
       paused: c.paused,
       type: c.type,
       notificationTargets: c.notification_targets,
-      teams: c.teams?.map((t: any) => ({ teamId: t.id, name: t.name }))
+      teams: c.teams?.map(t => ({ teamId: t.id, name: t.name }))
     }));
 
     return {
-      output: { contacts },
+      output: { contacts, returnedCount: contacts.length },
       message: `Found **${contacts.length}** alerting contact(s).`
     };
   })
@@ -111,17 +112,17 @@ export let createContact = SlateTool.create(spec, {
       accountEmail: ctx.auth.accountEmail
     });
 
-    let data: Record<string, any> = {
+    let data: Record<string, unknown> = {
       name: ctx.input.name
     };
 
     if (ctx.input.paused !== undefined) data.paused = ctx.input.paused;
 
-    let notifTargets: Record<string, any> = {};
-    if (ctx.input.notificationTargets.email?.length) {
+    let notifTargets: Record<string, unknown> = {};
+    if (ctx.input.notificationTargets.email !== undefined) {
       notifTargets.email = ctx.input.notificationTargets.email;
     }
-    if (ctx.input.notificationTargets.sms?.length) {
+    if (ctx.input.notificationTargets.sms !== undefined) {
       notifTargets.sms = ctx.input.notificationTargets.sms.map(s => ({
         number: s.number,
         country_code: s.countryCode,
@@ -132,7 +133,7 @@ export let createContact = SlateTool.create(spec, {
     data.notification_targets = notifTargets;
 
     let result = await client.createContact(data);
-    let contact = result.contact || result;
+    let contact = result.contact;
 
     return {
       output: { contactId: contact.id },
@@ -168,16 +169,16 @@ export let updateContact = SlateTool.create(spec, {
       accountEmail: ctx.auth.accountEmail
     });
 
-    let data: Record<string, any> = {};
+    let data: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) data.name = ctx.input.name;
     if (ctx.input.paused !== undefined) data.paused = ctx.input.paused;
 
     if (ctx.input.notificationTargets) {
-      let notifTargets: Record<string, any> = {};
-      if (ctx.input.notificationTargets.email?.length) {
+      let notifTargets: Record<string, unknown> = {};
+      if (ctx.input.notificationTargets.email !== undefined) {
         notifTargets.email = ctx.input.notificationTargets.email;
       }
-      if (ctx.input.notificationTargets.sms?.length) {
+      if (ctx.input.notificationTargets.sms !== undefined) {
         notifTargets.sms = ctx.input.notificationTargets.sms.map(s => ({
           number: s.number,
           country_code: s.countryCode,
@@ -191,7 +192,12 @@ export let updateContact = SlateTool.create(spec, {
     let result = await client.updateContact(ctx.input.contactId, data);
 
     return {
-      output: { message: result.message || 'Contact updated successfully' },
+      output: {
+        message:
+          ('message' in result && typeof result.message === 'string'
+            ? result.message
+            : undefined) || 'Contact updated successfully'
+      },
       message: `Updated alerting contact **${ctx.input.contactId}**.`
     };
   })
@@ -224,7 +230,12 @@ export let deleteContact = SlateTool.create(spec, {
     let result = await client.deleteContact(ctx.input.contactId);
 
     return {
-      output: { message: result.message || 'Contact deleted successfully' },
+      output: {
+        message:
+          ('message' in result && typeof result.message === 'string'
+            ? result.message
+            : undefined) || 'Contact deleted successfully'
+      },
       message: `Deleted alerting contact **${ctx.input.contactId}**.`
     };
   })

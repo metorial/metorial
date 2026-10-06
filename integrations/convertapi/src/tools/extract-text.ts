@@ -1,18 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deliverFiles } from '../lib/files';
+import { buildFileSource, fileSourceSchema, invalid } from '../lib/validation';
 import { spec } from '../spec';
-
-let fileSourceSchema = z
-  .object({
-    url: z.string().optional().describe('Public URL of the file'),
-    fileId: z.string().optional().describe('ConvertAPI file ID of a previously uploaded file'),
-    base64Data: z.string().optional().describe('Base64-encoded file content'),
-    fileName: z.string().optional().describe('File name (required when using base64Data)')
-  })
-  .describe(
-    'File source — provide exactly one of: url, fileId, or base64Data (with fileName)'
-  );
 
 export let extractText = SlateTool.create(spec, {
   name: 'Extract Text',
@@ -20,11 +11,11 @@ export let extractText = SlateTool.create(spec, {
   description: `Extract text content from PDF documents and other file formats. Supports OCR for scanned documents.
 Returns the extracted text as a plain text file. Useful for indexing, search, or text analysis.`,
   instructions: [
-    'For scanned PDFs, the tool automatically applies OCR to extract text from images.'
+    'For PDF input, set ocrEnabled true to force OCR, false to disable OCR, or omit it for the provider default.'
   ],
   tags: {
     destructive: false,
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -34,19 +25,29 @@ Returns the extracted text as a plain text file. Useful for indexing, search, or
         .default('pdf')
         .describe('Source file format (e.g., "pdf", "docx", "pptx")'),
       file: fileSourceSchema,
-      ocrEnabled: z.boolean().optional().describe('Enable OCR for scanned documents')
+      ocrEnabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'PDF input only: true forces OCR and false disables OCR. Omit for other formats.'
+        )
     })
   )
   .output(
     z.object({
       conversionCost: z.number().describe('Number of conversion credits consumed'),
-      conversionTime: z.number().describe('Extraction duration in seconds'),
+      conversionTime: z
+        .number()
+        .optional()
+        .describe('Provider-reported legacy duration, when present'),
       fileName: z.string().describe('Name of the output text file'),
       fileSize: z.number().describe('Size of the extracted text in bytes'),
       textContent: z
         .string()
         .nullable()
-        .describe('Extracted text content (base64-encoded if not directly available)'),
+        .describe(
+          'Legacy field, always null. The extracted text is available as a downloadable file.'
+        ),
       fileId: z.string().nullable().describe('ConvertAPI file ID'),
       url: z.string().nullable().describe('Download URL for the text file')
     })
@@ -54,23 +55,29 @@ Returns the extracted text as a plain text file. Useful for indexing, search, or
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
+      masterToken: ctx.auth.masterToken,
       region: ctx.config.region
     });
 
     let fileSource = buildFileSource(ctx.input.file);
     let parameters: Record<string, string> = {};
+    if (ctx.input.ocrEnabled !== undefined && ctx.input.sourceFormat !== 'pdf')
+      throw invalid(
+        'ocrEnabled is supported by the PDF text converter. Omit it for other source formats, or convert the source to PDF first.'
+      );
 
     if (ctx.input.ocrEnabled !== undefined) {
-      parameters.Ocr = ctx.input.ocrEnabled ? 'true' : 'false';
+      parameters.OcrMode = ctx.input.ocrEnabled ? 'force' : 'never';
     }
 
-    let result = await client.convert({
+    let rawResult = await client.convert({
       sourceFormat: ctx.input.sourceFormat,
       destinationFormat: 'txt',
       files: [fileSource],
       storeFile: true,
       parameters
     });
+    let result = await deliverFiles(ctx, rawResult);
 
     let textFile = result.files[0]!;
     return {
@@ -79,35 +86,11 @@ Returns the extracted text as a plain text file. Useful for indexing, search, or
         conversionTime: result.conversionTime,
         fileName: textFile.fileName,
         fileSize: textFile.fileSize,
-        textContent: textFile.fileData,
+        textContent: null,
         fileId: textFile.fileId,
         url: textFile.url
       },
-      message: `Extracted text from **${ctx.input.sourceFormat}** → \`${textFile.fileName}\` (${formatBytes(textFile.fileSize)}) in ${result.conversionTime}s.`
+      message: `Extracted text from **${ctx.input.sourceFormat}** → \`${textFile.fileName}\` (${textFile.fileSize} bytes).`
     };
   })
   .build();
-
-function buildFileSource(file: {
-  url?: string;
-  fileId?: string;
-  base64Data?: string;
-  fileName?: string;
-}) {
-  if (file.url) {
-    return { type: 'url' as const, url: file.url };
-  }
-  if (file.fileId) {
-    return { type: 'fileId' as const, fileId: file.fileId };
-  }
-  if (file.base64Data && file.fileName) {
-    return { type: 'base64' as const, fileName: file.fileName, data: file.base64Data };
-  }
-  throw new Error('Provide exactly one of: url, fileId, or base64Data (with fileName)');
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}

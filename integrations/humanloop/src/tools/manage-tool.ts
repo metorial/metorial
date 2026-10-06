@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectHumanloopOperation } from '../lib/retirement';
 import { spec } from '../spec';
 
 export let manageTool = SlateTool.create(spec, {
   name: 'Manage Tool',
   key: 'manage_tool',
-  description: `Create, update, retrieve, or delete Humanloop tools. Tools represent external functions or capabilities callable by Prompts and Agents. Each tool version is defined by its source code and function schema. Supports tool types including json_schema, python, snippet, and API calls.`,
+  description:
+    'DEPRECATED — Humanloop shut down on September 8, 2025. This operation is unavailable; the tool is retained only for compatibility.',
   instructions: [
-    'Provide a JSON Schema for the function parameters to enable structured function calling.',
-    'For Python tools, include the source code in the sourceCode field.'
+    'Humanloop is retired. Do not use this tool for new workflows; use data exported before September 8, 2025 with your chosen replacement platform.'
   ],
   tags: {
     destructive: false,
-    readOnly: false
+    readOnly: false,
+    deprecated: true
   }
 })
   .input(
@@ -66,76 +67,5 @@ export let manageTool = SlateTool.create(spec, {
       total: z.number().optional().describe('Total count')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    if (ctx.input.action === 'list') {
-      let result = await client.listTools({
-        page: ctx.input.page,
-        size: ctx.input.size
-      });
-      return {
-        output: { tools: result.records, total: result.total },
-        message: `Found **${result.total}** tools.`
-      };
-    }
-
-    if (ctx.input.action === 'get') {
-      if (!ctx.input.toolId) throw new Error('toolId is required for get action');
-      let tool = await client.getTool(ctx.input.toolId);
-      return {
-        output: { tool },
-        message: `Retrieved tool **${tool.name || tool.path}**.`
-      };
-    }
-
-    if (ctx.input.action === 'create') {
-      let body: Record<string, any> = {};
-      if (ctx.input.path) body.path = ctx.input.path;
-      if (ctx.input.toolId) body.id = ctx.input.toolId;
-      if (ctx.input.toolType) body.tool_type = ctx.input.toolType;
-      if (ctx.input.sourceCode) body.source_code = ctx.input.sourceCode;
-      if (ctx.input.setupValues) body.setup_values = ctx.input.setupValues;
-      if (ctx.input.versionName) body.version_name = ctx.input.versionName;
-      if (ctx.input.versionDescription)
-        body.version_description = ctx.input.versionDescription;
-
-      if (ctx.input.functionName || ctx.input.functionDescription || ctx.input.parameters) {
-        body.function = {};
-        if (ctx.input.functionName) body.function.name = ctx.input.functionName;
-        if (ctx.input.functionDescription)
-          body.function.description = ctx.input.functionDescription;
-        if (ctx.input.parameters) body.function.parameters = ctx.input.parameters;
-      }
-
-      let tool = await client.upsertTool(body);
-      return {
-        output: { tool },
-        message: `Created/updated tool **${tool.name || tool.path}** (type: ${ctx.input.toolType || 'unknown'}).`
-      };
-    }
-
-    if (ctx.input.action === 'update') {
-      if (!ctx.input.toolId) throw new Error('toolId is required for update action');
-      let body: Record<string, any> = {};
-      if (ctx.input.path) body.path = ctx.input.path;
-      if (ctx.input.name) body.name = ctx.input.name;
-      let tool = await client.updateTool(ctx.input.toolId, body);
-      return {
-        output: { tool },
-        message: `Updated tool **${tool.name || tool.path}**.`
-      };
-    }
-
-    if (ctx.input.action === 'delete') {
-      if (!ctx.input.toolId) throw new Error('toolId is required for delete action');
-      await client.deleteTool(ctx.input.toolId);
-      return {
-        output: {},
-        message: `Deleted tool **${ctx.input.toolId}**.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
-  })
+  .handleInvocation(async () => rejectHumanloopOperation())
   .build();

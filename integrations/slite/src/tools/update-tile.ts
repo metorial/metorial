@@ -25,7 +25,12 @@ export let updateTile = SlateTool.create(spec, {
       status: z
         .object({
           label: z.string().describe('Status text'),
-          colorHex: z.string().describe('Hex color code (e.g. #FF0000)')
+          colorHex: z
+            .string()
+            .regex(/^#[0-9a-fA-F]{6}$/)
+            .nullable()
+            .optional()
+            .describe('Hex color code (e.g. #FF0000)')
         })
         .nullable()
         .optional()

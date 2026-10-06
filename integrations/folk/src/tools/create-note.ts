@@ -7,6 +7,9 @@ export let createNote = SlateTool.create(spec, {
   name: 'Create Note',
   key: 'create_note',
   description: `Creates a new note attached to a person, company, or deal. Notes support plain text or markdown content and can be public or private. You can also create reply threads by specifying a parent note.`,
+  instructions: [
+    'Notes containing workspace-user mention links can notify those users. Avoid mentions unless notifications are intended.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +17,12 @@ export let createNote = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe(
+          'Optional unique retry key. Reuse the same key and identical input after an uncertain response; Folk retains completed keys for 24 hours.'
+        ),
       entityId: z
         .string()
         .describe('ID of the person, company, or deal to attach the note to'),
@@ -51,11 +60,11 @@ export let createNote = SlateTool.create(spec, {
       visibility: ctx.input.visibility
     };
 
-    if (ctx.input.parentNoteId) {
+    if (ctx.input.parentNoteId !== undefined) {
       input.parentNote = { id: ctx.input.parentNoteId };
     }
 
-    let note = await client.createNote(input);
+    let note = await client.createNote(input, ctx.input.idempotencyKey);
 
     return {
       output: {

@@ -22,8 +22,6 @@ import {
   manageList,
   search
 } from './tools';
-import { boardActivity } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     getNotifications,
     getActivity
   ],
-  triggers: [boardActivity]
+  triggers: []
 });

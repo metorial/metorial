@@ -39,18 +39,18 @@ export let getBatch = SlateTool.create(spec, {
 
     let [batch, batchStatus] = await Promise.all([
       client.getBatch(ctx.input.batchName),
-      client.getBatchStatus(ctx.input.batchName).catch(() => null)
+      client.getBatchStatus(ctx.input.batchName)
     ]);
 
     return {
       output: {
+        ...batch,
         batchName: batch.name ?? ctx.input.batchName,
         projectName: batch.project,
         status: batchStatus?.status ?? batch.status,
         tasksPending: batchStatus?.tasks_pending,
         tasksCompleted: batchStatus?.tasks_completed,
-        createdAt: batch.created_at,
-        ...batch
+        createdAt: batch.created_at
       },
       message: `Batch **${ctx.input.batchName}** is \`${batchStatus?.status ?? batch.status}\`${batchStatus ? ` — ${batchStatus.tasks_completed ?? 0} completed, ${batchStatus.tasks_pending ?? 0} pending` : ''}.`
     };

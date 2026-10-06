@@ -1,22 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GhostAdminClient } from '../lib/client';
+import { getClient } from '../lib/client';
+import { pagination } from '../lib/schemas';
 import { spec } from '../spec';
 
-let tagSchema = z.object({
-  tagId: z.string().describe('Unique tag ID'),
-  name: z.string().describe('Tag name'),
-  slug: z.string().describe('URL-friendly slug'),
-  description: z.string().nullable().describe('Tag description'),
-  featureImage: z.string().nullable().describe('Tag feature image URL'),
-  visibility: z.string().describe('Tag visibility (public or internal)'),
-  metaTitle: z.string().nullable().describe('SEO meta title'),
-  metaDescription: z.string().nullable().describe('SEO meta description'),
-  postCount: z.number().optional().describe('Number of posts with this tag'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp'),
-  url: z.string().describe('Tag URL')
-});
+let tagSchema = z
+  .object({
+    tagId: z.string().describe('Unique tag ID'),
+    name: z.string().optional().describe('Tag name'),
+    slug: z.string().optional().describe('URL-friendly slug'),
+    description: z.string().nullable().optional().describe('Tag description'),
+    featureImage: z.string().nullable().optional().describe('Tag feature image URL'),
+    visibility: z.string().optional().describe('Tag visibility (public or internal)'),
+    metaTitle: z.string().nullable().optional().describe('SEO meta title'),
+    metaDescription: z.string().nullable().optional().describe('SEO meta description'),
+    postCount: z.number().optional().describe('Number of posts with this tag'),
+    createdAt: z.string().optional().describe('Creation timestamp'),
+    updatedAt: z.string().optional().describe('Last update timestamp'),
+    url: z.string().optional().describe('Tag URL')
+  })
+  .partial()
+  .required({ tagId: true });
 
 let paginationSchema = z.object({
   page: z.number(),
@@ -35,6 +39,12 @@ export let browseTags = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      api: z
+        .enum(['admin', 'content'])
+        .optional()
+        .describe(
+          'Read through Admin or published Content API. Writes require Admin. Defaults to the connection type.'
+        ),
       filter: z
         .string()
         .optional()
@@ -52,10 +62,7 @@ export let browseTags = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GhostAdminClient({
-      domain: ctx.config.adminDomain,
-      apiKey: ctx.auth.token
-    });
+    let client = getClient(ctx, ctx.input.api);
 
     let result = await client.browseTags({
       filter: ctx.input.filter,
@@ -69,29 +76,22 @@ export let browseTags = SlateTool.create(spec, {
       tagId: t.id,
       name: t.name,
       slug: t.slug,
-      description: t.description ?? null,
-      featureImage: t.feature_image ?? null,
+      description: t.description,
+      featureImage: t.feature_image,
       visibility: t.visibility,
-      metaTitle: t.meta_title ?? null,
-      metaDescription: t.meta_description ?? null,
+      metaTitle: t.meta_title,
+      metaDescription: t.meta_description,
       postCount: t.count?.posts,
       createdAt: t.created_at,
       updatedAt: t.updated_at,
       url: t.url
     }));
 
-    let pagination = result.meta?.pagination ?? {
-      page: 1,
-      limit: 15,
-      pages: 1,
-      total: tags.length,
-      next: null,
-      prev: null
-    };
+    let pageInfo = pagination(result, tags.length);
 
     return {
-      output: { tags, pagination },
-      message: `Found **${pagination.total}** tags (page ${pagination.page} of ${pagination.pages}).`
+      output: { tags, pagination: pageInfo },
+      message: `Found **${pageInfo.total}** tags (page ${pageInfo.page} of ${pageInfo.pages}).`
     };
   })
   .build();

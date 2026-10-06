@@ -9,7 +9,6 @@
     "read and write record comments",
     "upload record attachments",
     "list accessible bases",
-    "receive webhook change events",
     "upsert records",
     "create and update tables"
   ],

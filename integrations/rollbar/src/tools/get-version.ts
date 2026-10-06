@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, levelName, versionEvents } from '../lib/client';
 import { spec } from '../spec';
 
 export let getVersion = SlateTool.create(spec, {
@@ -13,12 +13,27 @@ export let getVersion = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: z
+        .number()
+        .optional()
+        .describe('Project ID from manage_project; required with an account token.'),
       version: z.string().describe('Code version string (e.g., git SHA, semantic version)'),
       includeItems: z
         .boolean()
         .optional()
         .describe('Whether to also list items associated with this version'),
-      environment: z.string().optional().describe('Filter version items by environment'),
+      environment: z
+        .string()
+        .optional()
+        .describe(
+          'Required for version details and items. Use list_environments to discover the name.'
+        ),
+      event: z
+        .enum(versionEvents)
+        .optional()
+        .describe(
+          'Required when includeItems is true: the item event associated with this version'
+        ),
       page: z.number().optional().describe('Page number for items pagination')
     })
   )
@@ -41,23 +56,31 @@ export let getVersion = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
-    let versionResult = await client.getVersion(ctx.input.version);
+    if (ctx.input.includeItems && ctx.input.event === undefined)
+      throw createApiServiceError(
+        'event is required when includeItems is true: new, repeated, reactivated or resolved.'
+      );
+
+    let versionResult = await client.getVersion(ctx.input.version, ctx.input.environment);
     let versionDetails = versionResult?.result;
 
-    let items: any[] | undefined;
+    let items:
+      | { itemId: number; counter?: number; title?: string; status?: string; level?: string }[]
+      | undefined;
     if (ctx.input.includeItems) {
       let itemsResult = await client.listVersionItems(ctx.input.version, {
         environment: ctx.input.environment,
+        event: ctx.input.event,
         page: ctx.input.page
       });
-      items = (itemsResult?.result?.items || []).map((item: any) => ({
+      items = itemsResult.result.map(item => ({
         itemId: item.id,
         counter: item.counter,
         title: item.title,
         status: item.status,
-        level: item.level_string || item.level
+        level: levelName(item.level_string ?? item.level)
       }));
     }
 

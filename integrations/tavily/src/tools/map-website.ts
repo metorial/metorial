@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let mapWebsite = SlateTool.create(spec, {
   name: 'Map Website',
   key: 'map_website',
-  description: `Discover and list all URLs on a website by traversing its link structure, without extracting content. Returns a flat list of discovered URLs. Useful for understanding site structure before crawling or extracting specific pages.`,
+  description: `Discover a bounded set of URLs on a website by traversing its link structure, without extracting content. Returns a flat list of discovered URLs. Useful for understanding site structure before crawling or extracting specific pages.`,
   instructions: [
     'Use this before crawling to understand the site structure and identify which pages to target.',
     'Use selectPaths/excludePaths with regex patterns to focus on specific sections of a site.'
@@ -78,7 +78,14 @@ export let mapWebsite = SlateTool.create(spec, {
     z.object({
       baseUrl: z.string().describe('The root URL that was mapped'),
       urls: z.array(z.string()).describe('List of discovered URLs'),
-      totalUrls: z.number().describe('Total number of URLs discovered'),
+      totalUrls: z.number().describe('Number of URLs returned in this bounded response'),
+      requestId: z.string().optional().describe('Native request identifier when returned'),
+      usageCredits: z
+        .number()
+        .optional()
+        .describe(
+          'Native credits reported for this request; zero may reflect batched billing'
+        ),
       responseTime: z.number().describe('Time to complete the request in seconds')
     })
   )
@@ -109,6 +116,8 @@ export let mapWebsite = SlateTool.create(spec, {
         baseUrl: result.baseUrl,
         urls: result.results,
         totalUrls: urlCount,
+        requestId: result.requestId,
+        usageCredits: result.usageCredits,
         responseTime: result.responseTime
       },
       message: `Mapped **${urlCount} URL${urlCount !== 1 ? 's' : ''}** starting from **${result.baseUrl}** in ${result.responseTime.toFixed(2)}s.`

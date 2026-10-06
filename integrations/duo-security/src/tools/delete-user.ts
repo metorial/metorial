@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let deleteUser = SlateTool.create(spec, {
   name: 'Delete User',
   key: 'delete_user',
-  description: `Permanently delete a Duo Security user and all associated data including phones, tokens, and group memberships.`,
+  description: `Permanently remove a Duo Security user without trash or restoration. Associated phones are not immediately deleted; retained devices and historical audit effects require separate reconciliation.`,
   tags: {
     destructive: true
   }
@@ -22,10 +23,12 @@ export let deleteUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('delete_user', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     await client.deleteUser(ctx.input.userId);

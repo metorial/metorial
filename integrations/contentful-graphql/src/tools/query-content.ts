@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createGraphQLClient } from '../lib/helpers';
+import { queryFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let queryContent = SlateTool.create(spec, {
@@ -14,27 +15,16 @@ Allows you to run any valid GraphQL query against the auto-generated schema for 
     'Collection queries follow the pattern: `{contentTypeCollection { items { ... } }}` where contentType is the camelCase name of your content type.',
     'Single entry queries follow the pattern: `{contentType(id: "entry-id") { ... }}`.',
     'Use the `locale` argument on fields to override the locale for that field.',
-    'Use variables for dynamic values rather than string interpolation in queries.'
+    'Use variables for dynamic values rather than string interpolation in queries.',
+    'Select the key-authorized space ID explicitly. list_spaces uses an optional CMA token and does not prove delivery-key access.',
+    'Offset collections use limit/skip. Native CursorCollection fields use pageNext/pagePrev and return pages.next/pages.prev; keep cursors and filters unchanged.',
+    'Queries consume API quota and can resolve configured external references. Select only the content and relationships you need.'
   ],
   tags: {
     readOnly: true
   }
 })
-  .input(
-    z.object({
-      query: z
-        .string()
-        .describe(
-          'The GraphQL query string to execute against the Contentful Content Delivery API.'
-        ),
-      variables: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe(
-          'Optional variables for the GraphQL query. Keys are variable names, values are their corresponding values.'
-        )
-    })
-  )
+  .input(z.object(queryFields))
   .output(
     z.object({
       queryResult: z.any().describe('The data returned by the GraphQL query.'),
@@ -45,19 +35,23 @@ Allows you to run any valid GraphQL query against the auto-generated schema for 
     })
   )
   .handleInvocation(async ctx => {
-    let client = createGraphQLClient(ctx.config, ctx.auth);
+    let client = createGraphQLClient(ctx.config, ctx.auth, ctx.input);
 
-    let result = await client.query(ctx.input.query, ctx.input.variables);
+    let result = await client.query(
+      ctx.input.query,
+      ctx.input.variables,
+      ctx.input.operationName
+    );
 
     let hasErrors = result.errors && result.errors.length > 0;
 
     return {
       output: {
-        queryResult: result.data || null,
+        queryResult: result.data ?? null,
         errors: result.errors
       },
       message: hasErrors
-        ? `Query executed with **${result.errors.length} error(s)**. Check the errors field for details.`
+        ? `Query executed with **${result.errors?.length ?? 0} error(s)**. Check the errors field for details.`
         : `Query executed successfully.`
     };
   })

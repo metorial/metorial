@@ -14,7 +14,7 @@ let sharedFolderUserSchema = z.object({
 let sharedFolderSchema = z.object({
   folderId: z.string().describe('Unique identifier of the shared folder'),
   folderName: z.string().describe('Name of the shared folder'),
-  securityScore: z.number().describe('Security score of the shared folder'),
+  securityScore: z.number().optional().describe('Security score of the shared folder'),
   users: z
     .array(sharedFolderUserSchema)
     .describe('Users with access to this folder and their permissions')
@@ -23,7 +23,7 @@ let sharedFolderSchema = z.object({
 export let getSharedFolders = SlateTool.create(spec, {
   name: 'Get Shared Folders',
   key: 'get_shared_folders',
-  description: `Retrieve all shared folders in the LastPass Enterprise account with their contained sites, user permissions (read-only, admin, give access), and security scores.`,
+  description: `Retrieve all shared folders in the LastPass Enterprise account with their user permissions (read-only, admin, give access), and security scores.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -45,13 +45,13 @@ export let getSharedFolders = SlateTool.create(spec, {
 
     let folders = Object.entries(folderData).map(([folderId, folder]) => ({
       folderId,
-      folderName: folder.sharedfoldername || '',
-      securityScore: folder.score || 0,
+      folderName: folder.sharedfoldername,
+      securityScore: folder.score,
       users: (folder.users || []).map(u => ({
-        username: u.username || '',
-        readOnly: u.readonly === '1' || u.readonly === 'true',
-        canGive: u.give === '1' || u.give === 'true',
-        canAdminister: u.can_administer === '1' || u.can_administer === 'true',
+        username: u.username,
+        readOnly: u.readonly,
+        canGive: u.give,
+        canAdminister: u.can_administer,
         groupName: u.group_name || undefined
       }))
     }));

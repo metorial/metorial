@@ -44,8 +44,8 @@ Returns the query result as JSON.`,
 
     return {
       output: {
-        result: result.value !== undefined ? result.value : result,
-        status: result.status || 'success'
+        result: result.value,
+        status: result.status
       },
       message: `Query **${ctx.input.functionPath}** executed successfully.`
     };

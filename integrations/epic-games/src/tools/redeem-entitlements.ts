@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EosAccountServicesClient } from '../lib/client';
+import { accountClient, resolvedSandbox } from '../lib/client';
 import { spec } from '../spec';
 
 export let redeemEntitlements = SlateTool.create(spec, {
@@ -18,30 +18,41 @@ export let redeemEntitlements = SlateTool.create(spec, {
       sandboxId: z
         .string()
         .optional()
-        .describe('Sandbox ID. Uses the configured sandboxId if not provided.')
+        .describe(
+          'Sandbox ID. Uses the auth-observed or validated legacy sandbox only when available.'
+        )
     })
   )
   .output(
     z.object({
-      redeemed: z.boolean().describe('Whether the entitlements were successfully redeemed')
+      outcome: z
+        .literal('accepted')
+        .optional()
+        .describe('The provider accepted the consumption request.'),
+      entitlementIds: z.array(z.string()).optional().describe('Requested entitlement IDs.'),
+      upstreamStatus: z.number().optional().describe('Successful native response status.'),
+      redeemed: z
+        .boolean()
+        .describe(
+          'Whether Epic accepted the redemption request; game delivery is not verified'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EosAccountServicesClient({
-      token: ctx.auth.token,
-      accountId: ctx.auth.accountId
-    });
-
-    let sandboxId = ctx.input.sandboxId ?? ctx.config.sandboxId;
-    if (!sandboxId) {
-      throw new Error('sandboxId is required either in the input or in the configuration');
-    }
-
-    await client.redeemEntitlements(ctx.input.accountId, ctx.input.entitlementIds, sandboxId);
-
+    const receipt = await accountClient(ctx).redeemEntitlements(
+      ctx.input.accountId,
+      ctx.input.entitlementIds,
+      resolvedSandbox(ctx, ctx.input.sandboxId)
+    );
     return {
-      output: { redeemed: true },
-      message: `Successfully redeemed **${ctx.input.entitlementIds.length}** entitlement(s) for account \`${ctx.input.accountId}\`.`
+      output: {
+        redeemed: true,
+        outcome: 'accepted' as const,
+        entitlementIds: ctx.input.entitlementIds,
+        upstreamStatus: receipt.status
+      },
+      message:
+        'Epic accepted the redemption request. Consumption is irreversible; a successful request does not prove an in-game award was delivered.'
     };
   })
   .build();

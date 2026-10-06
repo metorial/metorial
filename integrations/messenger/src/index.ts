@@ -9,8 +9,6 @@ import {
   sendTemplate,
   uploadAttachment
 } from './tools';
-import { accountEvent, messageDelivery, messageReceived } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     senderAction,
     handover
   ],
-  triggers: [messageReceived, messageDelivery, accountEvent]
+  triggers: []
 });

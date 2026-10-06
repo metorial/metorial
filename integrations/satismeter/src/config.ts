@@ -1,10 +1,5 @@
 import { SlateConfig } from 'slates';
 import { z } from 'zod';
 
-export let config = SlateConfig.create(
-  z.object({
-    projectId: z
-      .string()
-      .describe('The SatisMeter Project ID. Found in Settings > Integrations > API.')
-  })
-);
+// Retain the stored projectId on existing connections without requiring it on new ones.
+export let config = SlateConfig.create(z.object({}).passthrough());

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listSubmissions = SlateTool.create(spec, {
@@ -35,6 +36,9 @@ export let listSubmissions = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: paginationSchema.describe(
+        'Native page count and ID cursors; use next as after to continue.'
+      ),
       submissions: z
         .array(
           z.object({
@@ -49,7 +53,7 @@ export let listSubmissions = SlateTool.create(spec, {
               .array(
                 z.object({
                   submitterId: z.number().describe('Submitter ID'),
-                  email: z.string().optional().describe('Submitter email'),
+                  email: z.string().nullable().optional().describe('Submitter email'),
                   name: z.string().nullable().optional().describe('Submitter name'),
                   status: z.string().optional().describe('Submitter status'),
                   role: z.string().optional().describe('Submitter role')
@@ -80,8 +84,8 @@ export let listSubmissions = SlateTool.create(spec, {
       before: ctx.input.before
     });
 
-    let items = Array.isArray(data) ? data : data.data || [];
-    let submissions = items.map((s: any) => ({
+    let items = data.data;
+    let submissions = items.map(s => ({
       submissionId: s.id,
       slug: s.slug,
       status: s.status,
@@ -89,7 +93,7 @@ export let listSubmissions = SlateTool.create(spec, {
       createdAt: s.created_at,
       completedAt: s.completed_at,
       archivedAt: s.archived_at,
-      submitters: (s.submitters || []).map((sub: any) => ({
+      submitters: (s.submitters || []).map(sub => ({
         submitterId: sub.id,
         email: sub.email,
         name: sub.name,
@@ -99,7 +103,7 @@ export let listSubmissions = SlateTool.create(spec, {
     }));
 
     return {
-      output: { submissions },
+      output: { submissions, pagination: data.pagination },
       message: `Found **${submissions.length}** submission(s).`
     };
   })

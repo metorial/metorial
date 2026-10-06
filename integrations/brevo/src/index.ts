@@ -47,13 +47,6 @@ import {
   updateEmailCampaign,
   updateWebhook
 } from './tools';
-import {
-  inboundEmailEvents,
-  marketingEvents,
-  transactionalEmailEvents,
-  transactionalSmsEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -103,10 +96,5 @@ export let provider = Slate.create({
     listSenders.build(),
     trackEvent.build()
   ],
-  triggers: [
-    transactionalEmailEvents.build(),
-    transactionalSmsEvents.build(),
-    marketingEvents.build(),
-    inboundEmailEvents.build()
-  ]
+  triggers: []
 });

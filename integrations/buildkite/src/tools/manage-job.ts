@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageJob = SlateTool.create(spec, {
@@ -17,9 +18,12 @@ export let manageJob = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pipelineSlug: z.string().describe('Slug of the pipeline'),
-      buildNumber: z.number().describe('Build number containing the job'),
-      jobId: z.string().describe('UUID of the job to retry or unblock'),
+      ...organizationInput,
+      pipelineSlug: z.string().describe('Pipeline slug from list_pipelines'),
+      buildNumber: z
+        .number()
+        .describe('Pipeline build number from list_builds, not a build UUID'),
+      jobId: z.string().describe('Job UUID from get_build to retry or unblock'),
       action: z.enum(['retry', 'unblock']).describe('Action to perform on the job'),
       unblockFields: z
         .record(z.string(), z.string())
@@ -35,26 +39,17 @@ export let manageJob = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
-    let j: any;
-    if (ctx.input.action === 'retry') {
-      j = await client.retryJob(
-        ctx.input.pipelineSlug,
-        ctx.input.buildNumber,
-        ctx.input.jobId
-      );
-    } else {
-      j = await client.unblockJob(
-        ctx.input.pipelineSlug,
-        ctx.input.buildNumber,
-        ctx.input.jobId,
-        ctx.input.unblockFields
-      );
-    }
+    const j =
+      ctx.input.action === 'retry'
+        ? await client.retryJob(ctx.input.pipelineSlug, ctx.input.buildNumber, ctx.input.jobId)
+        : await client.unblockJob(
+            ctx.input.pipelineSlug,
+            ctx.input.buildNumber,
+            ctx.input.jobId,
+            ctx.input.unblockFields
+          );
 
     return {
       output: {

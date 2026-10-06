@@ -1,6 +1,8 @@
 # <img src="logo.svg" height="20"> Omnisend
 
-Manage ecommerce marketing automation across email, SMS, and push notifications. Create, update, and list contacts with subscription statuses and custom properties. Manage product catalogs and categories. Track customer behavior events including cart actions, order lifecycle, and product views. Send custom events to trigger automation workflows such as abandoned cart, order confirmation, and browse abandonment. List and view campaigns and automations. Retrieve brand information. Export analytics data including campaign performance, engagement metrics, revenue attribution, and audience growth.
+Manage contacts, product catalogs and categories, discover campaigns and automations, and send customer events to Omnisend. The 16 tools include current-brand identity and complete product replacement. Events may update contacts and trigger messaging; acceptance does not confirm completed processing or reversible history.
+
+The default API version is `v5`. Select `2026-03-15` explicitly for the current API, whose contact tags replace the existing set instead of appending. Brand discovery requires the current API and brand-read permission. Authentication uses the documented current brand endpoint independently of the selected tool version. Archived v5 documentation does not establish ongoing service availability. See the [API specification](docs/SPEC.md) for compatibility, full-replacement semantics, permissions and irreversible effects.
 
 ## License
 

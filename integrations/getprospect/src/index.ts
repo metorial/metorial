@@ -32,8 +32,6 @@ import {
   updateTag,
   verifyEmail
 } from './tools';
-import { contactEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -68,5 +66,5 @@ export let provider = Slate.create({
     createDomain,
     deleteDomain
   ],
-  triggers: [contactEvent]
+  triggers: []
 });

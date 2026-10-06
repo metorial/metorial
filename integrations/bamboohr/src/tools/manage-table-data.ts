@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTableData = SlateTool.create(spec, {
@@ -31,13 +31,10 @@ export let getTableData = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getTableRows(ctx.input.employeeId, ctx.input.tableName);
-    let rows = Array.isArray(data) ? data : [];
+    let rows = data;
 
     return {
       output: {
@@ -76,17 +73,29 @@ export let upsertTableRow = SlateTool.create(spec, {
     z.object({
       employeeId: z.string().describe('The employee ID'),
       tableName: z.string().describe('The table name'),
-      action: z.string().describe('Whether the row was "created" or "updated"')
+      action: z.string().describe('Whether creation or update was accepted'),
+      rowId: z
+        .string()
+        .optional()
+        .describe('Exact supplied ID for an update; creation returns no row ID'),
+      verifiedFields: z
+        .array(z.string())
+        .optional()
+        .describe('Submitted update fields whose exact values were read back'),
+      unverifiedFields: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Submitted fields that remain unverified because they were omitted, normalized, or creation has no exact ID receipt'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
-    if (ctx.input.rowId) {
-      await client.updateTableRow(
+    let verifiedFields: string[] = [];
+    if (ctx.input.rowId !== undefined) {
+      verifiedFields = await client.updateTableRow(
         ctx.input.employeeId,
         ctx.input.tableName,
         ctx.input.rowId,
@@ -96,15 +105,24 @@ export let upsertTableRow = SlateTool.create(spec, {
       await client.addTableRow(ctx.input.employeeId, ctx.input.tableName, ctx.input.rowData);
     }
 
-    let action = ctx.input.rowId ? 'updated' : 'created';
+    let action = ctx.input.rowId !== undefined ? 'updated' : 'created';
+    const unverifiedFields = Object.keys(ctx.input.rowData).filter(
+      field => !verifiedFields.includes(field)
+    );
 
     return {
       output: {
         employeeId: ctx.input.employeeId,
         tableName: ctx.input.tableName,
-        action
+        action,
+        ...(ctx.input.rowId !== undefined ? { rowId: ctx.input.rowId } : {}),
+        verifiedFields,
+        unverifiedFields
       },
-      message: `${action === 'created' ? 'Added new' : 'Updated'} row in table **${ctx.input.tableName}** for employee **${ctx.input.employeeId}**.`
+      message:
+        action === 'created'
+          ? 'BambooHR accepted row creation without an ID receipt. Use get_table_data to identify the exact row and verify its values before further changes.'
+          : `BambooHR accepted the row update. Verified exact values for **${verifiedFields.length}** submitted fields; **${unverifiedFields.length}** remain unverified.`
     };
   })
   .build();
@@ -133,10 +151,7 @@ export let deleteTableRow = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     await client.deleteTableRow(ctx.input.employeeId, ctx.input.tableName, ctx.input.rowId);
 

@@ -24,7 +24,7 @@ Returns matching company records with pagination support.`,
   instructions: [
     'Provide either a SQL query or an Elasticsearch JSON query string, but not both.',
     "SQL example: `SELECT * FROM company WHERE industry='technology' AND location_country='united states'`",
-    'Use scroll_token from the response to paginate through results.'
+    'Repeat the same query and pass scrollToken from the response to paginate through results.'
   ],
   constraints: [
     'Maximum of 100 results per request.',
@@ -51,7 +51,7 @@ Returns matching company records with pagination support.`,
         .min(1)
         .max(100)
         .optional()
-        .describe('Number of results to return per page (1-100, default 10)'),
+        .describe('Number of results to return per page (1-100, default 1)'),
       scrollToken: z
         .string()
         .optional()

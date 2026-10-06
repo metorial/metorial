@@ -41,7 +41,7 @@ export let getOpportunity = SlateTool.create(spec, {
 
     let o = await client.getOpportunity(ctx.input.opportunityId);
 
-    let listEntries = (o.list_entries ?? []).map((e: any) => ({
+    let listEntries = (o.list_entries ?? []).map(e => ({
       listEntryId: e.id,
       listId: e.list_id,
       creatorId: e.creator_id ?? null,

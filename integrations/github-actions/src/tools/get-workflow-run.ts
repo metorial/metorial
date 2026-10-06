@@ -1,12 +1,32 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubActionsClient } from '../lib/client';
+import type { Job } from '../lib/types';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
+
+const mapJob = (j: Job) => ({
+  jobId: j.id,
+  name: j.name,
+  status: j.status,
+  conclusion: j.conclusion,
+  startedAt: j.started_at,
+  completedAt: j.completed_at,
+  runnerName: j.runner_name,
+  steps: (j.steps ?? []).map(s => ({
+    name: s.name,
+    status: s.status,
+    conclusion: s.conclusion,
+    number: s.number,
+    startedAt: s.started_at ?? null,
+    completedAt: s.completed_at ?? null
+  }))
+});
 
 export let getWorkflowRun = SlateTool.create(spec, {
   name: 'Get Workflow Run',
   key: 'get_workflow_run',
-  description: `Get detailed information about a specific workflow run, including its status, conclusion, timing, and associated commit. Also retrieves the jobs within the run and their step-level details.`,
+  description: `Get detailed information about a specific workflow run, including its status, conclusion, timing, and associated commit. Can include one page of jobs from the latest attempt and their step-level details; use jobsNextPage to retrieve additional jobs.`,
   tags: {
     readOnly: true
   }
@@ -16,6 +36,11 @@ export let getWorkflowRun = SlateTool.create(spec, {
       owner: z.string().describe('Repository owner (user or organization)'),
       repo: z.string().describe('Repository name'),
       runId: z.number().describe('Workflow run ID'),
+      jobsPage: z
+        .number()
+        .optional()
+        .describe('Job results page (default 1); applies when includeJobs is true'),
+      jobsPerPage: z.number().optional().describe('Jobs per page (1-100, default 30)'),
       includeJobs: z
         .boolean()
         .optional()
@@ -26,6 +51,10 @@ export let getWorkflowRun = SlateTool.create(spec, {
     z.object({
       runId: z.number().describe('Workflow run ID'),
       name: z.string().nullable().describe('Workflow run name'),
+      displayTitle: z
+        .string()
+        .optional()
+        .describe('Display title from the workflow run-name or event'),
       workflowId: z.number().describe('Workflow ID'),
       headBranch: z.string().nullable().describe('Head branch'),
       headSha: z.string().describe('Head commit SHA'),
@@ -40,6 +69,8 @@ export let getWorkflowRun = SlateTool.create(spec, {
       runStartedAt: z.string().nullable().describe('When the run started executing'),
       actor: z.string().nullable().describe('User who triggered the run'),
       triggeringActor: z.string().nullable().describe('User whose action triggered the run'),
+      jobsTotalCount: z.number().optional().describe('Total jobs for the latest run attempt'),
+      jobsNextPage: z.number().optional().describe('Next jobs page, when more results exist'),
       jobs: z
         .array(
           z.object({
@@ -70,33 +101,24 @@ export let getWorkflowRun = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new GitHubActionsClient(ctx.auth.token);
     let run = await client.getWorkflowRun(ctx.input.owner, ctx.input.repo, ctx.input.runId);
 
-    let jobs: any[] | undefined;
+    let jobs: ReturnType<typeof mapJob>[] | undefined;
+    let jobsTotalCount: number | undefined;
+    let jobsNextPage: number | undefined;
     if (ctx.input.includeJobs) {
       let jobsData = await client.listJobsForRun(
         ctx.input.owner,
         ctx.input.repo,
-        ctx.input.runId
+        ctx.input.runId,
+        { page: ctx.input.jobsPage, perPage: ctx.input.jobsPerPage }
       );
-      jobs = (jobsData.jobs ?? []).map((j: any) => ({
-        jobId: j.id,
-        name: j.name,
-        status: j.status,
-        conclusion: j.conclusion,
-        startedAt: j.started_at,
-        completedAt: j.completed_at,
-        runnerName: j.runner_name,
-        steps: (j.steps ?? []).map((s: any) => ({
-          name: s.name,
-          status: s.status,
-          conclusion: s.conclusion,
-          number: s.number,
-          startedAt: s.started_at,
-          completedAt: s.completed_at
-        }))
-      }));
+      jobsTotalCount = jobsData.total_count;
+      const page = ctx.input.jobsPage ?? 1;
+      if (page * (ctx.input.jobsPerPage ?? 30) < jobsTotalCount) jobsNextPage = page + 1;
+      jobs = jobsData.jobs.map(mapJob);
     }
 
     let statusText = run.conclusion ?? run.status ?? 'unknown';
@@ -104,7 +126,8 @@ export let getWorkflowRun = SlateTool.create(spec, {
     return {
       output: {
         runId: run.id,
-        name: run.name,
+        name: run.name ?? null,
+        displayTitle: run.display_title,
         workflowId: run.workflow_id,
         headBranch: run.head_branch,
         headSha: run.head_sha,
@@ -116,9 +139,11 @@ export let getWorkflowRun = SlateTool.create(spec, {
         htmlUrl: run.html_url,
         createdAt: run.created_at,
         updatedAt: run.updated_at,
-        runStartedAt: run.run_started_at,
+        runStartedAt: run.run_started_at ?? null,
         actor: run.actor?.login ?? null,
         triggeringActor: run.triggering_actor?.login ?? null,
+        jobsTotalCount,
+        jobsNextPage,
         jobs
       },
       message: `Workflow run **#${run.run_number}** (${run.name}) is **${statusText}**.${jobs ? ` Includes ${jobs.length} jobs.` : ''}`

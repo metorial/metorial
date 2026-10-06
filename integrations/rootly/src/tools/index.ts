@@ -16,4 +16,5 @@ export * from './list-users';
 export * from './list-workflows';
 export * from './manage-action-items';
 export * from './manage-alert';
+export * from './resource-actions';
 export * from './update-incident';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getPerformanceReviews = SlateTool.create(spec, {
@@ -25,12 +26,20 @@ export let getPerformanceReviews = SlateTool.create(spec, {
       expand: z
         .string()
         .optional()
-        .describe('Navigation properties to expand (e.g., "formContents,formAuditTrails")'),
+        .describe(
+          'Navigation properties to expand; discover exact tenant names with get_api_metadata'
+        ),
       top: z
         .number()
         .optional()
         .describe('Maximum records to return when searching')
         .default(50),
+      nextPage: z
+        .string()
+        .optional()
+        .describe(
+          'Exact nextLink from the preceding result. Keep the entity and original query unchanged; do not combine with skip.'
+        ),
       skip: z.number().optional().describe('Number of records to skip')
     })
   )
@@ -44,6 +53,13 @@ export let getPerformanceReviews = SlateTool.create(spec, {
         .array(z.record(z.string(), z.unknown()))
         .optional()
         .describe('List of performance reviews (when searching)'),
+      nextLink: z
+        .string()
+        .optional()
+        .describe(
+          'Exact provider continuation URL; pass it as nextPage to retrieve the next page.'
+        ),
+      hasMore: z.boolean().optional().describe('Whether SAP returned another page.'),
       totalCount: z.number().optional().describe('Total count of matching records')
     })
   )
@@ -53,7 +69,16 @@ export let getPerformanceReviews = SlateTool.create(spec, {
       apiServerUrl: ctx.auth.apiServerUrl
     });
 
-    if (ctx.input.formDataId) {
+    if (ctx.input.formDataId !== undefined) {
+      if (
+        ctx.input.filter !== undefined ||
+        ctx.input.skip !== undefined ||
+        ctx.input.nextPage !== undefined ||
+        ctx.input.top !== 50
+      )
+        throw invalid(
+          'A keyed read cannot use search filters or pagination. Omit the ID to search.'
+        );
       let review = await client.getPerformanceReview(ctx.input.formDataId, {
         select: ctx.input.select,
         expand: ctx.input.expand
@@ -70,13 +95,16 @@ export let getPerformanceReviews = SlateTool.create(spec, {
       expand: ctx.input.expand,
       top: ctx.input.top,
       skip: ctx.input.skip,
+      nextPage: ctx.input.nextPage,
       inlineCount: true
     });
 
     return {
       output: {
         reviews: result.results,
-        totalCount: result.count
+        totalCount: result.count,
+        nextLink: result.nextLink,
+        hasMore: result.hasMore
       },
       message: `Found **${result.results.length}** performance reviews`
     };

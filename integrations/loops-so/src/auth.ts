@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -21,6 +22,9 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim() || /[\r\n]/.test(ctx.input.apiKey)) {
+        throw createApiServiceError('Provide a nonblank Loops API key without line breaks.');
+      }
       return {
         output: {
           token: ctx.input.apiKey
@@ -29,18 +33,11 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://app.loops.so/api/v1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/api-key');
+      let result = await new Client(ctx.output).verifyApiKey();
 
       return {
         profile: {
-          name: response.data.teamName
+          name: result.teamName
         }
       };
     }

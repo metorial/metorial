@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let userActions = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let userActions = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       userId: z.string().describe('JumpCloud user ID'),
       action: z
         .enum(['reset_mfa', 'unlock'])
@@ -25,30 +27,34 @@ export let userActions = SlateTool.create(spec, {
     z.object({
       userId: z.string().describe('User ID the action was performed on'),
       action: z.string().describe('Action that was performed'),
-      success: z.boolean().describe('Whether the action was successful')
+      success: z
+        .boolean()
+        .describe(
+          'Whether JumpCloud accepted the request; effective login state is not confirmed'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      if (ctx.input.action === 'reset_mfa') {
+        await client.resetUserMfa(ctx.input.userId);
+      } else {
+        await client.unlockUser(ctx.input.userId);
+      }
 
-    if (ctx.input.action === 'reset_mfa') {
-      await client.resetUserMfa(ctx.input.userId);
-    } else {
-      await client.unlockUser(ctx.input.userId);
+      let actionLabel = ctx.input.action === 'reset_mfa' ? 'MFA reset' : 'Account unlock';
+
+      return {
+        output: {
+          userId: ctx.input.userId,
+          action: ctx.input.action,
+          success: true
+        },
+        message: `**${actionLabel}** accepted by JumpCloud; effective login/MFA state is not independently confirmed for user \`${ctx.input.userId}\`.`
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
     }
-
-    let actionLabel = ctx.input.action === 'reset_mfa' ? 'MFA reset' : 'Account unlock';
-
-    return {
-      output: {
-        userId: ctx.input.userId,
-        action: ctx.input.action,
-        success: true
-      },
-      message: `**${actionLabel}** completed successfully for user \`${ctx.input.userId}\`.`
-    };
   })
   .build();

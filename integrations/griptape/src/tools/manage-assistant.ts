@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,7 +45,8 @@ export let manageAssistant = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required for creating an assistant');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required for creating an assistant');
       let result = await client.createAssistant({
         name: ctx.input.name,
         description: ctx.input.description,
@@ -71,7 +72,12 @@ export let manageAssistant = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.assistantId) throw new Error('assistantId is required for update');
+      if (ctx.input.retrieverIds !== undefined)
+        throw createApiServiceError(
+          'Griptape Cloud does not document retriever updates on an existing assistant. Set retriever IDs when creating an assistant or override them on run_assistant.'
+        );
+      if (!ctx.input.assistantId)
+        throw createApiServiceError('assistantId is required for update');
       let result = await client.updateAssistant(ctx.input.assistantId, {
         name: ctx.input.name,
         description: ctx.input.description,
@@ -97,7 +103,8 @@ export let manageAssistant = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.assistantId) throw new Error('assistantId is required for delete');
+      if (!ctx.input.assistantId)
+        throw createApiServiceError('assistantId is required for delete');
       await client.deleteAssistant(ctx.input.assistantId);
       return {
         output: {
@@ -108,6 +115,6 @@ export let manageAssistant = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

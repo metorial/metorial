@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import type { templateSchema } from '../lib/api-schemas';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -20,21 +21,21 @@ let templateOutputSchema = z.object({
   ownerId: z.number().nullable().optional().describe('Owner user ID')
 });
 
-let mapTemplate = (raw: any) => ({
+let mapTemplate = (raw: z.output<typeof templateSchema>) => ({
   templateId: raw.id,
   title: raw.title,
   subject: raw.subject,
   body: raw.body,
-  openCount: raw.open_count ?? raw.counts?.opens,
-  clickCount: raw.click_count ?? raw.counts?.clicks,
-  replyCount: raw.reply_count ?? raw.counts?.replies,
-  sentCount: raw.sent_count ?? raw.counts?.sent_emails,
-  bounceCount: raw.bounce_count ?? raw.counts?.bounces,
+  openCount: raw.counts?.views,
+  clickCount: raw.counts?.clicks,
+  replyCount: raw.counts?.replies,
+  sentCount: raw.counts?.sent_emails,
+  bounceCount: raw.counts?.bounces,
   shared: raw.shared,
-  teamTemplate: raw.team_template,
+  teamTemplate: raw.team_template === undefined ? undefined : raw.team_template !== null,
   createdAt: raw.created_at,
   updatedAt: raw.updated_at,
-  ownerId: raw.owner?.id ?? null
+  ownerId: raw.template_owner?.id ?? null
 });
 
 let paginationOutputSchema = z.object({
@@ -47,7 +48,7 @@ let paginationOutputSchema = z.object({
 export let listEmailTemplates = SlateTool.create(spec, {
   name: 'List Email Templates',
   key: 'list_email_templates',
-  description: `List email templates in SalesLoft. Search by title or subject to find specific templates. Returns template content and engagement statistics (opens, clicks, replies).`,
+  description: `List email templates in Salesloft. Title/subject prefix filters are applied to each provider search page; a filtered page may be empty while a next page exists. Returns content and engagement statistics.`,
   tags: {
     readOnly: true
   }
@@ -61,11 +62,11 @@ export let listEmailTemplates = SlateTool.create(spec, {
       searchTitle: z
         .string()
         .optional()
-        .describe('Search templates by title (starts with, min 3 chars)'),
+        .describe('Require this title prefix within each provider search page.'),
       searchSubject: z
         .string()
         .optional()
-        .describe('Search templates by subject (starts with, min 3 chars)')
+        .describe('Require this subject prefix within each provider search page.')
     })
   )
   .output(

@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listDatasources = SlateTool.create(spec, {
   name: 'List Datasources',
   key: 'list_datasources',
-  description: `List all datasources configured in a workspace. Datasources represent connections to databases (PostgreSQL, MySQL, MongoDB, etc.) and APIs (REST, GraphQL) used by applications. Credentials are never exposed.`,
+  description: `List datasource metadata in a workspace through the version-sensitive dashboard API. Returns only identifiers, names, connector metadata and native validity flags; connection configuration is omitted.`,
   tags: {
     readOnly: true
   }
@@ -42,16 +42,13 @@ export let listDatasources = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
     let datasources = await client.listDatasources(ctx.input.workspaceId);
 
-    let mapped = datasources.map((ds: any) => ({
-      datasourceId: ds.id ?? '',
-      name: ds.name ?? '',
+    let mapped = datasources.map(ds => ({
+      datasourceId: ds.id,
+      name: ds.name,
       pluginName: ds.pluginName,
       pluginId: ds.pluginId,
       isValid: ds.isValid,

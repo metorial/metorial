@@ -26,8 +26,6 @@ import {
   triggerBroadcast,
   upsertPerson
 } from './tools';
-import { messageEvent, subscriptionEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -56,5 +54,5 @@ export let provider = Slate.create({
     manageCollection,
     listCollections
   ],
-  triggers: [messageEvent, subscriptionEvent]
+  triggers: []
 });

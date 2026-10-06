@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getErrorDetails,
+  listAccounts,
   listOutages,
   listProjects,
   manageCheckIns,
@@ -17,12 +18,11 @@ import {
   searchErrors,
   sendEvents
 } from './tools';
-import { checkInEvent, deployEvent, errorEvent, uptimeEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     listProjects,
+    listAccounts,
     manageProject,
     searchErrors,
     getErrorDetails,
@@ -38,5 +38,5 @@ export let provider = Slate.create({
     reportError,
     manageEnvironments
   ],
-  triggers: [errorEvent, uptimeEvent, checkInEvent, deployEvent]
+  triggers: []
 });

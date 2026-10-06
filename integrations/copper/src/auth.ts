@@ -1,13 +1,38 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { authHeaders, Client, type CopperAuth } from './lib/client';
+import { copperError } from './lib/contracts';
 
-let authAxios = createAxios({
-  baseURL: 'https://app.copper.com'
+let authAxios = createAuthenticatedAxios({
+  baseURL: 'https://app.copper.com',
+  timeout: 30000,
+  maxRedirects: 0,
+  contentType: 'application/x-www-form-urlencoded',
+  errorAdapter: copperError
 });
 
-let apiAxios = createAxios({
-  baseURL: 'https://api.copper.com/developer_api/v1'
-});
+const getProfile = async (output: CopperAuth) => {
+  const client = new Client(output);
+  const account = await client.getAccount();
+  const user = await client.getApiUser();
+  if (typeof account.name !== 'string' || typeof user.email !== 'string' || !user.email.trim())
+    throw createApiServiceError(
+      'Copper returned incomplete account or API-user identity. Reconnect the intended user.'
+    );
+  if (
+    output.authMethod === 'api_key' &&
+    user.email.toLowerCase() !== output.userEmail?.toLowerCase()
+  )
+    throw createApiServiceError(
+      'The API key belongs to a different user. Supply its owner email.'
+    );
+  return { profile: { id: String(account.id), name: account.name, email: user.email } };
+};
 
 let outputSchema = z.object({
   token: z.string(),
@@ -30,6 +55,7 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      authHeaders({ ...ctx.input, authMethod: 'api_key' });
       return {
         output: {
           token: ctx.input.token,
@@ -42,24 +68,7 @@ export let auth = SlateAuth.create()
     getProfile: async (ctx: {
       output: AuthOutput;
       input: { token: string; userEmail: string };
-    }) => {
-      let response = await apiAxios.get('/account', {
-        headers: {
-          'X-PW-AccessToken': ctx.output.token,
-          'X-PW-UserEmail': ctx.output.userEmail || '',
-          'X-PW-Application': 'developer_api',
-          'Content-Type': 'application/json'
-        }
-      });
-
-      return {
-        profile: {
-          id: String(response.data.id),
-          name: response.data.name,
-          email: ctx.output.userEmail
-        }
-      };
-    }
+    }) => getProfile(ctx.output)
   })
   .addOauth({
     type: 'auth.oauth',
@@ -101,21 +110,26 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let response = await authAxios.post(
+      const response = await authAxios.post(
         '/oauth/token',
-        {
+        new URLSearchParams({
           code: ctx.code,
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret,
           redirect_uri: ctx.redirectUri,
           grant_type: 'authorization_code'
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
+        }).toString()
       );
+      if (
+        !isApiErrorRecord(response.data) ||
+        typeof response.data.access_token !== 'string' ||
+        !response.data.access_token.trim() ||
+        String(response.data.token_type).toLowerCase() !== 'bearer'
+      )
+        throw createApiServiceError(
+          'Copper did not return a valid Bearer access token. Reauthorize the connection.'
+        );
+      // Copper documents non-expiring access tokens without refresh tokens.
 
       return {
         output: {
@@ -126,19 +140,6 @@ export let auth = SlateAuth.create()
       };
     },
 
-    getProfile: async (ctx: { output: AuthOutput; input: {}; scopes: string[] }) => {
-      let response = await apiAxios.get('/account', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      return {
-        profile: {
-          id: String(response.data.id),
-          name: response.data.name
-        }
-      };
-    }
+    getProfile: async (ctx: { output: AuthOutput; input: {}; scopes: string[] }) =>
+      getProfile(ctx.output)
   });

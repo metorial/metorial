@@ -1,6 +1,6 @@
 {
   "name": "@metorial/shippo",
-  "description": "Compare shipping rates across 85+ carriers (USPS, FedEx, UPS, DHL), create and purchase shipping labels, and track packages with normalized status updates. Manage addresses with validation, create shipments, handle customs declarations for international shipping, schedule carrier pickups, process label refunds, and generate manifests. Supports order management, carrier account configuration, parcel templates, batch label operations, and real-time webhook notifications for tracking and transaction events.",
+  "description": "Compare connected carrier rates, create shipments and shipping labels, and track packages. Validate addresses, prepare customs declarations and orders, discover carrier accounts, manage parcel templates, inspect asynchronous batch/refund/manifest status, and download available shipping documents. Label purchases can charge the connected account; carrier eligibility and test-mode restrictions apply.",
   "categories": ["e-commerce-and-retail"],
   "skills": [
     "compare carrier shipping rates",
@@ -10,7 +10,7 @@
     "manage customs declarations",
     "schedule carrier pickups",
     "process label refunds",
-    "manage carrier accounts",
+    "discover carrier accounts",
     "create shipments and orders",
     "generate manifests"
   ]

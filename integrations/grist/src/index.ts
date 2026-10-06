@@ -25,8 +25,6 @@ import {
   updateRecords,
   updateWebhook
 } from './tools';
-import { rowChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -54,5 +52,5 @@ export let provider = Slate.create({
     deleteWebhook,
     listAttachments
   ],
-  triggers: [rowChanges]
+  triggers: []
 });

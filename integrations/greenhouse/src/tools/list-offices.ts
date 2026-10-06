@@ -1,18 +1,29 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GreenhouseClient } from '../lib/client';
-import { mapOffice } from '../lib/mappers';
+import { mapOffice, officeOutputSchema } from '../lib/mappers';
 import { spec } from '../spec';
-
-export let listOfficesTool = SlateTool.create(spec, {
-  name: 'List Offices',
+export const listOfficesTool = SlateTool.create(spec, {
   key: 'list_offices',
-  description: `List all offices in Greenhouse. Returns office names, hierarchy (parent/child relationships), locations, and external IDs.`,
-  tags: { readOnly: true }
+  name: 'List Offices',
+  description:
+    'List office names, locations, parent IDs and external IDs. Follow nextCursor to retrieve further results.',
+  tags: { readOnly: true, destructive: false }
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (starts at 1)'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque nextCursor from the preceding response. Pass cursor alone for subsequent pages.'
+        ),
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy first-page selector. Only page 1 is supported; use cursor for subsequent pages.'
+        ),
       perPage: z
         .number()
         .optional()
@@ -21,39 +32,20 @@ export let listOfficesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      offices: z.array(
-        z.object({
-          officeId: z.string(),
-          name: z.string(),
-          parentOfficeId: z.string().nullable(),
-          childOfficeIds: z.array(z.string()),
-          location: z.object({ name: z.string() }).nullable(),
-          externalId: z.string().nullable()
-        })
-      ),
-      hasMore: z.boolean()
+      offices: z.array(officeOutputSchema),
+      hasMore: z.boolean(),
+      nextCursor: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GreenhouseClient({
-      token: ctx.auth.token,
-      onBehalfOf: ctx.config.onBehalfOf
-    });
-    let perPage = ctx.input.perPage || 50;
-
-    let results = await client.listOffices({
-      page: ctx.input.page,
-      perPage
-    });
-
-    let offices = results.map(mapOffice);
-
+    const page = await new GreenhouseClient(ctx.auth, ctx.config).listOffices(ctx.input);
     return {
       output: {
-        offices,
-        hasMore: results.length >= perPage
+        offices: page.items.map(mapOffice),
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor
       },
-      message: `Found ${offices.length} office(s).`
+      message: `Retrieved ${page.items.length} result(s).`
     };
   })
   .build();

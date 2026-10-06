@@ -1,6 +1,7 @@
 export * from './create-envelope';
 export * from './delete-envelope';
 export * from './distribute-envelope';
+export { downloadEnvelopeFileTool } from './download-envelope-file';
 export * from './duplicate-envelope';
 export * from './find-envelopes';
 export * from './get-audit-log';

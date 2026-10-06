@@ -12,8 +12,6 @@ import {
   manageKeys,
   manageSlots
 } from './tools';
-import { functionAppChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     manageSlots,
     listDeployments
   ],
-  triggers: [inboundWebhook, functionAppChanges]
+  triggers: []
 });

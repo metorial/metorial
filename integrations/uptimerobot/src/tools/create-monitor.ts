@@ -6,13 +6,14 @@ import { spec } from '../spec';
 export let createMonitor = SlateTool.create(spec, {
   name: 'Create Monitor',
   key: 'create_monitor',
-  description: `Create a new uptime monitor. Supports HTTP(s), Keyword, Ping, Port, and Heartbeat monitor types. Configure check intervals, timeouts, HTTP methods, alert contacts, and maintenance windows.`,
+  description: `Use a Legacy API Key connection (API v2). Create a new uptime monitor. Supports HTTP(s), Keyword, Ping, Port, and Heartbeat monitor types. Configure check intervals, timeouts, HTTP methods, alert contacts, and maintenance windows.`,
   instructions: [
     'For **Keyword** monitors, provide `keywordValue` and `keywordType`.',
     'For **Port** monitors, provide `portSubType` and optionally `portNumber` (required when portSubType is "custom").',
     'Alert contacts use the format `{contactId}_{threshold}_{recurrence}` separated by dashes, e.g. "457_0_0-373_5_0".'
   ],
   tags: {
+    readOnly: false,
     destructive: false
   }
 })
@@ -28,7 +29,7 @@ export let createMonitor = SlateTool.create(spec, {
       keywordType: z
         .enum(['exists', 'not_exists'])
         .optional()
-        .describe('Whether keyword should exist or not exist on the page'),
+        .describe('Alert when the keyword exists or does not exist on the page'),
       keywordCaseSensitive: z
         .boolean()
         .optional()
@@ -85,7 +86,7 @@ export let createMonitor = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let typeMap: Record<string, number> = {
       http: 1,
@@ -142,7 +143,7 @@ export let createMonitor = SlateTool.create(spec, {
         httpAuthType: ctx.input.httpAuthType === 'basic' ? 1 : 2
       }),
       ...(ctx.input.customHttpHeaders && { customHttpHeaders: ctx.input.customHttpHeaders }),
-      ...(ctx.input.alertContacts && { alertContacts: ctx.input.alertContacts }),
+      ...(ctx.input.alertContacts !== undefined && { alertContacts: ctx.input.alertContacts }),
       ...(ctx.input.maintenanceWindows && { mwindows: ctx.input.maintenanceWindows }),
       ...(ctx.input.ignoreSslErrors !== undefined && {
         ignoreSslErrors: ctx.input.ignoreSslErrors ? 1 : 0
@@ -154,7 +155,7 @@ export let createMonitor = SlateTool.create(spec, {
         monitorId: result.id,
         status: result.status
       },
-      message: `Created **${ctx.input.type}** monitor "${ctx.input.friendlyName}" (ID: ${result.id}) for \`${ctx.input.url}\`.`
+      message: `Created **${ctx.input.type}** monitor "${ctx.input.friendlyName}" (ID: ${result.id}).`
     };
   })
   .build();

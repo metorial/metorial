@@ -1,65 +1,45 @@
 # <img src="https://provider-logos.metorial-cdn.com/deel.svg" height="20"> Deel
 
-Manage global payroll, contracts, and compliance for international employees and contractors. Create, amend, sign, and terminate contracts across multiple types (fixed rate, pay-as-you-go, milestone, EOR). Run payroll in 120+ countries, process payments and invoices, and handle off-cycle payments. Manage timesheets, time off requests, and worker profiles. Track immigration cases, provision users via SCIM, perform background checks, and access accounting data. Manage IT assets and device lifecycle through Deel IT. Subscribe to webhooks for real-time notifications on contract changes, payments, onboarding, and other platform events.
+Read contract, workforce, organization and billing records. Create contractor contracts, submit amendments and signatures, request termination, manage contractor timesheets and invoice adjustments, and request or cancel time off. Download invoice PDFs and estimate EOR employment costs.
+
+## Connection
+
+Use a personal or organization API token, or OAuth 2.0. OAuth requests use both the access token and the app's client ID; token exchange and rotation use the documented form encoding. Personal and organization app types have different permissions. Organization service tokens may not expose a personal profile; use `get_current_organization` for their identity.
+
+API requests pin stable version `2026-01-01`. Production uses `api.letsdeel.com`; sandbox preserves the demo server listed in Deel's official OpenAPI. The separate sandbox guide lists a staging host, so confirm the host appropriate to your issued sandbox credentials. OAuth authorization currently uses the documented production app host.
 
 ## Tools
 
-### Create Contract
+| Tool | Outcome |
+| --- | --- |
+| `get_current_user` | Personal token/user identity |
+| `get_current_organization` | Token organization ID and name |
+| `list_contracts`, `get_contract` | Contract discovery, cursor paging and details |
+| `create_contract` | Fixed rate, hourly PAYG, task or milestone contractor contract |
+| `manage_contract` | Amendment submission, client signature or termination request |
+| `list_people`, `get_person` | Workforce directory and worker personal information |
+| `manage_timesheets` | List, create, read, review or delete contractor timesheets |
+| `manage_invoice_adjustments` | List, create, read, review or delete adjustments |
+| `manage_time_off` | Assigned policies, request paging, creation, update or cancellation |
+| `list_invoices`, `list_payments` | Billing invoices and payment receipts |
+| `download_invoice` | Downloadable invoice PDF |
+| `list_organization_data` | Legal entities, teams and departments |
+| `get_eor_country_guide`, `calculate_eor_cost` | Country hiring requirements and cost estimates |
 
-Create a new contractor contract in Deel. Supports fixed rate, pay-as-you-go (fixed and task-based), and milestone-based contracts. Provide the contract type, worker details, compensation, and start date.
+## Workflow details
 
-### Get EOR Country Guide
+Contract creation requires an explicit compliance-document choice, legal entity/team IDs and a complete payment schedule or supported configured payment policy. Discover organization resources with `list_organization_data`. Signing requires the client's signature text. An amendment can remain pending approval/signatures, and a termination request does not prove that a contract has already ended.
 
-Retrieve the Employer of Record (EOR) hiring guide for a specific country. Returns country-specific requirements, validations, and employment parameters needed to create an EOR contract.
+Contract and payment receipt lists use cursors. Their legacy nonzero offsets are rejected because the current stable APIs do not support them. Payment receipt page size is provider-controlled; omit the legacy `limit`. Invoices default to paid records; use `status: "all"` to include unpaid invoices. Decimal strings remain strings. Legacy numeric identifiers that exceed safe numeric precision are returned as exact strings.
 
-### Get Contract
+Invoice adjustments use the contract currency; omit the legacy per-adjustment `currencyCode`. Recurrence is sent as the provider's query parameter. Time-off requests need an assigned policy/type ID discovered with the `policies` action. New requests default to `REQUESTED`. Creation may produce multiple records; all are returned in `timeOffs`. The legacy `delete` action cancels a request and verifies its retained `CANCELED` state. It does not erase history.
 
-Retrieve detailed information about a specific contract by its ID. Returns full contract details including worker info, compensation, status, and custom fields.
+EOR cost estimates require the full country name, currency and salary. This integration does not initiate payroll, transfer money, create EOR employee contracts, provision users, manage immigration, administer IT assets, or register event subscriptions.
 
-### Get Person
+## Official references
 
-Retrieve detailed information about a specific person (worker) by their ID. Returns full profile including personal details, employment history, manager info, and direct reports.
-
-### List Contracts
-
-Retrieve a list of contracts from Deel. Supports filtering by status, contract type, and other parameters. Returns contract details including worker info, compensation, and status.
-
-### List Invoices
-
-Retrieve billing invoices from Deel for accounting and financial integration. Returns invoice details including amounts, dates, and statuses.
-
-### List Organization Data
-
-Retrieve organizational structure data from Deel. Can list legal entities, teams/groups, or departments. Useful for finding IDs needed when creating contracts.
-
-### List Payments
-
-Retrieve payment statements from Deel. Returns payment details including amounts, statuses, dates, and associated contracts.
-
-### List People
-
-Retrieve a list of people (workers) in the organization. Returns worker profiles including names, emails, employment details, and hiring types. Supports pagination.
-
-### Manage Contract
-
-Perform lifecycle actions on a Deel contract: amend, sign, or terminate. Use action "amend" to modify contract terms, "sign" to sign the contract, or "terminate" to end it.
-
-### Manage Invoice Adjustments
-
-Create, list, or review invoice adjustments for contractor contracts. Adjustments include bonuses, commissions, deductions, expenses, overtime, and more. Use "list" to retrieve, "create" to add, or "review" to approve/decline.
-
-### Manage Time Off
-
-Create, list, update, or delete time-off requests for workers. Use action "list" to see requests for a profile, "create" to submit a new request, "update" to modify, or "delete" to cancel a request.
-
-### Manage Timesheets
-
-Create, list, or review contractor timesheets. Use action "list" to retrieve timesheets for a contract, "create" to submit a new timesheet entry, or "review" to approve or decline a timesheet.
+[Authentication](https://developer.deel.com/api/stable/authentication), [OAuth](https://developer.deel.com/api/stable/oauth), [API versioning](https://developer.deel.com/api/stable/api-versioning), [API specification](https://api.letsdeel.com/openapi/rest/definitions).
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

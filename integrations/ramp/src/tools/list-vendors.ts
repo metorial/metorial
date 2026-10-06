@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { recordSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listVendors = SlateTool.create(spec, {
@@ -24,15 +25,12 @@ export let listVendors = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      vendors: z.array(z.any()).describe('List of vendor objects'),
+      vendors: z.array(recordSchema).describe('List of vendor objects'),
       nextCursor: z.string().optional().describe('Cursor for fetching the next page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = clientFor(ctx);
 
     let result = await client.listVendors({
       start: ctx.input.cursor,

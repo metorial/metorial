@@ -18,10 +18,16 @@ export let updateNote = SlateTool.create(spec, {
       title: z.string().optional().describe('New title for the note'),
       markdown: z.string().optional().describe('New markdown content for the note'),
       html: z.string().optional().describe('New HTML content (alternative to markdown)'),
-      attributes: z
-        .array(z.string())
+      sliteml: z
+        .string()
         .optional()
-        .describe('Updated collection attributes ordered by column')
+        .describe('Native SliteML content; choose one content representation.'),
+      attributes: z
+        .array(z.string().nullable())
+        .optional()
+        .describe(
+          'Updated collection attributes ordered by column; incompatible values can be ignored by Slite. Null slots follow native provider semantics and do not promise clearing.'
+        )
     })
   )
   .output(
@@ -40,6 +46,7 @@ export let updateNote = SlateTool.create(spec, {
       title: ctx.input.title,
       markdown: ctx.input.markdown,
       html: ctx.input.html,
+      sliteml: ctx.input.sliteml,
       attributes: ctx.input.attributes
     });
 

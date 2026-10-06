@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FlexClient } from '../lib/client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getFlexConfigurationTool = SlateTool.create(spec, {
@@ -14,6 +15,22 @@ export let getFlexConfigurationTool = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      taskrouterWorkspaceSid: z
+        .string()
+        .optional()
+        .describe('Configured TaskRouter workspace SID'),
+      taskrouterWorkflowSid: z
+        .string()
+        .optional()
+        .describe('Configured TaskRouter workflow SID'),
+      taskrouterTaskQueueSid: z
+        .string()
+        .optional()
+        .describe('Configured TaskRouter queue SID'),
+      flexInsights: z
+        .unknown()
+        .optional()
+        .describe('Native Flex Insights configuration when returned'),
       accountSid: z.string().optional().describe('Account SID'),
       flexInstanceSid: z.string().optional().describe('Flex Instance SID'),
       runtimeDomain: z.string().optional().describe('Runtime domain'),
@@ -36,21 +53,27 @@ export let getFlexConfigurationTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FlexClient(ctx.auth.token);
+    validateInput('get_flex_configuration', ctx.input);
+    let client = new FlexClient(ctx.auth.token, ctx.auth.accountSid);
     let config = await client.getConfiguration();
 
     return {
       output: {
         accountSid: config.account_sid,
+        taskrouterWorkspaceSid: config.taskrouter_workspace_sid,
+        taskrouterWorkflowSid: config.taskrouter_target_workflow_sid,
+        taskrouterTaskQueueSid: config.taskrouter_target_taskqueue_sid,
+        flexInsights: config.flex_insights_hr,
         flexInstanceSid: config.flex_instance_sid,
         runtimeDomain: config.runtime_domain,
-        serviceSid: config.service_sid,
+        serviceSid: config.flex_service_instance_sid,
         chatServiceSid: config.chat_service_instance_sid,
         messagingServiceSid: config.messaging_service_instance_sid,
         uiLanguage: config.ui_language,
         uiVersion: config.ui_version,
         serverlessServiceSids: config.serverless_service_sids,
-        flexInsightsSid: config.flex_insights_hr,
+        flexInsightsSid:
+          typeof config.flex_insights_hr === 'string' ? config.flex_insights_hr : undefined,
         dateCreated: config.date_created,
         dateUpdated: config.date_updated,
         attributes: config.attributes

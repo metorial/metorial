@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { currentVersion, resourceId, selection, versionSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageEntryLifecycle = SlateTool.create(spec, {
@@ -13,31 +14,31 @@ export let manageEntryLifecycle = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      entryId: z.string().describe('ID of the entry.'),
+      ...selection,
+      entryId: resourceId.describe('ID of the entry.'),
       action: z
         .enum(['publish', 'unpublish', 'archive', 'unarchive', 'delete'])
         .describe('Lifecycle action to perform.'),
-      version: z
-        .number()
+      version: versionSchema
         .optional()
         .describe('Current version of the entry. Fetched automatically if omitted.')
     })
   )
   .output(
     z.object({
-      entryId: z.string().describe('ID of the entry.'),
+      entryId: resourceId.describe('ID of the entry.'),
       action: z.string().describe('The action that was performed.'),
       version: z.number().optional().describe('Version after the action, if applicable.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
     let { entryId, action } = ctx.input;
 
     let version = ctx.input.version;
-    if (!version) {
+    if (version === undefined) {
       let current = await client.getEntry(entryId);
-      version = current.sys.version;
+      version = currentVersion(current);
     }
 
     let result: any;

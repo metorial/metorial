@@ -25,8 +25,6 @@ import {
   updateItem,
   updateTable
 } from './tools';
-import { inboundWebhook, streamChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -54,5 +52,5 @@ export let provider = Slate.create({
     describeBackup,
     restoreTableFromBackup
   ],
-  triggers: [inboundWebhook, streamChanges]
+  triggers: []
 });

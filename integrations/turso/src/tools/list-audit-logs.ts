@@ -1,20 +1,30 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientForContext } from '../lib/client';
 import { spec } from '../spec';
 
 export let listAuditLogs = SlateTool.create(spec, {
   name: 'List Audit Logs',
   key: 'list_audit_logs',
-  description: `Retrieve audit logs for the organization. Audit logs track actions taken by members, useful for monitoring activity and security.`,
+  constraints: ['Audit logs require a Scaler plan or higher.'],
+  description: `Choose an organization with list_organizations. Retrieve audit logs for the organization. Audit logs track actions taken by members, useful for monitoring activity and security.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      organizationSlug: z
+        .string()
+        .optional()
+        .describe(
+          'Organization slug. Call list_organizations to discover authorized organizations; older connections may use their saved organization.'
+        ),
       page: z.number().optional().describe('Page number (1-based)'),
-      pageSize: z.number().optional().describe('Number of results per page (default: 20)')
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Number of results per page (provider default: 100)')
     })
   )
   .output(
@@ -38,10 +48,7 @@ export let listAuditLogs = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    const client = clientForContext(ctx);
 
     let result = await client.listAuditLogs({
       page: ctx.input.page,

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/jira.svg" height="20"> Jira Service Management
 
-Create, view, search, and manage customer service requests (tickets) including comments, attachments, approvals, and SLA tracking. Manage service desk projects, request types, queues, customers, and organizations. Search knowledge base articles linked to Confluence. Manage assets and configuration items (CMDB) including schemas, object types, and attributes. Handle incident and alert management with on-call schedules, escalation policies, and routing rules. Perform full Jira issue CRUD, workflow transitions, JQL searches, and project management. Receive webhooks for issue, comment, attachment, project, sprint, and user events.
+Create, view, search, and manage customer service requests (tickets) including comments, attachments, approvals, and SLA tracking. Manage service desk projects, request types, queues, customers, and organizations. Search knowledge base articles linked to Confluence. Manage assets and configuration items (CMDB) including schemas, object types, and attributes. Handle incident and alert management with on-call schedules, escalation policies, and routing rules. Perform full Jira issue CRUD, workflow transitions, JQL searches, and project management.
 
 ## Tools
 

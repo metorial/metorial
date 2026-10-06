@@ -1,56 +1,37 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string(),
-      accountEmail: z.string().optional()
-    })
-  )
+  .output(z.object({ token: z.string(), accountEmail: z.string().optional() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Token',
     key: 'api_token',
-
     inputSchema: z.object({
       token: z
         .string()
         .describe(
-          'Pingdom API token. Generate one from My Pingdom → Integrations → The Pingdom API.'
+          'Pingdom API token generated in My Pingdom → Integrations → The Pingdom API. Read/Write access is required for mutations.'
         ),
       accountEmail: z
         .string()
         .optional()
-        .describe('Account owner email, required only for multi-account (enterprise) setups.')
+        .describe('Optional account owner email for legacy delegated enterprise accounts.')
     }),
-
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token,
-          accountEmail: ctx.input.accountEmail
-        }
-      };
+      new Client(ctx.input);
+      return { output: { token: ctx.input.token, accountEmail: ctx.input.accountEmail } };
     },
-
     getProfile: async (ctx: {
       output: { token: string; accountEmail?: string };
       input: { token: string; accountEmail?: string };
     }) => {
-      let http = createAxios({
-        baseURL: 'https://api.pingdom.com/api/3.1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await http.get('/credits');
-
+      const result = await new Client(ctx.output).getCredits();
       return {
         profile: {
-          name: 'Pingdom Account',
-          ...response.data
+          name: ctx.output.accountEmail ?? 'Pingdom Account',
+          availableChecks: result.credits.availablechecks
         }
       };
     }

@@ -16,15 +16,6 @@ import {
   manageTranslationsTool,
   translationStatusTool
 } from './tools';
-import {
-  commentEventsTrigger,
-  fileEventsTrigger,
-  projectEventsTrigger,
-  stringEventsTrigger,
-  suggestionEventsTrigger,
-  taskEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -43,12 +34,5 @@ export let provider = Slate.create({
     manageTasksTool,
     listMembersTool
   ],
-  triggers: [
-    fileEventsTrigger,
-    projectEventsTrigger,
-    stringEventsTrigger,
-    suggestionEventsTrigger,
-    taskEventsTrigger,
-    commentEventsTrigger
-  ]
+  triggers: []
 });

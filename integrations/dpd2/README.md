@@ -1,11 +1,17 @@
-# <img src="logo.png" height="20"> Dpd 2
+# DPD (Digital Product Delivery)
 
-Read digital product sales data from the DPD (Digital Product Delivery) e-commerce platform. View storefronts, retrieve product catalog details, list purchases and orders, access subscriber and customer records, and verify purchase notification webhooks. Supports filtering purchases by various criteria and reactivating purchases. Primarily a read-only API for monitoring and reporting on digital product sales including e-books, software, music, videos, and keycodes.
+Connect to the hosted Digital Product Delivery storefront API at `api.getdpd.com/v2`. This package is for the getdpd.com e-commerce product; it does not provide parcel-carrier dispatch or label purchases.
 
-## License
+Use the account username and API password from Profile > DPD API Credentials. This API uses HTTPS Basic Auth, without OAuth expiry or automatic password renewal; reconnect after credential rotation. `get_api_status` checks the authenticated ping response. Its username is configured connection information, not a verified person/account claim. No suitable profile endpoint is documented.
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
+The fourteen tools include storefront/product/purchase/customer/subscriber reads, subscriber-status and notification verification, purchase reactivation and API status. Every collection returns one page of at most 100 records. `page` defaults to 1 at request time. Continue with the returned candidate `nextPage` until `endOfResults` is true; a short or empty array alone does not assert DPD's documented `NOTFOUND` terminal sentinel. The account’s time zone applies to date filters unless the value includes an explicit time zone. Relative PHP-compatible date strings are passed through without inventing a date interpretation.
 
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Resource IDs must be positive safe integers. Readbacks bind the exact requested ID, and returned line-item purchase IDs must match their parent purchase. Money stays in exact decimal strings, including trailing zeroes; numeric money responses are refused. Missing provider values stay omitted instead of becoming fake empty strings, zero amounts or empty lists. The legacy purchase field `tangiblesToshIp` is retained for numeric values; `tangiblesToShip` accurately includes null when shipping does not apply. Delivered product keys are intentional authorized purchase data, not API authentication credentials. Credential-bearing ordinary fields are refused; inspect or correct the source data before retrying.
+
+`verify_subscriber` requires exactly one email/username or subscriber ID within a storefront. It returns the provider’s status and does not independently prove entitlement or change access. Public reference and legacy PHP-client access-status guidance differ; apply the storefront’s current policy.
+
+`verify_notification` posts every original decoded notification form name and string value, preserving empty values, money formatting and the signature. It accepts only the provider’s VERIFIED or INVALID response. Verification does not register a webhook, prove freshness or prevent replay. No event triggers are provided.
+
+`reactivate_purchase` can restore download access and initiate email or renewed fulfillment. It requires a documented native purchase status before submission, the provider’s explicit OK acknowledgement and an exact purchase readback with a documented status; the response does not prove email or download delivery. An omitted or blank email uses the original purchase email. No automatic retry occurs. Ambiguous errors identify the purchase and possible retained reactivation/email effects for reconciliation. This API supplies no documented reversal or purchase deletion; use an isolated, explicitly authorized purchase for testing.
+
+Product tools return file/image metadata. The API does not document an authenticated product-file download endpoint, and this integration does not invent one. Broader catalog/customer editing, checkout/payment creation, subscription administration and shipping execution are outside the published API surface.

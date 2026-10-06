@@ -1,15 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getUrlReport = SlateTool.create(spec, {
   name: 'Get URL Report',
   key: 'get_url_report',
-  description: `Retrieve the analysis report for a URL. Accepts either a URL identifier (base64-encoded URL without padding) or a raw URL. Returns detection results from 70+ URL scanners, final destination, category, and community reputation data.`,
+  description: `Retrieve the analysis report for a URL. Accepts a raw URL, its native SHA-256 identifier, or its base64url identifier without padding. Returns detection results from available URL scanners, final destination, category, and community reputation data.`,
   instructions: [
-    'Provide either the raw URL or its base64url-encoded (no padding) identifier.',
+    'Provide the raw URL, its returned SHA-256 ID, or its unpadded base64url identifier.',
     'If providing a raw URL, it will be automatically base64url-encoded.'
+  ],
+  constraints: [
+    'Use non-sensitive public indicators; submitted or queried indicators may be scanned and included in the community dataset.'
   ],
   tags: {
     readOnly: true
@@ -20,7 +24,7 @@ export let getUrlReport = SlateTool.create(spec, {
       url: z
         .string()
         .describe(
-          'The URL to look up, or its VirusTotal URL identifier (base64url without padding)'
+          'The URL to look up, its native SHA-256 ID, or its base64url identifier without padding'
         )
     })
   )
@@ -60,26 +64,15 @@ export let getUrlReport = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    let client = new Client(ctx.auth);
 
-    // If input looks like a raw URL, convert to base64url identifier
-    let urlId = ctx.input.url;
-    if (urlId.startsWith('http://') || urlId.startsWith('https://')) {
-      urlId = Buffer.from(urlId).toString('base64url').replace(/=/g, '');
-    }
-
-    let result = await client.getUrlReport(urlId);
+    let result = await client.getUrlReport(ctx.input.url);
     let attrs = result?.attributes ?? {};
-
-    let malicious = attrs.last_analysis_stats?.malicious ?? 0;
-    let total = Object.values(attrs.last_analysis_stats ?? {}).reduce(
-      (sum: number, v) => sum + (typeof v === 'number' ? v : 0),
-      0
-    );
 
     return {
       output: {
-        urlId: result?.id ?? '',
+        urlId: result.id,
         url: attrs.url,
         finalUrl: attrs.last_final_url,
         title: attrs.title,
@@ -103,7 +96,8 @@ export let getUrlReport = SlateTool.create(spec, {
         categories: attrs.categories,
         tags: attrs.tags
       },
-      message: `**URL report for** \`${attrs.url ?? ctx.input.url}\`\n- **Detection:** ${malicious}/${total} engines flagged as malicious\n- **Title:** ${attrs.title ?? 'N/A'}\n- **Reputation:** ${attrs.reputation ?? 'N/A'}`
+      message:
+        'Retrieved the available VirusTotal report. Missing analysis statistics are not a zero-detection result.'
     };
   })
   .build();

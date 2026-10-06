@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SatisMeterClient } from '../lib/client';
+import { projectIdSchema, resolveProject } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listResponsesTool = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listResponsesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       surveyId: z
         .string()
         .optional()
@@ -81,7 +83,7 @@ export let listResponsesTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SatisMeterClient(ctx.auth.token, ctx.auth.writeKey);
     let result = await client.listResponses({
-      projectId: ctx.config.projectId,
+      projectId: resolveProject(ctx.input.projectId, ctx.config),
       campaignId: ctx.input.surveyId,
       startDate: ctx.input.startDate,
       endDate: ctx.input.endDate,
@@ -89,7 +91,7 @@ export let listResponsesTool = SlateTool.create(spec, {
       pageSize: ctx.input.pageSize
     });
 
-    let responses = (result?.data || []).map((r: any) => ({
+    let responses = result.data.map(r => ({
       responseId: r.id,
       rating: r.rating,
       feedback: r.feedback,
@@ -101,7 +103,7 @@ export let listResponsesTool = SlateTool.create(spec, {
       user: r.user
     }));
 
-    let nextPageCursor = result?.page?.nextPageCursor;
+    let nextPageCursor = result.nextPageCursor;
 
     return {
       output: { responses, nextPageCursor },

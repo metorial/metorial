@@ -18,13 +18,6 @@ import {
   screenStocks,
   searchInstruments
 } from './tools';
-import {
-  earningsEvent,
-  inboundWebhook,
-  insiderTransactionAlert,
-  newFinancialNews
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -45,5 +38,5 @@ export let provider = Slate.create({
     getExchangeInfo,
     getBulkEod
   ],
-  triggers: [inboundWebhook, newFinancialNews, earningsEvent, insiderTransactionAlert]
+  triggers: []
 });

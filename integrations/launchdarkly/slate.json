@@ -10,8 +10,7 @@
     "manage projects and environments",
     "query audit log",
     "search contexts",
-    "invite and inspect account members",
-    "receive signed change notifications"
+    "invite and inspect account members"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/launch-darkly-logo.png"
 }

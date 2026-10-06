@@ -1,344 +1,384 @@
-import { createAxios } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  isApiErrorRecord,
+  requestAxios
+} from 'slates';
+import { API_VERSION, BASE_URLS, exactId, gustoError, requireFields } from './helpers';
+
+export type Resource = Record<string, unknown>;
+export type Pagination = {
+  page?: number;
+  per?: number;
+  totalCount?: number;
+  totalPages?: number;
+  nextPage?: number;
+};
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
-
+  private http: ReturnType<typeof createAuthenticatedAxios>;
   constructor(config: { token: string; baseUrl: string }) {
-    this.http = createAxios({
+    if (
+      !config.token?.trim() ||
+      !Object.values(BASE_URLS).some(url => url === config.baseUrl)
+    ) {
+      throw createApiServiceError('Reconnect Gusto with a valid production or demo token.', {
+        reason: 'invalid_auth'
+      });
+    }
+    this.http = createAuthenticatedAxios({
       baseURL: config.baseUrl,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
-        'X-Gusto-API-Version': '2024-04-01'
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: { 'X-Gusto-API-Version': API_VERSION },
+      timeout: 30000,
+      maxRedirects: 0,
+      errorAdapter: error => gustoError(error, 'request')
+    });
+  }
+  private path(...segments: string[]) {
+    return `/v1/${segments.map(encodeURIComponent).join('/')}`;
+  }
+  private async request(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    path: string,
+    data?: Resource,
+    params?: Resource
+  ) {
+    return requestAxios(
+      'request',
+      () => this.http.request<unknown>({ method, url: path, data, params }),
+      gustoError
+    );
+  }
+  private resource(value: unknown): Resource {
+    if (!isApiErrorRecord(value))
+      throw createApiServiceError('Gusto returned an invalid resource object.', {
+        reason: 'invalid_response'
+      });
+    return value;
+  }
+  private async read(path: string, params?: Resource) {
+    return this.resource((await this.request('GET', path, undefined, params)).data);
+  }
+  private async write(
+    method: 'POST' | 'PUT',
+    path: string,
+    data: Resource,
+    required: string[],
+    expectedId?: string
+  ) {
+    requireFields(data, required);
+    const body = Object.fromEntries(
+      Object.entries(data).filter(([, value]) => value !== undefined)
+    );
+    if (method === 'PUT' && !Object.keys(body).some(key => key !== 'version')) {
+      throw createApiServiceError('Provide at least one field to update.', {
+        reason: 'empty_update'
+      });
+    }
+    const result = this.resource((await this.request(method, path, body)).data);
+    if (expectedId && exactId(result.uuid) !== expectedId) {
+      throw createApiServiceError(
+        'Gusto returned a different resource after the update. Review the change in Gusto before retrying.',
+        { reason: 'resource_mismatch' }
+      );
+    }
+    return result;
+  }
+  private async list(path: string, params?: Resource, wrapper?: string) {
+    const response = await this.request('GET', path, undefined, params);
+    const data = Array.isArray(response.data)
+      ? response.data
+      : wrapper && isApiErrorRecord(response.data)
+        ? response.data[wrapper]
+        : undefined;
+    if (!Array.isArray(data))
+      throw createApiServiceError('Gusto returned an invalid collection.', {
+        reason: 'invalid_response'
+      });
+    const items = data.map(value => this.resource(value));
+    const pagination = this.pagination(response.headers);
+    return Object.assign(items, { pagination });
+  }
+  private pagination(headers: unknown): Pagination {
+    const pagination: Pagination = {};
+    for (const [key, header] of [
+      ['page', 'x-page'],
+      ['per', 'x-per-page'],
+      ['totalCount', 'x-total-count'],
+      ['totalPages', 'x-total-pages']
+    ] as const) {
+      const raw = getResponseHeaderValue(headers, header);
+      if (raw !== undefined) {
+        const value = Number(raw);
+        if (!/^\d+$/.test(String(raw)) || !Number.isSafeInteger(value) || value < 0)
+          throw createApiServiceError('Gusto returned invalid pagination metadata.', {
+            reason: 'invalid_response'
+          });
+        pagination[key] = value;
       }
-    });
+    }
+    if (pagination.page && pagination.totalPages && pagination.page < pagination.totalPages)
+      pagination.nextPage = pagination.page + 1;
+    return pagination;
   }
-
-  // ─── Company ──────────────────────────────────────────────────
-
-  async getCompany(companyId: string) {
-    let response = await this.http.get(`/v1/companies/${companyId}`);
-    return response.data;
+  async getTokenInfo() {
+    return this.read(this.path('token_info'));
   }
-
-  async listCompanyLocations(companyId: string) {
-    let response = await this.http.get(`/v1/companies/${companyId}/locations`);
-    return response.data;
+  async getCompany(id: string) {
+    return this.read(this.path('companies', id));
   }
-
-  async createCompanyLocation(companyId: string, data: any) {
-    let response = await this.http.post(`/v1/companies/${companyId}/locations`, data);
-    return response.data;
+  async listCompanyLocations(id: string, params?: Resource) {
+    return this.list(this.path('companies', id, 'locations'), params);
   }
-
-  async updateCompanyLocation(locationId: string, data: any) {
-    let response = await this.http.put(`/v1/locations/${locationId}`, data);
-    return response.data;
+  async createCompanyLocation(id: string, data: Resource) {
+    return this.write('POST', this.path('companies', id, 'locations'), data, [
+      'phone_number',
+      'street_1',
+      'city',
+      'state',
+      'zip'
+    ]);
   }
-
-  // ─── Employees ────────────────────────────────────────────────
-
-  async listEmployees(companyId: string, params?: any) {
-    let response = await this.http.get(`/v1/companies/${companyId}/employees`, { params });
-    return response.data;
+  async updateCompanyLocation(id: string, data: Resource) {
+    return this.write('PUT', this.path('locations', id), data, ['version'], id);
   }
-
-  async getEmployee(employeeId: string, params?: any) {
-    let response = await this.http.get(`/v1/employees/${employeeId}`, { params });
-    return response.data;
+  async listEmployees(id: string, params?: Resource) {
+    return this.list(this.path('companies', id, 'employees'), params);
   }
-
-  async createEmployee(companyId: string, data: any) {
-    let response = await this.http.post(`/v1/companies/${companyId}/employees`, data);
-    return response.data;
+  async getEmployee(id: string, params?: Resource) {
+    return this.read(this.path('employees', id), params);
   }
-
-  async updateEmployee(employeeId: string, data: any) {
-    let response = await this.http.put(`/v1/employees/${employeeId}`, data);
-    return response.data;
+  async createEmployee(id: string, data: Resource) {
+    return this.write('POST', this.path('companies', id, 'employees'), data, [
+      'first_name',
+      'last_name'
+    ]);
   }
-
-  async terminateEmployee(employeeId: string, data: any) {
-    let response = await this.http.post(`/v1/employees/${employeeId}/terminations`, data);
-    return response.data;
+  async updateEmployee(id: string, data: Resource) {
+    return this.write('PUT', this.path('employees', id), data, ['version'], id);
   }
-
-  async rehireEmployee(employeeId: string, data: any) {
-    let response = await this.http.post(`/v1/employees/${employeeId}/rehire`, data);
-    return response.data;
+  async terminateEmployee(id: string, data: Resource) {
+    return this.write('POST', this.path('employees', id, 'terminations'), data, [
+      'effective_date'
+    ]);
   }
-
-  // ─── Contractors ──────────────────────────────────────────────
-
-  async listContractors(companyId: string, params?: any) {
-    let response = await this.http.get(`/v1/companies/${companyId}/contractors`, { params });
-    return response.data;
+  async rehireEmployee(id: string, data: Resource) {
+    return this.write('POST', this.path('employees', id, 'rehire'), data, [
+      'effective_date',
+      'file_new_hire_report',
+      'work_location_uuid'
+    ]);
   }
-
-  async getContractor(contractorId: string) {
-    let response = await this.http.get(`/v1/contractors/${contractorId}`);
-    return response.data;
+  async listContractors(id: string, params?: Resource) {
+    return this.list(this.path('companies', id, 'contractors'), params);
   }
-
-  async createContractor(companyId: string, data: any) {
-    let response = await this.http.post(`/v1/companies/${companyId}/contractors`, data);
-    return response.data;
+  async getContractor(id: string) {
+    return this.read(this.path('contractors', id));
   }
-
-  async updateContractor(contractorId: string, data: any) {
-    let response = await this.http.put(`/v1/contractors/${contractorId}`, data);
-    return response.data;
+  async createContractor(id: string, data: Resource) {
+    return this.write('POST', this.path('companies', id, 'contractors'), data, [
+      'type',
+      'wage_type',
+      'start_date'
+    ]);
   }
-
-  // ─── Payroll ──────────────────────────────────────────────────
-
-  async listPayrolls(companyId: string, params?: any) {
-    let response = await this.http.get(`/v1/companies/${companyId}/payrolls`, { params });
-    return response.data;
+  async updateContractor(id: string, data: Resource) {
+    return this.write('PUT', this.path('contractors', id), data, ['version'], id);
   }
-
-  async getPayroll(companyId: string, payrollId: string, params?: any) {
-    let response = await this.http.get(`/v1/companies/${companyId}/payrolls/${payrollId}`, {
+  async listPayrolls(id: string, params?: Resource) {
+    return this.list(this.path('companies', id, 'payrolls'), params);
+  }
+  async getPayroll(
+    company: string,
+    id: string,
+    params?: Resource
+  ): Promise<Resource & { pagination: Pagination }> {
+    const response = await this.request(
+      'GET',
+      this.path('companies', company, 'payrolls', id),
+      undefined,
       params
-    });
-    return response.data;
-  }
-
-  async calculatePayroll(companyId: string, payrollId: string) {
-    let response = await this.http.put(
-      `/v1/companies/${companyId}/payrolls/${payrollId}/calculate`
     );
-    return response.data;
+    const result = this.resource(response.data);
+    if (exactId(result.payroll_uuid ?? result.uuid) !== id)
+      throw createApiServiceError('Gusto returned a different payroll.', {
+        reason: 'resource_mismatch'
+      });
+    return { ...result, pagination: this.pagination(response.headers) };
   }
-
-  async submitPayroll(companyId: string, payrollId: string) {
-    let response = await this.http.put(
-      `/v1/companies/${companyId}/payrolls/${payrollId}/submit`
-    );
-    return response.data;
+  async listPaySchedules(id: string, params?: Resource) {
+    return this.list(this.path('companies', id, 'pay_schedules'), params);
   }
-
-  async createOffCyclePayroll(companyId: string, data: any) {
-    let response = await this.http.post(`/v1/companies/${companyId}/payrolls`, data);
-    return response.data;
-  }
-
-  // ─── Pay Schedules ────────────────────────────────────────────
-
-  async listPaySchedules(companyId: string) {
-    let response = await this.http.get(`/v1/companies/${companyId}/pay_schedules`);
-    return response.data;
-  }
-
-  async getPaySchedule(companyId: string, payScheduleId: string) {
-    let response = await this.http.get(
-      `/v1/companies/${companyId}/pay_schedules/${payScheduleId}`
-    );
-    return response.data;
-  }
-
-  // ─── Contractor Payments ──────────────────────────────────────
-
-  async listContractorPayments(companyId: string, params: any) {
-    let response = await this.http.get(`/v1/companies/${companyId}/contractor_payments`, {
+  async listContractorPayments(
+    id: string,
+    params: Resource
+  ): Promise<Resource & { pagination: Pagination }> {
+    requireFields(params, ['start_date', 'end_date']);
+    const response = await this.request(
+      'GET',
+      this.path('companies', id, 'contractor_payments'),
+      undefined,
       params
+    );
+    return { ...this.resource(response.data), pagination: this.pagination(response.headers) };
+  }
+  async listCompanyBenefits(id: string) {
+    return this.list(this.path('companies', id, 'company_benefits'));
+  }
+  async getCompanyBenefit(id: string) {
+    return this.read(this.path('company_benefits', id));
+  }
+  async createCompanyBenefit(id: string, data: Resource) {
+    return this.write('POST', this.path('companies', id, 'company_benefits'), data, [
+      'description'
+    ]);
+  }
+  async updateCompanyBenefit(id: string, data: Resource) {
+    return this.write('PUT', this.path('company_benefits', id), data, ['version'], id);
+  }
+  async listEmployeeBenefits(id: string, params?: Resource) {
+    return this.list(this.path('employees', id, 'employee_benefits'), params);
+  }
+  async createEmployeeBenefit(id: string, data: Resource) {
+    return this.write('POST', this.path('employees', id, 'employee_benefits'), data, [
+      'company_benefit_uuid'
+    ]);
+  }
+  async updateEmployeeBenefit(id: string, data: Resource) {
+    return this.write('PUT', this.path('employee_benefits', id), data, ['version'], id);
+  }
+  async listEarningTypes(id: string) {
+    return this.read(this.path('companies', id, 'earning_types'));
+  }
+  async createEarningType(id: string, data: Resource) {
+    return this.write('POST', this.path('companies', id, 'earning_types'), data, ['name']);
+  }
+  async updateEarningType(company: string, id: string, data: Resource) {
+    return this.write(
+      'PUT',
+      this.path('companies', company, 'earning_types', id),
+      data,
+      ['name'],
+      id
+    );
+  }
+  async listTimeOffPolicies(id: string) {
+    return this.list(this.path('companies', id, 'time_off_policies'));
+  }
+  async getTimeOffBalances(id: string, type: string) {
+    return this.list(this.path('employees', id, 'time_off_activities'), {
+      time_off_type: type
     });
-    return response.data;
   }
-
-  async createContractorPayment(companyId: string, data: any) {
-    let response = await this.http.post(
-      `/v1/companies/${companyId}/contractor_payments`,
-      data
+  async listGarnishments(id: string, params?: Resource) {
+    return this.list(this.path('employees', id, 'garnishments'), params);
+  }
+  async createGarnishment(id: string, data: Resource) {
+    return this.write('POST', this.path('employees', id, 'garnishments'), data, [
+      'amount',
+      'court_ordered'
+    ]);
+  }
+  async updateGarnishment(id: string, data: Resource) {
+    return this.write('PUT', this.path('garnishments', id), data, ['version'], id);
+  }
+  async listDepartments(id: string) {
+    return this.list(this.path('companies', id, 'departments'));
+  }
+  async createDepartment(id: string, data: Resource) {
+    return this.write('POST', this.path('companies', id, 'departments'), data, ['title']);
+  }
+  async updateDepartment(id: string, data: Resource) {
+    return this.write('PUT', this.path('departments', id), data, ['version', 'title'], id);
+  }
+  async listJobCompensations(id: string, params?: Resource) {
+    return this.list(this.path('jobs', id, 'compensations'), params);
+  }
+  async createJobCompensation(id: string, data: Resource) {
+    return this.write('POST', this.path('jobs', id, 'compensations'), data, [
+      'rate',
+      'payment_unit',
+      'flsa_status'
+    ]);
+  }
+  async updateCompensation(id: string, data: Resource) {
+    return this.write('PUT', this.path('compensations', id), data, ['version'], id);
+  }
+  async calculatePayroll(company: string, id: string) {
+    return this.payrollOperation(company, id, 'calculate');
+  }
+  async submitPayroll(company: string, id: string) {
+    return this.payrollOperation(company, id, 'submit');
+  }
+  private async payrollOperation(company: string, id: string, action: 'calculate' | 'submit') {
+    const response = await this.request(
+      'PUT',
+      this.path('companies', company, 'payrolls', id, action)
     );
-    return response.data;
+    if (response.status !== 202)
+      throw createApiServiceError(
+        'Gusto did not confirm asynchronous payroll acceptance. Check the payroll before retrying.',
+        { reason: 'ambiguous_outcome' }
+      );
+    return { payrollId: id, accepted: true, operation: action };
   }
-
-  async cancelContractorPayment(companyId: string, contractorPaymentId: string) {
-    let response = await this.http.delete(
-      `/v1/companies/${companyId}/contractor_payments/${contractorPaymentId}`
+  async createContractorPayment(id: string, data: Resource) {
+    return this.write('POST', this.path('companies', id, 'contractor_payments'), data, [
+      'contractor_uuid',
+      'date'
+    ]);
+  }
+  async cancelContractorPayment(company: string, id: string) {
+    const path = this.path('companies', company, 'contractor_payments', id);
+    const before = await this.read(path);
+    if (exactId(before.uuid) !== id || before.may_cancel !== true)
+      throw createApiServiceError(
+        'Gusto has not confirmed that this exact payment can be cancelled.',
+        { reason: 'invalid_payment_state' }
+      );
+    const response = await this.request('DELETE', path);
+    if (response.status !== 204)
+      throw createApiServiceError(
+        'Gusto did not acknowledge payment cancellation. Review the payment before retrying.',
+        { reason: 'ambiguous_outcome' }
+      );
+    try {
+      await this.read(path);
+    } catch (error) {
+      if (gustoError(error, 'payment cancellation verification').data.upstreamStatus === 404)
+        return { contractorPaymentId: id, cancelled: true };
+      throw error;
+    }
+    throw createApiServiceError(
+      'The payment remains readable after cancellation. Review its state in Gusto before retrying.',
+      { reason: 'unverified_cancellation' }
     );
-    return response.data;
   }
-
-  // ─── Benefits ─────────────────────────────────────────────────
-
-  async listCompanyBenefits(companyId: string) {
-    let response = await this.http.get(`/v1/companies/${companyId}/company_benefits`);
-    return response.data;
+  async listCompanyForms(id: string) {
+    return this.list(this.path('companies', id, 'forms'));
   }
-
-  async getCompanyBenefit(companyBenefitId: string) {
-    let response = await this.http.get(`/v1/company_benefits/${companyBenefitId}`);
-    return response.data;
+  async listEmployeeForms(id: string) {
+    return this.list(this.path('employees', id, 'forms'));
   }
-
-  async createCompanyBenefit(companyId: string, data: any) {
-    let response = await this.http.post(`/v1/companies/${companyId}/company_benefits`, data);
-    return response.data;
-  }
-
-  async updateCompanyBenefit(companyBenefitId: string, data: any) {
-    let response = await this.http.put(`/v1/company_benefits/${companyBenefitId}`, data);
-    return response.data;
-  }
-
-  async listEmployeeBenefits(employeeId: string) {
-    let response = await this.http.get(`/v1/employees/${employeeId}/employee_benefits`);
-    return response.data;
-  }
-
-  async createEmployeeBenefit(employeeId: string, data: any) {
-    let response = await this.http.post(`/v1/employees/${employeeId}/employee_benefits`, data);
-    return response.data;
-  }
-
-  async updateEmployeeBenefit(employeeBenefitId: string, data: any) {
-    let response = await this.http.put(`/v1/employee_benefits/${employeeBenefitId}`, data);
-    return response.data;
-  }
-
-  // ─── Earning Types ────────────────────────────────────────────
-
-  async listEarningTypes(companyId: string) {
-    let response = await this.http.get(`/v1/companies/${companyId}/earning_types`);
-    return response.data;
-  }
-
-  async createEarningType(companyId: string, data: any) {
-    let response = await this.http.post(`/v1/companies/${companyId}/earning_types`, data);
-    return response.data;
-  }
-
-  async updateEarningType(companyId: string, earningTypeId: string, data: any) {
-    let response = await this.http.put(
-      `/v1/companies/${companyId}/earning_types/${earningTypeId}`,
-      data
+  async getForm(id: string, parent: { employeeId?: string }) {
+    return this.read(
+      parent.employeeId
+        ? this.path('employees', parent.employeeId, 'forms', id)
+        : this.path('forms', id)
     );
-    return response.data;
   }
-
-  // ─── Time Off ─────────────────────────────────────────────────
-
-  async listTimeOffPolicies(companyId: string) {
-    let response = await this.http.get(`/v1/companies/${companyId}/time_off_policies`);
-    return response.data;
+  async listEmployeeJobs(id: string, params?: Resource) {
+    return this.list(this.path('employees', id, 'jobs'), params);
   }
-
-  async getTimeOffBalances(employeeId: string) {
-    let response = await this.http.get(`/v1/employees/${employeeId}/time_off_activities`);
-    return response.data;
+  async createEmployeeJob(id: string, data: Resource) {
+    return this.write('POST', this.path('employees', id, 'jobs'), data, [
+      'title',
+      'hire_date'
+    ]);
   }
-
-  // ─── Garnishments ─────────────────────────────────────────────
-
-  async listGarnishments(employeeId: string) {
-    let response = await this.http.get(`/v1/employees/${employeeId}/garnishments`);
-    return response.data;
-  }
-
-  async createGarnishment(employeeId: string, data: any) {
-    let response = await this.http.post(`/v1/employees/${employeeId}/garnishments`, data);
-    return response.data;
-  }
-
-  async updateGarnishment(garnishmentId: string, data: any) {
-    let response = await this.http.put(`/v1/garnishments/${garnishmentId}`, data);
-    return response.data;
-  }
-
-  // ─── Forms ────────────────────────────────────────────────────
-
-  async listCompanyForms(companyId: string) {
-    let response = await this.http.get(`/v1/companies/${companyId}/forms`);
-    return response.data;
-  }
-
-  async getForm(formId: string) {
-    let response = await this.http.get(`/v1/forms/${formId}`);
-    return response.data;
-  }
-
-  async listEmployeeForms(employeeId: string) {
-    let response = await this.http.get(`/v1/employees/${employeeId}/forms`);
-    return response.data;
-  }
-
-  // ─── Departments ──────────────────────────────────────────────
-
-  async listDepartments(companyId: string) {
-    let response = await this.http.get(`/v1/companies/${companyId}/departments`);
-    return response.data;
-  }
-
-  async createDepartment(companyId: string, data: any) {
-    let response = await this.http.post(`/v1/companies/${companyId}/departments`, data);
-    return response.data;
-  }
-
-  async updateDepartment(departmentId: string, data: any) {
-    let response = await this.http.put(`/v1/departments/${departmentId}`, data);
-    return response.data;
-  }
-
-  // ─── Webhooks ─────────────────────────────────────────────────
-
-  async createWebhookSubscription(data: { url: string; subscription_types: string[] }) {
-    let response = await this.http.post('/v1/webhook_subscriptions', data);
-    return response.data;
-  }
-
-  async deleteWebhookSubscription(webhookSubscriptionId: string) {
-    let response = await this.http.delete(
-      `/v1/webhook_subscriptions/${webhookSubscriptionId}`
-    );
-    return response.data;
-  }
-
-  async listWebhookSubscriptions() {
-    let response = await this.http.get('/v1/webhook_subscriptions');
-    return response.data;
-  }
-
-  async verifyWebhookSubscription(webhookSubscriptionId: string, verificationToken: string) {
-    let response = await this.http.put(
-      `/v1/webhook_subscriptions/${webhookSubscriptionId}/verify`,
-      {
-        verification_token: verificationToken
-      }
-    );
-    return response.data;
-  }
-
-  // ─── Jobs and Compensations ───────────────────────────────────
-
-  async listEmployeeJobs(employeeId: string) {
-    let response = await this.http.get(`/v1/employees/${employeeId}/jobs`);
-    return response.data;
-  }
-
-  async createEmployeeJob(employeeId: string, data: any) {
-    let response = await this.http.post(`/v1/employees/${employeeId}/jobs`, data);
-    return response.data;
-  }
-
-  async updateJob(jobId: string, data: any) {
-    let response = await this.http.put(`/v1/jobs/${jobId}`, data);
-    return response.data;
-  }
-
-  async listJobCompensations(jobId: string) {
-    let response = await this.http.get(`/v1/jobs/${jobId}/compensations`);
-    return response.data;
-  }
-
-  async createJobCompensation(jobId: string, data: any) {
-    let response = await this.http.post(`/v1/jobs/${jobId}/compensations`, data);
-    return response.data;
-  }
-
-  async updateCompensation(compensationId: string, data: any) {
-    let response = await this.http.put(`/v1/compensations/${compensationId}`, data);
-    return response.data;
+  async updateJob(id: string, data: Resource) {
+    return this.write('PUT', this.path('jobs', id), data, ['version'], id);
   }
 }

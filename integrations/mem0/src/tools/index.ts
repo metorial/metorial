@@ -1,4 +1,5 @@
 export * from './add-memory';
+export * from './connection';
 export * from './delete-memory';
 export * from './get-memory';
 export * from './list-memories';

@@ -33,7 +33,7 @@ export let getLists = SlateTool.create(spec, {
     let client = new AffinityClient(ctx.auth.token);
 
     let result = await client.getLists();
-    let lists = (Array.isArray(result) ? result : []).map((l: any) => ({
+    let lists = (Array.isArray(result) ? result : []).map(l => ({
       listId: l.id,
       name: l.name,
       type: l.type,

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RunPodClient } from '../lib/client';
 import { spec } from '../spec';
@@ -39,10 +39,12 @@ export let manageJob = SlateTool.create(spec, {
     let { endpointId, action, jobId } = ctx.input;
 
     if (action === 'purge_queue') {
+      if (jobId !== undefined)
+        throw createApiServiceError('Omit jobId when purging the entire endpoint queue.');
       await client.purgeQueue(endpointId);
     } else {
       if (!jobId) {
-        throw new Error(`jobId is required for action "${action}".`);
+        throw createApiServiceError(`jobId is required for action "${action}".`);
       }
       if (action === 'cancel') {
         await client.cancelJob(endpointId, jobId);

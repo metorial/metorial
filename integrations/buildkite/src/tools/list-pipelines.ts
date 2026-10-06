@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput, paginationOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let pipelineSchema = z.object({
@@ -29,27 +30,26 @@ export let listPipelines = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...organizationInput,
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
       perPage: z.number().optional().describe('Number of results per page (max 100)')
     })
   )
   .output(
     z.object({
+      ...paginationOutput,
       pipelines: z.array(pipelineSchema)
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     let pipelines = await client.listPipelines({
       page: ctx.input.page,
       perPage: ctx.input.perPage
     });
 
-    let mapped = pipelines.map((p: any) => ({
+    let mapped = pipelines.map(p => ({
       pipelineId: p.id,
       pipelineSlug: p.slug,
       name: p.name,
@@ -61,12 +61,12 @@ export let listPipelines = SlateTool.create(spec, {
       running_builds_count: p.running_builds_count,
       scheduled_builds_count: p.scheduled_builds_count,
       tags: p.tags ?? [],
-      archived: p.archived_at !== null,
+      archived: p.archived_at != null,
       createdAt: p.created_at
     }));
 
     return {
-      output: { pipelines: mapped },
+      output: { pipelines: mapped, ...client.pagination },
       message: `Found **${mapped.length}** pipeline(s).`
     };
   });

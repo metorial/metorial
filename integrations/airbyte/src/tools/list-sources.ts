@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listSourcesTool = SlateTool.create(spec, {
   name: 'List Sources',
   key: 'list_sources',
-  description: `List configured data source connectors in Airbyte. Returns source names, types, workspace associations, and configurations. Supports filtering by workspace and pagination.`,
+  description: `List configured data source connectors in Airbyte. Returns source names, types, workspace associations, and configuration keys with all values redacted. Supports filtering by workspace and pagination.`,
   tags: {
     readOnly: true
   }
@@ -37,7 +37,11 @@ export let listSourcesTool = SlateTool.create(spec, {
           name: z.string(),
           sourceType: z.string(),
           workspaceId: z.string(),
-          configuration: z.record(z.string(), z.any())
+          configuration: z
+            .record(z.string(), z.unknown())
+            .describe(
+              'Configuration keys with all values redacted. Never reuse these values as connector input.'
+            )
         })
       ),
       hasMore: z.boolean()

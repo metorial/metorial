@@ -16,7 +16,8 @@ export let autocomplete = SlateTool.create(spec, {
 Supports fields like company, school, title, region, country, skill, major, and more.`,
   instructions: [
     'Specify the field to autocomplete on and optionally provide a text prefix.',
-    'Supported fields include: company, school, title, region, country, locality, skill, major, industry, and more.'
+    'Supported fields include: company, school, title, region, country, location_name, all_location, skill, major, industry, and more.',
+    'The legacy location field is deprecated by the provider; use location_name. locality is not a documented Autocomplete field.'
   ],
   tags: {
     readOnly: true
@@ -27,7 +28,7 @@ Supports fields like company, school, title, region, country, skill, major, and 
       field: z
         .string()
         .describe(
-          'Field to autocomplete on (e.g. "company", "school", "title", "skill", "region", "country", "locality", "major", "industry")'
+          'Field to autocomplete on (e.g. "company", "school", "title", "skill", "region", "country", "location_name", "major", "industry")'
         ),
       text: z
         .string()

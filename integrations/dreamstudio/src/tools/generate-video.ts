@@ -1,21 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let generateVideo = SlateTool.create(spec, {
   name: 'Generate Video',
   key: 'generate_video',
-  description: `Generate a short video (~2 seconds) from an input image using Stable Video Diffusion. The operation is **asynchronous** — the job is submitted and polled for completion (typically under 2 minutes). Costs 20 credits.`,
+  description:
+    'DEPRECATED — Stability AI retired its hosted Stable Video Diffusion API on July 24, 2025. This tool no longer generates videos.',
   instructions: [
-    'Input image must be 1024x576, 576x1024, or 768x768 pixels, in JPEG or PNG format.',
-    'Use motionBucketId to control the amount of motion in the generated video (higher = more motion).'
-  ],
-  constraints: [
-    'Image must be exactly 1024x576, 576x1024, or 768x768.',
-    'Results are stored for 24 hours only.'
+    'Hosted video generation is unavailable. Stability AI offers this model only for self-hosting.'
   ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }
@@ -56,26 +52,10 @@ export let generateVideo = SlateTool.create(spec, {
       finishReason: z.string().describe('Finish reason (SUCCESS or CONTENT_FILTERED)')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
-    let input = ctx.input;
-
-    ctx.progress('Submitting video generation job...');
-
-    let { generationId } = await client.generateVideoSubmit({
-      image: input.image,
-      seed: input.seed,
-      cfgScale: input.cfgScale,
-      motionBucketId: input.motionBucketId
-    });
-
-    ctx.progress(`Job submitted. Generation ID: ${generationId}. Polling for result...`);
-
-    let result = await client.pollAsyncResult(`/v2beta/image-to-video/result/${generationId}`);
-
-    return {
-      output: result,
-      message: `Video generated successfully. Generation ID: \`${generationId}\`, seed: \`${result.seed}\`. Finish reason: ${result.finishReason}.`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'Stability AI retired the hosted Stable Video Diffusion API on July 24, 2025. Hosted video generation is no longer available.',
+      { reason: 'provider_service_retired' }
+    );
   })
   .build();

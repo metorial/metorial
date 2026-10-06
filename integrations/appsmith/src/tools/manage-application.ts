@@ -1,25 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageApplication = SlateTool.create(spec, {
   name: 'Manage Application',
   key: 'manage_application',
-  description: `Create, update, delete, publish, clone, or fork an Appsmith application. Provides full lifecycle management for applications within workspaces.`,
+  description: `Create, update, delete, publish, clone, or fork an Appsmith application. Uses version-sensitive dashboard session endpoints. Publishing or public access can expose data; updates to name and public access are separate writes. Exact get reads the authorized base-application inventory, excluding branch-specific discovery.`,
   instructions: [
     'To create: set action to "create", provide workspaceId and name.',
     'To update: set action to "update", provide applicationId and fields to change.',
     'To delete: set action to "delete", provide applicationId.',
     'To publish: set action to "publish", provide applicationId.',
     'To clone: set action to "clone", provide applicationId (clones within same workspace).',
+    'To get: set action to "get" and provide applicationId.',
     'To fork: set action to "fork", provide applicationId and targetWorkspaceId.'
   ]
 })
   .input(
     z.object({
       action: z
-        .enum(['create', 'update', 'delete', 'publish', 'clone', 'fork'])
+        .enum(['create', 'update', 'delete', 'publish', 'clone', 'fork', 'get'])
         .describe('The action to perform.'),
       applicationId: z
         .string()
@@ -56,97 +57,46 @@ export let manageApplication = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
-
-    let {
-      action,
-      applicationId,
-      workspaceId,
-      targetWorkspaceId,
-      name,
-      isPublic,
-      color,
-      icon
-    } = ctx.input;
-
-    if (action === 'create') {
-      if (!workspaceId) throw new Error('Workspace ID is required to create an application.');
-      if (!name) throw new Error('Name is required to create an application.');
-      let app = await client.createApplication(workspaceId, name, color, icon);
+    const client = clientFor(ctx);
+    const input = ctx.input;
+    const key = input.applicationId ?? '';
+    if (input.action === 'delete') {
+      const app = await client.deleteApplication(key);
       return {
-        output: {
-          applicationId: app.id,
-          name: app.name,
-          slug: app.slug,
-          isPublic: app.isPublic
-        },
-        message: `Created application **${app.name}** (ID: ${app.id}).`
+        output: { applicationId: app.id, deleted: true },
+        message:
+          'Appsmith accepted deletion of the exact application. History and external query effects may remain.'
       };
     }
-
-    if (!applicationId) throw new Error('Application ID is required for this action.');
-
-    if (action === 'update') {
-      let updates: Record<string, any> = {};
-      if (name !== undefined) updates.name = name;
-      if (isPublic !== undefined) updates.isPublic = isPublic;
-      let app = await client.updateApplication(applicationId, updates);
-      return {
-        output: {
-          applicationId: app.id,
-          name: app.name,
-          slug: app.slug,
-          isPublic: app.isPublic
-        },
-        message: `Updated application **${app.name}**.`
-      };
-    }
-
-    if (action === 'delete') {
-      await client.deleteApplication(applicationId);
-      return {
-        output: { applicationId, deleted: true },
-        message: `Deleted application ${applicationId}.`
-      };
-    }
-
-    if (action === 'publish') {
-      await client.publishApplication(applicationId);
-      return {
-        output: { applicationId, published: true },
-        message: `Published application ${applicationId}.`
-      };
-    }
-
-    if (action === 'clone') {
-      let app = await client.cloneApplication(applicationId);
-      return {
-        output: {
-          applicationId: app.id,
-          name: app.name,
-          slug: app.slug
-        },
-        message: `Cloned application. New application: **${app.name}** (ID: ${app.id}).`
-      };
-    }
-
-    if (action === 'fork') {
-      if (!targetWorkspaceId)
-        throw new Error('Target workspace ID is required for fork action.');
-      let app = await client.forkApplication(applicationId, targetWorkspaceId);
-      return {
-        output: {
-          applicationId: app.id,
-          name: app.name,
-          slug: app.slug
-        },
-        message: `Forked application to workspace ${targetWorkspaceId}. New application: **${app.name}** (ID: ${app.id}).`
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
+    const app =
+      input.action === 'create'
+        ? await client.createApplication(
+            input.workspaceId ?? '',
+            input.name ?? '',
+            input.color,
+            input.icon
+          )
+        : input.action === 'update'
+          ? await client.updateApplication(key, { name: input.name, isPublic: input.isPublic })
+          : input.action === 'publish'
+            ? await client.publishApplication(key)
+            : input.action === 'clone'
+              ? await client.cloneApplication(key)
+              : input.action === 'fork'
+                ? await client.forkApplication(key, input.targetWorkspaceId ?? '')
+                : await client.getApplication(key);
+    return {
+      output: {
+        applicationId: app.id,
+        name: app.name,
+        slug: app.slug,
+        isPublic: app.isPublic,
+        ...(input.action === 'publish' ? { published: true } : {})
+      },
+      message:
+        input.action === 'publish'
+          ? 'Appsmith acknowledged publication. This does not confirm external query execution.'
+          : `Application ${input.action} confirmed by native readback.`
+    };
   })
   .build();

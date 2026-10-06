@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { unsupportedAppWrite } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateApp = SlateTool.create(spec, {
   name: 'Update App',
   key: 'update_app',
-  description: `Update a Retool application's name or move it to a different folder. Only provide the fields you want to change.`
+  description:
+    'Compatibility action. The current Retool API reference has no documented supported route for this app definition write. Edit or create the app in Retool, then read its metadata with list_apps or get_app.'
 })
   .input(
     z.object({
@@ -26,23 +27,7 @@ export let updateApp = SlateTool.create(spec, {
       folderId: z.string().nullable().optional()
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
-
-    let result = await client.updateApp(ctx.input.appId, {
-      name: ctx.input.appName,
-      folderId: ctx.input.folderId
-    });
-
-    let a = result.data;
-
-    return {
-      output: {
-        appId: a.id,
-        appName: a.name,
-        folderId: a.folder_id
-      },
-      message: `Updated app **${a.name}** (ID: \`${a.id}\`).`
-    };
+  .handleInvocation(async () => {
+    throw unsupportedAppWrite();
   })
   .build();

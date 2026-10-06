@@ -68,11 +68,20 @@ export let enrichTransactionsTool = SlateTool.create(spec, {
             description: z.string().describe('Raw transaction description from the bank'),
             amount: z.number().describe('Transaction amount'),
             direction: z.enum(['INFLOW', 'OUTFLOW']).describe('Money direction'),
-            isoCurrencyCode: z.string().optional().describe('ISO 4217 currency code'),
+            isoCurrencyCode: z
+              .string()
+              .optional()
+              .describe(
+                'Required by Plaid: uppercase ISO 4217 currency code; provide it for every transaction'
+              ),
             datePosted: z.string().optional().describe('Transaction date (YYYY-MM-DD)')
           })
         )
-        .describe('Transactions to enrich')
+        .describe('Between 1 and 100 distinct synthetic or authorized transactions'),
+      personalFinanceCategoryVersion: z
+        .enum(['v1', 'v2'])
+        .optional()
+        .describe('Requested category taxonomy')
     })
   )
   .output(
@@ -96,10 +105,11 @@ export let enrichTransactionsTool = SlateTool.create(spec, {
         direction: t.direction,
         isoCurrencyCode: t.isoCurrencyCode,
         datePosted: t.datePosted
-      }))
+      })),
+      ctx.input.personalFinanceCategoryVersion
     );
 
-    let enriched = (result.enriched_transactions || []).map((t: any) => ({
+    let enriched = result.enriched_transactions.map(t => ({
       transactionId: t.id,
       merchantName: t.enrichments?.merchant_name ?? null,
       website: t.enrichments?.website ?? null,
@@ -108,7 +118,7 @@ export let enrichTransactionsTool = SlateTool.create(spec, {
       category: t.enrichments?.personal_finance_category?.primary ?? null,
       categoryDetailed: t.enrichments?.personal_finance_category?.detailed ?? null,
       categoryConfidence: t.enrichments?.personal_finance_category?.confidence_level ?? null,
-      counterparties: (t.enrichments?.counterparties || []).map((c: any) => ({
+      counterparties: t.enrichments.counterparties.map(c => ({
         name: c.name,
         type: c.type,
         website: c.website ?? null,

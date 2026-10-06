@@ -6,12 +6,13 @@ import { spec } from '../spec';
 export let triggerAutomation = SlateTool.create(spec, {
   name: 'Trigger Automation',
   key: 'trigger_automation',
-  description: `Start an automation sequence for a specific contact. The automation must be configured with a "Started via API" trigger type in the EmailOctopus dashboard.`,
+  description: `Start an automation sequence for a specific contact. This can send emails, change fields or tags and retain execution history. The automation must be configured with a "Started via API" trigger type in the EmailOctopus dashboard.`,
   instructions: [
     'A contact can only trigger an automation once unless "Allow contacts to repeat" is enabled on the automation.'
   ],
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -22,7 +23,11 @@ export let triggerAutomation = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      triggered: z.boolean().describe('Whether the automation was successfully triggered')
+      triggered: z
+        .boolean()
+        .describe(
+          'Whether the API accepted the automation request; execution completion is not confirmed'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -31,7 +36,7 @@ export let triggerAutomation = SlateTool.create(spec, {
 
     return {
       output: { triggered: true },
-      message: `Triggered automation \`${ctx.input.automationId}\` for contact \`${ctx.input.contactId}\`.`
+      message: `Accepted automation request \`${client.safeText(ctx.input.automationId)}\` for contact \`${client.safeText(ctx.input.contactId)}\`.`
     };
   })
   .build();

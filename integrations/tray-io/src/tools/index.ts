@@ -1,5 +1,7 @@
 export * from './call-connector';
 export * from './get-connector-operations';
+export * from './get-current-context';
+export * from './get-resource';
 export * from './list-connectors';
 export * from './list-solutions';
 export * from './manage-authentications';

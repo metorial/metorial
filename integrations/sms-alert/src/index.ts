@@ -14,8 +14,6 @@ import {
   sendSms,
   validateOtp
 } from './tools';
-import { inboundWebhook, smsReport } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     getDeliveryStatus,
     manageShortUrls
   ],
-  triggers: [inboundWebhook, smsReport]
+  triggers: []
 });

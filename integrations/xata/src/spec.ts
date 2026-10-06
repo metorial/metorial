@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'xata',
   name: 'Xata',
   description:
-    'Serverless PostgreSQL database platform with copy-on-write branching, zero-downtime migrations, full-text search, vector search, and AI-powered Q&A.',
+    'Inspect current Xata organizations and projects and manage Postgres child branches. Historical Xata Lite operations remain deprecated after the provider retired that product.',
   metadata: {},
   config,
   auth

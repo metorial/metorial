@@ -27,8 +27,6 @@ import {
   uploadDocument,
   upsertContacts
 } from './tools';
-import { documentSigned, inboundWebhook, notificationError } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,5 +56,5 @@ export let provider = Slate.create({
     updateTokenConfig,
     getAuditTrail
   ],
-  triggers: [inboundWebhook, documentSigned, notificationError]
+  triggers: []
 });

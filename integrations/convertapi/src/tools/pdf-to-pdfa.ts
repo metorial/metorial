@@ -1,23 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deliverFiles } from '../lib/files';
+import { buildFileSource, fileSourceSchema } from '../lib/validation';
 import { spec } from '../spec';
-
-let fileSourceSchema = z
-  .object({
-    url: z.string().optional().describe('Public URL of the PDF file'),
-    fileId: z.string().optional().describe('ConvertAPI file ID of a previously uploaded PDF'),
-    base64Data: z.string().optional().describe('Base64-encoded PDF content'),
-    fileName: z.string().optional().describe('File name (required when using base64Data)')
-  })
-  .describe(
-    'PDF file source — provide exactly one of: url, fileId, or base64Data (with fileName)'
-  );
 
 export let pdfToPdfa = SlateTool.create(spec, {
   name: 'Convert to PDF/A',
   key: 'pdf_to_pdfa',
-  description: `Convert a PDF document to PDF/A format for long-term archiving and compliance.
+  description: `Convert a PDF document to PDF/A format using the provider default PDF/A-2b setting for archiving.
 PDF/A is an ISO-standardized version of PDF designed for digital preservation of electronic documents.`,
   tags: {
     destructive: false,
@@ -37,7 +28,10 @@ PDF/A is an ISO-standardized version of PDF designed for digital preservation of
   .output(
     z.object({
       conversionCost: z.number().describe('Number of conversion credits consumed'),
-      conversionTime: z.number().describe('Conversion duration in seconds'),
+      conversionTime: z
+        .number()
+        .optional()
+        .describe('Provider-reported legacy duration, when present'),
       fileName: z.string().describe('Name of the PDF/A file'),
       fileSize: z.number().describe('Size of the PDF/A file in bytes'),
       fileId: z.string().nullable().describe('ConvertAPI file ID'),
@@ -47,17 +41,19 @@ PDF/A is an ISO-standardized version of PDF designed for digital preservation of
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
+      masterToken: ctx.auth.masterToken,
       region: ctx.config.region
     });
 
     let fileSource = buildFileSource(ctx.input.file);
 
-    let result = await client.convert({
+    let rawResult = await client.convert({
       sourceFormat: 'pdf',
       destinationFormat: 'pdfa',
       files: [fileSource],
       storeFile: ctx.input.storeFile
     });
+    let result = await deliverFiles(ctx, rawResult);
 
     let pdfa = result.files[0]!;
     return {
@@ -69,31 +65,7 @@ PDF/A is an ISO-standardized version of PDF designed for digital preservation of
         fileId: pdfa.fileId,
         url: pdfa.url
       },
-      message: `Converted to PDF/A: \`${pdfa.fileName}\` (${formatBytes(pdfa.fileSize)}) in ${result.conversionTime}s.`
+      message: `Converted to PDF/A: \`${pdfa.fileName}\` (${pdfa.fileSize} bytes).`
     };
   })
   .build();
-
-function buildFileSource(file: {
-  url?: string;
-  fileId?: string;
-  base64Data?: string;
-  fileName?: string;
-}) {
-  if (file.url) {
-    return { type: 'url' as const, url: file.url };
-  }
-  if (file.fileId) {
-    return { type: 'fileId' as const, fileId: file.fileId };
-  }
-  if (file.base64Data && file.fileName) {
-    return { type: 'base64' as const, fileName: file.fileName, data: file.base64Data };
-  }
-  throw new Error('Provide exactly one of: url, fileId, or base64Data (with fileName)');
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}

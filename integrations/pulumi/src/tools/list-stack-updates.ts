@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listStackUpdates = SlateTool.create(spec, {
@@ -13,14 +14,14 @@ export let listStackUpdates = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe('Organization name (uses default from config if not set)'),
+      organization: organizationInput,
       projectName: z.string().describe('Project name'),
       stackName: z.string().describe('Stack name'),
-      page: z.number().optional().describe('Page number'),
-      pageSize: z.number().optional().describe('Results per page')
+      page: z.number().optional().describe('Nonnegative page number; 0 retrieves all history'),
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Nonnegative results per page; ignored when page is 0')
     })
   )
   .output(
@@ -42,12 +43,10 @@ export let listStackUpdates = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
 
     let result = await client.listStackUpdates(
       org,
@@ -59,7 +58,7 @@ export let listStackUpdates = SlateTool.create(spec, {
       }
     );
 
-    let updates = (result.updates || []).map((u: any) => ({
+    let updates = result.updates.map(u => ({
       version: u.version,
       kind: u.kind,
       result: u.result,

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { contactValue } from '../lib/types';
 import { spec } from '../spec';
 
 let alertContactSchema = z.object({
@@ -12,15 +13,16 @@ let alertContactSchema = z.object({
       'Contact type: 1=SMS, 2=Email, 3=Twitter, 5=WebHook, 6=Pushbullet, 7=Zapier, 9=Pushover, 11=Slack'
     ),
   status: z.number().describe('Contact status: 0=Not activated, 1=Paused, 2=Active'),
-  value: z.string().describe('Contact address (email, phone, webhook URL, etc.)')
+  value: z.string().describe('Email address; credential-bearing contact values are redacted')
 });
 
 export let listAlertContacts = SlateTool.create(spec, {
   name: 'List Alert Contacts',
   key: 'list_alert_contacts',
-  description: `Retrieve alert contacts configured in your UptimeRobot account. Alert contacts receive notifications when monitors change state (up/down). Supports filtering by specific contact IDs and pagination.`,
+  description: `Use a Legacy API Key connection (API v2). Retrieve alert contacts configured in your UptimeRobot account. Alert contacts receive notifications when monitors change state (up/down). Supports filtering by specific contact IDs and pagination.`,
   tags: {
-    readOnly: true
+    readOnly: true,
+    destructive: false
   }
 })
   .input(
@@ -36,11 +38,18 @@ export let listAlertContacts = SlateTool.create(spec, {
   .output(
     z.object({
       alertContacts: z.array(alertContactSchema),
+      offset: z.number().optional().describe('Current pagination offset'),
+      limit: z.number().optional().describe('Current pagination limit'),
+      nextOffset: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Offset for the next page, or null when complete'),
       total: z.number().describe('Total number of alert contacts')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.getAlertContacts({
       alertContacts: ctx.input.contactIds?.join('-'),
@@ -48,20 +57,26 @@ export let listAlertContacts = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let contacts = result.alertContacts.map((c: any) => ({
+    let contacts = result.alertContacts.map(c => ({
       contactId: String(c.id),
       friendlyName: c.friendly_name,
       type: c.type,
       status: c.status,
-      value: c.value
+      value: contactValue(c.type, c.value)
     }));
 
     return {
       output: {
         alertContacts: contacts,
-        total: result.total ?? contacts.length
+        total: result.total,
+        offset: result.offset,
+        limit: result.limit,
+        nextOffset:
+          result.offset + contacts.length < result.total
+            ? result.offset + contacts.length
+            : null
       },
-      message: `Found **${result.total ?? contacts.length}** alert contact(s).`
+      message: `Found **${result.total}** alert contact(s).`
     };
   })
   .build();

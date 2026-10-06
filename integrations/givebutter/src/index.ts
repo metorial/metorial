@@ -26,14 +26,6 @@ import {
   updateContact,
   updateFund
 } from './tools';
-import {
-  campaignEvents,
-  contactEvents,
-  planEvents,
-  ticketEvents,
-  transactionEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,5 +54,5 @@ export let provider = Slate.create({
     listCampaignMembers,
     listCampaignTeams
   ],
-  triggers: [campaignEvents, transactionEvents, contactEvents, ticketEvents, planEvents]
+  triggers: []
 });

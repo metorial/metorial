@@ -1,61 +1,13 @@
-# <img src="https://provider-logos.metorial-cdn.com/vimeo.png" height="20"> Vimeo
+# Vimeo
 
-Upload, manage, and stream videos on Vimeo. Edit video metadata including titles, descriptions, tags, and privacy settings. Organize videos into showcases, folders, channels, and groups. Search for videos by keywords, category, or tags. Manage user profiles, followers, likes, and watch history. Create and control live streaming events with RTMP configuration. Retrieve embed codes and customize player settings. Manage thumbnails and text tracks (subtitles/captions). Subscribe to webhooks for real-time notifications on video uploads, plays, and status changes.
+Read and search videos, edit authorized metadata, organize showcases, folders and channels, and manage comments and likes. The 32 public tools preserve the existing 29 tool keys and add exact folder/showcase reads and eligible video downloads.
 
-## Tools
+Use OAuth or an authenticated personal access token. Public-only app tokens cannot identify the current user or read private libraries. `get_user` without `userId` reads the authenticated `/me` profile. OAuth requests public, private, edit, delete, interact, create and video_files scopes. Stored token and legacy expiration fields remain compatible; Vimeo does not currently support a refresh-token grant. An expired token requires reconnection.
 
-### List Categories
+Folder operations use Vimeo's native project routes. List results expose actual page, per-page, total and optional navigation values. The legacy alphabetical folder sort maps to native name, and showcase modified_time maps to last_modified. Unsupported legacy folder sorts fail with guidance before dispatch.
 
-List all top-level video categories on Vimeo. Categories define genres that videos belong to.
+Video tag and embed-domain updates replace their existing sets using separate native calls. An empty array clears a set. Metadata and relationship changes are not atomic: inspect the exact resource before retrying a partial failure. Password values cannot be independently verified from a public readback. Channel creation requires explicit privacy even though its retained input schema allows omission.
 
-### Delete Video
+Downloads require an eligible Vimeo membership plus public, private and video_files scopes. The tool selects a native downloadable rendition and uses its unchanged, dated redirect URL. Renewal verifies the original viewer, owner, video and rendition identity before requesting a fresh link. Adaptive playlists are excluded. Only native HTTPS Vimeo redirect origins are accepted; credentials are never sent to signed storage. Native size is approximate. Media bytes, redirects and entitlement behavior require live verification.
 
-Permanently delete a video from Vimeo. This action cannot be undone.
-
-### Edit Video
-
-Update a video's metadata including its title, description, privacy settings, tags, password, and license. Only the fields you provide will be updated.
-
-### Get User Profile
-
-Retrieve the profile of the authenticated user or a specific user by ID. Returns account details, bio, location, and profile picture.
-
-### Get Video
-
-Retrieve detailed information about a specific Vimeo video including its metadata, privacy settings, embed code, statistics, and thumbnail.
-
-### List My Videos
-
-List videos from the authenticated user's account. Supports filtering by search query, sorting, and pagination.
-
-### List My Channels
-
-List all channels the authenticated user has created or follows. Channels group videos by theme.
-
-### List Video Comments
-
-Retrieve comments on a specific video. Results are paginated.
-
-### List Folders
-
-List all folders for the authenticated user. Folders are used for internal video organization.
-
-### List Liked Videos
-
-Retrieve the list of videos that the authenticated user has liked. Supports pagination and sorting.
-
-### List Showcases
-
-List all showcases (curated video collections) for the authenticated user. Supports pagination.
-
-### Search Videos
-
-Search for videos across all of Vimeo by keywords. Results can be sorted by relevance, date, plays, likes, comments, or duration.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Uploads, live streaming, player administration, captions and webhook triggers are outside this package's tools. Private verification is active but has not been run against a live Vimeo account. Destructive and retained effects require explicit controlled fixtures and prerequisites.

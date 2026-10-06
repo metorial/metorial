@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageOutput, xRechnungSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let contactSummarySchema = z
@@ -60,6 +61,7 @@ let contactSummarySchema = z
       .describe('Person details (present if contact is a person)'),
     archived: z.boolean().optional().describe('Whether the contact is archived'),
     note: z.string().optional().describe('Free-text note'),
+    xRechnung: xRechnungSchema.optional().describe('Customer XRechnung settings'),
     addresses: z
       .object({
         billing: z
@@ -133,6 +135,7 @@ export let listContacts = SlateTool.create(spec, {
       number: z.number().optional().describe('Filter contacts by customer or vendor number'),
       customer: z.boolean().optional().describe('Filter to only customer contacts'),
       vendor: z.boolean().optional().describe('Filter to only vendor contacts'),
+      size: z.number().optional().describe('Page size, between 1 and 250'),
       page: z.number().optional().describe('Page number (0-based, default: 0)')
     })
   )
@@ -145,62 +148,25 @@ export let listContacts = SlateTool.create(spec, {
       totalElements: z.number().describe('Total number of contacts matching the filters'),
       currentPage: z.number().describe('Current page number (0-based)'),
       numberOfElements: z.number().describe('Number of contacts on the current page'),
+      nextPage: z.number().optional().describe('Next page index, when available'),
+      searchWindowLimit: z.number().optional().describe('Maximum searchable results'),
+      windowMayBeTruncated: z
+        .boolean()
+        .optional()
+        .describe('Whether narrower filters may be needed beyond the search window'),
       first: z.boolean().describe('Whether this is the first page'),
       last: z.boolean().describe('Whether this is the last page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.listContacts({
-      email: ctx.input.email,
-      name: ctx.input.name,
-      number: ctx.input.number,
-      customer: ctx.input.customer,
-      vendor: ctx.input.vendor,
-      page: ctx.input.page
-    });
-
-    let contacts = (result.content || []).map((c: any) => ({
-      id: c.id,
-      organizationId: c.organizationId,
-      version: c.version,
-      roles: c.roles,
-      company: c.company,
-      person: c.person,
-      archived: c.archived,
-      note: c.note,
-      addresses: c.addresses,
-      emailAddresses: c.emailAddresses,
-      phoneNumbers: c.phoneNumbers
-    }));
-
-    let totalPages = result.totalPages ?? 0;
-    let totalElements = result.totalElements ?? 0;
-    let currentPage = result.number ?? 0;
-    let numberOfElements = result.numberOfElements ?? contacts.length;
-
-    let filtersApplied: string[] = [];
-    if (ctx.input.email) filtersApplied.push(`email="${ctx.input.email}"`);
-    if (ctx.input.name) filtersApplied.push(`name="${ctx.input.name}"`);
-    if (ctx.input.number !== undefined) filtersApplied.push(`number=${ctx.input.number}`);
-    if (ctx.input.customer) filtersApplied.push('customers only');
-    if (ctx.input.vendor) filtersApplied.push('vendors only');
-
-    let filterSummary =
-      filtersApplied.length > 0 ? ` (filtered by ${filtersApplied.join(', ')})` : '';
-
+    const result = await new Client({ token: ctx.auth.token }).listContacts(ctx.input);
     return {
       output: {
-        contacts,
-        totalPages,
-        totalElements,
-        currentPage,
-        numberOfElements,
-        first: result.first ?? currentPage === 0,
-        last: result.last ?? currentPage >= totalPages - 1
+        contacts: result.content,
+        numberOfElements: result.numberOfElements,
+        ...pageOutput(result)
       },
-      message: `Found **${totalElements}** contact(s)${filterSummary} -- showing page ${currentPage + 1} of ${totalPages}.`
+      message: `Retrieved ${result.content.length} contact(s) on page ${result.number}.`
     };
   })
   .build();

@@ -7,15 +7,19 @@ import {
   createContact,
   createLead,
   createTask,
+  deleteRecord,
   findAccounts,
   findActivities,
   findContacts,
   findLeads,
   getAccount,
   getContact,
+  getCurrentUser,
   getLead,
+  getRecord,
   getTimeline,
   listActivityTypes,
+  listCustomFields,
   listPipelinesStages,
   listProducts,
   listSources,
@@ -25,8 +29,6 @@ import {
   updateContact,
   updateLead
 } from './tools';
-import { entityChanges, newAccounts, newContacts, newLeads } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -52,7 +54,11 @@ export let provider = Slate.create({
     listUsersTeams,
     listActivityTypes,
     listSources,
-    getTimeline
+    getTimeline,
+    getCurrentUser,
+    getRecord,
+    deleteRecord,
+    listCustomFields
   ],
-  triggers: [entityChanges, newLeads, newContacts, newAccounts]
+  triggers: []
 });

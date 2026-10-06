@@ -16,7 +16,7 @@ export let findLeads = SlateTool.create(spec, {
       query: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Filter criteria for leads (e.g., { "status": 1 } for open leads)'),
+        .describe('Filter criteria for leads (e.g., { "status": 0 } for open leads)'),
       orderBy: z.string().optional().describe('Field to sort by'),
       orderDirection: z.enum(['ASC', 'DESC']).optional().describe('Sort direction'),
       limit: z.number().optional().describe('Number of results per page (default: 50)'),
@@ -58,7 +58,7 @@ export let findLeads = SlateTool.create(spec, {
       stubResponses: ctx.input.stubResponses
     });
 
-    let leads = results.map((l: any) => ({
+    let leads = results.map(l => ({
       leadId: l.id,
       name: l.name || l.description,
       status: l.status,

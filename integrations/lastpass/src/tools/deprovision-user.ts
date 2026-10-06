@@ -30,6 +30,10 @@ export let deprovisionUser = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      warnings: z
+        .array(z.string())
+        .optional()
+        .describe('Native warnings; some requested changes may not have applied'),
       status: z.string().describe('API response status')
     })
   )
@@ -39,22 +43,26 @@ export let deprovisionUser = SlateTool.create(spec, {
       provisioningHash: ctx.auth.provisioningHash
     });
 
-    let actionMap: Record<string, 0 | 1 | 2> = {
+    let actionMap: Record<typeof ctx.input.action, 0 | 1 | 2> = {
       deactivate: 0,
       remove: 1,
       delete: 2
     };
 
-    let deleteAction = actionMap[ctx.input.action] ?? 0;
+    let deleteAction = actionMap[ctx.input.action];
     let result = await client.deleteUser(ctx.input.username, deleteAction);
 
     let actionLabel = ctx.input.action.charAt(0).toUpperCase() + ctx.input.action.slice(1);
 
     return {
       output: {
-        status: result.status || 'OK'
+        status: result.status,
+        warnings: result.warnings
       },
-      message: `${actionLabel}d user **${ctx.input.username}** successfully.`
+      message:
+        result.status === 'WARN'
+          ? 'LastPass reported a warning; check the requested account state before retrying.'
+          : `LastPass accepted **${actionLabel}** for user **${ctx.input.username}**.`
     };
   })
   .build();

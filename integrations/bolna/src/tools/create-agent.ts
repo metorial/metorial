@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,11 +8,8 @@ let llmConfigSchema = z
     provider: z
       .string()
       .optional()
-      .describe('LLM provider (e.g. "openai", "anthropic", "deepgram")'),
-    model: z
-      .string()
-      .optional()
-      .describe('Model name (e.g. "gpt-4o-mini", "claude-3-5-sonnet")'),
+      .describe('LLM provider (e.g. "openai", "anthropic", "google")'),
+    model: z.string().optional().describe('Model name (e.g. "gpt-4.1-mini", "gpt-4o")'),
     maxTokens: z.number().optional().describe('Maximum tokens for response'),
     temperature: z.number().optional().describe('Temperature for response generation'),
     topP: z.number().optional().describe('Top P sampling parameter'),
@@ -26,9 +23,24 @@ let llmConfigSchema = z
 let synthesizerSchema = z
   .object({
     provider: z
-      .enum(['elevenlabs', 'polly', 'deepgram', 'cartesia', 'sarvam', 'styletts'])
+      .enum([
+        'elevenlabs',
+        'polly',
+        'deepgram',
+        'cartesia',
+        'sarvam',
+        'styletts',
+        'smallest',
+        'azuretts',
+        'rime',
+        'openai',
+        'gemini',
+        'maya',
+        'kalpa',
+        'soniox'
+      ])
       .optional()
-      .describe('TTS provider'),
+      .describe('TTS provider; use list_voice_providers to discover available providers'),
     providerConfig: z
       .object({
         voice: z.string().optional().describe('Voice name'),
@@ -48,7 +60,23 @@ let synthesizerSchema = z
 
 let transcriberSchema = z
   .object({
-    provider: z.enum(['deepgram', 'bodhi']).optional().describe('ASR provider'),
+    provider: z
+      .enum([
+        'deepgram',
+        'bodhi',
+        'azure',
+        'sarvam',
+        'assembly',
+        'google',
+        'gemini',
+        'openai',
+        'elevenlabs',
+        'smallest',
+        'gladia',
+        'soniox'
+      ])
+      .optional()
+      .describe('ASR provider'),
     model: z.string().optional().describe('Transcription model (e.g. "nova-3")'),
     language: z.string().optional().describe('Language code (e.g. "en", "hi")')
   })
@@ -87,7 +115,7 @@ export let createAgent = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Welcome message spoken when the call connects. Supports {variable} placeholders.'
+          'Welcome message spoken when the call connects. Supports {{variable}} placeholders.'
         ),
       systemPrompt: z
         .string()
@@ -97,6 +125,10 @@ export let createAgent = SlateTool.create(spec, {
         .optional()
         .describe('Webhook URL for receiving call status updates'),
       agentType: z.string().optional().describe('Agent type classification'),
+      telephonyProvider: z
+        .enum(['twilio', 'plivo', 'exotel', 'vobiz', 'sip-trunk'])
+        .optional()
+        .describe('Telephony provider for the conversation pipeline; defaults to plivo'),
       llmConfig: llmConfigSchema,
       synthesizer: synthesizerSchema,
       transcriber: transcriberSchema,
@@ -104,11 +136,25 @@ export let createAgent = SlateTool.create(spec, {
       knowledgeBaseIds: z
         .array(z.string())
         .optional()
-        .describe('Knowledge base IDs to connect to the agent'),
+        .describe(
+          'Processed knowledge base IDs from manage_knowledge_base to connect to the agent'
+        ),
       callingGuardrails: z
         .object({
-          callStartHour: z.number().optional().describe('Earliest hour to make calls (0-23)'),
-          callEndHour: z.number().optional().describe('Latest hour to make calls (0-23)')
+          callStartHour: z
+            .number()
+            .int()
+            .min(0)
+            .max(23)
+            .optional()
+            .describe('Earliest hour to make calls (0-23)'),
+          callEndHour: z
+            .number()
+            .int()
+            .min(0)
+            .max(23)
+            .optional()
+            .describe('Latest hour to make calls (0-23)')
         })
         .optional()
         .describe('Time-based calling restrictions')
@@ -124,9 +170,26 @@ export let createAgent = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let input = ctx.input;
 
+    let { callStartHour, callEndHour } = input.callingGuardrails ?? {};
+    if (
+      callStartHour !== undefined &&
+      callEndHour !== undefined &&
+      callEndHour < callStartHour
+    ) {
+      throw createApiServiceError(
+        'callEndHour must be greater than or equal to callStartHour.'
+      );
+    }
+
     let llmAgent: Record<string, any> = {
       agent_type: input.knowledgeBaseIds?.length ? 'knowledgebase_agent' : 'simple_llm_agent',
-      agent_flow_type: 'streaming'
+      agent_flow_type: 'streaming',
+      llm_config: {
+        provider: 'openai',
+        model: 'gpt-5.4-mini',
+        max_tokens: 150,
+        temperature: 1
+      }
     };
 
     if (input.llmConfig) {
@@ -149,11 +212,51 @@ export let createAgent = SlateTool.create(spec, {
     }
 
     if (input.knowledgeBaseIds?.length) {
-      llmAgent.knowledgebase_id = input.knowledgeBaseIds;
+      let vectorIds: string[] = [];
+      for (let knowledgeBaseId of input.knowledgeBaseIds) {
+        let knowledgeBase = await client.getKnowledgeBase(knowledgeBaseId);
+        if (knowledgeBase.status !== 'processed' || !knowledgeBase.vector_id) {
+          throw createApiServiceError(
+            `Knowledge base ${knowledgeBaseId} is not ready. Use manage_knowledge_base to wait for processed status before creating the agent.`
+          );
+        }
+        vectorIds.push(knowledgeBase.vector_id);
+      }
+      llmAgent.llm_config = {
+        ...llmAgent.llm_config,
+        vector_store: {
+          provider: 'lancedb',
+          provider_config: { vector_ids: vectorIds }
+        }
+      };
     }
 
+    let telephonyProvider = input.telephonyProvider ?? 'plivo';
+    let audioFormat = telephonyProvider === 'sip-trunk' ? 'ulaw' : 'wav';
     let toolsConfig: Record<string, any> = {
-      llm_agent: llmAgent
+      llm_agent: llmAgent,
+      synthesizer: {
+        provider: 'elevenlabs',
+        provider_config: {
+          voice: 'Angelica',
+          voice_id: 'IkSv4tkouLJ6kYsQA7XD',
+          model: 'eleven_turbo_v2_5'
+        },
+        stream: true,
+        buffer_size: 250,
+        audio_format: audioFormat
+      },
+      transcriber: {
+        provider: 'deepgram',
+        model: 'nova-3',
+        language: 'en',
+        stream: true,
+        encoding: 'linear16',
+        sampling_rate: 16000,
+        endpointing: 250
+      },
+      input: { provider: telephonyProvider, format: audioFormat },
+      output: { provider: telephonyProvider, format: audioFormat }
     };
 
     if (input.synthesizer) {
@@ -180,7 +283,7 @@ export let createAgent = SlateTool.create(spec, {
         }),
         ...(input.synthesizer.stream !== undefined && { stream: input.synthesizer.stream }),
         ...(input.synthesizer.bufferSize && { buffer_size: input.synthesizer.bufferSize }),
-        ...(input.synthesizer.audioFormat && { audio_format: input.synthesizer.audioFormat })
+        audio_format: input.synthesizer.audioFormat ?? audioFormat
       };
     }
 
@@ -216,6 +319,10 @@ export let createAgent = SlateTool.create(spec, {
       tasks: [
         {
           task_type: 'conversation',
+          toolchain: {
+            execution: 'parallel',
+            pipelines: [['transcriber', 'llm', 'synthesizer']]
+          },
           tools_config: toolsConfig,
           task_config: taskConfig
         }
@@ -245,7 +352,7 @@ export let createAgent = SlateTool.create(spec, {
     return {
       output: {
         agentId: result.agent_id,
-        status: result.status || 'created'
+        status: result.status || result.state || 'created'
       },
       message: `Created agent **${input.agentName}** with ID \`${result.agent_id}\`.`
     };

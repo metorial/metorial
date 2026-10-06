@@ -10,8 +10,6 @@ import {
   getTokenTransfers,
   getTransactions
 } from './tools';
-import { inboundWebhook, newDexTrades, newTokenTransfers } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     getTransactions,
     getTokenHolders
   ],
-  triggers: [inboundWebhook, newDexTrades, newTokenTransfers]
+  triggers: []
 });

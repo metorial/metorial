@@ -6,11 +6,12 @@ import { spec } from '../spec';
 export let createTransferTool = SlateTool.create(spec, {
   name: 'Create Transfer',
   key: 'create_transfer',
-  description: `Initiate a bank transfer (ACH debit or credit). Requires a prior transfer authorization. The transfer is idempotent — if a transfer with the same authorization ID exists, the existing transfer is returned. Returns the transfer details including status and expected settlement date.`,
+  description: `Initiate a bank transfer (ACH debit or credit). Requires a prior transfer authorization. The transfer is idempotent — if a transfer with the same authorization ID exists, the existing transfer is returned. Returns the confirmed provider receipt and current status; creation is not settlement.`,
   instructions: [
     'You must first create a transfer authorization before creating a transfer.',
     'Amount should be a decimal string, e.g. "10.00".',
-    'Description is limited to 15 characters for RTP or 10 characters for ACH.'
+    'Description is limited to 15 characters for RTP or 10 for ACH. Pass network from the authorization to validate its limit before submission.',
+    'After an ambiguous result, recover with the same authorization; never create a new authorization to retry.'
   ],
   tags: {
     destructive: true
@@ -30,7 +31,13 @@ export let createTransferTool = SlateTool.create(spec, {
       metadata: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Key-value metadata to attach to the transfer')
+        .describe(
+          'Up to 50 ASCII string pairs: keys at most 40 and values at most 500 characters'
+        ),
+      network: z
+        .enum(['ach', 'same-day-ach', 'rtp'])
+        .optional()
+        .describe('Network from the authorization; used for local description validation')
     })
   )
   .output(
@@ -63,7 +70,8 @@ export let createTransferTool = SlateTool.create(spec, {
       authorizationId: ctx.input.authorizationId,
       amount: ctx.input.amount,
       description: ctx.input.description,
-      metadata: ctx.input.metadata
+      metadata: ctx.input.metadata,
+      network: ctx.input.network
     });
 
     let transfer = result.transfer;

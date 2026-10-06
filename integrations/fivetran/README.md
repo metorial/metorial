@@ -1,61 +1,19 @@
-# <img src="https://provider-logos.metorial-cdn.com/fivetran.png" height="20"> Fivetran
+# Fivetran
 
-Manage automated data pipelines that extract data from hundreds of sources and load it into data warehouses, lakes, and other destinations. Create, configure, pause, and monitor connectors (connections) for SaaS apps, databases, events, and files. Manage groups, destinations, and schema configurations including selecting which schemas, tables, and columns to sync. Trigger manual syncs and historical re-syncs. Create and schedule transformations using dbt Core, dbt Cloud, or Coalesce. Manage users, teams, roles, and permissions. Configure webhooks for sync, transformation, and dbt run events. Manage hybrid deployment agents, private links, proxy agents, certificates, log services, and system API keys.
+Manage Fivetran groups, connections, destinations, schema selection, users, teams, transformations and webhook subscriptions. Discover account identity, connector configuration requirements and current role names before provisioning resources or assigning access.
 
-## Tools
+Authenticate with a scoped or system API key and secret. Access follows the key's permissions. `get_account` identifies the authenticating account and, when applicable, its user or system key. `get_user` without an ID works only for a user-oriented key; system keys require an explicit user ID discovered with `list_users`.
 
-### List Connections
+The 45 tools retain all 42 established keys. Lists follow provider cursors and fail on incomplete or non-advancing pagination. Connection status comes from the provider's nested status object. Stored source/destination credentials, webhook signing secrets and arbitrary setup-test diagnostics are omitted from results.
 
-List all connections (connectors) in the Fivetran account, or within a specific group. Returns summary information about each connection including its status, service type, and sync state.
+Connections may be created paused with manual scheduling. Incremental sync, forced rescheduling and historical re-sync are distinct options. Starting or resuming a pipeline can ingest data and incur costs. Deleting a connection removes its configuration; data already written to a destination is retained. Destination/group removal must be planned around their associated resources.
 
-### List Connector Types
+Transformation configuration uses current dbt Core or Quickstart formats. dbt Core configuration contains `project_id`, `name` and `steps`; Quickstart configuration uses a package and connection dependencies. `type` is optional when the configuration identifies it unambiguously. Legacy dbt Cloud or Coalesce payloads are not accepted by this endpoint. Native schedules use INTEGRATED, INTERVAL, CRON or TIME_OF_DAY; lowercase historical values are normalized. Transformations can execute warehouse commands and incur costs.
 
-List all available connector (source) types supported by Fivetran. Use this to discover available services and their IDs when creating new connections.
+Webhook subscriptions may be account- or group-scoped. Inactive subscriptions can be inspected and edited before enabling notification delivery. No automatic event subscriptions are provided by this integration.
 
-### List Groups
-
-List all groups in the Fivetran account. Groups are organizational containers that hold destinations, connectors, users, and other resources.
-
-### Get Connection Schema
-
-Retrieve the schema configuration for a connection, including which schemas, tables, and columns are enabled or disabled for syncing.
-
-### Get Connection
-
-Retrieve full details of a specific connection (connector), including its configuration, status, and setup test results.
-
-### List Destinations
-
-List all destinations in the Fivetran account. Each destination is a data warehouse or storage service that receives synced data from connections.
-
-### Get Group
-
-Retrieve details of a specific group, including its connections and users.
-
-### List Teams
-
-List all teams in the Fivetran account with their roles and descriptions.
-
-### List Transformations
-
-List all transformations in the Fivetran account. Transformations reshape synced data using dbt Core, dbt Cloud, or Coalesce.
-
-### List Users
-
-List all users in the Fivetran account with their roles, status, and contact information.
-
-### List Webhooks
-
-List all webhooks configured in the Fivetran account. Webhooks notify external URLs when events like syncs, transformations, or status changes occur.
-
-### Trigger Sync
-
-Trigger a manual data sync for a connection. Optionally force a full re-sync to reload all historical data. Use this when you need data synced immediately instead of waiting for the scheduled sync.
+[Official API documentation](https://fivetran.com/docs/developer-resources/rest-api/api-reference)
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE)

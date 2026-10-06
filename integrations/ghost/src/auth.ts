@@ -1,122 +1,125 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-import { generateGhostJwt } from './lib/jwt';
+import { GhostAdminClient } from './lib/client';
+import { type GhostAuth, siteUrl } from './lib/connection';
+import { validateAdminKey } from './lib/jwt';
+import { invalid, one } from './lib/schemas';
 
-export let auth = SlateAuth.create()
+const urlInput = z
+  .string()
+  .describe(
+    'Ghost Admin site HTTPS URL, including any site subdirectory. This may differ from the public site URL.'
+  );
+const contentKey = z
+  .string()
+  .optional()
+  .describe(
+    'Optional Content API key for explicit published-content reads. It never grants Admin access.'
+  );
+async function profile(output: GhostAuth) {
+  const client = new GhostAdminClient({
+    domain: output.siteUrl!,
+    apiKey: output.token,
+    contentApiKey: output.contentApiKey,
+    mode: output.authMode
+  });
+  await client.browsePosts({ limit: 1, fields: 'id' });
+  const site = (await client.readSite()).site;
+  let imageUrl: string | undefined;
+  if (site.icon || site.logo) {
+    try {
+      const u = new URL(site.icon ?? site.logo, output.siteUrl);
+      if (u.protocol === 'https:' && !u.username && !u.password) imageUrl = u.href;
+    } catch {
+      throw invalid('Ghost returned an invalid site image URL.');
+    }
+  }
+  return {
+    profile: {
+      id: output.siteUrl!,
+      name: site.title,
+      ...(imageUrl ? { imageUrl } : {})
+    }
+  };
+}
+export const auth = SlateAuth.create()
   .output(
     z.object({
-      token: z
-        .string()
-        .describe('Admin API key in the format {id}:{secret} or a staff access token'),
-      contentApiKey: z
-        .string()
-        .optional()
-        .describe('Content API key for read-only access to published content')
+      token: z.string().describe('Ghost credential'),
+      contentApiKey: z.string().optional(),
+      siteUrl: z.string().optional(),
+      authMode: z.enum(['admin_api_key', 'staff_access_token', 'content_api_key']).optional()
     })
   )
   .addCustomAuth({
     type: 'auth.custom',
     name: 'Admin API Key',
     key: 'admin_api_key',
-
     inputSchema: z.object({
-      adminApiKey: z
-        .string()
-        .describe('Admin API key from Ghost Custom Integration (format: {id}:{secret})'),
-      contentApiKey: z
-        .string()
-        .optional()
-        .describe(
-          'Content API key from Ghost Custom Integration (optional, for read-only content access)'
-        )
+      adminApiKey: z.string().describe('Ghost Custom Integration Admin key as id:hex-secret.'),
+      contentApiKey: contentKey,
+      siteUrl: urlInput
     }),
-
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.adminApiKey,
-          contentApiKey: ctx.input.contentApiKey
-        }
+      const output: GhostAuth = {
+        token: validateAdminKey(ctx.input.adminApiKey),
+        contentApiKey: ctx.input.contentApiKey,
+        siteUrl: siteUrl(ctx.input.siteUrl),
+        authMode: 'admin_api_key'
       };
+      await profile(output);
+      return { output };
     },
-
-    getProfile: async (ctx: any) => {
-      let jwt = await generateGhostJwt(ctx.output.token);
-
-      let http = createAxios({
-        headers: {
-          Authorization: `Ghost ${jwt}`,
-          'Accept-Version': 'v5.0',
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let domain = ctx.config?.adminDomain;
-      if (!domain) {
-        return { profile: {} };
-      }
-
-      let response = await http.get(`https://${domain}/ghost/api/admin/site/`);
-      let site = response.data.site;
-
-      return {
-        profile: {
-          id: domain,
-          name: site?.title ?? domain,
-          imageUrl: site?.icon ?? site?.logo
-        }
-      };
-    }
+    getProfile: async (ctx: { output: GhostAuth }) => profile(ctx.output)
   })
   .addTokenAuth({
     type: 'auth.token',
     name: 'Staff Access Token',
     key: 'staff_access_token',
-
     inputSchema: z.object({
-      staffToken: z.string().describe('Staff access token from your Ghost user settings page'),
+      staffToken: z
+        .string()
+        .describe(
+          'Original staff key as id:hex-secret from the staff profile. Not a previously generated JWT.'
+        ),
+      contentApiKey: contentKey,
+      siteUrl: urlInput
+    }),
+    getOutput: async ctx => {
+      const output: GhostAuth = {
+        token: validateAdminKey(ctx.input.staffToken),
+        contentApiKey: ctx.input.contentApiKey,
+        siteUrl: siteUrl(ctx.input.siteUrl),
+        authMode: 'staff_access_token'
+      };
+      const client = new GhostAdminClient({
+        domain: output.siteUrl!,
+        apiKey: output.token,
+        mode: output.authMode
+      });
+      one(await client.readUser('me'), 'users');
+      return { output };
+    },
+    getProfile: async (ctx: { output: GhostAuth }) => profile(ctx.output)
+  })
+  .addTokenAuth({
+    type: 'auth.token',
+    name: 'Content API Key',
+    key: 'content_api_key',
+    inputSchema: z.object({
       contentApiKey: z
         .string()
-        .optional()
-        .describe(
-          'Content API key from Ghost Custom Integration (optional, for read-only content access)'
-        )
+        .describe('Published-content key from a Ghost Custom Integration.'),
+      siteUrl: urlInput
     }),
-
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.staffToken,
-          contentApiKey: ctx.input.contentApiKey
-        }
+      const output: GhostAuth = {
+        token: ctx.input.contentApiKey,
+        siteUrl: siteUrl(ctx.input.siteUrl),
+        authMode: 'content_api_key'
       };
+      await profile(output);
+      return { output };
     },
-
-    getProfile: async (ctx: any) => {
-      let jwt = await generateGhostJwt(ctx.output.token);
-
-      let http = createAxios({
-        headers: {
-          Authorization: `Ghost ${jwt}`,
-          'Accept-Version': 'v5.0',
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let domain = ctx.config?.adminDomain;
-      if (!domain) {
-        return { profile: {} };
-      }
-
-      let response = await http.get(`https://${domain}/ghost/api/admin/site/`);
-      let site = response.data.site;
-
-      return {
-        profile: {
-          id: domain,
-          name: site?.title ?? domain,
-          imageUrl: site?.icon ?? site?.logo
-        }
-      };
-    }
+    getProfile: async (ctx: { output: GhostAuth }) => profile(ctx.output)
   });

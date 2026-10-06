@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import type { accountSchema } from '../lib/api-schemas';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -31,7 +32,7 @@ let accountOutputSchema = z.object({
   updatedAt: z.string().nullable().optional().describe('Last update timestamp')
 });
 
-let mapAccount = (raw: any) => ({
+let mapAccount = (raw: z.output<typeof accountSchema>) => ({
   accountId: raw.id,
   name: raw.name,
   domain: raw.domain,
@@ -104,28 +105,28 @@ export let createAccount = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       name: ctx.input.name,
       domain: ctx.input.domain
     };
-    if (ctx.input.website) body.website = ctx.input.website;
-    if (ctx.input.description) body.description = ctx.input.description;
-    if (ctx.input.phone) body.phone = ctx.input.phone;
-    if (ctx.input.linkedinUrl) body.linkedin_url = ctx.input.linkedinUrl;
-    if (ctx.input.twitterHandle) body.twitter_handle = ctx.input.twitterHandle;
-    if (ctx.input.street) body.street = ctx.input.street;
-    if (ctx.input.city) body.city = ctx.input.city;
-    if (ctx.input.state) body.state = ctx.input.state;
-    if (ctx.input.postalCode) body.postal_code = ctx.input.postalCode;
-    if (ctx.input.country) body.country = ctx.input.country;
-    if (ctx.input.industry) body.industry = ctx.input.industry;
-    if (ctx.input.companyType) body.company_type = ctx.input.companyType;
-    if (ctx.input.size) body.size = ctx.input.size;
-    if (ctx.input.founded) body.founded = ctx.input.founded;
-    if (ctx.input.revenueRange) body.revenue_range = ctx.input.revenueRange;
-    if (ctx.input.ownerId) body.owner_id = ctx.input.ownerId;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.customFields) body.custom_fields = ctx.input.customFields;
+    if (ctx.input.website !== undefined) body.website = ctx.input.website;
+    if (ctx.input.description !== undefined) body.description = ctx.input.description;
+    if (ctx.input.phone !== undefined) body.phone = ctx.input.phone;
+    if (ctx.input.linkedinUrl !== undefined) body.linkedin_url = ctx.input.linkedinUrl;
+    if (ctx.input.twitterHandle !== undefined) body.twitter_handle = ctx.input.twitterHandle;
+    if (ctx.input.street !== undefined) body.street = ctx.input.street;
+    if (ctx.input.city !== undefined) body.city = ctx.input.city;
+    if (ctx.input.state !== undefined) body.state = ctx.input.state;
+    if (ctx.input.postalCode !== undefined) body.postal_code = ctx.input.postalCode;
+    if (ctx.input.country !== undefined) body.country = ctx.input.country;
+    if (ctx.input.industry !== undefined) body.industry = ctx.input.industry;
+    if (ctx.input.companyType !== undefined) body.company_type = ctx.input.companyType;
+    if (ctx.input.size !== undefined) body.size = ctx.input.size;
+    if (ctx.input.founded !== undefined) body.founded = ctx.input.founded;
+    if (ctx.input.revenueRange !== undefined) body.revenue_range = ctx.input.revenueRange;
+    if (ctx.input.ownerId !== undefined) body.owner_id = ctx.input.ownerId;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.customFields !== undefined) body.custom_fields = ctx.input.customFields;
     if (ctx.input.doNotContact !== undefined) body.do_not_contact = ctx.input.doNotContact;
 
     let account = await client.createAccount(body);
@@ -173,7 +174,7 @@ export let updateAccount = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.domain !== undefined) body.domain = ctx.input.domain;
     if (ctx.input.website !== undefined) body.website = ctx.input.website;
@@ -231,7 +232,7 @@ export let getAccount = SlateTool.create(spec, {
 export let deleteAccount = SlateTool.create(spec, {
   name: 'Delete Account',
   key: 'delete_account',
-  description: `Permanently delete an account (company) from SalesLoft. This action is irreversible.`,
+  description: `Delete an account (company) from Salesloft and remove its connected people from that account. Restoration requires contacting Salesloft support; this does not promise erasure of retained CRM or activity history.`,
   tags: {
     destructive: true,
     readOnly: false

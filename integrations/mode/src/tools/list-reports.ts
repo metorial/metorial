@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ModeClient } from '../lib/client';
-import { getEmbedded, normalizeReport } from '../lib/helpers';
+import { getEmbedded, normalizeReport, pagination, paginationSchema } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listReports = SlateTool.create(spec, {
@@ -9,7 +9,7 @@ export let listReports = SlateTool.create(spec, {
   key: 'list_reports',
   description: `List reports within a Mode workspace. You can filter reports by collection or data source. Supports ordering and filtering by creation or update timestamps.`,
   instructions: [
-    'Provide either a collectionToken or a dataSourceToken to scope the results.'
+    'Use at most one collectionToken or dataSourceToken. Omit both to list workspace reports. An explicit page returns one page; otherwise all pages are read.'
   ],
   tags: {
     readOnly: true
@@ -29,7 +29,7 @@ export let listReports = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Filter expression using created_at or updated_at with gt/lt operators, e.g. "updated_at.gt:2024-01-01"'
+          'Filter expression using created_at or updated_at with gt/lt operators, e.g. "updated_at.gt.2024-01-01T00:00:00Z"'
         ),
       order: z.enum(['asc', 'desc']).optional().describe('Sort order'),
       orderBy: z.enum(['created_at', 'updated_at']).optional().describe('Field to order by'),
@@ -51,15 +51,12 @@ export let listReports = SlateTool.create(spec, {
             lastRunAt: z.string()
           })
         )
-        .describe('List of reports')
+        .describe('List of reports'),
+      pagination: paginationSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let options = {
       filter: ctx.input.filter,
@@ -68,34 +65,19 @@ export let listReports = SlateTool.create(spec, {
       page: ctx.input.page
     };
 
-    let data: any;
-    if (ctx.input.dataSourceToken) {
-      data = await client.listReportsByDataSource(ctx.input.dataSourceToken, options);
-    } else if (ctx.input.collectionToken) {
-      data = await client.listReportsInCollection(ctx.input.collectionToken, options);
-    } else {
-      ctx.warn(
-        'No collectionToken or dataSourceToken provided. Listing reports from all collections.'
-      );
-      data = await client.listCollections({ filter: 'all' });
-      let collections = getEmbedded(data, 'spaces');
-      let allReports: any[] = [];
-      for (let collection of collections.slice(0, 10)) {
-        let collData = await client.listReportsInCollection(collection.token, options);
-        let reports = getEmbedded(collData, 'reports');
-        allReports.push(...reports);
-      }
-      let reports = allReports.map(normalizeReport);
-      return {
-        output: { reports },
-        message: `Found **${reports.length}** reports across collections.`
-      };
-    }
+    if (ctx.input.collectionToken !== undefined && ctx.input.dataSourceToken !== undefined)
+      throw createApiServiceError('Choose only one collectionToken or dataSourceToken.');
+    const data =
+      ctx.input.dataSourceToken !== undefined
+        ? await client.listReportsByDataSource(ctx.input.dataSourceToken, options)
+        : ctx.input.collectionToken !== undefined
+          ? await client.listReportsInCollection(ctx.input.collectionToken, options)
+          : await client.listWorkspaceReports(options);
 
     let reports = getEmbedded(data, 'reports').map(normalizeReport);
 
     return {
-      output: { reports },
+      output: { reports, pagination: pagination(data) },
       message: `Found **${reports.length}** reports.`
     };
   })

@@ -22,8 +22,6 @@ import {
   manageWebhook,
   updateDatabase
 } from './tools';
-import { branchEvents, deployRequestEvents, storageEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     listMembers,
     listAuditLogs
   ] as any,
-  triggers: [branchEvents, deployRequestEvents, storageEvents] as any
+  triggers: []
 });

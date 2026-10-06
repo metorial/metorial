@@ -21,12 +21,12 @@ export let getTemplate = SlateTool.create(spec, {
       templateId: z.string().describe('Template ID'),
       name: z.string().describe('Template name'),
       variables: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .describe('Dynamic variable definitions and their types/defaults')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HeyGenClient({ token: ctx.auth.token });
+    let client = new HeyGenClient(ctx.auth);
 
     let result = await client.getTemplate(ctx.input.templateId);
 

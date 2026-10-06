@@ -4,19 +4,22 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let botQuery = SlateTool.create(spec, {
-  name: 'Bot Query',
+  name: 'Submit Question to Repository Owners',
   key: 'bot_query',
-  description: `Send a query through the Entelligence bot interface. This is useful for automated or integration-based queries where you need to associate a response with a specific user email. Supports conversation history for multi-turn interactions.`,
+  description:
+    'Submit a codebase question and conversation context to repository owners through Entelligence’s Slack integration. This sends an external message and does not generate an AI answer. Use chat_query for an AI response.',
   instructions: [
-    'Provide a userEmail to associate the query with a specific user for tracking purposes.'
+    'Use only when the user requests contacting the repository owners.',
+    'Provide userEmail so the owners can contact the person asking the question.',
+    'A successful submission confirms acceptance, not delivery or a reply.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
     z.object({
-      question: z.string().describe('The question to ask about the codebase'),
+      question: z.string().trim().min(1).describe('The question to send to repository owners'),
       conversationHistory: z
         .array(
           z.object({
@@ -29,13 +32,14 @@ export let botQuery = SlateTool.create(spec, {
       userEmail: z
         .string()
         .optional()
-        .describe('Email address of the user making the query for tracking')
+        .describe('Contact email for the person asking the question')
     })
   )
   .output(
     z.object({
-      answer: z.string().describe('AI-generated answer to the question'),
-      references: z.array(z.string()).describe('Source reference URLs cited in the answer')
+      answer: z.string().describe('Submission response text returned by the provider'),
+      references: z.array(z.string()).describe('Source URLs, empty for owner submissions'),
+      submitted: z.boolean().describe('Whether the provider accepted the owner submission')
     })
   )
   .handleInvocation(async ctx => {
@@ -45,7 +49,7 @@ export let botQuery = SlateTool.create(spec, {
       organization: ctx.config.organization
     });
 
-    ctx.progress('Sending bot query...');
+    ctx.progress('Submitting question to repository owners...');
 
     let result = await client.sendSlackQuery({
       question: ctx.input.question,
@@ -55,7 +59,8 @@ export let botQuery = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `**Answer:**\n\n${result.answer}`
+      message:
+        'Entelligence accepted the question for submission to repository owners. This does not confirm delivery or a reply.'
     };
   })
   .build();

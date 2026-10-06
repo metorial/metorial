@@ -1,17 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientForContext } from '../lib/client';
 import { spec } from '../spec';
 
 export let listGroups = SlateTool.create(spec, {
   name: 'List Groups',
   key: 'list_groups',
-  description: `List all database groups in the organization. Groups are logical containers for databases with regional replication.`,
+  description: `Choose an organization with list_organizations. List all database groups in the organization. Groups are logical containers for databases with regional replication.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      organizationSlug: z
+        .string()
+        .optional()
+        .describe(
+          'Organization slug. Call list_organizations to discover authorized organizations; older connections may use their saved organization.'
+        )
+    })
+  )
   .output(
     z.object({
       groups: z.array(
@@ -20,19 +29,17 @@ export let listGroups = SlateTool.create(spec, {
           groupUuid: z.string().describe('Unique identifier of the group'),
           locations: z
             .array(z.string())
+            .optional()
             .describe('All locations where the group has replicas'),
           primary: z.string().describe('Primary location of the group'),
-          archived: z.boolean().describe('Whether the group is archived'),
-          version: z.string().describe('Group version')
+          archived: z.boolean().optional().describe('Whether the group is archived'),
+          version: z.string().optional().describe('Group version')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    const client = clientForContext(ctx);
 
     let result = await client.listGroups();
 

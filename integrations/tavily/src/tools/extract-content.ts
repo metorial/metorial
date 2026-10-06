@@ -70,6 +70,13 @@ export let extractContent = SlateTool.create(spec, {
           })
         )
         .describe('URLs that could not be extracted'),
+      requestId: z.string().optional().describe('Native request identifier when returned'),
+      usageCredits: z
+        .number()
+        .optional()
+        .describe(
+          'Native credits reported for this request; zero may reflect batched billing'
+        ),
       responseTime: z.number().describe('Time to complete the request in seconds')
     })
   )
@@ -96,6 +103,8 @@ export let extractContent = SlateTool.create(spec, {
       output: {
         results: result.results,
         failedResults: result.failedResults,
+        requestId: result.requestId,
+        usageCredits: result.usageCredits,
         responseTime: result.responseTime
       },
       message: `Extracted content from **${successCount}** URL${successCount !== 1 ? 's' : ''}${failedCount > 0 ? ` (${failedCount} failed)` : ''} in ${result.responseTime.toFixed(2)}s.`

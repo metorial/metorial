@@ -15,6 +15,13 @@ export let getOnCall = SlateTool.create(spec, {
   .input(
     z.object({
       scope: z.enum(['organization', 'user', 'team']).describe('Scope of the on-call query'),
+      step: z
+        .number()
+        .int()
+        .min(0)
+        .max(3)
+        .optional()
+        .describe('Escalation step index for team schedule'),
       username: z
         .string()
         .optional()
@@ -26,11 +33,11 @@ export let getOnCall = SlateTool.create(spec, {
       daysForward: z
         .number()
         .optional()
-        .describe('Number of days forward to retrieve the team schedule for'),
+        .describe('Number of days forward to retrieve the team schedule for; 0 to 123'),
       daysSkip: z
         .number()
         .optional()
-        .describe('Number of days to skip before the schedule window')
+        .describe('Number of days to skip before the schedule window; 0 to 90')
     })
   )
   .output(
@@ -54,7 +61,7 @@ export let getOnCall = SlateTool.create(spec, {
     switch (ctx.input.scope) {
       case 'organization': {
         let data = await client.getCurrentOnCall();
-        let teamsOnCall = data?.teamsOnCall ?? [];
+        let teamsOnCall = data.teamsOnCall;
         return {
           output: { teamsOnCall },
           message: `Retrieved on-call roster for **${teamsOnCall.length}** team(s).`
@@ -72,7 +79,8 @@ export let getOnCall = SlateTool.create(spec, {
       case 'team': {
         let schedule = await client.getTeamOnCallSchedule(ctx.input.teamSlug ?? '', {
           daysForward: ctx.input.daysForward,
-          daysSkip: ctx.input.daysSkip
+          daysSkip: ctx.input.daysSkip,
+          step: ctx.input.step
         });
         return {
           output: { schedule },

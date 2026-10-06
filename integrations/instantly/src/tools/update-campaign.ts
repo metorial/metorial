@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateCampaign = SlateTool.create(spec, {
@@ -9,7 +9,8 @@ export let updateCampaign = SlateTool.create(spec, {
   description: `Update a campaign's settings. Can modify name, schedule, daily limits, tracking options, and other configuration. Also supports launching (activating) or pausing a campaign by setting the desired action.`,
   instructions: [
     'To launch a campaign, set action to "activate". To pause it, set action to "pause".',
-    'Only provide the fields you want to change; unspecified fields remain unchanged.'
+    'Only provide the fields you want to change; unspecified fields remain unchanged.',
+    'Activating or resuming a campaign can send real emails. sendingAccounts replaces the entire sender list; provide every sender to retain.'
   ]
 })
   .input(
@@ -20,6 +21,12 @@ export let updateCampaign = SlateTool.create(spec, {
         .optional()
         .describe('Launch or pause the campaign.'),
       name: z.string().optional().describe('New campaign name.'),
+      sendingAccounts: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Complete replacement list of sending-account email addresses. An empty array removes all senders.'
+        ),
       dailyLimit: z.number().optional().describe('Daily email sending limit.'),
       stopOnReply: z.boolean().optional().describe('Stop sending when a reply is received.'),
       stopOnAutoReply: z
@@ -49,6 +56,8 @@ export let updateCampaign = SlateTool.create(spec, {
 
     let updatePayload: Record<string, any> = {};
     if (fields.name !== undefined) updatePayload.name = fields.name;
+    if (fields.sendingAccounts !== undefined)
+      updatePayload.email_list = fields.sendingAccounts;
     if (fields.dailyLimit !== undefined) updatePayload.daily_limit = fields.dailyLimit;
     if (fields.stopOnReply !== undefined) updatePayload.stop_on_reply = fields.stopOnReply;
     if (fields.stopOnAutoReply !== undefined)
@@ -59,11 +68,13 @@ export let updateCampaign = SlateTool.create(spec, {
     if (fields.campaignSchedule !== undefined)
       updatePayload.campaign_schedule = fields.campaignSchedule;
 
-    let result: any;
+    if (!action && Object.keys(updatePayload).length === 0)
+      throw invalid('Provide settings to update or an activate/pause action.');
 
-    if (Object.keys(updatePayload).length > 0) {
-      result = await client.updateCampaign(campaignId, updatePayload);
-    }
+    let result =
+      Object.keys(updatePayload).length > 0
+        ? await client.updateCampaign(campaignId, updatePayload)
+        : undefined;
 
     if (action === 'activate') {
       result = await client.activateCampaign(campaignId);
@@ -71,9 +82,7 @@ export let updateCampaign = SlateTool.create(spec, {
       result = await client.pauseCampaign(campaignId);
     }
 
-    if (!result) {
-      result = await client.getCampaign(campaignId);
-    }
+    if (!result) throw invalid('No campaign update was submitted.');
 
     return {
       output: {

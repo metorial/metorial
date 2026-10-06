@@ -22,14 +22,6 @@ import {
   revokeCredential,
   verifyCredential
 } from './tools';
-import {
-  credentialEvents,
-  didEvents,
-  proofEvents,
-  registryEvents,
-  schemaEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -54,5 +46,5 @@ export let provider = Slate.create({
     listProfiles,
     getJob
   ],
-  triggers: [credentialEvents, didEvents, registryEvents, schemaEvents, proofEvents]
+  triggers: []
 });

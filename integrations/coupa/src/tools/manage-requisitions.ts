@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoupaClient } from '../lib/client';
+import { customFields, decimal, page, pageFields } from '../lib/contracts';
 import { spec } from '../spec';
 
 let requisitionOutputSchema = z.object({
@@ -15,7 +16,7 @@ let requisitionOutputSchema = z.object({
   justification: z.string().nullable().optional().describe('Requisition justification'),
   createdAt: z.string().nullable().optional().describe('Creation timestamp'),
   updatedAt: z.string().nullable().optional().describe('Last update timestamp'),
-  rawData: z.any().optional().describe('Complete raw requisition data')
+  rawData: z.any().optional().describe('Native data with documented credential fields omitted')
 });
 
 export let searchRequisitions = SlateTool.create(spec, {
@@ -54,14 +55,12 @@ export let searchRequisitions = SlateTool.create(spec, {
   .output(
     z.object({
       requisitions: z.array(requisitionOutputSchema).describe('List of matching requisitions'),
-      count: z.number().describe('Number of requisitions returned')
+      count: z.number().describe('Number of requisitions returned'),
+      ...pageFields
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let filters: Record<string, string> = {};
     if (ctx.input.filters) {
@@ -82,7 +81,7 @@ export let searchRequisitions = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let requisitions = (Array.isArray(results) ? results : []).map((r: any) => ({
+    let requisitions = results.map((r: any) => ({
       requisitionId: r.id,
       requisitionNumber: r['requisition-number'] ?? r.requisition_number ?? null,
       status: r.status ?? null,
@@ -90,7 +89,7 @@ export let searchRequisitions = SlateTool.create(spec, {
       department: r.department ?? null,
       currency: r.currency ?? null,
       requisitionLines: r['requisition-lines'] ?? r.requisition_lines ?? null,
-      totalAmount: r.total ?? r.total ?? null,
+      totalAmount: r.total ?? null,
       justification: r.justification ?? null,
       createdAt: r['created-at'] ?? r.created_at ?? null,
       updatedAt: r['updated-at'] ?? r.updated_at ?? null,
@@ -100,7 +99,8 @@ export let searchRequisitions = SlateTool.create(spec, {
     return {
       output: {
         requisitions,
-        count: requisitions.length
+        count: requisitions.length,
+        ...page(requisitions.length, ctx.input)
       },
       message: `Found **${requisitions.length}** requisition(s).`
     };
@@ -131,8 +131,20 @@ export let createRequisition = SlateTool.create(spec, {
         .array(
           z.object({
             description: z.string().describe('Line item description'),
-            quantity: z.number().describe('Quantity'),
-            unitPrice: z.number().describe('Unit price'),
+            quantity: z.number().optional().describe('Quantity'),
+            quantityDecimal: z
+              .string()
+              .optional()
+              .describe(
+                'Exact plain decimal quantity; omit the numeric alias for high precision'
+              ),
+            unitPrice: z.number().optional().describe('Unit price'),
+            unitPriceDecimal: z
+              .string()
+              .optional()
+              .describe(
+                'Exact plain decimal unitPrice; omit the numeric alias for high precision'
+              ),
             needByDate: z.string().optional().describe('Need-by date (ISO 8601)'),
             supplierId: z.number().optional().describe('Preferred supplier ID'),
             commodity: z.object({ name: z.string() }).optional().describe('Commodity'),
@@ -141,22 +153,25 @@ export let createRequisition = SlateTool.create(spec, {
         )
         .min(1)
         .describe('Requisition lines'),
+      customFieldsGlobalNamespace: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use true for existing global custom fields (legacy default); false places fields under the modern custom-fields namespace'
+        ),
       customFields: z.record(z.string(), z.any()).optional().describe('Custom field values')
     })
   )
   .output(requisitionOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let payload: any = {
       'requisition-lines': ctx.input.requisitionLines.map((line, idx) => {
         let rl: any = {
           description: line.description,
-          quantity: String(line.quantity),
-          'unit-price': String(line.unitPrice),
+          quantity: decimal(line.quantity, line.quantityDecimal, 'quantity'),
+          'unit-price': decimal(line.unitPrice, line.unitPriceDecimal, 'unit price'),
           'line-num': idx + 1
         };
         if (line.needByDate) rl['need-by-date'] = line.needByDate;
@@ -174,11 +189,11 @@ export let createRequisition = SlateTool.create(spec, {
     if (ctx.input.shipToAddress)
       payload['ship-to-address'] = { id: ctx.input.shipToAddress.addressId };
 
-    if (ctx.input.customFields) {
-      for (let [key, value] of Object.entries(ctx.input.customFields)) {
-        payload[key] = value;
-      }
-    }
+    customFields(
+      payload,
+      ctx.input.customFields,
+      ctx.input.customFieldsGlobalNamespace ?? true
+    );
 
     let result = await client.createRequisition(payload);
 
@@ -191,7 +206,7 @@ export let createRequisition = SlateTool.create(spec, {
         department: result.department ?? null,
         currency: result.currency ?? null,
         requisitionLines: result['requisition-lines'] ?? result.requisition_lines ?? null,
-        totalAmount: result.total ?? result.total ?? null,
+        totalAmount: result.total ?? null,
         justification: result.justification ?? null,
         createdAt: result['created-at'] ?? result.created_at ?? null,
         updatedAt: result['updated-at'] ?? result.updated_at ?? null,

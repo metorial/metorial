@@ -1,103 +1,70 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invalidInput } from '../lib/errors';
+import { createAndRead, jobMessage, singleResult } from '../lib/jobs';
+import { singleFileOutput, sourceUrl, tagInput, waitInput } from '../lib/schemas';
+import type { Tasks } from '../lib/validation';
 import { spec } from '../spec';
 
-export let generateThumbnail = SlateTool.create(spec, {
+export const generateThumbnail = SlateTool.create(spec, {
   name: 'Generate Thumbnail',
   key: 'generate_thumbnail',
-  description: `Generate a PNG, JPG, or WEBP thumbnail from a video, document, or image file.
-
-Useful for creating preview images, document thumbnails, or video frames.`,
-  tags: {
-    destructive: false,
-    readOnly: false
-  }
+  description:
+    'Generate PNG, JPG, or WEBP thumbnails from a video, document, or image and provide the resulting downloadable files.',
+  constraints: [
+    'Production processing can consume conversion credits. Sandbox only accepts whitelisted files.',
+    'Download result files before the job is deleted, normally 24 hours after completion.'
+  ],
+  tags: { destructive: false, readOnly: false }
 })
   .input(
     z.object({
-      sourceUrl: z.string().describe('URL of the source file'),
-      inputFormat: z
+      sourceUrl,
+      inputFormat: z.string().min(1).optional(),
+      outputFormat: z.enum(['png', 'jpg', 'webp']).default('png'),
+      width: z.number().int().positive().optional(),
+      height: z.number().int().positive().optional(),
+      fit: z
         .string()
         .optional()
-        .describe('Input file format (auto-detected if omitted)'),
-      outputFormat: z
-        .enum(['png', 'jpg', 'webp'])
-        .default('png')
-        .describe('Thumbnail output format'),
-      width: z.number().optional().describe('Thumbnail width in pixels'),
-      height: z.number().optional().describe('Thumbnail height in pixels'),
-      fit: z.string().optional().describe('Fit mode: "max", "crop", "scale", or "contain"'),
-      timestamp: z
-        .string()
-        .optional()
-        .describe('Timestamp for video thumbnails (e.g., "00:00:05")'),
-      tag: z.string().optional().describe('Tag to label the job'),
-      waitForCompletion: z
-        .boolean()
-        .optional()
-        .default(true)
-        .describe('Wait for thumbnail generation to complete')
+        .describe('max, crop, scale, or contain; support depends on the input format.'),
+      timestamp: z.string().optional().describe('Video timestamp such as 00:00:05.'),
+      tag: tagInput,
+      waitForCompletion: waitInput
     })
   )
-  .output(
-    z.object({
-      jobId: z.string().describe('ID of the thumbnail job'),
-      status: z.string().describe('Current status of the job'),
-      resultUrl: z.string().optional().describe('Temporary download URL for the thumbnail'),
-      resultFilename: z.string().optional().describe('Filename of the thumbnail')
-    })
-  )
+  .output(singleFileOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let thumbnailTask: Record<string, any> = {
+    if (
+      ctx.input.fit !== undefined &&
+      !['max', 'crop', 'scale', 'contain'].includes(ctx.input.fit)
+    )
+      throw invalidInput('Choose a supported thumbnail fit mode.');
+    if (
+      ctx.input.timestamp !== undefined &&
+      !/^\d{2,}:\d{2}:\d{2}(?:\.\d+)?$/.test(ctx.input.timestamp)
+    )
+      throw invalidInput('timestamp must use HH:MM:SS, optionally with fractional seconds.');
+    const task: Record<string, unknown> = {
       operation: 'thumbnail',
       input: ['import-file'],
       output_format: ctx.input.outputFormat
     };
-
-    if (ctx.input.inputFormat) thumbnailTask.input_format = ctx.input.inputFormat;
-    if (ctx.input.width) thumbnailTask.width = ctx.input.width;
-    if (ctx.input.height) thumbnailTask.height = ctx.input.height;
-    if (ctx.input.fit) thumbnailTask.fit = ctx.input.fit;
-    if (ctx.input.timestamp) thumbnailTask.timestamp = ctx.input.timestamp;
-
-    let tasks: Record<string, any> = {
-      'import-file': {
-        operation: 'import/url',
-        url: ctx.input.sourceUrl
-      },
-      'generate-thumbnail': thumbnailTask,
-      'export-file': {
-        operation: 'export/url',
-        input: ['generate-thumbnail']
-      }
+    const fields = {
+      input_format: ctx.input.inputFormat,
+      width: ctx.input.width,
+      height: ctx.input.height,
+      fit: ctx.input.fit,
+      timestamp: ctx.input.timestamp
     };
-
-    let job = await client.createJob(tasks, ctx.input.tag);
-
-    if (ctx.input.waitForCompletion) {
-      job = await client.waitForJob(job.id);
-    }
-
-    let exportTask = (job.tasks ?? []).find((t: any) => t.operation === 'export/url');
-    let resultFile = exportTask?.result?.files?.[0];
-
-    return {
-      output: {
-        jobId: job.id,
-        status: job.status,
-        resultUrl: resultFile?.url,
-        resultFilename: resultFile?.filename
-      },
-      message:
-        job.status === 'finished'
-          ? `Thumbnail generated as **${ctx.input.outputFormat.toUpperCase()}**. ${resultFile?.url ? `Download: ${resultFile.url}` : ''}`
-          : `Thumbnail job created (status: ${job.status}).`
+    for (const [key, value] of Object.entries(fields))
+      if (value !== undefined) task[key] = value;
+    const tasks: Tasks = {
+      'import-file': { operation: 'import/url', url: ctx.input.sourceUrl },
+      'generate-thumbnail': task,
+      'export-file': { operation: 'export/url', input: ['generate-thumbnail'] }
     };
+    const job = await createAndRead(ctx, tasks, ctx.input);
+    return { output: singleResult(job), message: jobMessage(job, 'Generate Thumbnail') };
   })
   .build();

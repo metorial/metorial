@@ -1,18 +1,25 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientForContext } from '../lib/client';
 import { spec } from '../spec';
 
 export let createGroupToken = SlateTool.create(spec, {
+  tags: { readOnly: false },
   name: 'Create Group Token',
   key: 'create_group_token',
-  description: `Generate an authentication token for all databases in a group. Group tokens grant access to every database within the group. Supports read-only access and custom expiration.`,
+  description: `Choose an organization with list_organizations. Generate an authentication token for all databases in a group. These SQL tokens grant access to every database within the group; they are different from group-scoped Platform API tokens. Supports read-only access and custom expiration.`,
   instructions: [
     'Expiration format examples: "2w1d30m" for 2 weeks 1 day 30 minutes, "never" for no expiration.'
   ]
 })
   .input(
     z.object({
+      organizationSlug: z
+        .string()
+        .optional()
+        .describe(
+          'Organization slug. Call list_organizations to discover authorized organizations; older connections may use their saved organization.'
+        ),
       groupName: z.string().describe('Name of the group to generate a token for'),
       expiration: z
         .string()
@@ -30,10 +37,7 @@ export let createGroupToken = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    const client = clientForContext(ctx);
 
     let result = await client.createGroupToken(ctx.input.groupName, {
       expiration: ctx.input.expiration,

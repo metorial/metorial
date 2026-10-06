@@ -1,10 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, safeChannels } from '../lib/client';
 import { spec } from '../spec';
 
 let channelSchema = z.object({
-  integration: z.string().describe('Alert integration type: email, webhook, or pagerduty'),
+  integration: z
+    .string()
+    .describe('Alert integration type: email, webhook, slack, or pagerduty'),
   emails: z.array(z.string()).optional().describe('Email addresses for email alerts'),
   url: z.string().optional().describe('Webhook URL'),
   method: z.string().optional().describe('HTTP method for webhook'),
@@ -31,7 +33,8 @@ let alertOutputSchema = z.object({
 export let listPresetAlerts = SlateTool.create(spec, {
   name: 'List Preset Alerts',
   key: 'list_preset_alerts',
-  description: `List all preset (account-wide) alerts. Preset alerts apply globally across all log data, unlike view-specific alerts.`,
+  description:
+    'List reusable preset alert configurations. Attach a preset to a saved view to apply its notification configuration.',
   tags: { destructive: false, readOnly: true }
 })
   .input(z.object({}))
@@ -41,16 +44,20 @@ export let listPresetAlerts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let alerts = await client.listPresetAlerts();
-    let alertList = Array.isArray(alerts) ? alerts : [];
+    let alertList = alerts;
 
     return {
       output: {
-        alerts: alertList.map((a: any) => ({
-          alertId: a.presetID || a.id || '',
+        alerts: alertList.map(a => ({
+          alertId: a.presetID,
           name: a.name,
-          channels: a.channels
+          channels: safeChannels(a.channels)
         }))
       },
       message: `Found **${alertList.length}** preset alert(s).`
@@ -61,7 +68,8 @@ export let listPresetAlerts = SlateTool.create(spec, {
 export let createPresetAlert = SlateTool.create(spec, {
   name: 'Create Preset Alert',
   key: 'create_preset_alert',
-  description: `Create a new account-wide preset alert with one or more notification channels (email, webhook, or PagerDuty). Preset alerts are global and not tied to a specific view.`,
+  description:
+    'Create a reusable preset alert with notification channels for saved views. Attach the returned alert ID to a view using create_view or update_view.',
   tags: { destructive: false, readOnly: false }
 })
   .input(
@@ -72,7 +80,11 @@ export let createPresetAlert = SlateTool.create(spec, {
   )
   .output(alertOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let a = await client.createPresetAlert({
       name: ctx.input.name,
       channels: ctx.input.channels
@@ -80,11 +92,42 @@ export let createPresetAlert = SlateTool.create(spec, {
 
     return {
       output: {
-        alertId: a.presetID || a.id || '',
+        alertId: a.presetID,
         name: a.name,
-        channels: a.channels
+        channels: safeChannels(a.channels)
       },
       message: `Created preset alert **${a.name || ctx.input.name}**.`
+    };
+  })
+  .build();
+
+export let getPresetAlert = SlateTool.create(spec, {
+  name: 'Get Preset Alert',
+  key: 'get_preset_alert',
+  description:
+    'Read a reusable preset alert configuration by ID. Call list_preset_alerts to discover available alert IDs. Notification credentials are omitted.',
+  tags: { destructive: false, readOnly: true }
+})
+  .input(
+    z.object({
+      alertId: z.string().describe('Preset alert ID. Call list_preset_alerts to discover IDs.')
+    })
+  )
+  .output(alertOutputSchema)
+  .handleInvocation(async ctx => {
+    const client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
+    const alert = await client.getPresetAlert(ctx.input.alertId);
+    return {
+      output: {
+        alertId: alert.presetID,
+        name: alert.name,
+        channels: safeChannels(alert.channels)
+      },
+      message: `Retrieved preset alert **${alert.name ?? alert.presetID}**.`
     };
   })
   .build();
@@ -104,17 +147,21 @@ export let updatePresetAlert = SlateTool.create(spec, {
   )
   .output(alertOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
-    let updates: any = {};
-    if (ctx.input.name) updates.name = ctx.input.name;
-    if (ctx.input.channels) updates.channels = ctx.input.channels;
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
+    let updates: { name?: string; channels?: typeof ctx.input.channels } = {};
+    if (ctx.input.name !== undefined) updates.name = ctx.input.name;
+    if (ctx.input.channels !== undefined) updates.channels = ctx.input.channels;
     let a = await client.updatePresetAlert(ctx.input.alertId, updates);
 
     return {
       output: {
-        alertId: a.presetID || a.id || ctx.input.alertId,
+        alertId: a.presetID,
         name: a.name,
-        channels: a.channels
+        channels: safeChannels(a.channels)
       },
       message: `Updated preset alert **${a.name || ctx.input.alertId}**.`
     };
@@ -138,7 +185,11 @@ export let deletePresetAlert = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     await client.deletePresetAlert(ctx.input.alertId);
 
     return {

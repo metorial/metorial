@@ -1,13 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema, queuedShape } from '../lib/schemas';
 import { spec } from '../spec';
 
 let lineItemSchema = z.object({
   productId: z.string().optional().describe('Product ID.'),
   sku: z.string().optional().describe('SKU.'),
+  productVariantId: z
+    .string()
+    .optional()
+    .describe('Product variant ID; use productId for a product with one variant.'),
   name: z.string().describe('Product name.'),
-  price: z.number().describe('Price in cents or dollars depending on provider.'),
+  price: z
+    .number()
+    .describe('Price in currency units, such as dollars for USD; do not send cents.'),
   quantity: z.number().optional().describe('Quantity purchased.'),
   categories: z.array(z.string()).optional().describe('Product categories.'),
   imageUrl: z.string().optional().describe('Product image URL.'),
@@ -44,6 +51,13 @@ export let manageOrder = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
+      initialStatus: z
+        .enum(['active', 'unsubscribed'])
+        .optional()
+        .describe(
+          'Initial subscriber status. If omitted, shopper activity can subscribe a person and trigger automations.'
+        ),
       email: z.string().describe('Subscriber email address.'),
       provider: z
         .string()
@@ -68,13 +82,16 @@ export let manageOrder = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      recorded: z.boolean().describe('Whether the order was recorded.')
+      recorded: z
+        .boolean()
+        .describe('False when processing is only accepted and not independently confirmed.'),
+      ...queuedShape
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 
@@ -85,13 +102,14 @@ export let manageOrder = SlateTool.create(spec, {
       order_id: ctx.input.orderId
     };
 
+    if (ctx.input.initialStatus !== undefined) order.initial_status = ctx.input.initialStatus;
     if (ctx.input.grandTotal !== undefined) order.grand_total = ctx.input.grandTotal;
     if (ctx.input.totalDiscounts !== undefined)
       order.total_discounts = ctx.input.totalDiscounts;
     if (ctx.input.totalTaxes !== undefined) order.total_taxes = ctx.input.totalTaxes;
     if (ctx.input.totalFees !== undefined) order.total_fees = ctx.input.totalFees;
     if (ctx.input.totalShipping !== undefined) order.total_shipping = ctx.input.totalShipping;
-    if (ctx.input.currencyCode) order.currency_code = ctx.input.currencyCode;
+    if (ctx.input.currencyCode) order.currency = ctx.input.currencyCode;
     if (ctx.input.orderUrl) order.order_url = ctx.input.orderUrl;
     if (ctx.input.occurredAt) order.occurred_at = ctx.input.occurredAt;
     if (ctx.input.refundAmount !== undefined) order.refund_amount = ctx.input.refundAmount;
@@ -99,6 +117,7 @@ export let manageOrder = SlateTool.create(spec, {
     if (ctx.input.items) {
       order.items = ctx.input.items.map(item => ({
         product_id: item.productId,
+        product_variant_id: item.productVariantId ?? item.productId,
         sku: item.sku,
         name: item.name,
         price: item.price,
@@ -119,7 +138,7 @@ export let manageOrder = SlateTool.create(spec, {
         address_2: ctx.input.billingAddress.address2,
         city: ctx.input.billingAddress.city,
         state: ctx.input.billingAddress.state,
-        zip: ctx.input.billingAddress.zip,
+        postal_code: ctx.input.billingAddress.zip,
         country: ctx.input.billingAddress.country,
         phone: ctx.input.billingAddress.phone
       };
@@ -135,17 +154,24 @@ export let manageOrder = SlateTool.create(spec, {
         address_2: ctx.input.shippingAddress.address2,
         city: ctx.input.shippingAddress.city,
         state: ctx.input.shippingAddress.state,
-        zip: ctx.input.shippingAddress.zip,
+        postal_code: ctx.input.shippingAddress.zip,
         country: ctx.input.shippingAddress.country,
         phone: ctx.input.shippingAddress.phone
       };
     }
 
-    await client.createOrUpdateOrder(order);
+    const result = await client.createOrUpdateOrder(order);
 
     return {
-      output: { recorded: true },
-      message: `Order **${ctx.input.orderId}** (${ctx.input.action}) recorded for **${ctx.input.email}**.`
+      output: {
+        recorded: false,
+        accepted: true,
+        completed: false,
+        requestIds: result.request_ids,
+        partialErrors: result.errors
+      },
+      message:
+        'Drip accepted the order activity for background processing; completion is unconfirmed.'
     };
   })
   .build();

@@ -1,76 +1,18 @@
-# Slates Specification for Formbricks
+# Formbricks API coverage
 
-## Overview
+20 public tools: 17 retained keys plus `get_response`, `get_contact`, and `list_contact_attribute_keys`. All input schemas remain top-level objects. All historical fields/types/enums remain; unsupported historical behavior returns actionable validation. Three attribute-class tools are deprecated; no triggers are registered.
 
-Formbricks is an open-source experience management and survey platform. It allows users to create and distribute surveys across websites, apps, email, and links, and collect responses with user targeting and segmentation. It can be self-hosted or used via its cloud offering.
+| Area | Native contract |
+| --- | --- |
+| Auth/context | `x-api-key`, auth-owned instance origin, bare single-workspace `GET /api/v1/management/me`; identity is workspace context, not a verified person. Saved auth origin takes precedence. Legacy token-only records use a validated stored configuration origin. |
+| Surveys | v1 list/get/POST/PUT/DELETE; native survey paging uses limit/offset; environmentId remains an accepted workspace alias. Questions remain supported and derived from blocks in reads. Required question flags/IDs and ending IDs are respected. Partial survey changes preserve omitted fields; empty updates are refused. |
+| Responses | v1 list/get/POST/PUT/DELETE; native paging uses limit/skip. Creation derives required workspace from an exact survey read. Answer values follow native string/number/string-array/string-object shapes. Native updates merge answer keys. |
+| Contacts | v1 list/get; omitted attributes remain omitted. Existing pagination selects a local slice because the v1 reference does not document native contact paging. |
+| Action classes | v1 list/POST/DELETE; code key and branch-specific noCodeConfig required. Automatic creation is unsupported. Exact mutation receipts are checked. |
+| Attribute keys | v1 list of native keys including nullable names; no attribute-definition writes invented. Historical attribute-classes routes are absent from the official router inventory. |
 
-## Authentication
+Upstream requests are bounded, prohibit redirects, and use a static ServiceError adapter with numeric upstream status and suppressed transport ancestry. Complete write inputs and successful payloads are validated before mapping; configured raw, URL-encoded, Base64, Base64url and wrapped credential reflections are refused. Explicit native null response attributes take precedence over historical aliases. These local guards do not establish universal secrecy for shared pre-adapter HTTP traces.
 
-Formbricks provides two APIs: the Public Client API and the Management API. Each API serves a different purpose and has different authentication requirements.
+Write failures or incomplete receipts may follow an already committed provider operation. Inspect the provider's exact record and audit history before retrying; do not assume rollback. Deleting responses can delete associated response files/displays on the provider, while pipelines, follow-up messages, and audit history remain. Private tests use only synthetic open-text data and refuse cleanup if ownership, empty response inventory, or unattached action associations cannot be established.
 
-**Public Client API:**
-The Public Client API does not require authentication. It is designed for client-side interactions and does not expose sensitive information. It requires only an `environmentId` to identify the Formbricks project environment.
-
-**Management API (primary integration API):**
-The Management API provides access to all data and settings that your account has access to in the Formbricks app. It requires a personal API Key for authentication, which can be generated in the Settings section of the Formbricks app.
-
-- The API key is passed via the `x-api-key` header.
-- The API key gives you the same rights as if you were logged in at formbricks.com.
-- You create a key for the development or production environment. Copy the key immediately — you won't be able to see it again.
-- Base URL for the cloud-hosted version: `https://app.formbricks.com/api/v1/` (v1) or `https://app.formbricks.com/api/v2/` (v2 beta). Self-hosted instances use their own domain.
-
-Example authentication header:
-
-```
-x-api-key: <your-api-key>
-```
-
-## Features
-
-### Survey Management
-
-The Management API supports creating and managing surveys. You can list, create, update, and delete surveys programmatically. The platform allows for flexible survey management: adding different question types, setting up validation and restrictions for respondents, using hidden fields, or distributing them via single-use links.
-
-### Response Management
-
-The API supports handling responses. You can list responses for a survey, create responses, update existing responses, and delete responses. Responses include metadata such as user agent, country, source URL, and time-to-completion per question.
-
-### Contact & People Management
-
-You can list and manage contacts (people) who have interacted with your surveys. You can retrieve a contact's state including their segments, displays, responses and other tracking information. If the contact doesn't exist, it will be created. The API also supports bulk uploading contacts and managing contact attribute keys.
-
-### Contact Segmentation & Survey Links
-
-You can generate personalized survey links for contacts in a segment. This enables targeted survey distribution to specific user cohorts. Generated links can have configurable expiration periods.
-
-### Action Classes
-
-You can create, list, and delete action classes. Actions represent user behaviors (e.g., page visits, button clicks) that can serve as triggers to display surveys to users.
-
-### Attribute Classes
-
-You can create, list, and delete attribute classes. Attributes define custom properties on contacts/people used for segmentation and targeting.
-
-### File Storage
-
-The API supports uploading public files, which can be used within surveys or other platform features.
-
-### Account Information
-
-You can retrieve information about the authenticated account, including project details and environment type via the `/me` endpoint.
-
-## Events
-
-Formbricks supports webhooks that deliver real-time HTTP notifications when specific objects change in your environment, allowing you to trigger automated actions based on these events.
-
-Webhooks can be created and managed both through the Formbricks UI and via the Management API. Formbricks implements the Standard Webhooks specification with HMAC signature verification for security.
-
-### Response Events
-
-Formbricks provides the following webhook events: `responseCreated`, `responseUpdated`, and `responseFinished`.
-
-- **responseCreated** — Fires when a new response is started for a survey (may be partial/incomplete).
-- **responseUpdated** — Fires when an existing response is updated (e.g., additional questions answered).
-- **responseFinished** — Fires when a response is fully completed.
-
-Each webhook can be scoped to specific surveys, so you only receive events for surveys you care about. The webhook payload includes the full response data, survey metadata, contact information, and the event type.
+Official sources: [v1 API](https://formbricks.com/docs/api-reference/rest-api), [single-workspace me source](https://github.com/formbricks/formbricks/blob/main/apps/web/app/api/v1/management/me/route.ts), [survey alias and paging source](https://github.com/formbricks/formbricks/blob/main/apps/web/app/api/v1/management/surveys/route.ts), [response route and pipeline](https://github.com/formbricks/formbricks/blob/main/apps/web/app/api/v1/management/responses/route.ts), [response merge/deletion source](https://github.com/formbricks/formbricks/blob/main/apps/web/lib/response/service.ts), [action requirements](https://formbricks.com/docs/api-reference/management-api--action-class/create-action-class), [contact key discovery](https://formbricks.com/docs/api-reference/management-api--contact-attribute-keys/get-all-contact-attribute-keys), [current router inventory](https://github.com/formbricks/formbricks/tree/main/apps/web/app/api/v1/management).

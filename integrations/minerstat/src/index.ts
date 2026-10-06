@@ -13,13 +13,6 @@ import {
   manageTagsTool,
   manageWorkerTool
 } from './tools';
-import {
-  inboundWebhook,
-  workerHashrateDropTrigger,
-  workerStatusChangeTrigger,
-  workerTemperatureAlertTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -35,10 +28,5 @@ export let provider = Slate.create({
     manageCustomersTool,
     manageClockTuneTool
   ],
-  triggers: [
-    inboundWebhook,
-    workerStatusChangeTrigger,
-    workerTemperatureAlertTrigger,
-    workerHashrateDropTrigger
-  ]
+  triggers: []
 });

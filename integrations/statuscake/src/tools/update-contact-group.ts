@@ -28,7 +28,10 @@ export let updateContactGroup = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Integration IDs for third-party integrations'),
-      pingUrl: z.string().optional().describe('Webhook URL to receive alert notifications')
+      pingUrl: z
+        .string()
+        .optional()
+        .describe('Endpoint URL to receive alert notifications via HTTP GET')
     })
   )
   .output(
@@ -40,7 +43,7 @@ export let updateContactGroup = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { groupId, emailAddresses, mobileNumbers, pingUrl, ...rest } = ctx.input;
 
-    let data: Record<string, any> = { ...rest };
+    let data: Record<string, unknown> = { ...rest };
     if (emailAddresses) data.email_addresses = emailAddresses;
     if (mobileNumbers) data.mobile_numbers = mobileNumbers;
     if (pingUrl !== undefined) data.ping_url = pingUrl;

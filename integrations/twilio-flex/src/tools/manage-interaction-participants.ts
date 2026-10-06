@@ -1,19 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FlexClient } from '../lib/client';
+import { fail, validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageInteractionParticipantsTool = SlateTool.create(spec, {
   name: 'Manage Interaction Participants',
   key: 'manage_interaction_participants',
-  description: `Add, remove, or list participants in a Flex interaction channel. Use this to invite agents, transfer conversations between agents, or remove participants from a channel.`,
+  description: `Add, remove, or list participants in a Flex interaction channel. Add requires the native Type and MediaProperties payload, with optional RoutingProperties. Closing a participant changes its task/reservation state and retains history; it does not delete the interaction.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque continuation from nextPageToken; retain the same resource and filters.'
+        ),
       action: z.enum(['add', 'remove', 'list']).describe('Action to perform'),
       interactionSid: z.string().describe('Interaction SID'),
       channelSid: z.string().describe('Channel SID within the interaction'),
@@ -34,6 +41,11 @@ export let manageInteractionParticipantsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Native continuation; omitted when this page is exhausted.'),
+      hasMore: z.boolean().optional().describe('Whether a next page is available.'),
       participants: z
         .array(
           z.object({
@@ -47,7 +59,8 @@ export let manageInteractionParticipantsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FlexClient(ctx.auth.token);
+    validateInput('manage_interaction_participants', ctx.input);
+    let client = new FlexClient(ctx.auth.token, ctx.auth.accountSid, ctx.input.pageToken);
 
     if (ctx.input.action === 'list') {
       let result = await client.listInteractionChannelParticipants(
@@ -61,7 +74,7 @@ export let manageInteractionParticipantsTool = SlateTool.create(spec, {
         channelSid: p.channel_sid
       }));
       return {
-        output: { participants },
+        output: { participants, nextPageToken: result.nextPageToken, hasMore: result.hasMore },
         message: `Found **${participants.length}** participants in interaction channel.`
       };
     }
@@ -70,10 +83,10 @@ export let manageInteractionParticipantsTool = SlateTool.create(spec, {
       let params: Record<string, string | undefined> = {
         Type: ctx.input.participantType || 'agent'
       };
-      if (ctx.input.mediaProperties) {
+      if (ctx.input.mediaProperties !== undefined) {
         params.MediaProperties = JSON.stringify(ctx.input.mediaProperties);
       }
-      if (ctx.input.routingAttributes) {
+      if (ctx.input.routingAttributes !== undefined) {
         params.RoutingProperties = JSON.stringify(ctx.input.routingAttributes);
       }
 
@@ -99,7 +112,7 @@ export let manageInteractionParticipantsTool = SlateTool.create(spec, {
 
     // Remove
     if (!ctx.input.participantSid) {
-      throw new Error('participantSid is required when removing a participant');
+      throw fail('participantSid is required when removing a participant');
     }
     await client.updateInteractionChannelParticipant(
       ctx.input.interactionSid,
@@ -118,7 +131,7 @@ export let manageInteractionParticipantsTool = SlateTool.create(spec, {
           }
         ]
       },
-      message: `Removed participant **${ctx.input.participantSid}** from interaction channel.`
+      message: `Closed participant **${ctx.input.participantSid}** in the interaction channel; history and downstream effects remain.`
     };
   })
   .build();

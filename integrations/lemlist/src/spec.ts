@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'lemlist',
   name: 'Lemlist',
   description:
-    'Sales engagement and outreach platform for creating and automating personalized email and LinkedIn campaigns with lead management, multichannel sequences, contact enrichment, and a people database for prospecting.',
+    'Manage outreach campaigns and their leads, inspect campaign sequences and statistics, read activity history and team credits, discover database filters and search for people, and manage current variable or contact opt-outs.',
   metadata: {},
   config,
   auth

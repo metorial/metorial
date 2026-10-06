@@ -6,14 +6,16 @@ import { spec } from '../spec';
 export let replaceBackground = SlateTool.create(spec, {
   name: 'Replace Background & Relight',
   key: 'replace_background',
-  description: `Replace the background of an image while keeping the main subject intact, with optional lighting adjustments. This is an **async operation** that submits a job and polls for the result.
+  description: `DEPRECATED — use \`transform_image\` instead. Replace the background of an image while keeping the main subject intact, with optional lighting adjustments. This is an **async operation** that submits a job and polls for the result.
 Can provide a text prompt for the new background or upload a reference background image. Supports lighting controls via direction, strength, and reference images.`,
   instructions: [
+    'Use transform_image to receive a downloadable file with current generation controls.',
     'Provide either a backgroundPrompt or backgroundReference (or both) to define the new background.',
     'Use lightSourceDirection and lightSourceStrength to control lighting on the subject.',
     'The operation is asynchronous and may take up to a few minutes to complete.'
   ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }
@@ -106,9 +108,7 @@ Can provide a text prompt for the new background or upload a reference backgroun
 
     ctx.progress(`Job submitted. Generation ID: ${generationId}. Polling for result...`);
 
-    let result = await client.pollAsyncResult(
-      `/v2beta/stable-image/edit/replace-background-and-relight/result/${generationId}`
-    );
+    let result = await client.pollAsyncResult(`/v2beta/results/${generationId}`);
 
     return {
       output: result,

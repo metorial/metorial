@@ -12,7 +12,7 @@ export let manageTeam = SlateTool.create(spec, {
     'Use action "list_members" or "list_admins" to view team composition.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -61,8 +61,8 @@ export let manageTeam = SlateTool.create(spec, {
       case 'list': {
         let data = await client.listTeams();
         return {
-          output: { teams: data ?? [] },
-          message: `Found **${(data ?? []).length}** team(s).`
+          output: { teams: data },
+          message: `Found **${data.length}** team(s).`
         };
       }
 
@@ -102,7 +102,7 @@ export let manageTeam = SlateTool.create(spec, {
 
       case 'list_members': {
         let data = await client.getTeamMembers(ctx.input.teamSlug ?? '');
-        let members = data?.members ?? [];
+        let members = data.members;
         return {
           output: { members },
           message: `Team **${ctx.input.teamSlug}** has **${members.length}** member(s).`
@@ -111,7 +111,7 @@ export let manageTeam = SlateTool.create(spec, {
 
       case 'list_admins': {
         let data = await client.getTeamAdmins(ctx.input.teamSlug ?? '');
-        let admins = data?.admins ?? [];
+        let admins = data.teamAdmins;
         return {
           output: { admins },
           message: `Team **${ctx.input.teamSlug}** has **${admins.length}** admin(s).`

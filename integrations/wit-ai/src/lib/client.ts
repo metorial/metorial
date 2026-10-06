@@ -1,13 +1,48 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+type EntityRole = string | { id?: string; name: string };
+export const mapEntityRoles = (roles: EntityRole[] | undefined) => ({
+  roles: roles?.map(role => (typeof role === 'string' ? role : role.name)),
+  roleDetails: roles?.map(role =>
+    typeof role === 'string' ? { name: role } : { roleId: role.id, name: role.name }
+  )
+});
 
 export class Client {
   private axios;
 
   constructor(private params: { token: string; apiVersion: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://api.wit.ai'
+    if (!params.token.trim()) {
+      throw createApiServiceError('A Wit.ai Server Access Token is required.');
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.wit.ai',
+      timeout: 60_000,
+      authHeader: { value: `Bearer ${params.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Wit.ai',
+          reason: 'wit_ai_api_error'
+        })
     });
-    this.axios.defaults.headers.common.Authorization = `Bearer ${params.token}`;
+    this.axios.interceptors.response.use(response => {
+      if (isApiErrorRecord(response.data) && response.data.error) {
+        throw buildApiServiceError(
+          { response },
+          {
+            providerLabel: 'Wit.ai',
+            reason: 'wit_ai_api_error'
+          }
+        );
+      }
+      return response;
+    });
   }
 
   private get v() {
@@ -20,7 +55,7 @@ export class Client {
 
   async message(q: string, options?: { n?: number; context?: Record<string, unknown> }) {
     let params: Record<string, unknown> = { v: this.v, q };
-    if (options?.n) params.n = options.n;
+    if (options?.n !== undefined) params.n = options.n;
     if (options?.context) params.context = JSON.stringify(options.context);
 
     let res = await this.axios.get('/message', { params });
@@ -33,7 +68,7 @@ export class Client {
 
   async detectLanguage(q: string, n?: number) {
     let params: Record<string, unknown> = { v: this.v, q };
-    if (n) params.n = n;
+    if (n !== undefined) params.n = n;
 
     let res = await this.axios.get('/language', { params });
     return res.data;
@@ -53,7 +88,9 @@ export class Client {
   }
 
   async getApp(appId: string) {
-    let res = await this.axios.get(`/apps/${appId}`, { params: { v: this.v } });
+    let res = await this.axios.get(`/apps/${encodeURIComponent(appId)}`, {
+      params: { v: this.v }
+    });
     return res.data;
   }
 
@@ -63,12 +100,18 @@ export class Client {
   }
 
   async updateApp(appId: string, app: Record<string, unknown>) {
-    let res = await this.axios.put(`/apps/${appId}`, app, { params: { v: this.v } });
+    if (!Object.keys(app).length)
+      throw createApiServiceError('Provide at least one app field to update.');
+    let res = await this.axios.put(`/apps/${encodeURIComponent(appId)}`, app, {
+      params: { v: this.v }
+    });
     return res.data;
   }
 
   async deleteApp(appId: string) {
-    let res = await this.axios.delete(`/apps/${appId}`, { params: { v: this.v } });
+    let res = await this.axios.delete(`/apps/${encodeURIComponent(appId)}`, {
+      params: { v: this.v }
+    });
     return res.data;
   }
 
@@ -77,26 +120,38 @@ export class Client {
   // ──────────────────────────────────────────────
 
   async listAppTags(appId: string) {
-    let res = await this.axios.get(`/apps/${appId}/tags`, { params: { v: this.v } });
+    let res = await this.axios.get(`/apps/${encodeURIComponent(appId)}/tags`, {
+      params: { v: this.v }
+    });
     return res.data;
   }
 
   async getAppTag(appId: string, tagName: string) {
-    let res = await this.axios.get(`/apps/${appId}/tags/${tagName}`, {
-      params: { v: this.v }
-    });
+    let res = await this.axios.get(
+      `/apps/${encodeURIComponent(appId)}/tags/${encodeURIComponent(tagName)}`,
+      {
+        params: { v: this.v }
+      }
+    );
     return res.data;
   }
 
   async createAppTag(appId: string, tag: string) {
-    let res = await this.axios.post(`/apps/${appId}/tags`, { tag }, { params: { v: this.v } });
+    let res = await this.axios.post(
+      `/apps/${encodeURIComponent(appId)}/tags`,
+      { tag },
+      { params: { v: this.v } }
+    );
     return res.data;
   }
 
   async deleteAppTag(appId: string, tagName: string) {
-    let res = await this.axios.delete(`/apps/${appId}/tags/${tagName}`, {
-      params: { v: this.v }
-    });
+    let res = await this.axios.delete(
+      `/apps/${encodeURIComponent(appId)}/tags/${encodeURIComponent(tagName)}`,
+      {
+        params: { v: this.v }
+      }
+    );
     return res.data;
   }
 
@@ -110,7 +165,9 @@ export class Client {
   }
 
   async getIntent(intentName: string) {
-    let res = await this.axios.get(`/intents/${intentName}`, { params: { v: this.v } });
+    let res = await this.axios.get(`/intents/${encodeURIComponent(intentName)}`, {
+      params: { v: this.v }
+    });
     return res.data;
   }
 
@@ -120,7 +177,9 @@ export class Client {
   }
 
   async deleteIntent(intentName: string) {
-    let res = await this.axios.delete(`/intents/${intentName}`, { params: { v: this.v } });
+    let res = await this.axios.delete(`/intents/${encodeURIComponent(intentName)}`, {
+      params: { v: this.v }
+    });
     return res.data;
   }
 
@@ -151,10 +210,20 @@ export class Client {
   }
 
   async updateEntity(entityId: string, entity: Record<string, unknown>) {
-    let res = await this.axios.put(`/entities/${encodeURIComponent(entityId)}`, entity, {
-      params: { v: this.v }
-    });
-    return res.data;
+    if (!Object.keys(entity).length) {
+      throw createApiServiceError('Provide at least one entity field to update.');
+    }
+    let current = await this.getEntity(entityId);
+    await this.axios.put(
+      `/entities/${encodeURIComponent(entityId)}`,
+      {
+        name: current.name,
+        roles: mapEntityRoles(current.roles).roles,
+        ...entity
+      },
+      { params: { v: this.v } }
+    );
+    return this.getEntity(typeof entity.name === 'string' ? entity.name : entityId);
   }
 
   async deleteEntity(entityId: string) {
@@ -259,12 +328,16 @@ export class Client {
   // Utterances (Training Data / Samples)
   // ──────────────────────────────────────────────
 
-  async listUtterances(limit?: number, offset?: number) {
+  async listUtterances(limit?: number, offset?: number, intents?: string[]) {
     let params: Record<string, unknown> = { v: this.v };
     if (limit !== undefined) params.limit = limit;
     if (offset !== undefined) params.offset = offset;
 
-    let res = await this.axios.get('/utterances', { params });
+    if (intents?.length) params.intents = intents;
+    let res = await this.axios.get('/utterances', {
+      params,
+      paramsSerializer: { indexes: null }
+    });
     return res.data;
   }
 
@@ -306,6 +379,21 @@ export class Client {
     return res.data;
   }
 
+  async getExportUri() {
+    let result = await this.exportApp();
+    let uri = typeof result === 'string' ? result : result?.uri;
+    let url: URL;
+    try {
+      url = new URL(uri);
+    } catch {
+      throw createApiServiceError('Wit.ai did not return a valid app export URL.');
+    }
+    if (url.protocol !== 'https:') {
+      throw createApiServiceError('Wit.ai did not return a secure app export URL.');
+    }
+    return url.href;
+  }
+
   // ──────────────────────────────────────────────
   // Voices (for Synthesis)
   // ──────────────────────────────────────────────
@@ -331,6 +419,6 @@ export class Client {
       params: { v: this.v },
       responseType: 'arraybuffer'
     });
-    return res.data;
+    return res;
   }
 }

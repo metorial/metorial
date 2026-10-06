@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import type { Secret, Vault } from '../lib/models';
 import { spec } from '../spec';
 
 let refSchema = z
@@ -23,7 +24,7 @@ let secretOutputSchema = z.object({
   vaultName: z.string().describe('Vault name')
 });
 
-let mapSecret = (s: any) => ({
+let mapSecret = (s: Secret) => ({
   secretId: s.id,
   uri: s.uri || '',
   createdAt: s.created_at || '',
@@ -45,7 +46,7 @@ let vaultOutputSchema = z.object({
   metadata: z.string().describe('Metadata')
 });
 
-let mapVault = (v: any) => ({
+let mapVault = (v: Vault) => ({
   vaultId: v.id,
   uri: v.uri || '',
   createdAt: v.created_at || '',
@@ -63,8 +64,17 @@ export let listVaults = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -76,6 +86,7 @@ export let listVaults = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listVaults({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -147,7 +158,7 @@ export let updateVault = SlateTool.create(spec, {
 export let deleteVault = SlateTool.create(spec, {
   name: 'Delete Vault',
   key: 'delete_vault',
-  description: `Delete a vault and all secrets it contains.`,
+  description: `Delete a vault. Remove its owned secrets first; the provider may reject deletion of a nonempty vault.`,
   tags: { destructive: true }
 })
   .input(
@@ -178,8 +189,17 @@ export let listSecrets = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -191,6 +211,7 @@ export let listSecrets = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listSecrets({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput, validateBase64 } from '../lib/validation';
 import { spec } from '../spec';
 
 let wikiPageOutputSchema = z.object({
@@ -25,10 +26,10 @@ export let listWikiPages = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page')
     })
   )
   .output(
@@ -37,7 +38,7 @@ export let listWikiPages = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let pages = await client.listWikiPages(ctx.input.owner, ctx.input.repo, {
       page: ctx.input.page,
       limit: ctx.input.limit
@@ -68,14 +69,14 @@ export let getWikiPage = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      pageName: z.string().describe('Wiki page name/title')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      pageName: z.string().min(1).describe('Wiki page name/title')
     })
   )
   .output(wikiPageOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let p = await client.getWikiPage(ctx.input.owner, ctx.input.repo, ctx.input.pageName);
 
     return {
@@ -102,8 +103,8 @@ export let createWikiPage = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       title: z.string().describe('Wiki page title'),
       contentBase64: z.string().describe('Base64-encoded page content (Markdown)'),
       commitMessage: z.string().optional().describe('Custom commit message')
@@ -111,10 +112,10 @@ export let createWikiPage = SlateTool.create(spec, {
   )
   .output(wikiPageOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let p = await client.createWikiPage(ctx.input.owner, ctx.input.repo, {
       title: ctx.input.title,
-      contentBase64: ctx.input.contentBase64,
+      contentBase64: validateBase64(ctx.input.contentBase64),
       message: ctx.input.commitMessage
     });
 
@@ -142,9 +143,9 @@ export let updateWikiPage = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      pageName: z.string().describe('Current wiki page name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      pageName: z.string().min(1).describe('Current wiki page name'),
       title: z.string().optional().describe('New page title'),
       contentBase64: z.string().optional().describe('New base64-encoded content'),
       commitMessage: z.string().optional().describe('Custom commit message')
@@ -152,10 +153,19 @@ export let updateWikiPage = SlateTool.create(spec, {
   )
   .output(wikiPageOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    if (
+      !Object.entries(ctx.input).some(
+        ([key, value]) => !['owner', 'repo', 'pageName'].includes(key) && value !== undefined
+      )
+    )
+      throw createApiServiceError('Provide page content or a title to update.');
+    let client = new GiteaClient(ctx.auth);
     let p = await client.updateWikiPage(ctx.input.owner, ctx.input.repo, ctx.input.pageName, {
       title: ctx.input.title,
-      contentBase64: ctx.input.contentBase64,
+      contentBase64:
+        ctx.input.contentBase64 === undefined
+          ? undefined
+          : validateBase64(ctx.input.contentBase64),
       message: ctx.input.commitMessage
     });
 
@@ -183,9 +193,9 @@ export let deleteWikiPage = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      pageName: z.string().describe('Wiki page name to delete')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      pageName: z.string().min(1).describe('Wiki page name to delete')
     })
   )
   .output(
@@ -194,7 +204,7 @@ export let deleteWikiPage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     await client.deleteWikiPage(ctx.input.owner, ctx.input.repo, ctx.input.pageName);
 
     return {

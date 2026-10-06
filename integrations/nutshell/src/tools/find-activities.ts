@@ -16,7 +16,9 @@ export let findActivities = SlateTool.create(spec, {
       query: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Filter criteria for activities'),
+        .describe(
+          'Documented filters such as leadId, contactId, activityTypeId, status, or startTime; relationship filters use numeric IDs'
+        ),
       orderBy: z.string().optional().describe('Field to sort by'),
       orderDirection: z.enum(['ASC', 'DESC']).optional().describe('Sort direction'),
       limit: z.number().optional().describe('Number of results per page (default: 50)'),
@@ -57,7 +59,7 @@ export let findActivities = SlateTool.create(spec, {
       stubResponses: ctx.input.stubResponses
     });
 
-    let activities = results.map((a: any) => ({
+    let activities = results.map(a => ({
       activityId: a.id,
       name: a.name,
       status: a.status,

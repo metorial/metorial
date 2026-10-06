@@ -1,13 +1,16 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  deleteError,
   getError,
   getErrorTrends,
   getEvent,
+  getOrganization,
   getPivots,
   getProject,
   getStability,
   listErrors,
+  listEventFields,
   listEvents,
   listOrganizations,
   listProjects,
@@ -18,11 +21,12 @@ import {
   manageSavedSearches,
   updateError
 } from './tools';
-import { errorEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getOrganization,
+    listEventFields,
+    deleteError,
     listOrganizations,
     listProjects,
     getProject,
@@ -40,5 +44,5 @@ export let provider = Slate.create({
     getPivots,
     manageSavedSearches
   ],
-  triggers: [errorEvents]
+  triggers: []
 });

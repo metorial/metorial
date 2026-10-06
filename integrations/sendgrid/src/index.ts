@@ -36,8 +36,6 @@ import {
   updateTemplate,
   upsertContacts
 } from './tools';
-import { emailEvents, inboundEmail } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -76,5 +74,5 @@ export let provider = Slate.create({
     resendSenderVerification.build(),
     listEventWebhooks.build()
   ],
-  triggers: [emailEvents.build(), inboundEmail.build()]
+  triggers: []
 });

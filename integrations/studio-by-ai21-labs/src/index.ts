@@ -5,7 +5,10 @@ import {
   contextualAnswer,
   conversationalRag,
   deleteFile,
+  downloadFile,
   getFile,
+  getFileUrl,
+  getMaestroRun,
   grammarCheck,
   listFiles,
   maestroRun,
@@ -15,17 +18,20 @@ import {
   summarizeBySegment,
   textCompletion,
   textImprovements,
-  updateFile
+  updateFile,
+  uploadFile
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
   tools: [
     chatCompletion,
     maestroRun,
+    getMaestroRun,
     conversationalRag,
+    uploadFile,
+    downloadFile,
+    getFileUrl,
     listFiles,
     getFile,
     updateFile,
@@ -39,5 +45,5 @@ export let provider = Slate.create({
     contextualAnswer,
     textCompletion
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

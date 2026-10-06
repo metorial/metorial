@@ -1,12 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { createdId, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageRole = SlateTool.create(spec, {
   name: 'Manage Role',
   key: 'manage_role',
   description: `Create, update, or delete a role with specific permission sets. Roles control access to features and resources within Klipfolio.`,
+  constraints: [
+    'Updating permissions replaces the complete permission set and immediately affects every user assigned this role.'
+  ],
   instructions: [
     'Use action "create" to define a new role, "update" to modify, "delete" to remove, or "get" to retrieve details.',
     'Permissions follow the format "category.action" (e.g., "dashboard.library", "klip.build", "user.manage").'
@@ -34,10 +38,11 @@ export let manageRole = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.roleId) throw new Error('roleId is required');
+      if (!ctx.input.roleId) throw createApiServiceError('roleId is required');
       let role = await client.getRole(ctx.input.roleId, true);
       let permissions = await client.getRolePermissions(ctx.input.roleId);
 
@@ -58,7 +63,8 @@ export let manageRole = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required when creating a role');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required when creating a role');
 
       let result = await client.createRole({
         name: ctx.input.name,
@@ -66,8 +72,7 @@ export let manageRole = SlateTool.create(spec, {
         permissions: ctx.input.permissions
       });
 
-      let location = result?.meta?.location;
-      let roleId = location ? location.split('/').pop() : undefined;
+      let roleId = createdId(result, 'roles');
 
       return {
         output: {
@@ -82,7 +87,16 @@ export let manageRole = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.roleId) throw new Error('roleId is required when updating');
+      if (
+        ctx.input.name === undefined &&
+        ctx.input.description === undefined &&
+        ctx.input.permissions === undefined
+      )
+        throw createApiServiceError(
+          'Provide at least one supported field or association to update.',
+          { reason: 'invalid_input' }
+        );
+      if (!ctx.input.roleId) throw createApiServiceError('roleId is required when updating');
 
       await client.updateRole(ctx.input.roleId, {
         name: ctx.input.name,
@@ -103,7 +117,7 @@ export let manageRole = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.roleId) throw new Error('roleId is required when deleting');
+      if (!ctx.input.roleId) throw createApiServiceError('roleId is required when deleting');
       await client.deleteRole(ctx.input.roleId);
 
       return {
@@ -112,6 +126,6 @@ export let manageRole = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

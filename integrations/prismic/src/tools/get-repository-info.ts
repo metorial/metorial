@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ContentApiClient } from '../lib/client';
+import { protect } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getRepositoryInfo = SlateTool.create(spec, {
@@ -50,8 +51,15 @@ Useful for discovering what content types and tags exist before querying documen
     })
   )
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     let client = new ContentApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       accessToken: ctx.auth.token
     });
 

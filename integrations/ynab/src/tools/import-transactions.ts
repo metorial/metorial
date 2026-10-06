@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { budgetInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let importTransactions = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let importTransactions = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      budgetId: z.string().optional().describe('Budget ID. Defaults to the configured budget.')
+      budgetId: budgetInput
     })
   )
   .output(
@@ -22,15 +23,12 @@ export let importTransactions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let budgetId = ctx.input.budgetId ?? ctx.config.budgetId;
-
-    let result = await client.importTransactions(budgetId);
-    let transactionIds = result?.transaction_ids ?? [];
-
+    const result = await new Client({ token: ctx.auth.token }).importTransactions(
+      ctx.input.budgetId ?? ctx.config.budgetId
+    );
     return {
-      output: { transactionIds },
-      message: `Imported **${transactionIds.length}** transaction(s) from linked accounts`
+      output: { transactionIds: result.transaction_ids },
+      message: `YNAB reported ${result.transaction_ids.length} imported transaction(s). Matching and bank-import history can be retained.`
     };
   })
   .build();

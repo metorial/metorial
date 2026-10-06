@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listAuditLogs = SlateTool.create(spec, {
@@ -14,11 +15,15 @@ export let listAuditLogs = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organization: z
-        .string()
+      organization: organizationInput,
+      startTime: z
+        .number()
+        .describe('Unix timestamp in seconds — return events newer than this time'),
+      endTime: z
+        .number()
         .optional()
-        .describe('Organization name (uses default from config if not set)'),
-      startTime: z.number().describe('Unix timestamp — return events newer than this time'),
+        .describe('End time in Unix seconds, at or after startTime'),
+      eventFilter: z.string().optional().describe('Provider audit event-type filter'),
       userFilter: z.string().optional().describe('Filter events by username'),
       continuationToken: z
         .string()
@@ -38,26 +43,27 @@ export let listAuditLogs = SlateTool.create(spec, {
           userLogin: z.string().optional()
         })
       ),
-      continuationToken: z.string().optional()
+      continuationToken: z.string().optional(),
+      returnedCount: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
 
     let result = await client.listAuditLogs(org, {
       startTime: ctx.input.startTime,
       userFilter: ctx.input.userFilter,
-      continuationToken: ctx.input.continuationToken
+      continuationToken: ctx.input.continuationToken,
+      endTime: ctx.input.endTime,
+      eventFilter: ctx.input.eventFilter
     });
 
-    let events = (result.auditLogEvents || []).map((e: any) => ({
+    let events = result.auditLogEvents.map(e => ({
       timestamp: e.timestamp,
       sourceIP: e.sourceIP,
       event: e.event,
@@ -69,7 +75,8 @@ export let listAuditLogs = SlateTool.create(spec, {
     return {
       output: {
         events,
-        continuationToken: result.continuationToken
+        continuationToken: result.continuationToken,
+        returnedCount: events.length
       },
       message: `Retrieved **${events.length}** audit log event(s) for organization **${org}**${result.continuationToken ? ' (more available)' : ''}`
     };

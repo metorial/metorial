@@ -4,7 +4,10 @@ import { PlaidClient } from '../lib/client';
 import { spec } from '../spec';
 
 let creditLiabilitySchema = z.object({
-  accountId: z.string().describe('Account ID'),
+  accountId: z
+    .string()
+    .nullable()
+    .describe('Account ID, or null when not provided by the institution'),
   isOverdue: z.boolean().nullable().optional().describe('Whether the account is overdue'),
   lastPaymentAmount: z.number().nullable().optional().describe('Last payment amount'),
   lastPaymentDate: z.string().nullable().optional().describe('Last payment date'),
@@ -35,7 +38,10 @@ let creditLiabilitySchema = z.object({
 });
 
 let studentLoanSchema = z.object({
-  accountId: z.string().describe('Account ID'),
+  accountId: z
+    .string()
+    .nullable()
+    .describe('Account ID, or null when not provided by the institution'),
   loanName: z.string().nullable().optional().describe('Name of the loan'),
   interestRatePercentage: z.number().nullable().optional().describe('Interest rate'),
   isOverdue: z.boolean().nullable().optional(),
@@ -94,9 +100,9 @@ export let getLiabilitiesTool = SlateTool.create(spec, {
     });
 
     let result = await client.getLiabilities(ctx.input.accessToken, ctx.input.accountIds);
-    let liabilities = result.liabilities || {};
+    let liabilities = result.liabilities;
 
-    let credit = (liabilities.credit || []).map((c: any) => ({
+    let credit = (liabilities.credit || []).map(c => ({
       accountId: c.account_id,
       isOverdue: c.is_overdue ?? null,
       lastPaymentAmount: c.last_payment_amount ?? null,
@@ -105,14 +111,14 @@ export let getLiabilitiesTool = SlateTool.create(spec, {
       lastStatementIssueDate: c.last_statement_issue_date ?? null,
       minimumPaymentAmount: c.minimum_payment_amount ?? null,
       nextPaymentDueDate: c.next_payment_due_date ?? null,
-      aprs: (c.aprs || []).map((a: any) => ({
+      aprs: c.aprs.map(a => ({
         aprPercentage: a.apr_percentage,
         aprType: a.apr_type,
         balanceSubjectToApr: a.balance_subject_to_apr ?? null
       }))
     }));
 
-    let student = (liabilities.student || []).map((s: any) => ({
+    let student = (liabilities.student || []).map(s => ({
       accountId: s.account_id,
       loanName: s.loan_name ?? null,
       interestRatePercentage: s.interest_rate_percentage ?? null,
@@ -128,7 +134,7 @@ export let getLiabilitiesTool = SlateTool.create(spec, {
       repaymentPlanType: s.repayment_plan?.type ?? null
     }));
 
-    let mortgage = (liabilities.mortgage || []).map((m: any) => ({
+    let mortgage = (liabilities.mortgage || []).map(m => ({
       accountId: m.account_id,
       loanTerm: m.loan_term ?? null,
       interestRatePercentage: m.interest_rate?.percentage ?? null,

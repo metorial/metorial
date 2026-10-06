@@ -22,8 +22,6 @@ import {
   upsertCustomer,
   upsertTenant
 } from './tools';
-import { customerEvents, messageEvents, threadEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     manageCustomerGroups,
     listCustomerGroups
   ],
-  triggers: [threadEvents, messageEvents, customerEvents]
+  triggers: []
 });

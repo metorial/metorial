@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deletePipeline = SlateTool.create(spec, {
@@ -16,6 +17,7 @@ export let deletePipeline = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...organizationInput,
       pipelineSlug: z.string().describe('Slug of the pipeline to delete')
     })
   )
@@ -25,10 +27,7 @@ export let deletePipeline = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     await client.deletePipeline(ctx.input.pipelineSlug);
 

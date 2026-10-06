@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConversationsClient } from '../lib/conversations-client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let sendConversationMessageTool = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let sendConversationMessageTool = SlateTool.create(spec, {
   key: 'send_conversation_message',
   description: `Send a message in a Twilio Conversation. Supports text messages and can optionally specify the author identity. Use this to programmatically send messages within an active conversation thread.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -36,13 +37,13 @@ export let sendConversationMessageTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ConversationsClient(ctx.auth.token);
+    validateInput('send_conversation_message', ctx.input);
+    let client = new ConversationsClient(ctx.auth.token, ctx.auth.accountSid);
 
     let params: Record<string, string | undefined> = {
       Body: ctx.input.body,
       Author: ctx.input.author,
       Attributes: ctx.input.attributes,
-      MediaContentType: ctx.input.mediaContentType,
       MediaSid: ctx.input.mediaSid
     };
 

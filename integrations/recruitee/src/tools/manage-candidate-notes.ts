@@ -1,34 +1,27 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RecruiteeClient } from '../lib/client';
+import { fail, integer } from '../lib/validation';
 import { spec } from '../spec';
-
 export let manageCandidateNotes = SlateTool.create(spec, {
   name: 'Manage Candidate Notes',
   key: 'manage_candidate_notes',
-  description: `List, create, or delete notes on a candidate profile. Notes are used for internal comments, interview feedback, and collaboration between team members.`,
-  tags: {
-    readOnly: false
-  }
+  description:
+    'List, create a team-visible note, or delete an exact note from a candidate. Deletion verifies the note belongs to that candidate and is absent from the subsequent list.',
+  tags: { readOnly: false }
 })
   .input(
     z.object({
-      action: z.enum(['list', 'create', 'delete']).describe('Action to perform'),
-      candidateId: z.number().describe('ID of the candidate'),
-      noteBody: z
-        .string()
-        .optional()
-        .describe('Note text content (required for "create" action)'),
+      action: z.enum(['list', 'create', 'delete']),
+      candidateId: z.number().describe('Candidate ID'),
+      noteBody: z.string().optional().describe('Plain note text for create'),
       visibility: z
         .enum(['public', 'private'])
         .optional()
         .describe(
-          'Note visibility: "public" (visible to all team members) or "private" (only visible to creator). Default: public'
+          'Default public: team-visible. Legacy private is retained but fails safely because current private-write semantics are undocumented; create private notes in Recruitee'
         ),
-      noteId: z
-        .number()
-        .optional()
-        .describe('ID of the note to delete (required for "delete" action)')
+      noteId: z.number().optional().describe('Exact note ID for delete')
     })
   )
   .output(
@@ -36,81 +29,62 @@ export let manageCandidateNotes = SlateTool.create(spec, {
       notes: z
         .array(
           z.object({
-            noteId: z.number().describe('Note ID'),
-            candidateId: z.number().describe('Candidate ID'),
-            body: z.string().describe('Note text content'),
-            createdAt: z.string().describe('Creation timestamp'),
-            updatedAt: z.string().describe('Last update timestamp'),
-            pinned: z.boolean().describe('Whether the note is pinned')
+            noteId: z.number(),
+            candidateId: z.number(),
+            body: z.string(),
+            createdAt: z.string(),
+            updatedAt: z.string(),
+            pinned: z.boolean()
           })
         )
-        .optional()
-        .describe('List of notes (returned for "list" action)'),
-      createdNoteId: z
-        .number()
-        .optional()
-        .describe('ID of newly created note (returned for "create" action)'),
-      deleted: z
-        .boolean()
-        .optional()
-        .describe('Whether the note was deleted (returned for "delete" action)')
+        .optional(),
+      createdNoteId: z.number().optional(),
+      deleted: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
-
+    integer(ctx.input.candidateId, 'Candidate ID');
+    if (ctx.input.action === 'delete') integer(ctx.input.noteId, 'Note ID');
+    if (ctx.input.action === 'create' && !ctx.input.noteBody?.trim())
+      fail('noteBody is required for creating a note.');
+    const client = await RecruiteeClient.forContext(ctx);
     if (ctx.input.action === 'list') {
-      let result = await client.listNotes(ctx.input.candidateId);
-      let notes = result.notes || [];
+      const result = await client.listNotes(ctx.input.candidateId);
       return {
         output: {
-          notes: notes.map((n: any) => ({
+          notes: result.notes.map(n => ({
             noteId: n.id,
             candidateId: n.candidate_id,
-            body: n.body || '',
+            body: n.body,
             createdAt: n.created_at,
             updatedAt: n.updated_at,
             pinned: !!n.pinned_at
           }))
         },
-        message: `Found ${notes.length} notes for candidate ${ctx.input.candidateId}.`
+        message: `Returned ${result.notes.length} candidate notes.`
       };
     }
-
     if (ctx.input.action === 'create') {
-      if (!ctx.input.noteBody) {
-        throw new Error('noteBody is required for creating a note.');
-      }
-      let result = await client.createNote(
+      const result = await client.createNote(
         ctx.input.candidateId,
-        ctx.input.noteBody,
+        ctx.input.noteBody ?? '',
         ctx.input.visibility
       );
-      let note = result.note;
       return {
-        output: {
-          createdNoteId: note.id
-        },
-        message: `Created note (ID: ${note.id}) on candidate ${ctx.input.candidateId}.`
+        output: { createdNoteId: result.note.id },
+        message: `Created note ${result.note.id} on candidate ${ctx.input.candidateId}.`
       };
     }
-
-    if (ctx.input.action === 'delete') {
-      if (!ctx.input.noteId) {
-        throw new Error('noteId is required for deleting a note.');
-      }
-      await client.deleteNote(ctx.input.noteId);
-      return {
-        output: {
-          deleted: true
-        },
-        message: `Deleted note ${ctx.input.noteId}.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    const noteId = integer(ctx.input.noteId, 'Note ID');
+    const before = await client.listNotes(ctx.input.candidateId);
+    if (!before.notes.some(n => n.id === noteId))
+      fail('The note was not found on this candidate. No deletion was attempted.');
+    await client.deleteNote(noteId);
+    if ((await client.listNotes(ctx.input.candidateId)).notes.some(n => n.id === noteId))
+      fail('The note remains listed after deletion. Read candidate notes before retrying.');
+    return {
+      output: { deleted: true },
+      message: `Confirmed note ${noteId} is absent from candidate ${ctx.input.candidateId}.`
+    };
   })
   .build();

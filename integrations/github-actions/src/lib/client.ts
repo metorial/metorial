@@ -1,17 +1,241 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue
+} from 'slates';
+import { z } from 'zod';
+import type {
+  Artifact,
+  Cache,
+  Job,
+  PendingDeployment,
+  PublicKey,
+  Runner,
+  RunnerLabel,
+  RunnerToken,
+  Secret,
+  SelectedActions,
+  User,
+  Variable,
+  Workflow,
+  WorkflowRun
+} from './types';
+import { encodePathSegment } from './validation';
+
+const timestamp = z.string();
+const numberId = z.number().int().positive();
+const recordSchema = z.record(z.string(), z.unknown());
+const workflowSchema = z
+  .object({
+    id: numberId,
+    name: z.string(),
+    path: z.string(),
+    state: z.string(),
+    created_at: timestamp,
+    updated_at: timestamp,
+    html_url: z.string(),
+    badge_url: z.string()
+  })
+  .passthrough();
+const runSchema = z
+  .object({
+    id: numberId,
+    name: z.string().nullish(),
+    display_title: z.string(),
+    workflow_id: numberId,
+    head_branch: z.string().nullable(),
+    head_sha: z.string(),
+    event: z.string(),
+    status: z.string().nullable(),
+    conclusion: z.string().nullable(),
+    run_number: z.number(),
+    run_attempt: z.number().optional(),
+    html_url: z.string(),
+    created_at: timestamp,
+    updated_at: timestamp,
+    run_started_at: timestamp.nullish(),
+    actor: z.object({ login: z.string() }).nullish(),
+    triggering_actor: z.object({ login: z.string() }).nullish()
+  })
+  .passthrough();
+const stepSchema = z
+  .object({
+    name: z.string(),
+    status: z.string(),
+    conclusion: z.string().nullable(),
+    number: z.number(),
+    started_at: timestamp.nullish(),
+    completed_at: timestamp.nullish()
+  })
+  .passthrough();
+const jobSchema = z
+  .object({
+    id: numberId,
+    run_id: numberId,
+    name: z.string(),
+    status: z.string(),
+    conclusion: z.string().nullable(),
+    started_at: timestamp.nullable(),
+    completed_at: timestamp.nullable(),
+    runner_name: z.string().nullable(),
+    steps: z.array(stepSchema).optional()
+  })
+  .passthrough();
+const artifactSchema = z
+  .object({
+    id: numberId,
+    name: z.string(),
+    size_in_bytes: z.number().nonnegative(),
+    expired: z.boolean(),
+    created_at: timestamp.nullable(),
+    updated_at: timestamp.nullable(),
+    expires_at: timestamp.nullable(),
+    workflow_run: z.object({ id: numberId.optional() }).nullish()
+  })
+  .passthrough();
+const secretSchema = z
+  .object({
+    name: z.string(),
+    created_at: timestamp,
+    updated_at: timestamp,
+    visibility: z.string().optional()
+  })
+  .passthrough();
+const variableSchema = secretSchema.extend({ value: z.string() });
+const labelSchema = z
+  .object({ id: numberId.optional(), name: z.string(), type: z.string().optional() })
+  .passthrough();
+const runnerSchema = z
+  .object({
+    id: numberId,
+    name: z.string(),
+    os: z.string(),
+    status: z.string(),
+    busy: z.boolean(),
+    labels: z.array(labelSchema)
+  })
+  .passthrough();
+const cacheSchema = z
+  .object({
+    id: numberId,
+    key: z.string(),
+    ref: z.string().optional(),
+    version: z.string().optional(),
+    created_at: timestamp.optional(),
+    last_accessed_at: timestamp.optional(),
+    size_in_bytes: z.number().optional()
+  })
+  .passthrough();
+const totalCount = z.number().int().nonnegative();
+const responseSchemas = {
+  workflows: z.object({ total_count: totalCount, workflows: z.array(workflowSchema) }),
+  workflow: workflowSchema,
+  runs: z.object({ total_count: totalCount, workflow_runs: z.array(runSchema) }),
+  run: runSchema,
+  jobs: z.object({ total_count: totalCount, jobs: z.array(jobSchema) }),
+  job: jobSchema,
+  artifacts: z.object({ total_count: totalCount, artifacts: z.array(artifactSchema) }),
+  artifact: artifactSchema,
+  secrets: z.object({ total_count: totalCount, secrets: z.array(secretSchema) }),
+  secret: secretSchema,
+  variables: z.object({ total_count: totalCount, variables: z.array(variableSchema) }),
+  variable: variableSchema,
+  publicKey: z.object({ key: z.string().min(1), key_id: z.string().min(1) }),
+  caches: z.object({ total_count: totalCount, actions_caches: z.array(cacheSchema) }),
+  runners: z.object({ total_count: totalCount, runners: z.array(runnerSchema) }),
+  runner: runnerSchema,
+  labels: z.object({ labels: z.array(labelSchema) }),
+  runnerToken: z.object({ token: z.string().min(1), expires_at: timestamp }),
+  permissions: z.object({ enabled: z.boolean(), allowed_actions: z.string().optional() }),
+  workflowPermissions: z.object({
+    default_workflow_permissions: z.string(),
+    can_approve_pull_request_reviews: z.boolean()
+  }),
+  selectedActions: z.object({
+    github_owned_allowed: z.boolean(),
+    verified_allowed: z.boolean(),
+    patterns_allowed: z.array(z.string())
+  }),
+  pendingDeployments: z.array(
+    z.object({
+      environment: z.object({ id: numberId, name: z.string(), html_url: z.string() }),
+      wait_timer: z.number(),
+      wait_timer_started_at: timestamp.nullable(),
+      current_user_can_approve: z.boolean()
+    })
+  ),
+  dispatch: z.object({ workflow_run_id: numberId, run_url: z.string(), html_url: z.string() }),
+  usage: z.object({ billable: recordSchema })
+};
+
+export const githubHeaders = {
+  Accept: 'application/vnd.github+json',
+  'X-GitHub-Api-Version': '2026-03-10'
+};
+export const githubApiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    parent: {},
+    providerLabel: 'GitHub',
+    reason: 'github_api_error',
+    formatMessage: ({ status }) =>
+      `GitHub request failed${status ? ` (HTTP ${status})` : ''}. Check token permissions, repository access, resource availability, and rate limits.`
+  });
 
 export class GitHubActionsClient {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(token: string) {
-    this.http = createAxios({
+    if (!token.trim()) throw createApiServiceError('A GitHub access token is required.');
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.github.com',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28'
-      }
+      timeout: 30000,
+      maxRedirects: 3,
+      beforeRedirect: options => {
+        if (
+          options.protocol !== 'https:' ||
+          options.hostname !== 'api.github.com' ||
+          options.auth ||
+          (options.port && String(options.port) !== '443')
+        )
+          throw createApiServiceError(
+            'GitHub redirected the request outside its secure API origin.'
+          );
+      },
+      authHeader: { value: `Bearer ${token.trim()}` },
+      headers: githubHeaders,
+      errorAdapter: githubApiError
     });
+  }
+
+  private validateResponse(data: unknown, schema: z.ZodType) {
+    if (!schema.safeParse(data).success)
+      throw createApiServiceError(
+        'GitHub returned an invalid API response. Request the resource again or check its availability.'
+      );
+  }
+
+  async getCurrentUser() {
+    const user = (await this.http.get<User>('/user')).data;
+    if (!user || !Number.isSafeInteger(user.id) || !user.login)
+      throw createApiServiceError('GitHub did not return an authenticated user profile.');
+    return user;
+  }
+
+  private async prepareDownload(path: string) {
+    // Keep the authenticated API endpoint: each download obtains a fresh one-minute redirect.
+    const response = await this.http.get<unknown>(path, {
+      maxRedirects: 0,
+      validateStatus: status => status === 302
+    });
+    const location = getResponseHeaderValue(response.headers, 'location');
+    const redirect = z.url().safeParse(location);
+    if (!redirect.success)
+      throw createApiServiceError('GitHub did not provide a secure download redirect.');
+    const target = new URL(redirect.data);
+    if (target.protocol !== 'https:' || target.username || target.password)
+      throw createApiServiceError('GitHub did not provide a secure download redirect.');
+    return { downloadUrl: location, apiUrl: `https://api.github.com${path}` };
   }
 
   // ─── Workflows ───────────────────────────────────────────────────────
@@ -21,34 +245,44 @@ export class GitHubActionsClient {
     repo: string,
     params: { perPage?: number; page?: number } = {}
   ) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/workflows`, {
-      params: {
-        per_page: params.perPage ?? 30,
-        page: params.page ?? 1
+    let response = await this.http.get<{ total_count: number; workflows: Workflow[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/workflows`,
+      {
+        params: {
+          per_page: params.perPage ?? 30,
+          page: params.page ?? 1
+        }
       }
-    });
+    );
+    this.validateResponse(response.data, responseSchemas.workflows);
     return response.data;
   }
 
   async getWorkflow(owner: string, repo: string, workflowId: number | string) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/actions/workflows/${workflowId}`
+    let response = await this.http.get<Workflow>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/workflows/${encodePathSegment(workflowId)}`
     );
+    this.validateResponse(response.data, responseSchemas.workflow);
     return response.data;
   }
 
   async enableWorkflow(owner: string, repo: string, workflowId: number | string) {
-    await this.http.put(`/repos/${owner}/${repo}/actions/workflows/${workflowId}/enable`);
+    await this.http.put(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/workflows/${encodePathSegment(workflowId)}/enable`
+    );
   }
 
   async disableWorkflow(owner: string, repo: string, workflowId: number | string) {
-    await this.http.put(`/repos/${owner}/${repo}/actions/workflows/${workflowId}/disable`);
+    await this.http.put(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/workflows/${encodePathSegment(workflowId)}/disable`
+    );
   }
 
   async getWorkflowUsage(owner: string, repo: string, workflowId: number | string) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/actions/workflows/${workflowId}/timing`
+    let response = await this.http.get<{ billable: Record<string, unknown> }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/workflows/${encodePathSegment(workflowId)}/timing`
     );
+    this.validateResponse(response.data, responseSchemas.usage);
     return response.data;
   }
 
@@ -59,13 +293,19 @@ export class GitHubActionsClient {
     ref: string,
     inputs?: Record<string, string>
   ) {
-    await this.http.post(
-      `/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`,
+    let response = await this.http.post<{
+      workflow_run_id: number;
+      run_url: string;
+      html_url: string;
+    }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/workflows/${encodePathSegment(workflowId)}/dispatches`,
       {
         ref,
         inputs: inputs ?? {}
       }
     );
+    this.validateResponse(response.data, responseSchemas.dispatch);
+    return response.data;
   }
 
   // ─── Workflow Runs ───────────────────────────────────────────────────
@@ -82,78 +322,103 @@ export class GitHubActionsClient {
       perPage?: number;
       page?: number;
       created?: string;
+      headSha?: string;
       excludePullRequests?: boolean;
     } = {}
   ) {
     let path = params.workflowId
-      ? `/repos/${owner}/${repo}/actions/workflows/${params.workflowId}/runs`
-      : `/repos/${owner}/${repo}/actions/runs`;
+      ? `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/workflows/${encodePathSegment(params.workflowId)}/runs`
+      : `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs`;
 
-    let response = await this.http.get(path, {
-      params: {
-        actor: params.actor,
-        branch: params.branch,
-        event: params.event,
-        status: params.status,
-        per_page: params.perPage ?? 30,
-        page: params.page ?? 1,
-        created: params.created,
-        exclude_pull_requests: params.excludePullRequests
+    let response = await this.http.get<{ total_count: number; workflow_runs: WorkflowRun[] }>(
+      path,
+      {
+        params: {
+          actor: params.actor,
+          branch: params.branch,
+          event: params.event,
+          status: params.status,
+          per_page: params.perPage ?? 30,
+          page: params.page ?? 1,
+          created: params.created,
+          head_sha: params.headSha,
+          exclude_pull_requests: params.excludePullRequests
+        }
       }
-    });
+    );
+    this.validateResponse(response.data, responseSchemas.runs);
     return response.data;
   }
 
   async getWorkflowRun(owner: string, repo: string, runId: number) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/runs/${runId}`);
+    let response = await this.http.get<WorkflowRun>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}`
+    );
+    this.validateResponse(response.data, responseSchemas.run);
     return response.data;
   }
 
   async cancelWorkflowRun(owner: string, repo: string, runId: number) {
-    await this.http.post(`/repos/${owner}/${repo}/actions/runs/${runId}/cancel`);
+    await this.http.post(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/cancel`
+    );
   }
 
   async rerunWorkflowRun(owner: string, repo: string, runId: number) {
-    await this.http.post(`/repos/${owner}/${repo}/actions/runs/${runId}/rerun`);
+    await this.http.post(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/rerun`
+    );
   }
 
   async rerunFailedJobs(owner: string, repo: string, runId: number) {
-    await this.http.post(`/repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`);
+    await this.http.post(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/rerun-failed-jobs`
+    );
   }
 
   async rerunWorkflowJob(owner: string, repo: string, jobId: number) {
-    await this.http.post(`/repos/${owner}/${repo}/actions/jobs/${jobId}/rerun`);
+    await this.http.post(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/jobs/${jobId}/rerun`
+    );
   }
 
   async deleteWorkflowRun(owner: string, repo: string, runId: number) {
-    await this.http.delete(`/repos/${owner}/${repo}/actions/runs/${runId}`);
+    await this.http.delete(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}`
+    );
   }
 
   async getWorkflowRunUsage(owner: string, repo: string, runId: number) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/runs/${runId}/timing`);
+    let response = await this.http.get<{ billable: Record<string, unknown> }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/timing`
+    );
+    this.validateResponse(response.data, responseSchemas.usage);
     return response.data;
   }
 
   async downloadWorkflowRunLogs(owner: string, repo: string, runId: number) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/runs/${runId}/logs`, {
-      maxRedirects: 0,
-      validateStatus: (status: number) => status >= 200 && status < 400
-    });
-    return response.headers?.location ?? response.data;
+    return this.prepareDownload(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/logs`
+    );
   }
 
   async deleteWorkflowRunLogs(owner: string, repo: string, runId: number) {
-    await this.http.delete(`/repos/${owner}/${repo}/actions/runs/${runId}/logs`);
+    await this.http.delete(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/logs`
+    );
   }
 
   async approvePendingRun(owner: string, repo: string, runId: number) {
-    await this.http.post(`/repos/${owner}/${repo}/actions/runs/${runId}/approve`);
+    await this.http.post(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/approve`
+    );
   }
 
   async getPendingDeployments(owner: string, repo: string, runId: number) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/actions/runs/${runId}/pending_deployments`
+    let response = await this.http.get<PendingDeployment[]>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/pending_deployments`
     );
+    this.validateResponse(response.data, responseSchemas.pendingDeployments);
     return response.data;
   }
 
@@ -166,7 +431,7 @@ export class GitHubActionsClient {
     comment: string
   ) {
     let response = await this.http.post(
-      `/repos/${owner}/${repo}/actions/runs/${runId}/pending_deployments`,
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/pending_deployments`,
       {
         environment_ids: environmentIds,
         state,
@@ -188,30 +453,33 @@ export class GitHubActionsClient {
       page?: number;
     } = {}
   ) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/runs/${runId}/jobs`, {
-      params: {
-        filter: params.filter ?? 'latest',
-        per_page: params.perPage ?? 30,
-        page: params.page ?? 1
+    let response = await this.http.get<{ total_count: number; jobs: Job[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/jobs`,
+      {
+        params: {
+          filter: params.filter ?? 'latest',
+          per_page: params.perPage ?? 30,
+          page: params.page ?? 1
+        }
       }
-    });
+    );
+    this.validateResponse(response.data, responseSchemas.jobs);
     return response.data;
   }
 
   async getJob(owner: string, repo: string, jobId: number) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/jobs/${jobId}`);
+    let response = await this.http.get<Job>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/jobs/${jobId}`
+    );
+    this.validateResponse(response.data, responseSchemas.job);
     return response.data;
   }
 
   async downloadJobLogs(owner: string, repo: string, jobId: number) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`, {
-      maxRedirects: 0,
-      validateStatus: (status: number) => status >= 200 && status < 400
-    });
-    return response.headers?.location ?? response.data;
+    return this.prepareDownload(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/jobs/${jobId}/logs`
+    );
   }
-
-  // ─── Artifacts ───────────────────────────────────────────────────────
 
   async listArtifactsForRepo(
     owner: string,
@@ -222,13 +490,17 @@ export class GitHubActionsClient {
       name?: string;
     } = {}
   ) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/artifacts`, {
-      params: {
-        per_page: params.perPage ?? 30,
-        page: params.page ?? 1,
-        name: params.name
+    let response = await this.http.get<{ total_count: number; artifacts: Artifact[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/artifacts`,
+      {
+        params: {
+          per_page: params.perPage ?? 30,
+          page: params.page ?? 1,
+          name: params.name
+        }
       }
-    });
+    );
+    this.validateResponse(response.data, responseSchemas.artifacts);
     return response.data;
   }
 
@@ -242,8 +514,8 @@ export class GitHubActionsClient {
       name?: string;
     } = {}
   ) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/actions/runs/${runId}/artifacts`,
+    let response = await this.http.get<{ total_count: number; artifacts: Artifact[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/artifacts`,
       {
         params: {
           per_page: params.perPage ?? 30,
@@ -252,29 +524,28 @@ export class GitHubActionsClient {
         }
       }
     );
+    this.validateResponse(response.data, responseSchemas.artifacts);
     return response.data;
   }
 
   async getArtifact(owner: string, repo: string, artifactId: number) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/actions/artifacts/${artifactId}`
+    let response = await this.http.get<Artifact>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/artifacts/${artifactId}`
     );
+    this.validateResponse(response.data, responseSchemas.artifact);
     return response.data;
   }
 
   async downloadArtifact(owner: string, repo: string, artifactId: number) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/actions/artifacts/${artifactId}/zip`,
-      {
-        maxRedirects: 0,
-        validateStatus: (status: number) => status >= 200 && status < 400
-      }
+    return this.prepareDownload(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/artifacts/${artifactId}/zip`
     );
-    return response.headers?.location ?? response.data;
   }
 
   async deleteArtifact(owner: string, repo: string, artifactId: number) {
-    await this.http.delete(`/repos/${owner}/${repo}/actions/artifacts/${artifactId}`);
+    await this.http.delete(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/artifacts/${artifactId}`
+    );
   }
 
   // ─── Secrets (Repository) ───────────────────────────────────────────
@@ -284,24 +555,32 @@ export class GitHubActionsClient {
     repo: string,
     params: { perPage?: number; page?: number } = {}
   ) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/secrets`, {
-      params: {
-        per_page: params.perPage ?? 30,
-        page: params.page ?? 1
+    let response = await this.http.get<{ total_count: number; secrets: Secret[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/secrets`,
+      {
+        params: {
+          per_page: params.perPage ?? 30,
+          page: params.page ?? 1
+        }
       }
-    });
+    );
+    this.validateResponse(response.data, responseSchemas.secrets);
     return response.data;
   }
 
   async getRepoSecret(owner: string, repo: string, secretName: string) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/actions/secrets/${secretName}`
+    let response = await this.http.get<Secret>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/secrets/${encodePathSegment(secretName)}`
     );
+    this.validateResponse(response.data, responseSchemas.secret);
     return response.data;
   }
 
   async getRepoPublicKey(owner: string, repo: string) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/secrets/public-key`);
+    let response = await this.http.get<PublicKey>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/secrets/public-key`
+    );
+    this.validateResponse(response.data, responseSchemas.publicKey);
     return response.data;
   }
 
@@ -312,35 +591,50 @@ export class GitHubActionsClient {
     encryptedValue: string,
     keyId: string
   ) {
-    await this.http.put(`/repos/${owner}/${repo}/actions/secrets/${secretName}`, {
-      encrypted_value: encryptedValue,
-      key_id: keyId
-    });
+    await this.http.put(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/secrets/${encodePathSegment(secretName)}`,
+      {
+        encrypted_value: encryptedValue,
+        key_id: keyId
+      }
+    );
   }
 
   async deleteRepoSecret(owner: string, repo: string, secretName: string) {
-    await this.http.delete(`/repos/${owner}/${repo}/actions/secrets/${secretName}`);
+    await this.http.delete(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/secrets/${encodePathSegment(secretName)}`
+    );
   }
 
   // ─── Secrets (Organization) ─────────────────────────────────────────
 
   async listOrgSecrets(org: string, params: { perPage?: number; page?: number } = {}) {
-    let response = await this.http.get(`/orgs/${org}/actions/secrets`, {
-      params: {
-        per_page: params.perPage ?? 30,
-        page: params.page ?? 1
+    let response = await this.http.get<{ total_count: number; secrets: Secret[] }>(
+      `/orgs/${encodePathSegment(org)}/actions/secrets`,
+      {
+        params: {
+          per_page: params.perPage ?? 30,
+          page: params.page ?? 1
+        }
       }
-    });
+    );
+    this.validateResponse(response.data, responseSchemas.secrets);
     return response.data;
   }
 
   async getOrgSecret(org: string, secretName: string) {
-    let response = await this.http.get(`/orgs/${org}/actions/secrets/${secretName}`);
+    let response = await this.http.get<Secret>(
+      `/orgs/${encodePathSegment(org)}/actions/secrets/${encodePathSegment(secretName)}`
+    );
+    this.validateResponse(response.data, responseSchemas.secret);
     return response.data;
   }
 
   async getOrgPublicKey(org: string) {
-    let response = await this.http.get(`/orgs/${org}/actions/secrets/public-key`);
+    let response = await this.http.get<PublicKey>(
+      `/orgs/${encodePathSegment(org)}/actions/secrets/public-key`
+    );
+    this.validateResponse(response.data, responseSchemas.publicKey);
     return response.data;
   }
 
@@ -354,16 +648,21 @@ export class GitHubActionsClient {
       selectedRepositoryIds?: number[];
     }
   ) {
-    await this.http.put(`/orgs/${org}/actions/secrets/${secretName}`, {
-      encrypted_value: data.encryptedValue,
-      key_id: data.keyId,
-      visibility: data.visibility,
-      selected_repository_ids: data.selectedRepositoryIds
-    });
+    await this.http.put(
+      `/orgs/${encodePathSegment(org)}/actions/secrets/${encodePathSegment(secretName)}`,
+      {
+        encrypted_value: data.encryptedValue,
+        key_id: data.keyId,
+        visibility: data.visibility,
+        selected_repository_ids: data.selectedRepositoryIds
+      }
+    );
   }
 
   async deleteOrgSecret(org: string, secretName: string) {
-    await this.http.delete(`/orgs/${org}/actions/secrets/${secretName}`);
+    await this.http.delete(
+      `/orgs/${encodePathSegment(org)}/actions/secrets/${encodePathSegment(secretName)}`
+    );
   }
 
   // ─── Secrets (Environment) ──────────────────────────────────────────
@@ -374,8 +673,8 @@ export class GitHubActionsClient {
     environmentName: string,
     params: { perPage?: number; page?: number } = {}
   ) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/environments/${environmentName}/secrets`,
+    let response = await this.http.get<{ total_count: number; secrets: Secret[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/environments/${encodePathSegment(environmentName)}/secrets`,
       {
         params: {
           per_page: params.perPage ?? 30,
@@ -383,13 +682,15 @@ export class GitHubActionsClient {
         }
       }
     );
+    this.validateResponse(response.data, responseSchemas.secrets);
     return response.data;
   }
 
   async getEnvironmentPublicKey(owner: string, repo: string, environmentName: string) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/environments/${environmentName}/secrets/public-key`
+    let response = await this.http.get<PublicKey>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/environments/${encodePathSegment(environmentName)}/secrets/public-key`
     );
+    this.validateResponse(response.data, responseSchemas.publicKey);
     return response.data;
   }
 
@@ -402,7 +703,7 @@ export class GitHubActionsClient {
     keyId: string
   ) {
     await this.http.put(
-      `/repos/${owner}/${repo}/environments/${environmentName}/secrets/${secretName}`,
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/environments/${encodePathSegment(environmentName)}/secrets/${encodePathSegment(secretName)}`,
       {
         encrypted_value: encryptedValue,
         key_id: keyId
@@ -417,7 +718,7 @@ export class GitHubActionsClient {
     secretName: string
   ) {
     await this.http.delete(
-      `/repos/${owner}/${repo}/environments/${environmentName}/secrets/${secretName}`
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/environments/${encodePathSegment(environmentName)}/secrets/${encodePathSegment(secretName)}`
     );
   }
 
@@ -428,27 +729,35 @@ export class GitHubActionsClient {
     repo: string,
     params: { perPage?: number; page?: number } = {}
   ) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/variables`, {
-      params: {
-        per_page: params.perPage ?? 30,
-        page: params.page ?? 1
+    let response = await this.http.get<{ total_count: number; variables: Variable[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/variables`,
+      {
+        params: {
+          per_page: params.perPage ?? 30,
+          page: params.page ?? 1
+        }
       }
-    });
+    );
+    this.validateResponse(response.data, responseSchemas.variables);
     return response.data;
   }
 
   async getRepoVariable(owner: string, repo: string, variableName: string) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/actions/variables/${variableName}`
+    let response = await this.http.get<Variable>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/variables/${encodePathSegment(variableName)}`
     );
+    this.validateResponse(response.data, responseSchemas.variable);
     return response.data;
   }
 
   async createRepoVariable(owner: string, repo: string, name: string, value: string) {
-    let response = await this.http.post(`/repos/${owner}/${repo}/actions/variables`, {
-      name,
-      value
-    });
+    let response = await this.http.post(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/variables`,
+      {
+        name,
+        value
+      }
+    );
     return response.data;
   }
 
@@ -458,27 +767,39 @@ export class GitHubActionsClient {
     variableName: string,
     data: { name?: string; value?: string }
   ) {
-    await this.http.patch(`/repos/${owner}/${repo}/actions/variables/${variableName}`, data);
+    await this.http.patch(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/variables/${encodePathSegment(variableName)}`,
+      data
+    );
   }
 
   async deleteRepoVariable(owner: string, repo: string, variableName: string) {
-    await this.http.delete(`/repos/${owner}/${repo}/actions/variables/${variableName}`);
+    await this.http.delete(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/variables/${encodePathSegment(variableName)}`
+    );
   }
 
   // ─── Variables (Organization) ───────────────────────────────────────
 
   async listOrgVariables(org: string, params: { perPage?: number; page?: number } = {}) {
-    let response = await this.http.get(`/orgs/${org}/actions/variables`, {
-      params: {
-        per_page: params.perPage ?? 30,
-        page: params.page ?? 1
+    let response = await this.http.get<{ total_count: number; variables: Variable[] }>(
+      `/orgs/${encodePathSegment(org)}/actions/variables`,
+      {
+        params: {
+          per_page: params.perPage ?? 30,
+          page: params.page ?? 1
+        }
       }
-    });
+    );
+    this.validateResponse(response.data, responseSchemas.variables);
     return response.data;
   }
 
   async getOrgVariable(org: string, variableName: string) {
-    let response = await this.http.get(`/orgs/${org}/actions/variables/${variableName}`);
+    let response = await this.http.get<Variable>(
+      `/orgs/${encodePathSegment(org)}/actions/variables/${encodePathSegment(variableName)}`
+    );
+    this.validateResponse(response.data, responseSchemas.variable);
     return response.data;
   }
 
@@ -489,7 +810,7 @@ export class GitHubActionsClient {
     visibility: 'all' | 'private' | 'selected',
     selectedRepositoryIds?: number[]
   ) {
-    let response = await this.http.post(`/orgs/${org}/actions/variables`, {
+    let response = await this.http.post(`/orgs/${encodePathSegment(org)}/actions/variables`, {
       name,
       value,
       visibility,
@@ -508,16 +829,21 @@ export class GitHubActionsClient {
       selectedRepositoryIds?: number[];
     }
   ) {
-    await this.http.patch(`/orgs/${org}/actions/variables/${variableName}`, {
-      name: data.name,
-      value: data.value,
-      visibility: data.visibility,
-      selected_repository_ids: data.selectedRepositoryIds
-    });
+    await this.http.patch(
+      `/orgs/${encodePathSegment(org)}/actions/variables/${encodePathSegment(variableName)}`,
+      {
+        name: data.name,
+        value: data.value,
+        visibility: data.visibility,
+        selected_repository_ids: data.selectedRepositoryIds
+      }
+    );
   }
 
   async deleteOrgVariable(org: string, variableName: string) {
-    await this.http.delete(`/orgs/${org}/actions/variables/${variableName}`);
+    await this.http.delete(
+      `/orgs/${encodePathSegment(org)}/actions/variables/${encodePathSegment(variableName)}`
+    );
   }
 
   // ─── Variables (Environment) ────────────────────────────────────────
@@ -528,8 +854,8 @@ export class GitHubActionsClient {
     environmentName: string,
     params: { perPage?: number; page?: number } = {}
   ) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/environments/${environmentName}/variables`,
+    let response = await this.http.get<{ total_count: number; variables: Variable[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/environments/${encodePathSegment(environmentName)}/variables`,
       {
         params: {
           per_page: params.perPage ?? 30,
@@ -537,6 +863,7 @@ export class GitHubActionsClient {
         }
       }
     );
+    this.validateResponse(response.data, responseSchemas.variables);
     return response.data;
   }
 
@@ -548,7 +875,7 @@ export class GitHubActionsClient {
     value: string
   ) {
     let response = await this.http.post(
-      `/repos/${owner}/${repo}/environments/${environmentName}/variables`,
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/environments/${encodePathSegment(environmentName)}/variables`,
       {
         name,
         value
@@ -565,7 +892,7 @@ export class GitHubActionsClient {
     data: { name?: string; value?: string }
   ) {
     await this.http.patch(
-      `/repos/${owner}/${repo}/environments/${environmentName}/variables/${variableName}`,
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/environments/${encodePathSegment(environmentName)}/variables/${encodePathSegment(variableName)}`,
       data
     );
   }
@@ -577,7 +904,7 @@ export class GitHubActionsClient {
     variableName: string
   ) {
     await this.http.delete(
-      `/repos/${owner}/${repo}/environments/${environmentName}/variables/${variableName}`
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/environments/${encodePathSegment(environmentName)}/variables/${encodePathSegment(variableName)}`
     );
   }
 
@@ -595,27 +922,38 @@ export class GitHubActionsClient {
       direction?: 'asc' | 'desc';
     } = {}
   ) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/caches`, {
-      params: {
-        per_page: params.perPage ?? 30,
-        page: params.page ?? 1,
-        ref: params.ref,
-        key: params.key,
-        sort: params.sort,
-        direction: params.direction
+    let response = await this.http.get<{ total_count: number; actions_caches: Cache[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/caches`,
+      {
+        params: {
+          per_page: params.perPage ?? 30,
+          page: params.page ?? 1,
+          ref: params.ref,
+          key: params.key,
+          sort: params.sort,
+          direction: params.direction
+        }
       }
-    });
+    );
+    this.validateResponse(response.data, responseSchemas.caches);
     return response.data;
   }
 
   async deleteCacheByKey(owner: string, repo: string, key: string, ref?: string) {
-    await this.http.delete(`/repos/${owner}/${repo}/actions/caches`, {
-      params: { key, ref }
-    });
+    const response = await this.http.delete<{ total_count: number; actions_caches: Cache[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/caches`,
+      {
+        params: { key, ref }
+      }
+    );
+    this.validateResponse(response.data, responseSchemas.caches);
+    return response.data;
   }
 
   async deleteCacheById(owner: string, repo: string, cacheId: number) {
-    await this.http.delete(`/repos/${owner}/${repo}/actions/caches/${cacheId}`);
+    await this.http.delete(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/caches/${cacheId}`
+    );
   }
 
   // ─── Self-Hosted Runners (Repository) ───────────────────────────────
@@ -625,66 +963,81 @@ export class GitHubActionsClient {
     repo: string,
     params: { perPage?: number; page?: number; name?: string } = {}
   ) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/runners`, {
-      params: {
-        per_page: params.perPage ?? 30,
-        page: params.page ?? 1,
-        name: params.name
+    let response = await this.http.get<{ total_count: number; runners: Runner[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runners`,
+      {
+        params: {
+          per_page: params.perPage ?? 30,
+          page: params.page ?? 1,
+          name: params.name
+        }
       }
-    });
+    );
+    this.validateResponse(response.data, responseSchemas.runners);
     return response.data;
   }
 
   async getRepoRunner(owner: string, repo: string, runnerId: number) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/runners/${runnerId}`);
+    let response = await this.http.get<Runner>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runners/${runnerId}`
+    );
+    this.validateResponse(response.data, responseSchemas.runner);
     return response.data;
   }
 
   async removeRepoRunner(owner: string, repo: string, runnerId: number) {
-    await this.http.delete(`/repos/${owner}/${repo}/actions/runners/${runnerId}`);
+    await this.http.delete(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runners/${runnerId}`
+    );
   }
 
   async createRepoRunnerRegistrationToken(owner: string, repo: string) {
-    let response = await this.http.post(
-      `/repos/${owner}/${repo}/actions/runners/registration-token`
+    let response = await this.http.post<RunnerToken>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runners/registration-token`
     );
+    this.validateResponse(response.data, responseSchemas.runnerToken);
     return response.data;
   }
 
   async createRepoRunnerRemovalToken(owner: string, repo: string) {
-    let response = await this.http.post(
-      `/repos/${owner}/${repo}/actions/runners/remove-token`
+    let response = await this.http.post<RunnerToken>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runners/remove-token`
     );
+    this.validateResponse(response.data, responseSchemas.runnerToken);
     return response.data;
   }
 
   async listRunnerLabels(owner: string, repo: string, runnerId: number) {
-    let response = await this.http.get(
-      `/repos/${owner}/${repo}/actions/runners/${runnerId}/labels`
+    let response = await this.http.get<{ labels: RunnerLabel[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runners/${runnerId}/labels`
     );
+    this.validateResponse(response.data, responseSchemas.labels);
     return response.data;
   }
 
   async addRunnerLabels(owner: string, repo: string, runnerId: number, labels: string[]) {
-    let response = await this.http.post(
-      `/repos/${owner}/${repo}/actions/runners/${runnerId}/labels`,
+    let response = await this.http.post<{ labels: RunnerLabel[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runners/${runnerId}/labels`,
       { labels }
     );
+    this.validateResponse(response.data, responseSchemas.labels);
     return response.data;
   }
 
   async removeRunnerLabel(owner: string, repo: string, runnerId: number, labelName: string) {
-    let response = await this.http.delete(
-      `/repos/${owner}/${repo}/actions/runners/${runnerId}/labels/${labelName}`
+    let response = await this.http.delete<{ labels: RunnerLabel[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runners/${runnerId}/labels/${encodePathSegment(labelName)}`
     );
+    this.validateResponse(response.data, responseSchemas.labels);
     return response.data;
   }
 
   async setRunnerLabels(owner: string, repo: string, runnerId: number, labels: string[]) {
-    let response = await this.http.put(
-      `/repos/${owner}/${repo}/actions/runners/${runnerId}/labels`,
+    let response = await this.http.put<{ labels: RunnerLabel[] }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runners/${runnerId}/labels`,
       { labels }
     );
+    this.validateResponse(response.data, responseSchemas.labels);
     return response.data;
   }
 
@@ -694,39 +1047,55 @@ export class GitHubActionsClient {
     org: string,
     params: { perPage?: number; page?: number; name?: string } = {}
   ) {
-    let response = await this.http.get(`/orgs/${org}/actions/runners`, {
-      params: {
-        per_page: params.perPage ?? 30,
-        page: params.page ?? 1,
-        name: params.name
+    let response = await this.http.get<{ total_count: number; runners: Runner[] }>(
+      `/orgs/${encodePathSegment(org)}/actions/runners`,
+      {
+        params: {
+          per_page: params.perPage ?? 30,
+          page: params.page ?? 1,
+          name: params.name
+        }
       }
-    });
+    );
+    this.validateResponse(response.data, responseSchemas.runners);
     return response.data;
   }
 
   async getOrgRunner(org: string, runnerId: number) {
-    let response = await this.http.get(`/orgs/${org}/actions/runners/${runnerId}`);
+    let response = await this.http.get<Runner>(
+      `/orgs/${encodePathSegment(org)}/actions/runners/${runnerId}`
+    );
+    this.validateResponse(response.data, responseSchemas.runner);
     return response.data;
   }
 
   async removeOrgRunner(org: string, runnerId: number) {
-    await this.http.delete(`/orgs/${org}/actions/runners/${runnerId}`);
+    await this.http.delete(`/orgs/${encodePathSegment(org)}/actions/runners/${runnerId}`);
   }
 
   async createOrgRunnerRegistrationToken(org: string) {
-    let response = await this.http.post(`/orgs/${org}/actions/runners/registration-token`);
+    let response = await this.http.post<RunnerToken>(
+      `/orgs/${encodePathSegment(org)}/actions/runners/registration-token`
+    );
+    this.validateResponse(response.data, responseSchemas.runnerToken);
     return response.data;
   }
 
   async createOrgRunnerRemovalToken(org: string) {
-    let response = await this.http.post(`/orgs/${org}/actions/runners/remove-token`);
+    let response = await this.http.post<RunnerToken>(
+      `/orgs/${encodePathSegment(org)}/actions/runners/remove-token`
+    );
+    this.validateResponse(response.data, responseSchemas.runnerToken);
     return response.data;
   }
 
   // ─── Permissions ─────────────────────────────────────────────────────
 
   async getRepoPermissions(owner: string, repo: string) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/permissions`);
+    let response = await this.http.get<{ enabled: boolean; allowed_actions?: string }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/permissions`
+    );
+    this.validateResponse(response.data, responseSchemas.permissions);
     return response.data;
   }
 
@@ -735,14 +1104,23 @@ export class GitHubActionsClient {
     repo: string,
     data: { enabled: boolean; allowedActions?: string }
   ) {
-    await this.http.put(`/repos/${owner}/${repo}/actions/permissions`, {
-      enabled: data.enabled,
-      allowed_actions: data.allowedActions
-    });
+    await this.http.put(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/permissions`,
+      {
+        enabled: data.enabled,
+        allowed_actions: data.allowedActions
+      }
+    );
   }
 
   async getRepoDefaultWorkflowPermissions(owner: string, repo: string) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/actions/permissions/workflow`);
+    let response = await this.http.get<{
+      default_workflow_permissions: string;
+      can_approve_pull_request_reviews: boolean;
+    }>(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/permissions/workflow`
+    );
+    this.validateResponse(response.data, responseSchemas.workflowPermissions);
     return response.data;
   }
 
@@ -754,35 +1132,94 @@ export class GitHubActionsClient {
       canApprovePullRequestReviews?: boolean;
     }
   ) {
-    await this.http.put(`/repos/${owner}/${repo}/actions/permissions/workflow`, {
-      default_workflow_permissions: data.defaultWorkflowPermissions,
-      can_approve_pull_request_reviews: data.canApprovePullRequestReviews
-    });
+    await this.http.put(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/permissions/workflow`,
+      {
+        default_workflow_permissions: data.defaultWorkflowPermissions,
+        can_approve_pull_request_reviews: data.canApprovePullRequestReviews
+      }
+    );
   }
 
-  // ─── Webhooks ────────────────────────────────────────────────────────
-
-  async createRepoWebhook(
+  async getEnvironmentSecret(
     owner: string,
     repo: string,
-    webhookUrl: string,
-    events: string[],
-    secret?: string
+    environmentName: string,
+    secretName: string
   ) {
-    let response = await this.http.post(`/repos/${owner}/${repo}/hooks`, {
-      name: 'web',
-      active: true,
-      events,
-      config: {
-        url: webhookUrl,
-        content_type: 'json',
-        secret
-      }
-    });
-    return response.data;
+    const data = (
+      await this.http.get<Secret>(
+        `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/environments/${encodePathSegment(environmentName)}/secrets/${encodePathSegment(secretName)}`
+      )
+    ).data;
+    this.validateResponse(data, responseSchemas.secret);
+    return data;
   }
-
-  async deleteRepoWebhook(owner: string, repo: string, hookId: number) {
-    await this.http.delete(`/repos/${owner}/${repo}/hooks/${hookId}`);
+  async getEnvironmentVariable(
+    owner: string,
+    repo: string,
+    environmentName: string,
+    variableName: string
+  ) {
+    const data = (
+      await this.http.get<Variable>(
+        `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/environments/${encodePathSegment(environmentName)}/variables/${encodePathSegment(variableName)}`
+      )
+    ).data;
+    this.validateResponse(data, responseSchemas.variable);
+    return data;
+  }
+  async getSelectedActions(owner: string, repo: string) {
+    const data = (
+      await this.http.get<SelectedActions>(
+        `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/permissions/selected-actions`
+      )
+    ).data;
+    this.validateResponse(data, responseSchemas.selectedActions);
+    return data;
+  }
+  async setSelectedActions(owner: string, repo: string, data: SelectedActions) {
+    await this.http.put(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/permissions/selected-actions`,
+      data
+    );
+  }
+  async listOrgRunnerLabels(org: string, runnerId: number) {
+    const data = (
+      await this.http.get<{ labels: RunnerLabel[] }>(
+        `/orgs/${encodePathSegment(org)}/actions/runners/${runnerId}/labels`
+      )
+    ).data;
+    this.validateResponse(data, responseSchemas.labels);
+    return data;
+  }
+  async addOrgRunnerLabels(org: string, runnerId: number, labels: string[]) {
+    const data = (
+      await this.http.post<{ labels: RunnerLabel[] }>(
+        `/orgs/${encodePathSegment(org)}/actions/runners/${runnerId}/labels`,
+        { labels }
+      )
+    ).data;
+    this.validateResponse(data, responseSchemas.labels);
+    return data;
+  }
+  async setOrgRunnerLabels(org: string, runnerId: number, labels: string[]) {
+    const data = (
+      await this.http.put<{ labels: RunnerLabel[] }>(
+        `/orgs/${encodePathSegment(org)}/actions/runners/${runnerId}/labels`,
+        { labels }
+      )
+    ).data;
+    this.validateResponse(data, responseSchemas.labels);
+    return data;
+  }
+  async removeOrgRunnerLabel(org: string, runnerId: number, labelName: string) {
+    const data = (
+      await this.http.delete<{ labels: RunnerLabel[] }>(
+        `/orgs/${encodePathSegment(org)}/actions/runners/${runnerId}/labels/${encodePathSegment(labelName)}`
+      )
+    ).data;
+    this.validateResponse(data, responseSchemas.labels);
+    return data;
   }
 }

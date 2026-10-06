@@ -1,6 +1,8 @@
-# <img src="logo.svg" height="20"> Flowiseai
+# <img src="logo.svg" height="20"> Flowise
 
-Build and interact with AI agents and LLM workflows. Send messages to chatflows, assistants, and agentflows to get AI-generated responses with streaming support. Create, update, and delete chatflows, assistants, and custom tools. Manage document stores for retrieval-augmented generation (RAG), upsert data into vector stores, and upload file attachments. Capture user feedback and leads from chatbot interactions. Manage runtime variables, retrieve chat message history, and track vector upsert operations.
+Build and manage AI workflows in a Flowise instance. Send questions, Agentflow V2 form inputs, and human checkpoint feedback; manage chatflows, assistants, custom tools, and variables; inspect conversation history, feedback, leads, and ingestion history. Create and update document stores, index configured document sources, inspect chunks, and query or delete record-manager-tracked vectors.
+
+Connect with your instance URL and an API key with permissions for the operations you need. Prediction calls return a complete response. Model execution and indexing require the relevant credentials and components to be configured in Flowise.
 
 ## License
 

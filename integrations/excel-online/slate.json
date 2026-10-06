@@ -11,8 +11,7 @@
     "invoke calculation functions",
     "retrieve chart images",
     "manage named items",
-    "manage workbook sessions",
-    "subscribe to file changes"
+    "manage workbook sessions"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/Excel.png",
   "version": "0.1.2"

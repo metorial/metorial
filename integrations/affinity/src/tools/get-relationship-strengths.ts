@@ -43,7 +43,7 @@ export let getRelationshipStrengths = SlateTool.create(spec, {
       internalId: ctx.input.internalId
     });
 
-    let strengths = (Array.isArray(result) ? result : []).map((s: any) => ({
+    let strengths = (Array.isArray(result) ? result : []).map(s => ({
       internalId: s.internal_id,
       externalId: s.external_id,
       strength: s.strength

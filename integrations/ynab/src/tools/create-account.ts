@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { budgetInput, invalid, milliunits, required } from '../lib/validation';
 import { spec } from '../spec';
 
 let accountTypeEnum = z.enum([
@@ -32,13 +33,10 @@ export let createAccount = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      budgetId: z
-        .string()
-        .optional()
-        .describe('Budget ID. Defaults to the configured budget.'),
-      name: z.string().describe('Name for the new account'),
+      budgetId: budgetInput,
+      name: z.string().trim().min(1).max(200).describe('Name for the new account'),
       type: accountTypeEnum.describe('Type of account'),
-      balance: z.number().describe('Starting balance in milliunits (e.g., 10000 = $10.00)')
+      balance: milliunits.describe('Starting balance in milliunits (e.g., 10000 = $10.00)')
     })
   )
   .output(
@@ -46,20 +44,27 @@ export let createAccount = SlateTool.create(spec, {
       accountId: z.string().describe('ID of the created account'),
       name: z.string().describe('Name of the account'),
       type: z.string().describe('Type of the account'),
-      balance: z.number().describe('Balance in milliunits'),
+      balance: milliunits.describe('Balance in milliunits'),
       onBudget: z.boolean().describe('Whether the account is on-budget')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let budgetId = ctx.input.budgetId ?? ctx.config.budgetId;
-
-    let account = await client.createAccount(budgetId, {
-      name: ctx.input.name,
-      type: ctx.input.type,
-      balance: ctx.input.balance
-    });
-
+    if (
+      !['checking', 'savings', 'cash', 'creditCard', 'otherAsset', 'otherLiability'].includes(
+        ctx.input.type
+      )
+    )
+      throw invalid(
+        'YNAB only supports creating checking, savings, cash, creditCard, otherAsset, or otherLiability accounts through the API. Create other account types in the YNAB app.'
+      );
+    const account = await new Client({ token: ctx.auth.token }).createAccount(
+      ctx.input.budgetId ?? ctx.config.budgetId,
+      {
+        name: required(ctx.input.name, 'Account name'),
+        type: ctx.input.type,
+        balance: ctx.input.balance
+      }
+    );
     return {
       output: {
         accountId: account.id,
@@ -68,7 +73,7 @@ export let createAccount = SlateTool.create(spec, {
         balance: account.balance,
         onBudget: account.on_budget
       },
-      message: `Created **${account.name}** (${account.type}) with balance ${account.balance / 1000} in milliunits`
+      message: `Created account ${account.id} with balance ${account.balance} milliunits. Account creation is retained; the API does not delete accounts.`
     };
   })
   .build();

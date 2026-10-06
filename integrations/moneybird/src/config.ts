@@ -5,8 +5,9 @@ export let config = SlateConfig.create(
   z.object({
     administrationId: z
       .string()
+      .optional()
       .describe(
-        'The Moneybird administration ID. Found in the URL when logged into Moneybird (e.g., https://moneybird.com/{administrationId}/).'
+        'Optional default administration ID. Call list_administrations to choose an authorized administration; each tool can override this default.'
       )
   })
 );

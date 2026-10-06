@@ -10,7 +10,9 @@ let wordSchema = z.object({
 });
 
 let transcriptEntrySchema = z.object({
-  entryId: z.number().describe('Transcript entry ID'),
+  entryId: z
+    .number()
+    .describe('Transcript entry ID, or its segment index in current transcripts'),
   speaker: z.string().describe('Speaker name'),
   speakerId: z.number().nullable().describe('Speaker participant ID'),
   words: z.array(wordSchema).describe('Words in this transcript segment'),
@@ -20,7 +22,7 @@ let transcriptEntrySchema = z.object({
 export let getTranscriptTool = SlateTool.create(spec, {
   name: 'Get Bot Transcript',
   key: 'get_transcript',
-  description: `Retrieve the transcript produced by a bot. Returns the full transcript with speaker attribution, timestamps, and individual words. If the call is still in progress, returns the transcript so far.`,
+  description: `Retrieve the transcript produced by a bot. Returns the full transcript with speaker attribution, timestamps, and individual words. For current workspaces the recording transcript must have finished processing; legacy workspaces retain their original transcript response.`,
   constraints: [
     'Rate limit: 300 requests per minute per workspace.',
     "Transcription must be enabled in the bot's recording config to produce a transcript."
@@ -31,6 +33,12 @@ export let getTranscriptTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      recordingId: z
+        .string()
+        .optional()
+        .describe(
+          'Recording ID from get_bot; omit to use the most recently created recording with a transcript'
+        ),
       botId: z
         .string()
         .describe('The unique identifier of the bot whose transcript to retrieve')
@@ -51,7 +59,19 @@ export let getTranscriptTool = SlateTool.create(spec, {
       region: ctx.config.region
     });
 
-    let entries = await client.getBotTranscript(ctx.input.botId);
+    let { entries, file } = await client.getBotTranscript(
+      ctx.input.botId,
+      ctx.input.recordingId
+    );
+    if (file)
+      await ctx.addAttachment({
+        type: 'url',
+        url: file.url,
+        filename: file.filename,
+        mimeType: file.mimeType,
+        refreshAt: file.expiresAt,
+        refreshReference: { recordingId: file.recordingId, mediaKind: file.mediaKind }
+      });
 
     return {
       output: {

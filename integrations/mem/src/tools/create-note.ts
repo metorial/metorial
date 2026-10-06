@@ -8,8 +8,9 @@ export let createNote = SlateTool.create(spec, {
   key: 'create_note',
   description: `Create a new note in your Mem knowledge base. The note content should be markdown-formatted, where the first line is automatically used as the title. Notes can optionally be assigned to collections by ID or by title.`,
   constraints: [
-    'Note content can be up to ~200,000 characters.',
-    'Collection titles are matched case-insensitively. Non-existent collection titles are silently ignored.'
+    'Note content is limited to 200,000 characters and UTF-8 bytes.',
+    'Collection titles are matched case-insensitively. Inaccessible collection IDs and unmatched titles are ignored; inspect the returned actual collection assignments.',
+    'Custom UUIDs are create-only. Existing UUIDs return a conflict; do not retry a write without inspecting its exact UUID.'
   ],
   tags: {
     readOnly: false,
@@ -46,7 +47,11 @@ export let createNote = SlateTool.create(spec, {
       content: z.string().nullable().describe('Full markdown content of the note.'),
       collectionIds: z.array(z.string()).describe('IDs of collections the note belongs to.'),
       createdAt: z.string().describe('Creation timestamp in ISO 8601 format.'),
-      updatedAt: z.string().describe('Last updated timestamp in ISO 8601 format.')
+      updatedAt: z.string().describe('Last updated timestamp in ISO 8601 format.'),
+      version: z
+        .number()
+        .optional()
+        .describe('Current content version required for a later update_note call.')
     })
   )
   .handleInvocation(async ctx => {
@@ -68,7 +73,8 @@ export let createNote = SlateTool.create(spec, {
         content: note.content,
         collectionIds: note.collection_ids,
         createdAt: note.created_at,
-        updatedAt: note.updated_at
+        updatedAt: note.updated_at,
+        version: note.version
       },
       message: `Created note **${note.title}** (${note.id}).`
     };

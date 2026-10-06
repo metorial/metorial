@@ -26,16 +26,17 @@ import {
   runAction,
   runFlow,
   syncKnowledgeBase,
-  updateKnowledgeBase
+  updateKnowledgeBase,
+  uploadDocument,
+  uploadKnowledgeBaseResource
 } from './tools';
-import { flowRunTrigger, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     runFlow,
     flowFeedback,
     listDocuments,
+    uploadDocument,
     deleteDocument,
     listKnowledgeBases,
     getKnowledgeBase,
@@ -44,6 +45,7 @@ export let provider = Slate.create({
     deleteKnowledgeBase,
     syncKnowledgeBase,
     listKnowledgeBaseResources,
+    uploadKnowledgeBaseResource,
     deleteKnowledgeBaseResource,
     listConnections,
     getConnection,
@@ -60,5 +62,5 @@ export let provider = Slate.create({
     listToolProviders,
     runAction
   ],
-  triggers: [inboundWebhook, flowRunTrigger]
+  triggers: []
 });

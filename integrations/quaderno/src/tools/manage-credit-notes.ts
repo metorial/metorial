@@ -1,138 +1,167 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
 import {
+  documentInput,
   documentOutputSchema,
-  lineItemInputSchema,
+  fields,
   mapDocumentOutput,
   mapLineItemInput
 } from '../lib/schemas';
-import { spec } from '../spec';
-
-export let listCreditNotes = SlateTool.create(spec, {
+import { tool } from '../lib/tool';
+import {
+  date,
+  decimal,
+  decimalInput,
+  idInput,
+  invalid,
+  numericId,
+  pageInput,
+  pageOutput,
+  type Row,
+  reject
+} from '../lib/validation';
+export const listCreditNotes = tool({
   name: 'List Credit Notes',
   key: 'list_credit_notes',
-  description: `Retrieve a list of credit notes from Quaderno. Credit notes are used for refunds and corrections since invoices cannot be deleted.`,
-  tags: { readOnly: true }
-})
-  .input(
-    z.object({
-      query: z.string().optional().describe('Search query to filter credit notes'),
-      date: z.string().optional().describe('Filter by date (YYYY-MM-DD)'),
-      page: z.number().optional().describe('Page number for pagination')
-    })
-  )
-  .output(
-    z.object({
-      creditNotes: z.array(documentOutputSchema)
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let result = await client.listCreditNotes({
-      q: ctx.input.query,
-      date: ctx.input.date,
-      page: ctx.input.page
-    });
-
-    let creditNotes = (Array.isArray(result) ? result : []).map(mapDocumentOutput);
-
-    return {
-      output: { creditNotes },
-      message: `Found **${creditNotes.length}** credit note(s)`
-    };
+  description: 'List one cursor page of credit notes. Date accepts a day or start,end range.',
+  readOnly: true,
+  input: {
+    ...pageInput,
+    query: z.string().optional(),
+    date: z.string().optional(),
+    state: z.enum(['outstanding', 'late', 'paid']).optional()
+  },
+  output: { creditNotes: z.array(documentOutputSchema), ...pageOutput },
+  run: async (input, client) => ({
+    creditNotes: (
+      await client.list('credits', input, {
+        q: input.query,
+        date: input.date,
+        state: input.state
+      })
+    ).map(mapDocumentOutput),
+    ...client.pagination
   })
-  .build();
-
-export let getCreditNote = SlateTool.create(spec, {
+});
+export const getCreditNote = tool({
   name: 'Get Credit Note',
   key: 'get_credit_note',
-  description: `Retrieve a single credit note by ID from Quaderno.`,
-  tags: { readOnly: true }
-})
-  .input(
-    z.object({
-      creditNoteId: z.string().describe('ID of the credit note to retrieve')
-    })
-  )
-  .output(documentOutputSchema)
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let doc = await client.getCreditNote(ctx.input.creditNoteId);
-
-    return {
-      output: mapDocumentOutput(doc),
-      message: `Retrieved credit note **#${doc.number || doc.id}** — Total: ${doc.total} ${doc.currency || ''}`
-    };
-  })
-  .build();
-
-export let createCreditNote = SlateTool.create(spec, {
+  description: 'Retrieve one credit note and its provider-calculated amounts.',
+  readOnly: true,
+  input: { creditNoteId: idInput },
+  output: documentOutputSchema.shape,
+  run: async (input, client) =>
+    mapDocumentOutput(await client.get('credits', input.creditNoteId))
+});
+export const createCreditNote = tool({
   name: 'Create Credit Note',
   key: 'create_credit_note',
-  description: `Create a new credit note in Quaderno. Used for issuing refunds or corrections against invoices. Supports partial refunds.`,
-  tags: { destructive: false }
-})
-  .input(
-    z.object({
-      contactId: z.string().describe('ID of the contact to issue the credit note to'),
-      currency: z.string().optional().describe('Currency code'),
-      issueDate: z.string().optional().describe('Issue date in YYYY-MM-DD format'),
-      subject: z.string().optional().describe('Subject line'),
-      notes: z.string().optional().describe('Notes'),
-      poNumber: z.string().optional().describe('Purchase order number'),
-      tag: z.string().optional().describe('Tag for categorization'),
-      items: z.array(lineItemInputSchema).min(1).describe('Line items for the credit note')
-    })
-  )
-  .output(documentOutputSchema)
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-
-    let data: Record<string, any> = {
-      contact_id: ctx.input.contactId,
-      items_attributes: ctx.input.items.map(mapLineItemInput)
-    };
-
-    if (ctx.input.currency) data.currency = ctx.input.currency;
-    if (ctx.input.issueDate) data.issue_date = ctx.input.issueDate;
-    if (ctx.input.subject) data.subject = ctx.input.subject;
-    if (ctx.input.notes) data.notes = ctx.input.notes;
-    if (ctx.input.poNumber) data.po_number = ctx.input.poNumber;
-    if (ctx.input.tag) data.tag = ctx.input.tag;
-
-    let doc = await client.createCreditNote(data);
-
-    return {
-      output: mapDocumentOutput(doc),
-      message: `Created credit note **#${doc.number || doc.id}** for ${doc.total} ${doc.currency || ''}`
-    };
-  })
-  .build();
-
-export let deliverCreditNote = SlateTool.create(spec, {
+  description:
+    'Create a credit note against invoiceId using the current API. creditedAmount is supported for a single-line invoice and defaults to the invoice total. This records a credit, not a cash transfer. For older callers without invoiceId, contactId and items use the historical unversioned document route; support depends on the account API version.',
+  input: {
+    ...documentInput,
+    items: documentInput.items.optional(),
+    invoiceId: idInput.optional(),
+    creditedAmount: decimalInput.optional(),
+    paymentMethod: z
+      .enum([
+        'credit_card',
+        'cash',
+        'wire_transfer',
+        'direct_debit',
+        'check',
+        'iou',
+        'paypal',
+        'other'
+      ])
+      .optional()
+  },
+  output: documentOutputSchema.shape,
+  run: async (input, client) => {
+    if (input.invoiceId) {
+      reject(
+        input,
+        [
+          'contactId',
+          'items',
+          'currency',
+          'issueDate',
+          'dueDate',
+          'subject',
+          'notes',
+          'poNumber',
+          'tag',
+          'paymentDetails',
+          'customMetadata'
+        ],
+        'For current invoice-linked credits, supply invoiceId, creditedAmount and paymentMethod only.'
+      );
+      const invoice = await client.get('invoices', input.invoiceId);
+      if (
+        input.creditedAmount !== undefined &&
+        (!Array.isArray(invoice.items) || invoice.items.length !== 1)
+      )
+        throw invalid('creditedAmount is supported only for an invoice with one line item.');
+      return mapDocumentOutput(
+        await client.create('credits', {
+          invoice_id: numericId(input.invoiceId),
+          credited_amount:
+            input.creditedAmount === undefined ? undefined : decimal(input.creditedAmount),
+          payment_method: input.paymentMethod
+        })
+      );
+    }
+    reject(
+      input,
+      ['creditedAmount', 'paymentMethod'],
+      'creditedAmount and paymentMethod require invoiceId for the current credit API.'
+    );
+    if (!input.contactId || !input.items)
+      throw invalid(
+        'Provide invoiceId for the current credit API, or contactId and items for the historical compatibility route.'
+      );
+    const legacy: Row = fields(input, {
+      contactId: 'contact_id',
+      currency: 'currency',
+      issueDate: 'issue_date',
+      dueDate: 'due_date',
+      subject: 'subject',
+      notes: 'notes',
+      poNumber: 'po_number',
+      tag: 'tag',
+      paymentDetails: 'payment_details',
+      customMetadata: 'custom_metadata'
+    });
+    legacy.items_attributes = input.items.map(item => {
+      if (!item.productCode) mapLineItemInput(item);
+      return fields(item, {
+        description: 'description',
+        quantity: 'quantity',
+        unitPrice: 'unit_price',
+        totalAmount: 'total_amount',
+        discount: 'discount',
+        taxCode: 'tax_code',
+        productCode: 'product_code',
+        tax1Rate: 'tax_1_rate',
+        tax1Name: 'tax_1_name',
+        tax1Country: 'tax_1_country',
+        tax2Rate: 'tax_2_rate',
+        tax2Name: 'tax_2_name'
+      });
+    });
+    if (input.issueDate !== undefined) date(input.issueDate);
+    if (input.dueDate !== undefined) date(input.dueDate);
+    return mapDocumentOutput(await client.create('credits.json', legacy, true));
+  }
+});
+export const deliverCreditNote = tool({
   name: 'Deliver Credit Note',
   key: 'deliver_credit_note',
-  description: `Send a credit note to the customer via email.`,
-  tags: { destructive: false }
-})
-  .input(
-    z.object({
-      creditNoteId: z.string().describe('ID of the credit note to deliver')
-    })
-  )
-  .output(
-    z.object({
-      success: z.boolean().describe('Whether the delivery was initiated')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    await client.deliverCreditNote(ctx.input.creditNoteId);
-
-    return {
-      output: { success: true },
-      message: `Delivered credit note **${ctx.input.creditNoteId}** to customer`
-    };
-  })
-  .build();
+  description:
+    'Ask Quaderno to email the credit note to its contact. Success confirms initiation, not receipt.',
+  input: { creditNoteId: idInput },
+  output: { success: z.boolean() },
+  run: async (input, client) => {
+    await client.deliver('credits', input.creditNoteId);
+    return { success: true };
+  }
+});

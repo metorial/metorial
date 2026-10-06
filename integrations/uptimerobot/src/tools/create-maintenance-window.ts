@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createMaintenanceWindow = SlateTool.create(spec, {
   name: 'Create Maintenance Window',
   key: 'create_maintenance_window',
-  description: `Create a maintenance window to suppress monitoring alerts during scheduled downtime. Supports one-time, daily, weekly, and monthly recurrence patterns.`,
+  description: `Use a Legacy API Key connection (API v2). Create a maintenance window to suppress monitoring alerts during scheduled downtime. Supports one-time, daily, weekly, and monthly recurrence patterns.`,
   instructions: [
     'For **once** type: provide `startTime` as a Unix timestamp.',
     'For **daily/weekly/monthly** types: provide `startTime` in "HH:mm" format.',
@@ -14,6 +14,7 @@ export let createMaintenanceWindow = SlateTool.create(spec, {
     'For **monthly**: provide `days` as day-of-month numbers (1-28).'
   ],
   tags: {
+    readOnly: false,
     destructive: false
   }
 })
@@ -38,7 +39,7 @@ export let createMaintenanceWindow = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let typeMap: Record<string, number> = {
       once: 1,

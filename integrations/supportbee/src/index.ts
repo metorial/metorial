@@ -16,8 +16,6 @@ import {
   searchTickets,
   updateTicketStatus
 } from './tools';
-import { assignmentEvents, replyCommentEvents, ticketEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     manageSnippets,
     getReports
   ],
-  triggers: [ticketEvents, replyCommentEvents, assignmentEvents]
+  triggers: []
 });

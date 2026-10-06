@@ -41,7 +41,11 @@ export let listConnectionsTool = SlateTool.create(spec, {
           workspaceId: z.string(),
           status: z.string(),
           scheduleType: z.string().optional(),
-          dataResidency: z.string()
+          dataResidency: z
+            .string()
+            .describe(
+              'Legacy connection residency field; empty when unavailable. Use get_workspace for workspace residency.'
+            )
         })
       ),
       hasMore: z.boolean()

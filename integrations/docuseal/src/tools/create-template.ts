@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import type { NativeTemplate } from '../lib/schemas';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let createTemplate = SlateTool.create(spec, {
@@ -29,7 +31,7 @@ For **HTML**: provide raw HTML content with field tags like \`<text-field>\`, \`
               .describe('Base64-encoded file content or URL (for PDF/DOCX)'),
             html: z.string().optional().describe('HTML content (for HTML source type)'),
             fields: z
-              .array(z.record(z.string(), z.any()))
+              .array(z.record(z.string(), z.unknown()))
               .optional()
               .describe('Field definitions with coordinates')
           })
@@ -63,8 +65,8 @@ For **HTML**: provide raw HTML content with field tags like \`<text-field>\`, \`
       slug: z.string().optional().describe('Template slug'),
       externalId: z.string().nullable().optional().describe('External ID'),
       folderName: z.string().nullable().optional().describe('Folder name'),
-      fields: z.array(z.any()).describe('Template fields'),
-      documents: z.array(z.any()).describe('Template documents'),
+      fields: z.array(z.unknown()).describe('Template fields'),
+      documents: z.array(z.unknown()).describe('Template documents'),
       createdAt: z.string().describe('Creation timestamp')
     })
   )
@@ -74,7 +76,31 @@ For **HTML**: provide raw HTML content with field tags like \`<text-field>\`, \`
       baseUrl: ctx.config.baseUrl
     });
 
-    let result: any;
+    let result: NativeTemplate;
+    const htmlOptions = [
+      ctx.input.html,
+      ctx.input.htmlHeader,
+      ctx.input.htmlFooter,
+      ctx.input.size
+    ];
+    if (
+      ctx.input.sourceType !== 'html' &&
+      (htmlOptions.some(value => value !== undefined) ||
+        ctx.input.documents?.some(d => d.html !== undefined))
+    )
+      fail('HTML options require sourceType=html. Remove these options or select html.');
+    if (
+      ctx.input.sourceType !== 'pdf' &&
+      (ctx.input.flatten !== undefined || ctx.input.removeTags !== undefined)
+    )
+      fail(
+        'flatten and removeTags require sourceType=pdf. Remove them for other source types.'
+      );
+    if (
+      ctx.input.sourceType === 'html' &&
+      ctx.input.documents?.some(d => d.file !== undefined || d.fields !== undefined)
+    )
+      fail('HTML documents use html content; remove file and coordinate fields.');
 
     if (ctx.input.sourceType === 'pdf') {
       let docs = (ctx.input.documents || []).map(d => ({

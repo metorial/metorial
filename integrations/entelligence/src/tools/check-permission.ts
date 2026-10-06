@@ -6,7 +6,8 @@ import { spec } from '../spec';
 export let checkPermission = SlateTool.create(spec, {
   name: 'Check Query Permission',
   key: 'check_query_permission',
-  description: `Verify whether the configured API key has permission to query the specified repository. Use this to validate access before sending chat queries.`,
+  description:
+    'Check whether the configured Entelligence chat-widget repository allows questions to its owners. This is the widget’s owner-submission permission check; it does not prove access to every Entelligence feature.',
   tags: {
     readOnly: true
   }
@@ -16,8 +17,12 @@ export let checkPermission = SlateTool.create(spec, {
     z.object({
       allowed: z
         .boolean()
-        .describe('Whether queries are allowed for the configured repository'),
-      repositoryUrl: z.string().describe('The repository URL that was checked')
+        .describe('Whether owner submissions are allowed for the configured repository'),
+      repositoryUrl: z
+        .string()
+        .describe(
+          'Configured repository address; the provider does not return a verified navigation link'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -30,7 +35,7 @@ export let checkPermission = SlateTool.create(spec, {
     ctx.progress('Checking query permissions...');
 
     let result = await client.checkQueryPermission();
-    let repoUrl = `https://entelligence.ai/${ctx.config.organization}/${ctx.config.repoName}`;
+    let repoUrl = `https://entelligence.ai/${encodeURIComponent(ctx.config.organization)}/${encodeURIComponent(ctx.config.repoName)}`;
 
     return {
       output: {
@@ -38,8 +43,8 @@ export let checkPermission = SlateTool.create(spec, {
         repositoryUrl: repoUrl
       },
       message: result.allowed
-        ? `Access **granted** for repository **${ctx.config.organization}/${ctx.config.repoName}**.`
-        : `Access **denied** for repository **${ctx.config.organization}/${ctx.config.repoName}**. Verify your API key and repository configuration.`
+        ? `Owner submissions are allowed for **${ctx.config.organization}/${ctx.config.repoName}**.`
+        : `Owner submissions are not allowed for **${ctx.config.organization}/${ctx.config.repoName}**. Verify your API key, repository configuration, and owner Slack setup.`
     };
   })
   .build();

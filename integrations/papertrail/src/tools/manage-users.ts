@@ -26,9 +26,9 @@ export let listUsers = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let data = await client.listUsers();
 
-    let users = (Array.isArray(data) ? data : []).map((u: any) => ({
+    let users = data.map(u => ({
       userId: u.id,
-      email: u.email || ''
+      email: u.email
     }));
 
     return {
@@ -44,7 +44,7 @@ export let inviteUser = SlateTool.create(spec, {
   description: `Invite a new team member to the Papertrail account by email. Configure their permission level including read-only access, member management, billing management, log purging, and group access restrictions.`,
   instructions: [
     'If manageMembers or manageBilling is enabled, readOnly is automatically overridden to false (full access granted).',
-    'If purgeLogs is enabled but readOnly or canAccessAllGroups is false, purge permission will not be granted.',
+    'Purge access follows provider permission rules; users restricted to specific groups cannot purge logs.',
     'To restrict access to specific groups, set canAccessAllGroups to false and provide groupIds.'
   ],
   tags: {
@@ -88,7 +88,7 @@ export let inviteUser = SlateTool.create(spec, {
 
     return {
       output: { invited: true },
-      message: `Invitation sent to **${ctx.input.email}**.`
+      message: `Invitation or access granted to **${ctx.input.email}**.`
     };
   })
   .build();

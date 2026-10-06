@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, TravisCIClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageCaches = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let manageCaches = SlateTool.create(spec, {
   key: 'manage_caches',
   description: `List or delete build caches for a repository. Caches store dependencies and artifacts to speed up builds. Can be filtered by branch or name pattern.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -38,7 +38,7 @@ export let manageCaches = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
     if (ctx.input.action === 'delete') {
@@ -57,7 +57,7 @@ export let manageCaches = SlateTool.create(spec, {
       match: ctx.input.match
     });
 
-    let caches = (result.caches || []).map((cache: any) => ({
+    let caches = (result.caches || []).map(cache => ({
       slug: cache.slug,
       branch: cache.branch,
       size: cache.size,

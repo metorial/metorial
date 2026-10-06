@@ -7,7 +7,7 @@ import { spec } from '../spec';
 export let listRunsTool = SlateTool.create(spec, {
   name: 'List Runs',
   key: 'list_runs',
-  description: `List Terraform runs for a workspace. Filter by status to find pending, planning, applying, or completed runs. Returns run details including status, changes, and timing information.`,
+  description: `List Terraform runs for a workspace. The provider excludes plan-only runs by default; use operation to include them. Filter by status to find pending, planning, applying, or completed runs. Returns run details including status, changes, and timing information.`,
   tags: {
     readOnly: true
   }
@@ -20,6 +20,12 @@ export let listRunsTool = SlateTool.create(spec, {
         .optional()
         .describe(
           'Filter by run status (e.g., "pending", "planning", "planned", "applying", "applied", "errored", "canceled", "discarded")'
+        ),
+      operation: z
+        .string()
+        .optional()
+        .describe(
+          'Comma-separated provider run operations. Include plan_only to list speculative plans; omitted uses the provider default, which excludes them.'
         ),
       pageNumber: z.number().optional().describe('Page number for pagination'),
       pageSize: z.number().optional().describe('Number of results per page')
@@ -60,6 +66,7 @@ export let listRunsTool = SlateTool.create(spec, {
     let client = createClient(ctx);
     let response = await client.listRuns(ctx.input.workspaceId, {
       status: ctx.input.status,
+      operation: ctx.input.operation,
       pageNumber: ctx.input.pageNumber,
       pageSize: ctx.input.pageSize
     });

@@ -2,18 +2,24 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GreenhouseClient } from '../lib/client';
 import { spec } from '../spec';
-
-export let rejectApplicationTool = SlateTool.create(spec, {
-  name: 'Reject Application',
+export const rejectApplicationTool = SlateTool.create(spec, {
   key: 'reject_application',
-  description: `Reject a candidate's application. Optionally specify a rejection reason, notes, and whether to send a rejection email. Requires the **On-Behalf-Of** user ID in config.`,
-  constraints: ['Requires the onBehalfOf config value to be set for audit purposes.'],
-  tags: { readOnly: false }
+  name: 'Reject Application',
+  description:
+    'Reject an application with a required rejection reason. Email scheduling requires a template and timestamp. This operation retains rejection history and may send email; confirmation does not prove email delivery.',
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
+      emailFromUserId: z
+        .string()
+        .optional()
+        .describe('Optional Greenhouse sender user ID when requesting an email.'),
       applicationId: z.string().describe('The application ID to reject'),
-      rejectionReasonId: z.string().optional().describe('ID of the rejection reason'),
+      rejectionReasonId: z
+        .string()
+        .optional()
+        .describe('Required by Harvest v3. Obtain the ID with list_rejection_reasons.'),
       notes: z.string().optional().describe('Notes about the rejection'),
       sendRejectionEmail: z.boolean().optional().describe('Whether to send a rejection email'),
       emailTemplateId: z
@@ -29,38 +35,19 @@ export let rejectApplicationTool = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean(),
-      applicationId: z.string()
+      applicationId: z.string(),
+      rejectionReasonId: z.string(),
+      emailRequested: z.boolean()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GreenhouseClient({
-      token: ctx.auth.token,
-      onBehalfOf: ctx.config.onBehalfOf
-    });
-
-    let rejectionEmail = ctx.input.sendRejectionEmail
-      ? {
-          sendEmailAt: ctx.input.sendEmailAt,
-          emailTemplateId: ctx.input.emailTemplateId
-            ? Number.parseInt(ctx.input.emailTemplateId, 10)
-            : undefined
-        }
-      : undefined;
-
-    await client.rejectApplication(Number.parseInt(ctx.input.applicationId, 10), {
-      rejectionReasonId: ctx.input.rejectionReasonId
-        ? Number.parseInt(ctx.input.rejectionReasonId, 10)
-        : undefined,
-      notes: ctx.input.notes,
-      rejectionEmail
-    });
-
     return {
-      output: {
-        success: true,
-        applicationId: ctx.input.applicationId
-      },
-      message: `Application **${ctx.input.applicationId}** has been rejected.${ctx.input.sendRejectionEmail ? ' A rejection email will be sent.' : ''}`
+      output: await new GreenhouseClient(ctx.auth, ctx.config).rejectApplication(
+        ctx.input.applicationId,
+        ctx.input
+      ),
+      message:
+        'Confirmed the application rejection. A requested email was submitted for scheduling; delivery is not verified.'
     };
   })
   .build();

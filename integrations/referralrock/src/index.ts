@@ -22,14 +22,6 @@ import {
   updateMember,
   updateReferral
 } from './tools';
-import {
-  emailEvents,
-  memberEvents,
-  programEvents,
-  referralEvents,
-  rewardEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -54,5 +46,5 @@ export let provider = Slate.create({
     sendInviteFeed,
     getMemberAccessUrls
   ],
-  triggers: [programEvents, memberEvents, referralEvents, rewardEvents, emailEvents]
+  triggers: []
 });

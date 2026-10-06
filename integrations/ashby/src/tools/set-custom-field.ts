@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AshbyClient } from '../lib/client';
+import { id, invalid, pageSchema, row, unexpected, warningsSchema } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let setCustomField = SlateTool.create(spec, {
   name: 'Set Custom Field',
   key: 'set_custom_field',
-  description: `Sets a custom field value on an Ashby entity. Use the list organization tool with \`resourceType\` set to the entity type to discover available custom field IDs.`,
+  description: `Sets a custom field value on an Ashby entity. Use the list organization tool with \`resourceType\` set to \`custom_fields\` to discover definitions and their supported object types. Offer fields use manage_offer forms; this endpoint does not support Offer.`,
   tags: {
     readOnly: false
   }
@@ -30,27 +31,43 @@ export let setCustomField = SlateTool.create(spec, {
       success: z.boolean(),
       objectType: z.string(),
       objectId: z.string(),
-      fieldId: z.string()
+      fieldValue: z.unknown().optional(),
+      fieldId: z.string(),
+      warnings: warningsSchema,
+      pageInfo: pageSchema.optional(),
+      completedActions: z.array(z.string()).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AshbyClient({ token: ctx.auth.token });
-
-    await client.setCustomFieldValue({
-      objectType: ctx.input.objectType,
-      objectId: ctx.input.objectId,
-      fieldId: ctx.input.fieldId,
-      value: ctx.input.fieldValue
+    const client = new AshbyClient(ctx.auth),
+      input = ctx.input;
+    if (input.objectType === 'Offer')
+      invalid(
+        'Offer custom fields use the offer form API. Use manage_offer update with documented field paths; customField.setValue does not support Offer.'
+      );
+    const objectId = id(input.objectId, 'Object ID'),
+      fieldId = id(input.fieldId, 'Custom field ID');
+    if (input.fieldValue === undefined)
+      invalid('Provide fieldValue explicitly; use null to clear a field.');
+    const result = await client.post('/customField.setValue', {
+      objectType: input.objectType,
+      objectId,
+      fieldId,
+      fieldValue: input.fieldValue
     });
-
+    const field = row(result.results);
+    if (field.id !== fieldId) unexpected();
     return {
       output: {
         success: true,
-        objectType: ctx.input.objectType,
-        objectId: ctx.input.objectId,
-        fieldId: ctx.input.fieldId
+        objectType: input.objectType,
+        objectId,
+        fieldId,
+        fieldValue: field.value,
+        warnings: client.warnings
       },
-      message: `Set custom field \`${ctx.input.fieldId}\` on ${ctx.input.objectType} \`${ctx.input.objectId}\`.`
+      message:
+        'Custom field write accepted. The provider-returned value is included; check warnings before retrying.'
     };
   })
   .build();

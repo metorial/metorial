@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { destinationOutputSchema } from '../lib/models';
 import { spec } from '../spec';
 
 export let getTransformation = SlateTool.create(spec, {
@@ -27,7 +28,10 @@ export let getTransformation = SlateTool.create(spec, {
       codeVersion: z.string().nullable().describe('Code version number'),
       language: z.string().describe('Programming language used'),
       createdAt: z.string().describe('Creation timestamp'),
-      updatedAt: z.string().describe('Last update timestamp')
+      updatedAt: z.string().describe('Last update timestamp'),
+      destinations: destinationOutputSchema.describe(
+        'Current destination associations when reported by the provider.'
+      )
     })
   )
   .handleInvocation(async ctx => {
@@ -48,7 +52,8 @@ export let getTransformation = SlateTool.create(spec, {
         codeVersion: result.codeVersion ?? null,
         language: result.language,
         createdAt: result.createdAt,
-        updatedAt: result.updatedAt
+        updatedAt: result.updatedAt,
+        destinations: result.destinations
       },
       message: `Retrieved transformation **${result.name}** (ID: \`${result.id}\`).`
     };

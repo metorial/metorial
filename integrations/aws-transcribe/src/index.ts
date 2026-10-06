@@ -19,8 +19,6 @@ import {
   startMedicalTranscriptionJob,
   startTranscriptionJob
 } from './tools';
-import { inboundWebhook, transcriptionJobStateChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     manageMedicalVocabulary.build(),
     listLanguageModels.build()
   ],
-  triggers: [inboundWebhook, transcriptionJobStateChange.build()]
+  triggers: []
 });

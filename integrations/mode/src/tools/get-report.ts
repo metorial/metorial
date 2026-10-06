@@ -30,11 +30,7 @@ export let getReport = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let raw = await client.getReport(ctx.input.reportToken);
     let report = normalizeReport(raw);

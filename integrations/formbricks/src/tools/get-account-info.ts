@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getAccountInfo = SlateTool.create(spec, {
   name: 'Get Account Info',
   key: 'get_account_info',
-  description: `Retrieve information about the authenticated Formbricks account, including the project details and environment type. Useful for getting the environmentId needed by other tools.`,
+  description: `Retrieve information about the authenticated single-workspace API key, including the project details and environment type. Useful for getting the environmentId needed by other tools.`,
   tags: {
     readOnly: true
   }
@@ -20,25 +20,33 @@ export let getAccountInfo = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Environment type (production or development)'),
-      environmentId: z.string().optional().describe('Environment ID')
+      environmentId: z
+        .string()
+        .optional()
+        .describe('Legacy environment ID accepted by v1 writes'),
+      workspaceId: z.string().optional().describe('Current workspace ID'),
+      workspaceName: z.string().optional().describe('Current workspace name')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     let me = await client.getMe();
 
     return {
       output: {
-        projectId: me?.project?.id,
-        projectName: me?.project?.name,
-        environmentType: me?.environment?.type,
-        environmentId: me?.environment?.id
+        projectId: me.project.id,
+        projectName: me.project.name,
+        environmentType: me.type,
+        environmentId: me.id,
+        workspaceId: me.workspace?.id,
+        workspaceName: me.workspace?.name
       },
-      message: `Account: project **${me?.project?.name ?? 'Unknown'}** (${me?.environment?.type ?? 'unknown'} environment).`
+      message: `Account: project **${me.project.name}** (${me.type} environment).`
     };
   })
   .build();

@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createDeploy = SlateTool.create(spec, {
   name: 'Create Deploy',
   key: 'create_deploy',
-  description: `Report a deployment to Rollbar. Deploy tracking enables suspect deploy identification and helps correlate error spikes with releases. Provide the environment, revision (git SHA or version), and optionally deployer info and status.`,
+  description: `Report a deployment to Rollbar. Deploy tracking enables suspect deploy identification and helps correlate error spikes with releases. Requires a project token with post_server_item scope or a separately configured postServerToken. The ingestion token determines the target project. Provide the environment, revision (git SHA or version), and optionally deployer info and status.`,
   tags: {
     destructive: false
   }
@@ -34,7 +34,7 @@ export let createDeploy = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let result = await client.createDeploy({
       environment: ctx.input.environment,
@@ -53,7 +53,7 @@ export let createDeploy = SlateTool.create(spec, {
         environment: deploy.environment || ctx.input.environment,
         revision: deploy.revision || ctx.input.revision,
         status: deploy.status || ctx.input.status,
-        projectId: deploy.project_id
+        projectId: undefined
       },
       message: `Deploy **${deploy.deploy_id || deploy.id}** created for revision \`${ctx.input.revision}\` in **${ctx.input.environment}**${ctx.input.status ? ` (status: ${ctx.input.status})` : ''}.`
     };

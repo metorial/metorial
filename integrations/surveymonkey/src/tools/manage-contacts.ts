@@ -4,28 +4,34 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let contactSchema = z.object({
-  firstName: z.string().describe('First name'),
-  lastName: z.string().describe('Last name'),
+  firstName: z.string().optional().describe('First name'),
+  lastName: z.string().optional().describe('Last name'),
   email: z.string().optional().describe('Email address (required if no phone number)'),
   phoneNumber: z.string().optional().describe('Phone number (required if no email)'),
   customFields: z
     .record(z.string(), z.string())
     .optional()
-    .describe('Custom fields with numeric keys (1-6)')
+    .describe('Custom fields with numeric keys (1-50)')
 });
 
 export let listContactLists = SlateTool.create(spec, {
   name: 'List Contact Lists',
   key: 'list_contact_lists',
-  description: `Retrieve all contact lists in the account. Contact lists are used to organize recipients for email and SMS survey invitations.`,
+  description: `Retrieve one native page of contact lists in the account. Contact lists are used to organize recipients for email and SMS survey invitations.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number'),
-      perPage: z.number().optional().describe('Results per page')
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Page number'),
+      perPage: z.number().int().min(1).max(1000).optional().describe('Results per page')
     })
   )
   .output(
@@ -37,7 +43,10 @@ export let listContactLists = SlateTool.create(spec, {
         })
       ),
       page: z.number(),
-      total: z.number()
+      total: z.number(),
+      perPage: z.number(),
+      hasMore: z.boolean(),
+      nextPage: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -51,7 +60,7 @@ export let listContactLists = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let contactLists = (result.data || []).map((l: any) => ({
+    let contactLists = result.data.map(l => ({
       contactListId: l.id,
       name: l.name
     }));
@@ -59,10 +68,13 @@ export let listContactLists = SlateTool.create(spec, {
     return {
       output: {
         contactLists,
-        page: result.page || 1,
-        total: result.total || contactLists.length
+        page: result.page,
+        total: result.total,
+        perPage: result.per_page,
+        hasMore: result.nextPage !== undefined,
+        nextPage: result.nextPage
       },
-      message: `Found **${result.total || contactLists.length}** contact lists.`
+      message: `Found **${result.total}** contact lists.`
     };
   })
   .build();
@@ -112,8 +124,14 @@ export let listContacts = SlateTool.create(spec, {
   .input(
     z.object({
       contactListId: z.string().describe('ID of the contact list'),
-      page: z.number().optional().describe('Page number'),
-      perPage: z.number().optional().describe('Results per page'),
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Page number'),
+      perPage: z.number().int().min(1).max(1000).optional().describe('Results per page'),
       status: z
         .enum(['active', 'optout', 'bounced'])
         .optional()
@@ -136,11 +154,15 @@ export let listContacts = SlateTool.create(spec, {
           lastName: z.string().optional(),
           email: z.string().optional(),
           phoneNumber: z.string().optional(),
-          status: z.string().optional()
+          status: z.string().optional(),
+          statusFlag: z.boolean().optional()
         })
       ),
       page: z.number(),
-      total: z.number()
+      total: z.number(),
+      perPage: z.number(),
+      hasMore: z.boolean(),
+      nextPage: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -159,22 +181,26 @@ export let listContacts = SlateTool.create(spec, {
       sortOrder: ctx.input.sortOrder
     });
 
-    let contacts = (result.data || []).map((c: any) => ({
+    let contacts = result.data.map(c => ({
       contactId: c.id,
       firstName: c.first_name,
       lastName: c.last_name,
       email: c.email,
       phoneNumber: c.phone_number,
-      status: c.status
+      status: typeof c.status === 'string' ? c.status : undefined,
+      statusFlag: typeof c.status === 'boolean' ? c.status : undefined
     }));
 
     return {
       output: {
         contacts,
-        page: result.page || 1,
-        total: result.total || contacts.length
+        page: result.page,
+        total: result.total,
+        perPage: result.per_page,
+        hasMore: result.nextPage !== undefined,
+        nextPage: result.nextPage
       },
-      message: `Found **${result.total || contacts.length}** contacts in list \`${ctx.input.contactListId}\`.`
+      message: `Found **${result.total}** contacts in list \`${ctx.input.contactListId}\`.`
     };
   })
   .build();
@@ -182,19 +208,19 @@ export let listContacts = SlateTool.create(spec, {
 export let createContact = SlateTool.create(spec, {
   name: 'Create Contact',
   key: 'create_contact',
-  description: `Add a single contact to a contact list. Requires first name, last name, and either email or phone number.`
+  description: `Add a single contact to a contact list. Requires either email or phone number; names are optional.`
 })
   .input(
     z.object({
       contactListId: z.string().describe('ID of the contact list to add the contact to'),
-      firstName: z.string().describe('First name'),
-      lastName: z.string().describe('Last name'),
+      firstName: z.string().optional().describe('First name'),
+      lastName: z.string().optional().describe('Last name'),
       email: z.string().optional().describe('Email address'),
       phoneNumber: z.string().optional().describe('Phone number'),
       customFields: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Custom fields with numeric keys (1-6)')
+        .describe('Custom fields with numeric keys (1-50)')
     })
   )
   .output(
@@ -239,7 +265,7 @@ export let createContactsBulk = SlateTool.create(spec, {
   .input(
     z.object({
       contactListId: z.string().describe('ID of the contact list'),
-      contacts: z.array(contactSchema).describe('Array of contacts to add'),
+      contacts: z.array(contactSchema).min(1).max(1000).describe('Array of contacts to add'),
       updateExisting: z
         .boolean()
         .optional()
@@ -291,7 +317,7 @@ export let createContactsBulk = SlateTool.create(spec, {
 export let deleteContactList = SlateTool.create(spec, {
   name: 'Delete Contact List',
   key: 'delete_contact_list',
-  description: `Permanently delete a contact list and all its contacts.`,
+  description: `Delete a contact list. Global contacts and previously sent invitations or responses can remain; this does not prove erasure.`,
   tags: {
     destructive: true
   }

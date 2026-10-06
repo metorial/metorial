@@ -36,14 +36,6 @@ import {
   updateSaleQuote
 } from './tools';
 
-import {
-  contactEvents,
-  customerEvents,
-  invoiceEvents,
-  productEvents,
-  quoteEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -80,5 +72,5 @@ export let provider = Slate.create({
     manageReceipt,
     getSettings
   ],
-  triggers: [customerEvents, contactEvents, invoiceEvents, quoteEvents, productEvents]
+  triggers: []
 });

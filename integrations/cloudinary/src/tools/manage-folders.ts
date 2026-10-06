@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import { folderSchema } from '../lib/types';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageFolders = SlateTool.create(spec, {
@@ -13,7 +15,7 @@ export let manageFolders = SlateTool.create(spec, {
     'Folders must be empty before they can be deleted.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -29,76 +31,53 @@ export let manageFolders = SlateTool.create(spec, {
       maxResults: z
         .number()
         .optional()
-        .describe('Maximum number of folders to return (for "list" action).'),
+        .describe(
+          'Maximum folder count per page (1–500); the endpoint is limited to 2000 results.'
+        ),
       nextCursor: z.string().optional().describe('Cursor for pagination (for "list" action).')
     })
   )
   .output(
     z.object({
-      folders: z
-        .array(
-          z.object({
-            name: z.string().describe('Folder name.'),
-            path: z.string().describe('Full folder path.')
-          })
-        )
-        .optional()
-        .describe('List of folders (for "list" action).'),
-      nextCursor: z.string().optional().describe('Cursor for the next page.'),
-      created: z
-        .boolean()
-        .optional()
-        .describe('Whether the folder was created (for "create" action).'),
-      deleted: z
-        .array(z.string())
-        .optional()
-        .describe('Deleted folder paths (for "delete" action).')
+      folders: z.array(folderSchema).optional(),
+      nextCursor: z.string().optional(),
+      created: z.boolean().optional(),
+      path: z.string().optional(),
+      deleted: z.array(z.string()).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-
+    const client = createClient(ctx);
     if (ctx.input.action === 'list') {
-      let result: any;
-      if (ctx.input.path) {
-        result = await client.listSubfolders(ctx.input.path, {
-          maxResults: ctx.input.maxResults,
-          nextCursor: ctx.input.nextCursor
-        });
-      } else {
-        result = await client.listFolders({
-          maxResults: ctx.input.maxResults,
-          nextCursor: ctx.input.nextCursor
-        });
-      }
-
+      const result =
+        ctx.input.path !== undefined
+          ? await client.listSubfolders(ctx.input.path, {
+              maxResults: ctx.input.maxResults,
+              nextCursor: ctx.input.nextCursor
+            })
+          : await client.listFolders({
+              maxResults: ctx.input.maxResults,
+              nextCursor: ctx.input.nextCursor
+            });
       return {
-        output: {
-          folders: result.folders.map((f: any) => ({ name: f.name, path: f.path })),
-          nextCursor: result.nextCursor
-        },
-        message: `Listed **${result.folders.length}** folder(s)${ctx.input.path ? ` under "${ctx.input.path}"` : ' at root'}.${result.nextCursor ? ' More results available.' : ''}`
+        output: { folders: result.folders, nextCursor: result.nextCursor },
+        message: `Listed ${result.folders.length} folder(s).${result.nextCursor ? ' Continue with nextCursor.' : ''}`
       };
     }
-
+    if (ctx.input.maxResults !== undefined || ctx.input.nextCursor !== undefined)
+      fail('Paging options apply only to listing folders.');
+    if (ctx.input.path === undefined) fail('path is required to create or delete a folder.');
     if (ctx.input.action === 'create') {
-      if (!ctx.input.path) throw new Error('Path is required to create a folder.');
-      await client.createFolder(ctx.input.path);
+      const result = await client.createFolder(ctx.input.path);
       return {
-        output: { created: true },
-        message: `Created folder **${ctx.input.path}**.`
+        output: { created: true, path: result.path },
+        message: `Cloudinary confirmed folder **${result.path}**.`
       };
     }
-
-    if (ctx.input.action === 'delete') {
-      if (!ctx.input.path) throw new Error('Path is required to delete a folder.');
-      let result = await client.deleteFolder(ctx.input.path);
-      return {
-        output: { deleted: result.deleted },
-        message: `Deleted folder **${ctx.input.path}**.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    const result = await client.deleteFolder(ctx.input.path);
+    return {
+      output: result,
+      message: `Cloudinary confirmed deletion of folder **${ctx.input.path}**. Backup entries may prevent deletion.`
+    };
   })
   .build();

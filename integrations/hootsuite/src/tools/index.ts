@@ -1,3 +1,4 @@
+export { getFileUrl } from './get-file-url';
 export { getUserInfoTool } from './get-user-info';
 export { listMessagesTool } from './list-messages';
 export { listSocialProfilesTool } from './list-social-profiles';

@@ -5,7 +5,8 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'contentful',
   name: 'Contentful',
-  description: undefined,
+  description:
+    'Read and manage Contentful content with the appropriate API credential and data residency region.',
   metadata: {},
   config,
   auth

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { fetchOEmbed, isValidLoomUrl } from '../lib/client';
+import { fetchOEmbed, parseLoomUrl } from '../lib/client';
 import { spec } from '../spec';
 
 export let getVideoMetadata = SlateTool.create(spec, {
@@ -42,13 +42,7 @@ export let getVideoMetadata = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!isValidLoomUrl(ctx.input.videoUrl)) {
-      throw new Error(
-        `Invalid Loom URL: "${ctx.input.videoUrl}". Expected format: https://www.loom.com/share/{videoId} or https://www.loom.com/embed/{videoId}`
-      );
-    }
-
-    ctx.info(`Fetching metadata for Loom video: ${ctx.input.videoUrl}`);
+    parseLoomUrl(ctx.input.videoUrl);
 
     let metadata = await fetchOEmbed(ctx.input.videoUrl, {
       maxWidth: ctx.input.maxWidth,

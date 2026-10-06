@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdInput } from '../lib/models';
 import { spec } from '../spec';
 
 export let deleteDataSource = SlateTool.create(spec, {
@@ -17,6 +18,7 @@ export let deleteDataSource = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdInput,
       dataSourceId: z.number().describe('ID of the data source to delete')
     })
   )
@@ -27,8 +29,10 @@ export let deleteDataSource = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.deleteDataSource(ctx.input.dataSourceId);
+    let client = new Client({ token: ctx.auth.token, apiVersion: ctx.config.apiVersion });
+    let result = await client.deleteDataSource(ctx.input.dataSourceId, {
+      accountId: ctx.input.accountId
+    });
 
     return {
       output: {

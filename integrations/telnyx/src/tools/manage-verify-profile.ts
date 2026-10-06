@@ -27,10 +27,21 @@ export let manageVerifyProfile = SlateTool.create(spec, {
         .describe('Profile name (required for create, optional for update)'),
       webhookUrl: z.string().optional().describe('Webhook URL for verification events'),
       webhookFailoverUrl: z.string().optional().describe('Failover webhook URL'),
+      channelSettings: z
+        .object({
+          sms: z.record(z.string(), z.unknown()).optional(),
+          call: z.record(z.string(), z.unknown()).optional(),
+          flashcall: z.record(z.string(), z.unknown()).optional(),
+          whatsapp: z.record(z.string(), z.unknown()).optional()
+        })
+        .optional()
+        .describe(
+          'Native channel settings, including default_verification_timeout_secs; flashcall is create-only'
+        ),
       defaultTimeoutSecs: z
         .number()
         .optional()
-        .describe('Default verification code timeout in seconds'),
+        .describe('Legacy aggregate timeout is unsupported; use channelSettings per channel'),
       pageNumber: z.number().optional().describe('Page number for list action'),
       pageSize: z.number().optional().describe('Page size for list action')
     })
@@ -41,10 +52,10 @@ export let manageVerifyProfile = SlateTool.create(spec, {
         .array(
           z.object({
             profileId: z.string().describe('Profile ID'),
-            name: z.string().optional().describe('Profile name'),
-            webhookUrl: z.string().optional().describe('Webhook URL'),
-            createdAt: z.string().optional().describe('Created timestamp'),
-            updatedAt: z.string().optional().describe('Updated timestamp')
+            name: z.string().nullish().describe('Profile name'),
+            webhookUrl: z.string().nullish().describe('Webhook URL'),
+            createdAt: z.string().nullish().describe('Created timestamp'),
+            updatedAt: z.string().nullish().describe('Updated timestamp')
           })
         )
         .optional()
@@ -52,12 +63,25 @@ export let manageVerifyProfile = SlateTool.create(spec, {
       profile: z
         .object({
           profileId: z.string().describe('Profile ID'),
-          name: z.string().optional().describe('Profile name'),
-          webhookUrl: z.string().optional().describe('Webhook URL'),
-          webhookFailoverUrl: z.string().optional().describe('Failover webhook URL'),
-          defaultTimeoutSecs: z.number().optional().describe('Default timeout'),
-          createdAt: z.string().optional().describe('Created timestamp'),
-          updatedAt: z.string().optional().describe('Updated timestamp')
+          name: z.string().nullish().describe('Profile name'),
+          webhookUrl: z.string().nullish().describe('Webhook URL'),
+          webhookFailoverUrl: z.string().nullish().describe('Failover webhook URL'),
+          defaultTimeoutSecs: z
+            .number()
+            .optional()
+            .describe(
+              'Legacy aggregate field; omitted because native timeouts are per channel'
+            ),
+          channelSettings: z
+            .object({
+              sms: z.record(z.string(), z.unknown()).optional(),
+              call: z.record(z.string(), z.unknown()).optional(),
+              flashcall: z.record(z.string(), z.unknown()).optional(),
+              whatsapp: z.record(z.string(), z.unknown()).optional()
+            })
+            .optional(),
+          createdAt: z.string().nullish().describe('Created timestamp'),
+          updatedAt: z.string().nullish().describe('Updated timestamp')
         })
         .optional()
         .describe('Single profile details'),
@@ -73,7 +97,7 @@ export let manageVerifyProfile = SlateTool.create(spec, {
         pageNumber: ctx.input.pageNumber,
         pageSize: ctx.input.pageSize
       });
-      let profiles = (result.data ?? []).map((p: any) => ({
+      let profiles = (result.data ?? []).map(p => ({
         profileId: p.id,
         name: p.name,
         webhookUrl: p.webhook_url,
@@ -91,7 +115,8 @@ export let manageVerifyProfile = SlateTool.create(spec, {
         name: ctx.input.name!,
         webhookUrl: ctx.input.webhookUrl,
         webhookFailoverUrl: ctx.input.webhookFailoverUrl,
-        defaultTimeoutSecs: ctx.input.defaultTimeoutSecs
+        defaultTimeoutSecs: ctx.input.defaultTimeoutSecs,
+        channelSettings: ctx.input.channelSettings
       });
       return {
         output: {
@@ -100,7 +125,12 @@ export let manageVerifyProfile = SlateTool.create(spec, {
             name: result.name,
             webhookUrl: result.webhook_url,
             webhookFailoverUrl: result.webhook_failover_url,
-            defaultTimeoutSecs: result.default_timeout_secs,
+            channelSettings: {
+              sms: result.sms,
+              call: result.call,
+              flashcall: result.flashcall,
+              whatsapp: result.whatsapp
+            },
             createdAt: result.created_at,
             updatedAt: result.updated_at
           }
@@ -122,7 +152,8 @@ export let manageVerifyProfile = SlateTool.create(spec, {
         name: ctx.input.name,
         webhookUrl: ctx.input.webhookUrl,
         webhookFailoverUrl: ctx.input.webhookFailoverUrl,
-        defaultTimeoutSecs: ctx.input.defaultTimeoutSecs
+        defaultTimeoutSecs: ctx.input.defaultTimeoutSecs,
+        channelSettings: ctx.input.channelSettings
       });
       return {
         output: {
@@ -131,7 +162,12 @@ export let manageVerifyProfile = SlateTool.create(spec, {
             name: result.name,
             webhookUrl: result.webhook_url,
             webhookFailoverUrl: result.webhook_failover_url,
-            defaultTimeoutSecs: result.default_timeout_secs,
+            channelSettings: {
+              sms: result.sms,
+              call: result.call,
+              flashcall: result.flashcall,
+              whatsapp: result.whatsapp
+            },
             createdAt: result.created_at,
             updatedAt: result.updated_at
           }
@@ -149,7 +185,12 @@ export let manageVerifyProfile = SlateTool.create(spec, {
           name: result.name,
           webhookUrl: result.webhook_url,
           webhookFailoverUrl: result.webhook_failover_url,
-          defaultTimeoutSecs: result.default_timeout_secs,
+          channelSettings: {
+            sms: result.sms,
+            call: result.call,
+            flashcall: result.flashcall,
+            whatsapp: result.whatsapp
+          },
           createdAt: result.created_at,
           updatedAt: result.updated_at
         }

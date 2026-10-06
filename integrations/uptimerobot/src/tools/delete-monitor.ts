@@ -6,8 +6,9 @@ import { spec } from '../spec';
 export let deleteMonitor = SlateTool.create(spec, {
   name: 'Delete Monitor',
   key: 'delete_monitor',
-  description: `Permanently delete an uptime monitor. This action cannot be undone — all historical data for the monitor will be lost.`,
+  description: `Use a Legacy API Key connection (API v2). Permanently delete an uptime monitor. This action cannot be undone — all historical data for the monitor will be lost.`,
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
@@ -22,7 +23,7 @@ export let deleteMonitor = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.deleteMonitor(ctx.input.monitorId);
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listPosts = SlateTool.create(spec, {
@@ -13,7 +14,15 @@ export let listPosts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      first: z.number().optional().default(10).describe('Number of posts to return (max 20)'),
+      ...selection,
+      first: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .default(10)
+        .describe('Number of posts to return (max 100)'),
       after: z
         .string()
         .optional()
@@ -91,16 +100,19 @@ export let listPosts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      publicationHost: ctx.config.publicationHost
+      publicationHost:
+        ctx.input.publicationHost ??
+        (ctx.input.publicationId === undefined ? ctx.config.publicationHost : undefined),
+      publicationId: ctx.input.publicationId
     });
 
     let result = await client.listPosts({
-      first: Math.min(ctx.input.first, 20),
+      first: ctx.input.first,
       after: ctx.input.after,
       tagSlugs: ctx.input.tagSlugs
     });
 
-    let posts = result.posts.map((p: any) => ({
+    let posts = result.posts.map(p => ({
       postId: p.id,
       title: p.title,
       slug: p.slug,
@@ -114,7 +126,7 @@ export let listPosts = SlateTool.create(spec, {
       coverImageUrl: p.coverImage?.url,
       authorUsername: p.author?.username,
       authorName: p.author?.name,
-      tags: (p.tags || []).map((t: any) => ({
+      tags: (p.tags || []).map(t => ({
         tagId: t.id,
         name: t.name,
         slug: t.slug

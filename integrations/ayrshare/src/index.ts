@@ -23,13 +23,6 @@ import {
   uploadMedia,
   validatePost
 } from './tools';
-import {
-  feedTrigger,
-  messagesTrigger,
-  scheduledPostTrigger,
-  socialAccountTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -55,5 +48,5 @@ export let provider = Slate.create({
     getFeeds,
     deleteFeed
   ],
-  triggers: [scheduledPostTrigger, socialAccountTrigger, messagesTrigger, feedTrigger]
+  triggers: []
 });

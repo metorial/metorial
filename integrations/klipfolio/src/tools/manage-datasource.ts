@@ -1,12 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { createdId, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageDatasource = SlateTool.create(spec, {
   name: 'Manage Data Source',
   key: 'manage_datasource',
   description: `Create, update, or delete a data source. When creating, specify a connector type and optional properties. Supports connectors like \`simple_rest\`, \`facebook\`, \`google_analytics\`, \`salesforce\`, and many more.`,
+  constraints: [
+    'Creating or refreshing a connector can contact external services and consume account usage. Multiple updates execute sequentially; earlier changes remain on a later failure.'
+  ],
   instructions: [
     'Use action "create" to create a new data source, "update" to modify, or "delete" to remove.',
     'Common connectors: simple_rest, facebook, google_analytics, google_spreadsheets, salesforce, hubspot, shopify, db, ftp.',
@@ -42,12 +46,14 @@ export let manageDatasource = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required when creating a data source');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required when creating a data source');
       if (!ctx.input.connector)
-        throw new Error('Connector is required when creating a data source');
+        throw createApiServiceError('Connector is required when creating a data source');
 
       let result = await client.createDatasource({
         name: ctx.input.name,
@@ -59,8 +65,7 @@ export let manageDatasource = SlateTool.create(spec, {
         clientId: ctx.input.clientId
       });
 
-      let location = result?.meta?.location;
-      let datasourceId = location ? location.split('/').pop() : undefined;
+      let datasourceId = createdId(result, 'datasources');
 
       return {
         output: { datasourceId, success: true },
@@ -69,7 +74,18 @@ export let manageDatasource = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.datasourceId) throw new Error('datasourceId is required when updating');
+      if (
+        ctx.input.name === undefined &&
+        ctx.input.description === undefined &&
+        ctx.input.refreshInterval === undefined &&
+        ctx.input.properties === undefined
+      )
+        throw createApiServiceError(
+          'Provide at least one supported field or association to update.',
+          { reason: 'invalid_input' }
+        );
+      if (!ctx.input.datasourceId)
+        throw createApiServiceError('datasourceId is required when updating');
 
       if (
         ctx.input.name !== undefined ||
@@ -94,7 +110,8 @@ export let manageDatasource = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.datasourceId) throw new Error('datasourceId is required when deleting');
+      if (!ctx.input.datasourceId)
+        throw createApiServiceError('datasourceId is required when deleting');
       await client.deleteDatasource(ctx.input.datasourceId);
 
       return {
@@ -103,6 +120,6 @@ export let manageDatasource = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,66 +1,46 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImgixClient } from '../lib/client';
+import { assetOutput, mapAsset, originPath, sourceId } from '../lib/schemas';
 import { spec } from '../spec';
-
-export let updateAsset = SlateTool.create(spec, {
+export const updateAsset = SlateTool.create(spec, {
   name: 'Update Asset',
   key: 'update_asset',
-  description: `Update metadata for an asset within an Imgix source. You can modify the asset's name, description, categories, and custom fields. Use this to organize and annotate your image library.`,
-  tags: {
-    destructive: false
-  }
+  description:
+    'Update metadata for an existing asset in a source discovered by list_sources. Supplied categories and customFields replace the entire prior list/object; include every value to retain. Asset metadata history can remain.',
+  tags: { readOnly: false, destructive: false }
 })
   .input(
     z.object({
-      sourceId: z.string().describe('ID of the source containing the asset'),
-      originPath: z.string().describe('Origin path of the asset to update'),
-      name: z.string().optional().describe('Updated display name for the asset'),
-      description: z.string().optional().describe('Updated description'),
-      categories: z.array(z.string()).optional().describe('Updated list of categories'),
-      customFields: z
-        .record(z.string(), z.string())
-        .optional()
-        .describe('Updated custom metadata fields (key-value pairs)')
+      sourceId,
+      originPath,
+      name: z.string().optional(),
+      description: z.string().optional(),
+      categories: z.array(z.string()).optional(),
+      customFields: z.record(z.string(), z.string()).optional()
     })
   )
-  .output(
-    z.object({
-      originPath: z.string().describe('Origin path of the updated asset'),
-      name: z.string().optional().describe('Updated display name'),
-      description: z.string().optional().describe('Updated description'),
-      categories: z.array(z.string()).optional().describe('Updated categories'),
-      customFields: z
-        .record(z.string(), z.string())
-        .optional()
-        .describe('Updated custom fields')
-    })
-  )
+  .output(assetOutput)
   .handleInvocation(async ctx => {
-    let client = new ImgixClient(ctx.auth.token);
-
-    let attributes: Record<string, any> = {};
-    if (ctx.input.name !== undefined) attributes.name = ctx.input.name;
-    if (ctx.input.description !== undefined) attributes.description = ctx.input.description;
-    if (ctx.input.categories) attributes.categories = ctx.input.categories;
-    if (ctx.input.customFields) attributes.custom_fields = ctx.input.customFields;
-
-    let result = await client.updateAsset(
-      ctx.input.sourceId,
-      ctx.input.originPath,
-      attributes
-    );
-    let a = result.data;
-
+    const attributes = pickDefined({
+      name: ctx.input.name,
+      description: ctx.input.description,
+      categories: ctx.input.categories,
+      custom_fields: ctx.input.customFields
+    });
+    if (!Object.keys(attributes).length)
+      throw createApiServiceError('Provide at least one metadata change.', { parent: {} });
+    const asset = (
+      await new ImgixClient(ctx.auth.token).updateAsset(
+        ctx.input.sourceId,
+        ctx.input.originPath,
+        attributes
+      )
+    ).data;
     return {
-      output: {
-        originPath: a.attributes?.origin_path ?? a.id ?? ctx.input.originPath,
-        name: a.attributes?.name,
-        description: a.attributes?.description,
-        categories: a.attributes?.categories,
-        customFields: a.attributes?.custom_fields
-      },
-      message: `Updated asset **${ctx.input.originPath}**.`
+      output: mapAsset(asset),
+      message:
+        'The existing asset returned updated metadata; omitted scalar attributes were not included in the patch.'
     };
   })
   .build();

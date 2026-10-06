@@ -1,6 +1,6 @@
 {
   "name": "@metorial/cody",
-  "description": "Create and manage custom AI bots trained on your own knowledge base. Upload documents (text, HTML, files, or web URLs), organize them into folders, and build conversations with AI bots that generate responses based on uploaded knowledge. Manage conversations with focus mode to restrict responses to specific documents. Send messages and receive AI-generated answers via standard responses or real-time SSE streaming.",
+  "description": "Use Cody business AI assistants with your knowledge base. Discover configured bots, organize documents in folders, import text, files, and webpages, and download documents as HTML. Create conversations with optional document focus, inspect response sources and usage, and receive AI answers directly or through streaming.",
   "categories": [
     "apis-and-http-requests",
     "crm-and-sales-tools",
@@ -15,6 +15,7 @@
     "stream AI responses",
     "ingest webpage content",
     "focus on specific documents",
-    "retrieve message history"
+    "retrieve message history",
+    "download documents as HTML"
   ]
 }

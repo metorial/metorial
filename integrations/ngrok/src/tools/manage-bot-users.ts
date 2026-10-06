@@ -1,17 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import type { BotUser } from '../lib/models';
 import { spec } from '../spec';
 
 let botUserOutputSchema = z.object({
-  botUserId: z.string().describe('Bot user ID'),
+  botUserId: z.string().describe('Service user ID (formerly a bot user)'),
   uri: z.string().describe('API resource URI'),
   name: z.string().describe('Bot user name'),
   active: z.boolean().describe('Whether the bot user is active'),
   createdAt: z.string().describe('Creation timestamp')
 });
 
-let mapBotUser = (b: any) => ({
+let mapBotUser = (b: BotUser) => ({
   botUserId: b.id,
   uri: b.uri || '',
   name: b.name || '',
@@ -22,13 +23,22 @@ let mapBotUser = (b: any) => ({
 export let listBotUsers = SlateTool.create(spec, {
   name: 'List Bot Users',
   key: 'list_bot_users',
-  description: `List all bot users (service accounts). Bot users provide programmatic API access separate from human user accounts. API keys and authtokens can be assigned to bot users.`,
+  description: `List all bot users (service accounts). Service users, formerly bot users, provide programmatic API access through the current Service Users API, separate from human user accounts. API keys and authtokens can be assigned to bot users.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -40,6 +50,7 @@ export let listBotUsers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listBotUsers({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -59,7 +70,7 @@ export let getBotUser = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      botUserId: z.string().describe('Bot user ID (e.g., bot_xxx)')
+      botUserId: z.string().describe('Service user ID from list_bot_users')
     })
   )
   .output(botUserOutputSchema)
@@ -103,11 +114,11 @@ export let updateBotUser = SlateTool.create(spec, {
   name: 'Update Bot User',
   key: 'update_bot_user',
   description: `Update a bot user's name or active status.`,
-  tags: { destructive: false }
+  tags: { destructive: true }
 })
   .input(
     z.object({
-      botUserId: z.string().describe('Bot user ID to update'),
+      botUserId: z.string().describe('Service user ID (formerly a bot user) to update'),
       name: z.string().optional().describe('New name'),
       active: z.boolean().optional().describe('New active status')
     })
@@ -134,7 +145,7 @@ export let deleteBotUser = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      botUserId: z.string().describe('Bot user ID to delete')
+      botUserId: z.string().describe('Service user ID (formerly a bot user) to delete')
     })
   )
   .output(

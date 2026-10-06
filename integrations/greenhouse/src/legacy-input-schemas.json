@@ -1,0 +1,643 @@
+{
+  "list_candidates": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number for pagination (starts at 1)",
+        "type": "number"
+      },
+      "perPage": {
+        "description": "Number of results per page (max 500, default 50)",
+        "type": "number"
+      },
+      "email": {
+        "description": "Filter candidates by email address",
+        "type": "string"
+      },
+      "jobId": {
+        "description": "Filter candidates associated with this job",
+        "type": "string"
+      },
+      "createdAfter": {
+        "description": "Only return candidates created after this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "createdBefore": {
+        "description": "Only return candidates created before this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "updatedAfter": {
+        "description": "Only return candidates updated after this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "updatedBefore": {
+        "description": "Only return candidates updated before this ISO 8601 timestamp",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "get_candidate": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "candidateId": {
+        "type": "string",
+        "description": "The Greenhouse candidate ID"
+      }
+    },
+    "required": ["candidateId"],
+    "additionalProperties": false
+  },
+  "create_candidate": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "firstName": {
+        "type": "string",
+        "description": "Candidate first name"
+      },
+      "lastName": {
+        "type": "string",
+        "description": "Candidate last name"
+      },
+      "company": {
+        "description": "Current company",
+        "type": "string"
+      },
+      "title": {
+        "description": "Current title",
+        "type": "string"
+      },
+      "emailAddresses": {
+        "description": "Email addresses",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Email address"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["personal", "work", "other"],
+              "description": "Email type"
+            }
+          },
+          "required": ["value", "type"],
+          "additionalProperties": false
+        }
+      },
+      "phoneNumbers": {
+        "description": "Phone numbers",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Phone number"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["home", "work", "mobile", "skype", "other"],
+              "description": "Phone type"
+            }
+          },
+          "required": ["value", "type"],
+          "additionalProperties": false
+        }
+      },
+      "websiteAddresses": {
+        "description": "Website addresses",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Website URL"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["personal", "company", "portfolio", "blog", "other"],
+              "description": "Website type"
+            }
+          },
+          "required": ["value", "type"],
+          "additionalProperties": false
+        }
+      },
+      "socialMediaAddresses": {
+        "description": "Social media profiles",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Social media profile URL"
+            },
+            "type": {
+              "type": "string",
+              "description": "Platform name (e.g., linkedin, twitter, github)"
+            }
+          },
+          "required": ["value", "type"],
+          "additionalProperties": false
+        }
+      },
+      "addresses": {
+        "description": "Physical addresses",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "description": "Physical address"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["home", "work", "other"],
+              "description": "Address type"
+            }
+          },
+          "required": ["value", "type"],
+          "additionalProperties": false
+        }
+      },
+      "tags": {
+        "description": "Tags to apply to the candidate",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "jobIds": {
+        "description": "Job IDs to create applications for this candidate",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": ["firstName", "lastName"],
+    "additionalProperties": false
+  },
+  "update_candidate": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "candidateId": {
+        "type": "string",
+        "description": "The Greenhouse candidate ID to update"
+      },
+      "firstName": {
+        "description": "Updated first name",
+        "type": "string"
+      },
+      "lastName": {
+        "description": "Updated last name",
+        "type": "string"
+      },
+      "company": {
+        "description": "Updated company name",
+        "type": "string"
+      },
+      "title": {
+        "description": "Updated title",
+        "type": "string"
+      },
+      "emailAddresses": {
+        "description": "Updated email addresses (replaces existing)",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["personal", "work", "other"]
+            }
+          },
+          "required": ["value", "type"],
+          "additionalProperties": false
+        }
+      },
+      "phoneNumbers": {
+        "description": "Updated phone numbers (replaces existing)",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": ["home", "work", "mobile", "skype", "other"]
+            }
+          },
+          "required": ["value", "type"],
+          "additionalProperties": false
+        }
+      },
+      "tags": {
+        "description": "Updated tags (replaces existing)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": ["candidateId"],
+    "additionalProperties": false
+  },
+  "list_applications": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number for pagination (starts at 1)",
+        "type": "number"
+      },
+      "perPage": {
+        "description": "Number of results per page (max 500, default 50)",
+        "type": "number"
+      },
+      "jobId": {
+        "description": "Filter by job ID",
+        "type": "string"
+      },
+      "status": {
+        "description": "Filter by application status",
+        "type": "string",
+        "enum": ["active", "rejected", "hired"]
+      },
+      "createdAfter": {
+        "description": "Only return applications created after this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "createdBefore": {
+        "description": "Only return applications created before this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "updatedAfter": {
+        "description": "Only return applications updated after this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "updatedBefore": {
+        "description": "Only return applications updated before this ISO 8601 timestamp",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "get_application": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "applicationId": {
+        "type": "string",
+        "description": "The Greenhouse application ID"
+      }
+    },
+    "required": ["applicationId"],
+    "additionalProperties": false
+  },
+  "advance_application": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "applicationId": {
+        "type": "string",
+        "description": "The application ID to advance or move"
+      },
+      "action": {
+        "type": "string",
+        "enum": ["advance", "move"],
+        "description": "\"advance\" progresses to the next stage; \"move\" goes to a specific stage"
+      },
+      "fromStageId": {
+        "description": "Current stage ID (optional for advance, required for move)",
+        "type": "string"
+      },
+      "toStageId": {
+        "description": "Target stage ID (required for move)",
+        "type": "string"
+      }
+    },
+    "required": ["applicationId", "action"],
+    "additionalProperties": false
+  },
+  "reject_application": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "applicationId": {
+        "type": "string",
+        "description": "The application ID to reject"
+      },
+      "rejectionReasonId": {
+        "description": "ID of the rejection reason",
+        "type": "string"
+      },
+      "notes": {
+        "description": "Notes about the rejection",
+        "type": "string"
+      },
+      "sendRejectionEmail": {
+        "description": "Whether to send a rejection email",
+        "type": "boolean"
+      },
+      "emailTemplateId": {
+        "description": "Email template ID for the rejection email",
+        "type": "string"
+      },
+      "sendEmailAt": {
+        "description": "ISO 8601 timestamp for when to send the rejection email",
+        "type": "string"
+      }
+    },
+    "required": ["applicationId"],
+    "additionalProperties": false
+  },
+  "list_jobs": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number for pagination (starts at 1)",
+        "type": "number"
+      },
+      "perPage": {
+        "description": "Number of results per page (max 500, default 50)",
+        "type": "number"
+      },
+      "status": {
+        "description": "Filter by job status",
+        "type": "string",
+        "enum": ["open", "closed", "draft"]
+      },
+      "departmentId": {
+        "description": "Filter by department ID",
+        "type": "string"
+      },
+      "officeId": {
+        "description": "Filter by office ID",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "get_job": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "jobId": {
+        "type": "string",
+        "description": "The Greenhouse job ID"
+      },
+      "includeStages": {
+        "description": "Also fetch the interview stages for this job",
+        "type": "boolean"
+      }
+    },
+    "required": ["jobId"],
+    "additionalProperties": false
+  },
+  "create_job": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "templateJobId": {
+        "type": "string",
+        "description": "ID of the template job to copy from"
+      },
+      "jobName": {
+        "description": "Name for the new job (defaults to template name)",
+        "type": "string"
+      },
+      "numberOfOpenings": {
+        "description": "Number of openings for this job",
+        "type": "number"
+      },
+      "departmentId": {
+        "description": "Department ID for the new job",
+        "type": "string"
+      },
+      "officeIds": {
+        "description": "Office IDs for the new job",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": ["templateJobId"],
+    "additionalProperties": false
+  },
+  "list_offers": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "applicationId": {
+        "description": "If provided, list offers only for this application",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number for pagination (starts at 1)",
+        "type": "number"
+      },
+      "perPage": {
+        "description": "Number of results per page (max 500, default 50)",
+        "type": "number"
+      },
+      "status": {
+        "description": "Filter by offer status",
+        "type": "string",
+        "enum": ["created", "sent", "accepted", "rejected", "deprecated"]
+      },
+      "createdAfter": {
+        "description": "Only return offers created after this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "createdBefore": {
+        "description": "Only return offers created before this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "updatedAfter": {
+        "description": "Only return offers updated after this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "updatedBefore": {
+        "description": "Only return offers updated before this ISO 8601 timestamp",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "list_users": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number for pagination (starts at 1)",
+        "type": "number"
+      },
+      "perPage": {
+        "description": "Number of results per page (max 500, default 50)",
+        "type": "number"
+      },
+      "email": {
+        "description": "Filter users by email address",
+        "type": "string"
+      },
+      "createdAfter": {
+        "description": "Only return users created after this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "createdBefore": {
+        "description": "Only return users created before this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "updatedAfter": {
+        "description": "Only return users updated after this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "updatedBefore": {
+        "description": "Only return users updated before this ISO 8601 timestamp",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "get_user": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "userId": {
+        "type": "string",
+        "description": "The Greenhouse user ID"
+      }
+    },
+    "required": ["userId"],
+    "additionalProperties": false
+  },
+  "list_departments": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number for pagination (starts at 1)",
+        "type": "number"
+      },
+      "perPage": {
+        "description": "Number of results per page (max 500, default 50)",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "list_offices": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number for pagination (starts at 1)",
+        "type": "number"
+      },
+      "perPage": {
+        "description": "Number of results per page (max 500, default 50)",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "list_scheduled_interviews": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "page": {
+        "description": "Page number for pagination (starts at 1)",
+        "type": "number"
+      },
+      "perPage": {
+        "description": "Number of results per page (max 500, default 50)",
+        "type": "number"
+      },
+      "applicationId": {
+        "description": "Filter interviews for a specific application",
+        "type": "string"
+      },
+      "createdAfter": {
+        "description": "Only return interviews created after this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "createdBefore": {
+        "description": "Only return interviews created before this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "updatedAfter": {
+        "description": "Only return interviews updated after this ISO 8601 timestamp",
+        "type": "string"
+      },
+      "updatedBefore": {
+        "description": "Only return interviews updated before this ISO 8601 timestamp",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "add_candidate_note": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "candidateId": {
+        "type": "string",
+        "description": "The candidate ID to add the note to"
+      },
+      "userId": {
+        "type": "string",
+        "description": "The Greenhouse user ID of the person creating the note"
+      },
+      "body": {
+        "type": "string",
+        "description": "The note content (supports HTML)"
+      },
+      "visibility": {
+        "type": "string",
+        "enum": ["admin_only", "private", "public"],
+        "description": "Note visibility level"
+      }
+    },
+    "required": ["candidateId", "userId", "body", "visibility"],
+    "additionalProperties": false
+  },
+  "manage_candidate_tags": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "candidateId": {
+        "type": "string",
+        "description": "The candidate ID"
+      },
+      "action": {
+        "type": "string",
+        "enum": ["add", "remove"],
+        "description": "Whether to add or remove the tag"
+      },
+      "tagName": {
+        "type": "string",
+        "description": "The tag name to add or remove"
+      }
+    },
+    "required": ["candidateId", "action", "tagName"],
+    "additionalProperties": false
+  }
+}

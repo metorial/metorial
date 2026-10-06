@@ -9,8 +9,6 @@ import {
   listCampaigns,
   toggleCampaign
 } from './tools';
-import { leadCollected } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     getNotificationData,
     createConversion
   ],
-  triggers: [leadCollected]
+  triggers: []
 });

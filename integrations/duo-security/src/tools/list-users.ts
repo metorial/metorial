@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -39,14 +40,17 @@ export let listUsers = SlateTool.create(spec, {
         })
       ),
       totalObjects: z.number().optional(),
-      hasMore: z.boolean()
+      hasMore: z.boolean(),
+      nextOffset: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('list_users', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.listUsers({
@@ -70,13 +74,17 @@ export let listUsers = SlateTool.create(spec, {
     }));
 
     let totalObjects = result.metadata?.total_objects;
+    let nextOffset =
+      typeof result.metadata?.next_offset === 'number'
+        ? result.metadata.next_offset
+        : undefined;
     let hasMore =
-      totalObjects !== undefined
-        ? (ctx.input.offset ?? 0) + users.length < totalObjects
-        : false;
+      nextOffset !== undefined ||
+      (totalObjects !== undefined &&
+        (ctx.input.offset ?? 0) + result.response.length < totalObjects);
 
     return {
-      output: { users, totalObjects, hasMore },
+      output: { users, totalObjects, hasMore, nextOffset },
       message: `Found **${users.length}** users${totalObjects ? ` out of ${totalObjects} total` : ''}.`
     };
   })

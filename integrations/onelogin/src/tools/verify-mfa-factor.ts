@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OneLoginClient } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let verifyMfaFactor = SlateTool.create(spec, {
@@ -35,14 +36,11 @@ export let verifyMfaFactor = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
     if (ctx.input.poll) {
       let result = await client.pollEnrollment(ctx.input.userId, ctx.input.registrationId);
-      let enrollment = Array.isArray(result) ? result[0] : result;
+      let enrollment = result;
       return {
         output: {
           status: enrollment.status,
@@ -53,9 +51,7 @@ export let verifyMfaFactor = SlateTool.create(spec, {
     }
 
     if (!ctx.input.otp) {
-      throw new Error(
-        'OTP is required for verification. Use poll=true for push-based factors.'
-      );
+      fail('OTP is required for verification. Use poll=true for push-based factors.');
     }
 
     let result = await client.verifyEnrollment(
@@ -63,7 +59,7 @@ export let verifyMfaFactor = SlateTool.create(spec, {
       ctx.input.registrationId,
       ctx.input.otp
     );
-    let enrollment = Array.isArray(result) ? result[0] : result;
+    let enrollment = result;
 
     return {
       output: {

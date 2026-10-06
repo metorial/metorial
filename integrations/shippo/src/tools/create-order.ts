@@ -9,7 +9,7 @@ let lineItemSchema = z.object({
   quantity: z.number().describe('Quantity ordered'),
   totalPrice: z.string().describe('Total price for this line item'),
   currency: z.string().describe('ISO 3-letter currency code'),
-  weight: z.string().optional().describe('Weight per item'),
+  weight: z.string().optional().describe('Total weight for the entire line item quantity'),
   weightUnit: z.enum(['g', 'oz', 'lb', 'kg']).optional().describe('Weight unit'),
   manufacturerCountry: z.string().optional().describe('Country of manufacture (ISO 2)')
 });
@@ -75,7 +75,7 @@ export let createOrder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
     let lineItems = ctx.input.lineItems?.map(item => ({
       title: item.title,
@@ -85,10 +85,10 @@ export let createOrder = SlateTool.create(spec, {
       currency: item.currency,
       weight: item.weight,
       weight_unit: item.weightUnit,
-      manufacturer_country: item.manufacturerCountry
+      manufacture_country: item.manufacturerCountry
     }));
 
-    let result = (await client.createOrder({
+    let result = await client.createOrder({
       to_address: {
         name: ctx.input.toAddress.name,
         company: ctx.input.toAddress.company,
@@ -113,7 +113,7 @@ export let createOrder = SlateTool.create(spec, {
       currency: ctx.input.currency,
       weight: ctx.input.weight,
       weight_unit: ctx.input.weightUnit
-    })) as Record<string, any>;
+    });
 
     return {
       output: {

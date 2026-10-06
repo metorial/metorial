@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCredentials = SlateTool.create(spec, {
@@ -13,6 +13,12 @@ export let listCredentials = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      credentialId: z
+        .string()
+        .optional()
+        .describe(
+          'Read this exact credential metadata ID instead of listing. Requires credential:read; secret data is not returned.'
+        ),
       limit: z.number().optional().describe('Maximum number of credentials to return'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
@@ -32,17 +38,17 @@ export let listCredentials = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
-    let result = await client.listCredentials({
-      limit: ctx.input.limit,
-      cursor: ctx.input.cursor
-    });
+    let result =
+      ctx.input.credentialId !== undefined
+        ? { data: [await client.getCredential(ctx.input.credentialId)], nextCursor: undefined }
+        : await client.listCredentials({
+            limit: ctx.input.limit,
+            cursor: ctx.input.cursor
+          });
 
-    let credentials = (result.data || []).map((c: any) => ({
+    let credentials = (result.data || []).map(c => ({
       credentialId: String(c.id),
       name: c.name || '',
       type: c.type || '',

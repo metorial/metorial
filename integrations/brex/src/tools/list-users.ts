@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapUser } from '../lib/schemas';
 import { spec } from '../spec';
 
 let userSchema = z.object({
@@ -8,7 +9,12 @@ let userSchema = z.object({
   firstName: z.string().nullable().describe('First name of the user'),
   lastName: z.string().nullable().describe('Last name of the user'),
   email: z.string().nullable().describe('Email address of the user'),
-  status: z.string().describe('Current status: INVITED, ACTIVE, ARCHIVED, or NOT_INVITED'),
+  status: z
+    .string()
+    .nullish()
+    .describe(
+      'Current user status, including ACTIVE, DISABLED, INACTIVE, ARCHIVED or INVITED'
+    ),
   managerId: z.string().nullable().optional().describe("ID of the user's manager"),
   departmentId: z.string().nullable().optional().describe("ID of the user's department"),
   locationId: z.string().nullable().optional().describe("ID of the user's location")
@@ -42,31 +48,15 @@ export let listUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.listUsers({
+    const result = await new Client({ token: ctx.auth.token }).listUsers({
       email: ctx.input.email,
       cursor: ctx.input.cursor,
       limit: ctx.input.limit
     });
-
-    let users = result.items.map((u: any) => ({
-      userId: u.id,
-      firstName: u.first_name ?? null,
-      lastName: u.last_name ?? null,
-      email: u.email ?? null,
-      status: u.status,
-      managerId: u.manager_id,
-      departmentId: u.department_id,
-      locationId: u.location_id
-    }));
-
+    const users = result.items.map(mapUser);
     return {
-      output: {
-        users,
-        nextCursor: result.next_cursor
-      },
-      message: `Found **${users.length}** user(s).${result.next_cursor ? ' More results available.' : ''}`
+      output: { users, nextCursor: result.next_cursor },
+      message: `Returned ${users.length} users.`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let makeCall = SlateTool.create(spec, {
   name: 'Make Call',
   key: 'make_call',
-  description: `Initiate an outbound phone call through a Synthflow AI agent. Specify the agent, recipient phone number, and recipient name. Supports custom variables for dynamic prompt injection, custom greetings, and webhook URLs for post-call notifications.`,
+  description: `Initiate an outbound phone call through a Synthflow AI agent. Specify the agent, recipient phone number, and recipient name. Supports custom variables for dynamic prompt injection and custom greetings. Configure post-call notifications on the agent with update_agent.`,
   instructions: [
     'The phone number must be in E.164 format (e.g., +14155552671).',
     'Custom variables are injected into the agent prompt at runtime.'
@@ -15,8 +15,15 @@ export let makeCall = SlateTool.create(spec, {
   .input(
     z.object({
       agentId: z.string().describe('The model ID of the agent to use for the call'),
-      phone: z.string().describe('Recipient phone number in E.164 format'),
-      name: z.string().describe('Recipient name'),
+      phone: z
+        .string()
+        .regex(/^\+[1-9]\d{1,14}$/)
+        .describe('Recipient phone number in E.164 format'),
+      name: z.string().min(1).describe('Recipient name'),
+      fromPhoneNumber: z
+        .string()
+        .optional()
+        .describe('Caller ID; must be attached to this outbound agent'),
       customVariables: z
         .array(
           z.object({
@@ -30,7 +37,12 @@ export let makeCall = SlateTool.create(spec, {
       greeting: z.string().optional().describe('Custom opening message'),
       leadEmail: z.string().optional().describe('Lead email for appointment booking'),
       leadTimezone: z.string().optional().describe('Lead timezone for scheduling'),
-      externalWebhookUrl: z.string().optional().describe('Webhook URL for post-call data')
+      externalWebhookUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy field. Configure the post-call URL on the agent with update_agent instead.'
+        )
     })
   )
   .output(
@@ -41,7 +53,11 @@ export let makeCall = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    if (ctx.input.externalWebhookUrl !== undefined)
+      throw createApiServiceError(
+        'The current call API does not accept externalWebhookUrl. Set externalWebhookUrl on the agent with update_agent first.'
+      );
+    let client = new Client(ctx.auth);
     let body: Record<string, any> = {
       model_id: ctx.input.agentId,
       phone: ctx.input.phone,
@@ -52,10 +68,13 @@ export let makeCall = SlateTool.create(spec, {
     if (ctx.input.greeting) body.greeting = ctx.input.greeting;
     if (ctx.input.leadEmail) body.lead_email = ctx.input.leadEmail;
     if (ctx.input.leadTimezone) body.lead_timezone = ctx.input.leadTimezone;
-    if (ctx.input.externalWebhookUrl) body.external_webhook_url = ctx.input.externalWebhookUrl;
+    if (ctx.input.fromPhoneNumber !== undefined)
+      body.from_phone_number = ctx.input.fromPhoneNumber;
 
     let result = await client.makeCall(body);
     let response = result.response || {};
+    if (!response.call_id)
+      throw createApiServiceError('Synthflow did not return the initiated call ID.');
 
     return {
       output: {
@@ -63,7 +82,7 @@ export let makeCall = SlateTool.create(spec, {
         eta: result.eta,
         answer: response.answer
       },
-      message: `Call initiated to **${ctx.input.name}** (${ctx.input.phone}). Call ID: \`${response.call_id}\`. ETA: ${result.eta || 'unknown'}s.`
+      message: `Call initiated to **${ctx.input.name}** (${ctx.input.phone}). Call ID: \`${response.call_id}\`. ETA: ${result.eta ?? 'unknown'}s.`
     };
   })
   .build();

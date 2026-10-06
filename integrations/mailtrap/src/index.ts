@@ -15,8 +15,6 @@ import {
   sendBulkEmail,
   sendTransactionalEmail
 } from './tools';
-import { emailEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     getEmailLog,
     listAccounts
   ],
-  triggers: [emailEvent]
+  triggers: []
 });

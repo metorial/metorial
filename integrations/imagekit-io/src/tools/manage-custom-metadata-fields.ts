@@ -1,14 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/validation';
 import { spec } from '../spec';
 
 let fieldSchema = z.object({
   fieldId: z.string().describe('Unique identifier for the custom metadata field'),
   name: z.string().describe('Internal name of the field'),
   label: z.string().describe('Display label'),
+  reserved: z
+    .boolean()
+    .optional()
+    .describe('Whether ImageKit owns this field and prevents deletion'),
   schema: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .describe('Field schema definition including type, constraints, and default values')
 });
 
@@ -16,12 +21,15 @@ export let manageCustomMetadataFields = SlateTool.create(spec, {
   name: 'Manage Custom Metadata Fields',
   key: 'manage_custom_metadata_fields',
   description: `Create, list, update, or delete custom metadata field definitions in the ImageKit Media Library. Custom metadata fields can be of types: Text, Textarea, Number, Date, Boolean, SingleSelect, MultiSelect.`,
+  constraints: [
+    'Deleted field names cannot be reused. Reserved fields cannot be deleted. A field’s schema type cannot be changed.'
+  ],
   instructions: [
     'Schema type must be one of: "Text", "Textarea", "Number", "Date", "Boolean", "SingleSelect", "MultiSelect"',
     'Schema properties include: type, defaultValue, isValueRequired, minValue, maxValue, minLength, maxLength'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -37,7 +45,7 @@ export let manageCustomMetadataFields = SlateTool.create(spec, {
         .optional()
         .describe('Display label (required for create, optional for update)'),
       schema: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe(
           'Field schema definition, e.g. {"type": "Number", "minValue": 0, "maxValue": 100}'
@@ -63,13 +71,25 @@ export let manageCustomMetadataFields = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.operation !== 'list' && ctx.input.includeDeleted !== undefined)
+      throw invalid('includeDeleted applies only to list.');
+    if (ctx.input.operation !== 'create' && ctx.input.name !== undefined)
+      throw invalid('Field name applies only to create and cannot be changed.');
+    if (
+      ['list', 'delete'].includes(ctx.input.operation) &&
+      (ctx.input.label !== undefined || ctx.input.schema !== undefined)
+    )
+      throw invalid('label and schema apply only to create and update.');
+    if (['list', 'create'].includes(ctx.input.operation) && ctx.input.fieldId !== undefined)
+      throw invalid('fieldId applies only to update and delete.');
     if (ctx.input.operation === 'list') {
       let fields = await client.listCustomMetadataFields(ctx.input.includeDeleted);
-      let mapped = (fields as any[]).map((f: any) => ({
+      let mapped = fields.map(f => ({
         fieldId: f.id,
         name: f.name,
         label: f.label,
-        schema: f.schema
+        schema: f.schema,
+        reserved: f.reserved
       }));
 
       return {
@@ -80,7 +100,7 @@ export let manageCustomMetadataFields = SlateTool.create(spec, {
 
     if (ctx.input.operation === 'create') {
       if (!ctx.input.name || !ctx.input.label || !ctx.input.schema) {
-        throw new Error('name, label, and schema are required for create operation');
+        throw invalid('name, label, and schema are required for create operation');
       }
       let result = await client.createCustomMetadataField({
         name: ctx.input.name,
@@ -102,8 +122,8 @@ export let manageCustomMetadataFields = SlateTool.create(spec, {
     }
 
     if (ctx.input.operation === 'update') {
-      if (!ctx.input.fieldId) throw new Error('fieldId is required for update operation');
-      let params: { label?: string; schema?: Record<string, any> } = {};
+      if (!ctx.input.fieldId) throw invalid('fieldId is required for update operation');
+      let params: { label?: string; schema?: Record<string, unknown> } = {};
       if (ctx.input.label) params.label = ctx.input.label;
       if (ctx.input.schema) params.schema = ctx.input.schema;
 
@@ -123,7 +143,7 @@ export let manageCustomMetadataFields = SlateTool.create(spec, {
     }
 
     if (ctx.input.operation === 'delete') {
-      if (!ctx.input.fieldId) throw new Error('fieldId is required for delete operation');
+      if (!ctx.input.fieldId) throw invalid('fieldId is required for delete operation');
       await client.deleteCustomMetadataField(ctx.input.fieldId);
 
       return {
@@ -132,6 +152,6 @@ export let manageCustomMetadataFields = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown operation: ${ctx.input.operation}`);
+    throw invalid(`Unknown operation: ${ctx.input.operation}`);
   })
   .build();

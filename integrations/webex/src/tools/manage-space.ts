@@ -146,7 +146,7 @@ export let updateSpace = SlateTool.create(spec, {
 export let deleteSpace = SlateTool.create(spec, {
   name: 'Delete Space',
   key: 'delete_space',
-  description: `Permanently delete a Webex space and all of its contents. This action cannot be undone. Team spaces are archived rather than deleted.`,
+  description: `Request deletion of a Webex space. Webex archives team spaces; a non-moderator may only leave the space. Retention and compliance policies can preserve content.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -159,17 +159,20 @@ export let deleteSpace = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      deleted: z.boolean().describe('Whether the space was successfully deleted')
+      deleted: z.boolean().describe('Whether Webex accepted the delete request'),
+      deletionEffect: z
+        .enum(['archive_requested', 'delete_or_leave_requested'])
+        .describe('Native possible effect; acceptance does not prove physical erasure')
     })
   )
   .handleInvocation(async ctx => {
     let client = new WebexClient({ token: ctx.auth.token });
 
-    await client.deleteRoom(ctx.input.spaceId);
+    let deletionEffect = await client.deleteRoom(ctx.input.spaceId);
 
     return {
-      output: { deleted: true },
-      message: `Space **${ctx.input.spaceId}** deleted successfully.`
+      output: { deleted: true, deletionEffect },
+      message: `Space **${ctx.input.spaceId}** delete request accepted.`
     };
   })
   .build();

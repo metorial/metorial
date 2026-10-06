@@ -1,111 +1,19 @@
-Now let me get the full list of scopes:# Slates Specification for Spotify
+# Spotify integration specification
 
-## Overview
+The integration exposes eleven tools for catalog search and exact track/album/artist reads, authenticated profile, playlists, playback, track/album library, following, top items and recent listening history. No triggers, image upload, audio analysis, podcast catalog search, export or playlist deletion is implemented.
 
-Spotify is a music streaming service that provides a Web API for accessing its music catalog, managing playlists, controlling playback, and retrieving user data. The Spotify Web API enables the creation of applications that can interact with Spotify's streaming service, such as retrieving content metadata, creating and managing playlists, or controlling playback. A Spotify Premium account is required to use the Web API.
+OAuth uses Spotify's Authorization Code flow with Basic client credentials at the token endpoint, refresh-token preservation when refresh responses omit rotation, and fifteen scopes used by the retained tools. Real account context comes from `/me`, including immutable `account_id` when available. No entitlement is inferred from profile fields.
 
-## Authentication
+`endpointCompatibility` defaults to `current`, the endpoints and response shapes introduced for new Development Mode apps in February 2026. Select `legacy` only after independently confirming Extended Quota or retained endpoint access. Spotify's March 9 blog update postponed endpoint-access changes for existing Development Mode integrations, so the older contracts are not treated as universally retired. Development Mode and Premium/account restrictions still apply. July 2026 developer quota changes can produce HTTP 429 with `QUOTA_EXCEEDED`; retry timing and safe native status metadata are preserved.
 
-Spotify implements the OAuth 2.0 authorization framework for granting applications access to Spotify data and features. The authorization process requires valid client credentials: a client ID and a client secret, which can be obtained by registering an app in the Spotify Developer Dashboard.
+Current search defaults to five results and allows ten; the legacy schema continues to accept up to fifty for confirmed legacy access. Current multiple-track requests use exact bounded sequential reads, reporting completed-read count on failure; this is not an atomic batch. Current playlist creation uses `/me/playlists`; item reads/writes use `/playlists/{id}/items`. Older entitled contracts retain `/users/{id}/playlists` and `/tracks`. Current playlist contents are available only where native ownership/collaboration access permits. Missing collections or removed popularity/follower/private-profile fields are not fabricated.
 
-Spotify supports the following OAuth 2.0 flows:
+Current library/follow operations use `/me/library` with up to forty Spotify URIs in the query. The official February migration guide includes artists and users, while the save/remove references omit them; intended request mapping is verified offline and live acceptance is unverified. Legacy contracts keep their entity-specific routes. Membership result length must exactly match input IDs. Playlist unfollow is not deletion. Snapshot IDs are passed to supported item removals/reordering; ordinary detail writes are not transactions or compare-and-swap operations.
 
-### 1. Authorization Code Flow
+All offset/cursor pages expose native paging metadata. Album/artist/playlist tools return one page and support explicit continuation inputs. Recent history supports either before or after, never both. Track relinking may return a different native ID only when `linked_from.id` binds the requested track. Native nulls, unavailable content, episodes and local tracks remain distinguishable. Top `long_term` currently describes approximately one year.
 
-The most comprehensive and commonly used flow, suitable for applications that have a server-side component and can securely store client secrets. This flow provides both an access token and a refresh token.
+Playback methods require applicable scopes, supported active devices and often Premium. HTTP 204 means the request was accepted; command order or execution is not independently observed. Read-only playback 204 yields no active session. No compound hidden playback/library/follow mutations are performed.
 
-- **Authorization endpoint:** `https://accounts.spotify.com/authorize` (GET)
-- **Token endpoint:** `https://accounts.spotify.com/api/token` (POST)
-- **Required parameters:** `client_id`, `response_type=code`, `redirect_uri`, and optionally `scope` and `state`
-- Upon successful authentication, Spotify responds with an access token (short-lived) and a refresh token (long-lived) used to obtain new access tokens without re-authentication.
+Token reflection screening covers complete input and native response key/value graphs, headers, and tested bounded URI/Unicode/base64 encodings before projecting public results. Failure adapters suppress raw parent transport graphs and preserve safe status/quota/retry metadata. This does not promise universal secret detection or removal of every internal transport trace. No provider call was made during implementation.
 
-### 2. Authorization Code Flow with PKCE
-
-The recommended authorization flow for mobile apps, single page web apps, or any application where the client secret can't be safely stored. This technique allows third-party apps to securely fetch a refreshable access token without a client secret.
-
-- Same endpoints as the standard Authorization Code Flow
-- Additional parameters: `code_challenge` and `code_challenge_method=S256`
-- Does not require the client secret for the token exchange; uses a code verifier instead
-
-### 3. Client Credentials Flow
-
-Used in server-to-server authentication. Since this flow does not include authorization, only endpoints that do not access user information can be accessed.
-
-- **Token endpoint:** `https://accounts.spotify.com/api/token` (POST)
-- Requires `client_id` and `client_secret` sent via Basic Auth header
-- No refresh token is issued; request a new token when it expires
-
-### Token Details
-
-Access tokens are valid for 1 hour (3600 seconds). After that time, the token expires and a new one must be requested. Access tokens are sent as a Bearer token in the `Authorization` header.
-
-### Scopes
-
-Scopes enable your application to access specific functionality (e.g., read a playlist, modify your library or just streaming) on behalf of a user. The set of scopes you set during authorization determines the access permissions that the user is asked to grant. Scopes are passed as a space-separated list during the authorization request.
-
-Available scope categories:
-
-- **Images:** `ugc-image-upload`
-- **Spotify Connect:** `user-read-playback-state`, `user-modify-playback-state`, `user-read-currently-playing`
-- **Playback:** `app-remote-control`, `streaming`
-- **Playlists:** `playlist-read-private`, `playlist-read-collaborative`, `playlist-modify-private`, `playlist-modify-public`
-- **Follow:** `user-follow-modify`, `user-follow-read`
-- **Listening History:** `user-read-playback-position`, `user-top-read`, `user-read-recently-played`
-- **Library:** `user-library-modify`, `user-library-read`
-- **Users:** `user-read-email`, `user-read-private`
-
-Note: Spotify has ended support for the implicit grant flow, HTTP redirect URIs, and localhost aliases in their OAuth system. Production apps must use HTTPS redirect URIs.
-
-## Features
-
-### Music Catalog Browsing
-
-Access Spotify's extensive music catalog including metadata for artists, albums, tracks, audiobooks, shows (podcasts), and episodes. Retrieve detailed information including names, descriptions, images, release dates, and popularity metrics. Browse categories and discover new releases and featured playlists.
-
-- Content can be filtered by market/country
-- Some catalog endpoints like Related Artists, Recommendations, and Audio Features are restricted for new applications (existing apps with extended quota mode access are unaffected)
-
-### Search
-
-Search across Spotify's catalog for tracks, artists, albums, playlists, shows, and episodes using keyword queries. Results can be filtered by content type, market, and other parameters.
-
-### Playlist Management
-
-Create, read, update, and delete playlists. Add or remove items (tracks and episodes), reorder items, change playlist details (name, description, public/private status), and upload custom cover images.
-
-- Playlists can be public, private, or collaborative
-- Requires appropriate playlist scopes for read/write access to private and collaborative playlists
-
-### Playback Control (Player API)
-
-Control Spotify playback from any internet-connected device. Start, pause, resume, skip tracks, seek to a position, set volume, toggle shuffle, and set repeat mode. Transfer playback between devices and add items to the playback queue.
-
-- Most playback commands require Spotify Premium.
-- Can target specific devices using a device ID
-- Retrieve the currently playing track, playback state, available devices, and the user's queue
-
-### User Library Management
-
-Save and remove albums, tracks, episodes, shows, and audiobooks to/from the user's personal library ("Your Music"). Check whether specific items are already saved.
-
-### User Profile & Personalization
-
-Retrieve the current user's profile (display name, email, subscription type, country) or other users' public profiles. Access the user's top artists and tracks over different time ranges, and retrieve recently played tracks.
-
-- Top items can be queried for `short_term`, `medium_term`, or `long_term` time ranges
-
-### Follow Management
-
-Follow or unfollow artists, users, and playlists. Check whether the current user follows specific artists, users, or playlists. Retrieve the list of artists the user follows.
-
-### Audio Features & Analysis
-
-Retrieve audio features for tracks (danceability, energy, tempo, acousticness, valence, etc.) and detailed audio analysis data.
-
-- Audio Features and Audio Analysis endpoints are restricted for new applications without extended quota mode access
-
-## Events
-
-Spotify doesn't have a direct webhook registration endpoint. The Spotify Web API does not provide native webhooks or purpose-built event subscription mechanisms. There is no way to subscribe to real-time notifications for changes such as playlist modifications, new tracks played, or library updates through the API itself.
-
-The provider does not support events.
+Official references: [February changes](https://developer.spotify.com/documentation/web-api/references/changes/february-2026), [updated access announcement](https://developer.spotify.com/blog/2026-02-06-update-on-developer-access-and-platform-security), [July quota changes](https://developer.spotify.com/blog/2026-07-23-web-api-quota-updates), [Authorization Code](https://developer.spotify.com/documentation/web-api/tutorials/code-flow), [refresh](https://developer.spotify.com/documentation/web-api/tutorials/refreshing-tokens), [May changes](https://developer.spotify.com/documentation/web-api/references/changes/may-2026), [library](https://developer.spotify.com/documentation/web-api/reference/save-library-items), [playlist items](https://developer.spotify.com/documentation/web-api/reference/get-playlists-items), [playback](https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback).

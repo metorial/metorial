@@ -1,11 +1,13 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getCurrentUser,
   getSpaceInfo,
   getStory,
   listActivities,
   listAssets,
   listComponents,
+  listSpaces,
   listStories,
   manageAsset,
   manageCollaborator,
@@ -15,18 +17,11 @@ import {
   manageRelease,
   manageStory
 } from './tools';
-import {
-  assetEvents,
-  datasourceEvents,
-  releaseEvents,
-  storyEvents,
-  userEvents,
-  workflowEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    listSpaces,
     manageStory,
     listStories,
     getStory,
@@ -41,12 +36,5 @@ export let provider = Slate.create({
     getSpaceInfo,
     listActivities
   ],
-  triggers: [
-    storyEvents,
-    assetEvents,
-    userEvents,
-    releaseEvents,
-    workflowEvents,
-    datasourceEvents
-  ]
+  triggers: []
 });

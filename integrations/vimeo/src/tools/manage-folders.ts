@@ -22,7 +22,15 @@ export let listFoldersTool = SlateTool.create(spec, {
   .input(
     paginationInputSchema.extend({
       sort: z
-        .enum(['alphabetical', 'date', 'modified_time', 'last_user_action_event_date'])
+        .enum([
+          'alphabetical',
+          'date',
+          'modified_time',
+          'last_user_action_event_date',
+          'name',
+          'default',
+          'pinned_on'
+        ])
         .optional()
         .describe('Sort order for the results')
     })
@@ -44,9 +52,10 @@ export let listFoldersTool = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total ?? 0,
-        page: result.page ?? 1,
-        perPage: result.perPage ?? folders.length,
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+        paging: result.paging,
         folders
       },
       message: `Found **${result.total ?? folders.length}** folders`
@@ -131,7 +140,15 @@ export let listFolderVideosTool = SlateTool.create(spec, {
     paginationInputSchema.extend({
       folderId: z.string().describe('The ID of the folder'),
       sort: z
-        .enum(['alphabetical', 'date', 'default', 'duration', 'modified_time', 'plays'])
+        .enum([
+          'alphabetical',
+          'date',
+          'default',
+          'duration',
+          'modified_time',
+          'plays',
+          'last_user_action_event_date'
+        ])
         .optional()
         .describe('Sort order for the results')
     })
@@ -153,9 +170,10 @@ export let listFolderVideosTool = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total ?? 0,
-        page: result.page ?? 1,
-        perPage: result.perPage ?? videos.length,
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+        paging: result.paging,
         videos
       },
       message: `Found **${result.total ?? videos.length}** videos in folder ${ctx.input.folderId}`

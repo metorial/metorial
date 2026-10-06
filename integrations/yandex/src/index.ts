@@ -32,11 +32,6 @@ import { listClouds, listFolders, manageFolder } from './tools/manage-resources'
 import { listBuckets, listObjects, manageBucket } from './tools/manage-storage';
 import { listNetworks, listSubnets, manageNetwork, manageSubnet } from './tools/manage-vpc';
 import { detectLanguage, listLanguages, translateText } from './tools/translate-text';
-import { dnsZoneChanges } from './triggers/dns-zone-changes';
-import { functionChanges } from './triggers/function-changes';
-import { inboundWebhook } from './triggers/inbound-webhook';
-import { instanceChanges } from './triggers/instance-changes';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -78,5 +73,5 @@ export let provider = Slate.create({
     readLogs,
     writeLogs
   ],
-  triggers: [inboundWebhook, instanceChanges, functionChanges, dnsZoneChanges]
+  triggers: []
 });

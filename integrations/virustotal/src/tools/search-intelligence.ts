@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let searchIntelligence = SlateTool.create(spec, {
@@ -11,7 +12,10 @@ export let searchIntelligence = SlateTool.create(spec, {
     'Use VirusTotal search modifiers like "type:pdf positives:5+" or "engines:"emotet"" for targeted results.',
     'Results include matching items with their attributes.'
   ],
-  constraints: ['This feature requires a VirusTotal Premium API key.'],
+  constraints: [
+    'Requires licensed Intelligence search privileges and available API or Intelligence quota.',
+    'Use non-sensitive queries; queried indicators may be included in the community dataset.'
+  ],
   tags: {
     readOnly: true
   }
@@ -23,7 +27,11 @@ export let searchIntelligence = SlateTool.create(spec, {
         .describe(
           'VirusTotal search query with optional modifiers (e.g. "type:pdf positives:5+")'
         ),
-      limit: z.number().optional().default(10).describe('Maximum number of results to return'),
+      limit: z
+        .number()
+        .optional()
+        .default(10)
+        .describe('Maximum number of results per page, from 1 to 300'),
       cursor: z.string().optional().describe('Pagination cursor for next page'),
       order: z
         .string()
@@ -32,7 +40,7 @@ export let searchIntelligence = SlateTool.create(spec, {
       descriptorsOnly: z
         .boolean()
         .optional()
-        .describe('If true, return only file descriptors (lighter response)')
+        .describe('If true, return only native object descriptors (lighter response)')
     })
   )
   .output(
@@ -53,7 +61,8 @@ export let searchIntelligence = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    let client = new Client(ctx.auth);
     let result = await client.searchIntelligence(
       ctx.input.query,
       ctx.input.limit,
@@ -62,8 +71,8 @@ export let searchIntelligence = SlateTool.create(spec, {
       ctx.input.descriptorsOnly
     );
 
-    let results = (result?.data ?? []).map((item: any) => ({
-      resultId: item.id ?? '',
+    let results = (result?.data ?? []).map(item => ({
+      resultId: item.id,
       resultType: item.type,
       attributes: item.attributes
     }));

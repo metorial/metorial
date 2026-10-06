@@ -28,6 +28,10 @@ Supports multi-tenant collections by specifying the tenant name.`,
         .array(z.number())
         .optional()
         .describe('Optional pre-computed vector embedding'),
+      vectors: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Named vector embeddings keyed by vector name'),
       tenant: z.string().optional().describe('Tenant name for multi-tenant collections')
     })
   )
@@ -51,6 +55,7 @@ Supports multi-tenant collections by specifying the tenant name.`,
       properties: ctx.input.properties,
       id: ctx.input.objectId,
       vector: ctx.input.vector,
+      vectors: ctx.input.vectors,
       tenant: ctx.input.tenant
     });
     return {

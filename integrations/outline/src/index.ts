@@ -2,6 +2,8 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createDocument,
+  exportDocument,
+  getCurrentUser,
   getDocument,
   listCollections,
   listComments,
@@ -15,11 +17,11 @@ import {
   searchDocuments,
   updateDocument
 } from './tools';
-import { collectionEvents, commentEvents, documentEvents, userEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    exportDocument,
     searchDocuments,
     getDocument,
     createDocument,
@@ -34,5 +36,5 @@ export let provider = Slate.create({
     manageComment,
     manageGroup
   ],
-  triggers: [documentEvents, collectionEvents, commentEvents, userEvents]
+  triggers: []
 });

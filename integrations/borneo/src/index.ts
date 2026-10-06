@@ -22,8 +22,6 @@ import {
   manageRecipient,
   manageScan
 } from './tools';
-import { dataBreachUpdated, inboundWebhook, scanCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     downloadReport,
     getCloudAccount
   ],
-  triggers: [inboundWebhook, scanCompleted, dataBreachUpdated]
+  triggers: []
 });

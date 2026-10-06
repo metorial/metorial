@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageContinuation, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 let leadOutputSchema = z.object({
@@ -102,12 +103,13 @@ export let createLead = SlateTool.create(spec, {
   )
   .output(leadOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'create_lead');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = { name: ctx.input.name };
-    if (ctx.input.email) body.email = ctx.input.email;
-    if (ctx.input.phoneNumbers) body.phone_numbers = ctx.input.phoneNumbers;
-    if (ctx.input.address) {
+    if (ctx.input.email !== undefined) body.email = ctx.input.email;
+    if (ctx.input.phoneNumbers !== undefined) body.phone_numbers = ctx.input.phoneNumbers;
+    if (ctx.input.address !== undefined) {
       body.address = {
         street: ctx.input.address.street,
         city: ctx.input.address.city,
@@ -116,14 +118,15 @@ export let createLead = SlateTool.create(spec, {
         country: ctx.input.address.country
       };
     }
-    if (ctx.input.title) body.title = ctx.input.title;
-    if (ctx.input.companyName) body.company_name = ctx.input.companyName;
-    if (ctx.input.assigneeId) body.assignee_id = ctx.input.assigneeId;
-    if (ctx.input.customerSourceId) body.customer_source_id = ctx.input.customerSourceId;
+    if (ctx.input.title !== undefined) body.title = ctx.input.title;
+    if (ctx.input.companyName !== undefined) body.company_name = ctx.input.companyName;
+    if (ctx.input.assigneeId !== undefined) body.assignee_id = ctx.input.assigneeId;
+    if (ctx.input.customerSourceId !== undefined)
+      body.customer_source_id = ctx.input.customerSourceId;
     if (ctx.input.monetaryValue !== undefined) body.monetary_value = ctx.input.monetaryValue;
-    if (ctx.input.details) body.details = ctx.input.details;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.customFields) {
+    if (ctx.input.details !== undefined) body.details = ctx.input.details;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.customFields !== undefined) {
       body.custom_fields = ctx.input.customFields.map(cf => ({
         custom_field_definition_id: cf.customFieldDefinitionId,
         value: cf.value
@@ -152,6 +155,7 @@ export let getLead = SlateTool.create(spec, {
   )
   .output(leadOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'get_lead');
     let client = new Client(ctx.auth);
     let lead = await client.getLead(ctx.input.leadId);
 
@@ -218,6 +222,7 @@ export let updateLead = SlateTool.create(spec, {
   )
   .output(leadOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'update_lead');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {};
@@ -275,6 +280,7 @@ export let deleteLead = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'delete_lead');
     let client = new Client(ctx.auth);
     await client.deleteLead(ctx.input.leadId);
 
@@ -314,33 +320,45 @@ export let searchLeads = SlateTool.create(spec, {
   .output(
     z.object({
       leads: z.array(leadOutputSchema).describe('Matching lead records'),
-      count: z.number().describe('Number of results returned')
+      count: z.number().describe('Number of results returned'),
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('A full page suggests another page may be available'),
+      nextPageNumber: z.number().optional().describe('Next page to request when available'),
+      atSearchLimit: z
+        .boolean()
+        .optional()
+        .describe('Narrow filters when the 100,000-result window is reached')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'search_leads');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {
       page_number: ctx.input.pageNumber,
       page_size: ctx.input.pageSize
     };
-    if (ctx.input.sortBy) body.sort_by = ctx.input.sortBy;
-    if (ctx.input.sortDirection) body.sort_direction = ctx.input.sortDirection;
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.assigneeIds) body.assignee_ids = ctx.input.assigneeIds;
-    if (ctx.input.statusIds) body.status_ids = ctx.input.statusIds;
-    if (ctx.input.customerSourceIds) body.customer_source_ids = ctx.input.customerSourceIds;
-    if (ctx.input.city) body.city = ctx.input.city;
-    if (ctx.input.state) body.state = ctx.input.state;
-    if (ctx.input.country) body.country = ctx.input.country;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
+    if (ctx.input.sortBy !== undefined) body.sort_by = ctx.input.sortBy;
+    if (ctx.input.sortDirection !== undefined) body.sort_direction = ctx.input.sortDirection;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.assigneeIds !== undefined) body.assignee_ids = ctx.input.assigneeIds;
+    if (ctx.input.statusIds !== undefined) body.status_ids = ctx.input.statusIds;
+    if (ctx.input.customerSourceIds !== undefined)
+      body.customer_source_ids = ctx.input.customerSourceIds;
+    if (ctx.input.city !== undefined) body.city = ctx.input.city;
+    if (ctx.input.state !== undefined) body.state = ctx.input.state;
+    if (ctx.input.country !== undefined) body.country = ctx.input.country;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
 
     let leads = await client.searchLeads(body);
 
     return {
       output: {
         leads: leads.map(mapLead),
-        count: leads.length
+        count: leads.length,
+        ...pageContinuation(ctx.input, leads.length)
       },
       message: `Found **${leads.length}** leads matching the search criteria.`
     };
@@ -353,7 +371,7 @@ export let convertLead = SlateTool.create(spec, {
   description: `Convert a lead into a person, with optional creation of an associated company and opportunity. The original lead is deleted upon successful conversion.`,
   instructions: [
     'The lead will be permanently deleted after conversion',
-    'Company can be specified by existing ID, by name for fuzzy matching, or as a new company name'
+    'Specify an existing company ID or a company name, never both. A name can match an existing company; an empty name prevents company creation.'
   ],
   tags: { destructive: true, readOnly: false }
 })
@@ -404,33 +422,35 @@ export let convertLead = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'convert_lead');
     let client = new Client(ctx.auth);
 
     let details: Record<string, any> = {};
-    if (ctx.input.person) {
+    if (ctx.input.person !== undefined) {
       details.person = {};
-      if (ctx.input.person.name) details.person.name = ctx.input.person.name;
-      if (ctx.input.person.contactTypeId)
+      if (ctx.input.person.name !== undefined) details.person.name = ctx.input.person.name;
+      if (ctx.input.person.contactTypeId !== undefined)
         details.person.contact_type_id = ctx.input.person.contactTypeId;
-      if (ctx.input.person.assigneeId)
+      if (ctx.input.person.assigneeId !== undefined)
         details.person.assignee_id = ctx.input.person.assigneeId;
     }
-    if (ctx.input.company) {
+    if (ctx.input.company !== undefined) {
       details.company = {};
-      if (ctx.input.company.existingCompanyId)
+      if (ctx.input.company.existingCompanyId !== undefined)
         details.company.id = ctx.input.company.existingCompanyId;
-      if (ctx.input.company.name) details.company.name = ctx.input.company.name;
+      if (ctx.input.company.name !== undefined) details.company.name = ctx.input.company.name;
     }
-    if (ctx.input.opportunity) {
+    if (ctx.input.opportunity !== undefined) {
       details.opportunity = {};
-      if (ctx.input.opportunity.name) details.opportunity.name = ctx.input.opportunity.name;
-      if (ctx.input.opportunity.pipelineId)
+      if (ctx.input.opportunity.name !== undefined)
+        details.opportunity.name = ctx.input.opportunity.name;
+      if (ctx.input.opportunity.pipelineId !== undefined)
         details.opportunity.pipeline_id = ctx.input.opportunity.pipelineId;
-      if (ctx.input.opportunity.pipelineStageId)
+      if (ctx.input.opportunity.pipelineStageId !== undefined)
         details.opportunity.pipeline_stage_id = ctx.input.opportunity.pipelineStageId;
       if (ctx.input.opportunity.monetaryValue !== undefined)
         details.opportunity.monetary_value = ctx.input.opportunity.monetaryValue;
-      if (ctx.input.opportunity.assigneeId)
+      if (ctx.input.opportunity.assigneeId !== undefined)
         details.opportunity.assignee_id = ctx.input.opportunity.assigneeId;
     }
 

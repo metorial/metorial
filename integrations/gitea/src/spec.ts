@@ -5,7 +5,8 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'gitea',
   name: 'Gitea',
-  description: undefined,
+  description:
+    'Manage repositories, files, issues, pull requests, releases, wikis, organizations, and teams on a Gitea instance.',
   metadata: {},
   config,
   auth

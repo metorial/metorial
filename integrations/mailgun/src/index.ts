@@ -51,8 +51,6 @@ import {
   validateEmail,
   verifyDomain
 } from './tools';
-import { emailEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -106,5 +104,5 @@ export let provider = Slate.create({
     updateWebhook,
     deleteWebhook
   ],
-  triggers: [emailEvents]
+  triggers: []
 });

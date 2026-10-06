@@ -6,6 +6,7 @@ import { spec } from '../spec';
 export let updateProjectStatus = SlateTool.create(spec, {
   name: 'Update Project Status',
   key: 'update_project_status',
+  tags: { destructive: true },
   description: `Add or remove a status (including endorsements) from a Hex project. Set status to null to remove the current status.`
 })
   .input(
@@ -26,7 +27,10 @@ export let updateProjectStatus = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
     let project = await client.updateProjectStatus(ctx.input.projectId, ctx.input.status);
 
     return {

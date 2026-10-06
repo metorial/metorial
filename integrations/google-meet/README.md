@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/google-meet.webp" height="20"> Google Meet
 
-Create and manage Google Meet meeting spaces, configure access settings, moderation modes, and auto-artifacts like recordings and transcripts. Add, list, and remove space members with roles such as co-host. Retrieve conference records including participant details, join/leave times, and session history. Access meeting artifacts including recording metadata, transcript entries with speaker and timestamp data, and smart notes. Subscribe to real-time events for conference start/end, participant join/leave, and recording/transcript file generation via Google Workspace Events API.
+Create and manage Google Meet meeting spaces, configure access settings, moderation modes, and auto-artifacts like recordings and transcripts. Add, list, and remove space members with roles such as co-host. Retrieve conference records including participant details, join/leave times, and session history. Access meeting artifacts including recording metadata, transcript entries with speaker and timestamp data, and smart notes.
 
 ## Tools
 

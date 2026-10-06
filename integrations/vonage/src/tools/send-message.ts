@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VonageRestClient } from '../lib/client';
+import { protect } from '../lib/validation';
 import { spec } from '../spec';
 
 export let sendMessage = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let sendMessage = SlateTool.create(spec, {
   key: 'send_message',
   description: `Send a message across multiple channels including SMS, MMS, WhatsApp, Facebook Messenger, Viber, and RCS using the Vonage Messages API.
 Supports text, image, audio, video, file, and template message types depending on the channel.
-Requires the **API Key, Secret & Application JWT** auth method.`,
+Supports API key/secret or application JWT authentication; application authentication enables application webhook settings.`,
   instructions: [
     'For SMS, use channel "sms" and messageType "text".',
     'For WhatsApp, use channel "whatsapp". The "from" must be a WhatsApp Business number.',
@@ -16,9 +17,9 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
     'Phone numbers must be in E.164 format (e.g., "14155550100") without the + prefix.'
   ],
   constraints: [
-    'MMS is only supported in the US.',
+    'MMS is supported in the US and Canada, with sender registration prerequisites.',
     'WhatsApp template messages require pre-approved templates.',
-    'Some message types are channel-specific (e.g., template is WhatsApp only, MMS image is sms channel with mms enabled).'
+    'Use the mms channel for MMS. SMS supports text only; outbound RCS does not support audio; this template input shape is WhatsApp only.'
   ],
   tags: {
     destructive: false,
@@ -89,6 +90,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
     })
   )
   .handleInvocation(async ctx => {
+    protect(ctx.input, [ctx.auth.apiSecret, ctx.auth.privateKey ?? '']);
     let client = new VonageRestClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret,
@@ -116,7 +118,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
 
     return {
       output: result,
-      message: `Message sent via **${ctx.input.channel}** to **${ctx.input.to}**. Message UUID: \`${result.messageUuid}\``
+      message: `Message accepted via **${ctx.input.channel}** to **${ctx.input.to}**. Message UUID: \`${result.messageUuid}\`. Acceptance is not proof of delivery.`
     };
   })
   .build();

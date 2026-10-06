@@ -86,6 +86,12 @@ export let createShipment = SlateTool.create(spec, {
         .array(
           z.object({
             rateId: z.string(),
+            testMode: z
+              .boolean()
+              .optional()
+              .describe(
+                'Provider-reported rate test state; never infer it from carrier or price.'
+              ),
             provider: z.string().optional(),
             servicelevel: z.string().optional(),
             amount: z.string().optional(),
@@ -99,23 +105,7 @@ export let createShipment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
-
-    let addressFrom =
-      typeof ctx.input.addressFrom === 'string'
-        ? ctx.input.addressFrom
-        : {
-            ...ctx.input.addressFrom,
-            distance_unit: undefined
-          };
-
-    let addressTo =
-      typeof ctx.input.addressTo === 'string'
-        ? ctx.input.addressTo
-        : {
-            ...ctx.input.addressTo,
-            distance_unit: undefined
-          };
+    let client = new ShippoClient(ctx.auth);
 
     let parcels = ctx.input.parcels.map(p => {
       if (typeof p === 'string') return p;
@@ -131,18 +121,19 @@ export let createShipment = SlateTool.create(spec, {
       };
     });
 
-    let result = (await client.createShipment({
-      address_from: addressFrom,
-      address_to: addressTo,
+    let result = await client.createShipment({
+      address_from: ctx.input.addressFrom,
+      address_to: ctx.input.addressTo,
       parcels,
       customs_declaration: ctx.input.customsDeclarationId,
       carrier_accounts: ctx.input.carrierAccounts,
       metadata: ctx.input.metadata,
       async: ctx.input.async
-    })) as Record<string, any>;
+    });
 
-    let rates = (result.rates || []).map((r: any) => ({
+    let rates = (result.rates || []).map(r => ({
       rateId: r.object_id,
+      testMode: r.test,
       provider: r.provider,
       servicelevel: r.servicelevel?.name,
       amount: r.amount,
@@ -159,7 +150,7 @@ export let createShipment = SlateTool.create(spec, {
         addressTo: result.address_to,
         rates
       },
-      message: `Shipment created (${result.object_id}). Found **${rates.length}** available rates.${rates.length > 0 ? ` Cheapest: ${rates[0].provider} ${rates[0].servicelevel} at ${rates[0].amount} ${rates[0].currency}.` : ''}`
+      message: `Shipment created (${result.object_id}). Found **${rates.length}** available rates.${rates.length > 0 ? ` First returned rate: ${rates[0]?.provider} ${rates[0]?.servicelevel} at ${rates[0]?.amount} ${rates[0]?.currency}.` : ''}`
     };
   })
   .build();

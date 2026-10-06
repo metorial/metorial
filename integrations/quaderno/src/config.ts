@@ -1,12 +1,13 @@
 import { SlateConfig } from 'slates';
 import { z } from 'zod';
-
-export let config = SlateConfig.create(
+export const config = SlateConfig.create(
   z.object({
     accountName: z
       .string()
+      .regex(/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/)
+      .optional()
       .describe(
-        'Your Quaderno account name, used in the API base URL (e.g., ACCOUNT_NAME.quadernoapp.com). Can be found via the /authorization endpoint.'
+        'Account subdomain from get_current_account for older connections. New connections discover it automatically.'
       )
   })
 );

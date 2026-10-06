@@ -3,6 +3,7 @@ export * from './create-snapshot';
 export * from './delete-template';
 export * from './get-lifecycle-events';
 export * from './get-sandbox';
+export * from './get-webhook';
 export * from './kill-sandbox';
 export * from './list-sandboxes';
 export * from './list-snapshots';

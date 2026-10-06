@@ -6,9 +6,14 @@ import { spec } from '../spec';
 export let getInstanceTool = SlateTool.create(spec, {
   name: 'Get Instance',
   key: 'get_instance',
-  description: `Retrieve metadata about the Later Influence community (instance) associated with your credentials. Use this to confirm which program your credentials are linked to before pulling campaign data.`,
+  description:
+    'DEPRECATED — use `list_instances` instead. Legacy Reporting API v1 instance metadata.',
+  instructions: [
+    'Use list_instances with Reporting API v2 credentials for current reporting.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(z.object({}))
@@ -21,12 +26,12 @@ export let getInstanceTool = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let instance = await client.getInstance();
 
     return {
-      output: instance as any,
-      message: `Retrieved instance information for community **${instance.communityName || instance.communityId}**.`
+      output: instance,
+      message: 'Retrieved legacy instance metadata.'
     };
   })
   .build();

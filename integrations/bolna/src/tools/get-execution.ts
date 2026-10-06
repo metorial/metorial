@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getExecution = SlateTool.create(spec, {
   name: 'Get Execution',
   key: 'get_execution',
-  description: `Retrieve details of a specific call execution including transcript, recording URL, cost breakdown, telephony metadata, and extracted data.`,
+  description: `Retrieve details of a specific call execution including transcript, recording URL, an optional downloadable recording, cost breakdown, telephony metadata, and extracted data.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,6 +15,10 @@ export let getExecution = SlateTool.create(spec, {
   .input(
     z.object({
       executionId: z.string().describe('Execution ID of the call'),
+      downloadRecording: z
+        .boolean()
+        .optional()
+        .describe('Provide the available call recording as a downloadable file'),
       includeLogs: z
         .boolean()
         .optional()
@@ -84,53 +88,80 @@ export let getExecution = SlateTool.create(spec, {
     if (ctx.input.includeLogs) {
       let logResult = await client.getExecutionLogs(ctx.input.executionId);
       logs = (logResult.data || []).map((l: any) => ({
-        createdAt: l.created_at,
-        type: l.type,
-        component: l.component,
-        provider: l.provider,
-        logData: l.data
+        createdAt: l.created_at ?? undefined,
+        type: l.type ?? undefined,
+        component: l.component ?? undefined,
+        provider: l.provider ?? undefined,
+        logData: l.data ?? undefined
       }));
+    }
+
+    if (ctx.input.downloadRecording) {
+      let recordingUrl = exec.telephony_data?.recording_url;
+      if (!recordingUrl)
+        throw createApiServiceError(
+          'No recording is available for this execution. Wait until call processing completes.'
+        );
+      let url: URL;
+      try {
+        url = new URL(recordingUrl);
+      } catch {
+        throw createApiServiceError('Bolna returned an invalid recording URL.');
+      }
+      if (!['https:', 'http:'].includes(url.protocol))
+        throw createApiServiceError('Bolna returned an unsupported recording URL.');
+      await ctx.addAttachment({
+        type: 'url',
+        url,
+        headers:
+          url.origin === 'https://api.bolna.ai'
+            ? { Authorization: `Bearer ${ctx.auth.token}` }
+            : undefined
+      });
     }
 
     return {
       output: {
         executionId: exec.id,
-        agentId: exec.agent_id,
-        batchId: exec.batch_id,
-        status: exec.status,
-        transcript: exec.transcript,
-        conversationTime: exec.conversation_time,
-        totalCost: exec.total_cost,
-        answeredByVoiceMail: exec.answered_by_voice_mail,
-        errorMessage: exec.error_message,
-        createdAt: exec.created_at,
-        updatedAt: exec.updated_at,
+        agentId: exec.agent_id ?? undefined,
+        batchId: exec.batch_id ?? undefined,
+        status: exec.status ?? undefined,
+        transcript: exec.transcript ?? undefined,
+        conversationTime: exec.conversation_duration ?? exec.conversation_time ?? undefined,
+        totalCost: exec.total_cost ?? undefined,
+        answeredByVoiceMail: exec.answered_by_voice_mail ?? undefined,
+        errorMessage: exec.error_message ?? undefined,
+        createdAt: exec.created_at ?? undefined,
+        updatedAt: exec.updated_at ?? undefined,
         extractedData: exec.extracted_data,
         contextDetails: exec.context_details,
         costBreakdown: exec.cost_breakdown
           ? {
-              llm: exec.cost_breakdown.llm,
-              network: exec.cost_breakdown.network,
-              platform: exec.cost_breakdown.platform,
-              synthesizer: exec.cost_breakdown.synthesizer,
-              transcriber: exec.cost_breakdown.transcriber
+              llm: exec.cost_breakdown.llm ?? undefined,
+              network: exec.cost_breakdown.network ?? undefined,
+              platform: exec.cost_breakdown.platform ?? undefined,
+              synthesizer: exec.cost_breakdown.synthesizer ?? undefined,
+              transcriber: exec.cost_breakdown.transcriber ?? undefined
             }
           : undefined,
         telephonyData: exec.telephony_data
           ? {
-              duration: exec.telephony_data.duration,
-              toNumber: exec.telephony_data.to_number,
-              fromNumber: exec.telephony_data.from_number,
-              recordingUrl: exec.telephony_data.recording_url,
-              callType: exec.telephony_data.call_type,
-              telephonyProvider: exec.telephony_data.provider,
-              hangupBy: exec.telephony_data.hangup_by,
-              hangupReason: exec.telephony_data.hangup_reason
+              duration:
+                exec.telephony_data.duration == null
+                  ? undefined
+                  : String(exec.telephony_data.duration),
+              toNumber: exec.telephony_data.to_number ?? undefined,
+              fromNumber: exec.telephony_data.from_number ?? undefined,
+              recordingUrl: exec.telephony_data.recording_url ?? undefined,
+              callType: exec.telephony_data.call_type ?? undefined,
+              telephonyProvider: exec.telephony_data.provider ?? undefined,
+              hangupBy: exec.telephony_data.hangup_by ?? undefined,
+              hangupReason: exec.telephony_data.hangup_reason ?? undefined
             }
           : undefined,
         logs
       },
-      message: `Execution \`${exec.id}\`: status **${exec.status}**, duration ${exec.conversation_time || 0}s, cost ${exec.total_cost || 0} cents.`
+      message: `Execution \`${exec.id}\`: status **${exec.status}**, duration ${(exec.conversation_duration ?? exec.conversation_time) || 0}s, cost ${exec.total_cost || 0} cents.`
     };
   })
   .build();

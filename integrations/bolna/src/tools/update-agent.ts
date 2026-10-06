@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,7 +30,12 @@ export let updateAgent = SlateTool.create(spec, {
             .object({
               voice: z.string().optional().describe('Voice name'),
               voiceId: z.string().optional().describe('Voice ID'),
-              model: z.string().optional().describe('TTS model')
+              model: z.string().optional().describe('TTS model'),
+              language: z
+                .string()
+                .optional()
+                .describe('Language code when the provider requires it'),
+              engine: z.string().optional().describe('Engine for Polly')
             })
             .optional()
             .describe('Provider-specific config'),
@@ -59,7 +64,7 @@ export let updateAgent = SlateTool.create(spec, {
     let agentConfig: Record<string, any> = {};
     let agentPrompts: Record<string, any> | undefined;
 
-    if (input.agentName) agentConfig.agent_name = input.agentName;
+    if (input.agentName !== undefined) agentConfig.agent_name = input.agentName;
     if (input.welcomeMessage !== undefined)
       agentConfig.agent_welcome_message = input.welcomeMessage;
     if (input.webhookUrl !== undefined) agentConfig.webhook_url = input.webhookUrl;
@@ -78,6 +83,12 @@ export let updateAgent = SlateTool.create(spec, {
             }),
             ...(input.synthesizer.providerConfig.model && {
               model: input.synthesizer.providerConfig.model
+            }),
+            ...(input.synthesizer.providerConfig.language && {
+              language: input.synthesizer.providerConfig.language
+            }),
+            ...(input.synthesizer.providerConfig.engine && {
+              engine: input.synthesizer.providerConfig.engine
             })
           }
         }),
@@ -87,10 +98,14 @@ export let updateAgent = SlateTool.create(spec, {
       };
     }
 
-    if (input.systemPrompt) {
+    if (input.systemPrompt !== undefined) {
       agentPrompts = {
         task_1: { system_prompt: input.systemPrompt }
       };
+    }
+
+    if (!Object.keys(agentConfig).length && !agentPrompts) {
+      throw createApiServiceError('Provide at least one agent property to update.');
     }
 
     let result = await client.patchAgent(

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getContact = SlateTool.create(spec, {
   name: 'Get Contact',
   key: 'get_contact',
-  description: `Retrieve a single contact by their Omnisend contact ID. Returns full contact details including subscription statuses, custom properties, tags, and identifiers.`,
+  description: `Retrieve a contact by its provider ID, including available subscription identifiers, personal details, tags and custom properties.`,
   tags: { readOnly: true }
 })
   .input(
@@ -40,31 +40,8 @@ export let getContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OmnisendClient(ctx.auth.token);
-    let result = await client.getContact(ctx.input.contactId);
-
-    return {
-      output: {
-        contactId: result.contactID,
-        email: result.email,
-        firstName: result.firstName,
-        lastName: result.lastName,
-        phone: result.phone,
-        address: result.address,
-        city: result.city,
-        state: result.state,
-        postalCode: result.postalCode,
-        country: result.country,
-        countryCode: result.countryCode,
-        birthdate: result.birthdate,
-        gender: result.gender,
-        tags: result.tags,
-        customProperties: result.customProperties,
-        identifiers: result.identifiers,
-        createdAt: result.createdAt,
-        updatedAt: result.updatedAt
-      },
-      message: `Retrieved contact **${result.email || result.contactID}**.`
-    };
+    let client = new OmnisendClient(ctx.auth, ctx.config.apiVersion);
+    let output = await client.getContact(ctx.input.contactId);
+    return { output, message: 'Retrieved contact.' };
   })
   .build();

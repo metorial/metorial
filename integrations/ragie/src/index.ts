@@ -13,8 +13,6 @@ import {
   retrieveDocuments,
   updateDocument
 } from './tools';
-import { connectionEvents, documentEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     manageConnections,
     managePartitions
   ],
-  triggers: [documentEvents, connectionEvents]
+  triggers: []
 });

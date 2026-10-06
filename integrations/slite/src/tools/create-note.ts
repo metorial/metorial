@@ -27,10 +27,16 @@ export let createNote = SlateTool.create(spec, {
           'ID of the parent note to nest this note under. If omitted, the note goes to the personal channel.'
         ),
       templateId: z.string().optional().describe('ID of a template to apply to the new note'),
-      attributes: z
-        .array(z.string())
+      sliteml: z
+        .string()
         .optional()
-        .describe('Collection attributes ordered by column')
+        .describe('Native SliteML content; choose one content representation.'),
+      attributes: z
+        .array(z.string().nullable())
+        .optional()
+        .describe(
+          'Collection attributes ordered by column; incompatible values can be ignored by Slite. Null slots follow native provider semantics and do not promise clearing.'
+        )
     })
   )
   .output(
@@ -50,6 +56,7 @@ export let createNote = SlateTool.create(spec, {
       title: ctx.input.title,
       markdown: ctx.input.markdown,
       html: ctx.input.html,
+      sliteml: ctx.input.sliteml,
       parentNoteId: ctx.input.parentNoteId,
       templateId: ctx.input.templateId,
       attributes: ctx.input.attributes

@@ -21,8 +21,6 @@ import {
   updateMicrosurvey,
   updateTour
 } from './tools';
-import { helpbarEvents, microsurveyEvents, tourEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     manageWebhooks,
     listTags
   ],
-  triggers: [tourEvents, microsurveyEvents, helpbarEvents]
+  triggers: []
 });

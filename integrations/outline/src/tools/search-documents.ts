@@ -1,17 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, clientConfig } from '../lib/client';
+import { authorOutput, optionalText, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-export let searchDocuments = SlateTool.create(spec, {
+export const searchDocuments = SlateTool.create(spec, {
   name: 'Search Documents',
   key: 'search_documents',
-  description: `Search across all documents in the Outline workspace using full-text search.
-Returns matching documents with relevant context snippets and ranking scores.
-Supports filtering by collection, user, date range, and document status.`,
-  tags: {
-    readOnly: true
-  }
+  description:
+    'Search one page of authorized documents by text, collection, editor, updated period or status. total counts this page only.',
+  tags: { readOnly: true }
 })
   .input(
     z.object({
@@ -20,7 +17,7 @@ Supports filtering by collection, user, date range, and document status.`,
       userId: z
         .string()
         .optional()
-        .describe('Filter results to documents created by a specific user'),
+        .describe('Filter results to documents edited by a specific user'),
       dateFilter: z
         .enum(['day', 'week', 'month', 'year'])
         .optional()
@@ -29,8 +26,15 @@ Supports filtering by collection, user, date range, and document status.`,
         .array(z.enum(['published', 'draft', 'archived']))
         .optional()
         .describe('Filter by document status'),
-      limit: z.number().optional().default(25).describe('Maximum number of results to return'),
-      offset: z.number().optional().default(0).describe('Offset for pagination')
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .default(25)
+        .describe('Maximum number of results to return'),
+      offset: z.number().int().min(0).optional().default(0).describe('Offset for pagination')
     })
   )
   .output(
@@ -39,54 +43,32 @@ Supports filtering by collection, user, date range, and document status.`,
         z.object({
           documentId: z.string(),
           title: z.string(),
-          context: z.string().describe('Matching text snippet'),
+          context: z.string(),
           ranking: z.number(),
-          collectionId: z.string().optional(),
+          collectionId: optionalText,
           updatedAt: z.string(),
-          createdBy: z.object({
-            userId: z.string(),
-            name: z.string()
-          })
+          createdBy: authorOutput
         })
       ),
-      total: z.number()
+      total: z.number(),
+      pagination: paginationSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let result = await client.searchDocuments({
-      query: ctx.input.query,
-      collectionId: ctx.input.collectionId,
-      userId: ctx.input.userId,
-      dateFilter: ctx.input.dateFilter,
-      statusFilter: ctx.input.statusFilter,
-      limit: ctx.input.limit,
-      offset: ctx.input.offset
-    });
-
-    let results = (result.data || []).map(item => ({
+    const client = new Client(clientConfig(ctx.auth, ctx.config));
+    const result = await client.searchDocuments(ctx.input);
+    const results = result.data.map(item => ({
       documentId: item.document.id,
       title: item.document.title,
       context: item.context,
       ranking: item.ranking,
       collectionId: item.document.collectionId,
       updatedAt: item.document.updatedAt,
-      createdBy: {
-        userId: item.document.createdBy.id,
-        name: item.document.createdBy.name
-      }
+      createdBy: { userId: item.document.createdBy.id, name: item.document.createdBy.name }
     }));
-
     return {
-      output: {
-        results,
-        total: results.length
-      },
-      message: `Found **${results.length}** documents matching "${ctx.input.query}".`
+      output: { results, total: results.length, pagination: result.pagination },
+      message: `Returned ${results.length} matching documents on this page.`
     };
   })
   .build();

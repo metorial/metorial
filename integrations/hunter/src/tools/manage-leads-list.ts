@@ -1,6 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  Client,
+  entity,
+  id,
+  optionalNumber,
+  optionalText,
+  row,
+  rows,
+  text
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let manageLeadsList = SlateTool.create(spec, {
@@ -15,7 +24,7 @@ export let manageLeadsList = SlateTool.create(spec, {
     'To **delete** a list, set action to "delete" and provide listId.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -41,7 +50,12 @@ export let manageLeadsList = SlateTool.create(spec, {
           z.object({
             listId: z.number().describe('List ID'),
             name: z.string().describe('List name'),
-            leadsCount: z.number().nullable().describe('Number of leads in the list')
+            leadsCount: z.number().nullable().describe('Number of leads in the list'),
+            type: z
+              .string()
+              .optional()
+              .describe('Static or dynamic list; save leads only to static lists'),
+            createdAt: z.string().optional()
           })
         )
         .optional()
@@ -50,10 +64,23 @@ export let manageLeadsList = SlateTool.create(spec, {
         .object({
           listId: z.number().describe('List ID'),
           name: z.string().describe('List name'),
-          leadsCount: z.number().nullable().describe('Number of leads in the list')
+          leadsCount: z.number().nullable().describe('Number of leads in the list'),
+          type: z
+            .string()
+            .optional()
+            .describe('Static or dynamic list; save leads only to static lists'),
+          createdAt: z.string().optional()
         })
         .optional()
         .describe('Single list (for get, create, update actions)'),
+      pending: z
+        .boolean()
+        .optional()
+        .describe(
+          'Deletion was accepted for background processing; independently confirm absence before treating cleanup as complete'
+        ),
+      total: z.number().optional().describe('Provider-reported total list count'),
+      returnedCount: z.number().optional(),
       deleted: z
         .boolean()
         .optional()
@@ -61,67 +88,54 @@ export let manageLeadsList = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
+    const client = new Client({ token: ctx.auth.token });
+    const map = (value: unknown) => {
+      const list = entity(value);
+      return {
+        listId: id(list.id),
+        name: text(list.name, 'list name'),
+        leadsCount: optionalNumber(list.leads_count) ?? null,
+        type: optionalText(list.type),
+        createdAt: optionalText(list.created_at)
+      };
+    };
     if (ctx.input.action === 'list') {
-      let result = await client.listLeadsLists({
+      const result = await client.listLeadsLists({
         limit: ctx.input.limit,
         offset: ctx.input.offset
       });
-      let lists = (result.data?.leads_lists || []).map((l: any) => ({
-        listId: l.id,
-        name: l.name,
-        leadsCount: l.leads_count ?? null
-      }));
+      const lists = rows(row(result.data).leads_lists).map(map);
       return {
-        output: { lists },
+        output: {
+          lists,
+          total: optionalNumber(result.meta.total),
+          returnedCount: lists.length
+        },
         message: `Retrieved **${lists.length}** leads lists.`
       };
     }
-
-    if (ctx.input.action === 'get') {
-      if (!ctx.input.listId) throw new Error('listId is required for get action');
-      let result = await client.getLeadsList(ctx.input.listId);
-      let l = result.data;
+    if (ctx.input.action === 'delete') {
+      const result = await client.deleteLeadsList(id(ctx.input.listId));
+      const pending = result.httpStatus === 202;
       return {
-        output: {
-          list: { listId: l.id, name: l.name, leadsCount: l.leads_count ?? null }
-        },
-        message: `Retrieved list **${l.name}** (ID: ${l.id}).`
+        output: { deleted: !pending, pending },
+        message: pending
+          ? 'Hunter accepted background list deletion. Confirm absence before considering cleanup complete.'
+          : `Deleted leads list **${ctx.input.listId}**.`
       };
     }
-
-    if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
-      let result = await client.createLeadsList(ctx.input.name);
-      let l = result.data;
-      return {
-        output: {
-          list: { listId: l.id, name: l.name, leadsCount: l.leads_count ?? 0 }
-        },
-        message: `Created leads list **${l.name}** (ID: ${l.id}).`
-      };
-    }
-
-    if (ctx.input.action === 'update') {
-      if (!ctx.input.listId) throw new Error('listId is required for update action');
-      if (!ctx.input.name) throw new Error('name is required for update action');
-      let result = await client.updateLeadsList(ctx.input.listId, ctx.input.name);
-      let l = result.data;
-      return {
-        output: {
-          list: { listId: l.id, name: l.name, leadsCount: l.leads_count ?? null }
-        },
-        message: `Updated leads list to **${l.name}** (ID: ${l.id}).`
-      };
-    }
-
-    // delete
-    if (!ctx.input.listId) throw new Error('listId is required for delete action');
-    await client.deleteLeadsList(ctx.input.listId);
+    const result =
+      ctx.input.action === 'get'
+        ? await client.getLeadsList(id(ctx.input.listId))
+        : ctx.input.action === 'create'
+          ? await client.createLeadsList(text(ctx.input.name, 'list name'))
+          : await client.updateLeadsList(
+              id(ctx.input.listId),
+              text(ctx.input.name, 'list name')
+            );
     return {
-      output: { deleted: true },
-      message: `Deleted leads list **${ctx.input.listId}**.`
+      output: { list: map(result.data) },
+      message: `Retrieved the ${ctx.input.action === 'get' ? 'requested' : 'saved'} leads list.`
     };
   })
   .build();

@@ -62,10 +62,7 @@ export let listFolderTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.listFolder(ctx.input.folderPath, {
       count: ctx.input.count,
@@ -79,7 +76,11 @@ export let listFolderTool = SlateTool.create(spec, {
           name: String(f.name || ''),
           path: String(f.path || ''),
           folderId: f.folder_id ? String(f.folder_id) : undefined,
-          lastModified: f.last_modified ? String(f.last_modified) : undefined
+          lastModified: f.last_modified
+            ? String(f.last_modified)
+            : typeof f.lastModified === 'number'
+              ? new Date(f.lastModified).toISOString()
+              : undefined
         }))
       : [];
 
@@ -90,7 +91,11 @@ export let listFolderTool = SlateTool.create(spec, {
           groupId: f.group_id ? String(f.group_id) : undefined,
           entryId: f.entry_id ? String(f.entry_id) : undefined,
           size: typeof f.size === 'number' ? f.size : undefined,
-          lastModified: f.last_modified ? String(f.last_modified) : undefined,
+          lastModified: f.last_modified
+            ? String(f.last_modified)
+            : typeof f.lastModified === 'number'
+              ? new Date(f.lastModified).toISOString()
+              : undefined,
           uploadedBy: f.uploaded_by ? String(f.uploaded_by) : undefined,
           numVersions: typeof f.num_versions === 'number' ? f.num_versions : undefined,
           locked: typeof f.locked === 'boolean' ? f.locked : undefined

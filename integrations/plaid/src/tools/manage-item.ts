@@ -65,7 +65,7 @@ export let getItemTool = SlateTool.create(spec, {
 export let removeItemTool = SlateTool.create(spec, {
   name: 'Remove Item',
   key: 'remove_item',
-  description: `Remove a Plaid Item and permanently invalidate its access token. This disconnects the user's bank account and all associated data will no longer be accessible. This action **cannot be undone**.`,
+  description: `Remove a Plaid Item and permanently invalidate its access token. This disconnects the user's bank account and future Item data access stops. Existing Asset Reports and Audit Copies can remain accessible and need separate lifecycle handling. This action **cannot be undone**.`,
   tags: {
     destructive: true
   }

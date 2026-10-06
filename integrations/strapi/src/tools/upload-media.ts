@@ -30,15 +30,13 @@ export let uploadMedia = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let fileInfo: { name?: string; alternativeText?: string; caption?: string } = {};
-    if (ctx.input.name) fileInfo.name = ctx.input.name;
-    if (ctx.input.alternativeText) fileInfo.alternativeText = ctx.input.alternativeText;
-    if (ctx.input.caption) fileInfo.caption = ctx.input.caption;
+    if (ctx.input.name !== undefined) fileInfo.name = ctx.input.name;
+    if (ctx.input.alternativeText !== undefined)
+      fileInfo.alternativeText = ctx.input.alternativeText;
+    if (ctx.input.caption !== undefined) fileInfo.caption = ctx.input.caption;
 
     let result = await client.uploadFileFromUrl(
       ctx.input.fileUrl,

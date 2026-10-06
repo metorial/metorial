@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShippoClient } from '../lib/client';
+import { addDocument } from '../lib/files';
 import { spec } from '../spec';
 
 export let getTransaction = SlateTool.create(spec, {
@@ -20,6 +21,10 @@ export let getTransaction = SlateTool.create(spec, {
   .output(
     z.object({
       transactionId: z.string(),
+      testMode: z
+        .boolean()
+        .optional()
+        .describe('Provider-reported test state; test labels cannot be mailed.'),
       status: z
         .string()
         .optional()
@@ -33,18 +38,40 @@ export let getTransaction = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
-    let result = (await client.getTransaction(ctx.input.transactionId)) as Record<string, any>;
+    let result = await client.getTransaction(ctx.input.transactionId);
+
+    if (result.status === 'SUCCESS') {
+      if (typeof result.label_url === 'string' && result.label_url)
+        await addDocument(
+          ctx,
+          result,
+          { kind: 'transaction', resourceId: result.object_id, documentType: 'label' },
+          false
+        );
+      if (result.commercial_invoice_url)
+        await addDocument(
+          ctx,
+          result,
+          {
+            kind: 'transaction',
+            resourceId: result.object_id,
+            documentType: 'commercial_invoice'
+          },
+          false
+        );
+    }
 
     return {
       output: {
         transactionId: result.object_id,
         status: result.status,
+        testMode: result.test,
         trackingNumber: result.tracking_number,
-        labelUrl: result.label_url,
+        labelUrl: typeof result.label_url === 'string' ? result.label_url : undefined,
         commercialInvoiceUrl: result.commercial_invoice_url,
-        rate: result.rate,
+        rate: typeof result.rate === 'string' ? result.rate : result.rate?.object_id,
         messages: result.messages,
         createdAt: result.object_created
       },

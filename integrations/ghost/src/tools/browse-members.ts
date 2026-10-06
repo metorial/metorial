@@ -1,42 +1,46 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GhostAdminClient } from '../lib/client';
+import { getClient } from '../lib/client';
+import { pagination } from '../lib/schemas';
 import { spec } from '../spec';
 
-let memberSchema = z.object({
-  memberId: z.string().describe('Unique member ID'),
-  uuid: z.string().describe('Member UUID'),
-  email: z.string().describe('Member email address'),
-  name: z.string().nullable().describe('Member name'),
-  note: z.string().nullable().describe('Internal note about the member'),
-  status: z.string().describe('Member status (free, paid, comped)'),
-  avatarImage: z.string().nullable().describe('Avatar image URL'),
-  emailCount: z.number().describe('Total emails sent to member'),
-  emailOpenedCount: z.number().describe('Number of emails opened'),
-  emailOpenRate: z.number().nullable().describe('Email open rate percentage'),
-  lastSeenAt: z.string().nullable().describe('Last activity timestamp'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp'),
-  labels: z
-    .array(
-      z.object({
-        labelId: z.string(),
-        name: z.string(),
-        slug: z.string()
-      })
-    )
-    .optional()
-    .describe('Associated labels'),
-  newsletters: z
-    .array(
-      z.object({
-        newsletterId: z.string(),
-        name: z.string()
-      })
-    )
-    .optional()
-    .describe('Subscribed newsletters')
-});
+let memberSchema = z
+  .object({
+    memberId: z.string().describe('Unique member ID'),
+    uuid: z.string().optional().describe('Member UUID'),
+    email: z.string().optional().describe('Member email address'),
+    name: z.string().nullable().optional().describe('Member name'),
+    note: z.string().nullable().optional().describe('Internal note about the member'),
+    status: z.string().optional().describe('Member status (free, paid, comped)'),
+    avatarImage: z.string().nullable().optional().describe('Avatar image URL'),
+    emailCount: z.number().optional().describe('Total emails sent to member'),
+    emailOpenedCount: z.number().optional().describe('Number of emails opened'),
+    emailOpenRate: z.number().nullable().optional().describe('Email open rate percentage'),
+    lastSeenAt: z.string().nullable().optional().describe('Last activity timestamp'),
+    createdAt: z.string().optional().describe('Creation timestamp'),
+    updatedAt: z.string().optional().describe('Last update timestamp'),
+    labels: z
+      .array(
+        z.object({
+          labelId: z.string(),
+          name: z.string(),
+          slug: z.string()
+        })
+      )
+      .optional()
+      .describe('Associated labels'),
+    newsletters: z
+      .array(
+        z.object({
+          newsletterId: z.string(),
+          name: z.string()
+        })
+      )
+      .optional()
+      .describe('Subscribed newsletters')
+  })
+  .partial()
+  .required({ memberId: true });
 
 let paginationSchema = z.object({
   page: z.number(),
@@ -79,10 +83,7 @@ export let browseMembers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GhostAdminClient({
-      domain: ctx.config.adminDomain,
-      apiKey: ctx.auth.token
-    });
+    let client = getClient(ctx);
 
     let result = await client.browseMembers({
       filter: ctx.input.filter,
@@ -96,14 +97,14 @@ export let browseMembers = SlateTool.create(spec, {
       memberId: m.id,
       uuid: m.uuid,
       email: m.email,
-      name: m.name ?? null,
-      note: m.note ?? null,
+      name: m.name,
+      note: m.note,
       status: m.status,
-      avatarImage: m.avatar_image ?? null,
-      emailCount: m.email_count ?? 0,
-      emailOpenedCount: m.email_opened_count ?? 0,
-      emailOpenRate: m.email_open_rate ?? null,
-      lastSeenAt: m.last_seen_at ?? null,
+      avatarImage: m.avatar_image,
+      emailCount: m.email_count,
+      emailOpenedCount: m.email_opened_count,
+      emailOpenRate: m.email_open_rate,
+      lastSeenAt: m.last_seen_at,
       createdAt: m.created_at,
       updatedAt: m.updated_at,
       labels: m.labels?.map((l: any) => ({
@@ -117,18 +118,11 @@ export let browseMembers = SlateTool.create(spec, {
       }))
     }));
 
-    let pagination = result.meta?.pagination ?? {
-      page: 1,
-      limit: 15,
-      pages: 1,
-      total: members.length,
-      next: null,
-      prev: null
-    };
+    let pageInfo = pagination(result, members.length);
 
     return {
-      output: { members, pagination },
-      message: `Found **${pagination.total}** members (page ${pagination.page} of ${pagination.pages}).`
+      output: { members, pagination: pageInfo },
+      message: `Found **${pageInfo.total}** members (page ${pageInfo.page} of ${pageInfo.pages}).`
     };
   })
   .build();

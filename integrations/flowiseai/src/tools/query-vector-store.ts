@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FlowiseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,12 +35,15 @@ export let queryVectorStore = SlateTool.create(spec, {
       query: ctx.input.query
     });
 
+    if (!Array.isArray(result.docs))
+      throw createApiServiceError('Flowise returned an invalid vector search response.');
+
     return {
       output: {
         timeTaken: result.timeTaken,
-        docs: result.docs || []
+        docs: result.docs
       },
-      message: `Query returned **${(result.docs || []).length}** document(s) in ${result.timeTaken}ms.`
+      message: `Query returned **${result.docs.length}** document(s) in ${result.timeTaken}ms.`
     };
   })
   .build();

@@ -28,8 +28,20 @@ export let searchNotes = SlateTool.create(spec, {
         .optional()
         .describe('Only include notes edited after this ISO 8601 date'),
       includeArchived: z.boolean().optional().describe('Include archived notes in results'),
-      page: z.number().optional().describe('Page number (0-indexed)'),
-      hitsPerPage: z.number().optional().describe('Results per page (1-100)')
+      page: z
+        .number()
+        .int()
+        .nonnegative()
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Page number (0-indexed)'),
+      hitsPerPage: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page (1-100)')
     })
   )
   .output(
@@ -72,7 +84,7 @@ export let searchNotes = SlateTool.create(spec, {
       hitsPerPage: ctx.input.hitsPerPage
     });
 
-    let hits = (result.hits || []).map((hit: any) => ({
+    let hits = result.hits.map(hit => ({
       noteId: hit.id,
       title: hit.title,
       type: hit.type,
@@ -81,7 +93,7 @@ export let searchNotes = SlateTool.create(spec, {
       archivedAt: hit.archivedAt ?? null,
       highlight: hit.highlight,
       reviewState: hit.reviewState,
-      parentNotes: hit.parentNotes?.map((p: any) => ({
+      parentNotes: hit.parentNotes?.map(p => ({
         noteId: p.id,
         title: p.title
       }))
@@ -90,10 +102,10 @@ export let searchNotes = SlateTool.create(spec, {
     return {
       output: {
         hits,
-        page: result.page ?? 0,
-        totalPages: result.nbPages ?? 1
+        page: result.page,
+        totalPages: result.nbPages
       },
-      message: `Found **${hits.length}** note(s) matching the search${ctx.input.query ? ` for "${ctx.input.query}"` : ''} (page ${(result.page ?? 0) + 1} of ${result.nbPages ?? 1})`
+      message: `Found **${hits.length}** note(s) matching the search${ctx.input.query ? ` for "${ctx.input.query}"` : ''} (page ${result.page + 1} of ${result.nbPages})`
     };
   })
   .build();

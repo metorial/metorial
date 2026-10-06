@@ -6,8 +6,9 @@ import { spec } from '../spec';
 export let executeTransaction = SlateTool.create(spec, {
   name: 'Execute Transaction',
   key: 'execute_transaction',
-  description: `Execute multiple record operations (insert, update, delete, get) as a single atomic transaction. All operations succeed together or fail together, ensuring data consistency.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Execute multiple record operations (insert, update, delete, get) as a single atomic transaction. All operations succeed together or fail together, ensuring data consistency.`,
   instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.',
     'Each operation requires a "type" ("insert", "update", "delete", or "get"), a "table" name, and type-specific fields.',
     'Insert: requires "record" (object with field values), optionally "id" to set a custom record ID.',
     'Update: requires "id" and "fields" (object with updated values).',
@@ -15,6 +16,7 @@ export let executeTransaction = SlateTool.create(spec, {
     'Get: requires "id", optionally "columns" (array of column names).'
   ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })

@@ -1,82 +1,57 @@
-# Slates Specification for Synthflow AI
+# Synthflow AI API Specification
 
-## Overview
-
-Synthflow AI is a voice AI platform that enables businesses to automate inbound and outbound phone calls using AI-powered agents. It provides a REST API for managing the full agent lifecycle including creation, call orchestration, telephony provisioning, knowledge bases, simulations, and analytics.
+Synthflow provides AI voice agents for inbound, outbound, and widget conversations.
 
 ## Authentication
 
-Synthflow uses API keys for authentication. Authentication to the Synthflow API is performed via HTTP Bearer Authentication. Provide your API Key in the Authorization request header.
+Create an API key under **Admin → Workspace Settings → API Keys**. Requests use
+`Authorization: Bearer <api_key>`. Select the region matching your workspace:
 
-All API requests require the header:
+| Region | API base URL |
+| --- | --- |
+| Global | `https://api.synthflow.ai/v2` |
+| United States | `https://api.us.synthflow.ai/v2` |
+| European Union | `https://api.eu.synthflow.ai/v2` |
 
-```
-Authorization: Bearer <your_api_key>
-```
+See [Authentication](https://docs.synthflow.ai/authentication) and
+[API introduction](https://docs.synthflow.ai/getting-started-with-your-api).
 
-API keys can be created and managed from **Integrations → API Keys** in the Synthflow dashboard. The Synthflow connection uses your API key, so it inherits the permissions of that key. Create separate keys per environment and rotate them regularly.
+## Supported workflows
 
-The base URL for all API requests is `https://api.synthflow.ai/v2/`.
+| Workflow | Tools | Provider contract |
+| --- | --- | --- |
+| Agent lifecycle | `list_agents`, `get_agent`, `create_agent`, `update_agent`, `delete_agent` | `/assistants`; nested `agent` settings use `voice_id`, `greeting_message`, and `redact_pii`. `max_duration` is an object with `duration_seconds` and `is_enabled`. |
+| Call initiation and history | `make_call`, `list_calls`, `get_call` | `/calls`; list time filters use milliseconds since epoch. `get_call` can provide a downloadable recording when available. |
+| Knowledge base lifecycle and assignment | `manage_knowledge_base` | `/knowledge_base`; attachment uses a `model_id` query parameter, while detachment sends it in the request body. |
+| Knowledge sources | `manage_knowledge_base_source` | Add, list, update, and delete text, website, or hosted PDF sources. Updates retain the existing source type and require its text content or URL. |
+| Voice and number discovery | `list_voices`, `list_phone_numbers` | `/voices`, `/numbers`; both require a workspace ID. Obtain `workspace_id` from a contact or simulation suite, or from your dashboard. |
+| Contacts | `manage_contact` | `/contacts`; updates use PATCH. Lists support phone-number search and return provider page metadata; the current API does not expose offset pagination. |
+| Custom actions | `manage_action` | `/actions`; create/update accept the documented body keyed by action type, such as `CUSTOM_ACTION`. Actions can be attached to and detached from agents. |
+| Simulation runs and results | `run_simulation` | List `/simulation_suites`, execute a suite for its existing agent, then retrieve `/simulations/session/{id}`. |
+| Usage analytics | `export_analytics` | `/analytics/` returns structured metrics. ISO datetime ranges cannot exceed 120 days. |
+| Agency accounts | `manage_subaccount` | `/subaccounts`; call limits map to `concurrency`, and account limits support null. Creation results omit generated credentials and sign-in links. |
 
-## Features
+Set post-call callback URLs on agents using `create_agent` or `update_agent`.
+The current `make_call` endpoint does not accept a per-call callback URL.
+Calls require provisioned telephony and an outbound agent. Simulations and agency
+operations may depend on account permissions or plan features.
 
-### Agent Management
+## Official references
 
-Create, update, and delete AI voice agents programmatically. Agents can be configured as inbound or outbound, with customizable prompts, greetings, voice selection, and agent type. Agents support PII redaction, which when enabled automatically removes sensitive data from transcripts, webhook payloads, and logs.
+- [Create an agent](https://docs.synthflow.ai/api-reference/platform-api/agents/create-assistant)
+- [Update an agent](https://docs.synthflow.ai/api-reference/platform-api/agents/update-assistant)
+- [Make a call](https://docs.synthflow.ai/api-reference/platform-api/calls/voice-call)
+- [List calls](https://docs.synthflow.ai/api-reference/platform-api/calls/list-calls)
+- [Get a call](https://docs.synthflow.ai/api-reference/platform-api/calls/get-phone-call)
+- [Knowledge base sources](https://docs.synthflow.ai/api-reference/platform-api/knowledge-bases/list-knowledge-base-sources)
+- [Update a knowledge source](https://docs.synthflow.ai/api-reference/platform-api/knowledge-bases/update-knowledge-base-source)
+- [Create an action](https://docs.synthflow.ai/api-reference/platform-api/actions/create-action)
+- [Update a contact](https://docs.synthflow.ai/api-reference/platform-api/contacts/update-a-contact)
+- [Execute a simulation suite](https://docs.synthflow.ai/api-reference/platform-api/simulations/execute-simulation-suite)
+- [Get a simulation session](https://docs.synthflow.ai/api-reference/platform-api/simulations/get-simulation-session)
+- [Analytics](https://docs.synthflow.ai/api-reference/platform-api/analytics/analytics-export)
+- [Subaccounts](https://docs.synthflow.ai/api-reference/platform-api/subaccounts/create-subaccount)
 
-### Call Orchestration
-
-Launch live calls, fetch call history, or monitor active conversations. Initiate real-time phone calls through an AI agent by specifying the agent ID, recipient phone number, recipient name, custom variables for dynamic prompt injection, and optional parameters like email and timezone for appointment booking. Call results include transcripts, recordings, status, duration, and collected variables.
-
-### Simulations & Testing
-
-Generate test cases and run rehearsal calls before going live. Simulations include a comprehensive set of endpoints to manage Test Cases, Test Suites, and Simulation Sessions programmatically. Previously created agent-based tests are grouped into Test Suites, and custom test cases are also grouped based on the most recently updated agent.
-
-### Custom Actions
-
-Custom actions allow you to extend your agent's capabilities by integrating external APIs. Whether pulling in live information, creating new records, or adjusting conversational flow based on external inputs, custom actions make your agent more capable. Actions can be registered, attached to agents, and configured with various HTTP methods (GET, POST, PUT, PATCH, DELETE). Actions can be triggered at different stages of a call.
-
-### Knowledge Bases & Voices
-
-Upload domain content, manage sources, and browse voice options. Knowledge bases allow agents to reference specific domain information during calls. Voices can be browsed and assigned to agents.
-
-### Telephony & Phone Numbers
-
-Provision phone numbers, manage contacts, and work with memory stores. Phone numbers can be assigned to agents for inbound and outbound calling. Contacts can be managed in phone books.
-
-### Chat
-
-Synthflow supports chat-based agents in addition to voice. Chat agents can be built, launched, and integrated into websites and apps.
-
-### Analytics
-
-Pull usage summaries or export granular metrics for your BI stack. Analytics export supports datetime-based filtering for precise time-based queries.
-
-### Subaccounts (Agency)
-
-Manage subaccounts for agency-level operations. Concurrency is set by your plan, and accounts and subaccounts share the main account's total.
-
-### Webhook Logs
-
-Webhook logs track all webhook interactions and their delivery status. Monitor both inbound webhooks and post-call webhooks in one place.
-
-## Events
-
-Synthflow supports two types of webhooks:
-
-### Post-Call Webhook
-
-Webhooks allow you to receive real-time notifications when a call is completed, eliminating the need to manually check for updates. Add a webhook URL to the request in order to receive information after the call. Specify the Webhook URL in your API request body using the `external_webhook_url` key. The post-call webhook payload includes:
-
-- Call status (completed, busy, failed, no answer, hangup on voicemail, etc.)
-- End call reason
-- Transcript and recording URL
-- Lead details
-- Collected variables (slots) from conversation flows, allowing you to access user-provided information programmatically.
-- Executed action results
-
-The webhook URL can be set per-call in the API request body or configured at the agent level.
-
-### Inbound Call Webhook
-
-You can intercept, reroute and decline every incoming call with inbound call webhooks. You receive a JSON payload (event: `call_inbound`) within 10 seconds after a call is initiated. Your endpoint must respond with an updated `call_inbound` object to assign an agent to the call or update the metadata. This allows dynamic routing of inbound calls to different agents, injecting custom variables and metadata, or rejecting calls by responding with an empty object. A `default_agent` can be specified as a fallback if the webhook endpoint fails to respond.
+Batch campaigns, chat, memory stores, phonebook configuration, number acquisition,
+and the provider's own MCP configuration are outside this integration's current
+tool surface.

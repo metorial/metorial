@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getAdminLogs = SlateTool.create(spec, {
@@ -37,10 +38,12 @@ export let getAdminLogs = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('get_admin_logs', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.getAdministratorLogs({
@@ -55,7 +58,12 @@ export let getAdminLogs = SlateTool.create(spec, {
       action: log.action || undefined,
       objectType: log.object || undefined,
       objectName: log.object_name || undefined,
-      description: log.description ? JSON.stringify(log.description) : undefined
+      description:
+        typeof log.description === 'string'
+          ? log.description
+          : log.description
+            ? JSON.stringify(log.description)
+            : undefined
     }));
 
     return {

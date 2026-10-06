@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { stateMessage } from '../lib/contracts';
+import { collectionOutput, deliverGeneratedFiles } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let generateCollection = SlateTool.create(spec, {
@@ -18,6 +21,7 @@ export let generateCollection = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       templateSetUid: z.string().describe('UID of the template set to generate from'),
       modifications: z
         .array(
@@ -60,33 +64,19 @@ export let generateCollection = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.createCollection({
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const result = await client.createCollection({
       template_set: ctx.input.templateSetUid,
       modifications: ctx.input.modifications,
       transparent: ctx.input.transparent,
       metadata: ctx.input.metadata,
       webhook_url: ctx.input.webhookUrl
     });
-
-    let images =
-      result.images?.map((img: any) => ({
-        imageUid: img.uid,
-        templateUid: img.template,
-        imageUrl: img.image_url || null,
-        status: img.status
-      })) || null;
-
+    const output = collectionOutput(result);
+    await deliverGeneratedFiles(ctx, 'collection', result);
     return {
-      output: {
-        collectionUid: result.uid,
-        status: result.status,
-        imageUrls: result.image_urls || null,
-        images,
-        createdAt: result.created_at
-      },
-      message: `Collection generation ${result.status === 'completed' ? 'completed' : 'initiated'} (UID: ${result.uid}) with ${result.images?.length || 0} images.`
+      output,
+      message: `Collection generation ${stateMessage(result.status)} (UID: ${output.collectionUid}). Read its status with get_resource.`
     };
   })
   .build();

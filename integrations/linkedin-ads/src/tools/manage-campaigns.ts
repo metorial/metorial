@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, continuation, urn } from '../lib/client';
+import { accountIdField } from '../lib/schemas';
 import { spec } from '../spec';
 
 let budgetSchema = z.object({
@@ -17,9 +18,10 @@ export let listCampaigns = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('r_ads', 'rw_ads'))
   .input(
     z.object({
-      accountId: z.string().describe('Numeric ID of the ad account'),
+      accountId: accountIdField,
       campaignGroupId: z.string().optional().describe('Filter by campaign group ID'),
       statuses: z
         .array(z.string())
@@ -31,6 +33,10 @@ export let listCampaigns = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Continuation token for pageToken with the same filters'),
       campaigns: z.array(
         z.object({
           campaignId: z.number().describe('Numeric ID of the campaign'),
@@ -73,7 +79,7 @@ export let listCampaigns = SlateTool.create(spec, {
     }));
 
     return {
-      output: { campaigns },
+      output: { campaigns, nextPageToken: continuation(result) },
       message: `Found **${campaigns.length}** campaign(s).`
     };
   })
@@ -88,9 +94,15 @@ export let getCampaign = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('r_ads', 'rw_ads'))
   .input(
     z.object({
-      campaignId: z.string().describe('Numeric ID of the campaign')
+      campaignId: z.string().describe('Numeric ID of the campaign'),
+      accountId: accountIdField
+        .optional()
+        .describe(
+          'Authorized account ID from list_ad_accounts. Omit only for bounded, unambiguous read-only account discovery.'
+        )
     })
   )
   .output(
@@ -98,7 +110,7 @@ export let getCampaign = SlateTool.create(spec, {
       campaignId: z.number().describe('Numeric ID of the campaign'),
       name: z.string().describe('Campaign name'),
       status: z.string().describe('Campaign status'),
-      objectiveType: z.string().describe('Campaign objective'),
+      objectiveType: z.string().describe('Campaign objective; empty if the provider omits it'),
       type: z.string().describe('Campaign type'),
       costType: z.string().describe('Cost type'),
       dailyBudget: budgetSchema.optional(),
@@ -123,7 +135,7 @@ export let getCampaign = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let campaign = await client.getCampaign(ctx.input.campaignId);
+    let campaign = await client.getCampaign(ctx.input.campaignId, ctx.input.accountId);
 
     return {
       output: {
@@ -166,9 +178,10 @@ export let createCampaign = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(anyOf('rw_ads'))
   .input(
     z.object({
-      accountId: z.string().describe('Numeric ID of the ad account'),
+      accountId: accountIdField,
       campaignGroupId: z.string().describe('Numeric ID of the campaign group'),
       name: z.string().describe('Campaign name'),
       objectiveType: z
@@ -202,7 +215,22 @@ export let createCampaign = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Optimization target (e.g., MAX_CLICK, MAX_IMPRESSION, MAX_CONVERSION)'),
-      targetingCriteria: z.any().optional().describe('Targeting criteria JSON object')
+      targetingCriteria: z
+        .any()
+        .optional()
+        .describe('Current targeting criteria JSON object using supported geographic URNs'),
+      associatedEntity: z
+        .string()
+        .optional()
+        .describe(
+          'Advertiser organization or person URN; required for Sponsored Content, Dynamic Ads and Lead Gen Forms'
+        ),
+      politicalIntent: z
+        .enum(['POLITICAL', 'NOT_POLITICAL', 'NOT_DECLARED'])
+        .optional()
+        .describe(
+          'Advertiser declaration. Do not infer NOT_POLITICAL; EU targeting requires explicit advertiser confirmation.'
+        )
     })
   )
   .output(
@@ -213,20 +241,23 @@ export let createCampaign = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let data: Record<string, any> = {
-      account: `urn:li:sponsoredAccount:${ctx.input.accountId}`,
-      campaignGroup: `urn:li:sponsoredCampaignGroup:${ctx.input.campaignGroupId}`,
+    let data: Record<string, unknown> = {
+      account: urn(ctx.input.accountId, 'sponsoredAccount'),
+      campaignGroup: urn(ctx.input.campaignGroupId, 'sponsoredCampaignGroup'),
       name: ctx.input.name,
       objectiveType: ctx.input.objectiveType,
       type: ctx.input.type,
       costType: ctx.input.costType,
-      status: ctx.input.status
+      status: ctx.input.status,
+      politicalIntent: ctx.input.politicalIntent ?? 'NOT_DECLARED'
     };
 
     if (ctx.input.dailyBudget) data.dailyBudget = ctx.input.dailyBudget;
     if (ctx.input.totalBudget) data.totalBudget = ctx.input.totalBudget;
     if (ctx.input.unitCost) data.unitCost = ctx.input.unitCost;
     if (ctx.input.locale) data.locale = ctx.input.locale;
+    if (ctx.input.associatedEntity !== undefined)
+      data.associatedEntity = ctx.input.associatedEntity;
     if (ctx.input.audienceExpansionEnabled !== undefined)
       data.audienceExpansionEnabled = ctx.input.audienceExpansionEnabled;
     if (ctx.input.offsiteDeliveryEnabled !== undefined)
@@ -235,17 +266,15 @@ export let createCampaign = SlateTool.create(spec, {
       data.optimizationTargetType = ctx.input.optimizationTargetType;
     if (ctx.input.targetingCriteria) data.targetingCriteria = ctx.input.targetingCriteria;
 
-    if (ctx.input.runScheduleStart || ctx.input.runScheduleEnd) {
-      data.runSchedule = {};
-      if (ctx.input.runScheduleStart) data.runSchedule.start = ctx.input.runScheduleStart;
-      if (ctx.input.runScheduleEnd) data.runSchedule.end = ctx.input.runScheduleEnd;
+    if (ctx.input.runScheduleStart !== undefined || ctx.input.runScheduleEnd !== undefined) {
+      data.runSchedule = { start: ctx.input.runScheduleStart, end: ctx.input.runScheduleEnd };
     }
 
     let campaignId = await client.createCampaign(data);
 
     return {
       output: { campaignId },
-      message: `Created campaign **${ctx.input.name}** with ID **${campaignId}** (Objective: ${ctx.input.objectiveType}).`
+      message: 'LinkedIn confirmed the requested operation.'
     };
   })
   .build();
@@ -259,9 +288,15 @@ export let updateCampaign = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(anyOf('rw_ads'))
   .input(
     z.object({
       campaignId: z.string().describe('Numeric ID of the campaign to update'),
+      accountId: accountIdField
+        .optional()
+        .describe(
+          'Authorized account ID from list_ad_accounts. Omit only for bounded, unambiguous read-only account discovery.'
+        ),
       name: z.string().optional().describe('New campaign name'),
       status: z
         .enum(['ACTIVE', 'PAUSED', 'ARCHIVED', 'DRAFT'])
@@ -288,8 +323,8 @@ export let updateCampaign = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let patch: Record<string, any> = {};
-    if (ctx.input.name) patch.name = ctx.input.name;
+    let patch: Record<string, unknown> = {};
+    if (ctx.input.name !== undefined) patch.name = ctx.input.name;
     if (ctx.input.status) patch.status = ctx.input.status;
     if (ctx.input.dailyBudget) patch.dailyBudget = ctx.input.dailyBudget;
     if (ctx.input.totalBudget) patch.totalBudget = ctx.input.totalBudget;
@@ -300,17 +335,15 @@ export let updateCampaign = SlateTool.create(spec, {
       patch.optimizationTargetType = ctx.input.optimizationTargetType;
     if (ctx.input.targetingCriteria) patch.targetingCriteria = ctx.input.targetingCriteria;
 
-    if (ctx.input.runScheduleStart || ctx.input.runScheduleEnd) {
-      patch.runSchedule = {};
-      if (ctx.input.runScheduleStart) patch.runSchedule.start = ctx.input.runScheduleStart;
-      if (ctx.input.runScheduleEnd) patch.runSchedule.end = ctx.input.runScheduleEnd;
+    if (ctx.input.runScheduleStart !== undefined || ctx.input.runScheduleEnd !== undefined) {
+      patch.runSchedule = { start: ctx.input.runScheduleStart, end: ctx.input.runScheduleEnd };
     }
 
-    await client.updateCampaign(ctx.input.campaignId, { patch });
+    await client.updateCampaign(ctx.input.campaignId, { patch }, ctx.input.accountId);
 
     return {
       output: { success: true },
-      message: `Updated campaign **${ctx.input.campaignId}** successfully.`
+      message: 'LinkedIn confirmed the requested operation.'
     };
   })
   .build();

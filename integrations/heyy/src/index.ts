@@ -18,8 +18,6 @@ import {
   updateChatTool,
   updateContactTool
 } from './tools';
-import { incomingMessageTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     listWorkflowsTool,
     triggerWorkflowTool
   ],
-  triggers: [incomingMessageTrigger]
+  triggers: []
 });

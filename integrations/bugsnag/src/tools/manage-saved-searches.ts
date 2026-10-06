@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { BugsnagClient } from '../lib/client';
+import { BugsnagClient, filtersSchema } from '../lib/client';
 import { spec } from '../spec';
 
 let savedSearchSchema = z.object({
@@ -16,7 +16,7 @@ export let manageSavedSearches = SlateTool.create(spec, {
   key: 'manage_saved_searches',
   description: `List, create, update, or delete saved searches in a Bugsnag project. Saved searches store filter configurations for quick access to frequently used error views.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -48,19 +48,19 @@ export let manageSavedSearches = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
+    let client = new BugsnagClient(ctx.auth);
 
     if (ctx.input.action === 'list') {
       let projectId = ctx.input.projectId || ctx.config.projectId;
-      if (!projectId) throw new Error('Project ID is required.');
+      if (!projectId) throw createApiServiceError('Project ID is required.');
 
       let searches = await client.listSavedSearches(projectId);
-      let mapped = searches.map((s: any) => ({
-        searchId: s.id,
-        name: s.name,
-        searchFilters: s.search_filters,
-        createdAt: s.created_at,
-        updatedAt: s.updated_at
+      let mapped = searches.map(s => ({
+        searchId: s.id ?? undefined,
+        name: s.name ?? undefined,
+        searchFilters: s.filters ?? undefined,
+        createdAt: s.created_at ?? undefined,
+        updatedAt: s.updated_at ?? undefined
       }));
 
       return {
@@ -71,22 +71,27 @@ export let manageSavedSearches = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       let projectId = ctx.input.projectId || ctx.config.projectId;
-      if (!projectId) throw new Error('Project ID is required.');
-      if (!ctx.input.name) throw new Error('Name is required.');
-      if (!ctx.input.searchFilters) throw new Error('Search filters are required.');
+      if (!projectId) throw createApiServiceError('Project ID is required.');
+      if (!ctx.input.name?.trim()) throw createApiServiceError('Name is required.');
+      const parsed = filtersSchema.safeParse(ctx.input.searchFilters);
+      if (!parsed.success)
+        throw createApiServiceError(
+          'Search filters must map event-field keys to arrays of comparisons containing type and string value.'
+        );
 
       let result = await client.createSavedSearch(projectId, {
         name: ctx.input.name,
-        search_filters: ctx.input.searchFilters
+        filters: parsed.data,
+        project_default: false
       });
 
       return {
         output: {
           savedSearch: {
-            searchId: result.id,
-            name: result.name,
-            searchFilters: result.search_filters,
-            createdAt: result.created_at
+            searchId: result.id ?? undefined,
+            name: result.name ?? undefined,
+            searchFilters: result.filters ?? undefined,
+            createdAt: result.created_at ?? undefined
           }
         },
         message: `Created saved search **${result.name}**.`
@@ -94,18 +99,18 @@ export let manageSavedSearches = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.searchId) throw new Error('Search ID is required.');
+      if (!ctx.input.searchId) throw createApiServiceError('Search ID is required.');
 
       let result = await client.getSavedSearch(ctx.input.searchId);
 
       return {
         output: {
           savedSearch: {
-            searchId: result.id,
-            name: result.name,
-            searchFilters: result.search_filters,
-            createdAt: result.created_at,
-            updatedAt: result.updated_at
+            searchId: result.id ?? undefined,
+            name: result.name ?? undefined,
+            searchFilters: result.filters ?? undefined,
+            createdAt: result.created_at ?? undefined,
+            updatedAt: result.updated_at ?? undefined
           }
         },
         message: `Retrieved saved search **${result.name}**.`
@@ -113,21 +118,34 @@ export let manageSavedSearches = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.searchId) throw new Error('Search ID is required.');
+      if (!ctx.input.searchId) throw createApiServiceError('Search ID is required.');
 
-      let updateData: Record<string, any> = {};
-      if (ctx.input.name) updateData.name = ctx.input.name;
-      if (ctx.input.searchFilters) updateData.search_filters = ctx.input.searchFilters;
+      let updateData: Record<string, unknown> = {};
+      if (ctx.input.name !== undefined) {
+        if (!ctx.input.name.trim())
+          throw createApiServiceError('Search name must not be blank.');
+        updateData.name = ctx.input.name;
+      }
+      if (ctx.input.searchFilters !== undefined) {
+        const parsed = filtersSchema.safeParse(ctx.input.searchFilters);
+        if (!parsed.success)
+          throw createApiServiceError(
+            'Search filters must map event-field keys to arrays of comparisons containing type and string value.'
+          );
+        updateData.filters = parsed.data;
+      }
+      if (!Object.keys(updateData).length)
+        throw createApiServiceError('Supply a search name or filters to update.');
 
       let result = await client.updateSavedSearch(ctx.input.searchId, updateData);
 
       return {
         output: {
           savedSearch: {
-            searchId: result.id,
-            name: result.name,
-            searchFilters: result.search_filters,
-            updatedAt: result.updated_at
+            searchId: result.id ?? undefined,
+            name: result.name ?? undefined,
+            searchFilters: result.filters ?? undefined,
+            updatedAt: result.updated_at ?? undefined
           }
         },
         message: `Updated saved search **${result.name}**.`
@@ -135,7 +153,7 @@ export let manageSavedSearches = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.searchId) throw new Error('Search ID is required.');
+      if (!ctx.input.searchId) throw createApiServiceError('Search ID is required.');
 
       await client.deleteSavedSearch(ctx.input.searchId);
 
@@ -145,6 +163,6 @@ export let manageSavedSearches = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

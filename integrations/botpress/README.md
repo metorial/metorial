@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Botpress
 
-Build, deploy, and manage AI-powered chatbots and conversational agents. Create and configure bots, manage conversations and messages across channels (WhatsApp, Slack, Telegram), handle users and participants, and store structured data in tables. Send and receive messages in various formats (text, image, audio, video, carousel, card, dropdown). Manage knowledge base files, trigger bot events via webhooks, execute bot actions, and maintain persistent state across conversations. Administer workspaces, collaborators, integrations, analytics, logs, and issue tracking.
+Manage Botpress bots, conversations, participants, messages, users, structured tables, and knowledge files. Discover accounts and workspaces, configure installed integrations and declared states/events, upload and download text files, and inspect bot analytics, logs, and issues.
 
 ## License
 

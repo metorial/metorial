@@ -49,9 +49,10 @@ export let listVideosTool = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total ?? 0,
-        page: result.page ?? 1,
-        perPage: result.perPage ?? videos.length,
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+        paging: result.paging,
         videos
       },
       message:

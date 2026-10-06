@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import type { Endpoint } from '../lib/models';
 import { spec } from '../spec';
 
 let refSchema = z
@@ -15,23 +16,30 @@ let endpointOutputSchema = z.object({
   endpointId: z.string().describe('Endpoint ID'),
   createdAt: z.string().describe('Creation timestamp'),
   updatedAt: z.string().describe('Last update timestamp'),
-  publicUrl: z.string().describe('Public URL'),
+  publicUrl: z
+    .string()
+    .describe('Endpoint URL, including internal URLs; an empty string means unavailable'),
   proto: z.string().describe('Protocol (http, https, tcp, tls)'),
   hostport: z.string().describe('Host and port combination'),
   host: z.string().describe('Hostname'),
-  port: z.number().describe('Port number'),
+  port: z.number().describe('Port number; zero means the provider did not return a port'),
   type: z.string().describe('Endpoint type (ephemeral, edge, cloud)'),
   description: z.string().describe('Description'),
   metadata: z.string().describe('Metadata'),
   url: z.string().describe('URL'),
   trafficPolicy: z.string().describe('Traffic policy configuration'),
   bindings: z.array(z.string()).describe('Endpoint bindings'),
+  poolingEnabled: z
+    .boolean()
+    .optional()
+    .nullable()
+    .describe('Whether endpoint pooling is enabled'),
   domain: refSchema.describe('Associated domain reference'),
   tunnel: refSchema.describe('Associated tunnel reference'),
   tunnelSession: refSchema.describe('Associated tunnel session reference')
 });
 
-let mapEndpoint = (e: any) => ({
+let mapEndpoint = (e: Endpoint) => ({
   endpointId: e.id,
   createdAt: e.created_at || '',
   updatedAt: e.updated_at || '',
@@ -46,6 +54,7 @@ let mapEndpoint = (e: any) => ({
   url: e.url || '',
   trafficPolicy: e.traffic_policy || '',
   bindings: e.bindings || [],
+  poolingEnabled: e.pooling_enabled ?? null,
   domain: e.domain?.id ? { id: e.domain.id, uri: e.domain.uri } : null,
   tunnel: e.tunnel?.id ? { id: e.tunnel.id, uri: e.tunnel.uri } : null,
   tunnelSession: e.tunnel_session?.id
@@ -56,11 +65,23 @@ let mapEndpoint = (e: any) => ({
 export let listEndpoints = SlateTool.create(spec, {
   name: 'List Endpoints',
   key: 'list_endpoints',
-  description: `List all active endpoints. Endpoints define how traffic is routed to your services. Only active endpoints associated with a tunnel or backend are returned.`,
+  description: `List all active endpoints. Endpoints define how traffic is routed to your services. Includes cloud endpoints and active agent or edge endpoints.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
+      filter: z
+        .string()
+        .optional()
+        .describe(
+          'CEL filter, for example obj.type == "cloud" or obj.metadata == "owned-test".'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
       limit: z.number().optional().describe('Max results per page (max 100)')
     })
@@ -74,6 +95,8 @@ export let listEndpoints = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listEndpoints({
+      nextPageUri: ctx.input.nextPageUri,
+      filter: ctx.input.filter,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -110,7 +133,7 @@ export let getEndpoint = SlateTool.create(spec, {
 export let createEndpoint = SlateTool.create(spec, {
   name: 'Create Cloud Endpoint',
   key: 'create_endpoint',
-  description: `Create a new cloud endpoint with a URL and optional traffic policy. Cloud endpoints allow you to route traffic without running an ngrok agent.`,
+  description: `Create a persistent cloud endpoint with a URL and traffic policy. Public bindings make the endpoint reachable from the internet. Cloud endpoints do not require a running agent and may incur provider charges.`,
   tags: { destructive: false }
 })
   .input(
@@ -119,9 +142,15 @@ export let createEndpoint = SlateTool.create(spec, {
       trafficPolicy: z
         .string()
         .optional()
-        .describe('Traffic policy YAML or JSON configuration'),
+        .describe(
+          'Traffic policy YAML or JSON configuration; required by the provider when creating the endpoint'
+        ),
       description: z.string().optional().describe('Description (max 255 bytes)'),
       metadata: z.string().optional().describe('Metadata (max 4096 bytes)'),
+      poolingEnabled: z
+        .boolean()
+        .optional()
+        .describe('Allow multiple endpoints with the same URL to form an endpoint pool.'),
       bindings: z.array(z.string()).optional().describe('Endpoint bindings (e.g., ["public"])')
     })
   )
@@ -134,7 +163,8 @@ export let createEndpoint = SlateTool.create(spec, {
       trafficPolicy: ctx.input.trafficPolicy,
       description: ctx.input.description,
       metadata: ctx.input.metadata,
-      bindings: ctx.input.bindings
+      bindings: ctx.input.bindings,
+      poolingEnabled: ctx.input.poolingEnabled
     });
     return {
       output: mapEndpoint(e),
@@ -147,7 +177,7 @@ export let updateEndpoint = SlateTool.create(spec, {
   name: 'Update Endpoint',
   key: 'update_endpoint',
   description: `Update an existing endpoint's URL, traffic policy, description, metadata, or bindings.`,
-  tags: { destructive: false }
+  tags: { destructive: true }
 })
   .input(
     z.object({
@@ -156,6 +186,10 @@ export let updateEndpoint = SlateTool.create(spec, {
       trafficPolicy: z.string().optional().describe('New traffic policy'),
       description: z.string().optional().describe('New description'),
       metadata: z.string().optional().describe('New metadata'),
+      poolingEnabled: z
+        .boolean()
+        .optional()
+        .describe('Allow multiple endpoints with the same URL to form an endpoint pool.'),
       bindings: z.array(z.string()).optional().describe('New bindings')
     })
   )
@@ -167,7 +201,8 @@ export let updateEndpoint = SlateTool.create(spec, {
       trafficPolicy: ctx.input.trafficPolicy,
       description: ctx.input.description,
       metadata: ctx.input.metadata,
-      bindings: ctx.input.bindings
+      bindings: ctx.input.bindings,
+      poolingEnabled: ctx.input.poolingEnabled
     });
     return {
       output: mapEndpoint(e),

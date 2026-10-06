@@ -6,13 +6,14 @@ import { spec } from '../spec';
 export let updateMonitor = SlateTool.create(spec, {
   name: 'Update Monitor',
   key: 'update_monitor',
-  description: `Update an existing monitor's settings including its name, URL, check interval, timeout, HTTP configuration, alert contacts, and maintenance windows. Can also pause or resume a monitor.`,
+  description: `Use a Legacy API Key connection (API v2). Update an existing monitor's settings including its name, URL, check interval, timeout, HTTP configuration, alert contacts, and maintenance windows. Can also pause or resume a monitor.`,
   instructions: [
     'Monitor type cannot be changed — delete and recreate the monitor to change its type.',
     'To pause a monitor, set `paused` to true. To resume, set it to false.'
   ],
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -33,7 +34,7 @@ export let updateMonitor = SlateTool.create(spec, {
       keywordType: z
         .enum(['exists', 'not_exists'])
         .optional()
-        .describe('Whether keyword should exist or not'),
+        .describe('Alert when the keyword exists or does not exist'),
       keywordCaseSensitive: z
         .boolean()
         .optional()
@@ -73,7 +74,7 @@ export let updateMonitor = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let httpMethodMap: Record<string, number> = {
       head: 1,

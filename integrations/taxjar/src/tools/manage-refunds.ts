@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import type { Refund } from '../lib/types';
 import { spec } from '../spec';
 
 let refundLineItemInput = z.object({
   lineItemId: z.string().optional().describe('Unique identifier for the line item'),
-  quantity: z.number().optional().describe('Quantity refunded'),
+  quantity: z.number().optional().describe('Whole-number quantity refunded'),
   productIdentifier: z.string().optional().describe('Product identifier or SKU'),
   description: z.string().optional().describe('Item description'),
   productTaxCode: z.string().optional().describe('Product tax code'),
@@ -30,7 +31,7 @@ let refundOutput = z.object({
   userId: z.number().optional().describe('TaxJar user ID'),
   transactionDate: z.string().optional().describe('Date of the refund'),
   transactionReferenceId: z.string().optional().describe('Original order transaction ID'),
-  provider: z.string().optional().describe('Marketplace provider'),
+  provider: z.string().optional().describe('Transaction provider source'),
   fromCountry: z.string().optional(),
   fromZip: z.string().optional(),
   fromState: z.string().optional(),
@@ -41,9 +42,19 @@ let refundOutput = z.object({
   toState: z.string().optional(),
   toCity: z.string().optional(),
   toStreet: z.string().optional(),
-  amount: z.number().optional().describe('Total refund amount (negative)'),
+  amount: z
+    .number()
+    .optional()
+    .describe(
+      'Total refunded order amount including shipping, excluding tax (negative recommended)'
+    ),
   shipping: z.number().optional().describe('Shipping refund amount (negative)'),
   salesTax: z.number().optional().describe('Sales tax refunded (negative)'),
+  customerId: z
+    .string()
+    .optional()
+    .describe('Customer identifier used for exemptions, when returned'),
+  exemptionType: z.string().optional().describe('Applied exemption type, when returned'),
   lineItems: z.array(refundLineItemOutput).optional()
 });
 
@@ -71,7 +82,7 @@ let mapRefundLineItems = (
   }));
 };
 
-let mapRefundOutput = (refund: any) => ({
+let mapRefundOutput = (refund: Refund) => ({
   transactionId: refund.transaction_id,
   userId: refund.user_id,
   transactionDate: refund.transaction_date,
@@ -90,6 +101,8 @@ let mapRefundOutput = (refund: any) => ({
   amount: refund.amount,
   shipping: refund.shipping,
   salesTax: refund.sales_tax,
+  customerId: refund.customer_id,
+  exemptionType: refund.exemption_type,
   lineItems: mapRefundLineItems(refund.line_items)
 });
 
@@ -98,7 +111,7 @@ let mapRefundOutput = (refund: any) => ({
 export let listRefunds = SlateTool.create(spec, {
   name: 'List Refund Transactions',
   key: 'list_refunds',
-  description: `List refund transaction IDs stored in TaxJar. Filter by date range or marketplace provider. Returns transaction IDs which can be used to fetch full refund details.`,
+  description: `List refund transaction IDs stored in TaxJar. Filter by date range or provider source. Returns transaction IDs which can be used to fetch full refund details.`,
   tags: {
     readOnly: true
   }
@@ -111,7 +124,10 @@ export let listRefunds = SlateTool.create(spec, {
         .describe('Exact date to filter by (YYYY-MM-DD or MM/DD/YYYY)'),
       fromTransactionDate: z.string().optional().describe('Start of date range'),
       toTransactionDate: z.string().optional().describe('End of date range'),
-      provider: z.string().optional().describe('Marketplace provider filter')
+      provider: z
+        .string()
+        .optional()
+        .describe('Transaction provider source filter; defaults to api')
     })
   )
   .output(
@@ -120,11 +136,7 @@ export let listRefunds = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let refunds = await client.listRefunds({
       transaction_date: ctx.input.transactionDate,
@@ -153,22 +165,18 @@ export let getRefund = SlateTool.create(spec, {
   .input(
     z.object({
       transactionId: z.string().describe('Unique transaction ID of the refund'),
-      provider: z.string().optional().describe('Marketplace provider if applicable')
+      provider: z.string().optional().describe('Transaction provider source; defaults to api')
     })
   )
   .output(refundOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let refund = await client.showRefund(ctx.input.transactionId, ctx.input.provider);
 
     return {
       output: mapRefundOutput(refund),
-      message: `Retrieved refund **${refund.transaction_id}** referencing order ${refund.transaction_reference_id ?? 'N/A'}: $${refund.amount ?? 0}.`
+      message: `Retrieved refund record **${refund.transaction_id}**.`
     };
   })
   .build();
@@ -178,11 +186,14 @@ export let getRefund = SlateTool.create(spec, {
 export let createRefund = SlateTool.create(spec, {
   name: 'Create Refund Transaction',
   key: 'create_refund',
-  description: `Create a new refund transaction in TaxJar linked to an original order. Monetary amounts should be negative. The refund transaction ID must be unique and different from the original order.`,
+  description: `Record a refund in TaxJar linked to its original order for sales tax reporting. This does not send money to a customer. Use a unique refund ID different from the original order ID.`,
+  constraints: [
+    'Sandbox transactions return stubbed responses and do not prove a stored lifecycle.'
+  ],
   instructions: [
-    'The transactionId must be unique and different from the original order ID. Do not use periods in IDs.',
+    'Supply transactionDate. Use a unique transactionId containing only letters, numbers, underscores or dashes, different from the original order ID.',
     'Use transactionReferenceId to link to the original order.',
-    'Monetary amounts (amount, shipping, salesTax, unitPrice) should be negative for refunds.'
+    'Negative monetary amounts are recommended for refunds; TaxJar signs them automatically. Amount includes shipping and excludes tax. An origin address must exist in account settings or be supplied.'
   ],
   tags: {
     destructive: false
@@ -192,12 +203,19 @@ export let createRefund = SlateTool.create(spec, {
     z.object({
       transactionId: z
         .string()
-        .describe('Unique refund transaction ID (no periods, different from original order)'),
+        .describe(
+          'Unique new refund ID: letters, numbers, underscores or dashes; different from the original order'
+        ),
       transactionReferenceId: z
         .string()
         .describe('Transaction ID of the original order being refunded'),
-      transactionDate: z.string().optional().describe('Refund date (YYYY/MM/DD)'),
-      provider: z.string().optional().describe('Marketplace provider'),
+      transactionDate: z
+        .string()
+        .optional()
+        .describe(
+          'Required for creation. Use YYYY-MM-DD or ISO date-time; date-only slash formats are supported.'
+        ),
+      provider: z.string().optional().describe('Transaction provider source'),
       fromCountry: z.string().optional(),
       fromZip: z.string().optional(),
       fromState: z.string().optional(),
@@ -208,7 +226,11 @@ export let createRefund = SlateTool.create(spec, {
       toState: z.string().describe('Destination state code'),
       toCity: z.string().optional(),
       toStreet: z.string().optional(),
-      amount: z.number().describe('Total refund amount (negative)'),
+      amount: z
+        .number()
+        .describe(
+          'Total refunded order amount including shipping, excluding tax (negative recommended)'
+        ),
       shipping: z.number().describe('Shipping refund amount (negative)'),
       salesTax: z.number().describe('Sales tax refunded (negative)'),
       customerId: z.string().optional(),
@@ -220,11 +242,7 @@ export let createRefund = SlateTool.create(spec, {
   )
   .output(refundOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let refund = await client.createRefund({
       transaction_id: ctx.input.transactionId,
@@ -260,7 +278,7 @@ export let createRefund = SlateTool.create(spec, {
 
     return {
       output: mapRefundOutput(refund),
-      message: `Created refund **${refund.transaction_id}** referencing order ${refund.transaction_reference_id ?? 'N/A'}: $${refund.amount ?? 0}.`
+      message: `TaxJar accepted refund record **${refund.transaction_id}**.`
     };
   })
   .build();
@@ -278,7 +296,12 @@ export let updateRefund = SlateTool.create(spec, {
   .input(
     z.object({
       transactionId: z.string().describe('Transaction ID of the refund to update'),
-      transactionReferenceId: z.string().optional(),
+      transactionReferenceId: z
+        .string()
+        .optional()
+        .describe(
+          'Original order ID. If omitted, the current refund reference is read and preserved.'
+        ),
       transactionDate: z.string().optional(),
       fromCountry: z.string().optional(),
       fromZip: z.string().optional(),
@@ -302,11 +325,7 @@ export let updateRefund = SlateTool.create(spec, {
   )
   .output(refundOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let refund = await client.updateRefund({
       transaction_id: ctx.input.transactionId,
@@ -341,7 +360,7 @@ export let updateRefund = SlateTool.create(spec, {
 
     return {
       output: mapRefundOutput(refund),
-      message: `Updated refund **${refund.transaction_id}**.`
+      message: `Updated refund record **${refund.transaction_id}**.`
     };
   })
   .build();
@@ -359,22 +378,18 @@ export let deleteRefund = SlateTool.create(spec, {
   .input(
     z.object({
       transactionId: z.string().describe('Transaction ID of the refund to delete'),
-      provider: z.string().optional().describe('Marketplace provider if applicable')
+      provider: z.string().optional().describe('Transaction provider source; defaults to api')
     })
   )
   .output(refundOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let refund = await client.deleteRefund(ctx.input.transactionId, ctx.input.provider);
 
     return {
       output: mapRefundOutput(refund),
-      message: `Deleted refund **${refund.transaction_id}**.`
+      message: `TaxJar accepted deletion of refund record **${refund.transaction_id}**.`
     };
   })
   .build();

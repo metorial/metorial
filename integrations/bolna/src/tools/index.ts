@@ -7,6 +7,7 @@ export * from './get-execution';
 export * from './list-agents';
 export * from './list-executions';
 export * from './list-phone-numbers';
+export * from './list-voice-providers';
 export * from './list-voices';
 export * from './make-call';
 export * from './manage-batch';

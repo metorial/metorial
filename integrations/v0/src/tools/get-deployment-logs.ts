@@ -13,11 +13,11 @@ export let getDeploymentLogsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      deploymentId: z.string().describe('The deployment ID to get logs for'),
+      deploymentId: z.string().min(1).describe('The deployment ID to get logs for'),
       since: z
         .string()
         .optional()
-        .describe('ISO timestamp to filter logs from (only return logs after this time)'),
+        .describe('ISO timestamp or Unix timestamp in seconds; return logs after this time'),
       includeErrors: z.boolean().optional().describe('Also fetch deployment errors')
     })
   )
@@ -32,7 +32,7 @@ export let getDeploymentLogsTool = SlateTool.create(spec, {
 
     let logs = await client.getDeploymentLogs(ctx.input.deploymentId, ctx.input.since);
 
-    let errors: any;
+    let errors: Awaited<ReturnType<V0Client['getDeploymentErrors']>> | undefined;
     if (ctx.input.includeErrors) {
       errors = await client.getDeploymentErrors(ctx.input.deploymentId);
     }

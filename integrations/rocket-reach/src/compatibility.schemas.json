@@ -1,0 +1,1267 @@
+{
+  "search_people": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "currentTitle": {
+          "type": "string"
+        },
+        "currentEmployer": {
+          "type": "string"
+        },
+        "companyDomain": {
+          "type": "string"
+        },
+        "companyIndustry": {
+          "type": "string"
+        },
+        "companySize": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "department": {
+          "type": "string"
+        },
+        "managementLevels": {
+          "type": "string"
+        },
+        "school": {
+          "type": "string"
+        },
+        "degree": {
+          "type": "string"
+        },
+        "major": {
+          "type": "string"
+        },
+        "yearsExperience": {
+          "type": "string"
+        },
+        "keyword": {
+          "type": "string"
+        },
+        "start": {
+          "type": "number"
+        },
+        "pageSize": {
+          "type": "number"
+        },
+        "orderBy": {
+          "type": "string",
+          "enum": ["relevance", "popularity", "score"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "profileId": {
+                "type": "number"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currentTitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currentEmployer": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currentEmployerDomain": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "location": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "linkedinUrl": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "profilePic": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "pagination": {
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "number"
+            },
+            "pageSize": {
+              "type": "number"
+            },
+            "totalResults": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["profiles"],
+      "additionalProperties": false
+    }
+  },
+  "lookup_person": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "currentEmployer": {
+          "type": "string"
+        },
+        "linkedinUrl": {
+          "type": "string"
+        },
+        "profileId": {
+          "type": "number"
+        },
+        "email": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currentTitle": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currentEmployer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currentEmployerDomain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currentEmployerIndustry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "city": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "countryCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "linkedinUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "profilePic": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recommendedEmail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recommendedProfessionalEmail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recommendedPersonalEmail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "emails": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "smtpValid": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "grade": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastValidationCheck": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "phones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "string"
+              },
+              "type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "validity": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "recommended": {
+                "type": "boolean"
+              },
+              "premium": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "skills": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "jobHistory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "companyName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "companyDomain": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "startDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "endDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "isCurrent": {
+                "type": "boolean"
+              },
+              "department": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "education": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "school": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "degree": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "major": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "startYear": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "endYear": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "links": {
+          "anyOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "check_lookup_status": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "profileIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "required": ["profileIds"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "profileId": {
+                "type": "number"
+              },
+              "status": {
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currentTitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currentEmployer": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "recommendedEmail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string"
+                    },
+                    "smtpValid": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "type": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "grade": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "phones": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "validity": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["profiles"],
+      "additionalProperties": false
+    }
+  },
+  "search_companies": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "industry": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "employees": {
+          "type": "string"
+        },
+        "revenue": {
+          "type": "string"
+        },
+        "naicsCode": {
+          "type": "string"
+        },
+        "sicCode": {
+          "type": "string"
+        },
+        "techstack": {
+          "type": "string"
+        },
+        "totalFunding": {
+          "type": "string"
+        },
+        "keyword": {
+          "type": "string"
+        },
+        "start": {
+          "type": "number"
+        },
+        "pageSize": {
+          "type": "number"
+        },
+        "orderBy": {
+          "type": "string",
+          "enum": ["relevance", "popularity", "score"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "companies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "companyId": {
+                "type": "number"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "domain": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tickerSymbol": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "industry": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "city": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "region": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "countryCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "pagination": {
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "number"
+            },
+            "pageSize": {
+              "type": "number"
+            },
+            "totalResults": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["companies"],
+      "additionalProperties": false
+    }
+  },
+  "lookup_company": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "linkedinUrl": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "companyId": {
+          "type": "number"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "websiteUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tickerSymbol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "industry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "employeeCount": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revenue": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "city": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "countryCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "founded": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "linkedinUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "facebookUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "twitterUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "crunchbaseUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fax": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalFunding": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "latestFundingRound": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "latestFundingDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "techstack": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "naicsCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sicCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_account": {
+    "input": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number"
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accountState": {
+          "type": "string"
+        },
+        "creditUsage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "creditType": {
+                "type": "string"
+              },
+              "allocated": {},
+              "used": {
+                "type": "number"
+              },
+              "remaining": {}
+            },
+            "additionalProperties": false
+          }
+        },
+        "rateLimits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string"
+              },
+              "duration": {
+                "type": "string"
+              },
+              "limit": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "used": {
+                "type": "number"
+              },
+              "remaining": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

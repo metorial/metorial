@@ -25,16 +25,9 @@ export let listEmailAccounts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
-    let result: any;
-    if (ctx.input.disconnectedOnly) {
-      result = await client.listDisconnectedEmailAccounts();
-    } else {
-      result = await client.listEmailAccounts();
-    }
-
-    let emailAccounts = Array.isArray(result) ? result : (result?.items ?? []);
+    let emailAccounts = await client.listEmailAccounts(ctx.input.disconnectedOnly);
 
     return {
       output: { emailAccounts },

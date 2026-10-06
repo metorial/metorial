@@ -36,7 +36,10 @@ export let updateSslTest = SlateTool.create(spec, {
       hostname: z.string().optional().describe('Hostname to verify on certificate'),
       paused: z.boolean().optional().describe('Whether the test is paused'),
       userAgent: z.string().optional().describe('Custom user agent string'),
-      tags: z.array(z.string()).optional().describe('Tags for the test')
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Legacy field; tags are not supported by the current SSL API')
     })
   )
   .output(
@@ -61,7 +64,7 @@ export let updateSslTest = SlateTool.create(spec, {
       ...rest
     } = ctx.input;
 
-    let data: Record<string, any> = { ...rest };
+    let data: Record<string, unknown> = { ...rest };
 
     if (websiteUrl !== undefined) data.website_url = websiteUrl;
     if (checkRate !== undefined) data.check_rate = checkRate;

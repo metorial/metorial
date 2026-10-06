@@ -1,33 +1,28 @@
-import { createAxios } from 'slates';
 import { encodeFormBody } from './client';
+import { createTwilioAxios } from './http';
+import { pathId } from './validation';
 
 export class StudioClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createTwilioAxios>;
 
-  constructor(token: string) {
-    this.axios = createAxios({
-      baseURL: 'https://studio.twilio.com/v2',
-      headers: {
-        Authorization: `Basic ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
+  constructor(token: string, accountSid?: string, pageToken?: string) {
+    this.axios = createTwilioAxios('studio', token, accountSid, pageToken);
   }
 
   async listFlows(pageSize?: number): Promise<any> {
     let response = await this.axios.get('/Flows', {
-      params: { PageSize: pageSize || 50 }
+      params: { PageSize: pageSize ?? 50 }
     });
     return response.data;
   }
 
   async getFlow(flowSid: string): Promise<any> {
-    let response = await this.axios.get(`/Flows/${flowSid}`);
+    let response = await this.axios.get(`/Flows/${pathId(flowSid)}`);
     return response.data;
   }
 
   async deleteFlow(flowSid: string): Promise<void> {
-    await this.axios.delete(`/Flows/${flowSid}`);
+    await this.axios.delete(`/Flows/${pathId(flowSid)}`);
   }
 
   async triggerFlowExecution(
@@ -35,21 +30,23 @@ export class StudioClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/Flows/${flowSid}/Executions`,
+      `/Flows/${pathId(flowSid)}/Executions`,
       encodeFormBody(params)
     );
     return response.data;
   }
 
   async listExecutions(flowSid: string, pageSize?: number): Promise<any> {
-    let response = await this.axios.get(`/Flows/${flowSid}/Executions`, {
-      params: { PageSize: pageSize || 50 }
+    let response = await this.axios.get(`/Flows/${pathId(flowSid)}/Executions`, {
+      params: { PageSize: pageSize ?? 50 }
     });
     return response.data;
   }
 
   async getExecution(flowSid: string, executionSid: string): Promise<any> {
-    let response = await this.axios.get(`/Flows/${flowSid}/Executions/${executionSid}`);
+    let response = await this.axios.get(
+      `/Flows/${pathId(flowSid)}/Executions/${pathId(executionSid)}`
+    );
     return response.data;
   }
 
@@ -58,9 +55,12 @@ export class StudioClient {
     executionSid: string,
     pageSize?: number
   ): Promise<any> {
-    let response = await this.axios.get(`/Flows/${flowSid}/Executions/${executionSid}/Steps`, {
-      params: { PageSize: pageSize || 50 }
-    });
+    let response = await this.axios.get(
+      `/Flows/${pathId(flowSid)}/Executions/${pathId(executionSid)}/Steps`,
+      {
+        params: { PageSize: pageSize ?? 50 }
+      }
+    );
     return response.data;
   }
 }

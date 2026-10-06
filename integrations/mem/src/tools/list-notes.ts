@@ -8,7 +8,8 @@ export let listNotes = SlateTool.create(spec, {
   key: 'list_notes',
   description: `List notes from your Mem knowledge base with optional filtering. Results can be filtered by collection, task status, images, or file attachments. Supports cursor-based pagination.`,
   instructions: [
-    'Use the "page" field with the "nextPage" value from a previous response to paginate through results.'
+    'Reuse the unchanged nextPage cursor with the same filters and orderBy. Omit page for the first page; null nextPage means the provider returned no continuation.',
+    'When multiple task/image/file flags are true, Mem matches any selected flag (OR), not every selected flag.'
   ],
   tags: {
     readOnly: true,
@@ -88,7 +89,7 @@ export let listNotes = SlateTool.create(spec, {
     let notes = response.results.map(note => ({
       noteId: note.id,
       title: note.title,
-      content: note.content,
+      content: note.content ?? null,
       snippet: note.snippet ?? null,
       collectionIds: note.collection_ids,
       createdAt: note.created_at,
@@ -99,7 +100,7 @@ export let listNotes = SlateTool.create(spec, {
       output: {
         notes,
         total: response.total,
-        nextPage: response.next_page
+        nextPage: response.next_page ?? null
       },
       message: `Found **${response.total}** note(s). Returned **${notes.length}** in this page.`
     };

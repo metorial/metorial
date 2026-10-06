@@ -1,23 +1,33 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PrismaClient } from '../lib/client';
+import { databaseIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getDatabaseBackups = SlateTool.create(spec, {
   name: 'Get Database Backups',
   key: 'get_database_backups',
-  description: `Retrieve backup information for a Prisma Postgres database. Lists all available backups with their status and metadata.`,
+  description: `Retrieve recent backup metadata for a Prisma Postgres database, including retention and whether more backups exist. The API does not expose a continuation cursor for this endpoint.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      databaseId: z.string().describe('ID of the database to retrieve backups for')
+      databaseId: databaseIdInput,
+      limit: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum recent backups to return, from 1 to 100. The provider does not expose a continuation cursor for backups.'
+        )
     })
   )
   .output(
     z.object({
+      hasMore: z.boolean().optional(),
+      limit: z.number().nullable().optional(),
+      backupRetentionDays: z.number().optional(),
       backups: z
         .array(
           z.object({
@@ -38,9 +48,9 @@ export let getDatabaseBackups = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new PrismaClient(ctx.auth.token);
-    let backups = await client.listBackups(ctx.input.databaseId);
+    let backups = await client.listBackups(ctx.input.databaseId, ctx.input.limit);
 
-    let mapped = backups.map(b => ({
+    let mapped = backups.data.map(b => ({
       backupId: b.id,
       createdAt: b.createdAt,
       status: b.status,
@@ -48,7 +58,12 @@ export let getDatabaseBackups = SlateTool.create(spec, {
     }));
 
     return {
-      output: { backups: mapped },
+      output: {
+        backups: mapped,
+        hasMore: backups.pagination.hasMore,
+        limit: backups.pagination.limit,
+        backupRetentionDays: backups.meta.backupRetentionDays
+      },
       message: `Found **${mapped.length}** backup(s) for database **${ctx.input.databaseId}**.`
     };
   })

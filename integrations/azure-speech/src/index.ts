@@ -15,8 +15,6 @@ import {
   synthesizeSpeech,
   verifySpeaker
 } from './tools';
-import { batchTranscriptionCompleted, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     verifySpeaker,
     identifySpeaker
   ],
-  triggers: [inboundWebhook, batchTranscriptionCompleted]
+  triggers: []
 });

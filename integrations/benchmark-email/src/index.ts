@@ -13,8 +13,6 @@ import {
   sendCampaign,
   updateCampaign
 } from './tools';
-import { contactListEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     listContacts,
     manageContact
   ],
-  triggers: [contactListEvents]
+  triggers: []
 });

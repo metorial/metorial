@@ -1,19 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GreenhouseClient } from '../lib/client';
-import { mapJob } from '../lib/mappers';
+import { jobOutputSchema, mapJob } from '../lib/mappers';
 import { spec } from '../spec';
-
-export let createJobTool = SlateTool.create(spec, {
-  name: 'Create Job',
+export const createJobTool = SlateTool.create(spec, {
   key: 'create_job',
-  description: `Create a new job in Greenhouse based on a template job. The template job's settings, stages, and configuration will be copied. Requires the **On-Behalf-Of** user ID in config.`,
-  instructions: [
-    'A templateJobId is required — the new job will be created as a copy of that template.',
-    'Use the "List Jobs" tool to find available template jobs if needed.'
-  ],
-  constraints: ['Requires the onBehalfOf config value to be set for audit purposes.'],
-  tags: { readOnly: false }
+  name: 'Create Job',
+  description:
+    'Create a job from an existing template. Harvest v3 requires numberOfOpenings. The API has no job deletion operation; creation leaves a job and audit history.',
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
@@ -27,37 +22,11 @@ export let createJobTool = SlateTool.create(spec, {
       officeIds: z.array(z.string()).optional().describe('Office IDs for the new job')
     })
   )
-  .output(
-    z.object({
-      jobId: z.string(),
-      name: z.string(),
-      status: z.string().nullable(),
-      departments: z.array(z.object({ departmentId: z.string(), name: z.string() })),
-      offices: z.array(z.object({ officeId: z.string(), name: z.string() })),
-      createdAt: z.string().nullable()
-    })
-  )
+  .output(jobOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GreenhouseClient({
-      token: ctx.auth.token,
-      onBehalfOf: ctx.config.onBehalfOf
-    });
-
-    let raw = await client.createJob({
-      templateJobId: Number.parseInt(ctx.input.templateJobId, 10),
-      jobName: ctx.input.jobName,
-      numberOfOpenings: ctx.input.numberOfOpenings,
-      departmentId: ctx.input.departmentId
-        ? Number.parseInt(ctx.input.departmentId, 10)
-        : undefined,
-      officeIds: ctx.input.officeIds?.map(id => Number.parseInt(id, 10))
-    });
-
-    let job = mapJob(raw);
-
     return {
-      output: job,
-      message: `Created job **${job.name}** (ID: ${job.jobId}).`
+      output: mapJob(await new GreenhouseClient(ctx.auth, ctx.config).createJob(ctx.input)),
+      message: 'Created the job. Review Greenhouse before retrying an ambiguous result.'
     };
   })
   .build();

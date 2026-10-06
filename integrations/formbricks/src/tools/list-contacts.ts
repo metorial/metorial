@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listContacts = SlateTool.create(spec, {
   name: 'List Contacts',
   key: 'list_contacts',
-  description: `List contacts (people) who have interacted with your surveys. Returns contact identifiers and attributes. Supports pagination.`,
+  description: `List contacts (people) who have interacted with your surveys. Returns contact identifiers and attributes. The documented v1 endpoint returns its contact list; limit and offset select a local slice from that list. Attributes are included only when the provider returns them.`,
   tags: {
     readOnly: true
   }
@@ -24,7 +24,9 @@ export let listContacts = SlateTool.create(spec, {
           contactId: z.string().describe('Unique contact identifier'),
           attributes: z.record(z.string(), z.any()).optional().describe('Contact attributes'),
           createdAt: z.string().optional().describe('Contact creation timestamp'),
-          updatedAt: z.string().optional().describe('Contact last update timestamp')
+          updatedAt: z.string().optional().describe('Contact last update timestamp'),
+          workspaceId: z.string().optional().describe('Current workspace ID'),
+          userId: z.string().optional().describe('Provider user identifier when returned')
         })
       )
     })
@@ -32,7 +34,8 @@ export let listContacts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     let contacts = await client.listContacts({
@@ -40,11 +43,13 @@ export let listContacts = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let mapped = contacts.map((c: any) => ({
+    let mapped = contacts.map(c => ({
       contactId: c.id,
       attributes: c.attributes,
-      createdAt: c.createdAt ?? '',
-      updatedAt: c.updatedAt ?? ''
+      workspaceId: c.workspaceId,
+      userId: c.userId ?? undefined,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt
     }));
 
     return {

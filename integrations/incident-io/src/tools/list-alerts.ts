@@ -13,15 +13,35 @@ export let listAlerts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pageSize: z.number().min(1).max(250).optional().describe('Number of results per page'),
-      after: z.string().optional().describe('Cursor for pagination')
+      pageSize: z
+        .number()
+        .min(1)
+        .max(250)
+        .optional()
+        .describe('Number of results per page; the provider maximum is 50'),
+      after: z.string().optional().describe('Cursor for pagination'),
+      deduplicationKey: z.string().optional().describe('Exact alert deduplication key'),
+      alertSourceId: z
+        .string()
+        .optional()
+        .describe('Filter by source ID from List Alert Sources'),
+      status: z.enum(['firing', 'resolved']).optional()
     })
   )
   .output(
     z.object({
+      returnedCount: z.number().int().nonnegative(),
       alerts: z.array(
         z.object({
           alertId: z.string(),
+          alertSourceId: z
+            .string()
+            .optional()
+            .describe('Source ID for filtering and discovery'),
+          deduplicationKey: z
+            .string()
+            .optional()
+            .describe('Deduplication key to resolve this alert through its source'),
           title: z.string().optional(),
           status: z.string().optional(),
           createdAt: z.string().optional()
@@ -35,11 +55,16 @@ export let listAlerts = SlateTool.create(spec, {
 
     let result = await client.listAlerts({
       pageSize: ctx.input.pageSize,
-      after: ctx.input.after
+      after: ctx.input.after,
+      deduplicationKey: ctx.input.deduplicationKey,
+      alertSourceId: ctx.input.alertSourceId,
+      status: ctx.input.status
     });
 
-    let alerts = result.alerts.map((a: any) => ({
+    let alerts = result.alerts.map(a => ({
       alertId: a.id,
+      alertSourceId: a.alert_source_id,
+      deduplicationKey: a.deduplication_key,
       title: a.title || undefined,
       status: a.status || undefined,
       createdAt: a.created_at || undefined
@@ -48,6 +73,7 @@ export let listAlerts = SlateTool.create(spec, {
     return {
       output: {
         alerts,
+        returnedCount: alerts.length,
         nextCursor: result.pagination_meta?.after || undefined
       },
       message: `Found **${alerts.length}** alert(s).`

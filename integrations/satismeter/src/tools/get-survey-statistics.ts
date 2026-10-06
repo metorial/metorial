@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SatisMeterClient } from '../lib/client';
+import { projectIdSchema, resolveProject } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getSurveyStatisticsTool = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let getSurveyStatisticsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       surveyId: z.string().describe('ID of the survey to get statistics for'),
       startDate: z.string().optional().describe('Start of the date range in ISO 8601 format'),
       endDate: z.string().optional().describe('End of the date range in ISO 8601 format')
@@ -30,14 +32,14 @@ export let getSurveyStatisticsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SatisMeterClient(ctx.auth.token, ctx.auth.writeKey);
     let result = await client.getSurveyStatistics({
-      projectId: ctx.config.projectId,
+      projectId: resolveProject(ctx.input.projectId, ctx.config),
       campaignId: ctx.input.surveyId,
       startDate: ctx.input.startDate,
       endDate: ctx.input.endDate
     });
 
     return {
-      output: { statistics: result?.data || result },
+      output: { statistics: result },
       message: `Retrieved statistics for survey **${ctx.input.surveyId}**.`
     };
   })

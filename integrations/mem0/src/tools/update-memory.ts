@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, mapMemory } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateMemory = SlateTool.create(spec, {
@@ -14,53 +14,53 @@ export let updateMemory = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      memoryId: z.string().describe('Unique identifier of the memory to update'),
-      text: z.string().optional().describe('New text content for the memory'),
+      memoryId: z.string().trim().min(1).describe('Unique identifier of the memory to update'),
+      text: z.string().trim().min(1).optional().describe('New text content for the memory'),
       metadata: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Updated metadata key-value pairs')
+        .describe('Updated metadata key-value pairs'),
+      expirationDate: z.iso
+        .date()
+        .nullable()
+        .optional()
+        .describe('Expiration date in YYYY-MM-DD format; null clears expiration')
     })
   )
   .output(
     z.object({
-      memoryId: z.string().describe('Unique identifier of the updated memory'),
+      memoryId: z.string().trim().min(1).describe('Unique identifier of the updated memory'),
       memory: z.string().describe('Updated memory content'),
-      userId: z.string().optional().describe('Associated user ID'),
-      agentId: z.string().optional().describe('Associated agent ID'),
-      appId: z.string().optional().describe('Associated app ID'),
-      runId: z.string().optional().describe('Associated run ID'),
-      hash: z.string().optional().describe('Content hash'),
+      userId: z.string().trim().min(1).optional().describe('Associated user ID'),
+      agentId: z.string().trim().min(1).optional().describe('Associated agent ID'),
+      appId: z.string().trim().min(1).optional().describe('Associated app ID'),
+      runId: z.string().trim().min(1).optional().describe('Associated run ID'),
+      hash: z.string().trim().min(1).optional().describe('Content hash'),
       metadata: z.record(z.string(), z.unknown()).optional().describe('Memory metadata'),
-      createdAt: z.string().optional().describe('Creation timestamp'),
-      updatedAt: z.string().optional().describe('Last update timestamp')
+      createdAt: z.string().trim().min(1).optional().describe('Creation timestamp'),
+      updatedAt: z.string().trim().min(1).optional().describe('Last update timestamp'),
+      expirationDate: z
+        .string()
+        .optional()
+        .describe('Date after which the memory is hidden from search')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      orgId: ctx.config.orgId,
-      projectId: ctx.config.projectId
+      legacyScope: ctx.config
     });
 
-    let result = (await client.updateMemory({
+    let result = await client.updateMemory({
       memoryId: ctx.input.memoryId,
       text: ctx.input.text,
-      metadata: ctx.input.metadata
-    })) as Record<string, unknown>;
+      metadata: ctx.input.metadata,
+      expirationDate: ctx.input.expirationDate
+    });
 
     return {
       output: {
-        memoryId: String(result.id || ctx.input.memoryId),
-        memory: String(result.text || result.memory || ''),
-        userId: result.user_id ? String(result.user_id) : undefined,
-        agentId: result.agent_id ? String(result.agent_id) : undefined,
-        appId: result.app_id ? String(result.app_id) : undefined,
-        runId: result.run_id ? String(result.run_id) : undefined,
-        hash: result.hash ? String(result.hash) : undefined,
-        metadata: result.metadata as Record<string, unknown> | undefined,
-        createdAt: result.created_at ? String(result.created_at) : undefined,
-        updatedAt: result.updated_at ? String(result.updated_at) : undefined
+        ...mapMemory(result)
       },
       message: `Updated memory **${ctx.input.memoryId}** successfully.`
     };

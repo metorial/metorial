@@ -1,0 +1,744 @@
+[
+  {
+    "key": "get_audit_logs",
+    "input": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string"
+        },
+        "startDate": {
+          "type": "string"
+        },
+        "endDate": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "auditLogs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        }
+      },
+      "required": ["auditLogs"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "get_event_audit",
+    "input": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "eventModelId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "eventModels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "eventModelMetadata": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_libraries",
+    "input": {
+      "type": "object",
+      "properties": {
+        "libraryId": {
+          "type": "string"
+        },
+        "versionOrder": {
+          "type": "string",
+          "enum": ["asc", "desc"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "libraries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_regulations",
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "regulations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        }
+      },
+      "required": ["regulations"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_tracking_plans",
+    "input": {
+      "type": "object",
+      "properties": {
+        "trackingPlanId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "trackingPlans": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "trackingPlan": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_transformations",
+    "input": {
+      "type": "object",
+      "properties": {
+        "transformationId": {
+          "type": "string"
+        },
+        "versionOrder": {
+          "type": "string",
+          "enum": ["asc", "desc"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "transformations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_library",
+    "input": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"]
+        },
+        "libraryId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string",
+          "enum": ["javascript", "python"]
+        },
+        "publish": {
+          "type": "boolean"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "libraryId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "versionId": {
+          "type": "string"
+        },
+        "published": {
+          "type": "boolean"
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_retl_sync",
+    "input": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["start", "stop", "status", "list"]
+        },
+        "connectionId": {
+          "type": "string"
+        },
+        "syncType": {
+          "type": "string",
+          "enum": ["incremental", "full"]
+        },
+        "syncId": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        }
+      },
+      "required": ["action", "connectionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "syncId": {
+          "type": "string"
+        },
+        "syncStatus": {
+          "type": "string"
+        },
+        "syncs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_tracking_plan",
+    "input": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete", "upsert_events", "delete_event"]
+        },
+        "trackingPlanId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "eventId": {
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "trackingPlanId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_transformation",
+    "input": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"]
+        },
+        "transformationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string",
+          "enum": ["javascript", "python"]
+        },
+        "publish": {
+          "type": "boolean"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "transformationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "versionId": {
+          "type": "string"
+        },
+        "published": {
+          "type": "boolean"
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "publish_transformations",
+    "input": {
+      "type": "object",
+      "properties": {
+        "transformationIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "libraryIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "send_batch_events",
+    "input": {
+      "type": "object",
+      "properties": {
+        "batch": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["identify", "track", "page", "screen", "group", "alias"]
+              },
+              "userId": {
+                "type": "string"
+              },
+              "anonymousId": {
+                "type": "string"
+              },
+              "event": {
+                "type": "string"
+              },
+              "traits": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "properties": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "groupId": {
+                "type": "string"
+              },
+              "previousId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "context": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "timestamp": {
+                "type": "string"
+              },
+              "integrations": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "required": ["type"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["batch"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "eventCount": {
+          "type": "number"
+        }
+      },
+      "required": ["success", "eventCount"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "send_event",
+    "input": {
+      "type": "object",
+      "properties": {
+        "eventType": {
+          "type": "string",
+          "enum": ["identify", "track", "page", "screen", "group", "alias"]
+        },
+        "userId": {
+          "type": "string"
+        },
+        "anonymousId": {
+          "type": "string"
+        },
+        "event": {
+          "type": "string"
+        },
+        "traits": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "properties": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "groupId": {
+          "type": "string"
+        },
+        "previousId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "context": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "integrations": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["eventType"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "suppress_user",
+    "input": {
+      "type": "object",
+      "properties": {
+        "regulationType": {
+          "type": "string",
+          "enum": ["suppress", "suppress_with_delete"]
+        },
+        "sourceIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "destinationIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              }
+            },
+            "required": ["userId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["regulationType", "users"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "regulationId": {
+          "type": "string"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "test_event_delivery",
+    "input": {
+      "type": "object",
+      "properties": {
+        "testType": {
+          "type": "string",
+          "enum": ["destination", "source"]
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "destinationId": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string"
+        },
+        "event": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["testType", "sourceId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "testResults": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["testResults"],
+      "additionalProperties": false
+    }
+  }
+]

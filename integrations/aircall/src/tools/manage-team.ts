@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fail, id, mapTeam, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageTeam = SlateTool.create(spec, {
@@ -21,7 +22,7 @@ export let manageTeam = SlateTool.create(spec, {
       teamName: z
         .string()
         .optional()
-        .describe('Team name (required for create, max 64 chars, must be unique)'),
+        .describe('Team name (required for create, fewer than 64 characters, must be unique)'),
       userId: z
         .number()
         .optional()
@@ -53,98 +54,72 @@ export let manageTeam = SlateTool.create(spec, {
         )
         .optional()
         .describe('List of teams (for list action)'),
+      currentPage: z.number().optional(),
+      perPage: z.number().optional(),
+      nextPageLink: z.string().nullable().optional(),
       totalCount: z.number().optional().describe('Total teams count (for list action)'),
+      accepted: z.boolean().optional(),
+      confirmed: z.boolean().optional(),
+      pending: z.boolean().optional(),
+      invitationSent: z.boolean().optional(),
       deleted: z.boolean().optional().describe('Whether the team was deleted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth);
-    let { action } = ctx.input;
-
+    const client = new Client(ctx.auth),
+      action = ctx.input.action;
     if (action === 'list') {
-      let result = await client.listTeams({
-        page: ctx.input.page,
-        perPage: ctx.input.perPage
-      });
-      let teams = result.items.map((t: any) => ({
-        teamId: t.id,
-        teamName: t.name,
-        userCount: (t.users || []).length
-      }));
-      return {
-        output: { teams, totalCount: result.meta.total },
-        message: `Found **${result.meta.total}** teams.`
-      };
-    }
-
-    if (action === 'get') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for get action');
-      let team = await client.getTeam(ctx.input.teamId);
+      const result = await client.listTeams(ctx.input);
       return {
         output: {
-          teamId: team.id,
-          teamName: team.name,
-          users: (team.users || []).map((u: any) => ({
-            userId: u.id,
-            name: u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim()
-          }))
+          teams: result.items.map(v => {
+            const t = mapTeam(v);
+            return { teamId: t.teamId, teamName: t.teamName, userCount: t.users.length };
+          }),
+          totalCount: result.meta.total,
+          currentPage: result.meta.currentPage,
+          perPage: result.meta.perPage,
+          nextPageLink: result.meta.nextPageLink
         },
-        message: `Team **${team.name}** has ${(team.users || []).length} members.`
+        message: `Retrieved ${result.items.length} teams from native page ${result.meta.currentPage}.`
       };
     }
-
     if (action === 'create') {
-      if (!ctx.input.teamName) throw new Error('teamName is required for creating a team');
-      let team = await client.createTeam(ctx.input.teamName);
+      const team = mapTeam(await client.createTeam(text(ctx.input.teamName, 'teamName', 63)));
       return {
-        output: { teamId: team.id, teamName: team.name, users: [] },
-        message: `Created team **${team.name}** (#${team.id}).`
+        output: team,
+        message:
+          'Created the native team with its returned membership; future routing effects remain separate.'
       };
     }
-
+    const teamId = id(ctx.input.teamId, 'teamId');
+    if (action === 'get')
+      return {
+        output: mapTeam(await client.getTeam(teamId)),
+        message: 'Retrieved exact native team and membership.'
+      };
     if (action === 'delete') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for deleting a team');
-      await client.deleteTeam(ctx.input.teamId);
+      await client.deleteTeam(teamId);
       return {
-        output: { teamId: ctx.input.teamId, deleted: true },
-        message: `Deleted team **#${ctx.input.teamId}**.`
+        output: { teamId, deleted: true, confirmed: true },
+        message:
+          'Confirmed team absence. Deletion removes it from number routing; users and calls are retained.'
       };
     }
-
-    if (action === 'add_user') {
-      if (!ctx.input.teamId || !ctx.input.userId)
-        throw new Error('teamId and userId are required for add_user');
-      let team = await client.addUserToTeam(ctx.input.teamId, ctx.input.userId);
-      return {
-        output: {
-          teamId: team.id,
-          teamName: team.name,
-          users: (team.users || []).map((u: any) => ({
-            userId: u.id,
-            name: u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim()
-          }))
-        },
-        message: `Added user #${ctx.input.userId} to team **${team.name}**.`
-      };
-    }
-
-    if (action === 'remove_user') {
-      if (!ctx.input.teamId || !ctx.input.userId)
-        throw new Error('teamId and userId are required for remove_user');
-      let team = await client.removeUserFromTeam(ctx.input.teamId, ctx.input.userId);
-      return {
-        output: {
-          teamId: team.id,
-          teamName: team.name,
-          users: (team.users || []).map((u: any) => ({
-            userId: u.id,
-            name: u.name || `${u.first_name || ''} ${u.last_name || ''}`.trim()
-          }))
-        },
-        message: `Removed user #${ctx.input.userId} from team **${team.name}**.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
+    const userId = id(ctx.input.userId, 'userId');
+    await client.getUser(userId);
+    if (action === 'add_user') await client.addUserToTeam(teamId, userId);
+    else await client.removeUserFromTeam(teamId, userId);
+    const team = mapTeam(await client.getTeam(teamId));
+    if (team.users.some(v => v.userId === userId) !== (action === 'add_user'))
+      fail(
+        'The membership acknowledgement is not yet confirmed by native team readback.',
+        'aircall_pending'
+      );
+    return {
+      output: { ...team, confirmed: true },
+      message:
+        'Verified current native team membership; existing calls and audit effects remain retained.'
+    };
   })
   .build();

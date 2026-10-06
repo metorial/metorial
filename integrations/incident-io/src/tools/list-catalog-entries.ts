@@ -20,6 +20,7 @@ export let listCatalogEntries = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      returnedCount: z.number().int().nonnegative(),
       entries: z.array(
         z.object({
           catalogEntryId: z.string(),
@@ -42,7 +43,7 @@ export let listCatalogEntries = SlateTool.create(spec, {
       after: ctx.input.after
     });
 
-    let entries = result.catalog_entries.map((e: any) => ({
+    let entries = result.catalog_entries.map(e => ({
       catalogEntryId: e.id,
       name: e.name,
       externalId: e.external_id || undefined,
@@ -55,6 +56,7 @@ export let listCatalogEntries = SlateTool.create(spec, {
     return {
       output: {
         entries,
+        returnedCount: entries.length,
         nextCursor: result.pagination_meta?.after || undefined
       },
       message: `Found **${entries.length}** catalog entries.`

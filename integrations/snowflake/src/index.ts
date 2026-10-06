@@ -13,8 +13,6 @@ import {
   manageUser,
   manageWarehouse
 } from './tools';
-import { inboundWebhook, queryCompleted, taskRunCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     manageTask,
     manageGrant
   ],
-  triggers: [inboundWebhook, queryCompleted, taskRunCompleted]
+  triggers: []
 });

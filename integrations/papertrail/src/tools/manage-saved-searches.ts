@@ -1,9 +1,10 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapSavedSearch } from '../lib/schemas';
 import { spec } from '../spec';
 
-let savedSearchSchema = z.object({
+export const savedSearchSchema = z.object({
   searchId: z.number().describe('Unique saved search ID'),
   name: z.string().describe('Name of the saved search'),
   query: z.string().describe('Search query string'),
@@ -29,13 +30,7 @@ export let listSavedSearches = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let data = await client.listSavedSearches();
 
-    let savedSearches = (Array.isArray(data) ? data : []).map((s: any) => ({
-      searchId: s.id,
-      name: s.name || '',
-      query: s.query || '',
-      groupId: s.group?.id ?? null,
-      groupName: s.group?.name ?? null
-    }));
+    let savedSearches = data.map(mapSavedSearch);
 
     return {
       output: { savedSearches },
@@ -72,13 +67,7 @@ export let createSavedSearch = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        searchId: s.id,
-        name: s.name || '',
-        query: s.query || '',
-        groupId: s.group?.id ?? null,
-        groupName: s.group?.name ?? null
-      },
+      output: mapSavedSearch(s),
       message: `Created saved search **${s.name}** (ID: ${s.id}) with query: \`${s.query}\`.`
     };
   })
@@ -111,13 +100,7 @@ export let updateSavedSearch = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        searchId: s.id,
-        name: s.name || '',
-        query: s.query || '',
-        groupId: s.group?.id ?? null,
-        groupName: s.group?.name ?? null
-      },
+      output: mapSavedSearch(s),
       message: `Updated saved search **${s.name}** (ID: ${s.id}).`
     };
   })

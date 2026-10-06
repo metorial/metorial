@@ -1,13 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { folderIdSchema, folderSchema, pageSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let folderSchema = z.object({
-  folderId: z.string().describe('Unique folder identifier'),
-  name: z.string().describe('Folder name'),
-  createdAt: z.number().describe('Unix timestamp of creation in seconds')
-});
 
 export let listFolders = SlateTool.create(spec, {
   name: 'List Folders',
@@ -20,20 +15,13 @@ export let listFolders = SlateTool.create(spec, {
   .input(
     z.object({
       keyword: z.string().optional().describe('Filter folders by partial name match'),
-      page: z.number().optional().describe('Page number for pagination')
+      page: pageSchema
     })
   )
   .output(
     z.object({
       folders: z.array(folderSchema),
-      pagination: z.object({
-        count: z.number(),
-        total: z.number(),
-        perPage: z.number(),
-        totalPages: z.number(),
-        nextPage: z.number().nullable(),
-        previousPage: z.number().nullable()
-      })
+      pagination: paginationSchema
     })
   )
   .handleInvocation(async ctx => {
@@ -57,7 +45,7 @@ export let createFolder = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('Name for the new folder')
+      name: z.string().min(1).describe('Name for the new folder')
     })
   )
   .output(folderSchema)
@@ -75,12 +63,12 @@ export let createFolder = SlateTool.create(spec, {
 export let updateFolder = SlateTool.create(spec, {
   name: 'Update Folder',
   key: 'update_folder',
-  description: `Rename an existing knowledge base folder.`
+  description: `Rename an existing knowledge base folder. Call list_folders to discover folder IDs.`
 })
   .input(
     z.object({
-      folderId: z.string().describe('ID of the folder to update'),
-      name: z.string().describe('New name for the folder')
+      folderId: folderIdSchema,
+      name: z.string().min(1).describe('New name for the folder')
     })
   )
   .output(folderSchema)
@@ -98,14 +86,14 @@ export let updateFolder = SlateTool.create(spec, {
 export let getFolder = SlateTool.create(spec, {
   name: 'Get Folder',
   key: 'get_folder',
-  description: `Retrieve details of a specific knowledge base folder by its ID.`,
+  description: `Retrieve a knowledge base folder by its ID. Call list_folders to discover available folders.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      folderId: z.string().describe('ID of the folder to retrieve')
+      folderId: folderIdSchema
     })
   )
   .output(folderSchema)

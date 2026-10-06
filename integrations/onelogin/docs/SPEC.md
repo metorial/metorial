@@ -1,120 +1,32 @@
-# Slates Specification for OneLogin
+# OneLogin capability specification
 
-## Overview
+The supported contract is 19 REST tools: 17 retained keys and native `get_role`/`get_group` reads. The connection uses the documented tenant subdomain rather than inventing a regional host selector. Public API scopes control authority; native token `account_id` is an API account, not a person identity.
 
-OneLogin (by One Identity) is a cloud-based identity and access management (IAM) platform that provides single sign-on (SSO), multi-factor authentication (MFA), user provisioning, and directory integration for both cloud and on-premises applications. It enables organizations to securely manage user access through its Unified Access Management platform. The API is RESTful, uses JSON, and is secured by OAuth 2.0 authentication.
+| Tools | Native contract |
+| --- | --- |
+| list_users / get_user / create_user / update_user / delete_user | `/api/2/users`; one-page headers/cursor, exact numeric IDs, native text external-ID filters, POST 201 object, PUT 200 exact object, DELETE 204. Password pairs are required together; explicit false/zero/empty update values remain sent, including native status 4 (PasswordExpired). Omit unused search filters; empty filters and invalid numeric IDs are refused. Mapping/provisioning completion is separate from the response. |
+| list_roles / get_role / manage_role | `/api/2/roles`; create returns a one-element ID array, update returns an exact ID object and supports name only, delete returns 204. Association update inputs remain visible but are refused before effects. Base-role read does not pretend to return relationship subresources. |
+| list_apps / get_app / manage_app | `/api/2/apps`; exact IDs, native configuration, 201 create / 200 update / 204 delete, explicit false values preserved. Native SSO configuration secrets may be intentional requested outputs. |
+| list_groups / get_group | Retained documented v1 paged group list and native v2 exact group with policy, users and administrators. The v1 reference field is deprecated and may be null. No group mutation is provided. |
+| list_events / get_event_types | Retained v1 event filters/status/data/pagination envelope, including text client IDs; current v2 event type lookup. The v2 event list is recommended by the provider for performance but is not silently substituted for the legacy contract. Cache type metadata for at most 24 hours as documented. |
+| manage_user_roles | Documented v1 add_roles/remove_roles, nonempty unique positive role IDs and exact success status acknowledgment. Removal cannot remove roles granted through mappings or provisioning. |
+| get_mfa_factors | Two native v2 reads for API/policy-available factors and enrolled devices; numeric-string device IDs are converted only within the safe integer range. This is not an atomic or universal MFA inventory. |
+| enroll_mfa_factor / verify_mfa_factor | Native v2 registration arrays/UUIDs/pending-or-accepted status. Setup data is preserved; expiry input is sent as native text, OTP as native integer. Available-factor preflight recognizes native SMS/OneLogin Voice/OneLogin Email labels and the existing Voice/Email aliases, using the corresponding existing contact for pre-verification. A returned conflicting authenticator family requires reconciliation before verification or retrying. No MFA retirement capability or rollback is invented. |
 
-## Authentication
+Auth uses Basic client credentials at `/auth/oauth2/v2/token` and `bearer <token>` for resource calls. Renewal requests the same client-credentials grant; the provider deprecated its refresh-token grant. Expiry derives from native creation time plus lifetime because requesting the same credential pair can return an existing token. Tenant/client/credential/account bindings prevent renewal across changed connections. Legacy unmarked outputs remain usable with their original configured subdomain and require reconnecting for safe renewal.
 
-OneLogin uses **OAuth 2.0 Client Credentials** for API authentication. The API uses OAuth2 for authorization — your client credentials (Client ID and Client Secret) are used to request an access token, which is then used for subsequent API calls.
+Shared authenticated HTTP and API error helpers are reused. Responses and outgoing data are checked for known connection credentials, including bounded URI/Base64 representations, before projection. User-facing failures omit upstream bodies/parents. The shared adapter captures HTTP traces before local response validation: conditional encoded reflection can remain in internal trace storage even when the tested public failure/protocol is clean. No universal privacy claim or shared transport rewrite is made.
 
-### Steps to Authenticate
+No person identity endpoint, session login, authorization-server/Smart Hook administration, SCIM server, directory sync, legacy triggers, attachment delivery or unsupported regional endpoint is added.
 
-1. **Create API Credentials**: Access OneLogin as an account owner or administrator, go to Developers > API Credentials, and click New Credential. Select a scope for the credentials.
+## Primary references
 
-2. **Generate an Access Token**: POST to the token endpoint with your client ID and client secret:
-
-   ```
-   POST https://<subdomain>.onelogin.com/auth/oauth2/v2/token
-   ```
-
-   The response includes an `access_token`, `created_at`, `expires_in`, `refresh_token`, and `token_type` (bearer).
-
-3. **Use the Access Token**: Include the token in the `Authorization` header as `bearer:<access_token>` on all subsequent API calls.
-
-### Required Inputs
-
-- **Subdomain**: Your OneLogin account subdomain (e.g., `mycompany` for `mycompany.onelogin.com`). Your sitename becomes your OneLogin subdomain.
-- **Client ID**: Generated when creating API credentials.
-- **Client Secret**: Generated when creating API credentials.
-
-### Token Details
-
-- An access token is valid for 10 hours.
-- The `grant_type` must be set to `client_credentials`.
-
-### API Credential Scopes
-
-When creating API credentials, you must select a scope that determines what the token can access. Available scopes include:
-
-- **Authentication Only**: Gives the credential pair the ability to generate an access token that can perform POST calls only to authentication endpoints.
-- **Read Users**: Gives the credential pair the ability to generate an access token that can perform GET calls available for the User, Role, and Group API resources.
-- **Manage Users**: Allows read and write access to User, Role, and Group resources.
-- **Read All**: Read access across all API resources.
-- **Manage All**: Gives the credential pair the ability to generate an access token that can perform GET, POST, PUT, and DELETE calls for all available API resources, including the ability to set passwords and assign and remove roles.
-
-## Features
-
-### User Management
-
-Create, read, update, and delete users in the OneLogin directory. User attributes include name, email, username, department, title, phone, status, custom attributes, and more. Users can be filtered, sorted, and searched by various fields including wildcards.
-
-### Role Management
-
-Manage roles that control access to applications. Roles can be assigned to users and associated with applications. Roles are also used as the basis for group provisioning via SCIM.
-
-### Application (App) Management
-
-The Apps API can be used to list, create, update, and manage apps. Often this set of APIs is used to back up the configuration of an app so that changes can be restored to a previous state. Apps represent the SSO-connected services in your OneLogin account.
-
-### Multi-Factor Authentication (MFA)
-
-OneLogin provides a series of API endpoints that let you manage MFA for your users. With these APIs you can register and verify a variety of different MFA factors. Supported factors include OneLogin Protect, SMS, Email, Google Authenticator, OneLogin Voice, and other authenticators that use Key URI Format. You can enroll devices, trigger OTP delivery, and verify codes.
-
-### User Authentication / Session Management
-
-Authenticate users programmatically by passing their credentials. Supports login flows with and without MFA, including session token generation and delegated authentication. Useful for building custom login pages.
-
-### API Authorization Server
-
-This collection of APIs lets you configure OneLogin as an Authorization Server. The purpose of the Authorization Server is to authenticate a user and return an Access Token for authorizing access to downstream APIs. You can define custom scopes, claims, and associate OpenID Connect apps with your authorization server configuration.
-
-### Smart Hooks
-
-A Smart Hook is an extension point in OneLogin that lets you define customized actions using Javascript code. You will use the Smart Hooks API to configure a javascript function that gets executed every time a specific hook fires. Smart Hooks are serverless, meaning OneLogin will host and execute the javascript functions for you.
-
-Available hook types include:
-
-- **Pre-Authentication Hook**: Runs synchronously as part of a UI-based login flow. The hook fires immediately after the user enters a username/email but before they enter their password or are prompted for MFA. Can be used to dynamically change user policies based on context (device, location, risk score).
-- **User Migration Hook**: Targeted at CIAM prospects and offers a way to seamlessly migrate users from an external database or Identity Provider into the OneLogin Cloud Directory.
-
-Smart Hooks support environment variables, external NPM packages, and conditions for targeting specific roles.
-
-### Events and Reporting
-
-Query historical events from your OneLogin account. Events can be filtered by event type, user, date range, and other attributes. Useful for audit logging, compliance, and extracting data for reporting.
-
-### SCIM Provisioning
-
-OneLogin supports SCIM (System for Cross-domain Identity Management) for automated user provisioning to third-party applications. Use the SCIM API reference as a guide to designing your SCIM APIs to respond to requests from OneLogin SCIM provisioning. Supports user create, update, delete, and group management operations.
-
-### Groups
-
-Manage user groups in OneLogin. Groups function as security boundaries to apply specific security policies to users.
-
-### Directory Sync
-
-Integrate with external directories (e.g., Active Directory, LDAP) for user synchronization.
-
-## Events
-
-OneLogin supports webhooks through its **Event Broadcaster** (also called the Event Webhook). Webhooks provide a way to make event-driven decisions in your application. The OneLogin Event Webhook API will send batches of events in near real-time to an endpoint that you specify.
-
-### Configuration
-
-- Webhooks need to be set up via the OneLogin Admin portal under Developers > Webhooks. There isn't currently an API for setting up the webhook endpoint.
-- When configuring your Event Broadcaster you have the opportunity to specify custom headers that will be sent along with each request. A great way to add additional security and verify authenticity is to set an arbitrary string as a custom header value.
-- If a non-200 code is returned or a timeout occurs then the webhook payload will be sent to your endpoint again. This process will be repeated for a maximum of 3 attempts and then will not be sent again.
-
-### Event Categories
-
-The events webhook endpoint is a firehose of every event that occurs on your OneLogin account. Filtering can be done based on event_type_id and other attributes like risk_score. Key event categories include:
-
-- **Authentication Events**: User logins, logouts, failed login attempts, and session-related activity. Each login event may include a risk score (when Adaptive Authentication is enabled).
-- **User Lifecycle Events**: User creation, updates, deletion, suspension, role assignment/removal, and password changes.
-- **App Events**: App added/removed from roles, app access events, SAML assertions.
-- **MFA Events**: OTP device registration, MFA factor verification, authentication factor changes.
-- **Admin/Account Events**: Admin actions, policy changes, directory sync events, API credential changes.
-- **Provisioning Events**: SCIM provisioning activities, directory sync runs.
-
-A full list of available Event Types can be retrieved dynamically by calling the Get Event Types API, which provides event type names, IDs, and descriptions.
+- [Token generation](https://developers.onelogin.com/api-docs/2/oauth20-tokens/generate-tokens-2/) and [deprecated token refresh](https://developers.onelogin.com/api-docs/2/oauth20-tokens/refresh-tokens-2/)
+- [Resource authorization](https://developers.onelogin.com/api-docs/2/getting-started/authorizing-resource-api-calls/) and [query parameters](https://developers.onelogin.com/api-docs/2/getting-started/using-query-parameters/)
+- [Users](https://developers.onelogin.com/api-docs/2/users/list-users/), [create](https://developers.onelogin.com/api-docs/2/users/create-user/), [update](https://developers.onelogin.com/api-docs/2/users/update-user/), [delete](https://developers.onelogin.com/api-docs/2/users/delete-user/)
+- [Roles](https://developers.onelogin.com/api-docs/2/roles/list-roles/), [get](https://developers.onelogin.com/api-docs/2/roles/get-role/), [create](https://developers.onelogin.com/api-docs/2/roles/create-role/), [update](https://developers.onelogin.com/api-docs/2/roles/update-role/), [delete](https://developers.onelogin.com/api-docs/2/roles/delete-role/)
+- [Apps](https://developers.onelogin.com/api-docs/2/apps/list-apps/), [get](https://developers.onelogin.com/api-docs/2/apps/get-app/), [create](https://developers.onelogin.com/api-docs/2/apps/create-app/), [update](https://developers.onelogin.com/api-docs/2/apps/update-app/), [delete](https://developers.onelogin.com/api-docs/2/apps/delete-app/)
+- [Legacy groups](https://developers.onelogin.com/api-docs/1/groups/get-groups/) and [native group](https://developers.onelogin.com/api-docs/2/groups/get-group/)
+- [Legacy events](https://developers.onelogin.com/api-docs/1/events/get-events/) and [event types](https://developers.onelogin.com/api-docs/2/events/list-event-types/)
+- [Assign roles](https://developers.onelogin.com/api-docs/1/users/assign-role-to-user/) and [remove roles](https://developers.onelogin.com/api-docs/1/users/remove-role-from-user/)
+- [Available MFA](https://developers.onelogin.com/api-docs/2/multi-factor-authentication/available-factors/), [enrolled devices](https://developers.onelogin.com/api-docs/2/multi-factor-authentication/enrolled-factors/), [enroll](https://developers.onelogin.com/api-docs/2/multi-factor-authentication/enroll-factor/), [poll](https://developers.onelogin.com/api-docs/2/multi-factor-authentication/enroll-factor-verify-poll/), [verify OTP](https://developers.onelogin.com/api-docs/2/multi-factor-authentication/enroll-factor-verify-otp/)

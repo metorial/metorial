@@ -6,6 +6,7 @@ import { spec } from '../spec';
 export let triggerSyncTool = SlateTool.create(spec, {
   name: 'Trigger Sync Job',
   key: 'trigger_sync',
+  tags: { destructive: true },
   description: `Trigger a sync or reset job on an Airbyte connection. A sync job moves data from source to destination. A reset job clears previously synced data at the destination.`
 })
   .input(

@@ -11,14 +11,6 @@ import {
   listWorkflowsTool,
   manageLinkTool
 } from './tools';
-import {
-  eventAttendeeTrigger,
-  eventCheckoutTrigger,
-  eventLifecycleTrigger,
-  pollResponseTrigger,
-  workflowActionTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,11 +24,5 @@ export let provider = Slate.create({
     listWorkflowsTool,
     listTimeZonesTool
   ],
-  triggers: [
-    eventLifecycleTrigger,
-    eventCheckoutTrigger,
-    eventAttendeeTrigger,
-    pollResponseTrigger,
-    workflowActionTrigger
-  ]
+  triggers: []
 });

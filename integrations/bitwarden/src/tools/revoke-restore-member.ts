@@ -29,8 +29,7 @@ export let revokeRestoreMember = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.auth.serverUrl
+      ...ctx.auth
     });
 
     if (ctx.input.action === 'revoke') {
@@ -45,7 +44,7 @@ export let revokeRestoreMember = SlateTool.create(spec, {
         action: ctx.input.action,
         success: true
       },
-      message: `Member **${ctx.input.memberId}** has been **${ctx.input.action}d**.`
+      message: `Member **${ctx.input.memberId}** has been **${ctx.input.action === 'revoke' ? 'revoked' : 'restored'}**.`
     };
   })
   .build();

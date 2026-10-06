@@ -9,7 +9,8 @@ export let sendChatMessageTool = SlateTool.create(spec, {
   description: `Send a chat message through a bot in an active meeting. The message will appear in the meeting's chat from the bot.`,
   constraints: [
     'Rate limit: 300 requests per minute per workspace.',
-    'The bot must be actively in a meeting to send chat messages.'
+    'The bot must be actively in a meeting to send chat messages.',
+    'Google Meet limits messages to 500 characters; other supported platforms permit up to 4096.'
   ],
   tags: {
     destructive: false,
@@ -19,7 +20,12 @@ export let sendChatMessageTool = SlateTool.create(spec, {
   .input(
     z.object({
       botId: z.string().describe('The unique identifier of the bot to send the message from'),
-      message: z.string().describe('The chat message text to send')
+      to: z
+        .string()
+        .optional()
+        .describe('Recipient; default everyone. Other recipients require Zoom'),
+      pin: z.boolean().optional().describe('Pin the chat message when supported'),
+      message: z.string().min(1).max(4096).describe('The chat message text to send')
     })
   )
   .output(
@@ -34,7 +40,12 @@ export let sendChatMessageTool = SlateTool.create(spec, {
       region: ctx.config.region
     });
 
-    await client.sendChatMessage(ctx.input.botId, ctx.input.message);
+    await client.sendChatMessage(
+      ctx.input.botId,
+      ctx.input.message,
+      ctx.input.to,
+      ctx.input.pin
+    );
 
     return {
       output: {

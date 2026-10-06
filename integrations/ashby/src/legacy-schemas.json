@@ -1,0 +1,1258 @@
+{
+  "create_candidate": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "firstName": {
+          "type": "string",
+          "description": "First name of the candidate"
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name of the candidate"
+        },
+        "email": {
+          "description": "Email address of the candidate",
+          "type": "string"
+        },
+        "emailType": {
+          "default": "Personal",
+          "description": "Type of the email address",
+          "type": "string",
+          "enum": ["Personal", "Work", "Other"]
+        },
+        "phone": {
+          "description": "Phone number of the candidate",
+          "type": "string"
+        },
+        "phoneType": {
+          "default": "Personal",
+          "description": "Type of the phone number",
+          "type": "string",
+          "enum": ["Personal", "Work", "Other", "Mobile"]
+        },
+        "socialLinks": {
+          "description": "Array of social profile links for the candidate",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Type of social link (e.g. LinkedIn, GitHub, Twitter)"
+              },
+              "url": {
+                "type": "string",
+                "description": "URL of the social profile"
+              }
+            },
+            "required": ["type", "url"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["firstName", "lastName", "emailType", "phoneType"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "candidateId": {
+          "type": "string",
+          "description": "Unique ID of the created candidate"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the candidate"
+        },
+        "primaryEmail": {
+          "description": "Primary email address of the candidate",
+          "type": "string"
+        },
+        "primaryPhone": {
+          "description": "Primary phone number of the candidate",
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["candidateId", "name", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "get_candidate": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "candidateId": {
+          "description": "Unique ID of the candidate to retrieve",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address to search for",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name to search for",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "candidateId": {
+          "type": "string",
+          "description": "Unique ID of the candidate"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the candidate"
+        },
+        "primaryEmail": {
+          "description": "Primary email address",
+          "type": "string"
+        },
+        "primaryPhone": {
+          "description": "Primary phone number",
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tagId": {
+                "type": "string",
+                "description": "Unique ID of the tag"
+              },
+              "title": {
+                "type": "string",
+                "description": "Title of the tag"
+              }
+            },
+            "required": ["tagId", "title"],
+            "additionalProperties": false
+          },
+          "description": "Tags associated with the candidate"
+        },
+        "emails": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "All email addresses for the candidate"
+        },
+        "phoneNumbers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "All phone numbers for the candidate"
+        },
+        "socialProfiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Social profile URLs for the candidate"
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Location names for the candidate"
+        },
+        "customFields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldId": {
+                "type": "string",
+                "description": "Unique ID of the custom field"
+              },
+              "title": {
+                "type": "string",
+                "description": "Display name of the custom field"
+              },
+              "value": {
+                "description": "Value of the custom field"
+              }
+            },
+            "required": ["fieldId", "title", "value"],
+            "additionalProperties": false
+          },
+          "description": "Custom field values set on the candidate"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": [
+        "candidateId",
+        "name",
+        "tags",
+        "emails",
+        "phoneNumbers",
+        "socialProfiles",
+        "locations",
+        "customFields",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "update_candidate": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "candidateId": {
+          "type": "string",
+          "description": "Candidate ID to update"
+        },
+        "name": {
+          "description": "New full name for the candidate",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address to set as primary",
+          "type": "string"
+        },
+        "emailType": {
+          "description": "Type of email address",
+          "type": "string",
+          "enum": ["Personal", "Work", "Other"]
+        },
+        "phone": {
+          "description": "Phone number to set as primary",
+          "type": "string"
+        },
+        "phoneType": {
+          "description": "Type of phone number",
+          "type": "string",
+          "enum": ["Personal", "Work", "Other", "Mobile"]
+        },
+        "socialLinks": {
+          "description": "Social links to set on the candidate profile",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Social link type (e.g., LinkedIn, GitHub, Twitter)"
+              },
+              "url": {
+                "type": "string",
+                "description": "Social link URL"
+              }
+            },
+            "required": ["type", "url"],
+            "additionalProperties": false
+          }
+        },
+        "tagId": {
+          "description": "Tag ID to add to the candidate",
+          "type": "string"
+        },
+        "note": {
+          "description": "Note text to add to the candidate",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "Project ID to add the candidate to",
+          "type": "string"
+        }
+      },
+      "required": ["candidateId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "candidateId": {
+          "type": "string",
+          "description": "Candidate ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Candidate full name"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last updated timestamp"
+        }
+      },
+      "required": ["candidateId", "name", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "create_application": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "candidateId": {
+          "type": "string",
+          "description": "ID of the candidate to create the application for"
+        },
+        "jobId": {
+          "type": "string",
+          "description": "ID of the job to apply the candidate to"
+        },
+        "interviewPlanId": {
+          "description": "ID of the interview plan to use",
+          "type": "string"
+        },
+        "interviewStageId": {
+          "description": "ID of the interview stage to start the application at",
+          "type": "string"
+        },
+        "sourceId": {
+          "description": "ID of the source to attribute the application to",
+          "type": "string"
+        },
+        "creditedToUserId": {
+          "description": "ID of the user to credit for this application",
+          "type": "string"
+        }
+      },
+      "required": ["candidateId", "jobId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applicationId": {
+          "type": "string",
+          "description": "Unique ID of the application"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the application"
+        },
+        "candidateName": {
+          "type": "string",
+          "description": "Name of the candidate"
+        },
+        "jobTitle": {
+          "type": "string",
+          "description": "Title of the job"
+        },
+        "currentStage": {
+          "description": "Current interview stage, if any",
+          "type": "object",
+          "properties": {
+            "stageId": {
+              "type": "string",
+              "description": "ID of the current interview stage"
+            },
+            "title": {
+              "type": "string",
+              "description": "Title of the current interview stage"
+            }
+          },
+          "required": ["stageId", "title"],
+          "additionalProperties": false
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["applicationId", "status", "candidateName", "jobTitle", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "update_application": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applicationId": {
+          "type": "string",
+          "description": "ID of the application to update"
+        },
+        "interviewStageId": {
+          "description": "ID of the interview stage to move the application to",
+          "type": "string"
+        },
+        "archiveReasonId": {
+          "description": "ID of the archive reason (required when moving to an archived stage)",
+          "type": "string"
+        },
+        "sourceId": {
+          "description": "ID of the new source to set on the application",
+          "type": "string"
+        },
+        "transferToJobId": {
+          "description": "ID of the job to transfer the application to",
+          "type": "string"
+        },
+        "transferToInterviewPlanId": {
+          "description": "ID of the interview plan to use when transferring to a new job",
+          "type": "string"
+        },
+        "addHiringTeamMember": {
+          "description": "Add a user to the hiring team for this application",
+          "type": "object",
+          "properties": {
+            "userId": {
+              "type": "string",
+              "description": "ID of the user to add to the hiring team"
+            },
+            "role": {
+              "type": "string",
+              "description": "Role of the hiring team member (e.g., \"Hiring Manager\", \"Recruiter\", \"Sourcer\")"
+            }
+          },
+          "required": ["userId", "role"],
+          "additionalProperties": false
+        },
+        "removeHiringTeamMember": {
+          "description": "Remove a user from the hiring team for this application",
+          "type": "object",
+          "properties": {
+            "userId": {
+              "type": "string",
+              "description": "ID of the user to remove from the hiring team"
+            },
+            "role": {
+              "type": "string",
+              "description": "Role of the hiring team member to remove"
+            }
+          },
+          "required": ["userId", "role"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["applicationId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applicationId": {
+          "type": "string",
+          "description": "Unique ID of the application"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the application"
+        },
+        "candidateName": {
+          "type": "string",
+          "description": "Name of the candidate"
+        },
+        "jobTitle": {
+          "type": "string",
+          "description": "Title of the job"
+        },
+        "currentStage": {
+          "description": "Current interview stage, if any",
+          "type": "object",
+          "properties": {
+            "stageId": {
+              "type": "string",
+              "description": "ID of the current interview stage"
+            },
+            "title": {
+              "type": "string",
+              "description": "Title of the current interview stage"
+            }
+          },
+          "required": ["stageId", "title"],
+          "additionalProperties": false
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["applicationId", "status", "candidateName", "jobTitle", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "list_applications": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applicationId": {
+          "description": "Application ID to get specific details",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "expand": {
+          "description": "Related data to expand and include in the response",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["openings", "applicationFormSubmissions", "referrals"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "application": {
+          "description": "Single application details (when applicationId is provided)",
+          "type": "object",
+          "properties": {
+            "applicationId": {
+              "type": "string",
+              "description": "Application ID"
+            },
+            "status": {
+              "type": "string",
+              "description": "Application status"
+            },
+            "candidateName": {
+              "type": "string",
+              "description": "Candidate name"
+            },
+            "candidateId": {
+              "type": "string",
+              "description": "Candidate ID"
+            },
+            "jobTitle": {
+              "type": "string",
+              "description": "Job title"
+            },
+            "jobId": {
+              "type": "string",
+              "description": "Job ID"
+            },
+            "currentStage": {
+              "description": "Current interview stage",
+              "type": "object",
+              "properties": {
+                "stageId": {
+                  "type": "string",
+                  "description": "Interview stage ID"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Interview stage title"
+                }
+              },
+              "required": ["stageId", "title"],
+              "additionalProperties": false
+            },
+            "source": {
+              "description": "Application source",
+              "type": "object",
+              "properties": {
+                "sourceId": {
+                  "type": "string",
+                  "description": "Source ID"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Source title"
+                }
+              },
+              "required": ["sourceId", "title"],
+              "additionalProperties": false
+            },
+            "createdAt": {
+              "type": "string",
+              "description": "Creation timestamp"
+            },
+            "updatedAt": {
+              "type": "string",
+              "description": "Last updated timestamp"
+            }
+          },
+          "required": [
+            "applicationId",
+            "status",
+            "candidateName",
+            "candidateId",
+            "jobTitle",
+            "jobId",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        },
+        "applications": {
+          "description": "List of applications (when listing)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "applicationId": {
+                "type": "string",
+                "description": "Application ID"
+              },
+              "status": {
+                "type": "string",
+                "description": "Application status"
+              },
+              "candidateName": {
+                "type": "string",
+                "description": "Candidate name"
+              },
+              "candidateId": {
+                "type": "string",
+                "description": "Candidate ID"
+              },
+              "jobTitle": {
+                "type": "string",
+                "description": "Job title"
+              },
+              "jobId": {
+                "type": "string",
+                "description": "Job ID"
+              },
+              "currentStage": {
+                "description": "Current interview stage",
+                "type": "object",
+                "properties": {
+                  "stageId": {
+                    "type": "string",
+                    "description": "Interview stage ID"
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Interview stage title"
+                  }
+                },
+                "required": ["stageId", "title"],
+                "additionalProperties": false
+              },
+              "source": {
+                "description": "Application source",
+                "type": "object",
+                "properties": {
+                  "sourceId": {
+                    "type": "string",
+                    "description": "Source ID"
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Source title"
+                  }
+                },
+                "required": ["sourceId", "title"],
+                "additionalProperties": false
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last updated timestamp"
+              }
+            },
+            "required": [
+              "applicationId",
+              "status",
+              "candidateName",
+              "candidateId",
+              "jobTitle",
+              "jobId",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "description": "Pagination cursor for the next page",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_jobs": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "searchTerm": {
+          "description": "Search term to filter jobs by title or other fields",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter jobs by status",
+          "type": "string",
+          "enum": ["Open", "Closed", "Archived", "Draft"]
+        },
+        "cursor": {
+          "description": "Pagination cursor from a previous request",
+          "type": "string"
+        },
+        "perPage": {
+          "default": 50,
+          "description": "Number of results per page",
+          "type": "number"
+        }
+      },
+      "required": ["perPage"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "jobId": {
+                "type": "string",
+                "description": "Unique ID of the job"
+              },
+              "title": {
+                "type": "string",
+                "description": "Job title"
+              },
+              "status": {
+                "type": "string",
+                "description": "Current status of the job"
+              },
+              "locationId": {
+                "description": "Location ID associated with the job",
+                "type": "string"
+              },
+              "departmentId": {
+                "description": "Department ID associated with the job",
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last updated timestamp"
+              }
+            },
+            "required": ["jobId", "title", "status", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          },
+          "description": "List of jobs matching the query"
+        },
+        "nextCursor": {
+          "description": "Pagination cursor for the next page",
+          "type": "string"
+        }
+      },
+      "required": ["jobs"],
+      "additionalProperties": false
+    }
+  },
+  "create_job": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title of the job to create"
+        },
+        "locationId": {
+          "description": "Location ID to associate with the job",
+          "type": "string"
+        },
+        "departmentId": {
+          "description": "Department ID to associate with the job",
+          "type": "string"
+        },
+        "defaultInterviewPlanId": {
+          "description": "Default interview plan ID for the job",
+          "type": "string"
+        }
+      },
+      "required": ["title"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "Unique ID of the created job"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the job"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the job"
+        },
+        "locationId": {
+          "description": "Location ID associated with the job",
+          "type": "string"
+        },
+        "departmentId": {
+          "description": "Department ID associated with the job",
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["jobId", "title", "status", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "update_job": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "The ID of the job to update"
+        },
+        "title": {
+          "description": "New job title",
+          "type": "string"
+        },
+        "status": {
+          "description": "New job status",
+          "type": "string",
+          "enum": ["Open", "Closed", "Archived", "Draft"]
+        },
+        "locationId": {
+          "description": "New location ID",
+          "type": "string"
+        },
+        "departmentId": {
+          "description": "New department ID",
+          "type": "string"
+        },
+        "compensation": {
+          "description": "Compensation details to update",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["jobId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "locationId": {
+          "type": "string"
+        },
+        "departmentId": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["jobId", "title", "status", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "manage_offer": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "get", "list", "update", "approve", "start"],
+          "description": "The offer action to perform"
+        },
+        "offerId": {
+          "description": "Offer ID (required for get, update, approve, and start)",
+          "type": "string"
+        },
+        "applicationId": {
+          "description": "Application ID (for create)",
+          "type": "string"
+        },
+        "offerFields": {
+          "description": "Offer form field values (for create and update)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "cursor": {
+          "description": "Pagination cursor (for list action)",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Number of results per page (for list action)",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "offer": {
+          "description": "Single offer result (for create, get, update, approve, start)",
+          "type": "object",
+          "properties": {
+            "offerId": {
+              "type": "string",
+              "description": "Unique ID of the offer"
+            },
+            "status": {
+              "type": "string",
+              "description": "Current status of the offer"
+            },
+            "applicationId": {
+              "description": "Associated application ID",
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string",
+              "description": "Creation timestamp"
+            },
+            "updatedAt": {
+              "type": "string",
+              "description": "Last updated timestamp"
+            }
+          },
+          "required": ["offerId", "status", "createdAt", "updatedAt"],
+          "additionalProperties": false
+        },
+        "offers": {
+          "description": "List of offers (for list action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "offerId": {
+                "type": "string",
+                "description": "Unique ID of the offer"
+              },
+              "status": {
+                "type": "string",
+                "description": "Current status of the offer"
+              },
+              "applicationId": {
+                "description": "Associated application ID",
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last updated timestamp"
+              }
+            },
+            "required": ["offerId", "status", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "description": "Pagination cursor for the next page",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_interview_schedule": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "cancel", "list"],
+          "description": "The interview schedule action to perform"
+        },
+        "interviewScheduleId": {
+          "description": "Interview schedule ID (required for update and cancel)",
+          "type": "string"
+        },
+        "applicationId": {
+          "description": "Application ID (required for create)",
+          "type": "string"
+        },
+        "interviewEvents": {
+          "description": "Interview events to schedule (for create action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "interviewId": {
+                "type": "string",
+                "description": "Interview ID"
+              },
+              "startTime": {
+                "type": "string",
+                "description": "Start time (ISO 8601)"
+              },
+              "endTime": {
+                "type": "string",
+                "description": "End time (ISO 8601)"
+              },
+              "interviewerUserIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "User IDs of interviewers"
+              }
+            },
+            "required": ["interviewId", "startTime", "endTime", "interviewerUserIds"],
+            "additionalProperties": false
+          }
+        },
+        "cursor": {
+          "description": "Pagination cursor (for list action)",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Number of results per page (for list action)",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "schedule": {
+          "description": "Single schedule result (for create, update, cancel)",
+          "type": "object",
+          "properties": {
+            "interviewScheduleId": {
+              "type": "string",
+              "description": "Interview schedule ID"
+            },
+            "applicationId": {
+              "description": "Associated application ID",
+              "type": "string"
+            },
+            "createdAt": {
+              "description": "Creation timestamp",
+              "type": "string"
+            },
+            "updatedAt": {
+              "description": "Last updated timestamp",
+              "type": "string"
+            }
+          },
+          "required": ["interviewScheduleId"],
+          "additionalProperties": false
+        },
+        "schedules": {
+          "description": "List of schedules (for list action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "interviewScheduleId": {
+                "type": "string",
+                "description": "Interview schedule ID"
+              },
+              "applicationId": {
+                "description": "Associated application ID",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              },
+              "updatedAt": {
+                "description": "Last updated timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["interviewScheduleId"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "description": "Pagination cursor for the next page",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_organization": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "resourceType": {
+          "type": "string",
+          "enum": [
+            "departments",
+            "locations",
+            "users",
+            "sources",
+            "archive_reasons",
+            "candidate_tags",
+            "interview_stages"
+          ],
+          "description": "Type of organization data to list"
+        },
+        "searchTerm": {
+          "description": "Search term (only applicable for users)",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        },
+        "perPage": {
+          "description": "Number of results per page",
+          "type": "number"
+        }
+      },
+      "required": ["resourceType"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "resourceId": {
+                "type": "string",
+                "description": "Unique resource ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name of the resource"
+              },
+              "resourceType": {
+                "type": "string",
+                "description": "Type of resource"
+              },
+              "additionalFields": {
+                "description": "Additional fields specific to the resource type",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "required": ["resourceId", "name", "resourceType"],
+            "additionalProperties": false
+          },
+          "description": "List of organization resources"
+        },
+        "nextCursor": {
+          "description": "Pagination cursor for the next page",
+          "type": "string"
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    }
+  },
+  "set_custom_field": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "objectType": {
+          "type": "string",
+          "enum": ["Candidate", "Application", "Job", "Opening", "Offer"],
+          "description": "The type of entity to set the field on"
+        },
+        "objectId": {
+          "type": "string",
+          "description": "The ID of the entity"
+        },
+        "fieldId": {
+          "type": "string",
+          "description": "The custom field definition ID"
+        },
+        "fieldValue": {
+          "description": "The value to set. Supports strings, numbers, booleans, currency objects ({currencyCode, value}), date strings, and arrays for multi-select fields."
+        }
+      },
+      "required": ["objectType", "objectId", "fieldId", "fieldValue"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "objectType": {
+          "type": "string"
+        },
+        "objectId": {
+          "type": "string"
+        },
+        "fieldId": {
+          "type": "string"
+        }
+      },
+      "required": ["success", "objectType", "objectId", "fieldId"],
+      "additionalProperties": false
+    }
+  }
+}

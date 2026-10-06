@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getEmployee = SlateTool.create(spec, {
@@ -8,8 +8,8 @@ export let getEmployee = SlateTool.create(spec, {
   key: 'get_employee',
   description: `Retrieve detailed information about a specific employee by their ID. Specify which fields to include in the response — common fields include name, email, job title, department, hire date, status, and more. Use the **Get Account Fields** tool to discover all available field names.`,
   instructions: [
-    'Pass the employee ID (use "0" to refer to the currently authenticated user when using OAuth).',
-    'Specify at least one field name to retrieve. Field names are camelCase (e.g., "firstName", "lastName", "workEmail", "jobTitle", "department", "hireDate", "status").'
+    'Use the internal employee ID; "0" resolves the authenticated caller. A service account without an employee record returns only id "0".',
+    'Request up to 400 exact field IDs from get_account_fields. Fields omitted because of permissions are not evidence that an employee value is empty.'
   ],
   tags: {
     readOnly: true,
@@ -37,19 +37,16 @@ export let getEmployee = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getEmployee(ctx.input.employeeId, ctx.input.fields);
 
     return {
       output: {
-        employeeId: data.id || ctx.input.employeeId,
+        employeeId: data.id,
         fields: data
       },
-      message: `Retrieved employee **${data.displayName || `${data.firstName} ${data.lastName}` || ctx.input.employeeId}** with ${ctx.input.fields.length} fields.`
+      message: `Retrieved employee **${data.id}**. Requested fields may be omitted by BambooHR permissions.`
     };
   })
   .build();

@@ -1,12 +1,184 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+import { klipSchema, pathId, validateInput } from './contracts';
 
 export class Client {
   private axios;
+  private nextRequestAt = 0;
 
   constructor(private config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://app.klipfolio.com/api/1.0'
+    if (
+      typeof config.token !== 'string' ||
+      !config.token.trim() ||
+      /[\r\n]/.test(config.token)
+    )
+      throw createApiServiceError('A nonempty Klipfolio API key is required.', {
+        reason: 'invalid_auth'
+      });
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://app.klipfolio.com/api/1.0',
+      timeout: 30000,
+      maxRedirects: 0,
+      authHeader: { name: 'kf-api-key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Klipfolio',
+          reason: 'upstream_error',
+          parent: {},
+          formatMessage: ({ status, message }) =>
+            `Klipfolio API request failed${typeof status === 'number' ? ` (HTTP ${status})` : ''}: ${message}`,
+          extractMessage: () =>
+            'Check API key permissions, account feature access, request fields and rate limits; response details are concealed.'
+        })
     });
+    this.axios.interceptors.request.use(async request => {
+      if (isApiErrorRecord(request.params)) {
+        const { limit, offset } = request.params;
+        validateInput({
+          limit: limit === undefined ? undefined : Number(limit),
+          offset: offset === undefined ? undefined : Number(offset)
+        });
+      }
+      const wait = Math.max(0, this.nextRequestAt - Date.now());
+      this.nextRequestAt = Date.now() + wait + 220;
+      if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
+      return request;
+    });
+    this.axios.interceptors.response.use(response => {
+      const envelope = response.data;
+      if (!isApiErrorRecord(envelope))
+        throw createApiServiceError('Klipfolio returned an invalid JSON response.', {
+          reason: 'invalid_response'
+        });
+      const meta = isApiErrorRecord(envelope.meta) ? envelope.meta : {};
+      if (meta.success === false || (typeof meta.status === 'number' && meta.status >= 400))
+        throw createApiServiceError(
+          'Klipfolio rejected the request. Check permissions, account features and request fields; response details are concealed.',
+          {
+            reason: 'upstream_error',
+            upstreamStatus: typeof meta.status === 'number' ? meta.status : undefined
+          }
+        );
+      if (response.config.method !== 'get' && meta.success !== true)
+        throw createApiServiceError(
+          'Klipfolio did not confirm this change. Read the resource back before retrying.',
+          { reason: 'invalid_response' }
+        );
+      if (response.config.method === 'get' && !Object.hasOwn(envelope, 'data'))
+        throw createApiServiceError('Klipfolio returned no resource data.', {
+          reason: 'invalid_response'
+        });
+      const resourcePath = response.config.url?.match(
+        /^\/(?:clients|tabs|klips|datasources|datasource-instances|users|roles|groups|dashboard-published-links)\/([^/]+)$/
+      );
+      if (
+        response.config.method === 'get' &&
+        (response.config.url === '/profile' || resourcePath) &&
+        (!isApiErrorRecord(envelope.data) ||
+          typeof envelope.data.id !== 'string' ||
+          !envelope.data.id.trim() ||
+          (resourcePath && envelope.data.id !== decodeURIComponent(resourcePath[1]!)))
+      )
+        throw createApiServiceError('Klipfolio returned an invalid resource identity.', {
+          reason: 'invalid_response'
+        });
+      response.data = /\/datasource-instances\/[^/]+\/data$/.test(response.config.url ?? '')
+        ? { ...envelope, data: this.concealFileData(envelope.data) }
+        : this.conceal(
+            envelope,
+            '',
+            /^\/datasources(?:\/|$)/.test(response.config.url ?? ''),
+            /\/(?:schema|layout)$/.test(response.config.url ?? '')
+          );
+      return response;
+    });
+  }
+
+  // Stored source data is user-requested content, not connector configuration.
+  // Preserve its structure and nulls; remove the configured API key from keys and values.
+  private concealFileData(value: unknown): unknown {
+    if (typeof value === 'string') return value.split(this.config.token).join('[concealed]');
+    if (Array.isArray(value)) return value.map(item => this.concealFileData(item));
+    if (isApiErrorRecord(value))
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [
+          key.split(this.config.token).join('[concealed]'),
+          this.concealFileData(item)
+        ])
+      );
+    return value;
+  }
+
+  private conceal(
+    value: unknown,
+    key = '',
+    hideProperties = false,
+    preserveNulls = false
+  ): unknown {
+    if (key === 'properties' && hideProperties) {
+      if (isApiErrorRecord(value))
+        return Object.fromEntries(
+          Object.keys(value).map(name => [
+            name.split(this.config.token).join('[concealed]'),
+            '[concealed]'
+          ])
+        );
+      return '[concealed]';
+    }
+    if (
+      /^(?:password|token|api[_-]?key|secret|authorization|credentials|access_token|refresh_token)$/i.test(
+        key
+      )
+    )
+      return '[concealed]';
+    if (value === null) return preserveNulls ? null : undefined;
+    if (typeof value === 'string') return value.split(this.config.token).join('[concealed]');
+    if (Array.isArray(value))
+      return value.map(item => this.conceal(item, '', hideProperties, preserveNulls));
+    if (isApiErrorRecord(value)) {
+      return Object.fromEntries(
+        Object.entries(value).map(([name, item]) => [
+          name.split(this.config.token).join('[concealed]'),
+          this.conceal(item, name, hideProperties, preserveNulls)
+        ])
+      );
+    }
+    return value;
+  }
+
+  private listResponse(response: any, key: string) {
+    const data = response.data;
+    const rows = Array.isArray(data)
+      ? data
+      : (data?.[key] ?? (key === 'tabs' && typeof data?.id === 'string' ? [data] : undefined));
+    if (
+      !Array.isArray(rows) ||
+      !rows.every(row => isApiErrorRecord(row) && typeof row.id === 'string' && row.id.trim())
+    )
+      throw createApiServiceError(`Klipfolio returned an invalid ${key} collection.`, {
+        reason: 'invalid_response'
+      });
+    const total = response.meta?.total;
+    if (total !== undefined && (!Number.isSafeInteger(total) || total < 0))
+      throw createApiServiceError('Klipfolio returned an invalid collection total.', {
+        reason: 'invalid_response'
+      });
+    return { ...response, data: rows };
+  }
+
+  async listGroups(opts?: { clientId?: string; limit?: number; offset?: number }) {
+    const response = await this.axios.get('/groups', {
+      params: {
+        client_id: opts?.clientId,
+        limit: opts?.limit,
+        offset: opts?.offset
+      }
+    });
+    return this.listResponse(response.data, 'groups');
   }
 
   private get headers() {
@@ -41,13 +213,13 @@ export class Client {
     if (opts?.limit !== undefined) params.limit = String(opts.limit);
     if (opts?.offset !== undefined) params.offset = String(opts.offset);
     let response = await this.axios.get('/clients', { headers: this.headers, params });
-    return response.data;
+    return this.listResponse(response.data, 'clients');
   }
 
   async getClient(clientId: string, full?: boolean) {
     let params: Record<string, string> = {};
     if (full) params.full = 'true';
-    let response = await this.axios.get(`/clients/${clientId}`, {
+    let response = await this.axios.get(`/clients/${pathId(clientId)}`, {
       headers: this.headers,
       params
     });
@@ -86,14 +258,16 @@ export class Client {
     if (data.status !== undefined) body.status = data.status;
     if (data.seats !== undefined) body.seats = data.seats;
     if (data.externalId !== undefined) body.external_id = data.externalId;
-    let response = await this.axios.put(`/clients/${clientId}`, body, {
+    let response = await this.axios.put(`/clients/${pathId(clientId)}`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
   async deleteClient(clientId: string) {
-    let response = await this.axios.delete(`/clients/${clientId}`, { headers: this.headers });
+    let response = await this.axios.delete(`/clients/${pathId(clientId)}`, {
+      headers: this.headers
+    });
     return response.data;
   }
 
@@ -111,13 +285,16 @@ export class Client {
     if (opts?.limit !== undefined) params.limit = String(opts.limit);
     if (opts?.offset !== undefined) params.offset = String(opts.offset);
     let response = await this.axios.get('/tabs', { headers: this.headers, params });
-    return response.data;
+    return this.listResponse(response.data, 'tabs');
   }
 
   async getTab(tabId: string, full?: boolean) {
     let params: Record<string, string> = {};
     if (full) params.full = 'true';
-    let response = await this.axios.get(`/tabs/${tabId}`, { headers: this.headers, params });
+    let response = await this.axios.get(`/tabs/${pathId(tabId)}`, {
+      headers: this.headers,
+      params
+    });
     return response.data?.data;
   }
 
@@ -133,19 +310,23 @@ export class Client {
     let body: Record<string, any> = {};
     if (data.name !== undefined) body.name = data.name;
     if (data.description !== undefined) body.description = data.description;
-    let response = await this.axios.put(`/tabs/${tabId}`, body, { headers: this.headers });
+    let response = await this.axios.put(`/tabs/${pathId(tabId)}`, body, {
+      headers: this.headers
+    });
     return response.data;
   }
 
   async deleteTab(tabId: string) {
-    let response = await this.axios.delete(`/tabs/${tabId}`, { headers: this.headers });
+    let response = await this.axios.delete(`/tabs/${pathId(tabId)}`, {
+      headers: this.headers
+    });
     return response.data;
   }
 
   // ── Tab Sub-Resources ──
 
   async getTabShareRights(tabId: string) {
-    let response = await this.axios.get(`/tabs/${tabId}/share-rights`, {
+    let response = await this.axios.get(`/tabs/${pathId(tabId)}/share-rights`, {
       headers: this.headers
     });
     return response.data?.data;
@@ -156,21 +337,24 @@ export class Client {
     groups: Array<{ groupId: string; canEdit: boolean }>
   ) {
     let body = { groups: groups.map(g => ({ group_id: g.groupId, can_edit: g.canEdit })) };
-    let response = await this.axios.put(`/tabs/${tabId}/share-rights`, body, {
+    let response = await this.axios.put(`/tabs/${pathId(tabId)}/share-rights`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
   async deleteTabShareRight(tabId: string, groupId: string) {
-    let response = await this.axios.delete(`/tabs/${tabId}/share-rights/${groupId}`, {
-      headers: this.headers
-    });
+    let response = await this.axios.delete(
+      `/tabs/${pathId(tabId)}/share-rights/${pathId(groupId)}`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
   async getTabKlipInstances(tabId: string) {
-    let response = await this.axios.get(`/tabs/${tabId}/klip-instances`, {
+    let response = await this.axios.get(`/tabs/${pathId(tabId)}/klip-instances`, {
       headers: this.headers
     });
     return response.data?.data;
@@ -183,26 +367,31 @@ export class Client {
     let body = {
       klips: klips.map(k => ({ klip_id: k.klipId, region: k.region, position: k.position }))
     };
-    let response = await this.axios.put(`/tabs/${tabId}/klip-instances`, body, {
+    let response = await this.axios.put(`/tabs/${pathId(tabId)}/klip-instances`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
   async removeKlipFromTab(tabId: string, instanceId: string) {
-    let response = await this.axios.delete(`/tabs/${tabId}/klip-instances/${instanceId}`, {
-      headers: this.headers
-    });
+    let response = await this.axios.delete(
+      `/tabs/${pathId(tabId)}/klip-instances/${pathId(instanceId)}`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
   async getTabLayout(tabId: string) {
-    let response = await this.axios.get(`/tabs/${tabId}/layout`, { headers: this.headers });
+    let response = await this.axios.get(`/tabs/${pathId(tabId)}/layout`, {
+      headers: this.headers
+    });
     return response.data?.data;
   }
 
   async updateTabLayout(tabId: string, layout: { type: string; state: Record<string, any> }) {
-    let response = await this.axios.put(`/tabs/${tabId}/layout`, layout, {
+    let response = await this.axios.put(`/tabs/${pathId(tabId)}/layout`, layout, {
       headers: this.headers
     });
     return response.data;
@@ -222,13 +411,16 @@ export class Client {
     if (opts?.limit !== undefined) params.limit = String(opts.limit);
     if (opts?.offset !== undefined) params.offset = String(opts.offset);
     let response = await this.axios.get('/klips', { headers: this.headers, params });
-    return response.data;
+    return this.listResponse(response.data, 'klips');
   }
 
   async getKlip(klipId: string, full?: boolean) {
     let params: Record<string, string> = {};
     if (full) params.full = 'true';
-    let response = await this.axios.get(`/klips/${klipId}`, { headers: this.headers, params });
+    let response = await this.axios.get(`/klips/${pathId(klipId)}`, {
+      headers: this.headers,
+      params
+    });
     return response.data?.data;
   }
 
@@ -241,7 +433,7 @@ export class Client {
     let body: Record<string, any> = { name: data.name };
     if (data.description !== undefined) body.description = data.description;
     if (data.clientId !== undefined) body.client_id = data.clientId;
-    if (data.schema !== undefined) body.schema = data.schema;
+    if (data.schema !== undefined) body.schema = klipSchema(data.schema);
     let response = await this.axios.post('/klips', body, { headers: this.headers });
     return response.data;
   }
@@ -250,29 +442,44 @@ export class Client {
     let body: Record<string, any> = {};
     if (data.name !== undefined) body.name = data.name;
     if (data.description !== undefined) body.description = data.description;
-    let response = await this.axios.put(`/klips/${klipId}`, body, { headers: this.headers });
-    return response.data;
-  }
-
-  async deleteKlip(klipId: string) {
-    let response = await this.axios.delete(`/klips/${klipId}`, { headers: this.headers });
-    return response.data;
-  }
-
-  async getKlipSchema(klipId: string) {
-    let response = await this.axios.get(`/klips/${klipId}/schema`, { headers: this.headers });
-    return response.data?.data;
-  }
-
-  async updateKlipSchema(klipId: string, schema: any) {
-    let response = await this.axios.put(`/klips/${klipId}/schema`, schema, {
+    let response = await this.axios.put(`/klips/${pathId(klipId)}`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
+  async deleteKlip(klipId: string) {
+    let response = await this.axios.delete(`/klips/${pathId(klipId)}`, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
+  async getKlipSchema(klipId: string) {
+    let response = await this.axios.get(`/klips/${pathId(klipId)}/schema`, {
+      headers: this.headers
+    });
+    const schema = response.data?.data?.schema;
+    if (!isApiErrorRecord(schema))
+      throw createApiServiceError('Klipfolio returned an invalid Klip schema definition.', {
+        reason: 'invalid_response'
+      });
+    return schema;
+  }
+
+  async updateKlipSchema(klipId: string, schema: any) {
+    let response = await this.axios.put(
+      `/klips/${pathId(klipId)}/schema`,
+      klipSchema(schema),
+      {
+        headers: this.headers
+      }
+    );
+    return response.data;
+  }
+
   async getKlipShareRights(klipId: string) {
-    let response = await this.axios.get(`/klips/${klipId}/share-rights`, {
+    let response = await this.axios.get(`/klips/${pathId(klipId)}/share-rights`, {
       headers: this.headers
     });
     return response.data?.data;
@@ -292,13 +499,13 @@ export class Client {
     if (opts?.limit !== undefined) params.limit = String(opts.limit);
     if (opts?.offset !== undefined) params.offset = String(opts.offset);
     let response = await this.axios.get('/datasources', { headers: this.headers, params });
-    return response.data;
+    return this.listResponse(response.data, 'datasources');
   }
 
   async getDatasource(datasourceId: string, full?: boolean) {
     let params: Record<string, string> = {};
     if (full) params.full = 'true';
-    let response = await this.axios.get(`/datasources/${datasourceId}`, {
+    let response = await this.axios.get(`/datasources/${pathId(datasourceId)}`, {
       headers: this.headers,
       params
     });
@@ -335,14 +542,14 @@ export class Client {
     if (data.name !== undefined) body.name = data.name;
     if (data.description !== undefined) body.description = data.description;
     if (data.refreshInterval !== undefined) body.refresh_interval = data.refreshInterval;
-    let response = await this.axios.put(`/datasources/${datasourceId}`, body, {
+    let response = await this.axios.put(`/datasources/${pathId(datasourceId)}`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
   async deleteDatasource(datasourceId: string) {
-    let response = await this.axios.delete(`/datasources/${datasourceId}`, {
+    let response = await this.axios.delete(`/datasources/${pathId(datasourceId)}`, {
       headers: this.headers
     });
     return response.data;
@@ -358,7 +565,7 @@ export class Client {
 
   async enableDatasource(datasourceId: string) {
     let response = await this.axios.post(
-      `/datasources/${datasourceId}/@/enable`,
+      `/datasources/${pathId(datasourceId)}/@/enable`,
       {},
       { headers: this.headers }
     );
@@ -367,7 +574,7 @@ export class Client {
 
   async disableDatasource(datasourceId: string) {
     let response = await this.axios.post(
-      `/datasources/${datasourceId}/@/disable`,
+      `/datasources/${pathId(datasourceId)}/@/disable`,
       {},
       { headers: this.headers }
     );
@@ -375,7 +582,7 @@ export class Client {
   }
 
   async getDatasourceProperties(datasourceId: string) {
-    let response = await this.axios.get(`/datasources/${datasourceId}/properties`, {
+    let response = await this.axios.get(`/datasources/${pathId(datasourceId)}/properties`, {
       headers: this.headers
     });
     return response.data?.data;
@@ -383,15 +590,15 @@ export class Client {
 
   async updateDatasourceProperties(datasourceId: string, properties: Record<string, any>) {
     let response = await this.axios.put(
-      `/datasources/${datasourceId}/properties`,
-      properties,
+      `/datasources/${pathId(datasourceId)}/properties`,
+      { properties },
       { headers: this.headers }
     );
     return response.data;
   }
 
   async getDatasourceShareRights(datasourceId: string) {
-    let response = await this.axios.get(`/datasources/${datasourceId}/share-rights`, {
+    let response = await this.axios.get(`/datasources/${pathId(datasourceId)}/share-rights`, {
       headers: this.headers
     });
     return response.data?.data;
@@ -414,9 +621,13 @@ export class Client {
         can_edit: g.canEdit
       }));
     }
-    let response = await this.axios.put(`/datasources/${datasourceId}/share-rights`, body, {
-      headers: this.headers
-    });
+    let response = await this.axios.put(
+      `/datasources/${pathId(datasourceId)}/share-rights`,
+      body,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -437,18 +648,18 @@ export class Client {
       headers: this.headers,
       params
     });
-    return response.data;
+    return this.listResponse(response.data, 'datasources');
   }
 
   async getDatasourceInstance(instanceId: string) {
-    let response = await this.axios.get(`/datasource-instances/${instanceId}`, {
+    let response = await this.axios.get(`/datasource-instances/${pathId(instanceId)}`, {
       headers: this.headers
     });
     return response.data?.data;
   }
 
   async getDatasourceInstanceData(instanceId: string) {
-    let response = await this.axios.get(`/datasource-instances/${instanceId}/data`, {
+    let response = await this.axios.get(`/datasource-instances/${pathId(instanceId)}/data`, {
       headers: this.headers
     });
     return response.data?.data;
@@ -456,7 +667,7 @@ export class Client {
 
   async refreshDatasourceInstance(instanceId: string) {
     let response = await this.axios.post(
-      `/datasource-instances/${instanceId}/@/refresh`,
+      `/datasource-instances/${pathId(instanceId)}/@/refresh`,
       {},
       { headers: this.headers }
     );
@@ -483,13 +694,16 @@ export class Client {
     if (opts?.limit !== undefined) params.limit = String(opts.limit);
     if (opts?.offset !== undefined) params.offset = String(opts.offset);
     let response = await this.axios.get('/users', { headers: this.headers, params });
-    return response.data;
+    return this.listResponse(response.data, 'users');
   }
 
   async getUser(userId: string, full?: boolean) {
     let params: Record<string, string> = {};
     if (full) params.full = 'true';
-    let response = await this.axios.get(`/users/${userId}`, { headers: this.headers, params });
+    let response = await this.axios.get(`/users/${pathId(userId)}`, {
+      headers: this.headers,
+      params
+    });
     return response.data?.data;
   }
 
@@ -504,7 +718,11 @@ export class Client {
     sendEmail?: boolean;
   }) {
     let params: Record<string, string> = {};
-    if (data.sendEmail) params.send_email = 'true';
+    params.send_email = data.sendEmail === true ? 'true' : 'false';
+    if (!data.roles?.length)
+      throw createApiServiceError('At least one role ID is required when creating a user.', {
+        reason: 'invalid_input'
+      });
     let body: Record<string, any> = {
       first_name: data.firstName,
       last_name: data.lastName,
@@ -527,23 +745,29 @@ export class Client {
     if (data.lastName !== undefined) body.last_name = data.lastName;
     if (data.email !== undefined) body.email = data.email;
     if (data.externalId !== undefined) body.external_id = data.externalId;
-    let response = await this.axios.put(`/users/${userId}`, body, { headers: this.headers });
+    let response = await this.axios.put(`/users/${pathId(userId)}`, body, {
+      headers: this.headers
+    });
     return response.data;
   }
 
   async deleteUser(userId: string) {
-    let response = await this.axios.delete(`/users/${userId}`, { headers: this.headers });
+    let response = await this.axios.delete(`/users/${pathId(userId)}`, {
+      headers: this.headers
+    });
     return response.data;
   }
 
   async getUserGroups(userId: string) {
-    let response = await this.axios.get(`/users/${userId}/groups`, { headers: this.headers });
+    let response = await this.axios.get(`/users/${pathId(userId)}/groups`, {
+      headers: this.headers
+    });
     return response.data?.data;
   }
 
   async addUserToGroup(userId: string, groupId: string) {
     let response = await this.axios.put(
-      `/users/${userId}/groups/${groupId}`,
+      `/users/${pathId(userId)}/groups/${pathId(groupId)}`,
       {},
       { headers: this.headers }
     );
@@ -551,14 +775,17 @@ export class Client {
   }
 
   async removeUserFromGroup(userId: string, groupId: string) {
-    let response = await this.axios.delete(`/users/${userId}/groups/${groupId}`, {
-      headers: this.headers
-    });
+    let response = await this.axios.delete(
+      `/users/${pathId(userId)}/groups/${pathId(groupId)}`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
   async getUserTabInstances(userId: string) {
-    let response = await this.axios.get(`/users/${userId}/tab-instances`, {
+    let response = await this.axios.get(`/users/${pathId(userId)}/tab-instances`, {
       headers: this.headers
     });
     return response.data?.data;
@@ -566,16 +793,19 @@ export class Client {
 
   async addTabsToUser(userId: string, tabIds: string[]) {
     let body = { tab_ids: tabIds };
-    let response = await this.axios.put(`/users/${userId}/tab-instances`, body, {
+    let response = await this.axios.put(`/users/${pathId(userId)}/tab-instances`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
   async removeTabFromUser(userId: string, tabInstanceId: string) {
-    let response = await this.axios.delete(`/users/${userId}/tab-instances/${tabInstanceId}`, {
-      headers: this.headers
-    });
+    let response = await this.axios.delete(
+      `/users/${pathId(userId)}/tab-instances/${pathId(tabInstanceId)}`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -593,13 +823,16 @@ export class Client {
     if (opts?.limit !== undefined) params.limit = String(opts.limit);
     if (opts?.offset !== undefined) params.offset = String(opts.offset);
     let response = await this.axios.get('/roles', { headers: this.headers, params });
-    return response.data;
+    return this.listResponse(response.data, 'roles');
   }
 
   async getRole(roleId: string, full?: boolean) {
     let params: Record<string, string> = {};
     if (full) params.full = 'true';
-    let response = await this.axios.get(`/roles/${roleId}`, { headers: this.headers, params });
+    let response = await this.axios.get(`/roles/${pathId(roleId)}`, {
+      headers: this.headers,
+      params
+    });
     return response.data?.data;
   }
 
@@ -619,39 +852,54 @@ export class Client {
     if (data.name !== undefined) body.name = data.name;
     if (data.description !== undefined) body.description = data.description;
     if (data.permissions !== undefined) body.permissions = data.permissions;
-    let response = await this.axios.put(`/roles/${roleId}`, body, { headers: this.headers });
+    let response = await this.axios.put(`/roles/${pathId(roleId)}`, body, {
+      headers: this.headers
+    });
     return response.data;
   }
 
   async deleteRole(roleId: string) {
-    let response = await this.axios.delete(`/roles/${roleId}`, { headers: this.headers });
+    let response = await this.axios.delete(`/roles/${pathId(roleId)}`, {
+      headers: this.headers
+    });
     return response.data;
   }
 
   async getRolePermissions(roleId: string) {
-    let response = await this.axios.get(`/roles/${roleId}/permissions`, {
+    let response = await this.axios.get(`/roles/${pathId(roleId)}/permissions`, {
       headers: this.headers
     });
-    return response.data?.data;
+    const permissions = response.data?.data?.permissions;
+    if (!Array.isArray(permissions) || !permissions.every(value => typeof value === 'string'))
+      throw createApiServiceError('Klipfolio returned invalid role permissions.', {
+        reason: 'invalid_response'
+      });
+    return permissions;
   }
 
-  async updateRolePermissions(roleId: string, permissions: Record<string, any>) {
-    let response = await this.axios.put(`/roles/${roleId}/permissions`, permissions, {
-      headers: this.headers
-    });
+  async updateRolePermissions(roleId: string, permissions: string[]) {
+    let response = await this.axios.put(
+      `/roles/${pathId(roleId)}/permissions`,
+      { permissions },
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
   // ── Groups ──
 
   async getGroupUsers(groupId: string) {
-    let response = await this.axios.get(`/groups/${groupId}/users`, { headers: this.headers });
+    let response = await this.axios.get(`/groups/${pathId(groupId)}/users`, {
+      headers: this.headers
+    });
     return response.data?.data;
   }
 
   async addUserToGroupDirect(groupId: string, userId: string) {
     let response = await this.axios.put(
-      `/groups/${groupId}/users/${userId}`,
+      `/groups/${pathId(groupId)}/users/${pathId(userId)}`,
       {},
       { headers: this.headers }
     );
@@ -659,14 +907,17 @@ export class Client {
   }
 
   async removeUserFromGroupDirect(groupId: string, userId: string) {
-    let response = await this.axios.delete(`/groups/${groupId}/users/${userId}`, {
-      headers: this.headers
-    });
+    let response = await this.axios.delete(
+      `/groups/${pathId(groupId)}/users/${pathId(userId)}`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
   async getGroupDefaultTabs(groupId: string) {
-    let response = await this.axios.get(`/groups/${groupId}/default-tabs`, {
+    let response = await this.axios.get(`/groups/${pathId(groupId)}/default-tabs`, {
       headers: this.headers
     });
     return response.data?.data;
@@ -680,7 +931,7 @@ export class Client {
     if (data.canEdit !== undefined) body.can_edit = data.canEdit;
     if (data.visibility !== undefined) body.visibility = data.visibility;
     if (data.index !== undefined) body.index = data.index;
-    let response = await this.axios.post(`/groups/${groupId}/default-tabs`, body, {
+    let response = await this.axios.post(`/groups/${pathId(groupId)}/default-tabs`, body, {
       headers: this.headers
     });
     return response.data;
@@ -696,7 +947,7 @@ export class Client {
     if (data.visibility !== undefined) body.visibility = data.visibility;
     if (data.index !== undefined) body.index = data.index;
     let response = await this.axios.put(
-      `/groups/${groupId}/default-tabs/${defaultTabId}`,
+      `/groups/${pathId(groupId)}/default-tabs/${pathId(defaultTabId)}`,
       body,
       { headers: this.headers }
     );
@@ -704,9 +955,12 @@ export class Client {
   }
 
   async deleteGroupDefaultTab(groupId: string, defaultTabId: string) {
-    let response = await this.axios.delete(`/groups/${groupId}/default-tabs/${defaultTabId}`, {
-      headers: this.headers
-    });
+    let response = await this.axios.delete(
+      `/groups/${pathId(groupId)}/default-tabs/${pathId(defaultTabId)}`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -718,6 +972,11 @@ export class Client {
     limit?: number;
     offset?: number;
   }) {
+    if (!opts?.dashboardId)
+      throw createApiServiceError(
+        'Provide dashboardId to list its published links; discover dashboard IDs with list_dashboards.',
+        { reason: 'invalid_input' }
+      );
     let params: Record<string, string> = {};
     if (opts?.clientId) params.client_id = opts.clientId;
     if (opts?.dashboardId) params.dashboard_id = opts.dashboardId;
@@ -727,11 +986,11 @@ export class Client {
       headers: this.headers,
       params
     });
-    return response.data;
+    return this.listResponse(response.data, 'published_links');
   }
 
   async getPublishedLink(linkId: string) {
-    let response = await this.axios.get(`/dashboard-published-links/${linkId}`, {
+    let response = await this.axios.get(`/dashboard-published-links/${pathId(linkId)}`, {
       headers: this.headers
     });
     return response.data?.data;
@@ -748,16 +1007,28 @@ export class Client {
       logo?: string;
     }
   ) {
+    if (data.description !== undefined)
+      throw createApiServiceError(
+        'Published links do not support description in the documented Klips API. Use name instead.',
+        { reason: 'invalid_input' }
+      );
     let body: Record<string, any> = {};
+    if (!data.name?.trim())
+      throw createApiServiceError('A name is required when creating a published link.', {
+        reason: 'invalid_input'
+      });
     if (data.name !== undefined) body.name = data.name;
     if (data.password !== undefined) body.password = data.password;
-    if (data.description !== undefined) body.description = data.description;
     if (data.isPublic !== undefined) body.isPublic = data.isPublic;
     if (data.theme !== undefined) body.theme = data.theme;
     if (data.logo !== undefined) body.logo = data.logo;
-    let response = await this.axios.post(`/dashboard-published-links/${dashboardId}`, body, {
-      headers: this.headers
-    });
+    let response = await this.axios.post(
+      `/dashboard-published-links/${pathId(dashboardId)}`,
+      body,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -772,21 +1043,25 @@ export class Client {
       logo?: string;
     }
   ) {
+    if (data.description !== undefined)
+      throw createApiServiceError(
+        'Published links do not support description in the documented Klips API. Use name instead.',
+        { reason: 'invalid_input' }
+      );
     let body: Record<string, any> = {};
     if (data.name !== undefined) body.name = data.name;
     if (data.password !== undefined) body.password = data.password;
-    if (data.description !== undefined) body.description = data.description;
     if (data.isPublic !== undefined) body.isPublic = data.isPublic;
     if (data.theme !== undefined) body.theme = data.theme;
     if (data.logo !== undefined) body.logo = data.logo;
-    let response = await this.axios.put(`/dashboard-published-links/${linkId}`, body, {
+    let response = await this.axios.put(`/dashboard-published-links/${pathId(linkId)}`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
   async deletePublishedLink(linkId: string) {
-    let response = await this.axios.delete(`/dashboard-published-links/${linkId}`, {
+    let response = await this.axios.delete(`/dashboard-published-links/${pathId(linkId)}`, {
       headers: this.headers
     });
     return response.data;

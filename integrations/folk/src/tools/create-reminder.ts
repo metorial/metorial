@@ -1,17 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { assignedUserReferences, Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let createReminder = SlateTool.create(spec, {
   name: 'Create Reminder',
   key: 'create_reminder',
-  description: `Creates a new reminder associated with a person, company, or deal. Reminders use iCalendar recurrence rules (DTSTART + RRULE) for scheduling and can be assigned to specific users.`,
+  description: `DEPRECATED — use manage_task for current task workflows. Creates a new reminder associated with a person, company, or deal. Reminders use iCalendar recurrence rules (DTSTART + RRULE) for scheduling and can be assigned to specific users.`,
   instructions: [
-    'The recurrenceRule must follow iCalendar format with DTSTART and RRULE, e.g. "DTSTART:20250101T090000Z\\nRRULE:FREQ=WEEKLY;INTERVAL=1".',
-    'Public reminders require at least one assigned user.'
+    'Prefer manage_task. Reminder endpoints remain supported until the provider sunset in February 2027; tasks have distinct scheduling and completion semantics.',
+    'The recurrenceRule must follow iCalendar format with DTSTART and RRULE, e.g. "DTSTART;TZID=Etc/UTC:20270101T090000\\nRRULE:COUNT=1".',
+    'Public reminders require 1–50 assigned users. Omit assignedUsers for private reminders; the API key owner is automatically notified.'
   ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }
@@ -30,7 +32,7 @@ export let createReminder = SlateTool.create(spec, {
           })
         )
         .optional()
-        .describe('Users to assign (required for public reminders)')
+        .describe('1–50 users for public reminders; omit for private reminders.')
     })
   )
   .output(
@@ -71,10 +73,7 @@ export let createReminder = SlateTool.create(spec, {
     };
 
     if (ctx.input.assignedUsers) {
-      input.assignedUsers = ctx.input.assignedUsers.map(u => {
-        if (u.userId) return { id: u.userId };
-        return { email: u.userEmail };
-      });
+      input.assignedUsers = assignedUserReferences(ctx.input.assignedUsers);
     }
 
     let reminder = await client.createReminder(input);

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { V0Client } from '../lib/client';
 import { spec } from '../spec';
@@ -21,20 +21,26 @@ let chatOutputSchema = z.object({
 export let createChatTool = SlateTool.create(spec, {
   name: 'Create Chat',
   key: 'create_chat',
-  description: `Start a new AI code generation session by sending a natural language prompt to V0. The AI will generate web application code based on your message. Optionally provide system context, associate with a project, or configure privacy settings.`,
+  description: `DEPRECATED — use \`create_current_chat\` instead. This tool uses API v1. Start a new AI code generation session by sending a natural language prompt to V0. The AI will generate web application code based on your message. Optionally provide system context, associate with a project, or configure privacy settings.`,
   instructions: [
+    'Use create_current_chat for current API v2 chats. This tool operates only on API v1 chats; v1 IDs cannot be used with v2.',
     'The response includes the generated chat with its latest version containing the AI-generated code.',
     'Use the demoUrl to preview the generated application in an iframe.'
-  ]
+  ],
+  tags: { deprecated: true }
 })
   .input(
     z.object({
-      message: z.string().describe('The prompt describing what to generate'),
+      message: z.string().min(1).describe('The prompt describing what to generate'),
       system: z
         .string()
         .optional()
         .describe('System-level context for frameworks, tools, or coding style'),
-      projectId: z.string().optional().describe('Associate chat with an existing project'),
+      projectId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('Associate chat with an existing project'),
       chatPrivacy: z
         .enum(['public', 'private', 'team-edit', 'team', 'unlisted'])
         .optional()
@@ -50,7 +56,7 @@ export let createChatTool = SlateTool.create(spec, {
       metadata: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Custom key-value metadata (max 50 pairs)')
+        .describe('Custom key-value metadata')
     })
   )
   .output(chatOutputSchema)
@@ -63,7 +69,7 @@ export let createChatTool = SlateTool.create(spec, {
       chatPrivacy: ctx.input.chatPrivacy,
       responseMode: ctx.input.responseMode,
       designSystemId: ctx.input.designSystemId,
-      metadata: ctx.input.metadata as Record<string, string> | undefined
+      metadata: ctx.input.metadata
     });
 
     return {
@@ -89,11 +95,13 @@ export let createChatTool = SlateTool.create(spec, {
 export let initChatTool = SlateTool.create(spec, {
   name: 'Initialize Chat',
   key: 'init_chat',
-  description: `Initialize a new chat from existing source content such as files, a GitHub repository, a component registry, or a zip archive. This enables context-rich AI conversations based on your existing code.`,
+  description: `DEPRECATED — use \`import_current_chat\` instead. This tool uses API v1. Initialize a new chat from existing source content such as files, a GitHub repository, a component registry, or a zip archive. This enables context-rich AI conversations based on your existing code.`,
   instructions: [
+    'Use import_current_chat for current API v2 chats. This tool operates only on API v1 chats; v1 IDs cannot be used with v2.',
     'Set type to "files" when providing inline file content, "repo" for GitHub repos, "registry" for component registries, or "zip" for zip archives.',
-    'When using type "repo", provide the repo.url field with the GitHub repository URL.'
-  ]
+    'When using type "repo", provide repoUrl with the GitHub repository URL.'
+  ],
+  tags: { deprecated: true }
 })
   .input(
     z.object({
@@ -101,12 +109,12 @@ export let initChatTool = SlateTool.create(spec, {
         .enum(['files', 'repo', 'registry', 'zip'])
         .optional()
         .describe('Source content type'),
-      name: z.string().optional().describe('Name for the chat session'),
+      name: z.string().min(1).optional().describe('Name for the chat session'),
       chatPrivacy: z
         .enum(['public', 'private', 'team-edit', 'team', 'unlisted'])
         .optional()
         .describe('Chat visibility setting'),
-      projectId: z.string().optional().describe('Associate with an existing project'),
+      projectId: z.string().min(1).optional().describe('Associate with an existing project'),
       metadata: z
         .record(z.string(), z.string())
         .optional()
@@ -114,48 +122,78 @@ export let initChatTool = SlateTool.create(spec, {
       files: z
         .array(
           z.object({
-            name: z.string().describe('File path (e.g., app/globals.css)'),
+            name: z.string().min(1).describe('File path (e.g., app/globals.css)'),
             content: z.string().describe('File content'),
             locked: z.boolean().optional().describe('Prevent AI from modifying this file')
           })
         )
         .optional()
         .describe('Inline files (when type is "files")'),
-      repoUrl: z.string().optional().describe('GitHub repository URL (when type is "repo")'),
+      repoUrl: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('GitHub repository URL (when type is "repo")'),
       repoBranch: z.string().optional().describe('Git branch name (when type is "repo")'),
       registryUrl: z
         .string()
         .optional()
         .describe('Component registry URL (when type is "registry")'),
-      zipUrl: z.string().optional().describe('ZIP archive URL (when type is "zip")'),
+      zipUrl: z.string().min(1).optional().describe('ZIP archive URL (when type is "zip")'),
       lockAllFiles: z.boolean().optional().describe('Prevent AI from modifying all files'),
-      templateId: z.string().optional().describe('Template ID from V0 system')
+      templateId: z.string().min(1).optional().describe('Template ID from V0 system')
     })
   )
   .output(chatOutputSchema)
   .handleInvocation(async ctx => {
     let client = new V0Client(ctx.auth.token);
 
-    let params: any = {
-      type: ctx.input.type,
+    const sources = [
+      ctx.input.files !== undefined,
+      ctx.input.repoUrl !== undefined,
+      ctx.input.registryUrl !== undefined,
+      ctx.input.zipUrl !== undefined,
+      ctx.input.templateId !== undefined
+    ];
+    if (sources.filter(Boolean).length !== 1)
+      throw createApiServiceError(
+        'Provide exactly one source: files, repoUrl, registryUrl, zipUrl, or templateId.'
+      );
+    const inferredType = ctx.input.files
+      ? 'files'
+      : ctx.input.repoUrl
+        ? 'repo'
+        : ctx.input.registryUrl
+          ? 'registry'
+          : ctx.input.zipUrl
+            ? 'zip'
+            : 'template';
+    const type = ctx.input.type ?? inferredType;
+    if (type !== inferredType)
+      throw createApiServiceError('type must match the provided source.');
+    if (ctx.input.files?.length === 0)
+      throw createApiServiceError('Provide at least one source file.');
+    if (ctx.input.repoBranch !== undefined && type !== 'repo')
+      throw createApiServiceError('repoBranch requires repoUrl.');
+    if (ctx.input.lockAllFiles !== undefined && (type === 'files' || type === 'template'))
+      throw createApiServiceError(
+        'lockAllFiles is supported only for repository, registry, and ZIP imports; use locked on individual files.'
+      );
+    const params: Parameters<V0Client['initChat']>[0] = {
+      type,
       name: ctx.input.name,
       chatPrivacy: ctx.input.chatPrivacy,
       projectId: ctx.input.projectId,
       metadata: ctx.input.metadata,
-      files: ctx.input.files,
-      lockAllFiles: ctx.input.lockAllFiles,
-      templateId: ctx.input.templateId
+      ...(type === 'files' ? { files: ctx.input.files } : {}),
+      ...(type === 'repo'
+        ? { repo: { url: ctx.input.repoUrl!, branch: ctx.input.repoBranch } }
+        : {}),
+      ...(type === 'registry' ? { registry: { url: ctx.input.registryUrl! } } : {}),
+      ...(type === 'zip' ? { zip: { url: ctx.input.zipUrl! } } : {}),
+      ...(type === 'template' ? { templateId: ctx.input.templateId } : {}),
+      ...(ctx.input.lockAllFiles !== undefined ? { lockAllFiles: ctx.input.lockAllFiles } : {})
     };
-
-    if (ctx.input.repoUrl) {
-      params.repo = { url: ctx.input.repoUrl, branch: ctx.input.repoBranch };
-    }
-    if (ctx.input.registryUrl) {
-      params.registry = { url: ctx.input.registryUrl };
-    }
-    if (ctx.input.zipUrl) {
-      params.zip = { url: ctx.input.zipUrl };
-    }
 
     let result = await client.initChat(params);
 

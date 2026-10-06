@@ -18,8 +18,6 @@ import {
   manageUser,
   searchMetabase
 } from './tools';
-import { alertWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     manageAlert,
     managePublicLink
   ],
-  triggers: [alertWebhook]
+  triggers: []
 });

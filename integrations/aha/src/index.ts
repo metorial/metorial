@@ -18,8 +18,6 @@ import {
   manageRelease,
   manageTodo
 } from './tools';
-import { featureChanges, ideaChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     manageTodo,
     listUsers
   ],
-  triggers: [inboundWebhook, featureChanges, ideaChanges]
+  triggers: []
 });

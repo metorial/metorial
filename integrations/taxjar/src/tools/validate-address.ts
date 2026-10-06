@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let validateAddress = SlateTool.create(spec, {
@@ -9,7 +9,8 @@ export let validateAddress = SlateTool.create(spec, {
   description: `Validate a US customer address and receive standardized address matches with ZIP+4 precision. Can return multiple candidate matches when the input is ambiguous.`,
   constraints: [
     'Only US addresses are supported.',
-    'Requires a TaxJar Professional or higher subscription.'
+    'Requires a TaxJar Professional or higher subscription.',
+    'Address validation is not supported in the TaxJar sandbox. ZIP-only matches omit the street.'
   ],
   tags: {
     readOnly: true
@@ -29,10 +30,13 @@ export let validateAddress = SlateTool.create(spec, {
       addresses: z
         .array(
           z.object({
-            zip: z.string().describe('Standardized ZIP+4 code'),
+            zip: z.string().describe('Standardized ZIP or ZIP+4 code'),
             state: z.string().describe('State code'),
             city: z.string().describe('City name'),
-            street: z.string().describe('Standardized street address'),
+            street: z
+              .string()
+              .optional()
+              .describe('Standardized street address, when provided'),
             country: z.string().describe('Country code')
           })
         )
@@ -40,11 +44,7 @@ export let validateAddress = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let addresses = await client.validateAddress({
       country: ctx.input.country,
@@ -58,7 +58,7 @@ export let validateAddress = SlateTool.create(spec, {
       output: { addresses },
       message:
         addresses.length === 1
-          ? `Address validated: **${addresses[0]!.street}, ${addresses[0]!.city}, ${addresses[0]!.state} ${addresses[0]!.zip}**`
+          ? `Address validated: **${[addresses[0]!.street, addresses[0]!.city, addresses[0]!.state, addresses[0]!.zip].filter(Boolean).join(', ')}**`
           : `Found **${addresses.length}** address candidate(s).`
     };
   })

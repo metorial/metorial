@@ -1,6 +1,6 @@
 # Gladia
 
-Transcribe audio and video files to text using asynchronous or real-time streaming modes. Supports 100+ languages with automatic language detection and code-switching. Perform speaker diarization to identify different speakers. Translate transcripts into multiple target languages. Generate summaries, sentiment analysis, named entity recognition, and chapter segmentation from audio. Extract structured data and produce subtitles in SRT/VTT formats. Apply custom vocabulary and spelling corrections, content moderation, and name consistency. Send custom prompts to generate LLM-powered responses from transcripts. Receive results via polling, callback URLs, or account-level webhooks.
+Transcribe audio and video URLs with asynchronous or real-time speech recognition. Discover transcription jobs, retrieve transcripts and audio intelligence, and delete pre-recorded or live results. Configure speaker diarization, translation, summaries, sentiment, entities, custom vocabulary, spelling corrections, and transcript prompts. Receive generated SRT/VTT subtitles as downloadable files. Live sessions return a WebSocket URL for an external audio-streaming client.
 
 ## License
 

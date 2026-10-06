@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/heroku.svg" height="20"> Heroku
 
-Deploy, manage, and scale applications on Heroku's cloud platform. Create and configure apps, scale dynos, provision add-ons (databases, caching, etc.), manage configuration variables, build and release code, add custom domains and SSL certificates, manage collaborators and team permissions, configure pipelines for continuous delivery, set up log drains, and sync data with Salesforce via Heroku Connect. Subscribe to webhooks for real-time notifications on app changes, builds, releases, dyno lifecycle events, and more.
+Deploy, manage, and scale applications on Heroku's cloud platform. Create and configure apps, scale dynos, provision add-ons (databases, caching, etc.), manage configuration variables, build and release code, add custom domains and SSL certificates, manage collaborators and team permissions, configure pipelines for continuous delivery, set up log drains, and sync data with Salesforce via Heroku Connect.
 
 ## Tools
 

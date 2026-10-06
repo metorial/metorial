@@ -1,6 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AshbyClient } from '../lib/client';
+import {
+  id,
+  invalid,
+  mapApplication,
+  pageSchema,
+  row,
+  unexpected,
+  warningsSchema
+} from '../lib/contracts';
 import { spec } from '../spec';
 
 let updateApplicationOutputSchema = z.object({
@@ -18,22 +27,6 @@ let updateApplicationOutputSchema = z.object({
   updatedAt: z.string().describe('Last update timestamp')
 });
 
-let mapUpdatedApplicationToOutput = (results: any) => ({
-  applicationId: results.id,
-  status: results.status,
-  candidateName: results.candidate?.name || '',
-  jobTitle: results.job?.title || '',
-  ...(results.currentInterviewStage
-    ? {
-        currentStage: {
-          stageId: results.currentInterviewStage.id,
-          title: results.currentInterviewStage.title
-        }
-      }
-    : {}),
-  updatedAt: results.updatedAt
-});
-
 export let updateApplicationTool = SlateTool.create(spec, {
   name: 'Update Application',
   key: 'update_application',
@@ -42,10 +35,10 @@ export let updateApplicationTool = SlateTool.create(spec, {
     'Provide the applicationId and at least one action to perform.',
     'To change the interview stage, provide interviewStageId. If moving to an archived stage, also provide archiveReasonId.',
     'To change the source, provide sourceId.',
-    'To transfer to a different job, provide transferToJobId and optionally transferToInterviewPlanId.',
+    'To transfer to a different job, provide transferToJobId, transferToInterviewStageId and a target interview plan; the exact target job default plan is used only when available.',
     'To add a hiring team member, provide addHiringTeamMember with userId and role.',
     'To remove a hiring team member, provide removeHiringTeamMember with userId and role.',
-    'All actions are executed sequentially, and the final application state is returned.'
+    'Actions run sequentially, may retain automation/history, and are not atomic. A partial-write error identifies confirmed prior operations; read exact state before retrying.'
   ],
   tags: {
     destructive: false,
@@ -75,6 +68,18 @@ export let updateApplicationTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('ID of the interview plan to use when transferring to a new job'),
+      transferToInterviewStageId: z
+        .string()
+        .optional()
+        .describe(
+          'Required target stage ID for transfer. Use list_organization interview_stages with the target plan.'
+        ),
+      startAutomaticActivities: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to start the target stage automatic activities on transfer; the provider defaults to true.'
+        ),
       addHiringTeamMember: z
         .object({
           userId: z.string().describe('ID of the user to add to the hiring team'),
@@ -95,71 +100,130 @@ export let updateApplicationTool = SlateTool.create(spec, {
         .describe('Remove a user from the hiring team for this application')
     })
   )
-  .output(updateApplicationOutputSchema)
+  .output(
+    updateApplicationOutputSchema.extend({
+      warnings: warningsSchema,
+      pageInfo: pageSchema.optional(),
+      completedActions: z.array(z.string()).optional()
+    })
+  )
   .handleInvocation(async ctx => {
-    let client = new AshbyClient({ token: ctx.auth.token });
-    let applicationId = ctx.input.applicationId;
-    let actions: string[] = [];
-
-    if (ctx.input.interviewStageId !== undefined) {
-      let stageParams: Record<string, any> = {
-        applicationId,
-        interviewStageId: ctx.input.interviewStageId
-      };
-      if (ctx.input.archiveReasonId !== undefined) {
-        stageParams.archiveReasonId = ctx.input.archiveReasonId;
+    const client = new AshbyClient(ctx.auth),
+      input = ctx.input,
+      applicationId = id(input.applicationId, 'Application ID');
+    const stage =
+        input.interviewStageId === undefined
+          ? undefined
+          : id(input.interviewStageId, 'Interview stage ID'),
+      archiveReasonId =
+        input.archiveReasonId === undefined
+          ? undefined
+          : id(input.archiveReasonId, 'Archive reason ID'),
+      sourceId = input.sourceId === undefined ? undefined : id(input.sourceId, 'Source ID'),
+      targetJob =
+        input.transferToJobId === undefined
+          ? undefined
+          : id(input.transferToJobId, 'Target job ID');
+    if (archiveReasonId !== undefined && stage === undefined)
+      invalid('archiveReasonId applies only to a stage change.');
+    if (
+      targetJob === undefined &&
+      (input.transferToInterviewPlanId !== undefined ||
+        input.transferToInterviewStageId !== undefined ||
+        input.startAutomaticActivities !== undefined)
+    )
+      invalid('Transfer options require transferToJobId.');
+    const transferStage =
+      input.transferToInterviewStageId === undefined
+        ? undefined
+        : id(input.transferToInterviewStageId, 'Target interview stage ID');
+    if (targetJob !== undefined && transferStage === undefined)
+      invalid(
+        'Transfer requires transferToInterviewStageId. Discover the target plan and its stages through list_organization; the API has no default transfer stage.'
+      );
+    const add =
+        input.addHiringTeamMember === undefined
+          ? undefined
+          : {
+              teamMemberId: id(input.addHiringTeamMember.userId, 'Hiring team user ID'),
+              roleId: await client.roleId(input.addHiringTeamMember.role)
+            },
+      remove =
+        input.removeHiringTeamMember === undefined
+          ? undefined
+          : {
+              teamMemberId: id(input.removeHiringTeamMember.userId, 'Hiring team user ID'),
+              roleId: await client.roleId(input.removeHiringTeamMember.role)
+            };
+    let plan =
+      input.transferToInterviewPlanId === undefined
+        ? undefined
+        : id(input.transferToInterviewPlanId, 'Target interview plan ID');
+    if (targetJob !== undefined && plan === undefined) {
+      const job = row((await client.getJob(targetJob)).results);
+      if (job.defaultInterviewPlanId === undefined)
+        invalid(
+          'Target job has no default plan. Provide transferToInterviewPlanId explicitly.'
+        );
+      plan = id(job.defaultInterviewPlanId, 'Target default interview plan ID');
+    }
+    const steps: { label: string; run: () => Promise<unknown> }[] = [];
+    if (stage !== undefined)
+      steps.push({
+        label: 'application.changeStage',
+        run: () =>
+          client.post('/application.changeStage', {
+            applicationId,
+            interviewStageId: stage,
+            archiveReasonId
+          })
+      });
+    if (sourceId !== undefined)
+      steps.push({
+        label: 'application.changeSource',
+        run: () => client.post('/application.changeSource', { applicationId, sourceId })
+      });
+    if (targetJob !== undefined)
+      steps.push({
+        label: 'application.transfer',
+        run: () =>
+          client.post('/application.transfer', {
+            applicationId,
+            jobId: targetJob,
+            interviewPlanId: plan,
+            interviewStageId: transferStage,
+            startAutomaticActivities: input.startAutomaticActivities
+          })
+      });
+    if (add !== undefined)
+      steps.push({
+        label: 'application.addHiringTeamMember',
+        run: () => client.post('/application.addHiringTeamMember', { applicationId, ...add })
+      });
+    if (remove !== undefined)
+      steps.push({
+        label: 'application.removeHiringTeamMember',
+        run: () =>
+          client.post('/application.removeHiringTeamMember', { applicationId, ...remove })
+      });
+    if (!steps.length)
+      invalid('Provide at least one stage, source, transfer or hiring-team change.');
+    let output: ReturnType<typeof mapApplication> | undefined;
+    const completedActions = await client.sequence([
+      ...steps,
+      {
+        label: 'application.readback',
+        run: async () => {
+          output = mapApplication((await client.getApplication(applicationId)).results);
+          if (targetJob !== undefined && output.jobId !== targetJob) unexpected();
+        }
       }
-      await client.changeApplicationStage(stageParams as any);
-      actions.push('changed stage');
-    }
-
-    if (ctx.input.sourceId !== undefined) {
-      await client.changeApplicationSource({
-        applicationId,
-        sourceId: ctx.input.sourceId
-      });
-      actions.push('changed source');
-    }
-
-    if (ctx.input.transferToJobId !== undefined) {
-      let transferParams: Record<string, any> = {
-        applicationId,
-        jobId: ctx.input.transferToJobId
-      };
-      if (ctx.input.transferToInterviewPlanId !== undefined) {
-        transferParams.interviewPlanId = ctx.input.transferToInterviewPlanId;
-      }
-      await client.transferApplication(transferParams as any);
-      actions.push('transferred to new job');
-    }
-
-    if (ctx.input.addHiringTeamMember !== undefined) {
-      await client.addHiringTeamMember({
-        applicationId,
-        userId: ctx.input.addHiringTeamMember.userId,
-        role: ctx.input.addHiringTeamMember.role
-      });
-      actions.push(`added hiring team member`);
-    }
-
-    if (ctx.input.removeHiringTeamMember !== undefined) {
-      await client.removeHiringTeamMember({
-        applicationId,
-        userId: ctx.input.removeHiringTeamMember.userId,
-        role: ctx.input.removeHiringTeamMember.role
-      });
-      actions.push(`removed hiring team member`);
-    }
-
-    let response = await client.getApplication(applicationId);
-    let results = response.results;
-    let output = mapUpdatedApplicationToOutput(results);
-
-    let actionSummary = actions.length > 0 ? actions.join(', ') : 'no changes applied';
-
+    ]);
+    if (!output) unexpected();
     return {
-      output,
-      message: `Updated application **${applicationId}** for **${output.candidateName}** on **${output.jobTitle}**: ${actionSummary}`
+      output: { ...output, warnings: client.warnings, completedActions },
+      message:
+        'Application operations accepted and exact state read back. Operations are not atomic; automatic activities and history may be retained.'
     };
   })
   .build();

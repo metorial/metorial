@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid, validateVariables } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateLead = SlateTool.create(spec, {
@@ -9,7 +9,8 @@ export let updateLead = SlateTool.create(spec, {
   description: `Update a lead's information, custom variables, or interest status. Can update contact details and also change the lead's interest status for a specific campaign.`,
   instructions: [
     'To update interest status, provide the leadEmail and interestValue fields. Interest value can be set to null to reset.',
-    'To update contact details, provide the leadId and the fields to change.'
+    'To update contact details, provide the leadId and the fields to change.',
+    'Interest-status requests run in the background and can change opportunities or trigger campaign automations and CRM-status subsequences. Use campaignId or listId to scope the request and read back before retrying.'
   ]
 })
   .input(
@@ -50,10 +51,33 @@ export let updateLead = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean().describe('Whether the update was successful'),
+      interestUpdateAccepted: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the provider accepted an interest-status request. Read the lead again to confirm the final value.'
+        ),
       leadId: z.string().optional().describe('ID of the updated lead')
     })
   )
   .handleInvocation(async ctx => {
+    validateVariables(ctx.input.customVariables);
+    let hasContactUpdate = [
+      'firstName',
+      'lastName',
+      'companyName',
+      'website',
+      'phone',
+      'personalization',
+      'customVariables'
+    ].some(key => ctx.input[key as keyof typeof ctx.input] !== undefined);
+    let hasInterestUpdate = ctx.input.interestValue !== undefined;
+    if (!hasContactUpdate && !hasInterestUpdate)
+      throw invalid('Provide at least one field to update.');
+    if (hasContactUpdate && !ctx.input.leadId)
+      throw invalid('Provide leadId to update contact details.');
+    if (hasInterestUpdate && !ctx.input.leadEmail)
+      throw invalid('Provide leadEmail to update interest status.');
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.leadId) {
@@ -86,9 +110,11 @@ export let updateLead = SlateTool.create(spec, {
     return {
       output: {
         success: true,
+        interestUpdateAccepted: hasInterestUpdate ? true : undefined,
         leadId: ctx.input.leadId
       },
-      message: `Updated lead${ctx.input.leadId ? ` ${ctx.input.leadId}` : ''}${ctx.input.leadEmail ? ` interest status for ${ctx.input.leadEmail}` : ''}.`
+      message:
+        `${hasContactUpdate ? 'Updated lead contact details.' : ''}${hasInterestUpdate ? ' Submitted the interest-status request; read the lead again to confirm the value.' : ''}`.trim()
     };
   })
   .build();

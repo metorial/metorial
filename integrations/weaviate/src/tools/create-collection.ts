@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -22,18 +22,22 @@ let propertyInputSchema = z.object({
   moduleConfig: z
     .any()
     .optional()
-    .describe('Per-property module configuration (e.g. vectorizer skip settings)')
+    .describe('Per-property module configuration (e.g. vectorizer skip settings)'),
+  nestedProperties: z
+    .array(z.any())
+    .optional()
+    .describe('Nested property definitions for object or object[] types')
 });
 
 export let createCollection = SlateTool.create(spec, {
   name: 'Create Collection',
   key: 'create_collection',
   description: `Create a new collection (class) in Weaviate with its schema definition. Configure properties, vectorizer, generative module, vector index settings, and multi-tenancy.
-The vectorizer and generative module **cannot be changed after creation**.`,
+The vectorizer cannot be changed after creation. Generative configuration is mutable on supported server versions.`,
   instructions: [
     'Collection names must start with an uppercase letter.',
     'Property names must start with a lowercase letter.',
-    'Once a vectorizer or generative module is set, it cannot be changed.'
+    'The vectorizer cannot be changed after creation.'
   ],
   tags: {
     destructive: false
@@ -62,6 +66,10 @@ The vectorizer and generative module **cannot be changed after creation**.`,
           'Generative module name (e.g. generative-openai, generative-cohere, generative-anthropic)'
         ),
       moduleConfig: z.any().optional().describe('Module configuration object'),
+      vectorConfig: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Named vector configurations keyed by vector name'),
       vectorIndexType: z
         .string()
         .optional()
@@ -95,6 +103,14 @@ The vectorizer and generative module **cannot be changed after creation**.`,
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
     let { collectionName, generativeModule, ...rest } = ctx.input;
+    if (
+      rest.vectorConfig &&
+      (rest.vectorizer || rest.vectorIndexType || rest.vectorIndexConfig)
+    ) {
+      throw createApiServiceError(
+        'Use vectorConfig for named vectors, or the legacy vectorizer/vectorIndexType/vectorIndexConfig fields, not both.'
+      );
+    }
 
     let schema: Record<string, any> = {
       class: collectionName,

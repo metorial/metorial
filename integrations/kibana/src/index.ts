@@ -32,8 +32,6 @@ import {
   searchSavedObjects,
   searchSLOs
 } from './tools';
-import { caseChanges, inboundWebhook, ruleStatusChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -68,5 +66,5 @@ export let provider = Slate.create({
     manageRole,
     getKibanaStatus
   ],
-  triggers: [inboundWebhook, ruleStatusChanges, caseChanges]
+  triggers: []
 });

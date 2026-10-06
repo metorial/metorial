@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid, type Note } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageNoteLifecycle = SlateTool.create(spec, {
@@ -63,9 +64,16 @@ export let manageNoteLifecycle = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
     let { noteId, action } = ctx.input;
-    let note: any;
+    let note: Note;
     let actionDescription: string;
 
+    if (
+      (action !== 'verify' && ctx.input.verifyUntil !== undefined) ||
+      (action !== 'flag_outdated' && ctx.input.outdatedReason !== undefined) ||
+      (action !== 'update_owner' &&
+        (ctx.input.ownerUserId !== undefined || ctx.input.ownerGroupId !== undefined))
+    )
+      throw invalid('Provide only fields for the selected lifecycle action.');
     switch (action) {
       case 'verify':
         note = await client.verifyNote(noteId, ctx.input.verifyUntil);
@@ -74,7 +82,7 @@ export let manageNoteLifecycle = SlateTool.create(spec, {
 
       case 'flag_outdated':
         if (!ctx.input.outdatedReason) {
-          throw new Error('outdatedReason is required for the flag_outdated action');
+          throw invalid('outdatedReason is required for the flag_outdated action');
         }
         note = await client.flagNoteAsOutdated(noteId, ctx.input.outdatedReason);
         actionDescription = 'Flagged as outdated';
@@ -92,7 +100,7 @@ export let manageNoteLifecycle = SlateTool.create(spec, {
 
       case 'update_owner':
         if (!ctx.input.ownerUserId && !ctx.input.ownerGroupId) {
-          throw new Error(
+          throw invalid(
             'Either ownerUserId or ownerGroupId is required for the update_owner action'
           );
         }

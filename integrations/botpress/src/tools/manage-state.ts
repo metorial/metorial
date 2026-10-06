@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RuntimeClient } from '../lib/client';
+import { resolveRuntimeParams, runtimeScopeFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageStateTool = SlateTool.create(spec, {
   name: 'Manage State',
   key: 'manage_state',
-  description: `Get or set persistent state for a bot. State is a key-value store scoped to a conversation, user, bot, or workflow. Useful for maintaining context across interactions.`,
+  description: `Get or set persistent state for a bot. State is a key-value store scoped to a conversation, user, bot, or workflow. Useful for maintaining context across interactions. Call list_workspaces to discover workspace IDs, then list_bots to discover bot IDs.`,
   instructions: [
     'Use stateType "conversation" with a conversationId, "user" with a userId, or "bot" with the botId as the resourceId.',
     'Use action "patch" to partially update an existing state without overwriting the entire payload.'
@@ -15,7 +16,7 @@ export let manageStateTool = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['get', 'set', 'patch']).describe('Operation to perform'),
-      botId: z.string().optional().describe('Bot ID. Falls back to config botId.'),
+      ...runtimeScopeFields,
       stateType: z
         .enum(['conversation', 'user', 'bot', 'workflow', 'integration', 'task'])
         .describe('Scope of the state'),
@@ -42,10 +43,14 @@ export let manageStateTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let botId = ctx.input.botId || ctx.config.botId;
-    if (!botId) throw new Error('botId is required (provide in input or config)');
-
-    let client = new RuntimeClient({ token: ctx.auth.token, botId });
+    if (ctx.input.stateType === 'task')
+      throw createApiServiceError(
+        'Botpress does not support task state. Use conversation, user, bot, workflow, or integration state.'
+      );
+    let client = new RuntimeClient({
+      token: ctx.auth.token,
+      ...resolveRuntimeParams(ctx.input, ctx.config)
+    });
 
     if (ctx.input.action === 'get') {
       let result = await client.getState(
@@ -68,7 +73,8 @@ export let manageStateTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'set') {
-      if (!ctx.input.payload) throw new Error('payload is required for set action');
+      if (!ctx.input.payload)
+        throw createApiServiceError('payload is required for set action');
       let result = await client.setState(
         ctx.input.stateType,
         ctx.input.resourceId,
@@ -90,7 +96,8 @@ export let manageStateTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'patch') {
-      if (!ctx.input.payload) throw new Error('payload is required for patch action');
+      if (!ctx.input.payload)
+        throw createApiServiceError('payload is required for patch action');
       let result = await client.patchState(
         ctx.input.stateType,
         ctx.input.resourceId,
@@ -111,6 +118,6 @@ export let manageStateTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

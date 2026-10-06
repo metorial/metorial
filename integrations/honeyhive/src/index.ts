@@ -7,6 +7,13 @@ import {
   updateConfiguration
 } from './tools/manage-configurations';
 import {
+  createDatapoint,
+  deleteDatapoint,
+  getDatapoint,
+  listDatapoints,
+  updateDatapoint
+} from './tools/manage-datapoints';
+import {
   addDatapointsToDataset,
   createDataset,
   deleteDataset,
@@ -34,15 +41,15 @@ import {
   deleteRun,
   getRun,
   getRunResult,
-  listRuns
+  listRuns,
+  updateRun
 } from './tools/manage-runs';
 import { deleteSession, getSession, startSession } from './tools/manage-sessions';
 import { postFeedback } from './tools/post-feedback';
-import { inboundWebhook } from './triggers/inbound-webhook';
-import { newEvents } from './triggers/new-events';
 
 export let provider = Slate.create({
   spec,
+  triggers: [],
   tools: [
     listProjects,
     createProject,
@@ -62,6 +69,11 @@ export let provider = Slate.create({
     updateDataset,
     deleteDataset,
     addDatapointsToDataset,
+    listDatapoints,
+    createDatapoint,
+    getDatapoint,
+    updateDatapoint,
+    deleteDatapoint,
     listConfigurations,
     createConfiguration,
     updateConfiguration,
@@ -72,11 +84,11 @@ export let provider = Slate.create({
     deleteMetric,
     listRuns,
     createRun,
+    updateRun,
     getRun,
     getRunResult,
     compareRuns,
     deleteRun,
     postFeedback
-  ],
-  triggers: [inboundWebhook, newEvents]
+  ]
 });

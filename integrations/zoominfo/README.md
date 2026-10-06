@@ -1,65 +1,30 @@
-# <img src="https://provider-logos.metorial-cdn.com/zoominfo.png" height="20"> Zoominfo
+# ZoomInfo
 
-Search and enrich B2B contact and company data from ZoomInfo's database of over 200 million business profiles. Look up contacts by title, company, location, and other filters. Enrich records with direct dials, email addresses, job titles, firmographics, technographics, corporate hierarchy, and funding details. Access intent data to identify accounts actively researching relevant topics. Retrieve actionable scoops and news about companies. Resolve anonymous website visitors to company-level data via WebSights. Manage data privacy compliance for GDPR and CCPA. Perform bulk search and enrichment operations at scale. Track credit and API usage. Receive real-time webhook notifications when previously enriched contact or company records change.
+Search and enrich B2B contact and company data through ZoomInfo's current GTM Data API. Discover intent topics and accepted filter/output-field values, retrieve scoops and news, inspect corporate hierarchy and technologies, and track request limits and credits.
+
+## Authentication
+
+OAuth PKCE and OAuth Client Credentials use the documented GTM OAuth endpoints. Connections persist their API dialect; older stored connections fall back to the existing apiVersion configuration. Usage access verifies current credentials without claiming that a usage-resource ID is a user identity.
+
+Existing Enterprise username/password and PKI connection keys remain available. PKI requires a ZoomInfo username and signs an RSA assertion locally; the private key is never sent to ZoomInfo. Current public GTM documentation does not establish availability of every legacy endpoint. Confirm Enterprise API availability and entitlement with ZoomInfo before using it.
 
 ## Tools
 
-### Compliance Check
+- Search Contacts and Search Companies return previews with provider IDs. Enrich Contacts and Enrich Companies retrieve selected fields for up to 25 matches.
+- Search Intent and Enrich Intent use subscribed topics from Lookup Data. Current audience strength values are letters A–E; legacy numeric input remains available for Enterprise connections.
+- Search Scoops accepts provider lookup values, keywords and a publishing date.
+- Search News uses categories, URLs or a publishing date. Current company-specific news uses credit-consuming enrichment and requires allowCompanyEnrichment=true. Legacy keyword search remains specific to Enterprise connections.
+- Enrich Corporate Hierarchy and Enrich Technographics inspect a selected company. Name/domain technology lookups require an exact, complete company match; provide companyId when discovery is ambiguous.
+- Get API Usage returns provider usage and credit limits.
+- Lookup Data discovers accepted values. Lookup Fields discovers input/output field names.
+- WebSights IP Lookup and Compliance Check retain their Enterprise contracts. They are absent from the current published GTM Data API and require separately confirmed routes and entitlement. Compliance results do not establish legal compliance or authorize outreach.
 
-Check opt-out and data privacy compliance status for contacts. Supports GDPR and CCPA compliance by identifying contacts who have opted out or have suppression flags. Use to ensure outreach respects contact preferences.
+Search and lookup do not consume enrichment credits, but provider request and record limits still apply. Enrichment can consume credits and retain purchased-record/usage history. Pagination totals are returned only when ZoomInfo supplies them. Current JSON:API records retain their id, type, attributes and matching metadata; NoMatch records are returned but excluded from matchCount.
 
-### Enrich Companies
+The current API has no contact/company CRUD or purchase-history deletion workflow. This integration does not send outreach, manage campaigns or invent administrative cleanup routes.
 
-Retrieve full ZoomInfo company profiles for up to 25 companies per request. Returns detailed firmographics including revenue, employee count, industry, locations, technographics, and corporate hierarchy information. Match by company ID, domain, or name.
-
-### Enrich Contacts
-
-Retrieve full ZoomInfo profiles for up to 25 contacts per request. Returns detailed sales intelligence including direct dials, email addresses, job titles, and company firmographics. You can match by contact ID (from search results), email, or name + company combination.
-
-### Enrich Corporate Hierarchy
-
-Retrieve corporate hierarchy and subsidiary relationships for a company. Returns parent companies, ultimate parent, and subsidiary/child companies in the organizational tree. Useful for understanding company structures and identifying related entities.
-
-### Enrich Intent
-
-Enrich intent data for a specific company. Returns detailed intent signals including topics being researched, signal scores, audience strength, and recommended contacts. Helps understand a specific company's active research interests.
-
-### Enrich Technographics
-
-Retrieve the technology stack installed at a company. Returns information about technologies, software, and tools that a company uses. Useful for competitive intelligence and technology-based targeting.
-
-### Get API Usage
-
-Retrieve current API usage statistics and credit consumption. Returns information about how many credits and API calls have been consumed and how many remain for the current billing period.
-
-### Search Companies
-
-Search ZoomInfo's database of companies using firmographic criteria such as name, location, industry, revenue, and employee count. Returns company previews with basic information. **Does not consume credits.** Use the returned company IDs with the Enrich Company tool for detailed profiles.
-
-### Search Contacts
-
-Search ZoomInfo's database of business contacts using various criteria. Returns contact previews including names, job titles, companies, and data availability indicators. **Does not consume credits.** Use the returned contact IDs with the Enrich Contact tool to retrieve full profiles with emails and phone numbers.
-
-### Search Intent
-
-Search for companies and contacts showing buyer intent signals for specific topics. Returns companies that are actively researching topics your organization subscribes to, along with signal scores and recommended contacts. Use this to identify accounts that are in-market for your solution.
-
-### Search News
-
-Search for recent news about companies in the ZoomInfo database. Returns news articles, press releases, and related coverage. Useful for staying updated on prospects and accounts.
-
-### Search Scoops
-
-Search ZoomInfo Scoops — actionable intelligence leads about internal projects, leadership moves, funding events, and pain points sourced by ZoomInfo's in-house Research Team. Use scoops to time outreach effectively and identify sales opportunities.
-
-### WebSights IP Lookup
-
-Resolve IP addresses to company-level data using ZoomInfo WebSights. Identifies anonymous website visitors by mapping their IP addresses to firmographic details, enabling account-based marketing plays and alerting sales to engaged accounts. Supports both IPv4 and IPv6.
+Official reference: [GTM Data API](https://docs.gtm.ai/reference/data-api-overview), [OAuth](https://docs.gtm.ai/docs/authorization-code-flow-pkce), [API usage](https://docs.gtm.ai/reference/userinterface_userusage).
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

@@ -24,8 +24,19 @@ export let listBatches = SlateTool.create(spec, {
         .describe('Include detailed progress information for each batch'),
       startTime: z.string().optional().describe('Minimum creation date (ISO 8601)'),
       endTime: z.string().optional().describe('Maximum creation date (ISO 8601)'),
-      limit: z.number().optional().describe('Max number of batches to return'),
-      offset: z.number().optional().describe('Number of batches to skip (for pagination)')
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .max(100)
+        .optional()
+        .describe('Max number of batches to return (1-100)'),
+      offset: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Number of batches to skip (for pagination)')
     })
   )
   .output(
@@ -41,7 +52,10 @@ export let listBatches = SlateTool.create(spec, {
             })
             .passthrough()
         )
-        .describe('List of batches')
+        .describe('List of batches'),
+      total: z.number().optional().describe('Total number of matching batches'),
+      hasMore: z.boolean().optional().describe('Whether another page is available'),
+      nextOffset: z.number().optional().describe('Offset to pass for the next page')
     })
   )
   .handleInvocation(async ctx => {
@@ -68,7 +82,14 @@ export let listBatches = SlateTool.create(spec, {
     }));
 
     return {
-      output: { batches: mapped },
+      output: {
+        batches: mapped,
+        total: result.totalDocs ?? result.total,
+        hasMore: result.has_more,
+        nextOffset: result.has_more
+          ? (result.offset ?? ctx.input.offset ?? 0) + (result.limit ?? mapped.length)
+          : undefined
+      },
       message: `Found **${mapped.length}** batch(es).`
     };
   })

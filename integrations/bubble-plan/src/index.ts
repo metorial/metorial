@@ -31,14 +31,6 @@ import {
   updateSubtask,
   updateTask
 } from './tools';
-import {
-  clientTrigger,
-  eventTrigger,
-  projectTrigger,
-  subtaskTrigger,
-  taskTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -72,5 +64,5 @@ export let provider = Slate.create({
     deleteContact,
     listClients
   ],
-  triggers: [projectTrigger, taskTrigger, subtaskTrigger, eventTrigger, clientTrigger]
+  triggers: []
 });

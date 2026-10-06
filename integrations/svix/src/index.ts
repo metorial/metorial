@@ -35,8 +35,6 @@ import {
   updateEndpointTransformation,
   updateEventType
 } from './tools';
-import { operationalWebhooksTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -74,5 +72,5 @@ export let provider = Slate.create({
     getPortalAccess,
     getEndpointStats
   ],
-  triggers: [operationalWebhooksTrigger]
+  triggers: []
 });

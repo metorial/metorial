@@ -6,9 +6,14 @@ import { spec } from '../spec';
 export let getDatasourceInstanceData = SlateTool.create(spec, {
   name: 'Get Data Source Instance Data',
   key: 'get_datasource_instance_data',
-  description: `Retrieve the actual data contained in a data source instance. Returns the columns and rows of the data. Use list data sources or data source instances to find instance IDs first.`,
+  description:
+    'DEPRECATED — use `download_datasource_instance_data` instead. This legacy tool preserves its columns and rows response contract; current data source content may not contain those fields.',
+  instructions: [
+    'Use download_datasource_instance_data to receive the actual source content as a downloadable file.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(

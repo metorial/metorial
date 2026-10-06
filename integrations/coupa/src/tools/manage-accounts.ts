@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoupaClient } from '../lib/client';
+import { customFields, page, pageFields, requireValue } from '../lib/contracts';
 import { spec } from '../spec';
 
 let accountOutputSchema = z.object({
@@ -14,7 +15,7 @@ let accountOutputSchema = z.object({
   active: z.boolean().nullable().optional().describe('Whether account is active'),
   createdAt: z.string().nullable().optional().describe('Creation timestamp'),
   updatedAt: z.string().nullable().optional().describe('Last update timestamp'),
-  rawData: z.any().optional().describe('Complete raw account data')
+  rawData: z.any().optional().describe('Native data with documented credential fields omitted')
 });
 
 export let searchAccounts = SlateTool.create(spec, {
@@ -47,14 +48,12 @@ export let searchAccounts = SlateTool.create(spec, {
   .output(
     z.object({
       accounts: z.array(accountOutputSchema).describe('List of matching accounts'),
-      count: z.number().describe('Number of accounts returned')
+      count: z.number().describe('Number of accounts returned'),
+      ...pageFields
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let filters: Record<string, string> = {};
     if (ctx.input.filters) {
@@ -63,7 +62,10 @@ export let searchAccounts = SlateTool.create(spec, {
       }
     }
     if (ctx.input.code) filters.code = ctx.input.code;
-    if (ctx.input.name) filters.name = ctx.input.name;
+    requireValue(
+      ctx.input.name === undefined,
+      'Account nickname name is searchable only through the Coupa UI. Omit name and use code or documented native filters.'
+    );
     if (ctx.input.active !== undefined) filters.active = String(ctx.input.active);
     if (ctx.input.updatedAfter) filters['updated-at[gt]'] = ctx.input.updatedAfter;
 
@@ -75,7 +77,7 @@ export let searchAccounts = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let accounts = (Array.isArray(results) ? results : []).map((a: any) => ({
+    let accounts = results.map((a: any) => ({
       accountId: a.id,
       code: a.code ?? null,
       name: a.name ?? null,
@@ -92,7 +94,8 @@ export let searchAccounts = SlateTool.create(spec, {
     return {
       output: {
         accounts,
-        count: accounts.length
+        count: accounts.length,
+        ...page(accounts.length, ctx.input)
       },
       message: `Found **${accounts.length}** account(s).`
     };
@@ -116,18 +119,33 @@ export let createAccount = SlateTool.create(spec, {
       segmentThree: z.string().optional().describe('Segment 3 value'),
       accountType: z.object({ name: z.string() }).optional().describe('Account type'),
       active: z.boolean().optional().describe('Whether account is active'),
+      customFieldsGlobalNamespace: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use true for existing global custom fields (legacy default); false places fields under the modern custom-fields namespace'
+        ),
       customFields: z.record(z.string(), z.any()).optional().describe('Custom field values')
     })
   )
   .output(accountOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
+    requireValue(
+      ctx.input.accountType && ctx.input.segmentOne !== undefined,
+      'Provide the existing accountType and explicit segments; native code is calculated and cannot be written. Dynamic accounts are managed through lookup values.'
+    );
+    const suppliedSegments = [
+      ctx.input.segmentOne,
+      ctx.input.segmentTwo,
+      ctx.input.segmentThree
+    ].filter(s => s !== undefined);
+    requireValue(
+      suppliedSegments.join('-') === ctx.input.code,
+      'code must equal the explicit native segments joined by hyphens. Do not guess segment boundaries from code.'
+    );
     let payload: any = {
-      code: ctx.input.code,
       name: ctx.input.name
     };
 
@@ -137,11 +155,11 @@ export let createAccount = SlateTool.create(spec, {
     if (ctx.input.accountType) payload['account-type'] = ctx.input.accountType;
     if (ctx.input.active !== undefined) payload.active = ctx.input.active;
 
-    if (ctx.input.customFields) {
-      for (let [key, value] of Object.entries(ctx.input.customFields)) {
-        payload[key] = value;
-      }
-    }
+    customFields(
+      payload,
+      ctx.input.customFields,
+      ctx.input.customFieldsGlobalNamespace ?? true
+    );
 
     let result = await client.createAccount(payload);
 

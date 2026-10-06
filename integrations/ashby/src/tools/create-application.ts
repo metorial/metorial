@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AshbyClient } from '../lib/client';
+import { id, mapApplication, pageSchema, unexpected, warningsSchema } from '../lib/contracts';
 import { spec } from '../spec';
 
 let applicationOutputSchema = z.object({
@@ -15,26 +16,14 @@ let applicationOutputSchema = z.object({
     })
     .optional()
     .describe('Current interview stage, if any'),
+  candidateId: z.string().optional(),
+  jobId: z.string().optional(),
   createdAt: z.string().describe('Creation timestamp')
 });
 
 export { applicationOutputSchema };
 
-export let mapApplicationToOutput = (results: any) => ({
-  applicationId: results.id,
-  status: results.status,
-  candidateName: results.candidate?.name || '',
-  jobTitle: results.job?.title || '',
-  ...(results.currentInterviewStage
-    ? {
-        currentStage: {
-          stageId: results.currentInterviewStage.id,
-          title: results.currentInterviewStage.title
-        }
-      }
-    : {}),
-  createdAt: results.createdAt
-});
+export const mapApplicationToOutput = mapApplication;
 
 export let createApplicationTool = SlateTool.create(spec, {
   name: 'Create Application',
@@ -69,31 +58,42 @@ export let createApplicationTool = SlateTool.create(spec, {
         .describe('ID of the user to credit for this application')
     })
   )
-  .output(applicationOutputSchema)
+  .output(
+    applicationOutputSchema.extend({
+      warnings: warningsSchema,
+      pageInfo: pageSchema.optional(),
+      completedActions: z.array(z.string()).optional()
+    })
+  )
   .handleInvocation(async ctx => {
-    let client = new AshbyClient({ token: ctx.auth.token });
-
-    let params: Record<string, any> = {
-      candidateId: ctx.input.candidateId,
-      jobId: ctx.input.jobId
+    const client = new AshbyClient(ctx.auth),
+      input = ctx.input;
+    const body = {
+      candidateId: id(input.candidateId, 'Candidate ID'),
+      jobId: id(input.jobId, 'Job ID'),
+      interviewPlanId:
+        input.interviewPlanId === undefined
+          ? undefined
+          : id(input.interviewPlanId, 'Interview plan ID'),
+      interviewStageId:
+        input.interviewStageId === undefined
+          ? undefined
+          : input.interviewStageId === 'FirstPreInterviewScreen'
+            ? input.interviewStageId
+            : id(input.interviewStageId, 'Interview stage ID'),
+      sourceId: input.sourceId === undefined ? undefined : id(input.sourceId, 'Source ID'),
+      creditedToUserId:
+        input.creditedToUserId === undefined
+          ? undefined
+          : id(input.creditedToUserId, 'Credited user ID')
     };
-
-    if (ctx.input.interviewPlanId !== undefined)
-      params.interviewPlanId = ctx.input.interviewPlanId;
-    if (ctx.input.interviewStageId !== undefined)
-      params.interviewStageId = ctx.input.interviewStageId;
-    if (ctx.input.sourceId !== undefined) params.sourceId = ctx.input.sourceId;
-    if (ctx.input.creditedToUserId !== undefined)
-      params.creditedToUserId = ctx.input.creditedToUserId;
-
-    let response = await client.createApplication(params as any);
-    let results = response.results;
-
-    let output = mapApplicationToOutput(results);
-
+    const result = await client.post('/application.create', body),
+      output = mapApplication(result.results);
+    if (output.candidateId !== body.candidateId || output.jobId !== body.jobId) unexpected();
     return {
-      output,
-      message: `Created application for **${output.candidateName}** on job **${output.jobTitle}**`
+      output: { ...output, warnings: client.warnings },
+      message:
+        'Application creation accepted. Recruiting history and configured automatic activities may be retained.'
     };
   })
   .build();

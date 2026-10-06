@@ -9,7 +9,9 @@ export let sendEvent = SlateTool.create(spec, {
   description: `Send a named event for a contact to trigger automated email workflows (loops) in Loops. Events can include custom properties and manage mailing list subscriptions. If the contact does not exist, a new one is created automatically.`,
   instructions: [
     'Provide either email or userId (or both) to identify the contact.',
-    'The eventName must match an event configured in your Loops workflows.'
+    'The eventName must match an event configured in your Loops workflows.',
+    'Submitting an event can immediately trigger emails and update contact identity, properties or subscriptions. Success confirms submission, not workflow completion or email delivery.',
+    'Use a stable unique idempotencyKey for this logical submission. Do not repeat an uncertain submission automatically.'
   ],
   tags: {
     destructive: false,
@@ -18,6 +20,12 @@ export let sendEvent = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe(
+          "Optional unique request ID, at most 100 characters. Sent in Idempotency-Key; reuse is limited to the provider's 24-hour window."
+        ),
       eventName: z
         .string()
         .describe('Name of the event to send (must match a configured event in Loops)'),
@@ -51,13 +59,13 @@ export let sendEvent = SlateTool.create(spec, {
       userId: ctx.input.userId,
       eventProperties: ctx.input.eventProperties,
       mailingLists: ctx.input.mailingLists,
-      contactProperties: ctx.input.contactProperties
+      contactProperties: ctx.input.contactProperties,
+      idempotencyKey: ctx.input.idempotencyKey
     });
 
-    let identifier = ctx.input.email || ctx.input.userId || 'unknown';
     return {
       output: { success: result.success },
-      message: `Sent event **${ctx.input.eventName}** for contact **${identifier}**.`
+      message: 'Submitted the event for the requested contact.'
     };
   })
   .build();

@@ -1,441 +1,575 @@
-import { createAxios } from 'slates';
+import {
+  AUTH_CONFIG_SECRET_PLACEHOLDER_PREFIX,
+  AuthConfigSecretRedactor,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined,
+  requestAxios
+} from 'slates';
+import { z } from 'zod';
+import {
+  apiFailure,
+  contactDto,
+  liveFeedDto,
+  meetingInviteDto,
+  meetingTypeDto,
+  messageDto,
+  pageDto,
+  parseResponse,
+  pollDto,
+  recipientDto,
+  recordDto,
+  reportDto,
+  resourceId,
+  ruleDto,
+  sequenceDto,
+  snippetDto,
+  taskDto,
+  teamDto,
+  teamMemberDto,
+  unsubscribeDto,
+  userDto,
+  validateEmail,
+  validatePaging
+} from './contracts';
+
+type Fields = Record<string, unknown>;
+type Page = { next?: string; limit?: number };
+type Recipient = { email: string; name?: string };
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
+  private redactor: AuthConfigSecretRedactor;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    if (!config.token.trim()) throw createApiServiceError('Connect a valid Mixmax API token.');
+    this.redactor = new AuthConfigSecretRedactor(config);
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.mixmax.com/v1',
-      headers: {
-        'X-API-Token': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'X-API-Token', value: config.token },
+      timeout: 30000,
+      maxRedirects: 0,
+      validateStatus: () => true
     });
   }
 
-  // ── Sequences ──
-
-  async listSequences(params?: { next?: string; limit?: number }) {
-    let response = await this.http.get('/sequences', { params });
-    return response.data;
+  private publicData(value: unknown): unknown {
+    if (typeof value === 'string') {
+      if (/^https?:\/\//i.test(value)) {
+        try {
+          let url = new URL(value);
+          if (
+            url.username ||
+            url.password ||
+            [...url.searchParams.keys()].some(key =>
+              /token|secret|credential|password|signature|api.?key|^sig$|^x-amz-|^x-goog-/i.test(
+                key
+              )
+            )
+          )
+            return undefined;
+        } catch {
+          /* Literal values are still redacted below. */
+        }
+      }
+      return this.redactor
+        .redactEmbedded(value)
+        .split(`${AUTH_CONFIG_SECRET_PLACEHOLDER_PREFIX}token$$`)
+        .join('[redacted]')
+        .split(`${AUTH_CONFIG_SECRET_PLACEHOLDER_PREFIX}token`)
+        .join('[redacted]');
+    }
+    if (Array.isArray(value)) return value.map(item => this.publicData(item));
+    if (isApiErrorRecord(value)) {
+      let result: Fields = {};
+      for (let [key, item] of Object.entries(value)) {
+        if (
+          /^(?:token|apitoken|accesstoken|refreshtoken|idtoken|authorization|password|clientsecret|secret|credentials?|apikey|privatekey)$/i.test(
+            key.replace(/[^a-z0-9]/gi, '')
+          ) ||
+          this.redactor.redactEmbedded(key) !== key
+        )
+          continue;
+        let cleaned = this.publicData(item);
+        if (cleaned !== undefined) result[key] = cleaned;
+      }
+      return result;
+    }
+    return value;
   }
 
-  async searchSequences(query: string) {
-    let response = await this.http.get('/sequences/search', { params: { q: query } });
-    return response.data;
+  private async request(
+    method: 'get' | 'post' | 'patch' | 'put' | 'delete',
+    path: string,
+    body?: unknown,
+    params?: Fields
+  ) {
+    let response = await requestAxios(
+      'request',
+      () =>
+        this.http.request<unknown>({
+          method,
+          url: path,
+          data: body,
+          params: params ? pickDefined(params) : undefined,
+          paramsSerializer: { indexes: false }
+        }),
+      apiFailure
+    );
+    if (response.status < 200 || response.status >= 300)
+      throw apiFailure({ response: { status: response.status } }, 'request');
+    return this.publicData(response.data);
+  }
+
+  private async page<T extends z.ZodType>(
+    path: string,
+    schema: T,
+    params: Fields & { limit?: number; offset?: number } = {},
+    max = 300
+  ) {
+    validatePaging(params, max);
+    return parseResponse(pageDto(schema), await this.request('get', path, undefined, params));
+  }
+
+  async listSequences(params: Page & { name?: string } = {}) {
+    let page = await this.page('/sequences', sequenceDto, params);
+    return {
+      ...page,
+      results: page.results.map(sequence => ({
+        ...sequence,
+        numStages: sequence.stages?.length
+      }))
+    };
+  }
+
+  async searchSequenceRecipients(params: {
+    query?: string;
+    recipients?: string[];
+    sequenceId?: string;
+    offset?: number;
+    limit?: number;
+  }) {
+    validatePaging(params, 50);
+    if (!params.query?.trim() && !params.recipients?.length)
+      throw createApiServiceError(
+        'Provide query or recipients to search sequence recipients.'
+      );
+    params.recipients?.forEach(validateEmail);
+    if (params.sequenceId) resourceId(params.sequenceId);
+    return parseResponse(
+      pageDto(recipientDto.omit({ createdAt: true })).extend({ total: z.number().optional() }),
+      await this.request('get', '/sequences/search', undefined, params)
+    );
   }
 
   async getSequenceRecipients(
     sequenceId: string,
-    params?: { limit?: number; offset?: number }
+    params: { limit?: number; offset?: number } = {}
   ) {
-    let response = await this.http.get(`/sequences/${sequenceId}/recipients`, { params });
-    return response.data;
+    validatePaging(params, 50);
+    if ((params.offset ?? 0) + (params.limit ?? 50) > 10000)
+      throw createApiServiceError(
+        'Sequence recipient paging must remain within the first 10,000 records.'
+      );
+    let results = parseResponse(
+      z.array(recipientDto),
+      await this.request('get', `/sequences/${resourceId(sequenceId)}/recipients`, undefined, {
+        ...params,
+        includeVariables: true
+      })
+    );
+    return results.map(recipient => ({ ...recipient, status: recipient.state }));
   }
 
   async addRecipientsToSequence(
     sequenceId: string,
-    recipients: Array<{ email: string; variables?: Record<string, string> }>
+    recipients: Array<{ email: string; variables?: Record<string, string> }>,
+    scheduledAt?: number | false
   ) {
-    let response = await this.http.post(`/sequences/${sequenceId}/recipients`, recipients);
-    return response.data;
+    if (
+      scheduledAt !== undefined &&
+      scheduledAt !== false &&
+      (!Number.isSafeInteger(scheduledAt) || scheduledAt < 0)
+    )
+      throw createApiServiceError(
+        'scheduledAt must be false for draft recipients or a nonnegative Unix timestamp in milliseconds.'
+      );
+    if (new Set(recipients.map(item => item.email)).size !== recipients.length)
+      throw createApiServiceError('Provide each recipient email only once in a request.');
+    let mapped = recipients.map(recipient => {
+      validateEmail(recipient.email);
+      let variables = { ...recipient.variables };
+      if (
+        (variables.email !== undefined && variables.email !== recipient.email) ||
+        (variables.Email !== undefined && variables.Email !== recipient.email)
+      )
+        throw createApiServiceError(
+          'The email personalization variable must match its recipient email.'
+        );
+      if (variables.email === undefined && variables.Email === undefined)
+        variables.email = recipient.email;
+      return { ...recipient, variables };
+    });
+    let result = parseResponse(
+      z.array(z.object({ email: z.string(), status: z.string() })),
+      await this.request(
+        'post',
+        `/sequences/${resourceId(sequenceId)}/recipients`,
+        pickDefined({ recipients: mapped, scheduledAt })
+      )
+    );
+    let requested = new Set(recipients.map(item => item.email));
+    let returned = new Set(result.map(item => item.email));
+    if (
+      result.length !== recipients.length ||
+      returned.size !== result.length ||
+      result.some(item => item.status !== 'success' || !requested.has(item.email))
+    ) {
+      throw createApiServiceError(
+        'Mixmax did not accept every recipient for sequence ' +
+          sequenceId +
+          '. Some recipients may already have been added; read their state before retrying. Reported recipient outcomes: ' +
+          result.map(item => `${item.email}: ${item.status}`).join(', '),
+        { reason: 'partial_recipient_failure' }
+      );
+    }
+    return result;
   }
 
   async cancelSequence(sequenceId: string, recipientEmail?: string) {
-    let response = await this.http.post(
-      `/sequences/${sequenceId}/cancel`,
-      recipientEmail ? { email: recipientEmail } : {}
+    if (recipientEmail !== undefined) validateEmail(recipientEmail);
+    return parseResponse(
+      z.object({ recipients: z.array(z.string()) }),
+      await this.request(
+        'post',
+        `/sequences/${resourceId(sequenceId)}/cancel`,
+        recipientEmail === undefined ? {} : { emails: [recipientEmail] }
+      )
     );
-    return response.data;
   }
 
   async bulkCancelSequences(body: { emails?: string[]; sequenceIds?: string[] }) {
-    let response = await this.http.post('/sequences/cancel', body);
-    return response.data;
+    if (body.sequenceIds !== undefined)
+      throw createApiServiceError(
+        'Bulk cancellation by sequenceIds is not documented. Use sequenceId for one sequence, or emails for recipients across sequences.'
+      );
+    if (!body.emails?.length)
+      throw createApiServiceError(
+        'Provide recipient emails or a sequenceId; empty input would cancel every active sequence.'
+      );
+    body.emails.forEach(validateEmail);
+    return parseResponse(
+      z.object({ recipients: z.array(z.string()) }),
+      await this.request('post', '/sequences/cancel', { emails: body.emails })
+    );
   }
 
-  // ── Sequence Folders ──
-
-  async listSequenceFolders() {
-    let response = await this.http.get('/sequencefolders');
-    return response.data;
+  async listMessages(params: Page = {}) {
+    return this.page('/messages', messageDto, params);
   }
-
-  async getSequencesInFolder(folderId: string) {
-    let response = await this.http.get(`/sequencefolders/${folderId}/sequences`);
-    return response.data;
+  async getMessage(id: string) {
+    return parseResponse(messageDto, await this.request('get', `/messages/${resourceId(id)}`));
   }
-
-  // ── Messages ──
-
-  async listMessages(params?: { next?: string; limit?: number }) {
-    let response = await this.http.get('/messages', { params });
-    return response.data;
-  }
-
-  async getMessage(messageId: string) {
-    let response = await this.http.get(`/messages/${messageId}`);
-    return response.data;
-  }
-
   async createMessage(message: {
-    to?: Array<{ email: string; name?: string }>;
-    cc?: Array<{ email: string; name?: string }>;
-    bcc?: Array<{ email: string; name?: string }>;
+    to?: Recipient[];
+    cc?: Recipient[];
+    bcc?: Recipient[];
     subject?: string;
     body?: string;
     trackingEnabled?: boolean;
     linkTrackingEnabled?: boolean;
-    fileTrackingEnabled?: boolean;
-    notificationsEnabled?: boolean;
     inReplyTo?: string;
   }) {
-    let response = await this.http.post('/messages', message);
-    return response.data;
+    for (let recipient of [
+      ...(message.to ?? []),
+      ...(message.cc ?? []),
+      ...(message.bcc ?? [])
+    ])
+      validateEmail(recipient.email);
+    return parseResponse(
+      messageDto,
+      await this.request('post', '/messages', pickDefined(message))
+    );
   }
-
-  async updateMessage(messageId: string, updates: Record<string, any>) {
-    let response = await this.http.patch(`/messages/${messageId}`, updates);
-    return response.data;
+  async sendMessage(id: string) {
+    await this.request('post', `/messages/${resourceId(id)}/send`);
   }
-
-  async sendMessage(messageId: string) {
-    let response = await this.http.post(`/messages/${messageId}/send`);
-    return response.data;
-  }
-
-  async sendTestMessage(message: Record<string, any>) {
-    let response = await this.http.post('/messages/test', message);
-    return response.data;
-  }
-
   async sendEmail(message: {
-    to: Array<{ email: string; name?: string }>;
-    cc?: Array<{ email: string; name?: string }>;
-    bcc?: Array<{ email: string; name?: string }>;
+    to: Recipient[];
+    cc?: Recipient[];
+    bcc?: Recipient[];
     subject: string;
     body: string;
     trackingEnabled?: boolean;
     linkTrackingEnabled?: boolean;
   }) {
-    let response = await this.http.post('/send', message);
-    return response.data;
+    if (message.trackingEnabled || message.linkTrackingEnabled)
+      throw createApiServiceError(
+        'The direct-send API does not support tracking. Create a draft message with tracking enabled and send that draft instead.'
+      );
+    for (let recipient of [...message.to, ...(message.cc ?? []), ...(message.bcc ?? [])])
+      validateEmail(recipient.email);
+    let result = await this.request(
+      'post',
+      '/send',
+      pickDefined({
+        to: message.to,
+        cc: message.cc,
+        bcc: message.bcc,
+        subject: message.subject,
+        body: message.body
+      })
+    );
+    return parseResponse(
+      z.object({ _id: z.string().optional() }),
+      result === '' || result === undefined ? {} : result
+    );
   }
 
-  // ── Snippets (Templates) ──
-
-  async listSnippets(params?: { search?: string; next?: string; limit?: number }) {
-    let response = await this.http.get('/snippets', { params });
-    return response.data;
+  async listSnippets(params: Page & { search?: string; deletedOnly?: boolean } = {}) {
+    let page = await this.page('/snippets', snippetDto, params);
+    return {
+      ...page,
+      results: page.results.map(snippet => ({
+        ...snippet,
+        subject: snippet.title,
+        body: snippet.source
+      }))
+    };
   }
-
-  async getSnippet(snippetId: string) {
-    let response = await this.http.get(`/snippets/${snippetId}`);
-    return response.data;
+  async getSnippet(id: string) {
+    let snippet = parseResponse(
+      snippetDto,
+      await this.request('get', `/snippets/${resourceId(id)}`)
+    );
+    return { ...snippet, subject: snippet.title, body: snippet.source };
   }
-
-  async updateSnippet(snippetId: string, updates: Record<string, any>) {
-    let response = await this.http.patch(`/snippets/${snippetId}`, updates);
-    return response.data;
+  async updateSnippet(id: string, updates: Fields) {
+    if (!Object.keys(updates).length)
+      throw createApiServiceError('Provide at least one template field to update.');
+    await this.request(
+      'patch',
+      `/snippets/${resourceId(id)}`,
+      pickDefined({ name: updates.name, title: updates.subject, source: updates.body })
+    );
+    return this.getSnippet(id);
   }
-
-  async deleteSnippet(snippetId: string) {
-    let response = await this.http.delete(`/snippets/${snippetId}`);
-    return response.data;
+  async deleteSnippet(id: string) {
+    await this.request('delete', `/snippets/${resourceId(id)}`);
   }
-
   async sendSnippet(
-    snippetId: string,
-    sendData: {
-      to: Array<{ email: string; name?: string }>;
-      cc?: Array<{ email: string; name?: string }>;
-      bcc?: Array<{ email: string; name?: string }>;
+    id: string,
+    data: {
+      to: Recipient[];
+      cc?: Recipient[];
+      bcc?: Recipient[];
       variables?: Record<string, string>;
     }
   ) {
-    let response = await this.http.post(`/snippets/${snippetId}/send`, sendData);
-    return response.data;
+    for (let recipient of [...data.to, ...(data.cc ?? []), ...(data.bcc ?? [])])
+      validateEmail(recipient.email);
+    await this.request('post', `/snippets/${resourceId(id)}/send`, pickDefined(data));
   }
 
-  // ── Snippet Tags ──
-
-  async listSnippetTags() {
-    let response = await this.http.get('/snippettags');
-    return response.data;
+  async listContacts(
+    params: Page & {
+      search?: string;
+      sort?: string;
+      sortAscending?: boolean;
+      includeShared?: boolean;
+    } = {}
+  ) {
+    if (params.includeShared && !params.search?.trim())
+      throw createApiServiceError('includeShared requires a contact search query.');
+    return this.page('/contacts', contactDto, params);
   }
-
-  async getSnippetsInTag(tagId: string) {
-    let response = await this.http.get(`/snippettags/${tagId}/snippets`);
-    return response.data;
+  async getContact(id: string) {
+    return parseResponse(
+      contactDto,
+      await this.request('get', `/contacts/${resourceId(id)}`, undefined, {
+        expand: 'firstName,lastName'
+      })
+    );
   }
-
-  // ── Contacts ──
-
-  async listContacts(params?: {
-    search?: string;
-    sort?: string;
-    sortAscending?: boolean;
-    includeShared?: boolean;
-    expand?: string;
-    next?: string;
-    limit?: number;
-  }) {
-    let response = await this.http.get('/contacts', { params });
-    return response.data;
-  }
-
-  async getContact(contactId: string, params?: { expand?: string }) {
-    let response = await this.http.get(`/contacts/${contactId}`, { params });
-    return response.data;
-  }
-
   async createContact(contact: {
     email: string;
     name?: string;
     groups?: string[];
-    meta?: Record<string, any>;
+    meta?: Fields;
     enrich?: boolean;
   }) {
-    let response = await this.http.post('/contacts', contact);
-    return response.data;
+    validateEmail(contact.email);
+    await this.request('post', '/contacts', pickDefined(contact));
+    let page = await this.listContacts({ search: `email:${contact.email}`, limit: 50 });
+    let matches = page.results.filter(
+      item => item.email?.toLowerCase() === contact.email.toLowerCase()
+    );
+    if (matches.length !== 1)
+      throw createApiServiceError(
+        'The contact write succeeded but its unique ID could not be confirmed. Search by email before retrying; creation can merge an existing record.'
+      );
+    return matches[0]!;
+  }
+  async updateContact(id: string, updates: Fields) {
+    if (updates.groups !== undefined)
+      throw createApiServiceError(
+        'Updating contact groups through this endpoint is not documented. Manage contact groups in Mixmax.'
+      );
+    if (!Object.keys(updates).length)
+      throw createApiServiceError('Provide at least one contact field to update.');
+    if (typeof updates.email === 'string') validateEmail(updates.email);
+    await this.request('patch', `/contacts/${resourceId(id)}`, { contact: updates });
+    return this.getContact(id);
+  }
+  async deleteContact(id: string) {
+    await this.request('delete', `/contacts/${resourceId(id)}`);
   }
 
-  async updateContact(contactId: string, updates: Record<string, any>) {
-    let response = await this.http.patch(`/contacts/${contactId}`, updates);
-    return response.data;
+  async listMeetingTypes(params: Page = {}) {
+    return this.page('/meetingtypes', meetingTypeDto, params);
+  }
+  async getMeetingType(id: string) {
+    return parseResponse(
+      meetingTypeDto,
+      await this.request('get', `/meetingtypes/${resourceId(id)}`)
+    );
+  }
+  private meetingTypeBody(body: Fields) {
+    if (body.name !== undefined && (typeof body.name !== 'string' || !body.name.trim()))
+      throw createApiServiceError('Provide a nonempty meeting type name.');
+    if (
+      body.durationMin !== undefined &&
+      (typeof body.durationMin !== 'number' ||
+        !Number.isSafeInteger(body.durationMin) ||
+        body.durationMin < 1)
+    )
+      throw createApiServiceError('durationMin must be a positive integer.');
+    if (
+      body.buffer !== undefined &&
+      (typeof body.buffer !== 'number' ||
+        !Number.isSafeInteger(body.buffer) ||
+        body.buffer < 0 ||
+        body.buffer > 60)
+    )
+      throw createApiServiceError('buffer must be an integer from 0 to 60.');
+    return body;
+  }
+  async createMeetingType(body: Fields) {
+    return parseResponse(
+      z.object({ _id: z.string().min(1) }),
+      await this.request('post', '/meetingtypes', this.meetingTypeBody(body))
+    );
+  }
+  async updateMeetingType(id: string, body: Fields) {
+    if (!Object.keys(body).length)
+      throw createApiServiceError('Provide at least one meeting-type field to update.');
+    await this.request('patch', `/meetingtypes/${resourceId(id)}`, this.meetingTypeBody(body));
+  }
+  async deleteMeetingType(id: string) {
+    await this.request('delete', `/meetingtypes/${resourceId(id)}`);
+  }
+  async listMeetingInvites(params: Page = {}) {
+    let page = await this.page('/meetinginvites', meetingInviteDto, params);
+    return {
+      ...page,
+      results: page.results.map(invite => ({ ...invite, createdAt: invite.creationDate }))
+    };
   }
 
-  async deleteContact(contactId: string) {
-    let response = await this.http.delete(`/contacts/${contactId}`);
-    return response.data;
+  private ruleBody(body: Fields) {
+    if (body.actions !== undefined)
+      throw createApiServiceError(
+        'Rule actions require the separate rule-actions API or Rules Dashboard. This tool cannot safely set them inline.'
+      );
+    if (body.trigger !== undefined) {
+      let trigger = parseResponse(
+        z.object({
+          type: z.enum(['event', 'recurring']),
+          eventName: z.string().optional(),
+          rrule: z.string().optional()
+        }),
+        body.trigger
+      );
+      if (
+        (trigger.type === 'event' && !trigger.eventName?.trim()) ||
+        (trigger.type === 'recurring' && !trigger.rrule?.trim())
+      )
+        throw createApiServiceError(
+          'Provide eventName for an event trigger, or rrule for a recurring trigger.'
+        );
+    }
+    let filter = body.filter;
+    if (filter !== undefined && typeof filter !== 'string') filter = JSON.stringify(filter);
+    if (typeof filter === 'string') {
+      try {
+        JSON.parse(filter);
+      } catch {
+        throw createApiServiceError('Provide a JSON-serialized Sift filter or JSON object.');
+      }
+    }
+    return pickDefined({
+      name: body.name,
+      trigger: body.trigger,
+      filter,
+      isPaused: typeof body.enabled === 'boolean' ? !body.enabled : undefined
+    });
+  }
+  private mapRule(rule: z.infer<typeof ruleDto>) {
+    return {
+      ...rule,
+      enabled: rule.isPaused === undefined ? undefined : !rule.isPaused,
+      updatedAt: rule.modifiedAt
+    };
+  }
+  async listRules(params: Page = {}) {
+    let page = await this.page('/rules', ruleDto, { ...params, expand: 'actions' });
+    return { ...page, results: page.results.map(rule => this.mapRule(rule)) };
+  }
+  async getRule(id: string) {
+    return this.mapRule(
+      parseResponse(
+        ruleDto,
+        await this.request('get', `/rules/${resourceId(id)}`, undefined, { expand: 'actions' })
+      )
+    );
+  }
+  async createRule(body: Fields) {
+    return this.mapRule(
+      parseResponse(ruleDto, await this.request('post', '/rules', this.ruleBody(body)))
+    );
+  }
+  async updateRule(id: string, body: Fields) {
+    if (!Object.keys(body).length)
+      throw createApiServiceError('Provide at least one rule field to update.');
+    await this.request('patch', `/rules/${resourceId(id)}`, this.ruleBody(body));
+    return this.getRule(id);
+  }
+  async deleteRule(id: string) {
+    await this.request('delete', `/rules/${resourceId(id)}`);
   }
 
-  async searchContacts(query: string) {
-    let response = await this.http.get('/contacts/query', { params: { q: query } });
-    return response.data;
+  async listUnsubscribes(params: Page = {}) {
+    return this.page('/unsubscribes', unsubscribeDto, params);
   }
-
-  // ── Contact Notes ──
-
-  async listContactNotes(contactId: string) {
-    let response = await this.http.get(`/contacts/${contactId}/notes`);
-    return response.data;
+  async addUnsubscribe(email: string, name?: string) {
+    await this.request('post', '/unsubscribes', {
+      email: validateEmail(email),
+      name: name ?? email
+    });
   }
-
-  async createContactNote(contactId: string, text: string) {
-    let response = await this.http.post(`/contacts/${contactId}/notes`, { text });
-    return response.data;
-  }
-
-  async updateContactNote(contactId: string, noteId: string, text: string) {
-    let response = await this.http.patch(`/contacts/${contactId}/notes/${noteId}`, { text });
-    return response.data;
-  }
-
-  async deleteContactNote(contactId: string, noteId: string) {
-    let response = await this.http.delete(`/contacts/${contactId}/notes/${noteId}`);
-    return response.data;
-  }
-
-  // ── Contact Groups ──
-
-  async listContactGroups(params?: { search?: string; expand?: string }) {
-    let response = await this.http.get('/contactgroups', { params });
-    return response.data;
-  }
-
-  async getContactGroup(groupId: string) {
-    let response = await this.http.get(`/contactgroups/${groupId}`);
-    return response.data;
-  }
-
-  async createContactGroup(name: string, contacts?: string[]) {
-    let response = await this.http.post('/contactgroups', { name, contacts });
-    return response.data;
-  }
-
-  async updateContactGroup(groupId: string, updates: Record<string, any>) {
-    let response = await this.http.patch(`/contactgroups/${groupId}`, updates);
-    return response.data;
-  }
-
-  async deleteContactGroup(groupId: string) {
-    let response = await this.http.delete(`/contactgroups/${groupId}`);
-    return response.data;
-  }
-
-  async getContactsInGroup(groupId: string, params?: { next?: string; limit?: number }) {
-    let response = await this.http.get(`/contactgroups/${groupId}/contacts`, { params });
-    return response.data;
-  }
-
-  async addContactsToGroup(groupId: string, contactIds: string[]) {
-    let response = await this.http.post(`/contactgroups/${groupId}/contacts`, contactIds);
-    return response.data;
-  }
-
-  async removeContactFromGroup(groupId: string, contactId: string) {
-    let response = await this.http.delete(`/contactgroups/${groupId}/contacts/${contactId}`);
-    return response.data;
-  }
-
-  // ── Meeting Types ──
-
-  async listMeetingTypes() {
-    let response = await this.http.get('/meetingtypes');
-    return response.data;
-  }
-
-  async getMeetingType(meetingTypeId: string) {
-    let response = await this.http.get(`/meetingtypes/${meetingTypeId}`);
-    return response.data;
-  }
-
-  async createMeetingType(data: Record<string, any>) {
-    let response = await this.http.post('/meetingtypes', data);
-    return response.data;
-  }
-
-  async updateMeetingType(meetingTypeId: string, updates: Record<string, any>) {
-    let response = await this.http.patch(`/meetingtypes/${meetingTypeId}`, updates);
-    return response.data;
-  }
-
-  async deleteMeetingType(meetingTypeId: string) {
-    let response = await this.http.delete(`/meetingtypes/${meetingTypeId}`);
-    return response.data;
-  }
-
-  // ── Meeting Invites ──
-
-  async listMeetingInvites(params?: { next?: string; limit?: number }) {
-    let response = await this.http.get('/meetinginvites', { params });
-    return response.data;
-  }
-
-  async getMeetingInvite(inviteId: string) {
-    let response = await this.http.get(`/meetinginvites/${inviteId}`);
-    return response.data;
-  }
-
-  async deleteMeetingInvite(inviteId: string) {
-    let response = await this.http.delete(`/meetinginvites/${inviteId}`);
-    return response.data;
-  }
-
-  // ── Meeting Summaries & Transcripts ──
-
-  async searchMeetingSummaries(params?: { next?: string; limit?: number }) {
-    let response = await this.http.get('/meetings/summaries/search', { params });
-    return response.data;
-  }
-
-  async getMeetingTranscript(meetingId: string) {
-    let response = await this.http.get(`/meetings/transcripts/${meetingId}`);
-    return response.data;
-  }
-
-  // ── Appointment Links ──
-
-  async getAppointmentLink() {
-    let response = await this.http.get('/appointmentlinks/me');
-    return response.data;
-  }
-
-  async updateAppointmentLink(name: string) {
-    let response = await this.http.patch('/appointmentlinks/me', { name });
-    return response.data;
-  }
-
-  // ── Rules ──
-
-  async listRules() {
-    let response = await this.http.get('/rules');
-    return response.data;
-  }
-
-  async getRule(ruleId: string) {
-    let response = await this.http.get(`/rules/${ruleId}`);
-    return response.data;
-  }
-
-  async createRule(rule: Record<string, any>) {
-    let response = await this.http.post('/rules', rule);
-    return response.data;
-  }
-
-  async updateRule(ruleId: string, updates: Record<string, any>) {
-    let response = await this.http.patch(`/rules/${ruleId}`, updates);
-    return response.data;
-  }
-
-  async deleteRule(ruleId: string) {
-    let response = await this.http.delete(`/rules/${ruleId}`);
-    return response.data;
-  }
-
-  async listRuleActions(ruleId: string) {
-    let response = await this.http.get(`/rules/${ruleId}/actions`);
-    return response.data;
-  }
-
-  async createRuleAction(ruleId: string, action: Record<string, any>) {
-    let response = await this.http.post(`/rules/${ruleId}/actions`, action);
-    return response.data;
-  }
-
-  async updateRuleAction(ruleId: string, actionId: string, updates: Record<string, any>) {
-    let response = await this.http.patch(`/rules/${ruleId}/actions/${actionId}`, updates);
-    return response.data;
-  }
-
-  async deleteRuleAction(ruleId: string, actionId: string) {
-    let response = await this.http.delete(`/rules/${ruleId}/actions/${actionId}`);
-    return response.data;
-  }
-
-  // ── Unsubscribes ──
-
-  async listUnsubscribes(params?: { next?: string; limit?: number }) {
-    let response = await this.http.get('/unsubscribes', { params });
-    return response.data;
-  }
-
-  async addUnsubscribe(email: string) {
-    let response = await this.http.post('/unsubscribes', { email });
-    return response.data;
-  }
-
   async removeUnsubscribe(email: string) {
-    let response = await this.http.delete('/unsubscribes', { data: { email } });
-    return response.data;
+    await this.request('delete', '/unsubscribes', { email: validateEmail(email) });
   }
-
-  // ── Live Feed ──
-
-  async getLiveFeed(params?: {
-    query?: string;
-    timezone?: string;
-    limit?: number;
-    offset?: number;
-    stats?: boolean;
-  }) {
-    let response = await this.http.get('/livefeed', { params });
-    return response.data;
+  async getLiveFeed(
+    params: { query?: string; timezone?: string; limit?: number; offset?: number } = {}
+  ) {
+    validatePaging(params, 10000);
+    return parseResponse(
+      pageDto(liveFeedDto).extend({ stats: z.unknown().optional() }),
+      await this.request('get', '/livefeed', undefined, params)
+    );
   }
-
-  async getLiveFeedEvents(params?: {
-    query?: string;
-    timezone?: string;
-    limit?: number;
-    offset?: number;
-  }) {
-    let response = await this.http.get('/livefeed/events', { params });
-    return response.data;
-  }
-
-  // ── Reports ──
-
   async getReportData(body: {
     type: string;
     groupBy?: string;
@@ -447,191 +581,130 @@ export class Client {
     sortDesc?: boolean;
     timezone?: string;
   }) {
-    let response = await this.http.post('/reports/data/table', body);
-    return response.data;
+    validatePaging(body, 10000);
+    return parseResponse(
+      reportDto,
+      await this.request('post', '/reports/data/table', pickDefined(body))
+    );
+  }
+  async listPolls(params: Page = {}) {
+    return this.page('/polls', pollDto, params);
+  }
+  async getPoll(id: string) {
+    return parseResponse(pollDto, await this.request('get', `/polls/${resourceId(id)}`));
   }
 
-  // ── Insights Reports ──
-
-  async listInsightsReports() {
-    let response = await this.http.get('/insightsreports');
-    return response.data;
+  async listTeams(params: Page = {}) {
+    return this.page('/teams', teamDto, params);
   }
-
-  async createInsightsReport(data: Record<string, any>) {
-    let response = await this.http.post('/insightsreports', data);
-    return response.data;
+  async getTeam(id: string) {
+    return parseResponse(teamDto, await this.request('get', `/teams/${resourceId(id)}`));
   }
-
-  async updateInsightsReport(reportId: string, updates: Record<string, any>) {
-    let response = await this.http.patch(`/insightsreports/${reportId}`, updates);
-    return response.data;
+  async createTeam(body: { name: string }) {
+    if (!body.name.trim()) throw createApiServiceError('Provide a nonempty team name.');
+    return parseResponse(
+      z.object({ _id: z.string().min(1) }),
+      await this.request('post', '/teams', body)
+    );
   }
-
-  // ── Polls ──
-
-  async listPolls(params?: { next?: string; limit?: number }) {
-    let response = await this.http.get('/polls', { params });
-    return response.data;
+  async updateTeam(id: string, body: Fields) {
+    if (typeof body.name !== 'string' || !body.name.trim())
+      throw createApiServiceError('Provide a nonempty team name to update.');
+    await this.request('patch', `/teams/${resourceId(id)}`, body);
   }
-
-  async getPoll(pollId: string) {
-    let response = await this.http.get(`/polls/${pollId}`);
-    return response.data;
+  async deleteTeam(id: string) {
+    await this.request('delete', `/teams/${resourceId(id)}`);
   }
-
-  // ── Q&A ──
-
-  async listQA(params?: { next?: string; limit?: number }) {
-    let response = await this.http.get('/qa', { params });
-    return response.data;
+  async listTeamMembers(id: string) {
+    let page = await this.page(`/teams/${resourceId(id)}/members`, teamMemberDto);
+    return {
+      ...page,
+      results: page.results.map(member => ({
+        _id: member.memberId,
+        userId: typeof member.userId === 'string' ? member.userId : member.userId?._id,
+        email:
+          member.email ??
+          (typeof member.userId === 'object' ? member.userId.email : undefined),
+        name:
+          member.name ?? (typeof member.userId === 'object' ? member.userId.name : undefined)
+      }))
+    };
   }
-
-  async getQA(qaId: string) {
-    let response = await this.http.get(`/qa/${qaId}`);
-    return response.data;
+  async addTeamMember(id: string, member: { email?: string; userId?: string }) {
+    if (member.userId !== undefined)
+      throw createApiServiceError(
+        'The team invitation endpoint requires an email, not userId. Provide the member email.'
+      );
+    if (!member.email)
+      throw createApiServiceError(
+        'Provide an email to invite a team member. This sends an invitation email.'
+      );
+    await this.request('post', `/teams/${resourceId(id)}/members`, {
+      members: [{ email: validateEmail(member.email) }]
+    });
   }
-
-  // ── Yes/No ──
-
-  async listYesNo(params?: { next?: string; limit?: number }) {
-    let response = await this.http.get('/yesno', { params });
-    return response.data;
+  async removeTeamMember(id: string, memberId: string) {
+    await this.request('delete', `/teams/${resourceId(id)}/members/${resourceId(memberId)}`);
   }
-
-  async getYesNo(yesnoId: string) {
-    let response = await this.http.get(`/yesno/${yesnoId}`);
-    return response.data;
-  }
-
-  // ── File Requests ──
-
-  async listFileRequests(params?: { next?: string; limit?: number }) {
-    let response = await this.http.get('/filerequests', { params });
-    return response.data;
-  }
-
-  async getFileRequest(fileRequestId: string) {
-    let response = await this.http.get(`/filerequests/${fileRequestId}`);
-    return response.data;
-  }
-
-  // ── Teams ──
-
-  async listTeams() {
-    let response = await this.http.get('/teams');
-    return response.data;
-  }
-
-  async getTeam(teamId: string) {
-    let response = await this.http.get(`/teams/${teamId}`);
-    return response.data;
-  }
-
-  async createTeam(data: { name: string }) {
-    let response = await this.http.post('/teams', data);
-    return response.data;
-  }
-
-  async updateTeam(teamId: string, updates: Record<string, any>) {
-    let response = await this.http.patch(`/teams/${teamId}`, updates);
-    return response.data;
-  }
-
-  async deleteTeam(teamId: string) {
-    let response = await this.http.delete(`/teams/${teamId}`);
-    return response.data;
-  }
-
-  async listTeamMembers(teamId: string) {
-    let response = await this.http.get(`/teams/${teamId}/members`);
-    return response.data;
-  }
-
-  async addTeamMember(teamId: string, member: { email?: string; userId?: string }) {
-    let response = await this.http.post(`/teams/${teamId}/members`, member);
-    return response.data;
-  }
-
-  async removeTeamMember(teamId: string, memberId: string) {
-    let response = await this.http.delete(`/teams/${teamId}/members/${memberId}`);
-    return response.data;
-  }
-
-  // ── Users ──
-
   async getCurrentUser() {
-    let response = await this.http.get('/users/me');
-    return response.data;
+    return parseResponse(userDto, await this.request('get', '/users/me'));
   }
-
-  // ── User Preferences ──
-
   async getUserPreferences() {
-    let response = await this.http.get('/userpreferences/me');
-    return response.data;
+    return parseResponse(recordDto, await this.request('get', '/userpreferences/me'));
   }
-
-  async updateUserPreferences(updates: Record<string, any>) {
-    let response = await this.http.patch('/userpreferences/me', updates);
-    return response.data;
-  }
-
-  // ── Salesforce ──
-
   async searchSalesforce(query: string) {
-    let response = await this.http.get('/salesforce/search', { params: { q: query } });
-    return response.data;
+    return parseResponse(
+      z.array(recordDto),
+      await this.request('get', '/salesforce/search', undefined, { q: query })
+    );
   }
-
   async getSalesforceContactOrLead(email: string) {
-    let response = await this.http.get('/salesforce/contactOrLead', { params: { email } });
-    return response.data;
+    return parseResponse(
+      recordDto,
+      await this.request('get', '/salesforce/contactOrLead', undefined, {
+        email: validateEmail(email)
+      })
+    );
   }
-
-  async getSalesforceWho(recordId: string) {
-    let response = await this.http.get(`/salesforce/who/${recordId}`);
-    return response.data;
+  private async salesforceWrite(method: 'post' | 'put', path: string, body: Fields) {
+    let result = parseResponse(
+      z.object({
+        id: z.string().optional(),
+        success: z.boolean(),
+        errors: z.array(z.unknown()).optional()
+      }),
+      await this.request(method, path, body)
+    );
+    if (!result.success || result.errors?.length)
+      throw createApiServiceError(
+        'Salesforce did not confirm the record write. Check the connected permissions and required fields.'
+      );
+    return { ...result, _id: result.id };
   }
-
-  async getSalesforceWhat(recordId: string) {
-    let response = await this.http.get(`/salesforce/what/${recordId}`);
-    return response.data;
+  async createSalesforceRecord(objectType: string, body: Fields) {
+    return this.salesforceWrite('post', `/salesforce/${resourceId(objectType)}`, body);
   }
-
-  async createSalesforceRecord(objectType: string, data: Record<string, any>) {
-    let response = await this.http.post(`/salesforce/${objectType}`, data);
-    return response.data;
+  async updateSalesforceRecord(objectType: string, id: string, body: Fields) {
+    if (body.Id !== undefined && body.Id !== id)
+      throw createApiServiceError('fields.Id must match recordId.');
+    return this.salesforceWrite(
+      'put',
+      `/salesforce/${resourceId(objectType)}/${resourceId(id)}`,
+      { ...body, Id: id }
+    );
   }
-
-  async updateSalesforceRecord(
-    objectType: string,
-    recordId: string,
-    data: Record<string, any>
-  ) {
-    let response = await this.http.patch(`/salesforce/${objectType}/${recordId}`, data);
-    return response.data;
-  }
-
-  async getSalesforceSyncedFields(type: string) {
-    let response = await this.http.get('/salesforce/syncedFields', { params: { type } });
-    return response.data;
-  }
-
-  // ── Live Feed Searches ──
-
-  async listLiveFeedSearches() {
-    let response = await this.http.get('/livefeedsearches');
-    return response.data;
-  }
-
-  async createLiveFeedSearch(data: Record<string, any>) {
-    let response = await this.http.post('/livefeedsearches', data);
-    return response.data;
-  }
-
-  async updateLiveFeedSearch(searchId: string, updates: Record<string, any>) {
-    let response = await this.http.patch(`/livefeedsearches/${searchId}`, updates);
-    return response.data;
+  async listTasks(params: Page & { query?: string; timezone?: string } = {}) {
+    return this.page(
+      '/tasks',
+      taskDto,
+      pickDefined({
+        search: 'all',
+        query: params.query,
+        next: params.next,
+        limit: params.limit,
+        tz: params.timezone
+      }),
+      500
+    );
   }
 }

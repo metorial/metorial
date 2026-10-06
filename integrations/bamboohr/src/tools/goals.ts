@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid, responseId } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getGoals = SlateTool.create(spec, {
   name: 'Get Employee Goals',
   key: 'get_goals',
-  description: `Retrieve goals for a specific employee. Optionally filter by status. Returns goal details including title, description, progress, due date, and sharing information.`,
+  description: `Retrieve up to 50 visible goals for an employee. all includes closed goals, open selects goals in progress, and closed selects closed goals. With no filter, BambooHR excludes closed goals. A full page is not proof of completeness.`,
   tags: {
     readOnly: true,
     destructive: false
@@ -25,13 +26,10 @@ export let getGoals = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getGoals(ctx.input.employeeId, ctx.input.filter);
-    let goals = data?.goals || (Array.isArray(data) ? data : []);
+    let goals = data.goals;
 
     return {
       output: {
@@ -46,7 +44,7 @@ export let getGoals = SlateTool.create(spec, {
 export let createGoal = SlateTool.create(spec, {
   name: 'Create Goal',
   key: 'create_goal',
-  description: `Create a new goal for an employee. Specify a title and optionally a description, due date, initial progress, alignment, and sharing with other employees.`,
+  description: `Create a simple goal for an employee. Supply title and dueDate. Sharing defaults to the owner and must include the owner if explicitly supplied. Progress must be an integer from 0 to 100.`,
   tags: {
     readOnly: false,
     destructive: false
@@ -58,7 +56,16 @@ export let createGoal = SlateTool.create(spec, {
       title: z.string().describe('Goal title'),
       description: z.string().optional().describe('Goal description'),
       percentComplete: z.number().optional().describe('Initial progress percentage (0-100)'),
-      dueDate: z.string().optional().describe('Due date in YYYY-MM-DD format'),
+      dueDate: z
+        .string()
+        .optional()
+        .describe('Required by BambooHR: due date in YYYY-MM-DD format'),
+      completionDate: z
+        .string()
+        .optional()
+        .describe(
+          'Completion date in YYYY-MM-DD format; allowed only with percentComplete=100'
+        ),
       sharedWithEmployeeIds: z
         .array(z.string())
         .optional()
@@ -76,23 +83,21 @@ export let createGoal = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let result = await client.createGoal(ctx.input.employeeId, {
       title: ctx.input.title,
       description: ctx.input.description,
       percentComplete: ctx.input.percentComplete,
       dueDate: ctx.input.dueDate,
+      completionDate: ctx.input.completionDate,
       sharedWithEmployeeIds: ctx.input.sharedWithEmployeeIds,
       alignsWithOptionId: ctx.input.alignsWithOptionId
     });
 
     return {
       output: {
-        goalId: String(result?.goal?.id || result?.id || 'unknown'),
+        goalId: responseId(result.goal.id),
         employeeId: ctx.input.employeeId
       },
       message: `Created goal **${ctx.input.title}** for employee **${ctx.input.employeeId}**.`
@@ -121,6 +126,12 @@ export let updateGoal = SlateTool.create(spec, {
       description: z.string().optional().describe('New description'),
       percentComplete: z.number().optional().describe('Updated progress percentage (0-100)'),
       dueDate: z.string().optional().describe('New due date in YYYY-MM-DD format'),
+      completionDate: z
+        .string()
+        .optional()
+        .describe(
+          'Completion date in YYYY-MM-DD format; allowed only with percentComplete=100'
+        ),
       sharedWithEmployeeIds: z
         .array(z.string())
         .optional()
@@ -135,22 +146,43 @@ export let updateGoal = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     if (ctx.input.action === 'close') {
+      if (
+        [
+          'title',
+          'description',
+          'percentComplete',
+          'dueDate',
+          'sharedWithEmployeeIds',
+          'completionDate'
+        ].some(key => Object.hasOwn(ctx.input, key))
+      )
+        invalid('Close/reopen actions do not accept update fields.');
       await client.closeGoal(ctx.input.employeeId, ctx.input.goalId);
     } else if (ctx.input.action === 'reopen') {
+      if (
+        [
+          'title',
+          'description',
+          'percentComplete',
+          'dueDate',
+          'sharedWithEmployeeIds',
+          'completionDate'
+        ].some(key => Object.hasOwn(ctx.input, key))
+      )
+        invalid('Close/reopen actions do not accept update fields.');
       await client.reopenGoal(ctx.input.employeeId, ctx.input.goalId);
     } else {
-      let updateData: Record<string, any> = {};
+      let updateData: Record<string, unknown> = {};
       if (ctx.input.title !== undefined) updateData.title = ctx.input.title;
       if (ctx.input.description !== undefined) updateData.description = ctx.input.description;
       if (ctx.input.percentComplete !== undefined)
         updateData.percentComplete = ctx.input.percentComplete;
       if (ctx.input.dueDate !== undefined) updateData.dueDate = ctx.input.dueDate;
+      if (ctx.input.completionDate !== undefined)
+        updateData.completionDate = ctx.input.completionDate;
       if (ctx.input.sharedWithEmployeeIds !== undefined)
         updateData.sharedWithEmployeeIds = ctx.input.sharedWithEmployeeIds;
       await client.updateGoal(ctx.input.employeeId, ctx.input.goalId, updateData);
@@ -186,21 +218,24 @@ export let addGoalComment = SlateTool.create(spec, {
   .output(
     z.object({
       goalId: z.string().describe('The goal ID'),
-      employeeId: z.string().describe('The employee ID')
+      employeeId: z.string().describe('The employee ID'),
+      commentId: z.string().optional().describe('Provider-assigned comment ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
-    await client.addGoalComment(ctx.input.employeeId, ctx.input.goalId, ctx.input.text);
+    const result = await client.addGoalComment(
+      ctx.input.employeeId,
+      ctx.input.goalId,
+      ctx.input.text
+    );
 
     return {
       output: {
         goalId: ctx.input.goalId,
-        employeeId: ctx.input.employeeId
+        employeeId: ctx.input.employeeId,
+        commentId: responseId(result.id)
       },
       message: `Added comment to goal **${ctx.input.goalId}** for employee **${ctx.input.employeeId}**.`
     };

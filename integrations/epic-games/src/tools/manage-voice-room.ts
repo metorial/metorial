@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { isIP } from 'node:net';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { EosGameServicesClient } from '../lib/client';
+import { gameClient } from '../lib/client';
+import { epicError, identifier, identifiers } from '../lib/validation';
 import { spec } from '../spec';
 
 let participantTokenSchema = z.object({
@@ -13,7 +15,7 @@ export let manageVoiceRoom = SlateTool.create(spec, {
   name: 'Manage Voice Room',
   key: 'manage_voice_room',
   description: `Manage voice chat rooms for your game. Supports three operations:
-- **join**: Generate room tokens for participants to join a voice room
+- **join**: Generate per-player room tokens for a trusted game backend; deliver each only to its corresponding player
 - **remove**: Remove a participant from a voice room
 - **mute**: Hard-mute or unmute a participant in a voice room`,
   tags: {
@@ -32,7 +34,9 @@ export let manageVoiceRoom = SlateTool.create(spec, {
             hardMuted: z
               .boolean()
               .optional()
-              .describe('Whether to hard-mute (for join and mute)')
+              .describe(
+                'Whether to hard-mute (for join and mute). Mute defaults to true when omitted.'
+              )
           })
         )
         .min(1)
@@ -47,63 +51,109 @@ export let manageVoiceRoom = SlateTool.create(spec, {
         .optional()
         .describe('Generated room tokens for joined participants'),
       clientBaseUrl: z.string().optional().describe('Media server base URL'),
+      completedParticipants: z
+        .array(z.string())
+        .optional()
+        .describe('Participants with successful native receipts.'),
+      remainingParticipants: z
+        .array(z.string())
+        .optional()
+        .describe('Failed or unattempted participants; failed effects may be uncertain.'),
+      outcome: z
+        .enum(['accepted', 'partial'])
+        .optional()
+        .describe('Native acceptance or a partially completed multi-request operation.'),
+      failure: z
+        .string()
+        .optional()
+        .describe('Safe reconciliation guidance for a partial operation.'),
       success: z.boolean().describe('Whether the operation succeeded')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EosGameServicesClient({
-      token: ctx.auth.token,
-      deploymentId: ctx.config.deploymentId
-    });
-
+    identifier(ctx.input.roomId, 'Room ID');
+    identifiers(
+      ctx.input.participants.map(row => row.productUserId),
+      100,
+      'Participants'
+    );
+    for (const row of ctx.input.participants) {
+      if (
+        row.clientIp !== undefined &&
+        (ctx.input.operation !== 'join' || !isIP(row.clientIp))
+      )
+        throw createApiServiceError(
+          'clientIp requires a valid IP address and applies only to join.'
+        );
+      if (ctx.input.operation === 'remove' && row.hardMuted !== undefined)
+        throw createApiServiceError('hardMuted does not apply to removal.');
+    }
+    const client = gameClient(ctx);
     if (ctx.input.operation === 'join') {
-      let data = await client.createVoiceRoomTokens(
+      const data = await client.createVoiceRoomTokens(
         ctx.input.roomId,
-        ctx.input.participants.map(p => ({
-          puid: p.productUserId,
-          clientIp: p.clientIp,
-          hardMuted: p.hardMuted
+        ctx.input.participants.map(row => ({
+          puid: row.productUserId,
+          clientIp: row.clientIp,
+          hardMuted: row.hardMuted
         }))
       );
-
-      let participantTokens = (data.participants ?? []).map((p: any) => ({
-        productUserId: p.puid,
-        token: p.token,
-        hardMuted: p.hardMuted ?? false
-      }));
-
       return {
         output: {
           roomId: data.roomId,
-          participantTokens,
+          participantTokens: data.participants.map(row => ({
+            productUserId: row.puid,
+            token: row.token,
+            hardMuted: row.hardMuted
+          })),
           clientBaseUrl: data.clientBaseUrl,
-          success: true
+          success: true,
+          outcome: 'accepted' as const
         },
-        message: `Generated voice room tokens for **${participantTokens.length}** participant(s) in room \`${ctx.input.roomId}\`.`
+        message:
+          'Created the exact participant room tokens. Deliver each token only to its matching player; never share tokens with the group. Token issuance does not prove anyone joined.'
       };
     }
-
-    if (ctx.input.operation === 'remove') {
-      for (let participant of ctx.input.participants) {
-        await client.removeVoiceParticipant(ctx.input.roomId, participant.productUserId);
+    const completed: string[] = [];
+    for (const participant of ctx.input.participants) {
+      try {
+        if (ctx.input.operation === 'remove')
+          await client.removeVoiceParticipant(ctx.input.roomId, participant.productUserId);
+        else
+          await client.modifyVoiceParticipant(
+            ctx.input.roomId,
+            participant.productUserId,
+            participant.hardMuted ?? true
+          );
+        completed.push(participant.productUserId);
+      } catch (error) {
+        const safe = epicError(error, true);
+        return {
+          output: {
+            roomId: ctx.input.roomId,
+            success: false,
+            outcome: 'partial' as const,
+            completedParticipants: completed,
+            remainingParticipants: ctx.input.participants
+              .slice(completed.length)
+              .map(row => row.productUserId),
+            failure: safe.message
+          },
+          message:
+            'The participant operation stopped after a failed request. Earlier native receipts remain effective; reconcile the failed participant before retrying. No rollback occurred.'
+        };
       }
-      return {
-        output: { success: true },
-        message: `Removed **${ctx.input.participants.length}** participant(s) from voice room \`${ctx.input.roomId}\`.`
-      };
-    }
-
-    // mute operation
-    for (let participant of ctx.input.participants) {
-      await client.modifyVoiceParticipant(
-        ctx.input.roomId,
-        participant.productUserId,
-        participant.hardMuted ?? true
-      );
     }
     return {
-      output: { success: true },
-      message: `Updated mute status for **${ctx.input.participants.length}** participant(s) in voice room \`${ctx.input.roomId}\`.`
+      output: {
+        roomId: ctx.input.roomId,
+        success: true,
+        outcome: 'accepted' as const,
+        completedParticipants: completed,
+        remainingParticipants: []
+      },
+      message:
+        'Epic accepted each participant operation. The API does not expose a complete room-membership observer.'
     };
   })
   .build();

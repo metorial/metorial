@@ -23,8 +23,6 @@ import {
   refreshDataset,
   updateDatasetParameters
 } from './tools';
-import { datasetRefreshCompleted, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     listCapacities,
     assignWorkspaceCapacity
   ],
-  triggers: [inboundWebhook, datasetRefreshCompleted]
+  triggers: []
 });

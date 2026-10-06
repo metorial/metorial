@@ -19,7 +19,9 @@ export let deleteCollection = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      requestId: z.string().describe('The request ID confirming the deletion.')
+      requestId: z
+        .string()
+        .describe('The request ID returned by the permanent deletion endpoint.')
     })
   )
   .handleInvocation(async ctx => {
@@ -31,7 +33,8 @@ export let deleteCollection = SlateTool.create(spec, {
       output: {
         requestId: response.request_id
       },
-      message: `Deleted collection \`${ctx.input.collectionId}\`.`
+      message:
+        'Mem accepted the permanent collection deletion. Read the exact collection ID to verify retirement; no note erasure is claimed.'
     };
   })
   .build();

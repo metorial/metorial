@@ -23,8 +23,6 @@ import {
   searchMembersTool,
   sendCampaignTool
 } from './tools';
-import { audienceWebhookTrigger, campaignActivityTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     manageInterestGroupsTool,
     manageFileManagerTool
   ],
-  triggers: [audienceWebhookTrigger, campaignActivityTrigger]
+  triggers: []
 });

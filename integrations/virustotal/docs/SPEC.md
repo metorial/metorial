@@ -1,73 +1,19 @@
-# Slates Specification for Virustotal
+# VirusTotal integration specification
 
-## Overview
+The integration uses the documented classic API v3 at `https://www.virustotal.com/api/v3` with `x-apikey` authentication. API-key renewal is a user reconnection, not OAuth refresh. No API key is placed in a path or returned in tool output. Optional username setup uses [GET /users/{id}](https://docs.virustotal.com/reference/user) and the [owner-only apikey attribute](https://docs.virustotal.com/reference/user-object) to prove the stored user binding. No undocumented `me` alias is required. Legacy token-only report connections remain usable; user context requires verified setup.
 
-VirusTotal is an online service (owned by Google) that analyzes files, URLs, domains, and IP addresses for malware and security threats. It aggregates antivirus scan results from multiple engines, providing users with a comprehensive assessment of potential threats, aiding in cybersecurity and threat intelligence efforts. The API exposes IoC relationships, sandbox dynamic analysis information, static information for files, YARA Livehunt & Retrohunt management, and crowdsourced detection details.
+| Capability | Actions and native contract |
+| --- | --- |
+| Reports | `get_file_report`, `get_url_report`, `get_domain_report`, `get_ip_report`: exact native object envelopes; file lookup accepts SHA-256/SHA-1/MD5, URL lookup accepts URL/base64/native SHA-256. |
+| Analysis | `scan_file`: POST existing hash `/analyse`; `scan_url`: form POST `/urls`; `get_analysis_status`: exact analysis GET, queued/in-progress/completed status. Accepted receipt is not completed analysis. |
+| Community | `get_comments`, `add_comment`, `add_vote`: documented indicator collections, exact nonempty receipts and observed text/verdict; votes return their native ID additively. |
+| Relationships | `get_relationships`: documented relationship names, encoded exact indicator paths, list or single-object native responses normalized to the retained list output. Native unavailable related-object errors remain explicit. |
+| Intelligence | `search_intelligence`: licensed advanced corpus search; optional descriptors, order and cursor; maximum native search page size 300. |
+| Hunting | `manage_livehunt_ruleset`: documented list/get/create/PATCH/delete; update includes exact body ID, no silent empty update. `manage_retrohunt`: list/get/create/matches, main/goodware corpus and optional completion email. |
+| Context | `get_connection_context`: safe owner-verified native user/privilege/quota projection; omitted privilege/ownership evidence remains unknown. |
 
-## Authentication
+Every public legacy action and input field is retained. Output additions are optional. `fileTypeMime` retains its historical description value but no longer falsely promises MIME semantics; use `fileTypeDescription`. Engine `result: null` stays null. No missing IDs or statistics are fabricated. Page cursors are opaque and returned without following provider-provided links; repeated cursors, malformed collections and explicit limit overruns fail. One response is bounded to 4 MiB; no automatic retries or unbounded enumeration occurs.
 
-VirusTotal uses **API key** authentication exclusively.
+Provider errors become user-facing service failures with safe operation/status/code metadata and no raw transport parent. Known connection-key reflections are screened from full response data before projection; this is bounded protection, not a claim that shared internal trace capture or every unknown encoding is secret-free. No shared transport semantics were changed.
 
-- For authenticating with the API you must include the `x-apikey` header with your personal API key in all your requests.
-- In order to use the API you must sign up to VirusTotal Community. Once you have a valid VirusTotal Community account you will find your personal API key in your personal settings section. This key is all you need to use the VirusTotal API.
-- The base URL for all API v3 requests is `https://www.virustotal.com/api/v3/`.
-- While many of the endpoints and features provided by the VirusTotal API are freely accessible to all registered users, many are restricted to premium customers only. Those endpoints and features constitute the VirusTotal Premium API.
-- The VirusTotal public API must not be used in commercial products or services.
-
-## Features
-
-### File Scanning and Analysis
-
-Upload a file for scanning and have it analyzed by 70+ antivirus products, 10+ dynamic analysis sandboxes, and other security tools to produce a threat score and relevant context. You can also retrieve analysis reports for files by their hash (MD5, SHA-1, SHA-256). Premium users can download submitted samples for offline study.
-
-### URL Scanning and Analysis
-
-Scan URLs with 70+ antivirus products/blocklists and other security tools to produce a threat score and relevant context. You can submit URLs for scanning and retrieve their analysis reports.
-
-### Domain and IP Address Reputation
-
-Look up reputation and contextual information for domains and IP addresses, including passive DNS data, WHOIS information, SSL certificates, and relationships such as communicating files, downloaded files, and referrer files. Users can also add votes (malicious or harmless) to domains.
-
-### IoC Relationships
-
-The API exposes rich relationships including embedded domains, embedded IP addresses, contacted domains, etc. This allows pivoting across indicators of compromise (files, URLs, domains, IPs) to map threat campaigns and infrastructure.
-
-### Intelligence Search (Premium)
-
-Search VirusTotal's entire dataset using advanced search modifiers to find files, URLs, domains, and IP addresses matching specific criteria (e.g., file type, detection count, submission country, behavioral attributes).
-
-### Livehunt (Premium)
-
-Livehunt allows you to hook into the stream of files submitted to VirusTotal and get notified whenever one of them matches your YARA rules. You can choose the matching entity among files, URLs, IPs, or domains. Rulesets can be created, updated, enabled/disabled, and deleted via the API. You can configure the maximum number of notifications received from a ruleset in any given 24-hour period.
-
-### Retrohunt (Premium)
-
-You can apply your YARA rules to the historical collection of files with Retrohunt. A Retrohunt job takes around 3-4 hours to complete and scans over 600TB of files sent to VirusTotal during the past year. Jobs can be launched and results retrieved programmatically. Retrohunt jobs can't have more than 300 YARA rules and a limit of 10 concurrent jobs per user is enforced.
-
-### Threat Feeds / IoC Stream (Premium)
-
-The IOC Stream is an evolution of the previous Livehunt Notifications view. It allows users to digest the incoming VirusTotal flux into relevant threat feeds that can be studied or easily exported. There are tabs for different feed types: Files, URLs, Domains, and IP Addresses. File feed batches can be retrieved by minute-level time windows.
-
-### Graphs
-
-Create and manage visual relationship graphs of IoCs (files, domains, URLs, IPs) to map threat campaigns and infrastructure. Graphs can be shared with other users.
-
-### Comments and Votes
-
-You can add comments to all indicator types (IP, Domain, File, and URL). Users can also cast votes on indicators as either malicious or harmless to contribute to community reputation scoring.
-
-### Private Scanning (Premium)
-
-Analyze files privately with VirusTotal. Private Scanning analyzes suspicious files without sharing them with anyone. Results are temporary and only visible to your team.
-
-### File Download (Premium)
-
-Premium users can download submitted samples for further research, along with the network traffic captures they generate upon execution and their detailed execution reports.
-
-### User and Group Management (Premium)
-
-Manage users and groups within an organization, including service accounts and quota management.
-
-## Events
-
-The provider does not support webhooks or purpose-built push-based event subscriptions. Livehunt notifications are retrieved via a polling-based API endpoint (`/api/v3/ioc_stream`). While Livehunt generates notifications when YARA rules match new submissions, these must be actively fetched rather than pushed to an external endpoint.
+[Public/Premium limits](https://docs.virustotal.com/reference/public-vs-premium-api), [quota consumption](https://docs.virustotal.com/docs/quota-consumption) and [dataset inclusion](https://docs.virustotal.com/reference/domain-info) are provider prerequisites. Hunting coverage does not imply broader account entitlements. Private tests require explicit isolated/retained-effect acceptance before any submission or mutation and gate destructive ruleset cleanup when complete native association proof is unavailable. No trigger registrations, sample transfers, graph/administration breadth or fabricated cleanup are implemented.

@@ -1,11 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import {
   buildRelationship,
   cleanAttributes,
   flattenResource,
-  mergeRelationships
+  mergeRelationships,
+  validateInput
 } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -29,7 +30,10 @@ Opportunities track deals through the sales pipeline with stages, amounts, and c
       closeDate: z.string().optional().describe('Expected close date (ISO 8601)'),
       description: z.string().optional().describe('Description'),
       opportunityType: z.string().optional().describe('Opportunity type'),
-      externalSource: z.string().optional().describe('External source (e.g. CRM identifier)'),
+      externalSource: z
+        .string()
+        .optional()
+        .describe('Deprecated: unsupported by the current opportunity API. Do not supply.'),
       tags: z.array(z.string()).optional().describe('Tags'),
       accountId: z.string().optional().describe('Account ID'),
       ownerId: z.string().optional().describe('Owner user ID'),
@@ -49,6 +53,11 @@ Opportunities track deals through the sales pipeline with stages, amounts, and c
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
+    if (ctx.input.externalSource !== undefined)
+      throw createApiServiceError(
+        'externalSource is deprecated for opportunities and is not a documented writable attribute. Do not supply it.'
+      );
     let client = new Client({ token: ctx.auth.token });
 
     let attributes = cleanAttributes({
@@ -58,7 +67,6 @@ Opportunities track deals through the sales pipeline with stages, amounts, and c
       closeDate: ctx.input.closeDate,
       description: ctx.input.description,
       opportunityType: ctx.input.opportunityType,
-      externalSource: ctx.input.externalSource,
       tags: ctx.input.tags
     });
 
@@ -82,11 +90,12 @@ Opportunities track deals through the sales pipeline with stages, amounts, and c
           createdAt: flat.createdAt,
           updatedAt: flat.updatedAt
         },
-        message: `Opportunity **${flat.name}** created with ID ${flat.id}.`
+        message: `Opportunity **${flat.name ?? flat.id}** created with ID ${flat.id}.`
       };
     }
 
-    if (!ctx.input.opportunityId) throw new Error('opportunityId is required for update');
+    if (!ctx.input.opportunityId)
+      throw createApiServiceError('opportunityId is required for update');
     let resource = await client.updateOpportunity(
       ctx.input.opportunityId,
       attributes,
@@ -104,7 +113,7 @@ Opportunities track deals through the sales pipeline with stages, amounts, and c
         createdAt: flat.createdAt,
         updatedAt: flat.updatedAt
       },
-      message: `Opportunity **${flat.name}** (${flat.id}) updated successfully.`
+      message: `Opportunity **${flat.name ?? flat.id}** (${flat.id}) updated successfully.`
     };
   })
   .build();

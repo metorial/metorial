@@ -1,14 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { permissionsSchema } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let updateMember = SlateTool.create(spec, {
   name: 'Update Member',
   key: 'update_member',
-  description: `Update an organization member's role, collection assignments, external ID, and/or group memberships. Provide only the fields you wish to change; unchanged fields should match current values.`,
+  description: `Update an organization member's role, collection assignments, external ID, and/or group memberships. Omitted external ID, collections, groups and existing Custom permissions are read back and preserved in the native replacement PUT. Supplied assignment arrays replace that entire assignment set.`,
   instructions: [
-    'The type and accessAll fields are required by the API. If you only want to update groups, you should still pass the current type and accessAll values.'
+    'The legacy type and accessAll inputs are retained. Use the current role and accessAll=false; current native API uses collections and groups. There is no atomic compare-and-swap: avoid concurrent changes while applying this read-then-replace operation.'
   ],
   tags: {
     destructive: false,
@@ -18,14 +19,37 @@ export let updateMember = SlateTool.create(spec, {
   .input(
     z.object({
       memberId: z.string().describe('ID of the member to update'),
-      type: z.number().describe('Role: 0=Owner, 1=Admin, 2=User, 3=Manager'),
-      accessAll: z.boolean().describe('Whether the member has access to all collections'),
+      type: z
+        .number()
+        .describe('Role: 0=Owner, 1=Admin, 2=User, 4=Custom; legacy role 3 is unsupported'),
+      accessAll: z
+        .boolean()
+        .describe(
+          'Legacy field: false only. Current Public API uses explicit collections; true is refused before any change.'
+        ),
+      permissions: permissionsSchema
+        .optional()
+        .describe(
+          'Complete Custom-role permissions; omission preserves current Custom permissions. Required when changing another role to Custom.'
+        ),
       externalId: z.string().optional().describe('External ID for directory sync'),
       collections: z
         .array(
           z.object({
             collectionId: z.string().describe('Collection ID'),
-            readOnly: z.boolean().default(false).describe('Whether access is read-only')
+            readOnly: z.boolean().default(false).describe('Whether access is read-only'),
+            hidePasswords: z
+              .boolean()
+              .optional()
+              .describe(
+                'Hide passwords permission; omitted values preserve existing assignment settings on updates.'
+              ),
+            manage: z
+              .boolean()
+              .optional()
+              .describe(
+                'Manage collection permission; omitted values preserve existing assignment settings on updates.'
+              )
           })
         )
         .optional()
@@ -38,29 +62,33 @@ export let updateMember = SlateTool.create(spec, {
       memberId: z.string().describe('ID of the updated member'),
       email: z.string().describe('Email of the member'),
       type: z.number().describe('Updated role'),
-      accessAll: z.boolean().describe('Updated access-all flag'),
+      accessAll: z
+        .boolean()
+        .nullable()
+        .describe(
+          'Legacy accessAll response; null when not exposed by the current Public API'
+        ),
       externalId: z.string().nullable().describe('Updated external ID')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.auth.serverUrl
+      ...ctx.auth
     });
 
     let result = await client.updateMember(ctx.input.memberId, {
       type: ctx.input.type,
       accessAll: ctx.input.accessAll,
       externalId: ctx.input.externalId,
+      groupIds: ctx.input.groupIds,
+      permissions: ctx.input.permissions,
       collections: ctx.input.collections?.map(c => ({
         id: c.collectionId,
-        readOnly: c.readOnly
+        readOnly: c.readOnly,
+        hidePasswords: c.hidePasswords,
+        manage: c.manage
       }))
     });
-
-    if (ctx.input.groupIds) {
-      await client.updateMemberGroupIds(ctx.input.memberId, ctx.input.groupIds);
-    }
 
     return {
       output: {

@@ -56,7 +56,7 @@ export let listNotes = SlateTool.create(spec, {
       pageToken: ctx.input.pageToken
     });
 
-    let notes = (result.notes ?? result ?? []).map((n: any) => ({
+    let notes = (result.notes ?? result ?? []).map(n => ({
       noteId: n.id,
       creatorId: n.creator_id ?? null,
       personIds: n.person_ids ?? [],

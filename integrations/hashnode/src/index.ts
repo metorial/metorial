@@ -6,6 +6,7 @@ import {
   getPublication,
   getUser,
   listPosts,
+  listPublications,
   listStaticPages,
   manageComments,
   manageDraft,
@@ -15,13 +16,12 @@ import {
   subscribeNewsletter,
   updatePost
 } from './tools';
-import { postEvents, staticPageEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     getPost,
     listPosts,
+    listPublications,
     publishPost,
     updatePost,
     deletePost,
@@ -34,5 +34,7 @@ export let provider = Slate.create({
     listStaticPages,
     subscribeNewsletter
   ],
-  triggers: [postEvents, staticPageEvents]
+  triggers: []
 });
+
+export { z } from 'zod';

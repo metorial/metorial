@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -32,11 +32,15 @@ export let getTransactionFee = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
     if (ctx.input.feeType === 'transfer') {
       let result = await client.getTransferFee(ctx.input.amount, ctx.input.currency);
-      let feeData = Array.isArray(result.data) ? result.data[0] : result.data;
+      let feeData = result.data.find((fee: any) => fee.currency === ctx.input.currency);
+      if (!feeData)
+        throw createApiServiceError(
+          'No transfer fee was returned for the requested currency.'
+        );
       return {
         output: {
           fee: feeData.fee,
@@ -56,9 +60,9 @@ export let getTransactionFee = SlateTool.create(spec, {
         flutterwaveFee: d.flutterwave_fee,
         merchantFee: d.merchant_fee,
         stampDutyFee: d.stamp_duty_fee,
-        currency: d.currency
+        currency: d.currency ?? ctx.input.currency
       },
-      message: `Fee for ${d.currency} ${d.charge_amount}: **${d.currency} ${d.fee}** (Flutterwave: ${d.flutterwave_fee}, Stamp duty: ${d.stamp_duty_fee}).`
+      message: `Fee for ${d.currency ?? ctx.input.currency} ${d.charge_amount}: **${d.currency ?? ctx.input.currency} ${d.fee}** (Flutterwave: ${d.flutterwave_fee}, Stamp duty: ${d.stamp_duty_fee}).`
     };
   })
   .build();

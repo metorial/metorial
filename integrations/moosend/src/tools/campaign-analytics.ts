@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoosendClient } from '../lib/client';
 import { spec } from '../spec';
@@ -11,7 +11,7 @@ export let campaignAnalytics = SlateTool.create(spec, {
     'Use reportType "summary" for an overview of campaign performance.',
     'Use reportType "ab_summary" for A/B test campaign results.',
     'Use reportType "stats" with a statsType to get detailed breakdowns by opens, clicks, bounces, unsubscribes, etc.',
-    'Sent stats are retained for 90 days; opened/clicked stats for 180 days.'
+    'Statistics availability depends on the campaign state and provider retention policy.'
   ],
   tags: {
     destructive: false,
@@ -32,7 +32,8 @@ export let campaignAnalytics = SlateTool.create(spec, {
           'Forward',
           'Unsubscribed',
           'Bounced',
-          'Complained'
+          'Complained',
+          'Activity'
         ])
         .optional()
         .describe('Specific stat type (required when reportType is "stats")'),
@@ -45,8 +46,11 @@ export let campaignAnalytics = SlateTool.create(spec, {
       fromDate: z
         .string()
         .optional()
-        .describe('Start date filter for stats (e.g. "2024-01-01")'),
-      toDate: z.string().optional().describe('End date filter for stats (e.g. "2024-12-31")')
+        .describe('Start date filter for stats (YYYY-MM-DD or DD-MM-YYYY)'),
+      toDate: z
+        .string()
+        .optional()
+        .describe('End date filter for stats (YYYY-MM-DD or DD-MM-YYYY)')
     })
   )
   .output(
@@ -72,7 +76,7 @@ export let campaignAnalytics = SlateTool.create(spec, {
         break;
       case 'stats':
         if (!ctx.input.statsType) {
-          throw new Error('statsType is required when reportType is "stats"');
+          throw createApiServiceError('statsType is required when reportType is "stats"');
         }
         analytics = await client.getCampaignStats(
           campaignId,

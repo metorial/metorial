@@ -1,14 +1,14 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { HoneybadgerClient } from './lib/client';
+import type { HoneybadgerAuth } from './lib/types';
 
-export let auth = SlateAuth.create()
+export const auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string().describe('Personal auth token for the Honeybadger Data API'),
-      projectToken: z
-        .string()
-        .optional()
-        .describe('Project API key for the Honeybadger Reporting API')
+      token: z.string().describe('Personal Data API token'),
+      projectToken: z.string().optional().describe('Project Reporting API key'),
+      region: z.enum(['us', 'eu']).optional().describe('Honeybadger data region')
     })
   )
   .addTokenAuth({
@@ -18,46 +18,35 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       personalAuthToken: z
         .string()
-        .describe(
-          'Your personal auth token found under the Authentication tab in your user settings'
-        ),
+        .describe('Personal token from the Authentication tab in user settings'),
       projectApiKey: z
         .string()
         .optional()
         .describe(
-          'Project API key found in project settings (required for reporting errors, events, deployments, and check-in pings)'
+          'Project API key for reporting errors and events; deployment records require the selected project’s primary key. ID-based check-in pings do not require it.'
+        ),
+      region: z
+        .enum(['us', 'eu'])
+        .optional()
+        .describe(
+          'Region used to sign in: us for app.honeybadger.io (default), eu for eu-app.honeybadger.io'
         )
     }),
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.personalAuthToken,
-          projectToken: ctx.input.projectApiKey
-        }
-      };
+      const token = ctx.input.personalAuthToken.trim();
+      const projectToken = ctx.input.projectApiKey?.trim();
+      if (!token || (ctx.input.projectApiKey !== undefined && !projectToken))
+        throw createApiServiceError(
+          'Provide a nonempty personal token and, if configured, a nonempty project API key.'
+        );
+      return { output: { token, projectToken, region: ctx.input.region ?? 'us' } };
     },
-    getProfile: async (ctx: {
-      output: { token: string; projectToken?: string };
-      input: { personalAuthToken: string; projectApiKey?: string };
-    }) => {
-      let http = createAxios({
-        baseURL: 'https://app.honeybadger.io/v2',
-        auth: {
-          username: ctx.output.token,
-          password: ''
-        },
-        headers: {
-          Accept: 'application/json'
-        }
-      });
-
-      let response = await http.get('/projects');
-      let projects = response.data?.results || [];
-
+    getProfile: async (ctx: { output: HoneybadgerAuth }) => {
+      const accounts = await new HoneybadgerClient(ctx.output).listAccounts();
       return {
         profile: {
-          name: 'Honeybadger User',
-          projectCount: projects.length
+          name: `Honeybadger (${ctx.output.region === 'eu' ? 'EU' : 'US'})`,
+          accountCountOnPage: accounts.results.length
         }
       };
     }

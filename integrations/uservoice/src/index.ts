@@ -21,8 +21,6 @@ import {
   updateSuggestion,
   updateSuggestionStatus
 } from './tools';
-import { newSuggestionsPolling, statusUpdatesPolling, suggestionWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     addNote,
     importExternalUsers
   ],
-  triggers: [suggestionWebhook, newSuggestionsPolling, statusUpdatesPolling]
+  triggers: []
 });

@@ -14,6 +14,12 @@ export let getAnalysis = SlateTool.create(spec, {
   .input(
     z.object({
       checkId: z.number().describe('ID of the check to get analysis for'),
+      analysisId: z
+        .number()
+        .optional()
+        .describe(
+          'Analysis ID from a previous get_analysis response; fetch detailed root cause diagnostics'
+        ),
       limit: z.number().optional().describe('Maximum number of analysis results'),
       offset: z.number().optional().describe('Offset for pagination'),
       from: z.number().optional().describe('Start timestamp (Unix epoch)'),
@@ -22,6 +28,11 @@ export let getAnalysis = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of records returned in this response'),
+      details: z
+        .unknown()
+        .optional()
+        .describe('Detailed root cause diagnostics for the requested analysis ID'),
       analysis: z
         .array(
           z.object({
@@ -42,6 +53,13 @@ export let getAnalysis = SlateTool.create(spec, {
       accountEmail: ctx.auth.accountEmail
     });
 
+    if (ctx.input.analysisId !== undefined) {
+      const details = await client.getAnalysisDetail(ctx.input.checkId, ctx.input.analysisId);
+      return {
+        output: { analysis: [], returnedCount: 0, details },
+        message: `Retrieved root cause analysis ${ctx.input.analysisId}.`
+      };
+    }
     let result = await client.getAnalysis(ctx.input.checkId, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
@@ -49,14 +67,14 @@ export let getAnalysis = SlateTool.create(spec, {
       to: ctx.input.to
     });
 
-    let analysis = (result.analysis || []).map((a: any) => ({
+    let analysis = result.analysis.map(a => ({
       analysisId: a.id,
       timeFirstTest: a.timefirsttest,
       timeConfirmTest: a.timeconfirmtest
     }));
 
     return {
-      output: { analysis },
+      output: { analysis, returnedCount: analysis.length },
       message: `Retrieved **${analysis.length}** root cause analysis result(s) for check ${ctx.input.checkId}.`
     };
   })

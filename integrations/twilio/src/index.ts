@@ -18,8 +18,6 @@ import {
   sendMessage,
   sendVerification
 } from './tools';
-import { callStatus, incomingCall, incomingMessage, messageStatus } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     listRecordings,
     listVerifyServices
   ],
-  triggers: [incomingMessage, messageStatus, incomingCall, callStatus]
+  triggers: []
 });

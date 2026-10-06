@@ -1,103 +1,72 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createPublicKey } from 'node:crypto';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { VonageRestClient, validateAuth } from './lib/client';
+import { generateVonageJwt, rsaPrivateKey, rsaPublicKey } from './lib/jwt';
+import { incomplete, record } from './lib/validation';
 
-let outputSchema = z.object({
+const outputSchema = z.object({
   apiKey: z.string(),
   apiSecret: z.string(),
   applicationId: z.string().optional(),
   privateKey: z.string().optional()
 });
-
 type AuthOutput = z.infer<typeof outputSchema>;
-
-let fetchProfile = async (output: AuthOutput) => {
-  let restAxios = createAxios({ baseURL: 'https://rest.nexmo.com' });
-  let res = await restAxios.get('/account/get-balance', {
-    params: {
-      api_key: output.apiKey,
-      api_secret: output.apiSecret
-    }
-  });
+async function fetchProfile(output: AuthOutput) {
+  const checked = validateAuth(output),
+    client = new VonageRestClient(checked),
+    balance = await client.getBalance();
+  if (checked.applicationId && checked.privateKey) {
+    const app = await client.getApplication(checked.applicationId);
+    const expected = createPublicKey(rsaPrivateKey(checked.privateKey))
+      .export({ type: 'spki', format: 'pem' })
+      .toString();
+    if (rsaPublicKey(String(record(app.keys).public_key)) !== expected) throw incomplete();
+  }
   return {
     profile: {
-      id: output.apiKey,
-      name: `Vonage Account (${output.apiKey})`,
-      balance: res.data.value
+      id: checked.apiKey,
+      name: 'Vonage account',
+      balance: balance.value,
+      configuredAccountApiKey: checked.apiKey,
+      applicationId: checked.applicationId
     }
   };
-};
-
-export let auth = SlateAuth.create()
+}
+const keySchema = z.object({
+  apiKey: z.string().describe('Eight-character account API key from the Vonage Dashboard'),
+  apiSecret: z.string().describe('Vonage account API secret')
+});
+export const auth = SlateAuth.create()
   .output(outputSchema)
   .addCustomAuth({
     type: 'auth.custom',
     name: 'API Key & Secret',
     key: 'api_key_secret',
-
-    inputSchema: z.object({
-      apiKey: z
-        .string()
-        .describe('Your Vonage API Key (found at the top of the Vonage Dashboard)'),
-      apiSecret: z
-        .string()
-        .describe('Your Vonage API Secret (found at the top of the Vonage Dashboard)')
+    inputSchema: keySchema,
+    getOutput: async (ctx: { input: { apiKey: string; apiSecret: string } }) => ({
+      output: validateAuth(ctx.input)
     }),
-
-    getOutput: async (ctx: { input: { apiKey: string; apiSecret: string } }) => {
-      return {
-        output: {
-          apiKey: ctx.input.apiKey,
-          apiSecret: ctx.input.apiSecret
-        }
-      };
-    },
-
-    getProfile: async (ctx: {
-      output: AuthOutput;
-      input: { apiKey: string; apiSecret: string };
-    }) => {
-      return fetchProfile(ctx.output);
-    }
+    getProfile: async (ctx: { output: AuthOutput }) => fetchProfile(ctx.output)
   })
   .addCustomAuth({
     type: 'auth.custom',
     name: 'API Key, Secret & Application JWT',
     key: 'api_key_jwt',
-
-    inputSchema: z.object({
-      apiKey: z
-        .string()
-        .describe('Your Vonage API Key (found at the top of the Vonage Dashboard)'),
-      apiSecret: z
-        .string()
-        .describe('Your Vonage API Secret (found at the top of the Vonage Dashboard)'),
+    inputSchema: keySchema.extend({
       applicationId: z
         .string()
-        .describe('The Vonage Application ID (from the Applications page in the Dashboard)'),
+        .describe('Exact application ID from manage_applications list/get or the Dashboard'),
       privateKey: z
         .string()
-        .describe(
-          'The private key contents (from the private.key file downloaded when generating keys for your Vonage Application)'
-        )
+        .describe('Matching unencrypted RSA private key contents, PKCS#1 or PKCS#8 PEM')
     }),
-
     getOutput: async (ctx: {
       input: { apiKey: string; apiSecret: string; applicationId: string; privateKey: string };
     }) => {
-      return {
-        output: {
-          apiKey: ctx.input.apiKey,
-          apiSecret: ctx.input.apiSecret,
-          applicationId: ctx.input.applicationId,
-          privateKey: ctx.input.privateKey
-        }
-      };
+      const output = validateAuth(ctx.input);
+      await generateVonageJwt(ctx.input.applicationId, ctx.input.privateKey);
+      return { output };
     },
-
-    getProfile: async (ctx: {
-      output: AuthOutput;
-      input: { apiKey: string; apiSecret: string; applicationId: string; privateKey: string };
-    }) => {
-      return fetchProfile(ctx.output);
-    }
+    getProfile: async (ctx: { output: AuthOutput }) => fetchProfile(ctx.output)
   });

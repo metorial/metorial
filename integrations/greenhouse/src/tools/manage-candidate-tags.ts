@@ -2,13 +2,12 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GreenhouseClient } from '../lib/client';
 import { spec } from '../spec';
-
-export let manageCandidateTagsTool = SlateTool.create(spec, {
-  name: 'Manage Candidate Tags',
+export const manageCandidateTagsTool = SlateTool.create(spec, {
   key: 'manage_candidate_tags',
-  description: `Add or remove tags on a candidate in Greenhouse. Use the action field to specify whether to add or remove the tag. Requires the **On-Behalf-Of** user ID in config.`,
-  constraints: ['Requires the onBehalfOf config value to be set for audit purposes.'],
-  tags: { readOnly: false }
+  name: 'Manage Candidate Tags',
+  description:
+    'Add or remove an existing tag on one candidate. Resolves the exact tag name and verifies membership. Does not create or delete organization-wide tag definitions.',
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
@@ -26,26 +25,13 @@ export let manageCandidateTagsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GreenhouseClient({
-      token: ctx.auth.token,
-      onBehalfOf: ctx.config.onBehalfOf
-    });
-    let candidateId = Number.parseInt(ctx.input.candidateId, 10);
-
-    if (ctx.input.action === 'add') {
-      await client.addCandidateTag(candidateId, ctx.input.tagName);
-    } else {
-      await client.removeCandidateTag(candidateId, ctx.input.tagName);
-    }
-
     return {
-      output: {
-        success: true,
-        candidateId: ctx.input.candidateId,
-        action: ctx.input.action,
-        tagName: ctx.input.tagName
-      },
-      message: `${ctx.input.action === 'add' ? 'Added' : 'Removed'} tag "${ctx.input.tagName}" ${ctx.input.action === 'add' ? 'to' : 'from'} candidate **${ctx.input.candidateId}**.`
+      output: await new GreenhouseClient(ctx.auth, ctx.config).manageCandidateTag(
+        ctx.input.candidateId,
+        ctx.input.action,
+        ctx.input.tagName
+      ),
+      message: 'Confirmed the candidate tag membership.'
     };
   })
   .build();

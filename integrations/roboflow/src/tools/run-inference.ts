@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema, versionNumberSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let runInferenceTool = SlateTool.create(spec, {
@@ -17,17 +18,21 @@ export let runInferenceTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project URL slug'),
-      versionNumber: z.number().describe('Model version number'),
+      projectId: projectIdSchema,
+      versionNumber: versionNumberSchema,
       imageSource: z
         .string()
         .describe('Publicly accessible image URL or base64-encoded image data'),
       confidence: z
         .number()
+        .min(0)
+        .max(100)
         .optional()
         .describe('Minimum confidence threshold (0-100, default 40)'),
       overlap: z
         .number()
+        .min(0)
+        .max(100)
         .optional()
         .describe(
           'Maximum bounding box overlap percentage before merging (0-100, default 30)'
@@ -70,14 +75,34 @@ export let runInferenceTool = SlateTool.create(spec, {
       }
     );
 
-    let predictions = (result.predictions || []).map((p: any) => ({
-      className: p.class,
-      confidence: p.confidence,
-      x: p.x,
-      y: p.y,
-      width: p.width,
-      height: p.height
-    }));
+    if (
+      !Array.isArray(result.predictions) ||
+      result.predictions.some(
+        (prediction: Record<string, unknown>) =>
+          !['x', 'y', 'width', 'height'].every(key => typeof prediction[key] === 'number')
+      )
+    ) {
+      throw createApiServiceError(
+        'run_inference requires a deployed object-detection model. Select an object-detection project from list_projects.'
+      );
+    }
+    const classes = ctx.input.classes
+      ?.split(',')
+      .map(value => value.trim())
+      .filter(Boolean);
+    let predictions = result.predictions
+      .filter(
+        (prediction: { class: string }) =>
+          !classes?.length || classes.includes(prediction.class)
+      )
+      .map((p: any) => ({
+        className: p.class,
+        confidence: p.confidence,
+        x: p.x,
+        y: p.y,
+        width: p.width,
+        height: p.height
+      }));
 
     return {
       output: {

@@ -34,8 +34,6 @@ import {
   updateTranscript,
   uploadAudio
 } from './tools';
-import { transcriptionCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -72,5 +70,5 @@ export let provider = Slate.create({
     getAiApps,
     getAnalytics
   ],
-  triggers: [transcriptionCompleted]
+  triggers: []
 });

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listAccounts = SlateTool.create(spec, {
   name: 'List Accounts',
   key: 'list_accounts',
-  description: `List all Drip accounts accessible to the authenticated user. Use this to find account IDs for configuring the integration.`,
+  description: `List all Drip accounts accessible to the authenticated user. Pass the selected accountId to subsequent account operations.`,
   tags: {
     readOnly: true
   }
@@ -30,7 +30,6 @@ export let listAccounts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 

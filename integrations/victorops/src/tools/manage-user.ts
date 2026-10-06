@@ -11,7 +11,7 @@ export let manageUser = SlateTool.create(spec, {
     'When deleting a user, a replacement username must be provided to take over their responsibilities.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -20,11 +20,17 @@ export let manageUser = SlateTool.create(spec, {
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete'])
         .describe('Action to perform'),
-      username: z.string().optional().describe('Username (required for get, update, delete)'),
+      username: z
+        .string()
+        .optional()
+        .describe('Username (required for create, get, update and delete)'),
       firstName: z.string().optional().describe('First name (for create or update)'),
       lastName: z.string().optional().describe('Last name (for create or update)'),
       email: z.string().optional().describe('Email address (required for create)'),
-      admin: z.boolean().optional().describe('Whether the user should have admin privileges'),
+      admin: z
+        .boolean()
+        .optional()
+        .describe('Legacy admin flag; the provider ignores it when creating users'),
       replacementUsername: z
         .string()
         .optional()
@@ -46,7 +52,7 @@ export let manageUser = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'list': {
         let data = await client.listUsers();
-        let users = data?.users ?? [];
+        let users = data.users;
         return {
           output: { users },
           message: `Found **${users.length}** user(s).`
@@ -76,7 +82,7 @@ export let manageUser = SlateTool.create(spec, {
       }
 
       case 'update': {
-        let updateData: any = {};
+        let updateData: Parameters<Client['updateUser']>[1] = {};
         if (ctx.input.firstName !== undefined) updateData.firstName = ctx.input.firstName;
         if (ctx.input.lastName !== undefined) updateData.lastName = ctx.input.lastName;
         if (ctx.input.email !== undefined) updateData.email = ctx.input.email;

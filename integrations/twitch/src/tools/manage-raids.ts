@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwitchClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageRaids = SlateTool.create(spec, {
@@ -34,11 +35,12 @@ export let manageRaids = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId);
+    validateInput('manage_raids', ctx.input, [ctx.auth.token]);
+    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId, ctx.auth.userId);
 
     if (ctx.input.action === 'start') {
       if (!ctx.input.toBroadcasterId)
-        throw new Error('toBroadcasterId is required to start a raid');
+        throw createApiServiceError('toBroadcasterId is required to start a raid');
 
       let result = await client.startRaid(
         ctx.input.fromBroadcasterId,
@@ -47,7 +49,7 @@ export let manageRaids = SlateTool.create(spec, {
 
       return {
         output: { success: true, createdAt: result.createdAt, isMature: result.isMature },
-        message: `Raid started to broadcaster \`${ctx.input.toBroadcasterId}\``
+        message: `Pending raid accepted to broadcaster \`${ctx.input.toBroadcasterId}\``
       };
     }
 

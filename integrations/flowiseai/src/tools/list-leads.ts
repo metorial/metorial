@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FlowiseClient } from '../lib/client';
+import { FlowiseClient, parseFlowiseList } from '../lib/client';
 import { spec } from '../spec';
 
 export let listLeads = SlateTool.create(spec, {
@@ -41,7 +41,7 @@ export let listLeads = SlateTool.create(spec, {
     });
 
     let result = await client.listLeads(ctx.input.chatflowId);
-    let leads = Array.isArray(result) ? result : [];
+    let { items: leads } = parseFlowiseList(result);
 
     return {
       output: {

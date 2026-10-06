@@ -48,8 +48,6 @@ import {
   updateTicket,
   whoAmI
 } from './tools';
-import { crmObjectChanges, crmObjectWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -100,5 +98,5 @@ export let provider = Slate.create({
     enrollContactInSequence,
     getSequenceEnrollmentStatus
   ],
-  triggers: [crmObjectChanges, crmObjectWebhook]
+  triggers: []
 });

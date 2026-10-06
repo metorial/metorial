@@ -24,12 +24,12 @@ describe('google-cloud-speech provider contract', () => {
         'synthesize_speech',
         'list_voices'
       ],
-      triggerIds: ['inbound_webhook'],
+      triggerIds: [],
       authMethodIds: ['google_oauth', 'api_key'],
-      triggers: [{ id: 'inbound_webhook', invocationType: 'webhook' }]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(11);
+    expect(contract.actions).toHaveLength(10);
 
     let expectedScopes = {
       transcribe_audio: googleCloudSpeechActionScopes.transcribeAudio,

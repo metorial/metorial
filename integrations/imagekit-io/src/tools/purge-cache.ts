@@ -1,15 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/validation';
 import { spec } from '../spec';
 
 export let purgeCache = SlateTool.create(spec, {
   name: 'Purge Cache',
   key: 'purge_cache',
   description: `Purge the CDN cache for a specific asset URL, or check the status of a pending purge request. Use this when you need to invalidate a cached version of an asset after updating it.`,
-  constraints: [
-    'Monthly limit of 1,000 URL cache purges per account (dashboard + API combined)'
-  ],
+  constraints: ['Cache purge quotas and additional charges depend on the account’s plan.'],
   tags: {
     destructive: false,
     readOnly: false
@@ -41,25 +40,29 @@ export let purgeCache = SlateTool.create(spec, {
       status: z
         .string()
         .optional()
-        .describe('Purge status: "Pending" or "Complete" (for status operation)')
+        .describe('Purge status: "Pending" or "Completed" (for status operation)')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.operation === 'purge' && ctx.input.purgeRequestId !== undefined)
+      throw invalid('purgeRequestId applies only to status.');
+    if (ctx.input.operation === 'status' && ctx.input.url !== undefined)
+      throw invalid('url applies only to purge.');
     if (ctx.input.operation === 'purge') {
-      if (!ctx.input.url) throw new Error('url is required for purge operation');
+      if (!ctx.input.url) throw invalid('url is required for purge operation');
       let result = await client.purgeCache(ctx.input.url);
 
       return {
         output: { purgeRequestId: result.requestId },
-        message: `Cache purge initiated for \`${ctx.input.url}\`. Request ID: \`${result.requestId}\`.`
+        message: `Cache purge initiated. Request ID: \`${result.requestId}\`.`
       };
     }
 
     if (ctx.input.operation === 'status') {
       if (!ctx.input.purgeRequestId)
-        throw new Error('purgeRequestId is required for status operation');
+        throw invalid('purgeRequestId is required for status operation');
       let result = await client.getPurgeCacheStatus(ctx.input.purgeRequestId);
 
       return {
@@ -68,6 +71,6 @@ export let purgeCache = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown operation: ${ctx.input.operation}`);
+    throw invalid(`Unknown operation: ${ctx.input.operation}`);
   })
   .build();

@@ -5,6 +5,7 @@ export let config = SlateConfig.create(
   z.object({
     baseUrl: z
       .string()
+      .url()
       .default('https://cloud.griptape.ai')
       .describe('Base URL for the Griptape Cloud API')
   })

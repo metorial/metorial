@@ -12,8 +12,6 @@ import {
   searchJobsTool,
   updateJobTool
 } from './tools';
-import { jobStatusWebhookTrigger, jobUpdatesPollingTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     listVehiclesTool,
     manageVehicleTool
   ],
-  triggers: [jobStatusWebhookTrigger, jobUpdatesPollingTrigger]
+  triggers: []
 });

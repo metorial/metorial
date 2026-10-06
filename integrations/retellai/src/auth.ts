@@ -14,6 +14,8 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
+        .trim()
+        .min(1)
         .describe(
           'Retell AI API key. Found in the "API Keys" tab of your Retell AI dashboard.'
         )

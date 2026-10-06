@@ -2,6 +2,8 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getAssistant,
+  getFileUrl,
+  getResource,
   listAssistants,
   listDataConnectors,
   listGriptapeTools,
@@ -10,6 +12,8 @@ import {
   listStructures,
   manageAssistant,
   manageBucket,
+  manageDataJob,
+  manageKnowledgeBase,
   manageKnowledgeBaseJob,
   manageMessage,
   manageRuleset,
@@ -20,11 +24,13 @@ import {
   runStructure,
   runToolActivity
 } from './tools';
-import { assistantRunCompleted, inboundWebhook, structureRunCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getFileUrl,
+    getResource,
+    manageDataJob,
+    manageKnowledgeBase,
     manageAssistant,
     listAssistants,
     getAssistant,
@@ -44,5 +50,5 @@ export let provider = Slate.create({
     listDataConnectors,
     manageBucket
   ],
-  triggers: [inboundWebhook, assistantRunCompleted, structureRunCompleted]
+  triggers: []
 });

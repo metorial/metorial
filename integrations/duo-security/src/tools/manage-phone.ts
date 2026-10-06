@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listPhones = SlateTool.create(spec, {
@@ -35,14 +36,17 @@ export let listPhones = SlateTool.create(spec, {
         })
       ),
       totalObjects: z.number().optional(),
-      hasMore: z.boolean()
+      hasMore: z.boolean(),
+      nextOffset: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('list_phones', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.listPhones({
@@ -62,13 +66,17 @@ export let listPhones = SlateTool.create(spec, {
     }));
 
     let totalObjects = result.metadata?.total_objects;
+    let nextOffset =
+      typeof result.metadata?.next_offset === 'number'
+        ? result.metadata.next_offset
+        : undefined;
     let hasMore =
-      totalObjects !== undefined
-        ? (ctx.input.offset ?? 0) + phones.length < totalObjects
-        : false;
+      nextOffset !== undefined ||
+      (totalObjects !== undefined &&
+        (ctx.input.offset ?? 0) + result.response.length < totalObjects);
 
     return {
-      output: { phones, totalObjects, hasMore },
+      output: { phones, totalObjects, hasMore, nextOffset },
       message: `Found **${phones.length}** phone(s).`
     };
   })
@@ -114,10 +122,12 @@ export let createPhone = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('create_phone', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.createPhone({
@@ -160,10 +170,12 @@ export let deletePhone = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('delete_phone', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     await client.deletePhone(ctx.input.phoneId);

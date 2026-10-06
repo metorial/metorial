@@ -1,19 +1,23 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MakeClient } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listHooks = SlateTool.create(spec, {
   name: 'List Webhooks',
   key: 'list_hooks',
-  description: `Retrieve all webhooks (hooks) for a team. Hooks are incoming trigger endpoints that receive data from external services and can initiate scenario executions. Filter by type or assignment status.`,
+  description: `Retrieve a bounded page of webhooks (hooks) for a team. Hooks are incoming trigger endpoints that receive data from external services and can initiate scenario executions. Filter by type or assignment status.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      teamId: z.number().describe('Team ID to list hooks for'),
+      teamId: z
+        .number()
+        .describe(
+          'Team ID; call list_teams after list_organizations to discover authorized IDs. to list hooks for'
+        ),
       typeName: z
         .string()
         .optional()
@@ -32,7 +36,12 @@ export let listHooks = SlateTool.create(spec, {
         z.object({
           hookId: z.number().describe('Hook ID'),
           name: z.string().optional().describe('Hook name'),
-          teamId: z.number().optional().describe('Team ID'),
+          teamId: z
+            .number()
+            .optional()
+            .describe(
+              'Team ID; call list_teams after list_organizations to discover authorized IDs.'
+            ),
           typeName: z.string().optional().describe('Hook type'),
           url: z.string().optional().describe('Hook URL for receiving data'),
           scenarioId: z.number().optional().describe('Associated scenario ID'),
@@ -43,34 +52,20 @@ export let listHooks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MakeClient({
-      token: ctx.auth.token,
-      zoneUrl: ctx.config.zoneUrl
-    });
-
-    let result = await client.listHooks(ctx.input.teamId, {
-      typeName: ctx.input.typeName,
-      assigned: ctx.input.assigned,
-      limit: ctx.input.limit,
-      offset: ctx.input.offset
-    });
-
-    let hooks = (result.hooks ?? result ?? []).map((h: any) => ({
+    const client = clientFor(ctx);
+    const result = await client.listHooks(ctx.input.teamId, ctx.input);
+    const hooks = result.hooks.map(h => ({
       hookId: h.id,
       name: h.name,
       teamId: h.teamId,
       typeName: h.typeName,
-      url: h.url,
-      scenarioId: h.scenarioId,
+      url: h.url ?? undefined,
+      scenarioId: h.scenarioId ?? undefined,
       enabled: h.enabled
     }));
-
     return {
-      output: {
-        hooks,
-        total: result.pg?.total
-      },
-      message: `Found **${hooks.length}** webhook(s) in team ${ctx.input.teamId}.`
+      output: { hooks, total: result.total },
+      message: `Returned ${hooks.length} hooks from the bounded native collection.`
     };
   })
   .build();

@@ -1,13 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VonageRestClient } from '../lib/client';
+import { protect } from '../lib/validation';
 import { spec } from '../spec';
 
 export let verifyUser = SlateTool.create(spec, {
   name: 'Verify User',
   key: 'verify_user',
   description: `Start a user verification (2FA) request using the Vonage Verify v2 API. Sends a one-time code to the user via one or more channels (SMS, WhatsApp, voice, email, or silent authentication) with automatic failover.
-Requires the **API Key, Secret & Application JWT** auth method.`,
+Supports API key/secret for basic synchronous use and application JWT for application callbacks and advanced features.`,
   instructions: [
     'Define one or more workflow channels in order of preference. If the first channel fails, Vonage automatically tries the next.',
     'Supported channels: "sms", "whatsapp", "whatsapp_interactive", "voice", "email", "silent_auth".',
@@ -15,7 +16,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
   ],
   constraints: [
     'Silent authentication requires the user to be on a mobile data connection.',
-    'You are only charged for successful verifications.'
+    'Pricing depends on the account model and channel. Conversion and success models have different charging and timeout rules.'
   ],
   tags: {
     destructive: false,
@@ -58,7 +59,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
       channelTimeout: z
         .number()
         .optional()
-        .describe('Seconds to wait before trying the next channel (default: 300)'),
+        .describe('Seconds to wait before trying the next channel (default: 180)'),
       locale: z
         .string()
         .optional()
@@ -74,6 +75,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
     })
   )
   .handleInvocation(async ctx => {
+    protect(ctx.input, [ctx.auth.apiSecret, ctx.auth.privateKey ?? '']);
     let client = new VonageRestClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret,
@@ -93,7 +95,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
     let channels = ctx.input.workflows.map(w => w.channel).join(' -> ');
     return {
       output: result,
-      message: `Verification started for **${ctx.input.to}** via **${channels}**. Request ID: \`${result.requestId}\``
+      message: `Verification request accepted for **${ctx.input.to}** via **${channels}**. Request ID: \`${result.requestId}\``
     };
   })
   .build();

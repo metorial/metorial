@@ -17,6 +17,9 @@ export let resumeSandbox = SlateTool.create(spec, {
       sandboxId: z.string().describe('The unique identifier of the paused sandbox to resume.'),
       timeout: z
         .number()
+        .int()
+        .min(1)
+        .max(86400)
         .optional()
         .describe(
           'New timeout in seconds for the resumed sandbox. Defaults to 300 seconds (5 minutes).'

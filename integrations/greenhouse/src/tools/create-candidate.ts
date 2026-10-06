@@ -1,18 +1,23 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GreenhouseClient } from '../lib/client';
-import { mapCandidate } from '../lib/mappers';
+import { candidateOutputSchema, mapCandidate } from '../lib/mappers';
 import { spec } from '../spec';
-
-export let createCandidateTool = SlateTool.create(spec, {
-  name: 'Create Candidate',
+export const createCandidateTool = SlateTool.create(spec, {
   key: 'create_candidate',
-  description: `Create a new candidate in Greenhouse. You can optionally associate the candidate with one or more jobs by providing application job IDs. Requires the **On-Behalf-Of** user ID in config.`,
-  constraints: ['Requires the onBehalfOf config value to be set for audit purposes.'],
-  tags: { readOnly: false }
+  name: 'Create Candidate',
+  description:
+    'Create a candidate, optionally with one application. Harvest v3 supports at most one job ID and untyped socialMediaUrls; legacy typed socialMediaAddresses require migration.',
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
+      socialMediaUrls: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Untyped social profile values supported by Harvest v3. Use instead of legacy socialMediaAddresses.'
+        ),
       firstName: z.string().describe('Candidate first name'),
       lastName: z.string().describe('Candidate last name'),
       company: z.string().optional().describe('Current company'),
@@ -68,48 +73,18 @@ export let createCandidateTool = SlateTool.create(spec, {
       jobIds: z
         .array(z.string())
         .optional()
-        .describe('Job IDs to create applications for this candidate')
+        .describe('At most one job ID. Harvest v3 creates one application in this request.')
     })
   )
-  .output(
-    z.object({
-      candidateId: z.string(),
-      firstName: z.string(),
-      lastName: z.string(),
-      company: z.string().nullable(),
-      title: z.string().nullable(),
-      emailAddresses: z.array(z.object({ value: z.string(), type: z.string() })),
-      phoneNumbers: z.array(z.object({ value: z.string(), type: z.string() })),
-      tags: z.array(z.string()),
-      applicationIds: z.array(z.string()),
-      createdAt: z.string().nullable()
-    })
-  )
+  .output(candidateOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GreenhouseClient({
-      token: ctx.auth.token,
-      onBehalfOf: ctx.config.onBehalfOf
-    });
-
-    let raw = await client.createCandidate({
-      firstName: ctx.input.firstName,
-      lastName: ctx.input.lastName,
-      company: ctx.input.company,
-      title: ctx.input.title,
-      emailAddresses: ctx.input.emailAddresses,
-      phoneNumbers: ctx.input.phoneNumbers,
-      websiteAddresses: ctx.input.websiteAddresses,
-      socialMediaAddresses: ctx.input.socialMediaAddresses,
-      addresses: ctx.input.addresses,
-      tags: ctx.input.tags,
-      applications: ctx.input.jobIds?.map(id => ({ jobId: Number.parseInt(id, 10) }))
-    });
-
-    let candidate = mapCandidate(raw);
-
+    const result = await new GreenhouseClient(ctx.auth, ctx.config).createCandidate(ctx.input);
     return {
-      output: candidate,
-      message: `Created candidate **${candidate.firstName} ${candidate.lastName}** (ID: ${candidate.candidateId}).`
+      output: {
+        ...mapCandidate(result.candidate),
+        applicationIds: result.application ? [String(result.application.id)] : undefined
+      },
+      message: 'Created the candidate. Review Greenhouse before retrying an ambiguous result.'
     };
   })
   .build();

@@ -1,0 +1,517 @@
+{
+  "search_contacts": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "personId": {
+        "description": "ZoomInfo person ID",
+        "type": "string"
+      },
+      "emailAddress": {
+        "description": "Email address to search for",
+        "type": "string"
+      },
+      "firstName": {
+        "description": "Contact first name",
+        "type": "string"
+      },
+      "lastName": {
+        "description": "Contact last name",
+        "type": "string"
+      },
+      "fullName": {
+        "description": "Contact full name",
+        "type": "string"
+      },
+      "jobTitle": {
+        "description": "Job title keyword (partial match)",
+        "type": "string"
+      },
+      "managementLevel": {
+        "description": "Management level (e.g., \"C-Level\", \"VP-Level\", \"Director\", \"Manager\")",
+        "type": "string"
+      },
+      "department": {
+        "description": "Department name",
+        "type": "string"
+      },
+      "companyId": {
+        "description": "ZoomInfo company ID",
+        "type": "number"
+      },
+      "companyName": {
+        "description": "Company name",
+        "type": "string"
+      },
+      "companyWebsite": {
+        "description": "Company website domain",
+        "type": "string"
+      },
+      "country": {
+        "description": "Country name or code",
+        "type": "string"
+      },
+      "state": {
+        "description": "State or province",
+        "type": "string"
+      },
+      "city": {
+        "description": "City name",
+        "type": "string"
+      },
+      "contactAccuracyScoreMin": {
+        "description": "Minimum contact accuracy score (70-99)",
+        "type": "number",
+        "minimum": 70,
+        "maximum": 99
+      },
+      "page": {
+        "description": "Page number (starts at 1)",
+        "type": "number",
+        "minimum": 1
+      },
+      "pageSize": {
+        "description": "Results per page (1-100, default 25)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "sort": {
+        "description": "Sort field (e.g., \"contactAccuracyScore\", \"-lastName\", \"companyName\")",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "search_companies": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyName": {
+        "description": "Company name to search for",
+        "type": "string"
+      },
+      "companyId": {
+        "description": "ZoomInfo company ID",
+        "type": "number"
+      },
+      "companyWebsite": {
+        "description": "Company website domain",
+        "type": "string"
+      },
+      "country": {
+        "description": "Country name or code",
+        "type": "string"
+      },
+      "state": {
+        "description": "State or province",
+        "type": "string"
+      },
+      "city": {
+        "description": "City name",
+        "type": "string"
+      },
+      "zipCode": {
+        "description": "ZIP/postal code",
+        "type": "string"
+      },
+      "revenueMin": {
+        "description": "Minimum annual revenue (in thousands USD)",
+        "type": "number"
+      },
+      "revenueMax": {
+        "description": "Maximum annual revenue (in thousands USD)",
+        "type": "number"
+      },
+      "employeeRangeMin": {
+        "description": "Minimum employee count",
+        "type": "number"
+      },
+      "employeeRangeMax": {
+        "description": "Maximum employee count",
+        "type": "number"
+      },
+      "industryKeywords": {
+        "description": "Industry keywords to filter by",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "companyType": {
+        "description": "Company type (e.g., \"Public\", \"Private\", \"Government\")",
+        "type": "string"
+      },
+      "companyTicker": {
+        "description": "Stock ticker symbol",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number (starts at 1)",
+        "type": "number",
+        "minimum": 1
+      },
+      "pageSize": {
+        "description": "Results per page (1-100, default 25)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "sort": {
+        "description": "Sort field (e.g., \"name\", \"-employeeCount\", \"revenue\")",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "enrich_contacts": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "matchBy": {
+        "type": "string",
+        "enum": ["personId", "email", "nameAndCompany"],
+        "description": "How to match contacts: by ZoomInfo person ID, email address, or name+company combination"
+      },
+      "personIds": {
+        "description": "ZoomInfo person IDs (when matchBy is \"personId\")",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "emailAddresses": {
+        "description": "Email addresses to look up (when matchBy is \"email\")",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "contacts": {
+        "description": "Contact records to match (when matchBy is \"nameAndCompany\")",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "firstName": {
+              "type": "string"
+            },
+            "lastName": {
+              "type": "string"
+            },
+            "companyName": {
+              "type": "string"
+            },
+            "companyId": {
+              "type": "number"
+            },
+            "jobTitle": {
+              "type": "string"
+            },
+            "emailAddress": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "outputFields": {
+        "description": "Specific fields to return (e.g., [\"firstName\", \"lastName\", \"email\", \"directPhoneNumber\", \"jobTitle\", \"companyName\"])",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": ["matchBy"],
+    "additionalProperties": false
+  },
+  "enrich_companies": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "matchBy": {
+        "type": "string",
+        "enum": ["companyId", "domain", "name"],
+        "description": "How to match companies: by ZoomInfo company ID, website domain, or company name"
+      },
+      "companyIds": {
+        "description": "ZoomInfo company IDs (when matchBy is \"companyId\")",
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      },
+      "domains": {
+        "description": "Company website domains (when matchBy is \"domain\")",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "companyNames": {
+        "description": "Company names (when matchBy is \"name\")",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "outputFields": {
+        "description": "Specific fields to return (e.g., [\"companyName\", \"revenue\", \"employeeCount\", \"industry\", \"website\", \"city\", \"state\", \"country\"])",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": ["matchBy"],
+    "additionalProperties": false
+  },
+  "search_intent": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "topicId": {
+        "description": "ZoomInfo intent topic ID to search for",
+        "type": "string"
+      },
+      "topicName": {
+        "description": "Intent topic name",
+        "type": "string"
+      },
+      "companyId": {
+        "description": "Filter by specific ZoomInfo company ID",
+        "type": "number"
+      },
+      "companyName": {
+        "description": "Filter by company name",
+        "type": "string"
+      },
+      "country": {
+        "description": "Filter by country",
+        "type": "string"
+      },
+      "state": {
+        "description": "Filter by state",
+        "type": "string"
+      },
+      "signalScoreMin": {
+        "description": "Minimum signal score",
+        "type": "number"
+      },
+      "audienceStrengthMin": {
+        "description": "Minimum audience strength",
+        "type": "number"
+      },
+      "page": {
+        "description": "Page number",
+        "type": "number",
+        "minimum": 1
+      },
+      "pageSize": {
+        "description": "Results per page",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "enrich_intent": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "description": "ZoomInfo company ID",
+        "type": "number"
+      },
+      "companyName": {
+        "description": "Company name",
+        "type": "string"
+      },
+      "companyWebsite": {
+        "description": "Company website domain",
+        "type": "string"
+      },
+      "topicId": {
+        "description": "Specific topic ID to get intent data for",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "search_scoops": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "description": "ZoomInfo company ID",
+        "type": "number"
+      },
+      "companyName": {
+        "description": "Company name",
+        "type": "string"
+      },
+      "scoopType": {
+        "description": "Scoop type (e.g., \"Project\", \"Pain Point\", \"Leadership\", \"Funding\")",
+        "type": "string"
+      },
+      "scoopTopic": {
+        "description": "Scoop topic keyword",
+        "type": "string"
+      },
+      "department": {
+        "description": "Department filter",
+        "type": "string"
+      },
+      "keywords": {
+        "description": "Keywords to search for in scoops",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "publishedDateAfter": {
+        "description": "Only return scoops published after this date (ISO 8601)",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number",
+        "type": "number",
+        "minimum": 1
+      },
+      "pageSize": {
+        "description": "Results per page",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "search_news": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "description": "ZoomInfo company ID",
+        "type": "number"
+      },
+      "companyName": {
+        "description": "Company name",
+        "type": "string"
+      },
+      "keywords": {
+        "description": "Keywords to search for in news",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "publishedDateAfter": {
+        "description": "Only return news published after this date (ISO 8601)",
+        "type": "string"
+      },
+      "page": {
+        "description": "Page number",
+        "type": "number",
+        "minimum": 1
+      },
+      "pageSize": {
+        "description": "Results per page",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "additionalProperties": false
+  },
+  "websights_lookup": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "ipAddresses": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "IP addresses to resolve (IPv4 or IPv6)"
+      }
+    },
+    "required": ["ipAddresses"],
+    "additionalProperties": false
+  },
+  "get_usage": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "enrich_corporate_hierarchy": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "description": "ZoomInfo company ID",
+        "type": "number"
+      },
+      "companyName": {
+        "description": "Company name",
+        "type": "string"
+      },
+      "companyWebsite": {
+        "description": "Company website domain",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "enrich_technographics": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "description": "ZoomInfo company ID",
+        "type": "number"
+      },
+      "companyName": {
+        "description": "Company name",
+        "type": "string"
+      },
+      "companyWebsite": {
+        "description": "Company website domain",
+        "type": "string"
+      },
+      "technologyNames": {
+        "description": "Filter by specific technology names",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "compliance_check": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "emailAddresses": {
+        "description": "Email addresses to check compliance status",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "personIds": {
+        "description": "ZoomInfo person IDs to check compliance status",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "additionalProperties": false
+  }
+}

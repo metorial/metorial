@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, mergeContactProperties } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateContact = SlateTool.create(spec, {
@@ -10,7 +10,8 @@ export let updateContact = SlateTool.create(spec, {
   instructions: [
     'Provide either email or userId to identify the contact. If both are provided, the system matches on either value.',
     'To reset a property value, pass null for that property in customProperties.',
-    'To change a contact email, the contact must have a userId set.'
+    'To change a contact email, the contact must have a userId set.',
+    'This upsert can create a new contact and affect workflows or subscriptions. Omit subscribed unless you intend to change it.'
   ],
   tags: {
     destructive: false,
@@ -55,17 +56,16 @@ export let updateContact = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let { customProperties, ...standardFields } = ctx.input;
-    let data = { ...standardFields, ...customProperties };
+    let data = mergeContactProperties(standardFields, customProperties);
 
     let result = await client.updateContact(data);
 
-    let identifier = ctx.input.email || ctx.input.userId || 'unknown';
     return {
       output: {
         contactId: result.id,
         success: result.success
       },
-      message: `Updated contact **${identifier}** (ID: \`${result.id}\`).`
+      message: `Updated or created a contact with ID \`${result.id}\`.`
     };
   })
   .build();

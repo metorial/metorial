@@ -9,8 +9,6 @@ import {
   getPayments,
   searchContacts
 } from './tools';
-import { contactCreated, inboundWebhook, orderBooked, paymentCreated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     getOrders,
     getPayments
   ],
-  triggers: [inboundWebhook, contactCreated, orderBooked, paymentCreated]
+  triggers: []
 });

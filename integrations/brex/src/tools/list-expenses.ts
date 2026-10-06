@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapExpense } from '../lib/schemas';
 import { spec } from '../spec';
 
 let expenseSchema = z.object({
@@ -14,7 +15,17 @@ let expenseSchema = z.object({
     })
     .optional()
     .describe('Expense amount'),
-  status: z.string().optional().describe('Payment status'),
+  status: z.string().nullish().describe('Expense status'),
+  paymentStatus: z.string().nullish().describe('Separate payment status'),
+  billingAmount: z.object({ amount: z.number(), currency: z.string().nullable() }).nullish(),
+  receipts: z
+    .array(
+      z.object({ receiptId: z.string(), fileCount: z.number().int().nonnegative().optional() })
+    )
+    .optional()
+    .describe(
+      'Receipt identifiers and the number of provider files; use download_expense_receipt.'
+    ),
   memo: z.string().nullable().optional().describe('Memo or note attached to the expense'),
   category: z.string().nullable().optional().describe('Expense category'),
   purchasedAt: z
@@ -44,9 +55,11 @@ export let listExpenses = SlateTool.create(spec, {
       expand: z
         .array(z.enum(['merchant', 'budget', 'user', 'department', 'location', 'receipts']))
         .optional()
-        .describe('Related data to include in the response'),
+        .describe(
+          'Related data to include; receipts returns identifiers and file counts. Use download_expense_receipt for files.'
+        ),
       cursor: z.string().optional().describe('Pagination cursor for fetching next page'),
-      limit: z.number().optional().describe('Maximum number of results per page (max 1000)')
+      limit: z.number().optional().describe('Maximum number of results per page (max 100)')
     })
   )
   .output(
@@ -56,35 +69,16 @@ export let listExpenses = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.listCardExpenses({
-      cursor: ctx.input.cursor,
-      limit: ctx.input.limit,
+    const result = await new Client({ token: ctx.auth.token }).listCardExpenses({
       expand: ctx.input.expand,
-      updated_at_start: ctx.input.updatedAtStart
+      updated_at_start: ctx.input.updatedAtStart,
+      cursor: ctx.input.cursor,
+      limit: ctx.input.limit
     });
-
-    let expenses = result.items.map((e: any) => ({
-      expenseId: e.id,
-      merchantName: e.merchant?.raw_descriptor ?? e.merchant_name ?? null,
-      merchantCategory: e.merchant?.mcc ?? null,
-      amount: e.amount ? { amount: e.amount.amount, currency: e.amount.currency } : undefined,
-      status: e.status ?? e.payment_status,
-      memo: e.memo,
-      category: e.category,
-      purchasedAt: e.purchased_at,
-      updatedAt: e.updated_at,
-      userId: e.user_id ?? e.user?.id,
-      budgetId: e.budget_id ?? e.budget?.id
-    }));
-
+    const expenses = result.items.map(mapExpense);
     return {
-      output: {
-        expenses,
-        nextCursor: result.next_cursor
-      },
-      message: `Found **${expenses.length}** expense(s).${result.next_cursor ? ' More results available.' : ''}`
+      output: { expenses, nextCursor: result.next_cursor },
+      message: `Returned ${expenses.length} expenses.`
     };
   })
   .build();

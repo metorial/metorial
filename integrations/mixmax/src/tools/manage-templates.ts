@@ -46,8 +46,8 @@ export let listTemplates = SlateTool.create(spec, {
       next: ctx.input.cursor
     });
 
-    let results = data.results || data || [];
-    let templates = results.map((t: any) => ({
+    let results = data.results;
+    let templates = results.map(t => ({
       templateId: t._id,
       name: t.name,
       subject: t.subject,
@@ -116,7 +116,7 @@ export let updateTemplate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let updates: Record<string, any> = {};
+    let updates: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) updates.name = ctx.input.name;
     if (ctx.input.subject !== undefined) updates.subject = ctx.input.subject;
     if (ctx.input.body !== undefined) updates.body = ctx.input.body;
@@ -138,7 +138,7 @@ export let updateTemplate = SlateTool.create(spec, {
 export let deleteTemplate = SlateTool.create(spec, {
   name: 'Delete Template',
   key: 'delete_template',
-  description: `Permanently delete an email template.`,
+  description: `Move an email template to Trash. Mixmax retains deleted templates for 28 days; this does not immediately erase it.`,
   tags: {
     destructive: true
   }

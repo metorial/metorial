@@ -1,13 +1,14 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getAnalyticsTool,
   getInstanceTool,
   getPerformanceReportTool,
   listCampaignsTool,
+  listCampaignsV2Tool,
+  listInstancesTool,
   listReportingGroupsTool
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -15,7 +16,10 @@ export let provider = Slate.create({
     getInstanceTool,
     listCampaignsTool,
     listReportingGroupsTool,
-    getPerformanceReportTool
+    getPerformanceReportTool,
+    listInstancesTool,
+    listCampaignsV2Tool,
+    getAnalyticsTool
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

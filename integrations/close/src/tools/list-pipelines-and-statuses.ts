@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -11,7 +11,10 @@ let pipelineSchema = z.object({
 let leadStatusSchema = z.object({
   statusId: z.string().describe('Unique identifier for the lead status'),
   label: z.string().describe('Display label for the status'),
-  type: z.string().describe('Status type (e.g., "active", "archived")')
+  type: z
+    .string()
+    .optional()
+    .describe('Status type, only if supplied by Close; lead statuses ordinarily have no type')
 });
 
 let opportunityStatusSchema = z.object({
@@ -53,78 +56,42 @@ export let listPipelinesAndStatuses = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-
-    let include = ctx.input.include ?? ['pipelines', 'leadStatuses', 'opportunityStatuses'];
-    let includePipelines = include.includes('pipelines');
-    let includeLeadStatuses = include.includes('leadStatuses');
-    let includeOpportunityStatuses = include.includes('opportunityStatuses');
-
-    let pipelinesResult: any = null;
-    let leadStatusesResult: any = null;
-    let opportunityStatusesResult: any = null;
-
-    // Fetch pipelines if needed (also needed for opportunity status pipeline names)
-    if (includePipelines || includeOpportunityStatuses) {
-      pipelinesResult = await client.listPipelines();
-    }
-
-    if (includeLeadStatuses) {
-      leadStatusesResult = await client.listLeadStatuses();
-    }
-
-    if (includeOpportunityStatuses) {
-      opportunityStatusesResult = await client.listOpportunityStatuses();
-    }
-
-    let pipelineMap: Record<string, string> = {};
-    let pipelines: any[] | undefined;
-    if (pipelinesResult) {
-      let pipelineData = pipelinesResult.data ?? [];
-      pipelineData.forEach((p: any) => {
-        pipelineMap[p.id] = p.name;
-      });
-      if (includePipelines) {
-        pipelines = pipelineData.map((p: any) => ({
-          pipelineId: p.id,
-          name: p.name
-        }));
-      }
-    }
-
-    let leadStatuses: any[] | undefined;
-    if (leadStatusesResult) {
-      leadStatuses = (leadStatusesResult.data ?? []).map((s: any) => ({
-        statusId: s.id,
-        label: s.label,
-        type: s.type
-      }));
-    }
-
-    let opportunityStatuses: any[] | undefined;
-    if (opportunityStatusesResult) {
-      opportunityStatuses = (opportunityStatusesResult.data ?? []).map((s: any) => ({
-        statusId: s.id,
-        label: s.label,
-        type: s.type,
-        pipelineId: s.pipeline_id,
-        pipelineName: pipelineMap[s.pipeline_id] ?? undefined
-      }));
-    }
-
-    let parts: string[] = [];
-    if (pipelines) parts.push(`${pipelines.length} pipeline(s)`);
-    if (leadStatuses) parts.push(`${leadStatuses.length} lead status(es)`);
-    if (opportunityStatuses)
-      parts.push(`${opportunityStatuses.length} opportunity status(es)`);
-
+    const client = new Client(ctx.auth);
+    const include = ctx.input.include ?? ['pipelines', 'leadStatuses', 'opportunityStatuses'];
+    const pipelinePage =
+      include.includes('pipelines') || include.includes('opportunityStatuses')
+        ? await client.listPipelines()
+        : undefined;
+    const leadPage = include.includes('leadStatuses')
+      ? await client.listLeadStatuses()
+      : undefined;
+    const opportunityPage = include.includes('opportunityStatuses')
+      ? await client.listOpportunityStatuses()
+      : undefined;
+    if (pipelinePage?.has_more || leadPage?.has_more || opportunityPage?.has_more)
+      throw createApiServiceError(
+        'Close returned incomplete configuration lists. Configuration pagination is not available through this tool.'
+      );
+    const names = new Map(pipelinePage?.data.map(p => [p.id, p.name]));
     return {
       output: {
-        ...(pipelines !== undefined ? { pipelines } : {}),
-        ...(leadStatuses !== undefined ? { leadStatuses } : {}),
-        ...(opportunityStatuses !== undefined ? { opportunityStatuses } : {})
+        pipelines: include.includes('pipelines')
+          ? pipelinePage?.data.map(p => ({ pipelineId: p.id, name: p.name }))
+          : undefined,
+        leadStatuses: leadPage?.data.map(s => ({
+          statusId: s.id,
+          label: s.label,
+          type: s.type ?? undefined
+        })),
+        opportunityStatuses: opportunityPage?.data.map(s => ({
+          statusId: s.id,
+          label: s.label,
+          type: s.type,
+          pipelineId: s.pipeline_id,
+          pipelineName: names.get(s.pipeline_id)
+        }))
       },
-      message: `Retrieved ${parts.join(', ')}.`
+      message: 'Retrieved the requested sales configuration.'
     };
   })
   .build();

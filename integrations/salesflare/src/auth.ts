@@ -1,10 +1,13 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client, id, object, text } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      userId: z.number().optional(),
+      teamId: z.number().optional()
     })
   )
   .addTokenAuth({
@@ -21,32 +24,25 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      const user = await new Client(ctx.input.token).getMe();
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          userId: user.id,
+          teamId: id(object(user.team).id, 'team ID')
         }
       };
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.salesflare.com'
-      });
-
-      let response = await client.get('/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data as Record<string, any>;
+      const user = await new Client(ctx.output.token).getMe();
 
       return {
         profile: {
           id: String(user.id),
-          email: user.email,
-          name: user.name,
-          imageUrl: user.picture
+          email: typeof user.email === 'string' ? user.email : undefined,
+          name: typeof user.name === 'string' ? user.name : text(user.email, 'profile name'),
+          imageUrl: typeof user.picture === 'string' ? user.picture : undefined
         }
       };
     }

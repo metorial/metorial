@@ -20,8 +20,6 @@ import {
   recordEscalation,
   updateBot
 } from './tools';
-import { inboundWebhook, newConversations, newQuestions } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     getConversation,
     deleteConversation
   ],
-  triggers: [inboundWebhook, newQuestions, newConversations]
+  triggers: []
 });

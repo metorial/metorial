@@ -14,13 +14,25 @@ export let listAddresses = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPage: z
+        .string()
+        .optional()
+        .describe(
+          'Exact nextLink from the preceding result. Omit page and keep any supplied filters and page size unchanged.'
+        ),
       page: z.number().optional().describe('Page number for pagination'),
       resultsPerPage: z.number().optional().describe('Number of results per page (default 5)')
     })
   )
   .output(
     z.object({
-      totalCount: z.number().describe('Total number of addresses'),
+      nextLink: z
+        .string()
+        .optional()
+        .describe('Exact provider continuation; pass as nextPage to this tool.'),
+      previousLink: z.string().optional(),
+      hasMore: z.boolean().optional(),
+      totalCount: z.number().optional().describe('Total number of addresses'),
       addresses: z.array(
         z.object({
           addressId: z.string(),
@@ -37,14 +49,15 @@ export let listAddresses = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
     let result = await client.listAddresses({
+      nextPage: ctx.input.nextPage,
       page: ctx.input.page,
       results: ctx.input.resultsPerPage
     });
 
-    let addresses = result.results.map((addr: any) => ({
+    let addresses = result.results.map(addr => ({
       addressId: addr.object_id,
       name: addr.name,
       company: addr.company,
@@ -59,9 +72,12 @@ export let listAddresses = SlateTool.create(spec, {
     return {
       output: {
         totalCount: result.count,
+        nextLink: result.next,
+        previousLink: result.previous,
+        hasMore: !!result.next,
         addresses
       },
-      message: `Found **${result.count}** addresses. Showing ${addresses.length} on this page.`
+      message: `Retrieved this page of addresses. Showing ${addresses.length} on this page.`
     };
   })
   .build();

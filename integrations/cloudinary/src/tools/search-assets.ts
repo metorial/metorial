@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import { resourceSchema } from '../lib/types';
 import { spec } from '../spec';
 
 export let searchAssets = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let searchAssets = SlateTool.create(spec, {
   key: 'search_assets',
   description: `Search for assets in Cloudinary using a Lucene-like query expression. Supports filtering by tags, metadata, format, size, dates, public ID, folder, and more. Results can be sorted and paginated.`,
   instructions: [
-    'Expression examples: `resource_type:image AND tags=hero`, `format:png AND bytes>100000`, `created_at>[2024-01-01]`, `folder:products/*`.',
+    'Expression examples: `resource_type:image AND tags=hero`, `format:png AND bytes>100000`, `created_at>[2024-01-01]`, `asset_folder:products/*` (dynamic mode) or `folder:products/*` (fixed mode).',
     'Use withField to include additional fields like "tags", "context", or "metadata" in results.'
   ],
   tags: {
@@ -53,65 +54,18 @@ export let searchAssets = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      totalCount: z.number().describe('Total number of matching assets.'),
-      time: z.number().describe('Time taken for the search in milliseconds.'),
-      nextCursor: z
-        .string()
-        .optional()
-        .describe('Cursor for fetching the next page of results.'),
-      resources: z
-        .array(
-          z.object({
-            assetId: z.string().describe('Immutable unique asset identifier.'),
-            publicId: z.string().describe('Public ID of the asset.'),
-            format: z.string().describe('File format.'),
-            resourceType: z.string().describe('Resource type (image, video, raw).'),
-            createdAt: z.string().describe('Creation timestamp.'),
-            bytes: z.number().describe('File size in bytes.'),
-            width: z.number().optional().describe('Width in pixels.'),
-            height: z.number().optional().describe('Height in pixels.'),
-            url: z.string().describe('HTTP delivery URL.'),
-            secureUrl: z.string().describe('HTTPS delivery URL.'),
-            folder: z.string().describe('Folder path.'),
-            tags: z.array(z.string()).optional().describe('Tags assigned to the asset.')
-          })
-        )
-        .describe('List of matching assets.')
+      totalCount: z.number(),
+      time: z.number().optional(),
+      nextCursor: z.string().optional(),
+      resources: z.array(resourceSchema),
+      aggregations: z.record(z.string(), z.unknown()).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-
-    let result = await client.search({
-      expression: ctx.input.expression,
-      sortBy: ctx.input.sortBy,
-      maxResults: ctx.input.maxResults,
-      nextCursor: ctx.input.nextCursor,
-      withField: ctx.input.withField,
-      aggregate: ctx.input.aggregate
-    });
-
+    const result = await createClient(ctx).search(ctx.input);
     return {
-      output: {
-        totalCount: result.totalCount,
-        time: result.time,
-        nextCursor: result.nextCursor,
-        resources: result.resources.map(r => ({
-          assetId: r.assetId,
-          publicId: r.publicId,
-          format: r.format,
-          resourceType: r.resourceType,
-          createdAt: r.createdAt,
-          bytes: r.bytes,
-          width: r.width,
-          height: r.height,
-          url: r.url,
-          secureUrl: r.secureUrl,
-          folder: r.folder,
-          tags: r.tags
-        }))
-      },
-      message: `Found **${result.totalCount}** assets${ctx.input.expression ? ` matching \`${ctx.input.expression}\`` : ''}. Returned ${result.resources.length} results.${result.nextCursor ? ' More results available via pagination.' : ''}`
+      output: result,
+      message: `Found ${result.totalCount} matching asset(s); returned ${result.resources.length}.${result.nextCursor ? ' Continue with nextCursor and unchanged search parameters.' : ''}`
     };
   })
   .build();

@@ -26,7 +26,7 @@ export let getInvestmentTransactionsTool = SlateTool.create(spec, {
   description: `Retrieve investment transaction history (buys, sells, dividends, fees, transfers) for a date range. Supports offset-based pagination for large result sets. Up to 24 months of history may be available.`,
   instructions: [
     'Use startDate and endDate in YYYY-MM-DD format.',
-    'Paginate using count and offset while offset < totalInvestmentTransactions.'
+    'Advance offset by returnedCount while it is below totalInvestmentTransactions; stop on an empty page.'
   ],
   tags: {
     readOnly: true
@@ -48,9 +48,12 @@ export let getInvestmentTransactionsTool = SlateTool.create(spec, {
   .output(
     z.object({
       investmentTransactions: z.array(investmentTransactionSchema),
-      totalInvestmentTransactions: z
+      totalInvestmentTransactions: z.number().describe('Provider total matching the query'),
+      returnedCount: z
         .number()
-        .describe('Total number of investment transactions available')
+        .optional()
+        .describe('Investment transactions returned on this page'),
+      nextOffset: z.number().optional().describe('Next offset when more results are indicated')
     })
   )
   .handleInvocation(async ctx => {
@@ -71,7 +74,7 @@ export let getInvestmentTransactionsTool = SlateTool.create(spec, {
       }
     );
 
-    let investmentTransactions = (result.investment_transactions || []).map((t: any) => ({
+    let investmentTransactions = result.investment_transactions.map(t => ({
       investmentTransactionId: t.investment_transaction_id,
       accountId: t.account_id,
       securityId: t.security_id ?? null,
@@ -89,7 +92,14 @@ export let getInvestmentTransactionsTool = SlateTool.create(spec, {
     return {
       output: {
         investmentTransactions,
-        totalInvestmentTransactions: result.total_investment_transactions
+        totalInvestmentTransactions: result.total_investment_transactions,
+        returnedCount: investmentTransactions.length,
+        nextOffset:
+          investmentTransactions.length > 0 &&
+          (ctx.input.offset ?? 0) + investmentTransactions.length <
+            result.total_investment_transactions
+            ? (ctx.input.offset ?? 0) + investmentTransactions.length
+            : undefined
       },
       message: `Retrieved **${investmentTransactions.length}** of **${result.total_investment_transactions}** investment transactions.`
     };

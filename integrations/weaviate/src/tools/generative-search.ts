@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { graphqlValue, validateCollectionName } from '../lib/graphql';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -23,9 +24,18 @@ Two generation modes:
   .input(
     z.object({
       collectionName: z.string().describe('Name of the collection to search'),
-      properties: z.array(z.string()).describe('Properties to return in results'),
+      properties: z
+        .array(z.string())
+        .describe(
+          'GraphQL properties or field selections to return, such as "title" or "address { city }"'
+        ),
       searchQuery: z.string().describe('Natural language search query (uses nearText)'),
-      limit: z.number().optional().describe('Maximum number of results for the search'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum number of results for the search'),
       where: z.any().optional().describe('Where filter for scalar conditions'),
       tenant: z.string().optional().describe('Tenant name for multi-tenant collections'),
       singlePrompt: z
@@ -49,6 +59,7 @@ Two generation modes:
       objects: z
         .array(
           z.object({
+            objectId: z.string().optional().describe('Object UUID'),
             properties: z.record(z.string(), z.any()).describe('Object properties'),
             singleResult: z.string().optional().describe('Generated text for this object'),
             generationError: z.string().optional().describe('Generation error for this object')
@@ -73,13 +84,20 @@ Two generation modes:
       groupedTask,
       groupedProperties
     } = ctx.input;
+    validateCollectionName(collectionName);
+    if (!singlePrompt?.trim() && !groupedTask?.trim()) {
+      throw createApiServiceError('Provide singlePrompt or groupedTask, or both.');
+    }
+    if (groupedProperties?.length && !groupedTask?.trim()) {
+      throw createApiServiceError('groupedProperties requires groupedTask.');
+    }
 
     let args: string[] = [`nearText: { concepts: ${JSON.stringify([searchQuery])} }`];
     if (limit !== undefined) args.push(`limit: ${limit}`);
     if (where) {
-      args.push(`where: ${JSON.stringify(where).replace(/"(\w+)":/g, '$1:')}`);
+      args.push(`where: ${graphqlValue(where)}`);
     }
-    if (tenant) args.push(`tenant: "${tenant}"`);
+    if (tenant) args.push(`tenant: ${JSON.stringify(tenant)}`);
 
     let argsStr = `(${args.join(', ')})`;
 
@@ -117,10 +135,6 @@ Two generation modes:
 
     let result = await client.graphql(query);
 
-    if (result.errors && result.errors.length > 0) {
-      throw new Error(`GraphQL error: ${result.errors.map((e: any) => e.message).join(', ')}`);
-    }
-
     let rawObjects = result.data?.Get?.[collectionName] || [];
     let groupedResult: string | undefined;
     let groupedError: string | undefined;
@@ -138,6 +152,7 @@ Two generation modes:
       }
 
       return {
+        objectId: _additional?.id,
         properties: props,
         singleResult: gen?.singleResult || undefined,
         generationError: gen?.singleResult ? undefined : gen?.error || undefined

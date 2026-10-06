@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { resourceId, selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getEntry = SlateTool.create(spec, {
@@ -13,13 +14,20 @@ export let getEntry = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      entryId: z.string().describe('The ID of the entry to retrieve.')
+      ...selection,
+      api: z
+        .enum(['management', 'delivery', 'preview'])
+        .optional()
+        .describe(
+          'API for legacy token-only connections. Must match the credential type; reconnect if unknown.'
+        ),
+      entryId: resourceId.describe('The ID of the entry to retrieve.')
     })
   )
   .output(
     z.object({
-      entryId: z.string(),
-      contentTypeId: z.string().optional(),
+      entryId: resourceId,
+      contentTypeId: resourceId.optional(),
       fields: z.record(z.string(), z.any()),
       version: z.number().optional(),
       createdAt: z.string().optional(),
@@ -30,7 +38,7 @@ export let getEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
     let entry = await client.getEntry(ctx.input.entryId);
 
     return {

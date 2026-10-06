@@ -1,6 +1,6 @@
 {
   "name": "@metorial/travis-ci",
-  "description": "Manage CI/CD builds, jobs, and repositories on Travis CI. Trigger, restart, and cancel builds and jobs. View build logs and job statuses. Manage repository settings, environment variables, cron jobs, and build caches. Validate .travis.yml configuration files. Access branch build statuses, build request history, and security scan results. Receive webhook notifications for build events.",
+  "description": "Manage CI/CD builds, jobs, and repositories on Travis CI. Trigger, restart, and cancel builds and jobs. View build logs and job statuses. Manage repository settings, environment variables, cron jobs, and build caches. Validate .travis.yml configuration files. Access branch build statuses, build request history, and security scan results.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "trigger builds",

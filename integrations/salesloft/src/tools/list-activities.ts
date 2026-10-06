@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import type { callSchema, emailSchema } from '../lib/api-schemas';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -27,18 +28,18 @@ let emailActivitySchema = z.object({
   stepId: z.number().nullable().optional().describe('Associated cadence step ID')
 });
 
-let mapEmailActivity = (raw: any) => ({
+let mapEmailActivity = (raw: z.output<typeof emailSchema>) => ({
   emailId: raw.id,
   subject: raw.subject,
   status: raw.status,
   bounced: raw.bounced,
-  clickCount: raw.click_count,
-  viewCount: raw.view_count,
-  replyCount: raw.reply_count,
+  clickCount: raw.counts?.clicks,
+  viewCount: raw.counts?.views,
+  replyCount: raw.counts?.replies,
   sentAt: raw.sent_at,
   createdAt: raw.created_at,
   updatedAt: raw.updated_at,
-  personId: raw.person?.id ?? null,
+  personId: raw.recipient?.id ?? null,
   userId: raw.user?.id ?? null,
   cadenceId: raw.cadence?.id ?? null,
   stepId: raw.step?.id ?? null
@@ -58,7 +59,13 @@ export let listEmailActivities = SlateTool.create(spec, {
       perPage: z.number().optional().describe('Results per page (1-100, default: 25)'),
       sortBy: z.string().optional().describe('Field to sort by'),
       sortDirection: z.enum(['ASC', 'DESC']).optional().describe('Sort direction'),
-      personId: z.number().optional().describe('Filter by person ID')
+      personId: z.number().optional().describe('Filter by person ID'),
+      includeSubject: z
+        .boolean()
+        .optional()
+        .describe(
+          'Request email subjects. Requires the privileged email_contents:read scope; subjects are otherwise omitted.'
+        )
     })
   )
   .output(
@@ -97,17 +104,19 @@ let callActivitySchema = z.object({
   cadenceId: z.number().nullable().optional().describe('Associated cadence ID')
 });
 
-let mapCallActivity = (raw: any) => ({
+let mapCallActivity = (
+  raw: z.output<typeof callSchema> & { note_content?: string | null }
+) => ({
   callId: raw.id,
   to: raw.to,
   duration: raw.duration,
   sentiment: raw.sentiment,
   disposition: raw.disposition,
   status: raw.status,
-  note: raw.note,
+  note: raw.note_content,
   createdAt: raw.created_at,
   updatedAt: raw.updated_at,
-  personId: raw.person?.id ?? null,
+  personId: raw.called_person?.id ?? null,
   userId: raw.user?.id ?? null,
   cadenceId: raw.cadence?.id ?? null
 });
@@ -153,7 +162,7 @@ export let listCallActivities = SlateTool.create(spec, {
 export let logCall = SlateTool.create(spec, {
   name: 'Log Call',
   key: 'log_call',
-  description: `Log a new call record in SalesLoft. Used to record calls made through third-party dialers or external systems. Associates the call with a person and optionally a cadence.`,
+  description: `Log a completed external call in Salesloft without placing a phone call. This can create CRM activity and related workflow effects; verify those effects before use.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -183,15 +192,15 @@ export let logCall = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
       person_id: ctx.input.personId
     };
-    if (ctx.input.to) body.to = ctx.input.to;
+    if (ctx.input.to !== undefined) body.to = ctx.input.to;
     if (ctx.input.duration !== undefined) body.duration = ctx.input.duration;
-    if (ctx.input.disposition) body.disposition = ctx.input.disposition;
-    if (ctx.input.sentiment) body.sentiment = ctx.input.sentiment;
-    if (ctx.input.note) body.note = ctx.input.note;
-    if (ctx.input.userId) body.user_id = ctx.input.userId;
+    if (ctx.input.disposition !== undefined) body.disposition = ctx.input.disposition;
+    if (ctx.input.sentiment !== undefined) body.sentiment = ctx.input.sentiment;
+    if (ctx.input.note !== undefined) body.note = ctx.input.note;
+    if (ctx.input.userId !== undefined) body.user_id = ctx.input.userId;
 
     let call = await client.createCall(body);
     let output = mapCallActivity(call);

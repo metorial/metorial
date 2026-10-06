@@ -1,6 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  dateRange,
+  pageParams,
+  paginationSchema,
+  readRows,
+  requireDate
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let listSicknesses = SlateTool.create(spec, {
@@ -29,28 +36,35 @@ export let listSicknesses = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      sicknesses: z.array(z.record(z.string(), z.any())).describe('List of sickness records')
+      pagination: paginationSchema.optional(),
+      sicknesses: z
+        .array(z.record(z.string(), z.unknown()))
+        .describe('List of sickness records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let result = await client.listSicknesses({
-      employeeId: ctx.input.employeeId,
-      departmentId: ctx.input.departmentId,
-      startDate: ctx.input.startDate,
-      endDate: ctx.input.endDate,
-      page: ctx.input.page,
-      perPage: ctx.input.perPage
-    });
-
-    let sicknesses = result?.sicknesses || [];
-
+    const client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
+    const startDate =
+      ctx.input.startDate === undefined
+        ? undefined
+        : requireDate(ctx.input.startDate, 'startDate');
+    const endDate =
+      ctx.input.endDate === undefined ? undefined : requireDate(ctx.input.endDate, 'endDate');
+    if (startDate) dateRange(startDate, endDate);
+    const result = await client.list(
+      'sicknesses',
+      {
+        ...pageParams(ctx.input, true),
+        employee_id: ctx.input.employeeId,
+        department_id: ctx.input.departmentId,
+        start_date: startDate,
+        end_date: endDate
+      },
+      true
+    );
+    const sicknesses = readRows(result, 'sicknesses');
     return {
-      output: { sicknesses },
+      output: { sicknesses, pagination: result.pagination },
       message: `Retrieved **${sicknesses.length}** sickness record(s).`
     };
   })

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, pagination, records } from '../lib/client';
 import { spec } from '../spec';
 
 export let searchScoops = SlateTool.create(spec, {
@@ -22,13 +22,18 @@ export let searchScoops = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Scoop type (e.g., "Project", "Pain Point", "Leadership", "Funding")'),
-      scoopTopic: z.string().optional().describe('Scoop topic keyword'),
+      scoopTopic: z
+        .string()
+        .optional()
+        .describe('Scoop topic accepted value from Lookup Data'),
       department: z.string().optional().describe('Department filter'),
       keywords: z.array(z.string()).optional().describe('Keywords to search for in scoops'),
       publishedDateAfter: z
         .string()
         .optional()
-        .describe('Only return scoops published after this date (ISO 8601)'),
+        .describe(
+          'Current GTM earliest inclusive publishing day (YYYY-MM-DD); legacy connections retain ISO 8601 input'
+        ),
       page: z.number().min(1).optional().describe('Page number'),
       pageSize: z.number().min(1).max(100).optional().describe('Results per page')
     })
@@ -36,26 +41,26 @@ export let searchScoops = SlateTool.create(spec, {
   .output(
     z.object({
       scoops: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .describe('Scoop records with details about projects, leadership changes, etc.'),
-      totalResults: z.number().optional().describe('Total matching scoops')
+      totalResults: z.number().optional().describe('Total matching scoops'),
+      currentPage: z.number().optional().describe('Provider current page'),
+      totalPages: z.number().optional().describe('Provider total pages'),
+      returnedCount: z.number().optional().describe('Number of records in this response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion
-    });
+    const client = Client.fromContext(ctx);
 
     let { page, pageSize, ...searchParams } = ctx.input;
 
     let result = await client.searchScoops(searchParams, page, pageSize);
 
-    let scoops = result.data || result.result || [];
-    let totalResults = result.meta?.totalResults ?? result.totalResults;
+    const scoops = records(result);
+    const { totalResults, currentPage, totalPages } = pagination(result);
 
     return {
-      output: { scoops, totalResults },
+      output: { scoops, totalResults, currentPage, totalPages, returnedCount: scoops.length },
       message: `Found **${totalResults ?? scoops.length}** scoop(s).`
     };
   })

@@ -1,44 +1,26 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createHash } from 'node:crypto';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { requireToken } from './lib/validation';
 
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+  .output(z.object({ token: z.string() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Token',
     key: 'api_token',
-
     inputSchema: z.object({
       token: z.string().describe('Papertrail API token found in your user profile settings')
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://papertrailapp.com/api/v1',
-        headers: {
-          'X-Papertrail-Token': ctx.output.token
-        }
-      });
-
-      let response = await axios.get('/accounts.json');
-      let account = response.data;
-
+    getOutput: async ctx => ({ output: { token: requireToken(ctx.input.token) } }),
+    getProfile: async (ctx: { output: { token: string } }) => {
+      await new Client(ctx.output).getUsage();
+      // The documented usage endpoint has no identity fields; identify this verified credential without exposing it.
       return {
         profile: {
-          id: String(account.id),
-          name: account.name
+          id: createHash('sha256').update(ctx.output.token).digest('hex'),
+          name: 'Papertrail API Token'
         }
       };
     }

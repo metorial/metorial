@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let recognizeAddress = SlateTool.create(spec, {
@@ -43,10 +43,7 @@ export let recognizeAddress = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
     let result = await client.recognizeAddress(ctx.input.text);
 

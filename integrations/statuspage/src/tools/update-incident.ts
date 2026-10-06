@@ -1,11 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let updateIncident = SlateTool.create(spec, {
   name: 'Update Incident',
   key: 'update_incident',
+  tags: { readOnly: false, destructive: true },
   description: `Update an existing incident's status, message, impact, or associated components. Each update creates a new entry in the incident timeline. Use this to progress an incident through its lifecycle (investigating -> identified -> monitoring -> resolved) or to delete it.`,
   instructions: [
     'Updating the status automatically creates a new incident update entry visible on the status page.',
@@ -14,6 +16,7 @@ export let updateIncident = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageId: pageIdSchema,
       incidentId: z.string().describe('ID of the incident to update'),
       status: z
         .enum(['investigating', 'identified', 'monitoring', 'resolved'])
@@ -54,7 +57,10 @@ export let updateIncident = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, pageId: ctx.config.pageId });
+    let client = new Client({
+      token: ctx.auth.token,
+      pageId: ctx.input.pageId ?? ctx.config.pageId
+    });
 
     if (ctx.input.delete) {
       await client.deleteIncident(ctx.input.incidentId);
@@ -64,7 +70,7 @@ export let updateIncident = SlateTool.create(spec, {
       };
     }
 
-    let data: Record<string, any> = {};
+    let data: Record<string, unknown> = {};
     if (ctx.input.status !== undefined) data.status = ctx.input.status;
     if (ctx.input.message !== undefined) data.body = ctx.input.message;
     if (ctx.input.impactOverride !== undefined)

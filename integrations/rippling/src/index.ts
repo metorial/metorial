@@ -21,8 +21,6 @@ import {
   pushCandidate,
   updateGroup
 } from './tools';
-import { companyActivity, employeeLifecycle } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     getCurrentUser,
     listCustomFields
   ],
-  triggers: [employeeLifecycle, companyActivity]
+  triggers: []
 });

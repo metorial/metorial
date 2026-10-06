@@ -1,136 +1,124 @@
-import { SlateTool } from 'slates';
-import { z } from 'zod';
+import { pickDefined, SlateTool } from 'slates';
 import { DatabaseClient } from '../lib/client';
+import {
+  collection,
+  databaseOutput,
+  dbId,
+  exact,
+  mappedDatabase,
+  nativeDatabase,
+  nativeTable,
+  single
+} from '../lib/schemas';
+import { connection, fail, id, text, z } from '../lib/validation';
 import { spec } from '../spec';
-
-let databaseOutputSchema = z.object({
-  databaseId: z.string().describe('Unique identifier of the database'),
-  name: z.string().describe('Name of the database'),
-  description: z.string().nullable().describe('Description of the database'),
-  workspaceId: z.string().describe('ID of the workspace'),
-  tablesCount: z.number().describe('Number of tables in the database'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp')
-});
-
-export let manageDatabase = SlateTool.create(spec, {
+export const manageDatabase = SlateTool.create(spec, {
   name: 'Manage Database',
   key: 'manage_database',
-  description: `Create, retrieve, update, or delete a Softr database.
-- To **create**: provide \`workspaceId\` and \`name\`.
-- To **get**: provide \`databaseId\` only.
-- To **update**: provide \`databaseId\` along with \`name\` and/or \`description\`.
-- To **delete**: provide \`databaseId\` and set \`delete\` to true. Database must be empty.`,
-  constraints: [
-    'A database can only be deleted if it contains no tables.',
-    'Write operations: max 30 requests/second per token.'
-  ],
-  tags: {
-    destructive: false,
-    readOnly: false
-  }
+  description:
+    'Create, get, update or delete a Softr database. Discover IDs with list_databases; its workspaceId identifies an existing authorized workspace. A workspace with no databases requires its workspace ID from Softr settings. Delete requires an empty database unless force is explicitly true; forced deletion removes its tables and records. Native absence is checked after a 204 receipt; retained history is not erased.',
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
-      databaseId: z
-        .string()
-        .optional()
-        .describe('ID of the database (required for get/update/delete)'),
+      databaseId: dbId.optional(),
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID (required for creating a new database)'),
-      name: z
-        .string()
+        .describe(
+          'Workspace ID from list_databases, or Softr settings for an empty workspace. Create only.'
+        ),
+      name: z.string().optional(),
+      description: z.string().optional(),
+      delete: z.boolean().optional(),
+      force: z
+        .boolean()
         .optional()
-        .describe('Name of the database (required for create, optional for update)'),
-      description: z.string().optional().describe('Description of the database'),
-      delete: z.boolean().optional().describe('Set to true to delete the database')
+        .describe(
+          'Delete only. Explicitly allow deletion of a database containing tables and records.'
+        )
     })
   )
-  .output(
-    z.object({
-      database: databaseOutputSchema
-        .optional()
-        .describe('Database details (not returned on delete)'),
-      deleted: z.boolean().optional().describe('True if database was deleted')
-    })
-  )
+  .output(z.object({ database: databaseOutput.optional(), deleted: z.boolean().optional() }))
   .handleInvocation(async ctx => {
-    let client = new DatabaseClient({ token: ctx.auth.token });
-    let { databaseId, workspaceId, name, description } = ctx.input;
-
-    if (ctx.input.delete) {
-      if (!databaseId) throw new Error('databaseId is required to delete a database.');
-      await client.deleteDatabase(databaseId);
+    const i = ctx.input;
+    const client = new DatabaseClient(connection(ctx.auth, ctx.config));
+    if (i.force !== undefined && !i.delete) fail('force is accepted only with delete:true.');
+    if (i.databaseId !== undefined) {
+      id(i.databaseId);
+      if (i.workspaceId !== undefined)
+        fail('workspaceId is create-only; use the database ID for existing resources.');
+    }
+    if (i.delete) {
+      if (!i.databaseId || i.name !== undefined || i.description !== undefined)
+        fail('Delete requires only databaseId, delete:true and optional force.');
+      exact(single(nativeDatabase, await client.getDatabase(i.databaseId)), i.databaseId);
+      if (!i.force && collection(nativeTable, await client.listTables(i.databaseId)).length)
+        fail(
+          'The database contains tables. Remove them first, or explicitly authorize force:true.'
+        );
+      await client.deleteDatabase(i.databaseId, i.force);
       return {
         output: { deleted: true },
-        message: `Database \`${databaseId}\` deleted successfully.`
+        message:
+          'Native database absence confirmed after deletion. This does not prove erasure of retained history.'
       };
     }
-
-    if (!databaseId && workspaceId && name) {
-      let result = await client.createDatabase({ workspaceId, name, description });
-      let db = result.data;
+    if (i.name !== undefined) text(i.name, 'database name');
+    if (i.databaseId === undefined) {
+      if (i.workspaceId === undefined || i.name === undefined)
+        fail(
+          'Create requires workspaceId and name; otherwise supply databaseId to read an existing database.'
+        );
+      const v = single(
+        nativeDatabase,
+        await client.createDatabase({
+          workspaceId: id(i.workspaceId, 'workspace ID'),
+          name: i.name,
+          description: i.description
+        })
+      );
+      if (v.workspaceId !== i.workspaceId || v.name !== i.name)
+        fail(
+          'The database creation receipt does not match the requested workspace and name. Reconcile before retrying.',
+          'identity_mismatch'
+        );
       return {
-        output: {
-          database: {
-            databaseId: db.id,
-            name: db.name,
-            description: db.description ?? null,
-            workspaceId: db.workspaceId,
-            tablesCount: db.tablesCount ?? 0,
-            createdAt: db.createdAt,
-            updatedAt: db.updatedAt
-          }
-        },
-        message: `Database **${db.name}** created successfully.`
+        output: { database: mappedDatabase(v) },
+        message: 'Softr returned the created database and its exact ID.'
       };
     }
-
-    if (databaseId && (name || description !== undefined)) {
-      let updateParams: { name?: string; description?: string } = {};
-      if (name) updateParams.name = name;
-      if (description !== undefined) updateParams.description = description;
-      let result = await client.updateDatabase(databaseId, updateParams);
-      let db = result.data;
-      return {
-        output: {
-          database: {
-            databaseId: db.id,
-            name: db.name,
-            description: db.description ?? null,
-            workspaceId: db.workspaceId,
-            tablesCount: db.tablesCount ?? 0,
-            createdAt: db.createdAt,
-            updatedAt: db.updatedAt
-          }
-        },
-        message: `Database **${db.name}** updated successfully.`
-      };
-    }
-
-    if (databaseId) {
-      let result = await client.getDatabase(databaseId);
-      let db = result.data;
-      return {
-        output: {
-          database: {
-            databaseId: db.id,
-            name: db.name,
-            description: db.description ?? null,
-            workspaceId: db.workspaceId,
-            tablesCount: db.tablesCount ?? 0,
-            createdAt: db.createdAt,
-            updatedAt: db.updatedAt
-          }
-        },
-        message: `Retrieved database **${db.name}**.`
-      };
-    }
-
-    throw new Error(
-      'Invalid input: provide databaseId (to get/update/delete) or workspaceId + name (to create).'
+    const before = exact(
+      single(nativeDatabase, await client.getDatabase(i.databaseId)),
+      i.databaseId
     );
+    if (i.name === undefined && i.description === undefined)
+      return {
+        output: { database: mappedDatabase(before) },
+        message: 'Returned the exact database.'
+      };
+    const v = exact(
+      single(
+        nativeDatabase,
+        await client.updateDatabase(
+          i.databaseId,
+          pickDefined({ name: i.name, description: i.description })
+        )
+      ),
+      i.databaseId
+    );
+    if (
+      v.workspaceId !== before.workspaceId ||
+      (i.name !== undefined && v.name !== i.name) ||
+      (i.description !== undefined && v.description !== i.description)
+    )
+      fail(
+        'The database update receipt does not match the requested state. Read the database before retrying.',
+        'mutation_unverified'
+      );
+    return {
+      output: { database: mappedDatabase(v) },
+      message: 'Softr returned the exact updated database.'
+    };
   })
   .build();

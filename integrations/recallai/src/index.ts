@@ -1,25 +1,26 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  cancelBotForEventTool,
   createBotTool,
   deleteBotTool,
+  downloadRecordingTool,
   getBotTool,
+  getCalendarEventTool,
+  getCalendarTool,
+  getFileUrl,
+  getRecordingTool,
   getTranscriptTool,
   listBotsTool,
   listCalendarEventsTool,
   listCalendarsTool,
+  listRecordingsTool,
   outputMediaTool,
   removeBotFromCallTool,
   scheduleBotForEventTool,
   sendChatMessageTool,
   updateBotTool
 } from './tools';
-import {
-  botStatusChangeTrigger,
-  calendarEventChangeTrigger,
-  recordingStatusChangeTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,7 +35,14 @@ export let provider = Slate.create({
     outputMediaTool,
     listCalendarsTool,
     listCalendarEventsTool,
-    scheduleBotForEventTool
+    scheduleBotForEventTool,
+    getCalendarTool,
+    getCalendarEventTool,
+    cancelBotForEventTool,
+    listRecordingsTool,
+    getRecordingTool,
+    downloadRecordingTool,
+    getFileUrl
   ],
-  triggers: [botStatusChangeTrigger, recordingStatusChangeTrigger, calendarEventChangeTrigger]
+  triggers: []
 });

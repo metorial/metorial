@@ -6,11 +6,12 @@ import { spec } from '../spec';
 export let createAlertContact = SlateTool.create(spec, {
   name: 'Create Alert Contact',
   key: 'create_alert_contact',
-  description: `Create a new alert contact to receive notifications when monitors go up or down. Supports email, SMS, webhook, Pushbullet, and Pushover contact types.`,
+  description: `Use a Legacy API Key connection (API v2). Create a new alert contact to receive notifications when monitors go up or down. Supports email, webhook, Pushbullet and Pushover contacts. The retained SMS choice returns a clear unsupported-operation error. Creating a contact can send a provider activation notification.`,
   instructions: [
     'Slack, Zapier, and HipChat contacts must be configured through the UptimeRobot dashboard first.'
   ],
   tags: {
+    readOnly: false,
     destructive: false
   }
 })
@@ -32,7 +33,7 @@ export let createAlertContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let typeMap: Record<string, number> = {
       sms: 1,

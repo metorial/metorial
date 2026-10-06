@@ -36,8 +36,6 @@ import {
   updateConversation,
   updateNote
 } from './tools';
-import { contactEvents, conversationEvents, messageEvents, noteEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -76,5 +74,5 @@ export let provider = Slate.create({
     addContactToList,
     removeContactFromList
   ],
-  triggers: [messageEvents, contactEvents, conversationEvents, noteEvents]
+  triggers: []
 });

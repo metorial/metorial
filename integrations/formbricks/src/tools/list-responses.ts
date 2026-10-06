@@ -42,7 +42,8 @@ export let listResponses = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     let responses = await client.listResponses(ctx.input.surveyId, {
@@ -50,15 +51,15 @@ export let listResponses = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let mapped = responses.map((r: any) => ({
+    let mapped = responses.map(r => ({
       responseId: r.id,
-      surveyId: r.surveyId ?? ctx.input.surveyId,
-      finished: r.finished ?? false,
-      answers: r.data ?? {},
+      surveyId: r.surveyId,
+      finished: r.finished,
+      answers: r.data,
       meta: r.meta,
       contactAttributes: r.contactAttributes,
-      createdAt: r.createdAt ?? '',
-      updatedAt: r.updatedAt ?? ''
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt
     }));
 
     return {

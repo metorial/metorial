@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import * as map from '../lib/mappers';
 import { spec } from '../spec';
 
 export let getWorkspaceInfoTool = SlateTool.create(spec, {
   name: 'Get Workspace Info',
   key: 'get_workspace_info',
-  description: `Retrieve information about the current Workato workspace, including the workspace name, plan, recipe counts, billing period, and root folder ID.`,
+  description: `Retrieve the authenticated Workato workspace account, including available workspace, environment, plan, recipe-count, and root-folder metadata. This does not identify an individual API client.`,
   tags: {
     readOnly: true
   }
@@ -14,33 +15,28 @@ export let getWorkspaceInfoTool = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      workspaceId: z.number().describe('Workspace/user ID'),
-      name: z.string().describe('Workspace name'),
-      email: z.string().nullable().describe('Contact email'),
-      planId: z.string().nullable().describe('Current plan ID'),
-      recipesCount: z.number().describe('Total recipe count'),
-      activeRecipesCount: z.number().describe('Currently active recipe count'),
-      rootFolderId: z.number().nullable().describe('Root folder ID of the workspace'),
-      companyName: z.string().nullable().describe('Company name'),
-      createdAt: z.string().describe('Workspace creation timestamp')
+      workspaceId: z.number().optional().describe('Workspace/user ID'),
+      name: z.string().optional().describe('Workspace name'),
+      email: z.string().nullable().optional().describe('Contact email'),
+      planId: z.string().nullable().optional().describe('Current plan ID'),
+      recipesCount: z.number().optional().describe('Total recipe count'),
+      activeRecipesCount: z.number().optional().describe('Currently active recipe count'),
+      rootFolderId: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Root folder ID of the workspace'),
+      teamName: z.string().optional().describe('Native workspace team name'),
+      environmentName: z.string().optional().describe('Native environment name'),
+      companyName: z.string().nullable().optional().describe('Company name'),
+      createdAt: z.string().optional().describe('Workspace creation timestamp')
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let info = await client.getWorkspaceInfo();
-
+    const client = createClient(ctx);
+    const output = map.workspace(await client.getWorkspaceInfo());
     return {
-      output: {
-        workspaceId: info.id,
-        name: info.name ?? '',
-        email: info.email ?? null,
-        planId: info.plan_id ?? null,
-        recipesCount: info.recipes_count ?? 0,
-        activeRecipesCount: info.active_recipes_count ?? 0,
-        rootFolderId: info.root_folder_id ?? null,
-        companyName: info.company_name ?? null,
-        createdAt: info.created_at
-      },
-      message: `Workspace **${info.name}** (ID: ${info.id}) — ${info.active_recipes_count ?? 0} active recipes of ${info.recipes_count ?? 0} total.`
+      output,
+      message: `Retrieved authenticated workspace context ${output.workspaceId}. This endpoint describes the workspace account, not the identity of an individual API client.`
     };
   });

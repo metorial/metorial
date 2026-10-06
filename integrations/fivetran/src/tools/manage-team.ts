@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FivetranClient } from '../lib/client';
+import { teamId, userId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let teamOutputSchema = z.object({
-  teamId: z.string().describe('Unique identifier of the team'),
+  teamId: teamId,
   name: z.string().describe('Name of the team'),
   description: z.string().optional().nullable().describe('Description of the team'),
   role: z.string().optional().describe('Account-level role assigned to the team')
@@ -54,7 +55,7 @@ export let getTeam = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team to retrieve'),
+      teamId: teamId,
       includeMembers: z
         .boolean()
         .optional()
@@ -107,8 +108,8 @@ export let createTeam = SlateTool.create(spec, {
     let client = new FivetranClient(ctx.auth.token);
 
     let body: Record<string, any> = { name: ctx.input.name };
-    if (ctx.input.description) body.description = ctx.input.description;
-    if (ctx.input.role) body.role = ctx.input.role;
+    if (ctx.input.description !== undefined) body.description = ctx.input.description;
+    if (ctx.input.role !== undefined) body.role = ctx.input.role;
 
     let t = await client.createTeam(body);
 
@@ -126,7 +127,7 @@ export let updateTeam = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team to update'),
+      teamId: teamId,
       name: z.string().optional().describe('Updated team name'),
       description: z.string().optional().describe('Updated description'),
       role: z.string().optional().describe('Updated account-level role')
@@ -137,9 +138,9 @@ export let updateTeam = SlateTool.create(spec, {
     let client = new FivetranClient(ctx.auth.token);
 
     let body: Record<string, any> = {};
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.description) body.description = ctx.input.description;
-    if (ctx.input.role) body.role = ctx.input.role;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.description !== undefined) body.description = ctx.input.description;
+    if (ctx.input.role !== undefined) body.role = ctx.input.role;
 
     let t = await client.updateTeam(ctx.input.teamId, body);
 
@@ -160,7 +161,7 @@ export let deleteTeam = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team to delete')
+      teamId: teamId
     })
   )
   .output(
@@ -182,12 +183,13 @@ export let deleteTeam = SlateTool.create(spec, {
 export let manageTeamMembership = SlateTool.create(spec, {
   name: 'Manage Team Membership',
   key: 'manage_team_membership',
+  tags: { destructive: true },
   description: `Add or remove a user from a team. Use action "add" to add a user and "remove" to remove a user from the team.`
 })
   .input(
     z.object({
-      teamId: z.string().describe('ID of the team'),
-      userId: z.string().describe('ID of the user to add or remove'),
+      teamId: teamId,
+      userId: userId,
       action: z.enum(['add', 'remove']).describe('Whether to add or remove the user')
     })
   )

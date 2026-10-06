@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { RoboflowClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -16,34 +17,33 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .min(1)
         .describe(
           'Roboflow Private API Key. Found under Settings > API Keys in your Roboflow dashboard.'
         )
     }),
 
     getOutput: async ctx => {
+      let workspaceId = await new RoboflowClient({
+        token: ctx.input.token
+      }).getAuthenticatedWorkspace();
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          workspaceId
         }
       };
     },
 
-    getProfile: async (ctx: any) => {
-      let axios = createAxios({
-        baseURL: 'https://api.roboflow.com'
-      });
-
-      let response = await axios.get('/', {
-        params: { api_key: ctx.output.token }
-      });
-
-      let data = response.data;
+    getProfile: async (ctx: { output: { token: string; workspaceId?: string } }) => {
+      let workspaceId =
+        ctx.output.workspaceId ??
+        (await new RoboflowClient(ctx.output).getAuthenticatedWorkspace());
 
       return {
         profile: {
-          id: data.workspace,
-          name: data.workspace
+          id: workspaceId,
+          name: workspaceId
         }
       };
     }

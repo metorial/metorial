@@ -24,8 +24,6 @@ import {
   updateBoardItem,
   updateBoardMember
 } from './tools';
-import { boardItemChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -52,5 +50,5 @@ export let provider = Slate.create({
     updateBoardMember,
     removeBoardMember
   ],
-  triggers: [inboundWebhook, boardItemChanges]
+  triggers: []
 });

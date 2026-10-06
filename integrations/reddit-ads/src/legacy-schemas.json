@@ -1,0 +1,829 @@
+{
+  "manage_audience_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "audienceId": {
+          "type": "string",
+          "description": "Custom audience ID (e.g., \"ca.xxxxxxxxxxx\")"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["ADD", "REMOVE"],
+          "description": "Whether to add or remove users"
+        },
+        "identifierType": {
+          "type": "string",
+          "enum": ["EMAIL_SHA256", "MAID_SHA256", "BOTH"],
+          "description": "Type of user identifiers being provided"
+        },
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "emailSha256": {
+                "description": "SHA256-hashed lowercase email address",
+                "type": "string"
+              },
+              "maidSha256": {
+                "description": "SHA256-hashed mobile advertising ID",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "List of user identifiers to add or remove"
+        }
+      },
+      "required": ["audienceId", "action", "identifierType", "users"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "audienceId": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "usersProcessed": {
+          "type": "number"
+        },
+        "raw": {}
+      },
+      "required": ["audienceId", "action", "usersProcessed"],
+      "additionalProperties": false
+    }
+  },
+  "list_ads": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "adGroupId": {
+          "description": "Filter ads by ad group ID",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "ads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "adId": {
+                "type": "string"
+              },
+              "adGroupId": {
+                "type": "string"
+              },
+              "campaignId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "headline": {
+                "type": "string"
+              },
+              "clickUrl": {
+                "type": "string"
+              },
+              "callToAction": {
+                "type": "string"
+              },
+              "raw": {}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["ads"],
+      "additionalProperties": false
+    }
+  },
+  "send_conversion_events": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pixelId": {
+          "description": "Reddit Pixel ID; uses the one from auth if not provided",
+          "type": "string"
+        },
+        "events": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "clickId": {
+                "description": "Reddit click ID (rdt_cid) from landing page URL",
+                "type": "string"
+              },
+              "eventAt": {
+                "type": "string",
+                "description": "Event timestamp in ISO 8601 format (must be within last 7 days)"
+              },
+              "trackingType": {
+                "type": "string",
+                "enum": [
+                  "Purchase",
+                  "AddToCart",
+                  "SignUp",
+                  "Lead",
+                  "ViewContent",
+                  "Search",
+                  "AddToWishlist",
+                  "PageVisit",
+                  "Custom"
+                ],
+                "description": "Type of conversion event"
+              },
+              "customEventName": {
+                "description": "Custom event name (required when trackingType is Custom)",
+                "type": "string"
+              },
+              "email": {
+                "description": "User email (SHA256-hashed and lowercased)",
+                "type": "string"
+              },
+              "externalId": {
+                "description": "Advertiser-assigned user ID (SHA256-hashed)",
+                "type": "string"
+              },
+              "uuid": {
+                "description": "Reddit Pixel-generated UUID",
+                "type": "string"
+              },
+              "ipAddress": {
+                "description": "User IP address",
+                "type": "string"
+              },
+              "userAgent": {
+                "description": "User agent string",
+                "type": "string"
+              },
+              "idfa": {
+                "description": "Apple IDFA (SHA256-hashed)",
+                "type": "string"
+              },
+              "aaid": {
+                "description": "Android AAID (SHA256-hashed)",
+                "type": "string"
+              },
+              "screenWidth": {
+                "description": "Screen width in pixels",
+                "type": "number"
+              },
+              "screenHeight": {
+                "description": "Screen height in pixels",
+                "type": "number"
+              },
+              "conversionId": {
+                "description": "Unique conversion ID for deduplication",
+                "type": "string"
+              },
+              "itemCount": {
+                "description": "Number of items in the conversion",
+                "type": "number"
+              },
+              "currency": {
+                "description": "Currency code in ISO 4217 format (e.g., USD)",
+                "type": "string"
+              },
+              "valueDecimal": {
+                "description": "Monetary value of the conversion",
+                "type": "number"
+              },
+              "products": {
+                "description": "Product details for the conversion",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "productId": {
+                      "description": "Product ID",
+                      "type": "string"
+                    },
+                    "productName": {
+                      "description": "Product name",
+                      "type": "string"
+                    },
+                    "productCategory": {
+                      "description": "Product category",
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["eventAt", "trackingType"],
+            "additionalProperties": false
+          },
+          "description": "Conversion events to send (max 500)"
+        }
+      },
+      "required": ["events"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "eventsSent": {
+          "type": "number"
+        },
+        "response": {}
+      },
+      "required": ["eventsSent"],
+      "additionalProperties": false
+    }
+  },
+  "get_performance_report": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "startDate": {
+          "type": "string",
+          "description": "Report start date in YYYY-MM-DD format"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "Report end date in YYYY-MM-DD format"
+        },
+        "level": {
+          "type": "string",
+          "enum": ["account", "campaign", "adGroup", "ad"],
+          "description": "Reporting level"
+        },
+        "metrics": {
+          "description": "Metrics to include (e.g., impressions, clicks, spend, ctr, cpc, ecpm, conversions, video_viewable_impressions)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "breakdowns": {
+          "description": "Breakdown dimensions (e.g., date, campaign_id, ad_group_id)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "campaignIds": {
+          "description": "Filter report to specific campaign IDs",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "adGroupIds": {
+          "description": "Filter report to specific ad group IDs",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "adIds": {
+          "description": "Filter report to specific ad IDs",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["startDate", "endDate", "level"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "report": {
+          "description": "Report data containing the requested metrics and breakdowns"
+        }
+      },
+      "required": ["report"],
+      "additionalProperties": false
+    }
+  },
+  "list_campaigns": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Filter campaigns by status",
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED", "COMPLETED", "DRAFT"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaigns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "campaignId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "objective": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "budgetCents": {
+                "type": "number"
+              },
+              "budgetType": {
+                "type": "string"
+              },
+              "startDate": {
+                "type": "string"
+              },
+              "endDate": {
+                "type": "string"
+              },
+              "isProcessing": {
+                "type": "boolean"
+              },
+              "raw": {}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["campaigns"],
+      "additionalProperties": false
+    }
+  },
+  "manage_ad_group": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "adGroupId": {
+          "description": "Ad group ID to update; omit to create a new ad group",
+          "type": "string"
+        },
+        "campaignId": {
+          "description": "Campaign ID for the new ad group (required when creating)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Ad group name",
+          "type": "string"
+        },
+        "bidCents": {
+          "description": "Bid amount in cents",
+          "type": "number"
+        },
+        "bidStrategy": {
+          "description": "Bidding strategy",
+          "type": "string",
+          "enum": ["CPC", "CPM", "CPA", "CPV"]
+        },
+        "status": {
+          "description": "Ad group status",
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED"]
+        },
+        "startDate": {
+          "description": "Start date in ISO 8601 format",
+          "type": "string"
+        },
+        "endDate": {
+          "description": "End date in ISO 8601 format",
+          "type": "string"
+        },
+        "targetSubreddits": {
+          "description": "List of subreddit names to target",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "targetInterests": {
+          "description": "List of interest category IDs to target",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "targetKeywords": {
+          "description": "List of keywords to target",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "placements": {
+          "description": "Ad placements",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["FEED", "CONVERSATIONS"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "adGroupId": {
+          "type": "string"
+        },
+        "campaignId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "bidCents": {
+          "type": "number"
+        },
+        "bidStrategy": {
+          "type": "string"
+        },
+        "raw": {}
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_custom_audience": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "audienceId": {
+          "description": "Audience ID to update; omit to create a new audience",
+          "type": "string"
+        },
+        "name": {
+          "description": "Audience name",
+          "type": "string"
+        },
+        "audienceType": {
+          "description": "Type of custom audience",
+          "type": "string",
+          "enum": ["CUSTOMER_LIST", "WEBSITE", "LOOKALIKE", "ENGAGEMENT"]
+        },
+        "description": {
+          "description": "Audience description",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "audienceId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "audienceType": {
+          "type": "string"
+        },
+        "approximateSize": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string"
+        },
+        "raw": {}
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_custom_audiences": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "audiences": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "audienceId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "audienceType": {
+                "type": "string"
+              },
+              "approximateSize": {
+                "type": "number"
+              },
+              "status": {
+                "type": "string"
+              },
+              "raw": {}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["audiences"],
+      "additionalProperties": false
+    }
+  },
+  "manage_ad": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "adId": {
+          "description": "Ad ID to update; omit to create a new ad",
+          "type": "string"
+        },
+        "adGroupId": {
+          "description": "Ad group ID for the new ad (required when creating)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Ad name",
+          "type": "string"
+        },
+        "headline": {
+          "description": "Ad headline text",
+          "type": "string"
+        },
+        "body": {
+          "description": "Ad body text",
+          "type": "string"
+        },
+        "clickUrl": {
+          "description": "Destination URL when ad is clicked",
+          "type": "string"
+        },
+        "callToAction": {
+          "description": "Call-to-action button text",
+          "type": "string",
+          "enum": [
+            "SHOP_NOW",
+            "SIGN_UP",
+            "DOWNLOAD",
+            "INSTALL",
+            "LEARN_MORE",
+            "WATCH_NOW",
+            "APPLY_NOW",
+            "CONTACT_US",
+            "GET_QUOTE",
+            "SUBSCRIBE",
+            "BOOK_NOW",
+            "PLAY_NOW",
+            "GET_STARTED"
+          ]
+        },
+        "thumbnailUrl": {
+          "description": "Thumbnail/image URL for the ad creative",
+          "type": "string"
+        },
+        "videoUrl": {
+          "description": "Video URL for video ads",
+          "type": "string"
+        },
+        "status": {
+          "description": "Ad status",
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "adId": {
+          "type": "string"
+        },
+        "adGroupId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "headline": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "callToAction": {
+          "type": "string"
+        },
+        "raw": {}
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_ad_groups": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "description": "Filter ad groups by campaign ID",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "adGroups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "adGroupId": {
+                "type": "string"
+              },
+              "campaignId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "bidCents": {
+                "type": "number"
+              },
+              "bidStrategy": {
+                "type": "string"
+              },
+              "startDate": {
+                "type": "string"
+              },
+              "endDate": {
+                "type": "string"
+              },
+              "raw": {}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["adGroups"],
+      "additionalProperties": false
+    }
+  },
+  "get_account_info": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "fundingInstruments": {
+          "type": "array",
+          "items": {}
+        },
+        "raw": {}
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "description": "Campaign ID to update; omit to create a new campaign",
+          "type": "string"
+        },
+        "name": {
+          "description": "Campaign name",
+          "type": "string"
+        },
+        "objective": {
+          "description": "Campaign objective",
+          "type": "string",
+          "enum": [
+            "BRAND_AWARENESS",
+            "TRAFFIC",
+            "CONVERSIONS",
+            "VIDEO_VIEWS",
+            "APP_INSTALLS",
+            "CATALOG_SALES",
+            "REACH",
+            "ENGAGEMENT"
+          ]
+        },
+        "budgetCents": {
+          "description": "Total budget in cents (e.g., 10000 = $100 USD)",
+          "type": "number"
+        },
+        "budgetType": {
+          "description": "Budget type",
+          "type": "string",
+          "enum": ["DAILY", "LIFETIME"]
+        },
+        "startDate": {
+          "description": "Campaign start date in ISO 8601 format",
+          "type": "string"
+        },
+        "endDate": {
+          "description": "Campaign end date in ISO 8601 format",
+          "type": "string"
+        },
+        "status": {
+          "description": "Campaign status",
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "objective": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "budgetCents": {
+          "type": "number"
+        },
+        "budgetType": {
+          "type": "string"
+        },
+        "raw": {}
+      },
+      "additionalProperties": false
+    }
+  }
+}

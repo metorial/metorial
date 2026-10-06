@@ -141,7 +141,7 @@ let expectedToolIds = [
   'business_central_list_document_attachments'
 ];
 
-let expectedTriggerIds = ['dataverse_inbound_webhook', 'dataverse_record_changed'];
+let expectedTriggerIds: string[] = [];
 
 let expectedAuthMethodsForActionId = (id: string) => [
   ...(getAuthMethodsForActionKey(id) ?? [])
@@ -193,7 +193,6 @@ describe('Dynamics 365 merged provider contract', () => {
       'finOpsDefaultMaxPages',
       'finOpsDefaultPageSize',
       'projectOperationsDefaultPageSize',
-      'recordChangedEntitySetName',
       'retailServerUrl'
     ]);
 

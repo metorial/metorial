@@ -8,7 +8,7 @@ export let manageTags = SlateTool.create(spec, {
   key: 'manage_tags',
   description: `Add, remove, or replace tags on one or more Cloudinary assets. Useful for organizing and categorizing assets in bulk.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -27,35 +27,12 @@ export let manageTags = SlateTool.create(spec, {
         .describe('Resource type of the assets.')
     })
   )
-  .output(
-    z.object({
-      publicIds: z.array(z.string()).describe('Public IDs of the affected assets.')
-    })
-  )
+  .output(z.object({ publicIds: z.array(z.string()) }))
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-
-    let result = await client.manageTags({
-      publicIds: ctx.input.publicIds,
-      tag: ctx.input.tag,
-      command: ctx.input.command,
-      resourceType: ctx.input.resourceType
-    });
-
-    let commandLabel =
-      ctx.input.command === 'add'
-        ? 'Added'
-        : ctx.input.command === 'remove'
-          ? 'Removed'
-          : ctx.input.command === 'replace'
-            ? 'Replaced with'
-            : ctx.input.command === 'set_exclusive'
-              ? 'Set exclusive'
-              : 'Removed all';
-
+    const result = await createClient(ctx).manageTags(ctx.input);
     return {
       output: result,
-      message: `${commandLabel} tag **${ctx.input.tag}** on ${ctx.input.publicIds.length} asset(s).`
+      message: `Cloudinary confirmed tag command ${ctx.input.command} for ${result.publicIds.length} asset(s).${ctx.input.command === 'set_exclusive' ? ' This command also removes these tags from other assets.' : ''}`
     };
   })
   .build();

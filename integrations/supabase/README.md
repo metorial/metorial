@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/supabase.jpeg" height="20"> Supabase
 
-Manage PostgreSQL databases, authenticate users, store files, and run Edge Functions on Supabase. Perform CRUD operations on database tables via auto-generated REST APIs with row-level security. Create and manage user accounts with password, magic link, OTP, social login, and SSO authentication. Upload, download, list, and delete files organized in storage buckets. Deploy and invoke server-side TypeScript Edge Functions. Listen to realtime database changes and configure database webhooks for INSERT, UPDATE, and DELETE events. Programmatically manage Supabase organizations and projects, including project lifecycle, API keys, auth settings, health checks, logs, database schema exports, and Edge Function secrets.
+Manage PostgreSQL databases, authenticate users, store files, and run Edge Functions on Supabase. Perform CRUD operations on database tables via auto-generated REST APIs with row-level security. Create and manage user accounts with password, magic link, OTP, social login, and SSO authentication. Upload, download, list, and delete files organized in storage buckets. Deploy and invoke server-side TypeScript Edge Functions. Programmatically manage Supabase organizations and projects, including project lifecycle, API keys, auth settings, health checks, logs, database schema exports, and Edge Function secrets.
 
 ## Tools
 

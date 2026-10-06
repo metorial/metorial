@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let getRecord = SlateTool.create(spec, {
   name: 'Get Record',
   key: 'get_record',
-  description: `Retrieve a single record by its ID from a Xata table. Optionally select specific columns to return.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Retrieve a single record by its ID from a Xata table. Optionally select specific columns to return.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -54,8 +58,12 @@ export let getRecord = SlateTool.create(spec, {
 export let createRecord = SlateTool.create(spec, {
   name: 'Create Record',
   key: 'create_record',
-  description: `Insert a new record into a Xata table. Optionally specify a custom ID; otherwise, one is auto-generated. Supports bulk inserts by providing an array of records.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Insert a new record into a Xata table. Optionally specify a custom ID; otherwise, one is auto-generated. Supports bulk inserts by providing an array of records.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })
@@ -128,8 +136,12 @@ export let createRecord = SlateTool.create(spec, {
 export let updateRecord = SlateTool.create(spec, {
   name: 'Update Record',
   key: 'update_record',
-  description: `Update an existing record in a Xata table by its ID. Only the provided fields will be updated; other fields remain unchanged. Use upsert mode to create the record if it doesn't exist.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Update an existing record in a Xata table by its ID. Only the provided fields will be updated; other fields remain unchanged. Use upsert mode to create the record if it doesn't exist.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })
@@ -189,8 +201,12 @@ export let updateRecord = SlateTool.create(spec, {
 export let deleteRecord = SlateTool.create(spec, {
   name: 'Delete Record',
   key: 'delete_record',
-  description: `Delete a record from a Xata table by its ID.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Delete a record from a Xata table by its ID.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     destructive: true
   }
 })

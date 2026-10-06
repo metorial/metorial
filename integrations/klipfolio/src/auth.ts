@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,6 +20,14 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (
+        typeof ctx.input.token !== 'string' ||
+        !ctx.input.token.trim() ||
+        /[\r\n]/.test(ctx.input.token)
+      )
+        throw createApiServiceError('A nonempty Klipfolio API key is required.', {
+          reason: 'invalid_auth'
+        });
       return {
         output: {
           token: ctx.input.token
@@ -27,17 +36,11 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://app.klipfolio.com/api/1.0'
-      });
-
-      let response = await axios.get('/profile', {
-        headers: {
-          'kf-api-key': ctx.output.token
-        }
-      });
-
-      let profile = response.data?.data;
+      let profile = await new Client({ token: ctx.output.token }).getProfile();
+      if (typeof profile?.id !== 'string' || !profile.id.trim())
+        throw createApiServiceError('Klipfolio did not return an authenticated profile ID.', {
+          reason: 'invalid_response'
+        });
       return {
         profile: {
           id: profile?.id,

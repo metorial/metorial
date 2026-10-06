@@ -1,7 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ModeClient } from '../lib/client';
-import { getEmbedded, normalizeCollection } from '../lib/helpers';
+import { ModeClient, requireToken } from '../lib/client';
+import {
+  getEmbedded,
+  normalizeCollection,
+  pagination,
+  paginationSchema
+} from '../lib/helpers';
 import { spec } from '../spec';
 
 let collectionSchema = z.object({
@@ -38,15 +43,12 @@ export let listCollections = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      collections: z.array(collectionSchema)
+      collections: z.array(collectionSchema),
+      pagination: paginationSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let data = await client.listCollections({
       filter: ctx.input.filter,
@@ -56,7 +58,7 @@ export let listCollections = SlateTool.create(spec, {
     let collections = getEmbedded(data, 'spaces').map(normalizeCollection);
 
     return {
-      output: { collections },
+      output: { collections, pagination: pagination(data) },
       message: `Found **${collections.length}** collections.`
     };
   })
@@ -93,17 +95,13 @@ Use **delete** to remove an empty collection (all reports must be removed first)
   )
   .output(collectionSchema)
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let { action } = ctx.input;
 
     if (action === 'create') {
       let raw = await client.createCollection({
-        name: ctx.input.name!,
+        name: ctx.input.name ?? '',
         description: ctx.input.description,
         spaceType: ctx.input.spaceType
       });
@@ -115,10 +113,13 @@ Use **delete** to remove an empty collection (all reports must be removed first)
     }
 
     if (action === 'update') {
-      let raw = await client.updateCollection(ctx.input.collectionToken!, {
-        name: ctx.input.name,
-        description: ctx.input.description
-      });
+      let raw = await client.updateCollection(
+        requireToken(ctx.input.collectionToken, 'collectionToken'),
+        {
+          name: ctx.input.name,
+          description: ctx.input.description
+        }
+      );
       let collection = normalizeCollection(raw);
       return {
         output: collection,
@@ -127,9 +128,11 @@ Use **delete** to remove an empty collection (all reports must be removed first)
     }
 
     // action === 'delete'
-    let existing = await client.getCollection(ctx.input.collectionToken!);
+    let existing = await client.getCollection(
+      requireToken(ctx.input.collectionToken, 'collectionToken')
+    );
     let collection = normalizeCollection(existing);
-    await client.deleteCollection(ctx.input.collectionToken!);
+    await client.deleteCollection(requireToken(ctx.input.collectionToken, 'collectionToken'));
     return {
       output: collection,
       message: `Deleted collection **${collection.name}**.`

@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SerpApiClient } from '../lib/client';
+import { receiptMessage, receiptOutput, SerpApiClient } from '../lib/client';
+import { searchMetadataSchema } from '../lib/contracts';
+import { searchParams } from '../lib/params';
 import { spec } from '../spec';
 
 let flightResultSchema = z.object({
@@ -57,12 +59,30 @@ export let flightsSearchTool = SlateTool.create(spec, {
       stops: z
         .enum(['0', '1', '2', '3'])
         .optional()
-        .describe('Max stops: 0=non-stop, 1=up to 1, 2=up to 2, 3=any'),
+        .describe('Native stops: 0=any, 1=nonstop, 2=up to 1, 3=up to 2'),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Submit asynchronously and return the native search ID/status. Not compatible with noCache or Ludicrous Speed accounts.'
+        ),
       noCache: z.boolean().optional().describe('Force fresh results')
     })
   )
   .output(
     z.object({
+      isComplete: z
+        .boolean()
+        .describe(
+          'Whether native search status is Success; queued/processing receipts are incomplete.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Native pagination metadata; follow native offsets/tokens without inferring a total.'
+        ),
+      searchMetadata: searchMetadataSchema.optional(),
       bestFlights: z.array(flightResultSchema).describe('Best flight options'),
       otherFlights: z.array(flightResultSchema).describe('Other available flight options'),
       priceInsights: z
@@ -78,24 +98,9 @@ export let flightsSearchTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SerpApiClient({ apiKey: ctx.auth.token });
+    let client = new SerpApiClient({ apiKey: ctx.auth.token, accountId: ctx.auth.accountId });
 
-    let params: Record<string, any> = {
-      engine: 'google_flights',
-      departure_id: ctx.input.departureAirport,
-      arrival_id: ctx.input.arrivalAirport,
-      outbound_date: ctx.input.outboundDate,
-      type: ctx.input.returnDate ? '1' : '2' // 1=round trip, 2=one way
-    };
-
-    if (ctx.input.returnDate) params.return_date = ctx.input.returnDate;
-    if (ctx.input.currency) params.currency = ctx.input.currency;
-    if (ctx.input.language) params.hl = ctx.input.language;
-    if (ctx.input.country) params.gl = ctx.input.country;
-    if (ctx.input.travelClass) params.travel_class = ctx.input.travelClass;
-    if (ctx.input.adults) params.adults = ctx.input.adults;
-    if (ctx.input.stops) params.stops = ctx.input.stops;
-    if (ctx.input.noCache) params.no_cache = ctx.input.noCache;
+    let params = searchParams('flights_search', ctx.input);
 
     let data = await client.search(params);
 
@@ -112,7 +117,7 @@ export let flightsSearchTool = SlateTool.create(spec, {
         arrivalAirportCode: lastLeg?.arrival_airport?.id,
         arrivalTime: lastLeg?.arrival_airport?.time,
         duration: flight.total_duration,
-        stops: flight.flights ? flight.flights.length - 1 : 0,
+        stops: flight.flights?.length ? flight.flights.length - 1 : undefined,
         price: flight.price,
         tripType: flight.type,
         layovers: (flight.layovers || []).map((l: any) => ({
@@ -136,11 +141,15 @@ export let flightsSearchTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...receiptOutput(data),
         bestFlights,
         otherFlights,
         priceInsights
       },
-      message: `Flight search from ${ctx.input.departureAirport} to ${ctx.input.arrivalAirport} on ${ctx.input.outboundDate} found **${totalFlights}** options (${bestFlights.length} best, ${otherFlights.length} other).${priceInsights?.lowestPrice ? ` Lowest price: $${priceInsights.lowestPrice}.` : ''}`
+      message: receiptMessage(
+        data,
+        `Flight search from ${ctx.input.departureAirport} to ${ctx.input.arrivalAirport} on ${ctx.input.outboundDate} found **${totalFlights}** options (${bestFlights.length} best, ${otherFlights.length} other).${priceInsights?.lowestPrice ? ` Lowest price: ${priceInsights.lowestPrice} ${ctx.input.currency ?? 'USD'}.` : ''}`
+      )
     };
   })
   .build();

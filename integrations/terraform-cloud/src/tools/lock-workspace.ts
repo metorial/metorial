@@ -28,15 +28,12 @@ export let lockWorkspaceTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let response: any;
-
-    if (ctx.input.action === 'lock') {
-      response = await client.lockWorkspace(ctx.input.workspaceId, ctx.input.reason);
-    } else if (ctx.input.action === 'unlock') {
-      response = await client.unlockWorkspace(ctx.input.workspaceId);
-    } else {
-      response = await client.forceUnlockWorkspace(ctx.input.workspaceId);
-    }
+    const response =
+      ctx.input.action === 'lock'
+        ? await client.lockWorkspace(ctx.input.workspaceId, ctx.input.reason)
+        : ctx.input.action === 'unlock'
+          ? await client.unlockWorkspace(ctx.input.workspaceId)
+          : await client.forceUnlockWorkspace(ctx.input.workspaceId);
 
     let workspace = mapWorkspace(response.data);
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoupaClient } from '../lib/client';
+import { customFields, page, pageFields } from '../lib/contracts';
 import { spec } from '../spec';
 
 let supplierOutputSchema = z.object({
@@ -17,7 +18,7 @@ let supplierOutputSchema = z.object({
   taxId: z.string().nullable().optional().describe('Tax ID / VAT number'),
   createdAt: z.string().nullable().optional().describe('Creation timestamp'),
   updatedAt: z.string().nullable().optional().describe('Last update timestamp'),
-  rawData: z.any().optional().describe('Complete raw supplier data')
+  rawData: z.any().optional().describe('Native data with documented credential fields omitted')
 });
 
 export let searchSuppliers = SlateTool.create(spec, {
@@ -55,14 +56,12 @@ export let searchSuppliers = SlateTool.create(spec, {
   .output(
     z.object({
       suppliers: z.array(supplierOutputSchema).describe('List of matching suppliers'),
-      count: z.number().describe('Number of suppliers returned')
+      count: z.number().describe('Number of suppliers returned'),
+      ...pageFields
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let filters: Record<string, string> = {};
     if (ctx.input.filters) {
@@ -70,7 +69,7 @@ export let searchSuppliers = SlateTool.create(spec, {
         filters[key] = value;
       }
     }
-    if (ctx.input.name) filters.name = ctx.input.name;
+    if (ctx.input.name !== undefined) filters.name = ctx.input.name;
     if (ctx.input.status) filters.status = ctx.input.status;
     if (ctx.input.supplierNumber) filters.number = ctx.input.supplierNumber;
     if (ctx.input.updatedAfter) filters['updated-at[gt]'] = ctx.input.updatedAfter;
@@ -83,7 +82,7 @@ export let searchSuppliers = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let suppliers = (Array.isArray(results) ? results : []).map((s: any) => ({
+    let suppliers = results.map((s: any) => ({
       supplierId: s.id,
       name: s.name ?? null,
       supplierNumber: s.number ?? null,
@@ -93,7 +92,7 @@ export let searchSuppliers = SlateTool.create(spec, {
       primaryAddress: s['primary-address'] ?? s.primary_address ?? null,
       paymentMethod: s['payment-method'] ?? s.payment_method ?? null,
       paymentTerm: s['payment-term'] ?? s.payment_term ?? null,
-      website: s['website-url'] ?? s.website_url ?? null,
+      website: s.website ?? s['website-url'] ?? s.website_url ?? null,
       taxId: s['tax-id'] ?? s.tax_id ?? null,
       createdAt: s['created-at'] ?? s.created_at ?? null,
       updatedAt: s['updated-at'] ?? s.updated_at ?? null,
@@ -103,7 +102,8 @@ export let searchSuppliers = SlateTool.create(spec, {
     return {
       output: {
         suppliers,
-        count: suppliers.length
+        count: suppliers.length,
+        ...page(suppliers.length, ctx.input)
       },
       message: `Found **${suppliers.length}** supplier(s).`
     };
@@ -146,25 +146,28 @@ export let createSupplier = SlateTool.create(spec, {
         .optional()
         .describe('Primary contact'),
       paymentTermCode: z.string().optional().describe('Payment term code'),
+      customFieldsGlobalNamespace: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use true for existing global custom fields (legacy default); false places fields under the modern custom-fields namespace'
+        ),
       customFields: z.record(z.string(), z.any()).optional().describe('Custom field values')
     })
   )
   .output(supplierOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let payload: any = {
       name: ctx.input.name
     };
 
     if (ctx.input.supplierNumber) payload.number = ctx.input.supplierNumber;
-    if (ctx.input.displayName) payload['display-name'] = ctx.input.displayName;
+    if (ctx.input.displayName !== undefined) payload['display-name'] = ctx.input.displayName;
     if (ctx.input.status) payload.status = ctx.input.status;
-    if (ctx.input.website) payload['website-url'] = ctx.input.website;
-    if (ctx.input.taxId) payload['tax-id'] = ctx.input.taxId;
+    if (ctx.input.website !== undefined) payload.website = ctx.input.website;
+    if (ctx.input.taxId !== undefined) payload['tax-id'] = ctx.input.taxId;
 
     if (ctx.input.primaryAddress) {
       let a = ctx.input.primaryAddress;
@@ -183,18 +186,18 @@ export let createSupplier = SlateTool.create(spec, {
       payload['primary-contact'] = {
         'name-fullname': c.name,
         email: c.email,
-        'phone-work': c.phone
+        'phone-work': c.phone !== undefined ? { number: c.phone } : undefined
       };
     }
 
-    if (ctx.input.paymentTermCode)
+    if (ctx.input.paymentTermCode !== undefined)
       payload['payment-term'] = { code: ctx.input.paymentTermCode };
 
-    if (ctx.input.customFields) {
-      for (let [key, value] of Object.entries(ctx.input.customFields)) {
-        payload[key] = value;
-      }
-    }
+    customFields(
+      payload,
+      ctx.input.customFields,
+      ctx.input.customFieldsGlobalNamespace ?? true
+    );
 
     let result = await client.createSupplier(payload);
 
@@ -209,7 +212,7 @@ export let createSupplier = SlateTool.create(spec, {
         primaryAddress: result['primary-address'] ?? result.primary_address ?? null,
         paymentMethod: result['payment-method'] ?? result.payment_method ?? null,
         paymentTerm: result['payment-term'] ?? result.payment_term ?? null,
-        website: result['website-url'] ?? result.website_url ?? null,
+        website: result.website ?? result['website-url'] ?? result.website_url ?? null,
         taxId: result['tax-id'] ?? result.tax_id ?? null,
         createdAt: result['created-at'] ?? result.created_at ?? null,
         updatedAt: result['updated-at'] ?? result.updated_at ?? null,
@@ -256,6 +259,12 @@ export let updateSupplier = SlateTool.create(spec, {
         .optional()
         .describe('Updated primary contact'),
       paymentTermCode: z.string().optional().describe('Updated payment term code'),
+      customFieldsGlobalNamespace: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use true for existing global custom fields (legacy default); false places fields under the modern custom-fields namespace'
+        ),
       customFields: z
         .record(z.string(), z.any())
         .optional()
@@ -264,18 +273,15 @@ export let updateSupplier = SlateTool.create(spec, {
   )
   .output(supplierOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let payload: any = {};
 
-    if (ctx.input.name) payload.name = ctx.input.name;
-    if (ctx.input.displayName) payload['display-name'] = ctx.input.displayName;
+    if (ctx.input.name !== undefined) payload.name = ctx.input.name;
+    if (ctx.input.displayName !== undefined) payload['display-name'] = ctx.input.displayName;
     if (ctx.input.status) payload.status = ctx.input.status;
-    if (ctx.input.website) payload['website-url'] = ctx.input.website;
-    if (ctx.input.taxId) payload['tax-id'] = ctx.input.taxId;
+    if (ctx.input.website !== undefined) payload.website = ctx.input.website;
+    if (ctx.input.taxId !== undefined) payload['tax-id'] = ctx.input.taxId;
 
     if (ctx.input.primaryAddress) {
       let a = ctx.input.primaryAddress;
@@ -292,19 +298,20 @@ export let updateSupplier = SlateTool.create(spec, {
     if (ctx.input.primaryContact) {
       let c = ctx.input.primaryContact;
       payload['primary-contact'] = {};
-      if (c.name) payload['primary-contact']['name-fullname'] = c.name;
-      if (c.email) payload['primary-contact'].email = c.email;
-      if (c.phone) payload['primary-contact']['phone-work'] = c.phone;
+      if (c.name !== undefined) payload['primary-contact']['name-fullname'] = c.name;
+      if (c.email !== undefined) payload['primary-contact'].email = c.email;
+      if (c.phone !== undefined)
+        payload['primary-contact']['phone-work'] = { number: c.phone };
     }
 
-    if (ctx.input.paymentTermCode)
+    if (ctx.input.paymentTermCode !== undefined)
       payload['payment-term'] = { code: ctx.input.paymentTermCode };
 
-    if (ctx.input.customFields) {
-      for (let [key, value] of Object.entries(ctx.input.customFields)) {
-        payload[key] = value;
-      }
-    }
+    customFields(
+      payload,
+      ctx.input.customFields,
+      ctx.input.customFieldsGlobalNamespace ?? true
+    );
 
     let result = await client.updateSupplier(ctx.input.supplierId, payload);
 
@@ -319,7 +326,7 @@ export let updateSupplier = SlateTool.create(spec, {
         primaryAddress: result['primary-address'] ?? result.primary_address ?? null,
         paymentMethod: result['payment-method'] ?? result.payment_method ?? null,
         paymentTerm: result['payment-term'] ?? result.payment_term ?? null,
-        website: result['website-url'] ?? result.website_url ?? null,
+        website: result.website ?? result['website-url'] ?? result.website_url ?? null,
         taxId: result['tax-id'] ?? result.tax_id ?? null,
         createdAt: result['created-at'] ?? result.created_at ?? null,
         updatedAt: result['updated-at'] ?? result.updated_at ?? null,

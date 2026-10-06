@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RevAIClient } from '../lib/client';
 import { spec } from '../spec';
@@ -20,23 +20,38 @@ Can submit a media URL for a new identification or poll an existing job for resu
     z.object({
       mediaUrl: z
         .string()
+        .url()
+        .max(2048)
         .optional()
         .describe('Public URL of the audio file to identify the language of'),
+      sourceAuthHeaders: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Optional headers required to download a new media URL'),
       jobId: z
         .string()
         .optional()
         .describe('Existing language identification job ID to retrieve results for'),
-      metadata: z.string().optional().describe('Optional metadata to associate with the job'),
+      metadata: z
+        .string()
+        .max(512)
+        .optional()
+        .describe('Optional metadata to associate with the job'),
       deleteAfterSeconds: z
         .number()
+        .int()
+        .min(0)
+        .max(2592000)
         .optional()
         .describe('Auto-delete job after this many seconds')
     })
   )
   .output(
     z.object({
-      jobId: z.string().describe('Language identification job ID'),
+      jobId: z.string().min(1).describe('Language identification job ID'),
       status: z.string().describe('Job status: "in_progress", "completed", "failed"'),
+      failure: z.string().optional().describe('Failure reason when processing failed'),
+      failureDetail: z.string().optional().describe('Detailed failure information'),
       topLanguage: z.string().optional().describe('Most likely language code'),
       languageConfidences: z
         .array(
@@ -52,11 +67,16 @@ Can submit a media URL for a new identification or poll an existing job for resu
   .handleInvocation(async ctx => {
     let client = new RevAIClient({ token: ctx.auth.token });
 
+    if (ctx.input.jobId && ctx.input.mediaUrl) {
+      throw createApiServiceError(
+        'Provide mediaUrl for a new identification or jobId for an existing job, not both.'
+      );
+    }
     let jobId = ctx.input.jobId;
 
     if (!jobId && ctx.input.mediaUrl) {
       let job = await client.submitLanguageIdentification({
-        mediaUrl: ctx.input.mediaUrl,
+        sourceConfig: { url: ctx.input.mediaUrl, authHeaders: ctx.input.sourceAuthHeaders },
         metadata: ctx.input.metadata,
         deleteAfterSeconds: ctx.input.deleteAfterSeconds
       });
@@ -64,7 +84,7 @@ Can submit a media URL for a new identification or poll an existing job for resu
     }
 
     if (!jobId) {
-      throw new Error('Either mediaUrl or jobId must be provided');
+      throw createApiServiceError('Either mediaUrl or jobId must be provided');
     }
 
     let job = await client.getLanguageIdentificationJob(jobId);
@@ -82,6 +102,8 @@ Can submit a media URL for a new identification or poll an existing job for resu
       output: {
         jobId,
         status: job.status,
+        failure: job.failure,
+        failureDetail: job.failureDetail,
         topLanguage,
         languageConfidences
       },

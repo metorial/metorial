@@ -22,7 +22,8 @@ export let getUser = SlateTool.create(spec, {
       accountType: z.string().optional(),
       language: z.string().optional(),
       dateCreated: z.string().optional(),
-      dateLastLogin: z.string().optional()
+      dateLastLogin: z.string().optional(),
+      apiRegion: z.string()
     })
   )
   .handleInvocation(async ctx => {
@@ -43,9 +44,10 @@ export let getUser = SlateTool.create(spec, {
         accountType: user.account_type,
         language: user.language,
         dateCreated: user.date_created,
-        dateLastLogin: user.date_last_login
+        dateLastLogin: user.date_last_login,
+        apiRegion: client.origin
       },
-      message: `Authenticated as **${user.first_name} ${user.last_name}** (${user.email}) — ${user.account_type} plan.`
+      message: `Authenticated SurveyMonkey user \`${user.id}\` in ${client.origin}.`
     };
   })
   .build();

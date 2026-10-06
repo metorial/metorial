@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, continuation, urn } from '../lib/client';
+import { accountIdField } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listCampaignGroups = SlateTool.create(spec, {
@@ -12,15 +13,20 @@ export let listCampaignGroups = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('r_ads', 'rw_ads'))
   .input(
     z.object({
-      accountId: z.string().describe('Numeric ID of the ad account'),
+      accountId: accountIdField,
       pageSize: z.number().optional().describe('Number of results per page'),
       pageToken: z.string().optional().describe('Page token for pagination')
     })
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Continuation token for pageToken with the same filters'),
       campaignGroups: z.array(
         z.object({
           campaignGroupId: z.number().describe('Numeric ID of the campaign group'),
@@ -63,7 +69,7 @@ export let listCampaignGroups = SlateTool.create(spec, {
     }));
 
     return {
-      output: { campaignGroups },
+      output: { campaignGroups, nextPageToken: continuation(result) },
       message: `Found **${campaignGroups.length}** campaign group(s).`
     };
   })
@@ -78,9 +84,10 @@ export let createCampaignGroup = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(anyOf('rw_ads'))
   .input(
     z.object({
-      accountId: z.string().describe('Numeric ID of the ad account'),
+      accountId: accountIdField,
       name: z.string().describe('Name for the campaign group'),
       status: z
         .enum(['ACTIVE', 'PAUSED', 'ARCHIVED', 'DRAFT'])
@@ -104,8 +111,8 @@ export let createCampaignGroup = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let data: Record<string, any> = {
-      account: `urn:li:sponsoredAccount:${ctx.input.accountId}`,
+    let data: Record<string, unknown> = {
+      account: urn(ctx.input.accountId, 'sponsoredAccount'),
       name: ctx.input.name,
       status: ctx.input.status
     };
@@ -114,17 +121,15 @@ export let createCampaignGroup = SlateTool.create(spec, {
       data.totalBudget = ctx.input.totalBudget;
     }
 
-    if (ctx.input.runScheduleStart || ctx.input.runScheduleEnd) {
-      data.runSchedule = {};
-      if (ctx.input.runScheduleStart) data.runSchedule.start = ctx.input.runScheduleStart;
-      if (ctx.input.runScheduleEnd) data.runSchedule.end = ctx.input.runScheduleEnd;
+    if (ctx.input.runScheduleStart !== undefined || ctx.input.runScheduleEnd !== undefined) {
+      data.runSchedule = { start: ctx.input.runScheduleStart, end: ctx.input.runScheduleEnd };
     }
 
-    let campaignGroupId = await client.createCampaignGroup(data as any);
+    let campaignGroupId = await client.createCampaignGroup(data);
 
     return {
       output: { campaignGroupId },
-      message: `Created campaign group **${ctx.input.name}** with ID **${campaignGroupId}**.`
+      message: 'LinkedIn confirmed the requested operation.'
     };
   })
   .build();
@@ -138,9 +143,15 @@ export let updateCampaignGroup = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(anyOf('rw_ads'))
   .input(
     z.object({
       campaignGroupId: z.string().describe('Numeric ID of the campaign group to update'),
+      accountId: accountIdField
+        .optional()
+        .describe(
+          'Authorized account ID from list_ad_accounts. Omit only for bounded, unambiguous read-only account discovery.'
+        ),
       name: z.string().optional().describe('New name for the campaign group'),
       status: z
         .enum(['ACTIVE', 'PAUSED', 'ARCHIVED', 'DRAFT'])
@@ -165,23 +176,23 @@ export let updateCampaignGroup = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let updates: Record<string, any> = {};
-    if (ctx.input.name) updates.patch = { ...updates.patch, name: ctx.input.name };
-    if (ctx.input.status) updates.patch = { ...updates.patch, status: ctx.input.status };
-    if (ctx.input.totalBudget)
-      updates.patch = { ...updates.patch, totalBudget: ctx.input.totalBudget };
-    if (ctx.input.runScheduleStart || ctx.input.runScheduleEnd) {
-      let runSchedule: Record<string, any> = {};
-      if (ctx.input.runScheduleStart) runSchedule.start = ctx.input.runScheduleStart;
-      if (ctx.input.runScheduleEnd) runSchedule.end = ctx.input.runScheduleEnd;
-      updates.patch = { ...updates.patch, runSchedule };
+    let updates: Record<string, unknown> = {};
+    if (ctx.input.name !== undefined) updates.name = ctx.input.name;
+    if (ctx.input.status !== undefined) updates.status = ctx.input.status;
+    if (ctx.input.totalBudget) updates.totalBudget = ctx.input.totalBudget;
+    if (ctx.input.runScheduleStart !== undefined || ctx.input.runScheduleEnd !== undefined) {
+      let runSchedule: Record<string, unknown> = {};
+      if (ctx.input.runScheduleStart !== undefined)
+        runSchedule.start = ctx.input.runScheduleStart;
+      if (ctx.input.runScheduleEnd !== undefined) runSchedule.end = ctx.input.runScheduleEnd;
+      updates.runSchedule = runSchedule;
     }
 
-    await client.updateCampaignGroup(ctx.input.campaignGroupId, updates);
+    await client.updateCampaignGroup(ctx.input.campaignGroupId, updates, ctx.input.accountId);
 
     return {
       output: { success: true },
-      message: `Updated campaign group **${ctx.input.campaignGroupId}** successfully.`
+      message: 'LinkedIn confirmed the requested operation.'
     };
   })
   .build();

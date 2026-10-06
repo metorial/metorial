@@ -1,6 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import {
+  integerAmount,
+  invalid,
+  nonemptyPatch,
+  object,
+  recordSchema,
+  required
+} from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageSpendProgram = SlateTool.create(spec, {
@@ -8,7 +16,9 @@ export let manageSpendProgram = SlateTool.create(spec, {
   key: 'manage_spend_program',
   description: `List, get, create, or update Ramp spend programs. Spend programs group funds, users, and cards under shared policies, acting as "blueprints" for consistent spending rules and automated fund provisioning.`,
   instructions: [
-    'Amounts are in cents (e.g. 1000000 = $10,000.00)',
+    "Amounts use the currency's minor units. No currency conversion is performed.",
+    'The current API documents create/list/get. The retained legacy update route may not be available on every account.',
+    'Creation requires displayName, description, icon, amount, interval and both permitted-spend flags. Nested update values are preserved from a readback rather than implicitly replaced.',
     "When a spend program is linked to a limit, it overrides the limit's spending restrictions"
   ]
 })
@@ -42,21 +52,23 @@ export let manageSpendProgram = SlateTool.create(spec, {
       allowedCategories: z
         .array(z.number())
         .optional()
-        .describe('Allowed merchant category codes')
+        .describe(
+          'Allowed Ramp category codes; these are distinct from merchant category (MCC) codes.'
+        )
     })
   )
   .output(
     z.object({
-      spendProgram: z.any().optional().describe('Single spend program object'),
-      spendPrograms: z.array(z.any()).optional().describe('List of spend program objects'),
+      spendProgram: recordSchema.optional().describe('Single spend program object'),
+      spendPrograms: z
+        .array(recordSchema)
+        .optional()
+        .describe('List of spend program objects'),
       nextCursor: z.string().optional().describe('Cursor for the next page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = clientFor(ctx);
 
     let { action } = ctx.input;
 
@@ -76,7 +88,7 @@ export let manageSpendProgram = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!ctx.input.spendProgramId)
-        throw new Error('spendProgramId is required for get action');
+        throw invalid('spendProgramId is required for get action');
       let spendProgram = await client.getSpendProgram(ctx.input.spendProgramId);
       return {
         output: { spendProgram },
@@ -84,67 +96,118 @@ export let manageSpendProgram = SlateTool.create(spec, {
       };
     }
 
-    let buildBody = () => {
-      let body: Record<string, any> = {};
-      if (ctx.input.displayName) body.display_name = ctx.input.displayName;
-      if (ctx.input.description) body.description = ctx.input.description;
-      if (ctx.input.icon) body.icon = ctx.input.icon;
-      if (ctx.input.isShareable !== undefined) body.is_shareable = ctx.input.isShareable;
-
-      if (
-        ctx.input.primaryCardEnabled !== undefined ||
-        ctx.input.reimbursementsEnabled !== undefined
-      ) {
-        body.permitted_spend_types = {};
-        if (ctx.input.primaryCardEnabled !== undefined)
-          body.permitted_spend_types.primary_card_enabled = ctx.input.primaryCardEnabled;
-        if (ctx.input.reimbursementsEnabled !== undefined)
-          body.permitted_spend_types.reimbursements_enabled = ctx.input.reimbursementsEnabled;
-      }
-
-      if (
-        ctx.input.amount !== undefined ||
-        ctx.input.currencyCode ||
-        ctx.input.interval ||
-        ctx.input.allowedCategories
-      ) {
-        body.spending_restrictions = {};
-        if (ctx.input.amount !== undefined || ctx.input.currencyCode) {
-          body.spending_restrictions.limit = {};
-          if (ctx.input.amount !== undefined)
-            body.spending_restrictions.limit.amount = ctx.input.amount;
-          if (ctx.input.currencyCode)
-            body.spending_restrictions.limit.currency_code = ctx.input.currencyCode;
+    let input = ctx.input;
+    integerAmount(input.amount);
+    let body: Record<string, unknown> = {};
+    for (let [field, key] of [
+      ['displayName', 'display_name'],
+      ['description', 'description'],
+      ['icon', 'icon'],
+      ['isShareable', 'is_shareable']
+    ] as const)
+      if (input[field] !== undefined) body[key] = input[field];
+    let nested =
+      input.primaryCardEnabled !== undefined ||
+      input.reimbursementsEnabled !== undefined ||
+      input.amount !== undefined ||
+      input.currencyCode !== undefined ||
+      input.interval !== undefined ||
+      input.allowedCategories !== undefined;
+    let old =
+      input.action === 'update' && nested
+        ? await client.getSpendProgram(required(input.spendProgramId, 'spendProgramId'))
+        : undefined;
+    if (
+      input.primaryCardEnabled !== undefined ||
+      input.reimbursementsEnabled !== undefined ||
+      input.action === 'create'
+    ) {
+      let before = old?.permitted_spend_types
+        ? object(old.permitted_spend_types, 'existing spend methods')
+        : {};
+      let permissions = {
+        primary_card_enabled: input.primaryCardEnabled ?? before.primary_card_enabled,
+        reimbursements_enabled: input.reimbursementsEnabled ?? before.reimbursements_enabled
+      };
+      if (Object.values(permissions).some(value => typeof value !== 'boolean'))
+        throw invalid(
+          'Provide primaryCardEnabled and reimbursementsEnabled when no existing flags can be preserved.'
+        );
+      body.permitted_spend_types = permissions;
+    }
+    if (
+      input.amount !== undefined ||
+      input.currencyCode !== undefined ||
+      input.interval !== undefined ||
+      input.allowedCategories !== undefined ||
+      input.action === 'create'
+    ) {
+      let before = old?.restrictions ? object(old.restrictions, 'existing restrictions') : {};
+      let beforeLimit = before.limit ? object(before.limit, 'existing amount') : {};
+      let amount = input.amount ?? beforeLimit.amount;
+      if (typeof amount !== 'number')
+        throw invalid('amount is required when no existing spending amount can be preserved.');
+      integerAmount(amount);
+      let interval = input.interval ?? before.interval;
+      let currency = input.currencyCode ?? beforeLimit.currency_code;
+      let restrictions: Record<string, unknown> = {};
+      if (input.action === 'update') {
+        for (let key of [
+          'allowed_categories',
+          'allowed_vendors',
+          'blocked_categories',
+          'blocked_vendors'
+        ])
+          if (before[key] !== undefined) restrictions[key] = before[key];
+        if (
+          before.transaction_amount_limit !== undefined &&
+          before.transaction_amount_limit !== null
+        ) {
+          let limit = object(
+            before.transaction_amount_limit,
+            'existing per-transaction amount'
+          );
+          restrictions.transaction_amount_limit = {
+            amount: limit.amount,
+            currency_code: limit.currency_code
+          };
         }
-        if (ctx.input.interval) body.spending_restrictions.interval = ctx.input.interval;
-        if (ctx.input.allowedCategories)
-          body.spending_restrictions.allowed_categories = ctx.input.allowedCategories;
+        if (before.auto_lock_date !== undefined)
+          restrictions.lock_date = before.auto_lock_date;
       }
-
-      return body;
+      restrictions.interval = required(interval, 'interval');
+      restrictions.limit = {
+        amount,
+        ...(currency === undefined
+          ? {}
+          : { currency_code: required(currency, 'currencyCode') })
+      };
+      if (input.allowedCategories !== undefined)
+        restrictions.allowed_categories = input.allowedCategories;
+      body.spending_restrictions = restrictions;
+    }
+    if (input.action === 'create') {
+      required(input.displayName, 'displayName');
+      required(input.icon, 'icon');
+      if (input.description === undefined)
+        throw invalid('description is required for spend-program creation.');
+      let spendProgram = await client.createSpendProgram(body);
+      return {
+        output: { spendProgram },
+        message:
+          'Ramp returned the created spend program. It may provision spending resources according to its policies.'
+      };
+    }
+    required(input.spendProgramId, 'spendProgramId');
+    nonemptyPatch(body);
+    let spendProgram = await client.updateSpendProgram(
+      required(input.spendProgramId, 'spendProgramId'),
+      body
+    );
+    return {
+      output: { spendProgram },
+      message:
+        'Ramp accepted the legacy spend-program update. Read the program to confirm its state.'
     };
-
-    if (action === 'create') {
-      let spendProgram = await client.createSpendProgram(buildBody());
-      return {
-        output: { spendProgram },
-        message: `Created spend program **${ctx.input.displayName || 'new program'}**.`
-      };
-    }
-
-    if (action === 'update') {
-      if (!ctx.input.spendProgramId)
-        throw new Error('spendProgramId is required for update action');
-      let spendProgram = await client.updateSpendProgram(
-        ctx.input.spendProgramId,
-        buildBody()
-      );
-      return {
-        output: { spendProgram },
-        message: `Updated spend program **${ctx.input.spendProgramId}**.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
   })
   .build();

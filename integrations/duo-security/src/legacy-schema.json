@@ -1,0 +1,1064 @@
+{
+  "list_users": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "realname": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "isEnrolled": {
+                "type": "boolean"
+              },
+              "lastLogin": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "created": {
+                "type": "number"
+              },
+              "phones": {
+                "type": "array",
+                "items": {}
+              },
+              "groups": {
+                "type": "array",
+                "items": {}
+              }
+            }
+          }
+        },
+        "totalObjects": {
+          "type": "number"
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "get_user": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "realname": {
+          "type": "string"
+        },
+        "firstname": {
+          "type": "string"
+        },
+        "lastname": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "isEnrolled": {
+          "type": "boolean"
+        },
+        "lastLogin": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "created": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "phones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "phoneId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "activated": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "groupId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "tokens": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tokenId": {
+                "type": "string"
+              },
+              "serial": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "create_user": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "realname": {
+          "type": "string"
+        },
+        "firstname": {
+          "type": "string"
+        },
+        "lastname": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "bypass", "disabled"]
+        },
+        "notes": {
+          "type": "string"
+        },
+        "sendEnrollment": {
+          "type": "boolean"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "enrollmentSent": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "update_user": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "realname": {
+          "type": "string"
+        },
+        "firstname": {
+          "type": "string"
+        },
+        "lastname": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "bypass", "disabled"]
+        },
+        "notes": {
+          "type": "string"
+        },
+        "addGroupIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removeGroupIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "addPhoneIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removePhoneIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "groupsAdded": {
+          "type": "number"
+        },
+        "groupsRemoved": {
+          "type": "number"
+        },
+        "phonesAdded": {
+          "type": "number"
+        },
+        "phonesRemoved": {
+          "type": "number"
+        }
+      }
+    }
+  },
+  "delete_user": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "create_bypass_codes": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "count": {
+          "type": "number"
+        },
+        "validSecs": {
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "list_groups": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "groupId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "pushEnabled": {
+                "type": "boolean"
+              },
+              "smsEnabled": {
+                "type": "boolean"
+              },
+              "voiceEnabled": {
+                "type": "boolean"
+              },
+              "mobileOtpEnabled": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "totalObjects": {
+          "type": "number"
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "create_group": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Active", "Bypass", "Disabled"]
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "delete_group": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "list_phones": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "phones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "phoneId": {
+                "type": "string"
+              },
+              "number": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "activated": {
+                "type": "boolean"
+              },
+              "model": {
+                "type": "string"
+              },
+              "lastSeen": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "totalObjects": {
+          "type": "number"
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "create_phone": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "number": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["Mobile", "Landline"]
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "Google Android",
+            "Apple iOS",
+            "Windows Phone",
+            "RIM Blackberry",
+            "Java ME",
+            "Palm webOS",
+            "Symbian OS",
+            "Windows Mobile",
+            "Generic Smartphone",
+            "Unknown"
+          ]
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "phoneId": {
+          "type": "string"
+        },
+        "number": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "delete_phone": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "phoneId": {
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "list_admins": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "admins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "adminId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "lastLogin": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "created": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "totalObjects": {
+          "type": "number"
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "create_admin": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "Owner",
+            "Administrator",
+            "User Manager",
+            "Security Analyst",
+            "Application Manager",
+            "Read-only",
+            "Billing"
+          ]
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "adminId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "update_admin": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "adminId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "Owner",
+            "Administrator",
+            "User Manager",
+            "Security Analyst",
+            "Application Manager",
+            "Read-only",
+            "Billing"
+          ]
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "adminId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "delete_admin": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "adminId": {
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "list_integrations": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "integrations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "integrationKey": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "adminApiAdmins": {
+                "type": "number"
+              },
+              "groupsAllowed": {
+                "type": "array",
+                "items": {}
+              },
+              "notesHtml": {
+                "type": "string"
+              },
+              "selfServiceAllowed": {
+                "type": "boolean"
+              },
+              "usernameNormalizationPolicy": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "totalObjects": {
+          "type": "number"
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "get_authentication_logs": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "mintime": {
+          "type": "string"
+        },
+        "maxtime": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "nextOffset": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "authlogs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "txid": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "number"
+              },
+              "username": {
+                "type": "string"
+              },
+              "factor": {
+                "type": "string"
+              },
+              "result": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "applicationName": {
+                "type": "string"
+              },
+              "applicationKey": {
+                "type": "string"
+              },
+              "accessDeviceIp": {
+                "type": "string"
+              },
+              "accessDeviceLocation": {},
+              "authDeviceName": {
+                "type": "string"
+              },
+              "eventType": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "totalObjects": {
+          "type": "number"
+        },
+        "nextOffset": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "get_admin_logs": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "mintime": {
+          "type": "string"
+        },
+        "maxtime": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "logs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "number"
+              },
+              "username": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              },
+              "objectType": {
+                "type": "string"
+              },
+              "objectName": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "get_telephony_logs": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "mintime": {
+          "type": "string"
+        },
+        "maxtime": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "logs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestamp": {
+                "type": "number"
+              },
+              "context": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "credits": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "get_account_summary": {
+    "input": {
+      "type": "object",
+      "properties": {}
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "object",
+          "properties": {
+            "adminCount": {
+              "type": "number"
+            },
+            "integrationCount": {
+              "type": "number"
+            },
+            "telephonyCreditsRemaining": {
+              "type": "number"
+            },
+            "userCount": {
+              "type": "number"
+            }
+          }
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "lockoutThreshold": {
+              "type": "number"
+            },
+            "lockoutExpireDuration": {
+              "type": "number"
+            },
+            "inactiveUserExpiration": {
+              "type": "number"
+            },
+            "smsMessage": {
+              "type": "string"
+            },
+            "fraudEmail": {
+              "type": "string"
+            },
+            "callerID": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

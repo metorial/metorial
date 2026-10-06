@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listFiles = SlateTool.create(spec, {
@@ -29,12 +30,9 @@ export let listFiles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
-    let data: any;
+    let data: { categories: Record<string, unknown>[] };
     let scope: string;
 
     if (ctx.input.employeeId) {
@@ -45,7 +43,7 @@ export let listFiles = SlateTool.create(spec, {
       scope = 'company';
     }
 
-    let categories = data?.categories || (Array.isArray(data) ? data : []);
+    let categories = data.categories;
 
     return {
       output: {
@@ -74,27 +72,33 @@ export let uploadFile = SlateTool.create(spec, {
         .describe('Employee ID to upload file for. Omit for company files.'),
       categoryId: z.string().describe('Category ID to upload the file into'),
       fileName: z.string().describe('Name for the file'),
-      fileContent: z.string().describe('File content as a text string'),
+      fileContent: z
+        .string()
+        .describe('Nonempty literal UTF-8 text under 20 MB; this is not a base64 input'),
       shareWithEmployee: z
         .boolean()
         .optional()
-        .describe('Whether to share the file with the employee (employee files only)')
+        .describe(
+          'Share with the selected employee, or with all employees for company files; defaults to false'
+        )
     })
   )
   .output(
     z.object({
       scope: z.string().describe('Whether the file was uploaded to "employee" or "company"'),
-      fileName: z.string().describe('The name of the uploaded file')
+      fileName: z.string().describe('The name of the uploaded file'),
+      fileId: z
+        .string()
+        .optional()
+        .describe('Provider-assigned file ID from the validated creation receipt')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
-    if (ctx.input.employeeId) {
-      await client.uploadEmployeeFile(
+    let result: { id: string; location: string };
+    if (ctx.input.employeeId !== undefined) {
+      result = await client.uploadEmployeeFile(
         ctx.input.employeeId,
         ctx.input.categoryId,
         ctx.input.fileName,
@@ -102,7 +106,7 @@ export let uploadFile = SlateTool.create(spec, {
         ctx.input.shareWithEmployee
       );
     } else {
-      await client.uploadCompanyFile(
+      result = await client.uploadCompanyFile(
         ctx.input.categoryId,
         ctx.input.fileName,
         ctx.input.fileContent,
@@ -113,9 +117,52 @@ export let uploadFile = SlateTool.create(spec, {
     return {
       output: {
         scope: ctx.input.employeeId ? 'employee' : 'company',
-        fileName: ctx.input.fileName
+        fileName: ctx.input.fileName,
+        fileId: result.id
       },
       message: `Uploaded file **${ctx.input.fileName}** to ${ctx.input.employeeId ? `employee **${ctx.input.employeeId}**` : 'company'} files.`
+    };
+  })
+  .build();
+
+export const downloadFile = SlateTool.create(spec, {
+  key: 'download_file',
+  name: 'Download File',
+  description:
+    'Download an exact existing employee or company file after checking that its ID appears in that folder. Use list_files to select an ID. Omit employeeId only for company files. Permission-limited or absent metadata is not proof that a file does not exist.',
+  tags: { readOnly: true, destructive: false }
+})
+  .input(
+    z.object({
+      fileId: z.string().describe('Exact file ID from list_files'),
+      employeeId: z.string().optional().describe('Employee folder ID; omit for company files')
+    })
+  )
+  .output(
+    z.object({
+      fileId: z.string(),
+      scope: z.enum(['employee', 'company']),
+      fileName: z.string()
+    })
+  )
+  .handleInvocation(async ctx => {
+    const client = clientFor(ctx);
+    const file = await client.file(ctx.input.fileId, ctx.input.employeeId);
+    const fileName = text(file.originalFileName ?? file.name, 'Provider filename');
+    await ctx.addAttachment({
+      type: 'url',
+      url: client.fileUrl(ctx.input.fileId, ctx.input.employeeId),
+      headers: { Authorization: client.authorization },
+      filename: fileName
+    });
+    return {
+      output: {
+        fileId: ctx.input.fileId,
+        scope:
+          ctx.input.employeeId === undefined ? ('company' as const) : ('employee' as const),
+        fileName
+      },
+      message: `Prepared download for file **${ctx.input.fileId}**.`
     };
   })
   .build();
@@ -145,10 +192,7 @@ export let deleteFile = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     if (ctx.input.employeeId) {
       await client.deleteEmployeeFile(ctx.input.employeeId, ctx.input.fileId);

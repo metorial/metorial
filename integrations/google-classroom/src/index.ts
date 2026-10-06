@@ -21,13 +21,6 @@ import {
   updateCourse,
   updateCoursework
 } from './tools';
-import {
-  announcementChanges,
-  courseRosterChanges,
-  courseworkChanges,
-  inboundWebhook
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -51,5 +44,5 @@ export let provider = Slate.create({
     getUserProfile,
     manageRubrics
   ],
-  triggers: [inboundWebhook, courseRosterChanges, courseworkChanges, announcementChanges]
+  triggers: []
 });

@@ -20,15 +20,6 @@ import {
   searchTransactions,
   sendPayout
 } from './tools';
-import {
-  disputeEvents,
-  invoiceEvents,
-  orderEvents,
-  paymentEvents,
-  payoutEvents,
-  subscriptionEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -51,12 +42,5 @@ export let provider = Slate.create({
     searchTransactions,
     addTracking
   ],
-  triggers: [
-    paymentEvents,
-    orderEvents,
-    subscriptionEvents,
-    invoiceEvents,
-    payoutEvents,
-    disputeEvents
-  ]
+  triggers: []
 });

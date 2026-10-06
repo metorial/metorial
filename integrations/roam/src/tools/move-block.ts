@@ -16,13 +16,20 @@ export let moveBlock = SlateTool.create(spec, {
       blockUid: z.string().describe('UID of the block to move'),
       newParentUid: z.string().describe('UID of the new parent page or block'),
       order: z
-        .union([z.number(), z.enum(['first', 'last'])])
+        .union([
+          z.number().nonnegative().max(Number.MAX_SAFE_INTEGER),
+          z.enum(['first', 'last'])
+        ])
         .default('last')
         .describe('Position among siblings: a number (0-based index), "first", or "last"')
     })
   )
   .output(
     z.object({
+      blockUid: z.string().describe('Exact target UID for independent reads and recovery'),
+      verified: z
+        .boolean()
+        .describe('Whether the requested outcome was confirmed by an exact read'),
       success: z.boolean().describe('Whether the block was moved successfully')
     })
   )
@@ -38,8 +45,12 @@ export let moveBlock = SlateTool.create(spec, {
     });
 
     return {
-      output: { success: result.success },
-      message: `Block **${ctx.input.blockUid}** moved to parent **${ctx.input.newParentUid}** in graph **${ctx.config.graphName}**.`
+      output: {
+        success: result.success,
+        blockUid: result.targetUid,
+        verified: result.verified
+      },
+      message: 'Moved the block and confirmed its requested parent and position.'
     };
   })
   .build();

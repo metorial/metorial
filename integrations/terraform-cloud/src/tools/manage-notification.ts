@@ -8,7 +8,9 @@ let notificationSchema = z.object({
   notificationConfigurationId: z.string(),
   name: z.string(),
   destinationType: z.string(),
-  url: z.string(),
+  url: z
+    .string()
+    .describe('Destination origin only; credential-bearing paths and query values are hidden'),
   enabled: z.boolean(),
   triggers: z.array(z.string()),
   createdAt: z.string(),
@@ -74,7 +76,9 @@ export let createNotificationTool = SlateTool.create(spec, {
       enabled: z
         .boolean()
         .optional()
-        .describe('Whether the notification is enabled (default: true)'),
+        .describe(
+          'Whether the notification is enabled (provider default: false). Enabling sends a verification request to the destination.'
+        ),
       triggers: z
         .array(z.string())
         .describe(
@@ -83,7 +87,9 @@ export let createNotificationTool = SlateTool.create(spec, {
       emailAddresses: z
         .array(z.string())
         .optional()
-        .describe('Email addresses for email notifications'),
+        .describe(
+          'HCP Terraform: accepted organization-member email addresses resolved to user IDs, without invitations. Terraform Enterprise: direct recipient addresses.'
+        ),
       emailUserIds: z.array(z.string()).optional().describe('User IDs for email notifications')
     })
   )

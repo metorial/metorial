@@ -1,12 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AshbyClient } from '../lib/client';
+import {
+  contactType,
+  email,
+  id,
+  optionalString,
+  pageSchema,
+  row,
+  socialLinks,
+  str,
+  text,
+  warningsSchema
+} from '../lib/contracts';
 import { spec } from '../spec';
 
 export let createCandidateTool = SlateTool.create(spec, {
   name: 'Create Candidate',
   key: 'create_candidate',
-  description: `Creates a new candidate in Ashby with name, email, phone, and social links. Returns the created candidate's ID and basic profile information.`,
+  description: `Creates a candidate with a full name and primary personal email/phone. Social links are set with a separate documented update; these operations are not atomic. Other legacy contact types are rejected before writes.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -45,51 +57,74 @@ export let createCandidateTool = SlateTool.create(spec, {
       name: z.string().describe('Full name of the candidate'),
       primaryEmail: z.string().optional().describe('Primary email address of the candidate'),
       primaryPhone: z.string().optional().describe('Primary phone number of the candidate'),
-      createdAt: z.string().describe('Creation timestamp')
+      createdAt: z.string().describe('Creation timestamp'),
+      warnings: warningsSchema,
+      pageInfo: pageSchema.optional(),
+      completedActions: z.array(z.string()).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AshbyClient({ token: ctx.auth.token });
-
-    let params: Record<string, any> = {
-      firstName: ctx.input.firstName,
-      lastName: ctx.input.lastName
+    const client = new AshbyClient(ctx.auth);
+    const name = `${text(ctx.input.firstName, 'First name')} ${text(ctx.input.lastName, 'Last name')}`;
+    contactType(ctx.input.emailType, ctx.input.email, 'email');
+    contactType(ctx.input.phoneType, ctx.input.phone, 'phoneNumber');
+    const links =
+      ctx.input.socialLinks === undefined ? undefined : socialLinks(ctx.input.socialLinks);
+    const body = {
+      name,
+      email: ctx.input.email === undefined ? undefined : email(ctx.input.email),
+      phoneNumber: ctx.input.phone === undefined ? undefined : text(ctx.input.phone, 'Phone')
     };
-
-    if (ctx.input.email !== undefined) {
-      params.primaryEmailAddress = {
-        value: ctx.input.email,
-        type: ctx.input.emailType || 'Personal',
-        isPrimary: true
-      };
-    }
-
-    if (ctx.input.phone !== undefined) {
-      params.primaryPhoneNumber = {
-        value: ctx.input.phone,
-        type: ctx.input.phoneType || 'Personal',
-        isPrimary: true
-      };
-    }
-
-    if (ctx.input.socialLinks !== undefined) {
-      params.socialLinks = ctx.input.socialLinks;
-    }
-
-    let result = await client.createCandidate(params as any);
-    let candidate = result.results;
-
-    let output = {
-      candidateId: candidate.id,
-      name: candidate.name || `${ctx.input.firstName} ${ctx.input.lastName}`,
-      primaryEmail: candidate.primaryEmailAddress?.value || ctx.input.email,
-      primaryPhone: candidate.primaryPhoneNumber?.value || ctx.input.phone,
-      createdAt: candidate.createdAt
-    };
-
+    let candidate: Record<string, unknown> = {};
+    const steps = [
+      {
+        label: 'candidate.create',
+        run: async () => {
+          candidate = row((await client.post('/candidate.create', body)).results);
+          id(candidate.id, 'Created candidate ID');
+        }
+      }
+    ];
+    if (links !== undefined)
+      steps.push({
+        label: 'candidate.update.socialLinks',
+        run: async () => {
+          candidate = row(
+            (
+              await client.exact(
+                '/candidate.update',
+                {
+                  candidateId: str(candidate.id),
+                  socialLinks: links,
+                  sendNotifications: false
+                },
+                str(candidate.id)
+              )
+            ).results
+          );
+        }
+      });
+    const completedActions = await client.sequence(steps, () => ({
+      candidateId: str(candidate.id)
+    }));
     return {
-      output,
-      message: `Created candidate **${output.name}**${output.primaryEmail ? ` (${output.primaryEmail})` : ''}`
+      output: {
+        candidateId: str(candidate.id),
+        name: str(candidate.name),
+        primaryEmail:
+          candidate.primaryEmailAddress === null
+            ? undefined
+            : optionalString(row(candidate.primaryEmailAddress).value),
+        primaryPhone:
+          candidate.primaryPhoneNumber === null
+            ? undefined
+            : optionalString(row(candidate.primaryPhoneNumber).value),
+        createdAt: str(candidate.createdAt),
+        warnings: client.warnings,
+        completedActions
+      },
+      message:
+        'Candidate creation accepted. Review any warning codes; recruiting history may be retained.'
     };
   })
   .build();

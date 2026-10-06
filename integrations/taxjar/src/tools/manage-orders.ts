@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import type { Order } from '../lib/types';
 import { spec } from '../spec';
 
 let orderLineItemInput = z.object({
   lineItemId: z.string().optional().describe('Unique identifier for the line item'),
-  quantity: z.number().optional().describe('Quantity purchased'),
+  quantity: z.number().optional().describe('Whole-number quantity purchased'),
   productIdentifier: z.string().optional().describe('Product identifier or SKU'),
   description: z.string().optional().describe('Item description'),
   productTaxCode: z.string().optional().describe('Product tax code'),
@@ -40,9 +41,17 @@ let orderOutput = z.object({
   toState: z.string().optional(),
   toCity: z.string().optional(),
   toStreet: z.string().optional(),
-  amount: z.number().optional().describe('Total order amount excluding tax'),
+  amount: z
+    .number()
+    .optional()
+    .describe('Total order amount including shipping, excluding tax'),
   shipping: z.number().optional().describe('Shipping cost'),
   salesTax: z.number().optional().describe('Sales tax collected'),
+  customerId: z
+    .string()
+    .optional()
+    .describe('Customer identifier used for exemptions, when returned'),
+  exemptionType: z.string().optional().describe('Applied exemption type, when returned'),
   lineItems: z.array(orderLineItemOutput).optional().describe('Order line items')
 });
 
@@ -70,7 +79,7 @@ let mapOrderLineItems = (
   }));
 };
 
-let mapOrderOutput = (order: any) => ({
+let mapOrderOutput = (order: Order) => ({
   transactionId: order.transaction_id,
   userId: order.user_id,
   transactionDate: order.transaction_date,
@@ -88,6 +97,8 @@ let mapOrderOutput = (order: any) => ({
   amount: order.amount,
   shipping: order.shipping,
   salesTax: order.sales_tax,
+  customerId: order.customer_id,
+  exemptionType: order.exemption_type,
   lineItems: mapOrderLineItems(order.line_items)
 });
 
@@ -96,7 +107,7 @@ let mapOrderOutput = (order: any) => ({
 export let listOrders = SlateTool.create(spec, {
   name: 'List Order Transactions',
   key: 'list_orders',
-  description: `List order transaction IDs stored in TaxJar for sales tax reporting. Filter by date range or marketplace provider. Returns transaction IDs which can be used to fetch full order details.`,
+  description: `List order transaction IDs stored in TaxJar for sales tax reporting. Filter by date range or provider source. Returns transaction IDs which can be used to fetch full order details.`,
   tags: {
     readOnly: true
   }
@@ -118,7 +129,7 @@ export let listOrders = SlateTool.create(spec, {
       provider: z
         .string()
         .optional()
-        .describe('Marketplace provider filter (e.g. amazon, ebay)')
+        .describe('Transaction provider source filter; defaults to api')
     })
   )
   .output(
@@ -127,11 +138,7 @@ export let listOrders = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let orders = await client.listOrders({
       transaction_date: ctx.input.transactionDate,
@@ -160,22 +167,18 @@ export let getOrder = SlateTool.create(spec, {
   .input(
     z.object({
       transactionId: z.string().describe('Unique transaction ID of the order'),
-      provider: z.string().optional().describe('Marketplace provider if applicable')
+      provider: z.string().optional().describe('Transaction provider source; defaults to api')
     })
   )
   .output(orderOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let order = await client.showOrder(ctx.input.transactionId, ctx.input.provider);
 
     return {
       output: mapOrderOutput(order),
-      message: `Retrieved order **${order.transaction_id}**: $${order.amount ?? 0} with $${order.sales_tax ?? 0} sales tax.`
+      message: `Retrieved order record **${order.transaction_id}**.`
     };
   })
   .build();
@@ -185,7 +188,14 @@ export let getOrder = SlateTool.create(spec, {
 export let createOrder = SlateTool.create(spec, {
   name: 'Create Order Transaction',
   key: 'create_order',
-  description: `Create a new order transaction in TaxJar for sales tax reporting and filing. The order will appear on the Transactions page in TaxJar.`,
+  description: `Create an order record in TaxJar for sales tax reporting and filing. This records a completed sale; it does not charge a customer.`,
+  instructions: [
+    'Supply transactionDate and a unique transactionId. Order amount includes shipping and excludes tax. An origin address must exist in account settings or be supplied.',
+    'If a create request has an uncertain result, read the transaction before retrying or deliberately updating it.'
+  ],
+  constraints: [
+    'Sandbox transactions return stubbed responses and do not prove a stored lifecycle.'
+  ],
   tags: {
     destructive: false
   }
@@ -194,12 +204,16 @@ export let createOrder = SlateTool.create(spec, {
     z.object({
       transactionId: z
         .string()
-        .describe('Unique transaction ID for the order (no periods allowed)'),
-      transactionDate: z.string().optional().describe('Transaction date (YYYY/MM/DD)'),
-      provider: z
+        .describe(
+          'Unique new order ID containing only letters, numbers, underscores or dashes'
+        ),
+      transactionDate: z
         .string()
         .optional()
-        .describe('Marketplace provider (e.g. amazon, ebay, facebook)'),
+        .describe(
+          'Required for creation. Use YYYY-MM-DD or ISO date-time; date-only slash formats are supported.'
+        ),
+      provider: z.string().optional().describe('Transaction provider source; defaults to api'),
       fromCountry: z.string().optional().describe('Origin two-letter ISO country code'),
       fromZip: z.string().optional().describe('Origin ZIP code'),
       fromState: z.string().optional().describe('Origin state code'),
@@ -210,7 +224,7 @@ export let createOrder = SlateTool.create(spec, {
       toState: z.string().describe('Destination state code'),
       toCity: z.string().optional().describe('Destination city'),
       toStreet: z.string().optional().describe('Destination street address'),
-      amount: z.number().describe('Total order amount excluding tax'),
+      amount: z.number().describe('Total order amount including shipping, excluding tax'),
       shipping: z.number().describe('Total shipping cost'),
       salesTax: z.number().describe('Total sales tax collected'),
       customerId: z.string().optional().describe('Customer ID for exemption tracking'),
@@ -222,11 +236,7 @@ export let createOrder = SlateTool.create(spec, {
   )
   .output(orderOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let order = await client.createOrder({
       transaction_id: ctx.input.transactionId,
@@ -261,7 +271,7 @@ export let createOrder = SlateTool.create(spec, {
 
     return {
       output: mapOrderOutput(order),
-      message: `Created order **${order.transaction_id}**: $${order.amount ?? 0} with $${order.sales_tax ?? 0} sales tax.`
+      message: `TaxJar accepted order record **${order.transaction_id}**.`
     };
   })
   .build();
@@ -302,11 +312,7 @@ export let updateOrder = SlateTool.create(spec, {
   )
   .output(orderOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let order = await client.updateOrder({
       transaction_id: ctx.input.transactionId,
@@ -340,7 +346,7 @@ export let updateOrder = SlateTool.create(spec, {
 
     return {
       output: mapOrderOutput(order),
-      message: `Updated order **${order.transaction_id}**.`
+      message: `Updated order record **${order.transaction_id}**.`
     };
   })
   .build();
@@ -358,22 +364,18 @@ export let deleteOrder = SlateTool.create(spec, {
   .input(
     z.object({
       transactionId: z.string().describe('Transaction ID of the order to delete'),
-      provider: z.string().optional().describe('Marketplace provider if applicable')
+      provider: z.string().optional().describe('Transaction provider source; defaults to api')
     })
   )
   .output(orderOutput)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let order = await client.deleteOrder(ctx.input.transactionId, ctx.input.provider);
 
     return {
       output: mapOrderOutput(order),
-      message: `Deleted order **${order.transaction_id}**.`
+      message: `TaxJar accepted deletion of order record **${order.transaction_id}**.`
     };
   })
   .build();

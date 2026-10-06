@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SpotifyClient } from '../lib/client';
+import { paging, pagingOutputSchema } from '../lib/types';
 import { spec } from '../spec';
 
 export let manageLibrary = SlateTool.create(spec, {
@@ -91,6 +92,8 @@ export let manageLibrary = SlateTool.create(spec, {
           })
         )
         .optional(),
+      paging: pagingOutputSchema.optional(),
+      unavailableItems: z.number().optional(),
       total: z.number().optional(),
       success: z.boolean().optional()
     })
@@ -98,7 +101,10 @@ export let manageLibrary = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SpotifyClient({
       token: ctx.auth.token,
-      market: ctx.config.market
+      refreshToken: ctx.auth.refreshToken,
+      input: ctx.input,
+      market: ctx.config.market,
+      endpointCompatibility: ctx.config.endpointCompatibility
     });
 
     let { action } = ctx.input;
@@ -110,19 +116,26 @@ export let manageLibrary = SlateTool.create(spec, {
         offset: ctx.input.offset
       });
 
-      let savedTracks = result.items.map(item => ({
-        addedAt: item.added_at,
-        trackId: item.track.id,
-        name: item.track.name,
-        artists: item.track.artists.map(a => ({ artistId: a.id, name: a.name })),
-        albumName: item.track.album.name,
-        durationMs: item.track.duration_ms,
-        spotifyUrl: item.track.external_urls.spotify,
-        uri: item.track.uri
-      }));
+      let savedTracks = result.items
+        .filter(item => item.track !== null)
+        .map(item => ({
+          addedAt: item.added_at,
+          trackId: item.track!.id,
+          name: item.track!.name,
+          artists: item.track!.artists.map(a => ({ artistId: a.id, name: a.name })),
+          albumName: item.track!.album.name,
+          durationMs: item.track!.duration_ms,
+          spotifyUrl: item.track!.external_urls.spotify,
+          uri: item.track!.uri
+        }));
 
       return {
-        output: { savedTracks, total: result.total },
+        output: {
+          savedTracks,
+          total: result.total,
+          paging: paging(result),
+          unavailableItems: result.items.filter(item => item.track === null).length
+        },
         message: `Retrieved ${savedTracks.length} saved tracks (${result.total} total).`
       };
     }
@@ -134,26 +147,33 @@ export let manageLibrary = SlateTool.create(spec, {
         offset: ctx.input.offset
       });
 
-      let savedAlbums = result.items.map(item => ({
-        addedAt: item.added_at,
-        albumId: item.album.id,
-        name: item.album.name,
-        artists: item.album.artists.map(a => ({ artistId: a.id, name: a.name })),
-        totalTracks: item.album.total_tracks,
-        releaseDate: item.album.release_date,
-        imageUrl: item.album.images?.[0]?.url ?? null,
-        spotifyUrl: item.album.external_urls.spotify
-      }));
+      let savedAlbums = result.items
+        .filter(item => item.album !== null)
+        .map(item => ({
+          addedAt: item.added_at,
+          albumId: item.album!.id,
+          name: item.album!.name,
+          artists: item.album!.artists.map(a => ({ artistId: a.id, name: a.name })),
+          totalTracks: item.album!.total_tracks,
+          releaseDate: item.album!.release_date,
+          imageUrl: item.album!.images?.[0]?.url ?? null,
+          spotifyUrl: item.album!.external_urls.spotify
+        }));
 
       return {
-        output: { savedAlbums, total: result.total },
+        output: {
+          savedAlbums,
+          total: result.total,
+          paging: paging(result),
+          unavailableItems: result.items.filter(item => item.album === null).length
+        },
         message: `Retrieved ${savedAlbums.length} saved albums (${result.total} total).`
       };
     }
 
     if (action === 'saveTracks') {
       if (!ctx.input.trackIds || ctx.input.trackIds.length === 0)
-        throw new Error('trackIds is required for "saveTracks" action');
+        throw createApiServiceError('trackIds is required for "saveTracks" action');
       await client.saveTracks(ctx.input.trackIds);
       return {
         output: { success: true },
@@ -163,7 +183,7 @@ export let manageLibrary = SlateTool.create(spec, {
 
     if (action === 'saveAlbums') {
       if (!ctx.input.albumIds || ctx.input.albumIds.length === 0)
-        throw new Error('albumIds is required for "saveAlbums" action');
+        throw createApiServiceError('albumIds is required for "saveAlbums" action');
       await client.saveAlbums(ctx.input.albumIds);
       return {
         output: { success: true },
@@ -173,7 +193,7 @@ export let manageLibrary = SlateTool.create(spec, {
 
     if (action === 'removeTracks') {
       if (!ctx.input.trackIds || ctx.input.trackIds.length === 0)
-        throw new Error('trackIds is required for "removeTracks" action');
+        throw createApiServiceError('trackIds is required for "removeTracks" action');
       await client.removeSavedTracks(ctx.input.trackIds);
       return {
         output: { success: true },
@@ -183,7 +203,7 @@ export let manageLibrary = SlateTool.create(spec, {
 
     if (action === 'removeAlbums') {
       if (!ctx.input.albumIds || ctx.input.albumIds.length === 0)
-        throw new Error('albumIds is required for "removeAlbums" action');
+        throw createApiServiceError('albumIds is required for "removeAlbums" action');
       await client.removeSavedAlbums(ctx.input.albumIds);
       return {
         output: { success: true },
@@ -193,11 +213,11 @@ export let manageLibrary = SlateTool.create(spec, {
 
     if (action === 'checkTracks') {
       if (!ctx.input.trackIds || ctx.input.trackIds.length === 0)
-        throw new Error('trackIds is required for "checkTracks" action');
+        throw createApiServiceError('trackIds is required for "checkTracks" action');
       let results = await client.checkSavedTracks(ctx.input.trackIds);
       let checkResults = ctx.input.trackIds.map((id, i) => ({
         itemId: id,
-        isSaved: results[i] ?? false
+        isSaved: results[i]!
       }));
       return {
         output: { checkResults },
@@ -207,11 +227,11 @@ export let manageLibrary = SlateTool.create(spec, {
 
     if (action === 'checkAlbums') {
       if (!ctx.input.albumIds || ctx.input.albumIds.length === 0)
-        throw new Error('albumIds is required for "checkAlbums" action');
+        throw createApiServiceError('albumIds is required for "checkAlbums" action');
       let results = await client.checkSavedAlbums(ctx.input.albumIds);
       let checkResults = ctx.input.albumIds.map((id, i) => ({
         itemId: id,
-        isSaved: results[i] ?? false
+        isSaved: results[i]!
       }));
       return {
         output: { checkResults },
@@ -219,5 +239,5 @@ export let manageLibrary = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   });

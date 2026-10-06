@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageTeamProjects = SlateTool.create(spec, {
@@ -14,7 +14,7 @@ Requires an **account-level** access token.`,
     'Use action "remove" with projectId to remove a project from the team.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -42,13 +42,12 @@ Requires an **account-level** access token.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
     if (ctx.input.action === 'list') {
       let result = await client.listTeamProjects(ctx.input.teamId);
-      let projects = (result?.result || []).map((p: any) => ({
-        projectId: p.id,
-        name: p.name
+      let projects = (result?.result || []).map(p => ({
+        projectId: p.project_id
       }));
       return {
         output: { projects },
@@ -57,7 +56,8 @@ Requires an **account-level** access token.`,
     }
 
     if (ctx.input.action === 'add') {
-      if (!ctx.input.projectId) throw new Error('projectId is required for "add" action');
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required for "add" action');
       await client.addProjectToTeam(ctx.input.teamId, ctx.input.projectId);
       return {
         output: { success: true },
@@ -66,7 +66,8 @@ Requires an **account-level** access token.`,
     }
 
     if (ctx.input.action === 'remove') {
-      if (!ctx.input.projectId) throw new Error('projectId is required for "remove" action');
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required for "remove" action');
       await client.removeProjectFromTeam(ctx.input.teamId, ctx.input.projectId);
       return {
         output: { success: true },
@@ -74,6 +75,6 @@ Requires an **account-level** access token.`,
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

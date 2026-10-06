@@ -20,8 +20,6 @@ import {
   startJob,
   stopJob
 } from './tools';
-import { inboundWebhook, jobCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     getPageContent,
     extractStructuredData
   ],
-  triggers: [inboundWebhook, jobCompleted]
+  triggers: []
 });

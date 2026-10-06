@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client, optionalText, text } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -21,29 +22,22 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: text(ctx.input.apiKey, 'API key')
         }
       };
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.hunter.io/v2'
-      });
-
-      let response = await http.get('/account', {
-        headers: {
-          'X-API-KEY': ctx.output.token
-        }
-      });
-
-      let account = response.data.data;
+      const account = await new Client({ token: ctx.output.token }).getAccountStats();
+      const email = text(account.email, 'API-key owner email');
 
       return {
         profile: {
-          id: account.email,
-          email: account.email,
-          name: `${account.first_name ?? ''} ${account.last_name ?? ''}`.trim() || undefined
+          id: email,
+          email,
+          name:
+            `${optionalText(account.first_name) ?? ''} ${optionalText(account.last_name) ?? ''}`.trim() ||
+            undefined
         }
       };
     }

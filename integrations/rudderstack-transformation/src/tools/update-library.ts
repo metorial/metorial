@@ -18,7 +18,7 @@ Set **publish** to true to make the updated code live.`,
   ],
   tags: {
     readOnly: false,
-    destructive: false
+    destructive: true
   }
 })
   .input(

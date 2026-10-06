@@ -1,12 +1,16 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  deleteCustomAudience,
   getAccountInfo,
   getPerformanceReport,
+  getResource,
+  listAdAccounts,
   listAdGroups,
   listAds,
   listCampaigns,
   listCustomAudiences,
+  listPixels,
   manageAd,
   manageAdGroup,
   manageAudienceUsers,
@@ -14,12 +18,14 @@ import {
   manageCustomAudience,
   sendConversionEvents
 } from './tools';
-import { campaignStatusChange, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     getAccountInfo,
+    listAdAccounts,
+    listPixels,
+    getResource,
+    deleteCustomAudience,
     listCampaigns,
     manageCampaign,
     listAdGroups,
@@ -32,5 +38,5 @@ export let provider = Slate.create({
     manageAudienceUsers,
     sendConversionEvents
   ],
-  triggers: [inboundWebhook, campaignStatusChange]
+  triggers: []
 });

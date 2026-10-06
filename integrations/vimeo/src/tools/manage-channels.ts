@@ -36,9 +36,10 @@ export let listChannelsTool = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total ?? 0,
-        page: result.page ?? 1,
-        perPage: result.perPage ?? channels.length,
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+        paging: result.paging,
         channels
       },
       message: `Found **${result.total ?? channels.length}** channels`
@@ -87,7 +88,9 @@ export let createChannelTool = SlateTool.create(spec, {
       privacy: z
         .enum(['anybody', 'moderators', 'user'])
         .optional()
-        .describe('Who can access the channel'),
+        .describe(
+          'Required by Vimeo for creation: anybody, moderators or user; omission fails before creation'
+        ),
       link: z.string().optional().describe('Custom URL slug for the channel')
     })
   )
@@ -187,9 +190,10 @@ export let listChannelVideosTool = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total ?? 0,
-        page: result.page ?? 1,
-        perPage: result.perPage ?? videos.length,
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+        paging: result.paging,
         videos
       },
       message: `Found **${result.total ?? videos.length}** videos in channel ${ctx.input.channelId}`

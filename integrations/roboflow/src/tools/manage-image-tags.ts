@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageImageTagsTool = SlateTool.create(spec, {
@@ -10,7 +11,7 @@ export let manageImageTagsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project URL slug'),
+      projectId: projectIdSchema,
       imageId: z.string().describe('Unique image identifier'),
       operation: z
         .enum(['add', 'remove', 'set'])

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FlowiseClient } from '../lib/client';
+import { FlowiseClient, flowiseJsonString, parseFlowiseList } from '../lib/client';
 import { spec } from '../spec';
 
 export let getChatMessages = SlateTool.create(spec, {
@@ -65,7 +65,7 @@ export let getChatMessages = SlateTool.create(spec, {
 
     let { chatflowId, ...params } = ctx.input;
     let result = await client.getChatMessages(chatflowId, params);
-    let messages = Array.isArray(result) ? result : [];
+    let { items: messages } = parseFlowiseList(result);
 
     return {
       output: {
@@ -78,10 +78,10 @@ export let getChatMessages = SlateTool.create(spec, {
           chatType: m.chatType,
           sessionId: m.sessionId,
           memoryType: m.memoryType,
-          sourceDocuments: m.sourceDocuments,
-          usedTools: m.usedTools,
-          fileUploads: m.fileUploads,
-          agentReasoning: m.agentReasoning,
+          sourceDocuments: flowiseJsonString(m.sourceDocuments),
+          usedTools: flowiseJsonString(m.usedTools),
+          fileUploads: flowiseJsonString(m.fileUploads),
+          agentReasoning: flowiseJsonString(m.agentReasoning),
           createdDate: m.createdDate,
           leadEmail: m.leadEmail
         }))

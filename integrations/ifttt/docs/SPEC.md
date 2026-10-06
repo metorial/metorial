@@ -1,88 +1,28 @@
-# Slates Specification for IFTTT
+# IFTTT API specification
 
-## Overview
+This integration implements documented Connect v2 and Realtime v1 operations for a provisioned Platform service. It retains eight original keys and adds the read-only current service context tool.
 
-IFTTT (If This Then That) is an automation platform that connects over 900 services together through conditional workflows called Applets. Applets are composed of triggers, queries, and actions — triggers tell an Applet to start, queries provide additional conditions, and actions are the result of an Applet run. IFTTT provides two main APIs: the Service API (for building your own service on IFTTT) and the Connect API (for programmatically managing connections between services on behalf of users).
+| Capability | Native contract |
+| --- | --- |
+| Service context | `GET https://connect.ifttt.com/v2/me`, bare `type: me`; `IFTTT-Service-Key` and optional `user_id`. Setup persists the observed `service_id`. |
+| Connection | `GET /v2/connections/{id}`, bare `type: connection`; public definition or service-authenticated `user_id`. Map `user_status` to optional legacy `status`; native null remains in `connection`. |
+| Full configuration replacement | `PUT /v2/connections/{id}/user_connection?user_id=...`, native `{user_features:[...]}`. Omitted fields/features are removed. Exact GET readback supplies the result. |
+| Field options | `GET /v2/connections/{id}/{triggers,actions,queries,features}/{typeId}/field_options?user_id=...`; select `options[fieldSlug]` locally. No slug path suffix. |
+| Action / test trigger | `POST .../actions/{id}/run` or `.../triggers/{id}/test`; body `user_id`, optional `fields` and `user_feature_id`; native empty 204 means accepted. |
+| Query | `POST .../queries/{id}/perform`; body `user_id`, optional `fields`, `limit`, `cursor`, `user_feature_id`. Preserve list `data`, native `next.cursor`/`next.fields` or compatible top-level continuation. Conflicting/nonadvancing cursors and continuation objects without usable cursors fail. Native `type: query` is an ingredient, not a list. |
+| Realtime | `POST https://realtime.ifttt.com/v1/notifications`, `{data:[{user_id?,trigger_identity?}]}`; 1–1000 nonempty targets. Accepted status indicates a polling notification only. |
+| Maker Webhooks | Documented standard/JSON paths require a key in the URL. Execution currently refuses locally before dispatch; all original input/output fields remain. No credential-in-header substitute is documented. |
 
-## Authentication
+No file endpoint or generated file tool is implemented, and no legacy trigger registration exists. User-invoked test and webhook actions are distinct from event subscriptions. There is no invented identity, OAuth token issuance, generic discovery, Applet management or administrative capability.
 
-IFTTT supports two authentication approaches depending on the API being used:
+Legacy keys, required fields and types remain. Additions are optional query `userFeatureId`, continuation/type fields, `features` field-option type, observed service binding, and current-context discovery. Previously accepted but invalid empty notification targets, fractional/nonpositive limits, incomplete replacement objects, and missing native field-option users now fail with an actionable validation error. An empty simple webhook value retains its input meaning although execution is blocked. JSON payload takes precedence over simple values.
 
-### Connect API Authentication
+All HTTP operations have bounded response/body size, a 30-second timeout and no redirect following. Native data and inputs are checked for configured credential reflection before projection or dispatch; public errors preserve only safe status metadata. A failed write can have retained effects: there is no automatic retry or invented undo.
 
-The Connect API supports two methods:
+## Primary references
 
-1. **Service Key Authentication (server-to-server):** A request includes an `IFTTT-Service-Key` header containing your service key, found in the API tab of the IFTTT Platform under the Service Key heading. You can use this approach when making calls from your backend servers to the API. Most Connect API requests access user-specific resources, so the `user_id` parameter is required.
-
-   Example: `IFTTT-Service-Key: vFRqPGZBmZjB8JPp3mBFqOdt`
-
-2. **User Token Authentication (client-side):** A user-authenticated request includes an `Authorization` header containing a user-specific token that IFTTT has issued to your service. This approach lets you make calls from places like mobile apps or browsers where it would be inappropriate to expose your service key. A token endpoint can be used to obtain a token for a specific user: `POST /v2/user_token?user_id=123&access_token=abc` with the `IFTTT-Service-Key` header.
-
-### Service API Authentication (OAuth2)
-
-OAuth2 is the only authentication mechanism supported for the Service API. IFTTT's protocol supports OAuth2 authentication, including support for refresh tokens. Your service API should use access tokens for authentication and as a source of identity. A single access token should correspond to a single user account or resource owner on your service.
-
-- If refresh tokens are used, they must be non-expiring. If refresh tokens are not used, access tokens must be non-expiring.
-- When configuring your service, provide IFTTT with a client ID and client secret for authentication-related requests.
-
-### Webhooks Service Authentication
-
-The Webhooks service (for triggering Applets via HTTP) uses a simple API key. The key is found on the Webhooks settings page (`https://ifttt.com/maker_webhooks/settings`) and is included in the webhook URL: `https://maker.ifttt.com/trigger/{event}/with/key/{webhooks_key}`.
-
-## Features
-
-### Connection Management
-
-Manage connections between your service and other IFTTT services on behalf of users. Connections allow you to set up queries, triggers, and actions for your users via the Connect API without the user having to enable anything on IFTTT. You can show connection status, enable/disable connections, and update connection configuration (e.g., trigger fields, action fields).
-
-- Connections are identified by a `connection_id`.
-- Requests fail if the user does not have the connection enabled, and the same user cannot enable the same connection twice, even across multiple IFTTT accounts.
-
-### Triggers
-
-Subscribe to events from any IFTTT-connected service. When a trigger detects a new event, IFTTT will send a request to your API's webhook endpoint. You can test triggers via a `/test` endpoint and configure trigger fields per user.
-
-- For each Applet using a given trigger, IFTTT will poll that trigger's endpoint about once every hour.
-- Triggers are required to use the Realtime API if a user would expect Applets to run in realtime.
-
-### Actions
-
-Execute actions on connected services programmatically. Actions are the output side of Applets — examples include creating calendar events, sending messages, controlling smart home devices, etc. Action fields can be pre-configured by the developer or set by the user.
-
-### Queries
-
-Retrieve data from connected services. A query lets your Applet retrieve extra data that isn't included in the trigger, so that your automation can include more complete or useful information. Queries can be executed on-demand via the Connect API with custom field parameters.
-
-### Webhooks Service (Maker Webhooks)
-
-The built-in Webhooks service allows sending and receiving arbitrary HTTP requests:
-
-- **Receive a web request:** This trigger fires every time the Maker service receives a web request to notify it of an event. Supports up to 3 values as parameters or full JSON payloads.
-- **Make a web request:** An action that allows you to send any data from IFTTT to any digital service on the internet with a public API. It is highly customizable — you can send data as GET, POST, PUT, HEAD, DELETE, or OPTIONS methods.
-- The Webhooks service's two triggers and one action are available on the Pro tier. The Webhooks service also supports three queries that are available on the Pro+ tier. The webhooks service is currently not available on the free tier.
-
-### Runtime Scripts
-
-A runtime script is JavaScript code that runs when IFTTT detects a new trigger event. Normally a connection requires you to run a backend server that receives trigger webhooks from IFTTT, but if your case is simple enough you can avoid running your own backend by implementing your connection logic in a runtime script.
-
-### Realtime API
-
-With IFTTT's Realtime API, you can have Applets involving user-oriented triggers from your service run near-instantly. Simply write a hook to notify IFTTT of any changes related to a given user. Rather than sending data directly, the Realtime API is used to notify IFTTT that there are new events available at your service for a specific `user_id` or `trigger_identity` that IFTTT can then fetch through polling.
-
-## Events
-
-IFTTT supports webhooks for notifying your service about connection lifecycle events and trigger events.
-
-### Connection Lifecycle Webhooks
-
-IFTTT sends webhooks to your service's endpoint when connections are enabled or disabled by users.
-
-- **Connection enabled:** This webhook is fired anytime a user enables your connection. Sent as `POST /ifttt/v1/webhooks/connection/enabled`.
-- **Connection disabled:** Sent as `POST /ifttt/v1/webhooks/connection/disabled` when a user disables a connection. Includes the connection ID, user ID, and timestamp.
-
-### Trigger Event Webhooks
-
-When a trigger detects a new event, IFTTT will send a request to your API's webhook endpoint. This is how your backend is notified of new trigger events from connected services so it can execute queries and actions in response. The webhook payload includes the trigger event data and user context.
-
-- Can be replaced by runtime scripts for simpler use cases.
-- Trigger fields and event data vary depending on the connected service's trigger definition.
+- [Connect API](https://ifttt.com/docs/connect_api): native routes, bare envelopes, user IDs, field maps, replacement and query continuation.
+- [Service and Realtime API](https://ifttt.com/docs/api_reference): polling notifications and target bounds.
+- [Webhooks FAQ](https://help.ifttt.com/hc/en-us/articles/115010230347-Webhooks-service-FAQ): standard and JSON key-in-path authentication, values, plan prerequisites and direct invocation.
+- [Service rate limits](https://help.ifttt.com/hc/en-us/articles/1260803229749-IFTTT-Service-Rate-Limits): Webhooks 240 requests/minute on Pro/Pro+; no Free access.
+- [Connections](https://ifttt.com/docs/connections): Platform connection prerequisites.

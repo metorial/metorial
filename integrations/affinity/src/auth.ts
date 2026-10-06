@@ -1,12 +1,9 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { AffinityClient } from './lib/client';
 
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+export const auth = SlateAuth.create()
+  .output(z.object({ token: z.string() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Key',
@@ -14,33 +11,22 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Affinity API key. Generate from Settings > API in the Affinity web app.')
+        .describe(
+          'Affinity API key from Settings > Manage Apps. Its permissions are those of the key owner.'
+        )
     }),
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('An Affinity API key is required.');
+      return { output: { token: ctx.input.token } };
     },
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.affinity.co'
-      });
-
-      let response = await client.get('/auth/whoami', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data;
-
+    getProfile: async (ctx: { output: { token: string } }) => {
+      const identity = await new AffinityClient(ctx.output.token).whoAmI();
       return {
         profile: {
-          id: String(user.user?.id ?? ''),
-          email: user.user?.email ?? '',
-          name: `${user.user?.first_name ?? ''} ${user.user?.last_name ?? ''}`.trim()
+          id: String(identity.user.id),
+          email: identity.user.email,
+          name: `${identity.user.firstName} ${identity.user.lastName}`.trim()
         }
       };
     }

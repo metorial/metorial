@@ -25,8 +25,6 @@ import {
   updateWebhook,
   uploadFromUrl
 } from './tools';
-import { fileEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -54,5 +52,5 @@ export let provider = Slate.create({
     deleteWebhook,
     buildCdnUrl
   ],
-  triggers: [fileEvents]
+  triggers: []
 });

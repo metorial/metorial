@@ -14,6 +14,7 @@ Returns the action result.`,
     'Actions may take longer to execute than queries or mutations since they can call external services'
   ],
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
@@ -46,8 +47,8 @@ Returns the action result.`,
 
     return {
       output: {
-        result: result.value !== undefined ? result.value : result,
-        status: result.status || 'success'
+        result: result.value,
+        status: result.status
       },
       message: `Action **${ctx.input.functionPath}** executed successfully.`
     };

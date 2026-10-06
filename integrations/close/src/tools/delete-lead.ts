@@ -7,9 +7,9 @@ export let deleteLead = SlateTool.create(spec, {
   name: 'Delete Lead',
   key: 'delete_lead',
   description: `Delete a lead from Close CRM by its ID.
-Permanently removes the lead and all associated data including contacts, activities, opportunities, and tasks. This action cannot be undone.`,
+Removes the lead and its contacts, activities, opportunities, and tasks from the active CRM. Audit history and provider recovery copies may remain.`,
   constraints: [
-    'This action is permanent and cannot be undone.',
+    'Deletion is destructive. Recovery, when available, requires an organization administrator; this tool does not restore records.',
     'All contacts, activities, opportunities, and tasks associated with the lead will also be deleted.'
   ],
   tags: {
@@ -32,7 +32,7 @@ Permanently removes the lead and all associated data including contacts, activit
 
     return {
       output: { success: true },
-      message: `Deleted lead **${ctx.input.leadId}** and all associated data.`
+      message: `Deleted lead **${ctx.input.leadId}** and its associated CRM records. Provider-retained history is not erased.`
     };
   })
   .build();

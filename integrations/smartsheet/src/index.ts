@@ -26,8 +26,6 @@ import {
   updateRows,
   updateSheet
 } from './tools';
-import { sheetChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -56,5 +54,5 @@ export let provider = Slate.create({
     listDashboards,
     createUpdateRequest
   ],
-  triggers: [sheetChanges]
+  triggers: []
 });

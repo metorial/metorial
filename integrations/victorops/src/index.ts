@@ -3,9 +3,12 @@ import { spec } from './spec';
 import {
   createIncident,
   createOnCallOverride,
+  deleteRoutingKey,
+  getIncident,
   getOnCall,
   getShiftLog,
   getTeamRotations,
+  listChatMessages,
   listIncidents,
   manageEscalationPolicy,
   manageIncident,
@@ -17,11 +20,12 @@ import {
   searchIncidentHistory,
   sendChatMessage
 } from './tools';
-import { incidentEvents, incidentWebhook, onCallChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getIncident,
+    deleteRoutingKey,
+    listChatMessages,
     listIncidents,
     createIncident,
     manageIncident,
@@ -38,5 +42,5 @@ export let provider = Slate.create({
     getTeamRotations,
     getShiftLog
   ],
-  triggers: [incidentEvents, incidentWebhook, onCallChange]
+  triggers: []
 });

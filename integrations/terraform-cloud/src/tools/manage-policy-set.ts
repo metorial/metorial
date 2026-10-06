@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { organizationNameSchema } from '../lib/contracts';
 import { createClient } from '../lib/helpers';
 import { mapPagination, mapPolicySet } from '../lib/mappers';
 import { spec } from '../spec';
@@ -18,13 +19,14 @@ let policySetSchema = z.object({
 export let listPolicySetsTool = SlateTool.create(spec, {
   name: 'List Policy Sets',
   key: 'list_policy_sets',
-  description: `List policy sets configured in the organization. Policy sets contain Sentinel or OPA policies that are enforced on runs.`,
+  description: `Call list_organizations to select an organization or use the optional configured default. List policy sets configured in the organization. Policy sets contain Sentinel or OPA policies that are enforced on runs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       search: z.string().optional().describe('Search policy sets by name'),
       pageNumber: z.number().optional().describe('Page number for pagination'),
       pageSize: z.number().optional().describe('Number of results per page')
@@ -62,7 +64,7 @@ export let listPolicySetsTool = SlateTool.create(spec, {
 export let createPolicySetTool = SlateTool.create(spec, {
   name: 'Create Policy Set',
   key: 'create_policy_set',
-  description: `Create a new policy set using Sentinel or OPA. Apply it globally or scope it to specific workspaces and projects. Optionally connect to a VCS repository containing policy code.`,
+  description: `Call list_organizations to select an organization or use the optional configured default. Create a new policy set using Sentinel or OPA. Apply it globally or scope it to specific workspaces and projects. Optionally connect to a VCS repository containing policy code.`,
   instructions: [
     'Set global to true to enforce on all workspaces, or scope to specific workspaceIds/projectIds.',
     'Kind must match the policy framework: "sentinel" or "opa".'
@@ -70,6 +72,7 @@ export let createPolicySetTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       name: z.string().describe('Name of the policy set'),
       description: z.string().optional().describe('Description of the policy set'),
       global: z

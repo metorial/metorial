@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listModels = SlateTool.create(spec, {
   name: 'List Models',
   key: 'list_models',
-  description: `List all available Palmyra models in your Writer account. Returns model IDs, names, and types. Use this to discover which models are available for text generation and chat completions.`,
+  description: `List available Palmyra and configured external models in your Writer account. Returns model IDs and names. Use this to discover which models are available for text generation and chat completions.`,
   tags: {
     readOnly: true
   }
@@ -19,7 +19,9 @@ export let listModels = SlateTool.create(spec, {
           z.object({
             modelId: z.string().describe('Unique model identifier'),
             name: z.string().describe('Display name of the model'),
-            type: z.string().describe('Type of the model')
+            type: z
+              .string()
+              .describe('Model type, or unknown when Writer does not return one.')
           })
         )
         .describe('Available models')

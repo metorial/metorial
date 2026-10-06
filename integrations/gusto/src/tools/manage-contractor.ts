@@ -1,8 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { getBaseUrl } from '../lib/helpers';
+import { invokeGusto } from '../lib/actions';
+import { companyIdSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  pagination: paginationSchema.optional(),
+  contractorId: z.string().describe('UUID of the contractor'),
+  companyId: z.string().nullable().optional(),
+  firstName: z.string().nullable().optional().describe('First name'),
+  lastName: z.string().nullable().optional().describe('Last name'),
+  businessName: z.string().nullable().optional().describe('Business name'),
+  email: z.string().nullable().optional().describe('Email address'),
+  type: z.string().nullable().optional().describe('Contractor type'),
+  wageType: z.string().nullable().optional().describe('Wage type'),
+  isActive: z.boolean().nullable().optional().describe('Whether the contractor is active'),
+  version: z.string().nullable().optional().describe('Current resource version')
+});
 
 export let manageContractor = SlateTool.create(spec, {
   name: 'Manage Contractor',
@@ -19,8 +33,12 @@ export let manageContractor = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      hourlyRate: z
+        .string()
+        .optional()
+        .describe('Exact decimal hourly rate, required when wageType is Hourly.'),
       action: z.enum(['create', 'get', 'update']).describe('The action to perform'),
-      companyId: z.string().optional().describe('Company UUID (required for create)'),
+      companyId: companyIdSchema.optional(),
       contractorId: z
         .string()
         .optional()
@@ -39,84 +57,6 @@ export let manageContractor = SlateTool.create(spec, {
       ssn: z.string().optional().describe('SSN or EIN for the contractor')
     })
   )
-  .output(
-    z.object({
-      contractorId: z.string().describe('UUID of the contractor'),
-      firstName: z.string().optional().describe('First name'),
-      lastName: z.string().optional().describe('Last name'),
-      businessName: z.string().optional().describe('Business name'),
-      email: z.string().optional().describe('Email address'),
-      type: z.string().optional().describe('Contractor type'),
-      wageType: z.string().optional().describe('Wage type'),
-      isActive: z.boolean().optional().describe('Whether the contractor is active'),
-      version: z.string().optional().describe('Current resource version')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: getBaseUrl(ctx.auth.environment)
-    });
-
-    let result: any;
-    let actionMessage: string;
-
-    switch (ctx.input.action) {
-      case 'create': {
-        if (!ctx.input.companyId)
-          throw new Error('companyId is required to create a contractor');
-        let data: Record<string, any> = {
-          type: ctx.input.type,
-          wage_type: ctx.input.wageType,
-          start_date: ctx.input.startDate,
-          email: ctx.input.email
-        };
-        if (ctx.input.type === 'Individual') {
-          data.first_name = ctx.input.firstName;
-          data.last_name = ctx.input.lastName;
-          if (ctx.input.ssn) data.ssn = ctx.input.ssn;
-        } else {
-          data.business_name = ctx.input.businessName;
-          if (ctx.input.ssn) data.ein = ctx.input.ssn;
-        }
-        result = await client.createContractor(ctx.input.companyId, data);
-        actionMessage = `Created contractor **${ctx.input.firstName ? `${ctx.input.firstName} ${ctx.input.lastName}` : ctx.input.businessName}**`;
-        break;
-      }
-      case 'get': {
-        if (!ctx.input.contractorId) throw new Error('contractorId is required');
-        result = await client.getContractor(ctx.input.contractorId);
-        actionMessage = `Retrieved contractor **${result.first_name || result.business_name}**`;
-        break;
-      }
-      case 'update': {
-        if (!ctx.input.contractorId) throw new Error('contractorId is required for update');
-        let updateData: Record<string, any> = {};
-        if (ctx.input.version) updateData.version = ctx.input.version;
-        if (ctx.input.firstName) updateData.first_name = ctx.input.firstName;
-        if (ctx.input.lastName) updateData.last_name = ctx.input.lastName;
-        if (ctx.input.businessName) updateData.business_name = ctx.input.businessName;
-        if (ctx.input.email) updateData.email = ctx.input.email;
-        if (ctx.input.wageType) updateData.wage_type = ctx.input.wageType;
-        result = await client.updateContractor(ctx.input.contractorId, updateData);
-        actionMessage = `Updated contractor ${ctx.input.contractorId}`;
-        break;
-      }
-    }
-
-    return {
-      output: {
-        contractorId: result.uuid || result.id?.toString(),
-        firstName: result.first_name,
-        lastName: result.last_name,
-        businessName: result.business_name,
-        email: result.email,
-        type: result.type,
-        wageType: result.wage_type,
-        isActive: result.is_active,
-        version: result.version
-      },
-      message: actionMessage
-    };
-  })
+  .output(outputSchema)
+  .handleInvocation(ctx => invokeGusto('manage_contractor', ctx.input, ctx.auth, outputSchema))
   .build();

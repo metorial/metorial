@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'zoominfo',
   name: 'ZoomInfo',
   description:
-    'B2B data intelligence platform with over 200 million business contacts and companies. Search, enrich, and monitor contacts, companies, intent signals, scoops, and news.',
+    'ZoomInfo GTM data intelligence: search and enrich contacts, companies, intent, scoops, news, corporate hierarchy and technologies; discover accepted fields and track API usage.',
   metadata: {},
   config,
   auth

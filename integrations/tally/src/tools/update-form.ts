@@ -3,20 +3,22 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let blockSchema = z.object({
-  uuid: z.string().describe('Unique block identifier (UUID)'),
-  type: z.string().describe('Block type'),
-  groupUuid: z.string().describe('Group identifier for related blocks'),
-  groupType: z.string().describe('Group category type'),
-  payload: z.record(z.string(), z.any()).describe('Block-specific configuration')
-});
+let blockSchema = z
+  .object({
+    uuid: z.string().describe('Unique block identifier (UUID)'),
+    type: z.string().describe('Block type'),
+    groupUuid: z.string().describe('Group identifier for related blocks'),
+    groupType: z.string().describe('Group category type'),
+    payload: z.record(z.string(), z.any()).describe('Block-specific configuration')
+  })
+  .passthrough();
 
 export let updateForm = SlateTool.create(spec, {
   name: 'Update Form',
   key: 'update_form',
   description: `Update an existing Tally form's name, status, blocks, or settings. Use this to modify form structure, open/close a form, rename it, or change its configuration.`,
   instructions: [
-    'Only provide the fields you want to update — unspecified fields remain unchanged.',
+    'Only provide the fields you want to update. Unspecified settings are preserved; blocks is a complete replacement array. Read the current form before changing blocks.',
     'Set status to "PUBLISHED" to make a draft form live, or update isClosed in settings to stop accepting responses.'
   ]
 })
@@ -29,7 +31,10 @@ export let updateForm = SlateTool.create(spec, {
         .array(blockSchema)
         .optional()
         .describe('Updated form blocks (replaces all blocks)'),
-      settings: z.record(z.string(), z.any()).optional().describe('Updated form settings')
+      settings: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Settings fields to change; unspecified settings are preserved')
     })
   )
   .output(

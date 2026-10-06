@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput, paginationOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let buildSchema = z.object({
   buildId: z.string().describe('UUID of the build'),
   buildNumber: z.number().describe('Build number within the pipeline'),
-  pipelineSlug: z.string().describe('Slug of the pipeline'),
+  pipelineSlug: z.string().describe('Pipeline slug from list_pipelines'),
   state: z
     .string()
     .describe('Current state (running, scheduled, passed, failed, blocked, canceled, etc.)'),
@@ -30,6 +31,7 @@ export let listBuilds = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...organizationInput,
       pipelineSlug: z
         .string()
         .optional()
@@ -47,7 +49,9 @@ export let listBuilds = SlateTool.create(spec, {
           'canceling',
           'skipped',
           'not_run',
-          'finished'
+          'finished',
+          'creating',
+          'failing'
         ])
         .optional()
         .describe('Filter by build state'),
@@ -67,18 +71,16 @@ export let listBuilds = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...paginationOutput,
       builds: z.array(buildSchema)
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     let builds = await client.listBuilds(ctx.input);
 
-    let mapped = builds.map((b: any) => ({
+    let mapped = builds.map(b => ({
       buildId: b.id,
       buildNumber: b.number,
       pipelineSlug: b.pipeline?.slug ?? '',
@@ -94,7 +96,7 @@ export let listBuilds = SlateTool.create(spec, {
     }));
 
     return {
-      output: { builds: mapped },
+      output: { builds: mapped, ...client.pagination },
       message: `Found **${mapped.length}** build(s).`
     };
   });

@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { reject, text, uid } from '../lib/contracts';
+import { templateOutput } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTemplate = SlateTool.create(spec, {
@@ -18,6 +21,7 @@ export let manageTemplate = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       action: z
         .enum(['create', 'update', 'duplicate', 'delete', 'import'])
         .describe('Operation to perform'),
@@ -26,8 +30,11 @@ export let manageTemplate = SlateTool.create(spec, {
         .optional()
         .describe('UID of the template (required for update, duplicate, delete)'),
       name: z.string().optional().describe('Template name (for create or update)'),
-      width: z.number().optional().describe('Template width in pixels (for create)'),
-      height: z.number().optional().describe('Template height in pixels (for create)'),
+      width: z.number().optional().describe('Template width in pixels (for create or update)'),
+      height: z
+        .number()
+        .optional()
+        .describe('Template height in pixels (for create or update)'),
       tags: z
         .array(z.string())
         .optional()
@@ -63,100 +70,48 @@ export let manageTemplate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-    let { action } = ctx.input;
-
-    if (action === 'create') {
-      if (!ctx.input.name || !ctx.input.width || !ctx.input.height) {
-        throw new Error('name, width, and height are required for creating a template');
-      }
-      let result = await client.createTemplate({
-        name: ctx.input.name,
-        width: ctx.input.width,
-        height: ctx.input.height,
-        tags: ctx.input.tags,
-        metadata: ctx.input.metadata
-      });
-      return {
-        output: {
-          templateUid: result.uid,
-          name: result.name,
-          width: result.width,
-          height: result.height,
-          previewUrl: result.preview_url || null,
-          tags: result.tags || []
-        },
-        message: `Template **${result.name}** created (UID: ${result.uid}).`
-      };
-    }
-
-    if (action === 'update') {
-      if (!ctx.input.templateUid)
-        throw new Error('templateUid is required for updating a template');
-      let result = await client.updateTemplate(ctx.input.templateUid, {
-        name: ctx.input.name,
-        tags: ctx.input.tags,
-        metadata: ctx.input.metadata
-      });
-      return {
-        output: {
-          templateUid: result.uid,
-          name: result.name,
-          width: result.width,
-          height: result.height,
-          previewUrl: result.preview_url || null,
-          tags: result.tags || []
-        },
-        message: `Template **${result.name}** updated.`
-      };
-    }
-
-    if (action === 'duplicate') {
-      if (!ctx.input.templateUid)
-        throw new Error('templateUid is required for duplicating a template');
-      let result = await client.duplicateTemplate(ctx.input.templateUid);
-      return {
-        output: {
-          templateUid: result.uid,
-          name: result.name,
-          width: result.width,
-          height: result.height,
-          previewUrl: result.preview_url || null,
-          tags: result.tags || []
-        },
-        message: `Template duplicated. New template: **${result.name}** (UID: ${result.uid}).`
-      };
-    }
-
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const { action } = ctx.input;
+    const contentFields = ['name', 'width', 'height', 'tags', 'metadata'] as const;
+    if (
+      ['duplicate', 'delete', 'import'].includes(action) &&
+      contentFields.some(field => ctx.input[field] !== undefined)
+    )
+      reject('Template field changes apply only to create or update.');
+    if (action !== 'import' && ctx.input.publicationIds !== undefined)
+      reject('publicationIds apply only to import.');
+    if ((action === 'create' || action === 'import') && ctx.input.templateUid !== undefined)
+      reject('templateUid does not apply to create or import.');
+    const body = {
+      name: ctx.input.name,
+      width: ctx.input.width,
+      height: ctx.input.height,
+      tags: ctx.input.tags,
+      metadata: ctx.input.metadata
+    };
     if (action === 'delete') {
-      if (!ctx.input.templateUid)
-        throw new Error('templateUid is required for deleting a template');
-      await client.deleteTemplate(ctx.input.templateUid);
+      await client.deleteTemplate(uid(ctx.input.templateUid));
       return {
-        output: {
-          deleted: true
-        },
-        message: `Template ${ctx.input.templateUid} deleted.`
+        output: { templateUid: ctx.input.templateUid, deleted: true },
+        message: 'The exact template was deleted. Its deletion is permanent.'
       };
     }
-
     if (action === 'import') {
-      if (!ctx.input.publicationIds || ctx.input.publicationIds.length === 0) {
-        throw new Error('publicationIds are required for importing templates');
-      }
-      let results = await client.importTemplates(ctx.input.publicationIds);
-      let imported = (Array.isArray(results) ? results : [results]).map((t: any) => ({
-        templateUid: t.uid,
-        name: t.name
-      }));
+      const importedTemplates = (
+        await client.importTemplates(ctx.input.publicationIds ?? [])
+      ).map(item => ({ templateUid: uid(item.uid), name: text(item.name) }));
       return {
-        output: {
-          importedTemplates: imported
-        },
-        message: `Imported ${imported.length} template(s) from the Bannerbear library.`
+        output: { importedTemplates },
+        message: `Imported ${importedTemplates.length} template(s).`
       };
     }
-
-    throw new Error(`Unknown action: ${action}`);
+    const result =
+      action === 'create'
+        ? await client.createTemplate(body)
+        : action === 'update'
+          ? await client.updateTemplate(uid(ctx.input.templateUid), body)
+          : await client.duplicateTemplate(uid(ctx.input.templateUid));
+    const output = templateOutput(result);
+    return { output, message: `Template ${action} completed (UID: ${output.templateUid}).` };
   })
   .build();

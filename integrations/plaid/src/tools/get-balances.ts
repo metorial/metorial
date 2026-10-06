@@ -46,7 +46,7 @@ export let getBalancesTool = SlateTool.create(spec, {
 
     let result = await client.getBalance(ctx.input.accessToken, ctx.input.accountIds);
 
-    let accounts = (result.accounts || []).map((a: any) => ({
+    let accounts = result.accounts.map(a => ({
       accountId: a.account_id,
       name: a.name,
       type: a.type,

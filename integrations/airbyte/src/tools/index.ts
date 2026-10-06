@@ -7,6 +7,12 @@ export * from './delete-connection';
 export * from './delete-destination';
 export * from './delete-source';
 export * from './delete-workspace';
+export {
+  getWorkspaceTool,
+  listDestinationDefinitionsTool,
+  listOrganizationsTool,
+  listSourceDefinitionsTool
+} from './discovery';
 export * from './get-connection';
 export * from './get-destination';
 export * from './get-job';

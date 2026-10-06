@@ -20,8 +20,6 @@ import {
   getWinProbability,
   searchPlayers
 } from './tools';
-import { bettingLineUpdates, gameScoreUpdates, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     getLiveScoreboard,
     getAdjustedMetrics
   ],
-  triggers: [inboundWebhook, gameScoreUpdates, bettingLineUpdates]
+  triggers: []
 });

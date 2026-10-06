@@ -22,7 +22,7 @@ export let listEnvVarsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project ID to list environment variables for'),
+      projectId: z.string().min(1).describe('Project ID to list environment variables for'),
       decrypted: z
         .boolean()
         .optional()
@@ -38,7 +38,7 @@ export let listEnvVarsTool = SlateTool.create(spec, {
     let client = new V0Client(ctx.auth.token);
     let result = await client.listEnvVars(ctx.input.projectId, ctx.input.decrypted);
 
-    let envVars = (result.data || []).map((v: any) => ({
+    let envVars = (result.data || []).map(v => ({
       envVarId: v.id,
       key: v.key,
       value: v.value,
@@ -62,14 +62,15 @@ export let createEnvVarsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project to create environment variables for'),
+      projectId: z.string().min(1).describe('Project to create environment variables for'),
       environmentVariables: z
         .array(
           z.object({
-            key: z.string().describe('Variable name'),
+            key: z.string().min(1).describe('Variable name'),
             value: z.string().describe('Variable value')
           })
         )
+        .min(1)
         .describe('Environment variables to create'),
       upsert: z
         .boolean()
@@ -89,7 +90,7 @@ export let createEnvVarsTool = SlateTool.create(spec, {
       upsert: ctx.input.upsert
     });
 
-    let envVars = (result.data || []).map((v: any) => ({
+    let envVars = (result.data || []).map(v => ({
       envVarId: v.id,
       key: v.key,
       value: v.value,
@@ -112,11 +113,11 @@ export let updateEnvVarsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project containing the environment variables'),
+      projectId: z.string().min(1).describe('Project containing the environment variables'),
       environmentVariables: z
         .array(
           z.object({
-            envVarId: z.string().describe('ID of the environment variable to update'),
+            envVarId: z.string().min(1).describe('ID of the environment variable to update'),
             value: z.string().describe('New value')
           })
         )
@@ -137,7 +138,7 @@ export let updateEnvVarsTool = SlateTool.create(spec, {
       }))
     });
 
-    let envVars = (result.data || []).map((v: any) => ({
+    let envVars = (result.data || []).map(v => ({
       envVarId: v.id,
       key: v.key,
       value: v.value,
@@ -163,8 +164,11 @@ export let deleteEnvVarsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project containing the environment variables'),
-      envVarIds: z.array(z.string()).describe('IDs of environment variables to delete')
+      projectId: z.string().min(1).describe('Project containing the environment variables'),
+      envVarIds: z
+        .array(z.string().min(1))
+        .min(1)
+        .describe('IDs of environment variables to delete')
     })
   )
   .output(
@@ -176,7 +180,7 @@ export let deleteEnvVarsTool = SlateTool.create(spec, {
     let client = new V0Client(ctx.auth.token);
     let result = await client.deleteEnvVars(ctx.input.projectId, ctx.input.envVarIds);
 
-    let deletedIds = (result.data || []).map((v: any) => v.id);
+    let deletedIds = (result.data || []).map(v => v.id);
 
     return {
       output: { deletedIds },

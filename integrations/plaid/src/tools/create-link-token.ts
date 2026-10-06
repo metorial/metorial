@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let createLinkTokenTool = SlateTool.create(spec, {
   name: 'Create Link Token',
   key: 'create_link_token',
-  description: `Create a short-lived \`link_token\` used to initialize Plaid Link in a client application. The token expires in 4 hours (or 30 minutes in update mode). Pass the resulting link token to your frontend to open the Plaid Link flow for users to connect their bank accounts.`,
+  description: `Create a short-lived \`link_token\` used to initialize Plaid Link in a client application. Use the actual expiration returned by Plaid. Pass the resulting link token to your frontend to open the Plaid Link flow for users to connect their bank accounts.`,
   instructions: [
     'clientName must be 30 characters or fewer.',
-    'To update an existing Item (e.g. to fix a broken connection), pass the accessToken parameter instead of products.'
+    'To update an existing Item (e.g. to fix a broken connection), pass accessToken and only products supported for that update flow. For transfer user action, provide transferAuthorizationId.'
   ]
 })
   .input(
@@ -20,7 +20,11 @@ export let createLinkTokenTool = SlateTool.create(spec, {
         .array(z.string())
         .default(['US'])
         .describe('ISO 3166-1 alpha-2 country codes'),
-      userId: z.string().describe('Unique identifier for the end user in your system'),
+      userId: z
+        .string()
+        .describe(
+          'Opaque identifier for the end user in your system; do not use personal information'
+        ),
       products: z
         .array(z.string())
         .optional()
@@ -33,7 +37,13 @@ export let createLinkTokenTool = SlateTool.create(spec, {
       accessToken: z
         .string()
         .optional()
-        .describe('Access token for an existing Item (update mode)')
+        .describe('Access token for an existing Item (update mode)'),
+      transferAuthorizationId: z
+        .string()
+        .optional()
+        .describe(
+          'Authorization ID requiring user action; initializes the supported Transfer UI flow'
+        )
     })
   )
   .output(
@@ -57,7 +67,8 @@ export let createLinkTokenTool = SlateTool.create(spec, {
       products: ctx.input.products,
       webhook: ctx.input.webhook,
       redirectUri: ctx.input.redirectUri,
-      accessToken: ctx.input.accessToken
+      accessToken: ctx.input.accessToken,
+      transferAuthorizationId: ctx.input.transferAuthorizationId
     });
 
     return {

@@ -7,7 +7,8 @@ export let findSimilarTool = SlateTool.create(spec, {
   name: 'Find Similar',
   key: 'find_similar',
   description: `Find web pages similar in meaning to a given URL. Useful for competitor analysis, discovering related content, or building recommendation systems.
-Supports filtering by domains, dates, and text content. Optionally retrieve full text, highlights, and summaries.`,
+Supports filtering by domains, dates, and text content. Optionally retrieve full text, highlights, and summaries.
+Exa documents this endpoint as deprecated while retaining it; prefer Web Search with a query describing the source for new workflows.`,
   tags: {
     readOnly: true
   }
@@ -37,8 +38,14 @@ Supports filtering by domains, dates, and text content. Optionally retrieve full
         .string()
         .optional()
         .describe('Filter by publish date end (ISO 8601)'),
-      startCrawlDate: z.string().optional().describe('Filter by crawl date start (ISO 8601)'),
-      endCrawlDate: z.string().optional().describe('Filter by crawl date end (ISO 8601)'),
+      startCrawlDate: z
+        .string()
+        .optional()
+        .describe('Legacy crawl date hint, deprecated and ignored by Exa'),
+      endCrawlDate: z
+        .string()
+        .optional()
+        .describe('Legacy crawl date hint, deprecated and ignored by Exa'),
       includeText: z
         .array(z.string())
         .optional()
@@ -72,8 +79,8 @@ Supports filtering by domains, dates, and text content. Optionally retrieve full
       results: z
         .array(
           z.object({
-            resultId: z.string().describe('Unique result identifier'),
-            title: z.string().describe('Page title'),
+            resultId: z.string().optional().describe('Unique result identifier'),
+            title: z.string().optional().describe('Page title'),
             url: z.string().describe('Page URL'),
             publishedDate: z.string().optional().describe('Publication date'),
             author: z.string().optional().describe('Content author'),
@@ -86,7 +93,7 @@ Supports filtering by domains, dates, and text content. Optionally retrieve full
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
 
     let response = await client.findSimilar({
       url: ctx.input.url,

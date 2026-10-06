@@ -1,37 +1,37 @@
-type DataCenter = 'us' | 'eu' | 'jp' | 'sg' | 'au';
-
-let apiBaseUrls: Record<DataCenter, string> = {
-  us: 'https://www.workato.com/api',
-  eu: 'https://app.eu.workato.com/api',
-  jp: 'https://app.jp.workato.com/api',
-  sg: 'https://app.sg.workato.com/api',
-  au: 'https://app.au.workato.com/api'
+import { createApiServiceError } from 'slates';
+export const dataCenters = [
+  'us',
+  'eu',
+  'jp',
+  'sg',
+  'au',
+  'il',
+  'cn',
+  'kr',
+  'uk',
+  'trial'
+] as const;
+export type DataCenter = (typeof dataCenters)[number];
+export const validateDataCenter = (value: string): DataCenter => {
+  const region = dataCenters.find(region => region === value);
+  if (!region)
+    throw createApiServiceError('Select the documented Workato workspace data center.', {
+      reason: 'invalid_data_center'
+    });
+  return region;
 };
-
-let dataTablesBaseUrls: Record<DataCenter, string> = {
-  us: 'https://data-tables.workato.com',
-  eu: 'https://data-tables.eu.workato.com',
-  jp: 'https://data-tables.jp.workato.com',
-  sg: 'https://data-tables.sg.workato.com',
-  au: 'https://data-tables.au.workato.com'
+export const getApiBaseUrl = (value: string) => {
+  const region = validateDataCenter(value);
+  if (region === 'us') return 'https://www.workato.com/api';
+  if (region === 'cn') return 'https://app.workatoapp.cn/api';
+  return `https://app.${region}.workato.com/api`;
 };
-
-let eventStreamsBaseUrls: Record<DataCenter, string> = {
-  us: 'https://event-streams.workato.com',
-  eu: 'https://event-streams.eu.workato.com',
-  jp: 'https://event-streams.jp.workato.com',
-  sg: 'https://event-streams.sg.workato.com',
-  au: 'https://event-streams.au.workato.com'
+const serviceBaseUrl = (service: string, value: string) => {
+  const region = validateDataCenter(value);
+  if (region === 'us') return `https://${service}.workato.com`;
+  if (region === 'cn') return `https://${service}.workatoapp.cn`;
+  return `https://${service}.${region}.workato.com`;
 };
-
-export let getApiBaseUrl = (dc: string): string => {
-  return apiBaseUrls[dc as DataCenter] ?? apiBaseUrls.us;
-};
-
-export let getDataTablesBaseUrl = (dc: string): string => {
-  return dataTablesBaseUrls[dc as DataCenter] ?? dataTablesBaseUrls.us;
-};
-
-export let getEventStreamsBaseUrl = (dc: string): string => {
-  return eventStreamsBaseUrls[dc as DataCenter] ?? eventStreamsBaseUrls.us;
-};
+export const getDataTablesBaseUrl = (value: string) => serviceBaseUrl('data-tables', value);
+export const getEventStreamsBaseUrl = (value: string) =>
+  serviceBaseUrl('event-streams', value);

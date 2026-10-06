@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'bubble',
   name: 'Bubble',
   description:
-    'No-code platform for building web applications. Perform CRUD operations on application databases, search and filter records, trigger server-side workflows, and manage user authentication through the Bubble Data API and Workflow API.',
+    'Read, search, create, edit and delete exposed Bubble data records; invoke configured API workflows, discover API schemas and download bounded JSON data exports.',
   metadata: {},
   config,
   auth

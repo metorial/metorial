@@ -25,8 +25,6 @@ import {
   updateTask,
   updateTimelog
 } from './tools';
-import { approvalEvents, folderEvents, taskEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -54,5 +52,5 @@ export let provider = Slate.create({
     deleteDependency,
     listAttachments
   ],
-  triggers: [taskEvents, folderEvents, approvalEvents]
+  triggers: []
 });

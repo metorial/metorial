@@ -5,6 +5,11 @@ import {
   createAlert,
   createHeartbeat,
   createIncident,
+  deleteActionItem,
+  deleteIncident,
+  getActionItem,
+  getAlert,
+  getCurrentUser,
   getIncident,
   listActionItems,
   listAlerts,
@@ -20,19 +25,19 @@ import {
   listUsers,
   listWorkflows,
   manageAlert,
+  manageHeartbeat,
   updateActionItem,
   updateIncident
 } from './tools';
-import {
-  alertEvents,
-  incidentEvents,
-  retrospectiveEvents,
-  scheduledIncidentEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    getAlert,
+    deleteIncident,
+    getActionItem,
+    deleteActionItem,
+    manageHeartbeat,
     listIncidents,
     getIncident,
     createIncident,
@@ -55,5 +60,5 @@ export let provider = Slate.create({
     listSeverities,
     listEnvironments
   ],
-  triggers: [incidentEvents, alertEvents, retrospectiveEvents, scheduledIncidentEvents]
+  triggers: []
 });

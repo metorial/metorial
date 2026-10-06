@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ModeClient } from '../lib/client';
+import { ModeClient, requireToken } from '../lib/client';
 import { getEmbedded, normalizeDataset } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -34,7 +34,7 @@ export let listDatasets = SlateTool.create(spec, {
       filter: z
         .string()
         .optional()
-        .describe('Filter expression, e.g. "created_at.gt:2024-01-01"'),
+        .describe('Filter expression, e.g. "created_at.gt.2024-01-01T00:00:00Z"'),
       order: z.enum(['asc', 'desc']).optional().describe('Sort order'),
       orderBy: z.enum(['created_at', 'updated_at']).optional().describe('Field to order by')
     })
@@ -45,11 +45,7 @@ export let listDatasets = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let options = {
       filter: ctx.input.filter,
@@ -57,18 +53,18 @@ export let listDatasets = SlateTool.create(spec, {
       orderBy: ctx.input.orderBy
     };
 
-    let data: any;
-    if (ctx.input.dataSourceToken) {
-      data = await client.listDatasetsByDataSource(ctx.input.dataSourceToken, options);
-    } else if (ctx.input.collectionToken) {
-      data = await client.listDatasetsInCollection(ctx.input.collectionToken, options);
-    } else {
-      return {
-        output: { datasets: [] },
-        message:
-          'No collectionToken or dataSourceToken provided. Please provide one to scope the results.'
-      };
-    }
+    if (
+      (ctx.input.collectionToken !== undefined) ===
+      (ctx.input.dataSourceToken !== undefined)
+    )
+      throw createApiServiceError('Provide exactly one collectionToken or dataSourceToken.');
+    const data =
+      ctx.input.dataSourceToken !== undefined
+        ? await client.listDatasetsByDataSource(ctx.input.dataSourceToken, options)
+        : await client.listDatasetsInCollection(
+            requireToken(ctx.input.collectionToken, 'collectionToken'),
+            options
+          );
 
     let datasets = getEmbedded(data, 'datasets').map(normalizeDataset);
 
@@ -106,11 +102,7 @@ Use **delete** to permanently remove a dataset.`,
   )
   .output(datasetSchema)
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     if (ctx.input.action === 'delete') {
       let existing = await client.getDataset(ctx.input.datasetToken);

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fail, limit as validateLimit } from '../lib/native';
 import { spec } from '../spec';
 
 export let getUser = SlateTool.create(spec, {
@@ -18,31 +19,41 @@ export let getUser = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      userId: z.string().describe('Unique identifier (URN)'),
-      username: z.string().describe('Username'),
-      fullName: z.string().describe('Full display name'),
-      description: z.string().nullable().describe('User bio'),
-      permalinkUrl: z.string().describe('Profile URL on SoundCloud'),
-      avatarUrl: z.string().describe('Avatar image URL'),
-      city: z.string().nullable().describe('City'),
-      countryCode: z.string().nullable().describe('Country code'),
-      followersCount: z.number().describe('Number of followers'),
-      followingsCount: z.number().describe('Number of users followed'),
-      trackCount: z.number().describe('Number of uploaded tracks'),
-      playlistCount: z.number().describe('Number of playlists'),
-      likesCount: z.number().describe('Number of likes'),
-      verified: z.boolean().describe('Whether the user is verified'),
-      createdAt: z.string().describe('When the account was created')
+      userId: z.string().optional().describe('Unique identifier (URN)'),
+      username: z.string().optional().describe('Username'),
+      fullName: z.string().nullable().optional().describe('Full display name'),
+      description: z.string().nullable().optional().describe('User bio'),
+      permalinkUrl: z.string().nullable().optional().describe('Profile URL on SoundCloud'),
+      avatarUrl: z.string().nullable().optional().describe('Avatar image URL'),
+      city: z.string().nullable().optional().describe('City'),
+      countryCode: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native country code, only when supplied'),
+      country: z.string().nullable().optional().describe('Native country name or value'),
+      publicFavoritesCount: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Native public favorites count'),
+      followersCount: z.number().nullable().optional().describe('Number of followers'),
+      followingsCount: z.number().nullable().optional().describe('Number of users followed'),
+      trackCount: z.number().nullable().optional().describe('Number of uploaded tracks'),
+      playlistCount: z.number().nullable().optional().describe('Number of playlists'),
+      likesCount: z.number().nullable().optional().describe('Number of likes'),
+      verified: z.boolean().optional().describe('Whether the user is verified'),
+      createdAt: z.string().nullable().optional().describe('When the account was created')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let user = await client.getUser(ctx.input.userId);
 
     return {
       output: {
-        userId: user.urn || String(user.id),
+        userId: user.urn,
         username: user.username,
         fullName: user.full_name,
         description: user.description,
@@ -50,6 +61,8 @@ export let getUser = SlateTool.create(spec, {
         avatarUrl: user.avatar_url,
         city: user.city,
         countryCode: user.country_code,
+        country: user.country,
+        publicFavoritesCount: user.public_favorites_count,
         followersCount: user.followers_count,
         followingsCount: user.followings_count,
         trackCount: user.track_count,
@@ -83,29 +96,47 @@ export let getMyProfile = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe("Include the user's liked tracks (default false)"),
-      limit: z.number().optional().describe('Max items to include per list (default 20)')
+      limit: z.number().optional().describe('Max items to include per list (default 20)'),
+      tracksNextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact native uploaded-track continuation returned by this tool; requires includeTracks'
+        ),
+      playlistsNextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact native playlist continuation returned by this tool; requires includePlaylists'
+        ),
+      likesNextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact native liked-track continuation returned by this tool; requires includeLikes'
+        )
     })
   )
   .output(
     z.object({
-      userId: z.string().describe('Unique identifier (URN)'),
-      username: z.string().describe('Username'),
-      fullName: z.string().describe('Full display name'),
-      description: z.string().nullable().describe('User bio'),
-      permalinkUrl: z.string().describe('Profile URL on SoundCloud'),
-      avatarUrl: z.string().describe('Avatar image URL'),
-      followersCount: z.number().describe('Number of followers'),
-      followingsCount: z.number().describe('Number of users followed'),
-      trackCount: z.number().describe('Number of uploaded tracks'),
-      playlistCount: z.number().describe('Number of playlists'),
+      userId: z.string().optional().describe('Unique identifier (URN)'),
+      username: z.string().optional().describe('Username'),
+      fullName: z.string().nullable().optional().describe('Full display name'),
+      description: z.string().nullable().optional().describe('User bio'),
+      permalinkUrl: z.string().nullable().optional().describe('Profile URL on SoundCloud'),
+      avatarUrl: z.string().nullable().optional().describe('Avatar image URL'),
+      followersCount: z.number().nullable().optional().describe('Number of followers'),
+      followingsCount: z.number().nullable().optional().describe('Number of users followed'),
+      trackCount: z.number().nullable().optional().describe('Number of uploaded tracks'),
+      playlistCount: z.number().nullable().optional().describe('Number of playlists'),
       tracks: z
         .array(
           z.object({
             trackId: z.string(),
             title: z.string(),
-            permalinkUrl: z.string(),
-            duration: z.number(),
-            access: z.string()
+            permalinkUrl: z.string().nullable().optional(),
+            duration: z.number().nullable().optional(),
+            access: z.string().nullable().optional()
           })
         )
         .optional()
@@ -115,19 +146,30 @@ export let getMyProfile = SlateTool.create(spec, {
           z.object({
             playlistId: z.string(),
             title: z.string(),
-            permalinkUrl: z.string(),
-            trackCount: z.number()
+            permalinkUrl: z.string().nullable().optional(),
+            trackCount: z.number().nullable().optional()
           })
         )
         .optional()
         .describe('User playlists'),
+      tracksNextHref: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native next uploaded-track page'),
+      playlistsNextHref: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native next playlist page'),
+      likesNextHref: z.string().nullable().optional().describe('Native next liked-track page'),
       likedTracks: z
         .array(
           z.object({
             trackId: z.string(),
             title: z.string(),
-            permalinkUrl: z.string(),
-            username: z.string()
+            permalinkUrl: z.string().nullable().optional(),
+            username: z.string().optional()
           })
         )
         .optional()
@@ -135,61 +177,28 @@ export let getMyProfile = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let limit = ctx.input.limit || 20;
-
-    let user = await client.getMe();
-
-    let tracks:
-      | {
-          trackId: string;
-          title: string;
-          permalinkUrl: string;
-          duration: number;
-          access: string;
-        }[]
-      | undefined;
-    let playlists:
-      | { playlistId: string; title: string; permalinkUrl: string; trackCount: number }[]
-      | undefined;
-    let likedTracks:
-      | { trackId: string; title: string; permalinkUrl: string; username: string }[]
-      | undefined;
-
-    if (ctx.input.includeTracks) {
-      let result = await client.getMyTracks({ limit });
-      tracks = result.collection.map(t => ({
-        trackId: t.urn || String(t.id),
-        title: t.title,
-        permalinkUrl: t.permalink_url,
-        duration: t.duration,
-        access: t.access
-      }));
-    }
-
-    if (ctx.input.includePlaylists) {
-      let result = await client.getMyPlaylists({ limit });
-      playlists = result.collection.map(p => ({
-        playlistId: p.urn || String(p.id),
-        title: p.title,
-        permalinkUrl: p.permalink_url,
-        trackCount: p.track_count
-      }));
-    }
-
-    if (ctx.input.includeLikes) {
-      let result = await client.getMyLikedTracks({ limit });
-      likedTracks = result.collection.map(t => ({
-        trackId: t.urn || String(t.id),
-        title: t.title,
-        permalinkUrl: t.permalink_url,
-        username: t.user?.username || ''
-      }));
-    }
-
+    const client = new Client(ctx.auth),
+      limit = validateLimit(ctx.input.limit ?? 20);
+    for (const [next, include] of [
+      [ctx.input.tracksNextHref, ctx.input.includeTracks],
+      [ctx.input.playlistsNextHref, ctx.input.includePlaylists],
+      [ctx.input.likesNextHref, ctx.input.includeLikes]
+    ])
+      if (next !== undefined && !include)
+        throw fail('A profile-list continuation requires its matching include flag.');
+    const user = await client.getMe();
+    const trackPage = ctx.input.includeTracks
+      ? await client.getMyTracks({ limit, nextHref: ctx.input.tracksNextHref })
+      : undefined;
+    const playlistPage = ctx.input.includePlaylists
+      ? await client.getMyPlaylists({ limit, nextHref: ctx.input.playlistsNextHref })
+      : undefined;
+    const likesPage = ctx.input.includeLikes
+      ? await client.getMyLikedTracks({ limit, nextHref: ctx.input.likesNextHref })
+      : undefined;
     return {
       output: {
-        userId: user.urn || String(user.id),
+        userId: user.urn,
         username: user.username,
         fullName: user.full_name,
         description: user.description,
@@ -199,11 +208,30 @@ export let getMyProfile = SlateTool.create(spec, {
         followingsCount: user.followings_count,
         trackCount: user.track_count,
         playlistCount: user.playlist_count,
-        tracks,
-        playlists,
-        likedTracks
+        tracks: trackPage?.collection.map(t => ({
+          trackId: t.urn,
+          title: t.title,
+          permalinkUrl: t.permalink_url,
+          duration: t.duration,
+          access: t.access
+        })),
+        playlists: playlistPage?.collection.map(p => ({
+          playlistId: p.urn,
+          title: p.title,
+          permalinkUrl: p.permalink_url,
+          trackCount: p.track_count
+        })),
+        likedTracks: likesPage?.collection.map(t => ({
+          trackId: t.urn,
+          title: t.title,
+          permalinkUrl: t.permalink_url,
+          username: t.user?.username
+        })),
+        tracksNextHref: trackPage?.next_href,
+        playlistsNextHref: playlistPage?.next_href,
+        likesNextHref: likesPage?.next_href
       },
-      message: `Retrieved profile for **${user.username}** - ${user.track_count} tracks, ${user.followers_count} followers.`
+      message: `Retrieved SoundCloud profile for **${user.username}**. Optional lists are native pages, with continuations when supplied.`
     };
   })
   .build();

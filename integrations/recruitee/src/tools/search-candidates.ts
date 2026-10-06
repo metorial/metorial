@@ -1,121 +1,135 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RecruiteeClient } from '../lib/client';
+import { fail, integer } from '../lib/validation';
 import { spec } from '../spec';
-
 export let searchCandidates = SlateTool.create(spec, {
   name: 'Search Candidates',
   key: 'search_candidates',
-  description: `Search and filter candidates using Recruitee's advanced search. Supports filtering by name, email, stage, status, tags, and more. Use **query** for simple text search (name/offer), or **filters** for structured filtering with field/value pairs.
-
-Available filter fields include: \`stages\`, \`status\` (qualified/disqualified), \`tags\`, \`sources\`, \`departments\`, \`offers\`, among others.`,
+  description:
+    'Search one page of candidates. Basic query searches names and offer titles; filters selects the documented advanced search with JSON filter objects.',
   instructions: [
-    'Use the "query" parameter for simple name/text searches via the basic candidates endpoint.',
-    'Use the "filters" parameter for advanced structured search with the search endpoint. Filters is a JSON array like: [{"field": "stages", "has_one_of": ["Applied"]}].'
+    'Basic search uses limit and offset, or page translated to an offset. Advanced search uses page and filters, for example [{"field":"status","in":["qualified"]}] or [{"filter":"stages","name":{"in":["Applied"]}}]. Do not combine filters with query, offerId, or offset.'
   ],
-  tags: {
-    readOnly: true
-  }
+  tags: { readOnly: true }
 })
   .input(
     z.object({
-      query: z.string().optional().describe('Simple text search by name or offer title'),
+      query: z.string().optional().describe('Basic text search by name or offer title'),
       filters: z
         .string()
         .optional()
-        .describe(
-          'JSON array of filter objects for advanced search, e.g. [{"field": "status", "in": ["qualified"]}]'
-        ),
+        .describe('JSON array of current documented advanced filter objects'),
       limit: z
         .number()
         .optional()
-        .describe('Maximum number of candidates to return (default 60, max 10000)'),
+        .describe(
+          'Page size, default 60. Basic search: exact integer from 1 to 1000. Advanced search: exact integer from 1 to 10000'
+        ),
       page: z
         .number()
         .optional()
-        .describe('Page number for paginated results (used with advanced search)'),
+        .describe('One-based page; basic search translates this to an offset'),
+      offset: z.number().optional().describe('Basic search offset; do not combine with page'),
       sortBy: z
         .string()
         .optional()
         .describe(
-          'Sort field: created_at_desc, created_at_asc, candidate_name_asc, candidate_name_desc, relevance, etc.'
+          'Basic: by_date or by_last_message. Advanced: a documented field followed by _asc or _desc, such as created_at_desc'
         ),
-      offerId: z.number().optional().describe('Filter by job offer ID (basic search only)')
+      offerId: z.number().optional().describe('Offer ID for basic search only')
     })
   )
   .output(
     z.object({
-      candidates: z
-        .array(
-          z.object({
-            candidateId: z.number().describe('Candidate ID'),
-            name: z.string().describe('Full name'),
-            emails: z.array(z.string()).describe('Email addresses'),
-            phones: z.array(z.string()).describe('Phone numbers'),
-            source: z.string().nullable().describe('Primary source'),
-            createdAt: z.string().describe('Creation timestamp')
-          })
-        )
-        .describe('Matching candidates'),
-      total: z
+      candidates: z.array(
+        z.object({
+          candidateId: z.number(),
+          name: z.string(),
+          emails: z.array(z.string()),
+          phones: z.array(z.string()),
+          source: z.string().nullable(),
+          createdAt: z.string()
+        })
+      ),
+      total: z.number().optional().describe('Actual advanced-search total when provided'),
+      page: z.number().optional().describe('Requested advanced-search page'),
+      offset: z.number().optional().describe('Requested basic-search offset'),
+      nextOffset: z
         .number()
         .optional()
-        .describe('Total number of matching candidates (advanced search only)')
+        .describe(
+          'Suggested basic offset when a full page was returned; request it to determine whether more records exist'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
-
-    if (ctx.input.filters) {
-      // Advanced search endpoint
-      let result = await client.searchCandidates({
-        limit: ctx.input.limit,
-        page: ctx.input.page,
+    const limit = integer(
+      ctx.input.limit ?? 60,
+      ctx.input.filters === undefined ? 'Basic candidate limit' : 'Advanced candidate limit',
+      1,
+      ctx.input.filters === undefined ? 1000 : 10000
+    );
+    const page = integer(ctx.input.page ?? 1, 'Page');
+    if (
+      ctx.input.filters !== undefined &&
+      (ctx.input.query !== undefined ||
+        ctx.input.offerId !== undefined ||
+        ctx.input.offset !== undefined)
+    )
+      fail(
+        'Advanced filters cannot be combined with query, offerId, or offset. Express those criteria in filters.'
+      );
+    if (ctx.input.offset !== undefined && ctx.input.page !== undefined)
+      fail('Use offset or page for basic search, not both.');
+    const offset = integer(ctx.input.offset ?? (page - 1) * limit, 'Offset', 0);
+    const client = await RecruiteeClient.forContext(ctx);
+    if (ctx.input.filters !== undefined) {
+      const result = await client.searchCandidates({
+        limit,
+        page,
         sortBy: ctx.input.sortBy,
         filtersJson: ctx.input.filters
       });
-
-      let hits = result.hits || [];
       return {
         output: {
-          candidates: hits.map((c: any) => ({
+          candidates: result.hits.map(c => ({
             candidateId: c.id,
             name: c.name,
-            emails: c.emails || [],
-            phones: c.phones || [],
-            source: c.source || null,
+            emails: c.emails,
+            phones: c.phones,
+            source: c.source,
             createdAt: c.created_at
           })),
-          total: result.total
+          total: result.total,
+          page
         },
-        message: `Found ${result.total ?? hits.length} candidates matching the search criteria.`
-      };
-    } else {
-      // Basic list/search endpoint
-      let result = await client.listCandidates({
-        query: ctx.input.query,
-        limit: ctx.input.limit,
-        offerId: ctx.input.offerId,
-        sort: ctx.input.sortBy
-      });
-
-      let candidates = result.candidates || [];
-      return {
-        output: {
-          candidates: candidates.map((c: any) => ({
-            candidateId: c.id,
-            name: c.name,
-            emails: c.emails || [],
-            phones: c.phones || [],
-            source: c.source || null,
-            createdAt: c.created_at
-          }))
-        },
-        message: `Found ${candidates.length} candidates.`
+        message: `Returned ${result.hits.length} candidates from advanced search.`
       };
     }
+    const result = await client.listCandidates({
+      query: ctx.input.query,
+      limit,
+      offset,
+      offerId: ctx.input.offerId,
+      sort: ctx.input.sortBy
+    });
+    return {
+      output: {
+        candidates: result.candidates.map(c => ({
+          candidateId: c.id,
+          name: c.name,
+          emails: c.emails,
+          phones: c.phones,
+          source: c.source,
+          createdAt: c.created_at
+        })),
+        offset,
+        ...(result.candidates.length === limit && Number.isSafeInteger(offset + limit)
+          ? { nextOffset: offset + limit }
+          : {})
+      },
+      message: `Returned ${result.candidates.length} candidates from offset ${offset}.`
+    };
   })
   .build();

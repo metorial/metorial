@@ -2,6 +2,7 @@ export * from './check-ownership';
 export * from './find-player-reports';
 export * from './get-account-info';
 export * from './get-anti-cheat-status';
+export * from './get-connection-context';
 export * from './get-entitlements';
 export * from './get-friends';
 export * from './lookup-product-user';

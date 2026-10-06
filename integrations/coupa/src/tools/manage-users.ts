@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoupaClient } from '../lib/client';
+import { customFields, page, pageFields, requireValue } from '../lib/contracts';
 import { spec } from '../spec';
 
 let userOutputSchema = z.object({
@@ -17,7 +18,7 @@ let userOutputSchema = z.object({
   defaultAddress: z.any().nullable().optional().describe('Default address'),
   createdAt: z.string().nullable().optional().describe('Creation timestamp'),
   updatedAt: z.string().nullable().optional().describe('Last update timestamp'),
-  rawData: z.any().optional().describe('Complete raw user data')
+  rawData: z.any().optional().describe('Native data with documented credential fields omitted')
 });
 
 export let searchUsers = SlateTool.create(spec, {
@@ -51,14 +52,12 @@ export let searchUsers = SlateTool.create(spec, {
   .output(
     z.object({
       users: z.array(userOutputSchema).describe('List of matching users'),
-      count: z.number().describe('Number of users returned')
+      count: z.number().describe('Number of users returned'),
+      ...pageFields
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let filters: Record<string, string> = {};
     if (ctx.input.filters) {
@@ -68,7 +67,11 @@ export let searchUsers = SlateTool.create(spec, {
     }
     if (ctx.input.login) filters.login = ctx.input.login;
     if (ctx.input.email) filters.email = ctx.input.email;
-    if (ctx.input.active !== undefined) filters.active = String(ctx.input.active);
+    requireValue(
+      ctx.input.active !== false,
+      'Native user documentation establishes status=active only. Omit active=false and inspect exact user active state, rather than claiming a filtered inactive inventory.'
+    );
+    if (ctx.input.active === true) filters.status = 'active';
     if (ctx.input.employeeNumber) filters['employee-number'] = ctx.input.employeeNumber;
     if (ctx.input.updatedAfter) filters['updated-at[gt]'] = ctx.input.updatedAfter;
 
@@ -80,13 +83,13 @@ export let searchUsers = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let users = (Array.isArray(results) ? results : []).map((u: any) => ({
+    let users = results.map((u: any) => ({
       userId: u.id,
       login: u.login ?? null,
       email: u.email ?? null,
-      firstName: u.firstname ?? u.firstname ?? null,
-      lastName: u.lastname ?? u.lastname ?? null,
-      fullName: u.fullname ?? u.fullname ?? null,
+      firstName: u.firstname ?? null,
+      lastName: u.lastname ?? null,
+      fullName: u.fullname ?? null,
       employeeNumber: u['employee-number'] ?? u.employee_number ?? null,
       active: u.active ?? null,
       department: u.department ?? null,
@@ -100,7 +103,8 @@ export let searchUsers = SlateTool.create(spec, {
     return {
       output: {
         users,
-        count: users.length
+        count: users.length,
+        ...page(users.length, ctx.input)
       },
       message: `Found **${users.length}** user(s).`
     };
@@ -110,7 +114,7 @@ export let searchUsers = SlateTool.create(spec, {
 export let createUser = SlateTool.create(spec, {
   name: 'Create User',
   key: 'create_user',
-  description: `Create a new user in Coupa with login credentials, email, name, and role assignments.`,
+  description: `Create a user in Coupa with login name, email, profile and role assignments. No password or credential fields are supported.`,
   tags: {
     destructive: false
   }
@@ -134,15 +138,18 @@ export let createUser = SlateTool.create(spec, {
         })
         .optional()
         .describe('Default address reference'),
+      customFieldsGlobalNamespace: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use true for existing global custom fields (legacy default); false places fields under the modern custom-fields namespace'
+        ),
       customFields: z.record(z.string(), z.any()).optional().describe('Custom field values')
     })
   )
   .output(userOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let payload: any = {
       login: ctx.input.login,
@@ -151,18 +158,19 @@ export let createUser = SlateTool.create(spec, {
       lastname: ctx.input.lastName
     };
 
-    if (ctx.input.employeeNumber) payload['employee-number'] = ctx.input.employeeNumber;
+    if (ctx.input.employeeNumber !== undefined)
+      payload['employee-number'] = ctx.input.employeeNumber;
     if (ctx.input.active !== undefined) payload.active = ctx.input.active;
     if (ctx.input.department) payload.department = ctx.input.department;
     if (ctx.input.roles) payload.roles = ctx.input.roles;
     if (ctx.input.defaultAddress)
       payload['default-address'] = { id: ctx.input.defaultAddress.addressId };
 
-    if (ctx.input.customFields) {
-      for (let [key, value] of Object.entries(ctx.input.customFields)) {
-        payload[key] = value;
-      }
-    }
+    customFields(
+      payload,
+      ctx.input.customFields,
+      ctx.input.customFieldsGlobalNamespace ?? true
+    );
 
     let result = await client.createUser(payload);
 
@@ -171,9 +179,9 @@ export let createUser = SlateTool.create(spec, {
         userId: result.id,
         login: result.login ?? null,
         email: result.email ?? null,
-        firstName: result.firstname ?? result.firstname ?? null,
-        lastName: result.lastname ?? result.lastname ?? null,
-        fullName: result.fullname ?? result.fullname ?? null,
+        firstName: result.firstname ?? null,
+        lastName: result.lastname ?? null,
+        fullName: result.fullname ?? null,
         employeeNumber: result['employee-number'] ?? result.employee_number ?? null,
         active: result.active ?? null,
         department: result.department ?? null,
@@ -209,6 +217,12 @@ export let updateUser = SlateTool.create(spec, {
         .array(z.object({ name: z.string() }))
         .optional()
         .describe('Updated role assignments'),
+      customFieldsGlobalNamespace: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use true for existing global custom fields (legacy default); false places fields under the modern custom-fields namespace'
+        ),
       customFields: z
         .record(z.string(), z.any())
         .optional()
@@ -217,26 +231,24 @@ export let updateUser = SlateTool.create(spec, {
   )
   .output(userOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let payload: any = {};
 
-    if (ctx.input.email) payload.email = ctx.input.email;
-    if (ctx.input.firstName) payload.firstname = ctx.input.firstName;
-    if (ctx.input.lastName) payload.lastname = ctx.input.lastName;
-    if (ctx.input.employeeNumber) payload['employee-number'] = ctx.input.employeeNumber;
+    if (ctx.input.email !== undefined) payload.email = ctx.input.email;
+    if (ctx.input.firstName !== undefined) payload.firstname = ctx.input.firstName;
+    if (ctx.input.lastName !== undefined) payload.lastname = ctx.input.lastName;
+    if (ctx.input.employeeNumber !== undefined)
+      payload['employee-number'] = ctx.input.employeeNumber;
     if (ctx.input.active !== undefined) payload.active = ctx.input.active;
     if (ctx.input.department) payload.department = ctx.input.department;
     if (ctx.input.roles) payload.roles = ctx.input.roles;
 
-    if (ctx.input.customFields) {
-      for (let [key, value] of Object.entries(ctx.input.customFields)) {
-        payload[key] = value;
-      }
-    }
+    customFields(
+      payload,
+      ctx.input.customFields,
+      ctx.input.customFieldsGlobalNamespace ?? true
+    );
 
     let result = await client.updateUser(ctx.input.userId, payload);
 
@@ -245,9 +257,9 @@ export let updateUser = SlateTool.create(spec, {
         userId: result.id,
         login: result.login ?? null,
         email: result.email ?? null,
-        firstName: result.firstname ?? result.firstname ?? null,
-        lastName: result.lastname ?? result.lastname ?? null,
-        fullName: result.fullname ?? result.fullname ?? null,
+        firstName: result.firstname ?? null,
+        lastName: result.lastname ?? null,
+        fullName: result.fullname ?? null,
         employeeNumber: result['employee-number'] ?? result.employee_number ?? null,
         active: result.active ?? null,
         department: result.department ?? null,

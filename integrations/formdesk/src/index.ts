@@ -21,8 +21,6 @@ import {
   updateResult,
   updateVisitor
 } from './tools';
-import { inboundWebhook, newFormSubmission } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     signOn,
     parkData
   ],
-  triggers: [inboundWebhook, newFormSubmission]
+  triggers: []
 });

@@ -31,15 +31,6 @@ import {
   updateProject,
   updateTask
 } from './tools';
-import {
-  companyEvents,
-  dealEvents,
-  noteEvents,
-  personEvents,
-  projectEvents,
-  taskEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -73,5 +64,5 @@ export let provider = Slate.create({
     linkContacts,
     getStats
   ],
-  triggers: [personEvents, companyEvents, dealEvents, taskEvents, noteEvents, projectEvents]
+  triggers: []
 });

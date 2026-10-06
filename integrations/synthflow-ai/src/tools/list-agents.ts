@@ -15,9 +15,16 @@ export let listAgents = SlateTool.create(spec, {
     z.object({
       limit: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Number of agents to return per page (default: 20)'),
-      offset: z.number().optional().describe('Starting index for pagination (default: 0)')
+      offset: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Starting index for pagination (default: 0)')
     })
   )
   .output(
@@ -34,13 +41,13 @@ export let listAgents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listAgents({
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
     let response = result.response || {};
-    let agents = response.assistants || response.models || [];
+    let agents = response.assistants || [];
     let pagination = response.pagination;
 
     return {

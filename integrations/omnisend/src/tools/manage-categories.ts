@@ -25,31 +25,14 @@ export let listCategories = SlateTool.create(spec, {
   .output(
     z.object({
       categories: z.array(categorySchema).describe('List of product categories'),
-      hasMore: z.boolean().describe('Whether more categories are available')
+      hasMore: z.boolean().describe('Whether more categories are available'),
+      nextOffset: z.number().optional().describe('Provider offset for the next category page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OmnisendClient(ctx.auth.token);
-
-    let result = await client.listCategories({
-      limit: ctx.input.limit,
-      offset: ctx.input.offset
-    });
-
-    let categories = (result.categories || []).map((c: any) => ({
-      categoryId: c.id || c.categoryID,
-      title: c.title,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt
-    }));
-
-    return {
-      output: {
-        categories,
-        hasMore: !!result.paging?.next
-      },
-      message: `Retrieved **${categories.length}** categories.`
-    };
+    let client = new OmnisendClient(ctx.auth, ctx.config.apiVersion);
+    let output = await client.listCategories(ctx.input);
+    return { output, message: 'Retrieved product category page.' };
   })
   .build();
 
@@ -67,29 +50,19 @@ export let createCategory = SlateTool.create(spec, {
   )
   .output(categorySchema)
   .handleInvocation(async ctx => {
-    let client = new OmnisendClient(ctx.auth.token);
-
-    let result = await client.createCategory({
-      id: ctx.input.categoryId,
+    let client = new OmnisendClient(ctx.auth, ctx.config.apiVersion);
+    let output = await client.createCategory({
+      categoryID: ctx.input.categoryId,
       title: ctx.input.title
     });
-
-    return {
-      output: {
-        categoryId: result.id || ctx.input.categoryId,
-        title: ctx.input.title,
-        createdAt: result.createdAt,
-        updatedAt: result.updatedAt
-      },
-      message: `Created category **${ctx.input.title}** (ID: ${ctx.input.categoryId}).`
-    };
+    return { output, message: 'Product category created.' };
   })
   .build();
 
 export let deleteCategory = SlateTool.create(spec, {
   name: 'Delete Product Category',
   key: 'delete_category',
-  description: `Delete a product category from the Omnisend catalog. This removes the category but does not affect products assigned to it.`,
+  description: `Delete a product category from the Omnisend catalog. Review product associations before deleting a category.`,
   tags: { destructive: true, readOnly: false }
 })
   .input(
@@ -103,12 +76,8 @@ export let deleteCategory = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OmnisendClient(ctx.auth.token);
+    let client = new OmnisendClient(ctx.auth, ctx.config.apiVersion);
     await client.deleteCategory(ctx.input.categoryId);
-
-    return {
-      output: { success: true },
-      message: `Deleted category (ID: ${ctx.input.categoryId}).`
-    };
+    return { output: { success: true }, message: 'Product category deletion completed.' };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RunPodClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,13 +10,24 @@ let billingRecordSchema = z.object({
   diskSpaceBilledGb: z.number().nullable().describe('Disk space billed in GB'),
   podId: z.string().nullable().optional().describe('Pod ID (if grouped by Pod)'),
   gpuTypeId: z.string().nullable().optional().describe('GPU type (if grouped by GPU)'),
-  endpointId: z.string().nullable().optional().describe('Endpoint ID (if applicable)')
+  endpointId: z.string().nullable().optional().describe('Endpoint ID (if applicable)'),
+  networkVolumeId: z.string().nullable().describe('Network volume ID (if applicable)'),
+  endTime: z.string().nullable().describe('End of the time bucket, exclusive.'),
+  gpuAmount: z.number().nullable().describe('GPU compute cost in USD.'),
+  cpuAmount: z.number().nullable().describe('CPU compute cost in USD.'),
+  diskAmount: z.number().nullable().describe('Container disk cost in USD.'),
+  feeAmount: z.number().nullable().describe('Platform fee in USD.'),
+  standardAmount: z.number().nullable().describe('Standard network storage cost in USD.'),
+  highPerformanceAmount: z
+    .number()
+    .nullable()
+    .describe('High-performance network storage cost in USD.')
 });
 
 export let getBilling = SlateTool.create(spec, {
   name: 'Get Billing',
   key: 'get_billing',
-  description: `Retrieve billing history for Pods, Serverless endpoints, or Network Volumes. Filter by date range, resource ID, and grouping to analyze costs. Amounts are in USD.`,
+  description: `Retrieve billing history for Pods, Serverless endpoints, or Network Volumes. Filter by date range and resource ID to analyze costs. Amounts are in USD.`,
   instructions: [
     'Use ISO 8601 timestamps for startTime and endTime, e.g. "2024-01-01T00:00:00Z".',
     'Bucket sizes: hour, day, week, month, year.'
@@ -34,15 +45,30 @@ export let getBilling = SlateTool.create(spec, {
         .enum(['hour', 'day', 'week', 'month', 'year'])
         .optional()
         .describe('Aggregation interval (default: day)'),
-      startTime: z.string().optional().describe('Start time (ISO 8601)'),
-      endTime: z.string().optional().describe('End time (ISO 8601)'),
+      startTime: z.iso.datetime({ offset: true }).optional().describe('Start time (ISO 8601)'),
+      endTime: z.iso.datetime({ offset: true }).optional().describe('End time (ISO 8601)'),
       podId: z.string().optional().describe('Filter by Pod ID (for pods billing)'),
       endpointId: z
         .string()
         .optional()
         .describe('Filter by endpoint ID (for endpoints billing)'),
-      gpuTypeId: z.string().optional().describe('Filter by GPU type'),
-      grouping: z.string().optional().describe('Group by: podId, gpuTypeId, or endpointId')
+      networkVolumeId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('Filter by network volume ID (for network_volumes billing).'),
+      gpuTypeId: z
+        .string()
+        .optional()
+        .describe(
+          'Retained for compatibility. The current API does not support GPU filtering; omit this field.'
+        ),
+      grouping: z
+        .string()
+        .optional()
+        .describe(
+          'Retained for compatibility. The current API groups by resource ID automatically; omit this field.'
+        )
     })
   )
   .output(
@@ -60,10 +86,25 @@ export let getBilling = SlateTool.create(spec, {
       endTime,
       podId,
       endpointId,
+      networkVolumeId,
       gpuTypeId,
       grouping
     } = ctx.input;
 
+    if (gpuTypeId !== undefined || grouping !== undefined)
+      throw createApiServiceError(
+        'GPU filtering and custom grouping are not supported by the current Runpod billing API. Omit gpuTypeId and grouping.'
+      );
+    if (resourceType !== 'pods' && podId !== undefined)
+      throw createApiServiceError('podId is only supported for pods billing.');
+    if (resourceType !== 'endpoints' && endpointId !== undefined)
+      throw createApiServiceError('endpointId is only supported for endpoints billing.');
+    if (resourceType !== 'network_volumes' && networkVolumeId !== undefined)
+      throw createApiServiceError(
+        'networkVolumeId is only supported for network_volumes billing.'
+      );
+    if (startTime && endTime && Date.parse(startTime) >= Date.parse(endTime))
+      throw createApiServiceError('startTime must be before endTime.');
     let result: any[];
 
     switch (resourceType) {
@@ -88,7 +129,12 @@ export let getBilling = SlateTool.create(spec, {
         });
         break;
       case 'network_volumes':
-        result = await client.getNetworkVolumeBilling({ bucketSize, startTime, endTime });
+        result = await client.getNetworkVolumeBilling({
+          bucketSize,
+          startTime,
+          endTime,
+          networkVolumeId
+        });
         break;
     }
 
@@ -101,7 +147,15 @@ export let getBilling = SlateTool.create(spec, {
       diskSpaceBilledGb: r.diskSpaceBilledGb ?? null,
       podId: r.podId ?? null,
       gpuTypeId: r.gpuTypeId ?? null,
-      endpointId: r.endpointId ?? null
+      endpointId: r.endpointId ?? null,
+      networkVolumeId: r.networkVolumeId ?? null,
+      endTime: r.endTime ?? null,
+      gpuAmount: r.gpuAmount ?? null,
+      cpuAmount: r.cpuAmount ?? null,
+      diskAmount: r.diskAmount ?? null,
+      feeAmount: r.feeAmount ?? null,
+      standardAmount: r.standardAmount ?? null,
+      highPerformanceAmount: r.highPerformanceAmount ?? null
     }));
 
     let totalAmount = mapped.reduce((sum, r) => sum + (r.amount ?? 0), 0);

@@ -1,11 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { QdrantClient } from '../lib/client';
 import { spec } from '../spec';
 
 let vectorParamsSchema = z
   .object({
-    size: z.number().describe('Dimensionality of the vector'),
+    size: z.number().int().min(1).max(65536).describe('Dimensionality of the vector'),
     distance: z
       .enum(['Cosine', 'Euclid', 'Dot', 'Manhattan'])
       .describe('Distance metric for similarity'),
@@ -23,7 +23,8 @@ export let createCollection = SlateTool.create(spec, {
   instructions: [
     'For a single vector space, provide `vectors` as a single vector params object with `size` and `distance`.',
     'For named vector spaces, provide `namedVectors` as a map of name to vector params.',
-    'Only one of `vectors` or `namedVectors` should be provided.'
+    'Only one of `vectors` or `namedVectors` should be provided.',
+    'For a sparse-only collection, provide sparseVectors without vectors or namedVectors.'
   ],
   tags: {
     destructive: false
@@ -39,12 +40,35 @@ export let createCollection = SlateTool.create(spec, {
         .describe(
           'Named vector spaces, e.g. {"text": {size: 768, distance: "Cosine"}, "image": {size: 512, distance: "Dot"}}'
         ),
-      shardNumber: z.number().optional().describe('Number of shards for the collection'),
+      shardNumber: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Number of shards for the collection'),
       replicationFactor: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Replication factor for distributed deployments'),
       onDiskPayload: z.boolean().optional().describe('Whether to store payloads on disk'),
+      hnswConfig: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'HNSW index configuration using Qdrant API field names, such as m and ef_construct.'
+        ),
+      quantizationConfig: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Qdrant scalar, product, or binary quantization configuration.'),
+      optimizersConfig: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Optimizer configuration using Qdrant API field names, such as indexing_threshold.'
+        ),
       sparseVectors: z
         .record(z.string(), z.any())
         .optional()
@@ -58,8 +82,16 @@ export let createCollection = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.vectors !== undefined && ctx.input.namedVectors !== undefined) {
+      throw createApiServiceError('Provide only one of vectors or namedVectors.');
+    }
+    if (ctx.input.namedVectors && Object.keys(ctx.input.namedVectors).length === 0) {
+      throw createApiServiceError(
+        'namedVectors must contain at least one vector configuration.'
+      );
+    }
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 
@@ -68,8 +100,12 @@ export let createCollection = SlateTool.create(spec, {
       vectorsConfig = ctx.input.namedVectors;
     } else if (ctx.input.vectors) {
       vectorsConfig = ctx.input.vectors;
+    } else if (ctx.input.sparseVectors && Object.keys(ctx.input.sparseVectors).length > 0) {
+      vectorsConfig = {};
     } else {
-      throw new Error('Either vectors or namedVectors must be provided');
+      throw createApiServiceError(
+        'Provide vectors, namedVectors, or at least one sparseVectors configuration.'
+      );
     }
 
     await client.createCollection(ctx.input.collectionName, {
@@ -77,6 +113,9 @@ export let createCollection = SlateTool.create(spec, {
       shardNumber: ctx.input.shardNumber,
       replicationFactor: ctx.input.replicationFactor,
       onDiskPayload: ctx.input.onDiskPayload,
+      hnswConfig: ctx.input.hnswConfig,
+      quantizationConfig: ctx.input.quantizationConfig,
+      optimizersConfig: ctx.input.optimizersConfig,
       sparseVectors: ctx.input.sparseVectors
     });
 

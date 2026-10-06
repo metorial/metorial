@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let listContacts = SlateTool.create(spec, {
@@ -46,7 +46,7 @@ export let listContacts = SlateTool.create(spec, {
         .optional()
         .default(0)
         .describe('Number of results to skip for pagination'),
-      orderBy: z.array(z.string()).optional().describe('Sort order, e.g. ["name asc"]')
+      orderBy: z.array(z.string()).optional().describe('Sort order, e.g. ["name"]')
     })
   )
   .output(
@@ -58,7 +58,7 @@ export let listContacts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let params: Record<string, any> = {
+    let params: Row = {
       limit: ctx.input.limit,
       offset: ctx.input.offset
     };
@@ -67,7 +67,7 @@ export let listContacts = SlateTool.create(spec, {
     if (ctx.input.email) params.email = ctx.input.email;
     if (ctx.input.phoneNumber) params.phone_number = ctx.input.phoneNumber;
     if (ctx.input.domain) params.domain = ctx.input.domain;
-    if (ctx.input.accountId) params.account = ctx.input.accountId;
+    if (ctx.input.accountId !== undefined) params.account = ctx.input.accountId;
     if (ctx.input.tagName) params['tag.name'] = ctx.input.tagName;
     if (ctx.input.role) params['position.role'] = ctx.input.role;
     if (ctx.input.modificationAfter) params.modification_after = ctx.input.modificationAfter;
@@ -80,7 +80,7 @@ export let listContacts = SlateTool.create(spec, {
     if (ctx.input.orderBy) params.order_by = ctx.input.orderBy;
 
     let contacts = await client.listContacts(params);
-    let list = Array.isArray(contacts) ? contacts : [];
+    let list = contacts;
 
     return {
       output: {

@@ -3,6 +3,7 @@ export * from './get-post';
 export * from './get-publication';
 export * from './get-user';
 export * from './list-posts';
+export { listPublications } from './list-publications';
 export * from './list-static-pages';
 export * from './manage-comments';
 export * from './manage-draft';

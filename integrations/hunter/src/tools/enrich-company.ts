@@ -1,12 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  Client,
+  optionalNumber,
+  optionalRow,
+  optionalStrings,
+  optionalText,
+  row
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let enrichCompany = SlateTool.create(spec, {
   name: 'Enrich Company',
   key: 'enrich_company',
-  description: `Retrieve detailed company profile information by domain name. Returns industry classification, location, description, employee count, founding year, technologies used, funding details, social profiles, and more.`,
+  description: `Retrieve detailed company profile information by domain name. Returns industry classification, location, description, employee count, founding year, technologies used and social profiles.`,
   tags: {
     readOnly: true
   }
@@ -39,32 +46,33 @@ export let enrichCompany = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.enrichCompany(ctx.input.domain);
-    let data = result.data;
-
+    const result = await new Client({ token: ctx.auth.token }).enrichCompany(ctx.input.domain);
+    const data = row(result.data),
+      geo = optionalRow(data.geo),
+      category = optionalRow(data.category),
+      metrics = optionalRow(data.metrics);
+    const linkedin = optionalText(optionalRow(data.linkedin).handle);
     return {
       output: {
-        domain: data.domain ?? ctx.input.domain,
-        name: data.name ?? null,
-        description: data.description ?? null,
-        industry: data.industry ?? null,
-        headcount: data.headcount ?? null,
-        foundedYear: data.founded_year ?? null,
-        country: data.country ?? null,
-        city: data.city ?? null,
-        state: data.state ?? null,
-        linkedinUrl: data.linkedin_url ?? null,
-        twitterHandle: data.twitter_handle ?? null,
-        facebookHandle: data.facebook_handle ?? null,
-        phone: data.phone ?? null,
-        technologies: data.technologies ?? [],
-        tags: data.tags ?? []
+        domain: optionalText(data.domain) ?? null,
+        name: optionalText(data.name) ?? null,
+        description: optionalText(data.description) ?? null,
+        industry: optionalText(category.industry) ?? null,
+        headcount: optionalText(metrics.employees) ?? null,
+        foundedYear: optionalNumber(data.foundedYear) ?? null,
+        country: optionalText(geo.country) ?? null,
+        city: optionalText(geo.city) ?? null,
+        state: optionalText(geo.state) ?? null,
+        linkedinUrl: linkedin
+          ? `https://www.linkedin.com/${linkedin.split('/').map(encodeURIComponent).join('/')}`
+          : null,
+        twitterHandle: optionalText(optionalRow(data.twitter).handle) ?? null,
+        facebookHandle: optionalText(optionalRow(data.facebook).handle) ?? null,
+        phone: optionalText(data.phone) ?? null,
+        technologies: optionalStrings(data.tech),
+        tags: optionalStrings(data.tags)
       },
-      message: data.name
-        ? `Found company **${data.name}** (${data.industry ?? 'unknown industry'}, ${data.headcount ?? 'unknown size'} employees).`
-        : `No company data found for **${ctx.input.domain}**.`
+      message: 'Retrieved the company enrichment profile.'
     };
   })
   .build();

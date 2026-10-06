@@ -11,8 +11,6 @@ import {
   getLists,
   reverseGeocode
 } from './tools';
-import { inboundWebhook, listCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     deleteGeocodingList,
     downloadGeocodingList
   ],
-  triggers: [inboundWebhook, listCompleted]
+  triggers: []
 });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PlaidClient } from '../lib/client';
+import type { transaction } from '../lib/contracts';
 import { spec } from '../spec';
 
 let transactionSchema = z.object({
@@ -26,6 +27,10 @@ let transactionSchema = z.object({
     .optional()
     .describe('Detailed personal finance category'),
   isoCurrencyCode: z.string().nullable().optional().describe('ISO 4217 currency code'),
+  categoryVersion: z
+    .enum(['v1', 'v2'])
+    .optional()
+    .describe('Provider category taxonomy version'),
   location: z
     .object({
       city: z.string().nullable().optional(),
@@ -39,10 +44,11 @@ let transactionSchema = z.object({
 export let syncTransactionsTool = SlateTool.create(spec, {
   name: 'Sync Transactions',
   key: 'sync_transactions',
-  description: `Incrementally sync transaction data using Plaid's cursor-based approach. On the first call, omit the cursor to get the initial set of transactions. On subsequent calls, pass the **nextCursor** from the previous response to get only new changes (added, modified, removed). Continue calling while **hasMore** is true to get all available updates.`,
+  description: `Retrieve one page of transaction changes. Continue while hasMore is true, retaining the original cursor for the whole batch. Commit the final nextCursor only after all pages succeed. An empty initial response may mean data is not ready; check transactionsUpdateStatus.`,
   instructions: [
     'On first call, omit the cursor parameter to begin a fresh sync.',
-    'Store the returned nextCursor and pass it on subsequent calls to get incremental updates.',
+    'Use nextCursor to continue each page; persist it only after the complete batch succeeds.',
+    'On TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION, discard the partial batch and restart from its original cursor.',
     'Keep calling while hasMore is true to retrieve all pending changes.'
   ],
   tags: {
@@ -56,10 +62,11 @@ export let syncTransactionsTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Cursor from a previous sync response. Omit for initial sync.'),
-      count: z
-        .number()
+      count: z.number().optional().describe('Integer page size from 1 to 500 (default 100)'),
+      personalFinanceCategoryVersion: z
+        .enum(['v1', 'v2'])
         .optional()
-        .describe('Max number of transactions to return per page (default 100, max 500)')
+        .describe('Requested category taxonomy, subject to account eligibility')
     })
   )
   .output(
@@ -68,7 +75,16 @@ export let syncTransactionsTool = SlateTool.create(spec, {
       modified: z.array(transactionSchema).describe('Modified transactions'),
       removed: z.array(z.string()).describe('IDs of removed transactions'),
       hasMore: z.boolean().describe('Whether more updates are available'),
-      nextCursor: z.string().describe('Cursor to use for the next sync call')
+      nextCursor: z
+        .string()
+        .describe('Page continuation; persist only after the full batch succeeds'),
+      transactionsUpdateStatus: z
+        .string()
+        .optional()
+        .describe(
+          'Provider readiness: unknown, not ready, initial or historical update complete'
+        ),
+      returnedCount: z.number().optional().describe('Total changes returned on this page')
     })
   )
   .handleInvocation(async ctx => {
@@ -81,10 +97,11 @@ export let syncTransactionsTool = SlateTool.create(spec, {
     let result = await client.syncTransactions(
       ctx.input.accessToken,
       ctx.input.cursor,
-      ctx.input.count
+      ctx.input.count,
+      ctx.input.personalFinanceCategoryVersion
     );
 
-    let mapTxn = (t: any) => ({
+    let mapTxn = (t: z.infer<typeof transaction>) => ({
       transactionId: t.transaction_id,
       accountId: t.account_id,
       amount: t.amount,
@@ -96,6 +113,7 @@ export let syncTransactionsTool = SlateTool.create(spec, {
       category: t.personal_finance_category?.primary ?? null,
       categoryDetailed: t.personal_finance_category?.detailed ?? null,
       isoCurrencyCode: t.iso_currency_code ?? null,
+      categoryVersion: t.personal_finance_category?.version,
       location: t.location
         ? {
             city: t.location.city ?? null,
@@ -105,9 +123,9 @@ export let syncTransactionsTool = SlateTool.create(spec, {
         : undefined
     });
 
-    let added = (result.added || []).map(mapTxn);
-    let modified = (result.modified || []).map(mapTxn);
-    let removed = (result.removed || []).map((r: any) => r.transaction_id);
+    let added = result.added.map(mapTxn);
+    let modified = result.modified.map(mapTxn);
+    let removed = result.removed.map(r => r.transaction_id);
 
     return {
       output: {
@@ -115,9 +133,11 @@ export let syncTransactionsTool = SlateTool.create(spec, {
         modified,
         removed,
         hasMore: result.has_more,
-        nextCursor: result.next_cursor
+        nextCursor: result.next_cursor,
+        transactionsUpdateStatus: result.transactions_update_status,
+        returnedCount: added.length + modified.length + removed.length
       },
-      message: `Synced **${added.length}** added, **${modified.length}** modified, **${removed.length}** removed transactions. ${result.has_more ? 'More updates available.' : 'All caught up.'}`
+      message: `Synced **${added.length}** added, **${modified.length}** modified, **${removed.length}** removed transactions. ${result.has_more ? 'More pages are available; the batch is incomplete.' : `Batch complete; readiness: ${result.transactions_update_status}.`}`
     };
   })
   .build();

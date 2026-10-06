@@ -37,7 +37,7 @@ describe('youtube provider contract', () => {
         'set_thumbnail',
         'list_activities'
       ],
-      triggerIds: ['inbound_webhook', 'channel_activity', 'new_video'],
+      triggerIds: [],
       authMethodIds: ['oauth2', 'api_key'],
       tools: [
         { id: 'search_content', readOnly: true, destructive: false },
@@ -56,14 +56,10 @@ describe('youtube provider contract', () => {
         { id: 'download_caption', readOnly: true, destructive: false },
         { id: 'set_thumbnail', readOnly: false, destructive: false }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'channel_activity', invocationType: 'polling' },
-        { id: 'new_video', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(24);
+    expect(contract.actions).toHaveLength(21);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -87,10 +83,7 @@ describe('youtube provider contract', () => {
       list_captions: youtubeActionScopes.listCaptions,
       download_caption: youtubeActionScopes.downloadCaption,
       set_thumbnail: youtubeActionScopes.setThumbnail,
-      list_activities: youtubeActionScopes.listActivities,
-      channel_activity: youtubeActionScopes.channelActivity,
-      new_video: youtubeActionScopes.newVideo,
-      inbound_webhook: youtubeActionScopes.inboundWebhook
+      list_activities: youtubeActionScopes.listActivities
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

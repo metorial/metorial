@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listWorkflows = SlateTool.create(spec, {
@@ -37,10 +37,7 @@ export let listWorkflows = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
     let result = await client.listWorkflows({
       active: ctx.input.active,
@@ -52,7 +49,7 @@ export let listWorkflows = SlateTool.create(spec, {
       excludePinnedData: true
     });
 
-    let workflows = (result.data || []).map((w: any) => ({
+    let workflows = (result.data || []).map(w => ({
       workflowId: String(w.id),
       name: w.name || '',
       active: w.active ?? false,

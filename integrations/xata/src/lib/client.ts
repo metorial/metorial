@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
+
+export const liteRetirementMessage =
+  'Xata Lite was permanently retired on February 28, 2026. Its workspace, data and OAuth APIs are unavailable. Connect with a current Xata API key and use list_organizations, list_projects and the current project branch tools. Use native PostgreSQL for records, schemas, search and transactions; legacy keys are not remapped.';
+export const rejectRetiredLite = (): never => {
+  throw createApiServiceError(liteRetirementMessage);
+};
 
 export interface XataClientConfig {
   token: string;
@@ -12,6 +18,7 @@ export class XataCoreClient {
   private http: ReturnType<typeof createAxios>;
 
   constructor(config: { token: string }) {
+    rejectRetiredLite();
     this.http = createAxios({
       baseURL: 'https://api.xata.io',
       headers: {
@@ -67,6 +74,7 @@ export class XataWorkspaceClient {
   private region: string;
 
   constructor(config: { token: string; workspaceId: string; region: string }) {
+    rejectRetiredLite();
     this.workspaceId = config.workspaceId;
     this.region = config.region;
 

@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let deleteUser = SlateTool.create(spec, {
   name: 'Delete User',
   key: 'delete_user',
-  description: `Deactivate and remove a user from the Retool organization. This disables the user's access to the organization.`,
+  description: `Disable a user in the Retool organization. The legacy deleted flag reports a successful disable receipt; it does not mean permanent account erasure. This disables the user's access to the organization.`,
   tags: {
     destructive: true
   }
@@ -23,7 +23,7 @@ export let deleteUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     await client.deleteUser(ctx.input.userId);
 

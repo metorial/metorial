@@ -1,6 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  dateRange,
+  pageParams,
+  paginationSchema,
+  readRows,
+  requireDate
+} from '../lib/response';
 import { spec } from '../spec';
 
 export let listAbsences = SlateTool.create(spec, {
@@ -34,30 +41,35 @@ export let listAbsences = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      absences: z.array(z.record(z.string(), z.any())).describe('List of absence records')
+      pagination: paginationSchema.optional(),
+      absences: z.array(z.record(z.string(), z.unknown())).describe('List of absence records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let result = await client.listAbsences({
-      type: ctx.input.type,
-      employeeId: ctx.input.employeeId,
-      departmentId: ctx.input.departmentId,
-      startDate: ctx.input.startDate,
-      endDate: ctx.input.endDate,
-      excludeCancelledAbsences: ctx.input.excludeCancelledAbsences,
-      page: ctx.input.page,
-      perPage: ctx.input.perPage
-    });
-
-    let absences = result?.absences || [];
-
+    const client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
+    const startDate =
+      ctx.input.startDate === undefined
+        ? undefined
+        : requireDate(ctx.input.startDate, 'startDate');
+    const endDate =
+      ctx.input.endDate === undefined ? undefined : requireDate(ctx.input.endDate, 'endDate');
+    if (startDate) dateRange(startDate, endDate);
+    const result = await client.list(
+      'absences',
+      {
+        ...pageParams(ctx.input, true),
+        employee_id: ctx.input.employeeId,
+        department_id: ctx.input.departmentId,
+        start_date: startDate,
+        end_date: endDate,
+        type: ctx.input.type,
+        exclude_cancelled_absences: ctx.input.excludeCancelledAbsences
+      },
+      true
+    );
+    const absences = readRows(result, 'absences');
     return {
-      output: { absences },
+      output: { absences, pagination: result.pagination },
       message: `Retrieved **${absences.length}** absence record(s).`
     };
   })

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listGriptapeTools = SlateTool.create(spec, {
@@ -14,8 +15,8 @@ export let listGriptapeTools = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number to retrieve'),
-      pageSize: z.number().optional().describe('Number of items per page')
+      page: z.number().int().min(1).optional().describe('Page number to retrieve'),
+      pageSize: z.number().int().min(1).optional().describe('Number of items per page')
     })
   )
   .output(
@@ -26,11 +27,13 @@ export let listGriptapeTools = SlateTool.create(spec, {
             toolId: z.string().describe('ID of the tool'),
             name: z.string().describe('Name of the tool'),
             description: z.string().optional().describe('Description'),
+            deploymentId: z.string().optional().describe('Latest deployment ID'),
             createdAt: z.string().describe('Creation timestamp'),
             updatedAt: z.string().describe('Last update timestamp')
           })
         )
         .describe('List of tools'),
+      pagination: paginationSchema.optional().describe('Page navigation metadata'),
       totalCount: z.number().describe('Total number of tools'),
       totalPages: z.number().describe('Total number of pages')
     })
@@ -46,6 +49,7 @@ export let listGriptapeTools = SlateTool.create(spec, {
       toolId: t.tool_id,
       name: t.name,
       description: t.description,
+      deploymentId: t.latest_deployment_id,
       createdAt: t.created_at,
       updatedAt: t.updated_at
     }));
@@ -53,6 +57,7 @@ export let listGriptapeTools = SlateTool.create(spec, {
     return {
       output: {
         tools,
+        pagination: result.pagination,
         totalCount: result.pagination.totalCount,
         totalPages: result.pagination.totalPages
       },

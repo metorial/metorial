@@ -1,4 +1,7 @@
 export * from './create-deploy';
+export * from './create-occurrence';
+export * from './delete-occurrence';
+export * from './get-deploy';
 export * from './get-item';
 export * from './get-metrics';
 export * from './get-occurrence';
@@ -11,6 +14,7 @@ export * from './list-users';
 export * from './manage-access-tokens';
 export * from './manage-notification-rules';
 export * from './manage-project';
+export * from './manage-rql-job';
 export * from './manage-service-links';
 export * from './manage-team';
 export * from './manage-team-members';

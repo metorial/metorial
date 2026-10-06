@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createAnnotationJobTool = SlateTool.create(spec, {
@@ -10,14 +11,23 @@ export let createAnnotationJobTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project URL slug'),
+      projectId: projectIdSchema,
       name: z.string().describe('Name for the annotation job'),
-      batchId: z.string().describe('Batch ID or name containing the images to annotate'),
-      labelerEmail: z.string().describe('Email of the workspace member who will label images'),
-      reviewerEmail: z
+      batchId: z
         .string()
+        .describe(
+          'Batch ID containing images to annotate. Call list_batches to discover batch IDs.'
+        ),
+      labelerEmail: z.email().describe('Email of the workspace member who will label images'),
+      reviewerEmail: z
+        .email()
         .describe('Email of the workspace member who will review labels'),
-      numImages: z.number().optional().describe('Number of images to include from the batch')
+      numImages: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Number of images to include from the batch')
     })
   )
   .output(

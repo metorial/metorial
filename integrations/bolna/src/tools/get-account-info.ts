@@ -33,9 +33,9 @@ export let getAccountInfo = SlateTool.create(spec, {
     return {
       output: {
         userId: user.id,
-        name: user.name,
-        email: user.email,
-        walletBalance: user.wallet,
+        name: user.name ?? undefined,
+        email: user.email ?? undefined,
+        walletBalance: user.wallet ?? undefined,
         maxConcurrentCalls: user.concurrency?.max,
         currentConcurrentCalls: user.concurrency?.current
       },

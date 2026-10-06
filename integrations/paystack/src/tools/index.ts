@@ -1,5 +1,6 @@
 export * from './charge-authorization';
 export * from './create-refund';
+export * from './financial-status';
 export * from './initialize-transaction';
 export * from './initiate-transfer';
 export * from './list-settlements';
@@ -12,5 +13,6 @@ export * from './manage-payment-request';
 export * from './manage-plan';
 export * from './manage-subaccount';
 export * from './manage-subscription';
+export * from './manage-transfer-recipient';
 export * from './verify-account';
 export * from './verify-transaction';

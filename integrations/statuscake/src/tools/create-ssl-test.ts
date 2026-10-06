@@ -25,7 +25,9 @@ export let createSslTest = SlateTool.create(spec, {
       alertAt: z
         .array(z.number())
         .optional()
-        .describe('Array of 3 days before expiry to send alerts (e.g. [1, 7, 30])'),
+        .describe(
+          'Exactly three integer day values before expiry (e.g. [1, 7, 30]); required for creation'
+        ),
       alertBroken: z.boolean().optional().describe('Alert when certificate is broken'),
       alertExpiry: z
         .boolean()
@@ -37,7 +39,10 @@ export let createSslTest = SlateTool.create(spec, {
       hostname: z.string().optional().describe('Hostname to verify on certificate'),
       paused: z.boolean().optional().describe('Whether the test starts paused'),
       userAgent: z.string().optional().describe('Custom user agent string'),
-      tags: z.array(z.string()).optional().describe('Tags for the test')
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Legacy field; tags are not supported by the current SSL API')
     })
   )
   .output(
@@ -61,7 +66,7 @@ export let createSslTest = SlateTool.create(spec, {
       ...rest
     } = ctx.input;
 
-    let data: Record<string, any> = {
+    let data: Record<string, unknown> = {
       ...rest,
       website_url: websiteUrl,
       check_rate: checkRate
@@ -77,7 +82,7 @@ export let createSslTest = SlateTool.create(spec, {
     if (userAgent !== undefined) data.user_agent = userAgent;
 
     let result = await client.createSslTest(data);
-    let testId = String(result?.data?.new_id ?? result?.new_id ?? '');
+    let testId = result.data.new_id;
 
     return {
       output: { testId },

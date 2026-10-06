@@ -5,7 +5,7 @@ import { spec } from '../spec';
 
 let deploymentSchema = z.object({
   deploymentId: z.string().describe('Unique deployment identifier'),
-  projectId: z.string().describe('Associated project ID'),
+  projectId: z.string().optional().describe('Associated project ID'),
   chatId: z.string().describe('Associated chat ID'),
   versionId: z.string().describe('Associated version ID'),
   inspectorUrl: z.string().optional().describe('URL to the deployment inspector'),
@@ -23,9 +23,9 @@ export let createDeploymentTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project to deploy to'),
-      chatId: z.string().describe('Chat containing the code to deploy'),
-      versionId: z.string().describe('Specific version of the chat to deploy')
+      projectId: z.string().min(1).describe('Project to deploy to'),
+      chatId: z.string().min(1).describe('Chat containing the code to deploy'),
+      versionId: z.string().min(1).describe('Specific version of the chat to deploy')
     })
   )
   .output(deploymentSchema)
@@ -58,7 +58,7 @@ export let getDeploymentTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      deploymentId: z.string().describe('The deployment ID to retrieve')
+      deploymentId: z.string().min(1).describe('The deployment ID to retrieve')
     })
   )
   .output(deploymentSchema)
@@ -91,9 +91,9 @@ export let listDeploymentsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project ID to filter by'),
-      chatId: z.string().describe('Chat ID to filter by'),
-      versionId: z.string().describe('Version ID to filter by')
+      projectId: z.string().min(1).describe('Project ID to filter by'),
+      chatId: z.string().min(1).describe('Chat ID to filter by'),
+      versionId: z.string().min(1).describe('Version ID to filter by')
     })
   )
   .output(
@@ -105,7 +105,7 @@ export let listDeploymentsTool = SlateTool.create(spec, {
     let client = new V0Client(ctx.auth.token);
     let result = await client.listDeployments(ctx.input);
 
-    let deployments = (result.data || []).map((d: any) => ({
+    let deployments = (result.data || []).map(d => ({
       deploymentId: d.id,
       projectId: d.projectId,
       chatId: d.chatId,
@@ -132,7 +132,7 @@ export let deleteDeploymentTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      deploymentId: z.string().describe('The deployment ID to delete')
+      deploymentId: z.string().min(1).describe('The deployment ID to delete')
     })
   )
   .output(

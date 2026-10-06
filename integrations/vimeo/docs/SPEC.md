@@ -1,127 +1,20 @@
-# Slates Specification for Vimeo
+# Vimeo API coverage
 
-## Overview
+Current reference contracts: Vimeo3.4.9 documentation, requested API version3.4. Provider routes remain `https://api.vimeo.com` and authenticated `/me` aliases.
 
-Vimeo is a video hosting and sharing platform that provides tools for uploading, managing, embedding, and streaming video content. Its API allows programmatic access to video management, user account data, showcases, folders, channels, and live streaming capabilities. Vimeo also offers a separate OTT (over-the-top) API for subscription-based video services.
+| Capability | Tools |
+| --- | --- |
+| Video and account reads | get_video, get_user, list_videos, search_videos |
+| Metadata and comments | edit_video, delete_video, list_video_comments, add_video_comment |
+| Likes | list_liked_videos, like_video |
+| Showcases | list_showcases, get_showcase, create_showcase, edit_showcase, delete_showcase, list_showcase_videos, manage_showcase_video |
+| Folders (native projects) | list_folders, get_folder, create_folder, delete_folder, list_folder_videos, manage_folder_video |
+| Channels | list_channels, get_channel, create_channel, delete_channel, list_channel_videos, manage_channel_video |
+| Categories | list_categories, list_category_videos |
+| Downloadable rendition | download_video |
 
-## Authentication
+Native HTTP completion statuses and canonical resource identities are validated. Folder deletion explicitly keeps its videos. Tag/domain replacement uses documented relationship endpoints and verifies complete inventories. Writes can be partially committed across calls and are never retried automatically.
 
-Vimeo uses **OAuth 2.0** as its authentication framework. All API requests require an access token.
+Sources: [authentication](https://developer.vimeo.com/api/authentication), [auth response](https://developer.vimeo.com/api/reference/response/auth), [videos](https://developer.vimeo.com/api/reference/videos), [folders](https://developer.vimeo.com/api/reference/folders), [showcases](https://developer.vimeo.com/api/reference/showcases), [channels](https://developer.vimeo.com/api/reference/channels), [download links](https://help.vimeo.com/hc/en-us/articles/12427806914577-About-video-file-download-links-from-the-API).
 
-### Registering an Application
-
-Registering an application inside Vimeo's Developer Portal generates a unique client ID and client secret, which form the backbone for token exchanges. Register your app at `https://developer.vimeo.com/api/apps`.
-
-You must configure a **Redirect URI** in your application settings, which is where users are redirected after authorization.
-
-### Authentication Methods
-
-1. **Authorization Code Grant (OAuth 2.0):** This mechanism allows a Vimeo user to grant permission to your app so that it can access private, user-specific content on their behalf.
-   - **Authorization endpoint:** `https://api.vimeo.com/oauth/authorize`
-   - Set `response_type` to `code`, allowing for the exchange of an authorization code.
-   - Use the authorization code to request an access token from the token endpoint: `https://api.vimeo.com/oauth/access_token`. Send a POST request containing your client ID, client secret, the code, and the redirect URI to receive a token.
-   - Access tokens expire—typically after one hour—and your code needs to seamlessly refresh them using the refresh token provided during the initial authorization.
-
-2. **Client Credentials Grant:** This mechanism allows your application to access publicly accessible content on Vimeo. No user context is involved; the token represents the application itself.
-
-3. **Personal Access Token (PAT):** A Personal Access Token offers a direct, straightforward method to gain sustained authorization without juggling OAuth flows. Unlike temporary session tokens, PATs behave like long-lived keys tied explicitly to an individual account, granting granular permission scopes. These can be generated directly from the Vimeo app page in the developer portal.
-
-### Scopes
-
-Vimeo employs OAuth scopes that define exactly what actions your token can perform. Available scopes include:
-
-- **`public`** – Access to public video metadata and user information.
-- **`private`** – Access to private user data and videos.
-- **`upload`** – Ability to upload videos.
-- **`edit`** – Ability to edit video metadata and settings.
-- **`delete`** – Ability to delete videos.
-- **`interact`** – Allows not only liking and commenting but also following users.
-- **`purchased`** – Access to purchased content.
-- **`create`** – Ability to create resources (albums, channels, etc.).
-- **`video_files`** – Access to video file links (may require a Pro or higher plan).
-
-For uploading, you need an access token with the `upload` and `edit` scopes. Also note that for an app to be able to upload videos to Vimeo, you need to switch on the upload access—this option isn't enabled by default.
-
-### Token Usage
-
-Include the access token as a Bearer token in the `Authorization` header:
-
-```
-Authorization: Bearer {access_token}
-```
-
-## Features
-
-### Video Management
-
-The Vimeo API allows developers to access and interact with Vimeo's video platform programmatically. By using the API, developers can upload, manage, and customize videos, as well as access data related to their Vimeo account and videos.
-
-- Upload videos (requires requesting upload access for your app).
-- Edit video metadata (title, description, tags, etc.).
-- Delete videos.
-- Update video metadata, set privacy controls, and manage video settings.
-- Manage thumbnails and text tracks (subtitles/captions).
-- Search for videos by keywords, with filtering by category, tag, and sorting by relevance or date.
-
-### User and Account Management
-
-Retrieve and update user profile information, manage followers/following relationships, and access user-specific data such as liked videos, watch history, and purchased content.
-
-### Showcases and Folders
-
-The API Reference includes features like Showcases, Folders, etc., with endpoint documentation for actions like adding videos to a Showcase or getting videos in a Folder.
-
-- Create, update, and delete showcases (curated video collections).
-- Organize videos into folders for internal management.
-- Manage showcase privacy and branding settings.
-
-### Channels and Groups
-
-Channels arrange videos based on their theme or some other criteria and group them into channels. Groups are places like communities where members can share, discuss, and collaborate on videos.
-
-- Create and manage channels and groups.
-- Add or remove videos from channels.
-
-### Embedding and Player Customization
-
-It's possible to modify the default Vimeo video player in terms of features like autoplay, looping, playback events, and even player on-screen dimensions and controls colors.
-
-- Retrieve embed codes via oEmbed.
-- Configure embed parameters for branding and playback behavior.
-- The Player SDK (JavaScript) provides additional programmatic control over embedded players.
-
-### Live Streaming
-
-The Live API is a part of the Vimeo API that enables interaction with and control of live events on Vimeo. Access to the Live API is only available to Vimeo Enterprise members.
-
-- Create and manage live events (one-time and recurring).
-- Configure streaming settings and retrieve RTMP endpoints.
-- Access archived live clips after events conclude.
-
-### Categories
-
-Categories define a set of videos that belong to a specific genre. You can browse and retrieve videos by category.
-
-## Events
-
-Vimeo supports **webhooks** for receiving real-time notifications about events on the platform. Vimeo offers notifications for almost 40 different events related to videos, channels, and albums.
-
-Webhooks are created programmatically via the API by posting to `https://api.vimeo.com/me/webhooks` with a callback URL and a list of event types to subscribe to. Incoming requests can be verified using a shared secret to authenticate notifications (signature validation).
-
-### Video Events
-
-Notifications related to video lifecycle and interactions, such as:
-
-- Upload completion (`video.upload.complete`)
-- Video playback (`video.play`)
-- Video status changes
-
-These events allow you to trigger workflows when videos are uploaded, processed, played, or modified.
-
-### Channel and Album Events
-
-Notifications related to changes in channels and albums/showcases, such as videos being added or removed.
-
-### Account/User Events
-
-Notifications for user-level activities such as likes, follows, and other interactions on the platform.
+No live account or media operations were performed during refresh. Current documentation is used directly; Vimeo's archived GitHub OpenAPI is supplemental historical evidence only.

@@ -1,19 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageStackTags = SlateTool.create(spec, {
   name: 'Manage Stack Tags',
   key: 'manage_stack_tags',
+  tags: { destructive: true },
   description: `Set or delete tags on a Pulumi stack. Tags are key-value metadata used for categorization and querying. You can set a new tag, update an existing one, or delete a tag.`
 })
   .input(
     z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe('Organization name (uses default from config if not set)'),
+      organization: organizationInput,
       projectName: z.string().describe('Project name'),
       stackName: z.string().describe('Stack name'),
       action: z.enum(['set', 'delete']).describe('Action to perform on the tag'),
@@ -31,15 +30,14 @@ export let manageStackTags = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
 
     if (ctx.input.action === 'set') {
-      if (!ctx.input.tagValue) throw new Error('tagValue is required when setting a tag');
+      if (ctx.input.tagValue === undefined)
+        throw createApiServiceError('tagValue is required when setting a tag');
       await client.setStackTag(
         org,
         ctx.input.projectName,

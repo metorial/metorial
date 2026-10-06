@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let searchPosts = SlateTool.create(spec, {
@@ -13,12 +14,16 @@ export let searchPosts = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...selection,
       query: z.string().describe('Search query string'),
       first: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
         .default(10)
-        .describe('Number of results to return (max 20)'),
+        .describe('Number of results to return (max 100)'),
       after: z.string().optional().describe('Pagination cursor')
     })
   )
@@ -55,15 +60,18 @@ export let searchPosts = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      publicationHost: ctx.config.publicationHost
+      publicationHost:
+        ctx.input.publicationHost ??
+        (ctx.input.publicationId === undefined ? ctx.config.publicationHost : undefined),
+      publicationId: ctx.input.publicationId
     });
 
     let result = await client.searchPosts(ctx.input.query, {
-      first: Math.min(ctx.input.first, 20),
+      first: ctx.input.first,
       after: ctx.input.after
     });
 
-    let posts = result.posts.map((p: any) => ({
+    let posts = result.posts.map(p => ({
       postId: p.id,
       title: p.title,
       slug: p.slug,
@@ -73,7 +81,7 @@ export let searchPosts = SlateTool.create(spec, {
       authorUsername: p.author?.username,
       authorName: p.author?.name,
       coverImageUrl: p.coverImage?.url,
-      tags: (p.tags || []).map((t: any) => ({
+      tags: (p.tags || []).map(t => ({
         tagId: t.id,
         name: t.name,
         slug: t.slug

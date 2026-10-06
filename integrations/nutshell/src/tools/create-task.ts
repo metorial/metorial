@@ -14,13 +14,16 @@ export let createTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      description: z.string().describe('Description of the task'),
+      description: z
+        .string()
+        .describe('Description of the task; also used as the title when title is omitted'),
+      title: z.string().optional().describe('Task title'),
       dueTime: z.string().optional().describe('Due date/time for the task (ISO 8601 format)'),
       assigneeId: z.number().optional().describe('User ID to assign the task to'),
       leadIds: z
         .array(z.number())
         .optional()
-        .describe('IDs of leads to associate with this task')
+        .describe('Related lead ID; provide at most one. A task supports one related entity.')
     })
   )
   .output(
@@ -37,12 +40,13 @@ export let createTask = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let taskData: Record<string, any> = {
-      description: ctx.input.description
+    let taskData: Record<string, unknown> = {
+      description: ctx.input.description,
+      title: ctx.input.title ?? ctx.input.description
     };
 
-    if (ctx.input.dueTime) taskData.dueTime = ctx.input.dueTime;
-    if (ctx.input.assigneeId)
+    if (ctx.input.dueTime !== undefined) taskData.dueTime = ctx.input.dueTime;
+    if (ctx.input.assigneeId !== undefined)
       taskData.assignee = { entityType: 'Users', id: ctx.input.assigneeId };
     if (ctx.input.leadIds) {
       taskData.leads = ctx.input.leadIds.map(id => ({ entityType: 'Leads', id }));
@@ -54,7 +58,7 @@ export let createTask = SlateTool.create(spec, {
       output: {
         taskId: result.id,
         rev: String(result.rev),
-        description: result.description || result.name,
+        description: result.description ?? result.title,
         entityType: result.entityType
       },
       message: `Created task (ID: ${result.id}).`

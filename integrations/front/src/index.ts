@@ -48,8 +48,6 @@ import {
   updateTeammate
 } from './tools';
 
-import { conversationEvent, webhookEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -98,5 +96,5 @@ export let provider = Slate.create({
     getKnowledgeBaseContent.build(),
     listEvents.build()
   ],
-  triggers: [conversationEvent.build(), webhookEvent.build()]
+  triggers: []
 });

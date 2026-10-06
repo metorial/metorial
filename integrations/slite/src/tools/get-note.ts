@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getNote = SlateTool.create(spec, {
@@ -20,6 +21,18 @@ export let getNote = SlateTool.create(spec, {
         .optional()
         .default('md')
         .describe('Content format to return: md (Markdown), html, or sliteml'),
+      css: z
+        .enum(['inline', 'none'])
+        .optional()
+        .describe('HTML stylesheet representation; applies only to html.'),
+      compact: z
+        .boolean()
+        .optional()
+        .describe('Compact native serialization; applies only to sliteml.'),
+      childrenCursor: z
+        .string()
+        .optional()
+        .describe('Native child-page cursor; requires includeChildren.'),
       includeChildren: z
         .boolean()
         .optional()
@@ -53,6 +66,9 @@ export let getNote = SlateTool.create(spec, {
         })
         .optional()
         .describe('Owner of the note'),
+      childrenTotal: z.number().optional(),
+      childrenHasNextPage: z.boolean().optional(),
+      childrenNextCursor: z.string().nullable().optional(),
       children: z
         .array(
           z.object({
@@ -68,12 +84,22 @@ export let getNote = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let note = await client.getNote(ctx.input.noteId, ctx.input.format);
+    if (ctx.input.childrenCursor !== undefined && !ctx.input.includeChildren)
+      throw invalid('childrenCursor requires includeChildren.');
+    let note = await client.getNote(ctx.input.noteId, ctx.input.format, {
+      css: ctx.input.css,
+      compact: ctx.input.compact
+    });
 
+    let childrenPage: Awaited<ReturnType<Client['getNoteChildren']>> | undefined;
     let children: Array<{ noteId: string; title: string; url: string }> | undefined;
     if (ctx.input.includeChildren) {
-      let childrenResult = await client.getNoteChildren(ctx.input.noteId);
-      children = childrenResult.notes.map((child: any) => ({
+      let childrenResult = await client.getNoteChildren(
+        ctx.input.noteId,
+        ctx.input.childrenCursor
+      );
+      childrenPage = childrenResult;
+      children = childrenResult.notes.map(child => ({
         noteId: child.id,
         title: child.title,
         url: child.url
@@ -92,7 +118,10 @@ export let getNote = SlateTool.create(spec, {
         archivedAt: note.archivedAt ?? null,
         reviewState: note.reviewState,
         owner: note.owner,
-        children
+        children,
+        childrenTotal: childrenPage?.total,
+        childrenHasNextPage: childrenPage?.hasNextPage,
+        childrenNextCursor: childrenPage?.nextCursor
       },
       message: `Retrieved note **${note.title}**${children ? ` with ${children.length} child note(s)` : ''}`
     };

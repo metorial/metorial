@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getPost = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let getPost = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...selection,
       postId: z.string().optional().describe('The ID of the post to retrieve'),
       slug: z
         .string()
@@ -22,6 +24,7 @@ export let getPost = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      publicationId: z.string().optional().describe('Publication containing this exact post.'),
       postId: z.string().describe('Unique identifier of the post'),
       title: z.string().describe('Title of the post'),
       subtitle: z.string().nullable().optional().describe('Subtitle of the post'),
@@ -85,15 +88,18 @@ export let getPost = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.input.postId && !ctx.input.slug) {
-      throw new Error('Either postId or slug must be provided');
+      throw createApiServiceError('Either postId or slug must be provided');
     }
 
     let client = new Client({
       token: ctx.auth.token,
-      publicationHost: ctx.config.publicationHost
+      publicationHost:
+        ctx.input.publicationHost ??
+        (ctx.input.publicationId === undefined ? ctx.config.publicationHost : undefined),
+      publicationId: ctx.input.publicationId
     });
 
-    let post: any;
+    let post: Awaited<ReturnType<Client['getPost']>>;
     if (ctx.input.postId) {
       post = await client.getPost(ctx.input.postId);
     } else {
@@ -101,12 +107,13 @@ export let getPost = SlateTool.create(spec, {
     }
 
     if (!post) {
-      throw new Error(`Post not found`);
+      throw createApiServiceError(`Post not found`);
     }
 
     return {
       output: {
         postId: post.id,
+        publicationId: post.publication?.id,
         title: post.title,
         subtitle: post.subtitle,
         slug: post.slug,
@@ -123,7 +130,7 @@ export let getPost = SlateTool.create(spec, {
         authorId: post.author?.id,
         authorUsername: post.author?.username,
         authorName: post.author?.name,
-        tags: (post.tags || []).map((t: any) => ({
+        tags: (post.tags || []).map(t => ({
           tagId: t.id,
           name: t.name,
           slug: t.slug

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, nextCursorFrom } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCustomFields = SlateTool.create(spec, {
@@ -67,11 +67,7 @@ export let listCustomFields = SlateTool.create(spec, {
       cursor: ctx.input.cursor
     });
 
-    let nextCursor: string | null = null;
-    if (result.pagination.nextLink) {
-      let url = new URL(result.pagination.nextLink);
-      nextCursor = url.searchParams.get('cursor');
-    }
+    const nextCursor = nextCursorFrom(result.pagination.nextLink);
 
     return {
       output: {

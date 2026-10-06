@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MakeClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { paging } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `Retrieve all users for a team or organization. Returns user profiles including name, email, and last login information.`,
+  description: `Retrieve a bounded page of users for a team or organization. Returns user profiles including name, email, and last login information.`,
   tags: {
     readOnly: true
   },
@@ -14,8 +15,14 @@ export let listUsers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organizationId: z.number().optional().describe('Filter users by organization ID'),
-      teamId: z.number().optional().describe('Filter users by team ID'),
+      organizationId: z
+        .number()
+        .optional()
+        .describe('Organization ID from list_organizations; provide exactly one container'),
+      teamId: z
+        .number()
+        .optional()
+        .describe('Team ID from list_teams; provide exactly one teamId or organizationId'),
       limit: z.number().optional().describe('Maximum number of users to return'),
       offset: z.number().optional().describe('Number to skip for pagination')
     })
@@ -32,37 +39,24 @@ export let listUsers = SlateTool.create(spec, {
           avatar: z.string().optional().describe('Avatar URL')
         })
       ),
+      page: paging.optional(),
       total: z.number().optional().describe('Total number of users')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MakeClient({
-      token: ctx.auth.token,
-      zoneUrl: ctx.config.zoneUrl
-    });
-
-    let result = await client.listUsers({
-      organizationId: ctx.input.organizationId,
-      teamId: ctx.input.teamId,
-      limit: ctx.input.limit,
-      offset: ctx.input.offset
-    });
-
-    let users = (result.users ?? result ?? []).map((u: any) => ({
+    const client = clientFor(ctx);
+    const result = await client.listUsers(ctx.input);
+    const users = result.users.map(u => ({
       userId: u.id,
-      name: u.name,
-      email: u.email,
-      language: u.language,
-      lastLogin: u.lastLogin,
-      avatar: u.avatar
+      name: u.name ?? undefined,
+      email: u.email ?? undefined,
+      language: u.language ?? undefined,
+      lastLogin: u.lastLogin ?? undefined,
+      avatar: u.avatar ?? undefined
     }));
-
     return {
-      output: {
-        users,
-        total: result.pg?.total
-      },
-      message: `Found **${users.length}** user(s).`
+      output: { users, page: result.pg },
+      message: `Returned ${users.length} users in this page.`
     };
   })
   .build();

@@ -1,12 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, pagination, requireInput, TravisCIClient } from '../lib/client';
+import type { Cron } from '../lib/types';
 import { spec } from '../spec';
 
 export let manageCrons = SlateTool.create(spec, {
   name: 'Manage Cron Jobs',
   key: 'manage_crons',
   description: `List, create, get, or delete scheduled cron builds for a repository. Crons can run daily, weekly, or monthly on a specific branch. Only one cron job is allowed per branch.`,
+  tags: { destructive: true },
+  instructions: [
+    'Creating a cron replaces any existing schedule on that branch. List the repository crons before creating one.'
+  ],
   constraints: ['There can be only one cron per branch on a repository.']
 })
   .input(
@@ -24,6 +29,8 @@ export let manageCrons = SlateTool.create(spec, {
         .enum(['daily', 'weekly', 'monthly'])
         .optional()
         .describe('Cron schedule interval. Required for create.'),
+      limit: z.number().optional().describe('Maximum crons to return for list.'),
+      offset: z.number().optional().describe('List pagination offset.'),
       dontRunIfRecentBuildExists: z
         .boolean()
         .optional()
@@ -32,6 +39,9 @@ export let manageCrons = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      hasMore: z.boolean().optional().describe('Whether another page is available'),
+      nextOffset: z.number().optional().describe('Offset for the next page'),
+      totalCount: z.number().optional().describe('Total cron count'),
       crons: z
         .array(
           z.object({
@@ -70,10 +80,10 @@ export let manageCrons = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
-    let mapCron = (cron: any) => ({
+    let mapCron = (cron: Cron) => ({
       cronId: cron.id,
       branchName: cron.branch?.name,
       interval: cron.interval,
@@ -86,19 +96,28 @@ export let manageCrons = SlateTool.create(spec, {
 
     switch (ctx.input.action) {
       case 'list': {
-        let result = await client.listCrons(ctx.input.repoSlugOrId!);
+        let result = await client.listCrons(
+          requireInput(ctx.input.repoSlugOrId, 'repoSlugOrId'),
+          { limit: ctx.input.limit, offset: ctx.input.offset }
+        );
         let crons = (result.crons || []).map(mapCron);
         return {
-          output: { crons },
+          output: { crons, ...pagination(result) },
           message: `Found **${crons.length}** cron jobs for **${ctx.input.repoSlugOrId}**.`
         };
       }
 
       case 'create': {
-        let result = await client.createCron(ctx.input.repoSlugOrId!, ctx.input.branchName!, {
-          interval: ctx.input.interval!,
-          dontRunIfRecentBuildExists: ctx.input.dontRunIfRecentBuildExists
-        });
+        if (!ctx.input.interval)
+          throw createApiServiceError('interval is required for create.');
+        let result = await client.createCron(
+          requireInput(ctx.input.repoSlugOrId, 'repoSlugOrId'),
+          requireInput(ctx.input.branchName, 'branchName'),
+          {
+            interval: ctx.input.interval,
+            dontRunIfRecentBuildExists: ctx.input.dontRunIfRecentBuildExists
+          }
+        );
         return {
           output: { cron: mapCron(result) },
           message: `Created **${ctx.input.interval}** cron on branch **${ctx.input.branchName}** for **${ctx.input.repoSlugOrId}**.`
@@ -106,7 +125,7 @@ export let manageCrons = SlateTool.create(spec, {
       }
 
       case 'get': {
-        let result = await client.getCron(ctx.input.cronId!);
+        let result = await client.getCron(requireInput(ctx.input.cronId, 'cronId'));
         return {
           output: { cron: mapCron(result) },
           message: `Retrieved cron job **${result.id}** (${result.interval}, branch: ${result.branch?.name}).`
@@ -114,7 +133,7 @@ export let manageCrons = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        await client.deleteCron(ctx.input.cronId!);
+        await client.deleteCron(requireInput(ctx.input.cronId, 'cronId'));
         return {
           output: { deleted: true },
           message: `Deleted cron job **${ctx.input.cronId}**.`

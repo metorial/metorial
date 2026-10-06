@@ -1,97 +1,243 @@
-import { createAxios } from 'slates';
-
-let BASE_URLS: Record<string, string> = {
-  production: 'https://api.ramp.com/developer/v1',
-  sandbox: 'https://demo-api.ramp.com/developer/v1'
-};
+import { createApiServiceError, createAxios } from 'slates';
+import {
+  apiFailure,
+  bases,
+  date,
+  dateRange,
+  environment,
+  id,
+  invalid,
+  object,
+  publicRecord,
+  type RampRecord,
+  required
+} from './validation';
 
 export interface PaginationParams {
   start?: string;
   pageSize?: number;
 }
-
-export interface PaginatedResponse<T> {
+export interface PaginatedResponse<T = RampRecord> {
   data: T[];
-  page: {
-    next?: string;
-  };
+  page: { next?: string };
 }
-
+type Query = Record<string, string | number | boolean | undefined>;
+type PageInput = PaginationParams;
 export class Client {
   private axios: ReturnType<typeof createAxios>;
-
+  readonly baseURL: string;
+  private token: string;
   constructor(config: { token: string; environment?: string }) {
-    let baseURL = BASE_URLS[config.environment || 'production'] || BASE_URLS.production;
+    this.baseURL = bases[environment(config.environment)];
+    this.token = required(config.token, 'Access token');
     this.axios = createAxios({
-      baseURL,
+      baseURL: this.baseURL,
+      timeout: 30000,
+      maxRedirects: 0,
       headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${required(config.token, 'Access token')}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
       }
     });
   }
-
-  // ---- Transactions ----
-
-  async listTransactions(params?: {
-    start?: string;
-    pageSize?: number;
-    fromDate?: string;
-    toDate?: string;
-    merchantId?: string;
-    state?: string;
-    syncStatus?: string;
-    entityId?: string;
-    spendLimitId?: string;
-    userId?: string;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    if (params?.fromDate) query.from_date = params.fromDate;
-    if (params?.toDate) query.to_date = params.toDate;
-    if (params?.merchantId) query.merchant_id = params.merchantId;
-    if (params?.state) query.state = params.state;
-    if (params?.syncStatus) query.sync_status = params.syncStatus;
-    if (params?.entityId) query.entity_id = params.entityId;
-    if (params?.spendLimitId) query.spend_limit_id = params.spendLimitId;
-    if (params?.userId) query.user_id = params.userId;
-
-    let response = await this.axios.get('/transactions', { params: query });
-    return response.data;
+  async request(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    path: string,
+    data?: RampRecord,
+    params?: Query,
+    headers?: Record<string, string>,
+    emptySuccess = false
+  ): Promise<RampRecord> {
+    let response: { status: number; data: unknown };
+    try {
+      response = await this.axios.request<unknown>({
+        method,
+        url: path,
+        data,
+        params,
+        headers
+      });
+    } catch (error) {
+      apiFailure(error, method === 'GET' ? 'read' : 'mutation');
+    }
+    if (
+      emptySuccess &&
+      (response.status === 204 ||
+        response.data === '' ||
+        response.data === undefined ||
+        response.data === null)
+    )
+      return { acknowledged: true };
+    let raw = object(response.data);
+    if ('error_v2' in raw || 'error' in raw)
+      throw createApiServiceError('Ramp rejected the request.', { reason: 'ramp_api' });
+    if (raw.page !== undefined) {
+      let page = object(raw.page, 'pagination');
+      let next = page.next;
+      if (next !== null && next !== undefined && typeof next !== 'string')
+        throw createApiServiceError('Ramp returned invalid pagination metadata.', {
+          reason: 'ramp_response'
+        });
+      if (typeof next === 'string' && next) {
+        let route = path.startsWith(this.baseURL)
+          ? new URL(path).pathname.slice(new URL(this.baseURL).pathname.length)
+          : path;
+        if (/^https?:\/\//i.test(next)) this.pageUrl(route, next);
+        else if (!['/cards', '/limits'].includes(route) || /[/?#\\]/.test(next))
+          throw createApiServiceError('Ramp returned an invalid next-page URL.', {
+            reason: 'ramp_response'
+          });
+      }
+    }
+    return publicRecord(raw, [this.token]);
   }
-
-  async getTransaction(transactionId: string): Promise<any> {
-    let response = await this.axios.get(`/transactions/${transactionId}`);
-    return response.data;
+  private pageUrl(path: string, cursor: string): URL {
+    let next: URL;
+    try {
+      next = new URL(cursor);
+    } catch {
+      throw invalid('The next-page URL is invalid.');
+    }
+    let expected = new URL(`${this.baseURL}${path}`);
+    if (
+      next.origin !== expected.origin ||
+      next.pathname !== expected.pathname ||
+      next.username ||
+      next.password ||
+      next.hash ||
+      [...next.searchParams.keys()].some(key =>
+        /token|authorization|secret|signature|credential/i.test(key)
+      )
+    )
+      throw invalid('Use a next-page URL from this resource and Ramp environment.');
+    return next;
   }
-
-  // ---- Users ----
-
-  async listUsers(params?: {
-    start?: string;
-    pageSize?: number;
-    departmentId?: string;
-    locationId?: string;
-    entityId?: string;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    if (params?.departmentId) query.department_id = params.departmentId;
-    if (params?.locationId) query.location_id = params.locationId;
-    if (params?.entityId) query.entity_id = params.entityId;
-
-    let response = await this.axios.get('/users', { params: query });
-    return response.data;
+  async page(
+    path: string,
+    input: PageInput = {},
+    filters: Record<string, string> = {}
+  ): Promise<PaginatedResponse> {
+    if (
+      input.pageSize !== undefined &&
+      (!Number.isInteger(input.pageSize) || input.pageSize < 2 || input.pageSize > 100)
+    )
+      throw invalid('pageSize must be an integer from 2 to 100.');
+    let query: Query = { page_size: input.pageSize };
+    let values: Record<string, unknown> = { ...input };
+    for (let [name, apiName] of Object.entries(filters)) {
+      let value = values[name];
+      if (value === undefined) continue;
+      if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')
+        throw invalid(`${name} has an invalid value.`);
+      if (typeof value === 'string') required(value, name);
+      let validated: string | number | boolean | undefined = value;
+      if (/date/i.test(name)) validated = date(String(value), name);
+      query[apiName] = validated;
+    }
+    dateRange(
+      typeof values.fromDate === 'string'
+        ? values.fromDate
+        : typeof values.fromDueDate === 'string'
+          ? values.fromDueDate
+          : undefined,
+      typeof values.toDate === 'string'
+        ? values.toDate
+        : typeof values.toDueDate === 'string'
+          ? values.toDueDate
+          : undefined
+    );
+    let url = path;
+    if (input.start !== undefined) {
+      let cursor = required(input.start, 'cursor');
+      if (/^https?:\/\//i.test(cursor)) {
+        let next = this.pageUrl(path, cursor);
+        for (let [key, value] of Object.entries(query))
+          if (
+            value !== undefined &&
+            key !== 'page_size' &&
+            next.searchParams.get(key) !== String(value)
+          )
+            throw invalid('Keep the original filters when following a next-page URL.');
+        url = next.toString();
+        query = {};
+      } else {
+        if (cursor.length > 2000 || /[/?#\\]/.test(cursor))
+          throw invalid('Use the opaque cursor or next-page URL returned by Ramp.');
+        query.start = cursor;
+      }
+    }
+    let raw = await this.request('GET', url, undefined, query);
+    if (!Array.isArray(raw.data))
+      throw createApiServiceError('Ramp list response did not contain a data array.', {
+        reason: 'ramp_response'
+      });
+    let page = raw.page === undefined ? {} : object(raw.page, 'pagination');
+    let next = page.next;
+    if (next !== null && next !== undefined && typeof next !== 'string')
+      throw createApiServiceError('Ramp returned invalid pagination metadata.', {
+        reason: 'ramp_response'
+      });
+    if (typeof next === 'string' && /^https?:\/\//i.test(next)) this.pageUrl(path, next);
+    return {
+      data: raw.data.map(entry => publicRecord(entry)),
+      page: { next: typeof next === 'string' && next ? next : undefined }
+    };
   }
-
-  async getUser(userId: string): Promise<any> {
-    let response = await this.axios.get(`/users/${userId}`);
-    return response.data;
+  listTransactions(
+    input: PaginationParams & {
+      fromDate?: string;
+      toDate?: string;
+      merchantId?: string;
+      state?: string;
+      syncStatus?: string;
+      entityId?: string;
+      spendLimitId?: string;
+      userId?: string;
+    } = {}
+  ) {
+    return this.page('/transactions', input, {
+      fromDate: 'from_date',
+      toDate: 'to_date',
+      merchantId: 'merchant_id',
+      state: 'state',
+      syncStatus: 'sync_status',
+      entityId: 'entity_id',
+      spendLimitId: 'limit_id',
+      userId: 'user_id'
+    });
   }
-
-  async createUserInvite(data: {
+  getTransaction(value: string) {
+    return this.request('GET', `/transactions/${id(value)}`);
+  }
+  listUsers(
+    input: PaginationParams & {
+      departmentId?: string;
+      locationId?: string;
+      entityId?: string;
+      email?: string;
+      status?: string;
+    } = {}
+  ) {
+    if (
+      input.status !== undefined &&
+      !['USER_ACTIVE', 'USER_DRAFT', 'USER_INACTIVE', 'USER_SUSPENDED'].includes(input.status)
+    )
+      throw invalid(
+        'status must be USER_ACTIVE, USER_DRAFT, USER_INACTIVE or USER_SUSPENDED for user listing.'
+      );
+    return this.page('/users', input, {
+      departmentId: 'department_id',
+      locationId: 'location_id',
+      entityId: 'entity_id',
+      email: 'email',
+      status: 'status'
+    });
+  }
+  getUser(value: string) {
+    return this.request('GET', `/users/${id(value)}`);
+  }
+  createUserInvite(data: {
     email: string;
     firstName: string;
     lastName: string;
@@ -100,9 +246,10 @@ export class Client {
     locationId?: string;
     directManagerId?: string;
     isManager?: boolean;
+    isDraft?: boolean;
     idempotencyKey: string;
-  }): Promise<any> {
-    let response = await this.axios.post('/users/deferred', {
+  }) {
+    return this.request('POST', '/users/deferred', {
       email: data.email,
       first_name: data.firstName,
       last_name: data.lastName,
@@ -111,502 +258,334 @@ export class Client {
       location_id: data.locationId,
       direct_manager_id: data.directManagerId,
       is_manager: data.isManager,
+      is_draft: data.isDraft,
       idempotency_key: data.idempotencyKey
     });
-    return response.data;
   }
-
-  async updateUser(
-    userId: string,
+  updateUser(
+    value: string,
     data: {
       departmentId?: string;
       locationId?: string;
       directManagerId?: string;
       role?: string;
+      firstName?: string;
+      lastName?: string;
+      isManager?: boolean;
     }
-  ): Promise<any> {
-    let body: Record<string, any> = {};
-    if (data.departmentId !== undefined) body.department_id = data.departmentId;
-    if (data.locationId !== undefined) body.location_id = data.locationId;
-    if (data.directManagerId !== undefined) body.direct_manager_id = data.directManagerId;
-    if (data.role !== undefined) body.role = data.role;
-
-    let response = await this.axios.patch(`/users/${userId}`, body);
-    return response.data;
+  ) {
+    return this.request(
+      'PATCH',
+      `/users/${id(value)}`,
+      {
+        department_id: data.departmentId,
+        location_id: data.locationId,
+        direct_manager_id: data.directManagerId,
+        role: data.role,
+        first_name: data.firstName,
+        last_name: data.lastName,
+        is_manager: data.isManager
+      },
+      undefined,
+      undefined,
+      true
+    );
   }
-
-  async deactivateUser(userId: string): Promise<any> {
-    let response = await this.axios.post(`/users/${userId}/deferred/deactivation`);
-    return response.data;
+  deactivateUser(value: string) {
+    return this.request(
+      'PATCH',
+      `/users/${id(value)}/deactivate`,
+      undefined,
+      undefined,
+      undefined,
+      true
+    );
   }
-
-  async reactivateUser(userId: string): Promise<any> {
-    let response = await this.axios.post(`/users/${userId}/deferred/reactivation`);
-    return response.data;
+  reactivateUser(value: string) {
+    return this.request(
+      'PATCH',
+      `/users/${id(value)}/reactivate`,
+      undefined,
+      undefined,
+      undefined,
+      true
+    );
   }
-
-  // ---- Cards ----
-
-  async listCards(params?: {
-    start?: string;
-    pageSize?: number;
-    userId?: string;
-    cardProgramId?: string;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    if (params?.userId) query.user_id = params.userId;
-    if (params?.cardProgramId) query.card_program_id = params.cardProgramId;
-
-    let response = await this.axios.get('/cards', { params: query });
-    return response.data;
+  getDeferredTaskStatus(
+    value: string,
+    resource: 'user' | 'legacy_card' | 'legacy_limit' = 'user'
+  ) {
+    return this.request(
+      'GET',
+      `/${resource === 'user' ? 'users' : resource === 'legacy_card' ? 'cards' : 'limits'}/deferred/status/${id(value, 'taskId')}`
+    );
   }
-
-  async getCard(cardId: string): Promise<any> {
-    let response = await this.axios.get(`/cards/${cardId}`);
-    return response.data;
-  }
-
-  async updateCard(
-    cardId: string,
-    data: {
-      displayName?: string;
+  listCards(
+    input: PaginationParams & {
       userId?: string;
-      spendingRestrictions?: Record<string, any>;
-    }
-  ): Promise<any> {
-    let body: Record<string, any> = {};
-    if (data.displayName !== undefined) body.display_name = data.displayName;
-    if (data.userId !== undefined) body.user_id = data.userId;
-    if (data.spendingRestrictions !== undefined)
-      body.spending_restrictions = data.spendingRestrictions;
-
-    let response = await this.axios.patch(`/cards/${cardId}`, body);
-    return response.data;
+      cardProgramId?: string;
+      cardType?: 'legacy' | 'physical' | 'virtual';
+    } = {}
+  ) {
+    let kind = input.cardType ?? 'legacy';
+    if (kind !== 'legacy' && input.cardProgramId !== undefined)
+      throw invalid('cardProgramId is only supported by the legacy Cards API.');
+    return this.page(kind === 'legacy' ? '/cards' : `/cards/${kind}`, input, {
+      userId: 'user_id',
+      ...(kind === 'legacy' ? { cardProgramId: 'card_program_id' } : {})
+    });
   }
-
-  async createVirtualCard(data: {
-    displayName: string;
-    userId: string;
-    spendProgramId?: string;
-    spendingRestrictions?: Record<string, any>;
-    idempotencyKey: string;
-  }): Promise<any> {
-    let body: Record<string, any> = {
+  getCard(value: string, kind: 'legacy' | 'physical' | 'virtual' = 'legacy') {
+    return this.request('GET', `/cards/${kind === 'legacy' ? '' : `${kind}/`}${id(value)}`);
+  }
+  updateCard(
+    value: string,
+    data: { displayName?: string; userId?: string; spendingRestrictions?: RampRecord }
+  ) {
+    return this.request('PATCH', `/cards/${id(value)}`, {
       display_name: data.displayName,
       user_id: data.userId,
-      idempotency_key: data.idempotencyKey
-    };
-    if (data.spendProgramId) body.spend_program_id = data.spendProgramId;
-    if (data.spendingRestrictions) body.spending_restrictions = data.spendingRestrictions;
-
-    let response = await this.axios.post('/cards/deferred/virtual', body);
-    return response.data;
+      spending_restrictions: data.spendingRestrictions
+    });
   }
-
-  async createPhysicalCard(data: {
+  createVirtualCard(data: {
     displayName: string;
     userId: string;
-    fulfillment: Record<string, any>;
     spendProgramId?: string;
-    spendingRestrictions?: Record<string, any>;
+    spendingRestrictions?: RampRecord;
     idempotencyKey: string;
-  }): Promise<any> {
-    let body: Record<string, any> = {
+  }) {
+    return this.request('POST', '/cards/deferred/virtual', {
+      display_name: data.displayName,
+      user_id: data.userId,
+      spend_program_id: data.spendProgramId,
+      spending_restrictions: data.spendingRestrictions,
+      idempotency_key: data.idempotencyKey
+    });
+  }
+  createPhysicalCard(data: {
+    displayName: string;
+    userId: string;
+    fulfillment: RampRecord;
+    spendProgramId?: string;
+    spendingRestrictions?: RampRecord;
+    idempotencyKey: string;
+  }) {
+    return this.request('POST', '/cards/deferred/physical', {
       display_name: data.displayName,
       user_id: data.userId,
       fulfillment: data.fulfillment,
+      spend_program_id: data.spendProgramId,
+      spending_restrictions: data.spendingRestrictions,
       idempotency_key: data.idempotencyKey
-    };
-    if (data.spendProgramId) body.spend_program_id = data.spendProgramId;
-    if (data.spendingRestrictions) body.spending_restrictions = data.spendingRestrictions;
-
-    let response = await this.axios.post('/cards/deferred/physical', body);
-    return response.data;
-  }
-
-  async suspendCard(cardId: string, idempotencyKey: string): Promise<any> {
-    let response = await this.axios.post(`/cards/${cardId}/deferred/suspension`, {
-      idempotency_key: idempotencyKey
     });
-    return response.data;
   }
-
-  async unsuspendCard(cardId: string, idempotencyKey: string): Promise<any> {
-    let response = await this.axios.post(`/cards/${cardId}/deferred/unsuspension`, {
-      idempotency_key: idempotencyKey
+  suspendCard(value: string, key: string) {
+    return this.request('POST', `/cards/${id(value)}/deferred/suspension`, {
+      idempotency_key: key
     });
-    return response.data;
   }
-
-  async terminateCard(cardId: string, idempotencyKey: string): Promise<any> {
-    let response = await this.axios.post(`/cards/${cardId}/deferred/termination`, {
-      idempotency_key: idempotencyKey
+  unsuspendCard(value: string, key: string) {
+    return this.request('POST', `/cards/${id(value)}/deferred/unsuspension`, {
+      idempotency_key: key
     });
-    return response.data;
   }
-
-  async getDeferredTaskStatus(taskId: string): Promise<any> {
-    let response = await this.axios.get(`/cards/deferred/status/${taskId}`);
-    return response.data;
-  }
-
-  // ---- Bills ----
-
-  async listBills(params?: {
-    start?: string;
-    pageSize?: number;
-    status?: string;
-    vendorId?: string;
-    entityId?: string;
-    syncStatus?: string;
-    paymentStatus?: string;
-    fromDueDate?: string;
-    toDueDate?: string;
-    invoiceNumber?: string;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    if (params?.status) query.status_summaries = params.status;
-    if (params?.vendorId) query.vendor_id = params.vendorId;
-    if (params?.entityId) query.entity_id = params.entityId;
-    if (params?.syncStatus) query.sync_status = params.syncStatus;
-    if (params?.paymentStatus) query.payment_status = params.paymentStatus;
-    if (params?.fromDueDate) query.from_due_date = params.fromDueDate;
-    if (params?.toDueDate) query.to_due_date = params.toDueDate;
-    if (params?.invoiceNumber) query.invoice_number = params.invoiceNumber;
-
-    let response = await this.axios.get('/bills', { params: query });
-    return response.data;
-  }
-
-  async getBill(billId: string): Promise<any> {
-    let response = await this.axios.get(`/bills/${billId}`);
-    return response.data;
-  }
-
-  async createBill(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/bills', data);
-    return response.data;
-  }
-
-  async updateBill(billId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/bills/${billId}`, data);
-    return response.data;
-  }
-
-  async archiveBill(billId: string): Promise<any> {
-    let response = await this.axios.delete(`/bills/${billId}`);
-    return response.data;
-  }
-
-  // ---- Reimbursements ----
-
-  async listReimbursements(params?: {
-    start?: string;
-    pageSize?: number;
-    state?: string;
-    syncStatus?: string;
-    entityId?: string;
-    userId?: string;
-    fromDate?: string;
-    toDate?: string;
-    direction?: string;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    if (params?.state) query.state = params.state;
-    if (params?.syncStatus) query.sync_status = params.syncStatus;
-    if (params?.entityId) query.entity_id = params.entityId;
-    if (params?.userId) query.user_id = params.userId;
-    if (params?.fromDate) query.from_date = params.fromDate;
-    if (params?.toDate) query.to_date = params.toDate;
-    if (params?.direction) query.direction = params.direction;
-
-    let response = await this.axios.get('/reimbursements', { params: query });
-    return response.data;
-  }
-
-  async getReimbursement(reimbursementId: string): Promise<any> {
-    let response = await this.axios.get(`/reimbursements/${reimbursementId}`);
-    return response.data;
-  }
-
-  // ---- Departments ----
-
-  async listDepartments(params?: {
-    start?: string;
-    pageSize?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-
-    let response = await this.axios.get('/departments', { params: query });
-    return response.data;
-  }
-
-  async getDepartment(departmentId: string): Promise<any> {
-    let response = await this.axios.get(`/departments/${departmentId}`);
-    return response.data;
-  }
-
-  async createDepartment(data: { name: string }): Promise<any> {
-    let response = await this.axios.post('/departments', data);
-    return response.data;
-  }
-
-  async updateDepartment(
-    departmentId: string,
-    data: {
-      name?: string;
-    }
-  ): Promise<any> {
-    let response = await this.axios.patch(`/departments/${departmentId}`, data);
-    return response.data;
-  }
-
-  // ---- Locations ----
-
-  async listLocations(params?: {
-    start?: string;
-    pageSize?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-
-    let response = await this.axios.get('/locations', { params: query });
-    return response.data;
-  }
-
-  async getLocation(locationId: string): Promise<any> {
-    let response = await this.axios.get(`/locations/${locationId}`);
-    return response.data;
-  }
-
-  // ---- Spend Programs ----
-
-  async listSpendPrograms(params?: {
-    start?: string;
-    pageSize?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-
-    let response = await this.axios.get('/spend-programs', { params: query });
-    return response.data;
-  }
-
-  async getSpendProgram(spendProgramId: string): Promise<any> {
-    let response = await this.axios.get(`/spend-programs/${spendProgramId}`);
-    return response.data;
-  }
-
-  async createSpendProgram(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/spend-programs', data);
-    return response.data;
-  }
-
-  async updateSpendProgram(spendProgramId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/spend-programs/${spendProgramId}`, data);
-    return response.data;
-  }
-
-  // ---- Limits ----
-
-  async listLimits(params?: {
-    start?: string;
-    pageSize?: number;
-    spendProgramId?: string;
-    userId?: string;
-    entityId?: string;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    if (params?.spendProgramId) query.spend_program_id = params.spendProgramId;
-    if (params?.userId) query.user_id = params.userId;
-    if (params?.entityId) query.entity_id = params.entityId;
-
-    let response = await this.axios.get('/limits', { params: query });
-    return response.data;
-  }
-
-  async getLimit(limitId: string): Promise<any> {
-    let response = await this.axios.get(`/limits/${limitId}`);
-    return response.data;
-  }
-
-  async createLimit(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/limits/deferred', data);
-    return response.data;
-  }
-
-  async updateLimit(limitId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/limits/${limitId}`, data);
-    return response.data;
-  }
-
-  async terminateLimit(limitId: string, idempotencyKey: string): Promise<any> {
-    let response = await this.axios.post(`/limits/${limitId}/deferred/termination`, {
-      idempotency_key: idempotencyKey
+  terminateCard(value: string, key: string) {
+    return this.request('POST', `/cards/${id(value)}/deferred/termination`, {
+      idempotency_key: key
     });
-    return response.data;
   }
-
-  // ---- Vendors ----
-
-  async listVendors(params?: {
-    start?: string;
-    pageSize?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-
-    let response = await this.axios.get('/vendors', { params: query });
-    return response.data;
-  }
-
-  async getVendor(vendorId: string): Promise<any> {
-    let response = await this.axios.get(`/vendors/${vendorId}`);
-    return response.data;
-  }
-
-  // ---- Entities ----
-
-  async listEntities(params?: {
-    start?: string;
-    pageSize?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-
-    let response = await this.axios.get('/entities', { params: query });
-    return response.data;
-  }
-
-  async getEntity(entityId: string): Promise<any> {
-    let response = await this.axios.get(`/entities/${entityId}`);
-    return response.data;
-  }
-
-  // ---- Business ----
-
-  async getBusiness(): Promise<any> {
-    let response = await this.axios.get('/business');
-    return response.data;
-  }
-
-  async getBusinessBalance(): Promise<any> {
-    let response = await this.axios.get('/business/balance');
-    return response.data;
-  }
-
-  // ---- Merchants ----
-
-  async listMerchants(params?: {
-    start?: string;
-    pageSize?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-
-    let response = await this.axios.get('/merchants', { params: query });
-    return response.data;
-  }
-
-  async getMerchant(merchantId: string): Promise<any> {
-    let response = await this.axios.get(`/merchants/${merchantId}`);
-    return response.data;
-  }
-
-  // ---- Receipts ----
-
-  async listReceipts(params?: {
-    start?: string;
-    pageSize?: number;
-    transactionId?: string;
-    userId?: string;
-    fromDate?: string;
-    toDate?: string;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    if (params?.transactionId) query.transaction_id = params.transactionId;
-    if (params?.userId) query.user_id = params.userId;
-    if (params?.fromDate) query.from_date = params.fromDate;
-    if (params?.toDate) query.to_date = params.toDate;
-
-    let response = await this.axios.get('/receipts', { params: query });
-    return response.data;
-  }
-
-  // ---- Transfers ----
-
-  async listTransfers(params?: {
-    start?: string;
-    pageSize?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-
-    let response = await this.axios.get('/transfers', { params: query });
-    return response.data;
-  }
-
-  // ---- Statements ----
-
-  async listStatements(params?: {
-    start?: string;
-    pageSize?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let query: Record<string, any> = {};
-    if (params?.start) query.start = params.start;
-    if (params?.pageSize) query.page_size = params.pageSize;
-
-    let response = await this.axios.get('/statements', { params: query });
-    return response.data;
-  }
-
-  // ---- Webhooks ----
-
-  async listWebhooks(): Promise<any> {
-    let response = await this.axios.get('/webhooks');
-    return response.data;
-  }
-
-  async createWebhook(data: { url: string; eventTypes: string[] }): Promise<any> {
-    let response = await this.axios.post('/webhooks', {
-      url: data.url,
-      event_types: data.eventTypes
+  listBills(
+    input: PaginationParams & {
+      status?: string;
+      vendorId?: string;
+      entityId?: string;
+      syncStatus?: string;
+      paymentStatus?: string;
+      fromDueDate?: string;
+      toDueDate?: string;
+      invoiceNumber?: string;
+      isArchived?: boolean;
+    } = {}
+  ) {
+    return this.page('/bills', input, {
+      status: 'status_summaries',
+      vendorId: 'vendor_id',
+      entityId: 'entity_id',
+      syncStatus: 'sync_status',
+      paymentStatus: 'payment_status',
+      fromDueDate: 'from_due_date',
+      toDueDate: 'to_due_date',
+      invoiceNumber: 'invoice_number',
+      isArchived: 'is_archived'
     });
-    return response.data;
   }
-
-  async deleteWebhook(webhookId: string): Promise<void> {
-    await this.axios.delete(`/webhooks/${webhookId}`);
+  getBill(value: string) {
+    return this.request('GET', `/bills/${id(value)}`);
   }
-
-  // ---- Accounting Syncs ----
-
-  async reportSyncResults(data: {
-    idempotencyKey: string;
-    syncResults: Record<string, any>[];
-  }): Promise<any> {
-    let response = await this.axios.post('/accounting/syncs', {
-      idempotency_key: data.idempotencyKey,
-      sync_results: data.syncResults
+  createBill(data: RampRecord) {
+    return this.request('POST', '/bills', data);
+  }
+  updateBill(value: string, data: RampRecord) {
+    return this.request('PATCH', `/bills/${id(value)}`, data);
+  }
+  archiveBill(value: string) {
+    return this.request(
+      'DELETE',
+      `/bills/${id(value)}`,
+      undefined,
+      undefined,
+      undefined,
+      true
+    );
+  }
+  listReimbursements(
+    input: PaginationParams & {
+      state?: string;
+      syncStatus?: string;
+      entityId?: string;
+      userId?: string;
+      fromDate?: string;
+      toDate?: string;
+      direction?: string;
+    } = {}
+  ) {
+    return this.page('/reimbursements', input, {
+      state: 'state',
+      syncStatus: 'sync_status',
+      entityId: 'entity_id',
+      userId: 'user_id',
+      fromDate: 'from_date',
+      toDate: 'to_date',
+      direction: 'direction'
     });
-    return response.data;
   }
+  getReimbursement(value: string) {
+    return this.request('GET', `/reimbursements/${id(value)}`);
+  }
+  listDepartments(input: PaginationParams = {}) {
+    return this.page('/departments', input);
+  }
+  getDepartment(value: string) {
+    return this.request('GET', `/departments/${id(value)}`);
+  }
+  createDepartment(data: { name: string }) {
+    return this.request('POST', '/departments', data);
+  }
+  updateDepartment(value: string, data: { name?: string }) {
+    return this.request('PATCH', `/departments/${id(value)}`, data);
+  }
+  listLocations(input: PaginationParams = {}) {
+    return this.page('/locations', input);
+  }
+  getLocation(value: string) {
+    return this.request('GET', `/locations/${id(value)}`);
+  }
+  listSpendPrograms(input: PaginationParams = {}) {
+    return this.page('/spend-programs', input);
+  }
+  getSpendProgram(value: string) {
+    return this.request('GET', `/spend-programs/${id(value)}`);
+  }
+  createSpendProgram(data: RampRecord) {
+    return this.request('POST', '/spend-programs', data);
+  }
+  updateSpendProgram(value: string, data: RampRecord) {
+    return this.request('PATCH', `/spend-programs/${id(value)}`, data);
+  }
+  listLimits(
+    input: PaginationParams & {
+      spendProgramId?: string;
+      userId?: string;
+      entityId?: string;
+    } = {}
+  ) {
+    return this.page('/limits', input, {
+      spendProgramId: 'spend_program_id',
+      userId: 'user_id',
+      entityId: 'entity_id'
+    });
+  }
+  getLimit(value: string) {
+    return this.request('GET', `/limits/${id(value)}`);
+  }
+  createLimit(data: RampRecord) {
+    return this.request('POST', '/limits/deferred', data);
+  }
+  updateLimit(value: string, data: RampRecord) {
+    return this.request('PATCH', `/limits/${id(value)}`, data);
+  }
+  terminateLimit(value: string, key: string) {
+    return this.request('POST', `/limits/${id(value)}/deferred/termination`, {
+      idempotency_key: key
+    });
+  }
+  listFunds(
+    input: PaginationParams & {
+      spendProgramId?: string;
+      userId?: string;
+      entityId?: string;
+      displayName?: string;
+      isTerminated?: boolean;
+    } = {}
+  ) {
+    return this.page('/funds', input, {
+      spendProgramId: 'spend_program_id',
+      userId: 'user_id',
+      entityId: 'entity_id',
+      displayName: 'display_name',
+      isTerminated: 'is_terminated'
+    });
+  }
+  getFund(value: string) {
+    return this.request('GET', `/funds/${id(value)}`);
+  }
+  createFund(data: RampRecord, key?: string) {
+    return this.request(
+      'POST',
+      '/funds',
+      data,
+      undefined,
+      key ? { 'X-Idempotency-Key': required(key, 'idempotencyKey') } : undefined
+    );
+  }
+  updateFund(value: string, data: RampRecord, key?: string) {
+    return this.request(
+      'PATCH',
+      `/funds/${id(value)}`,
+      data,
+      undefined,
+      key ? { 'X-Idempotency-Key': key } : undefined
+    );
+  }
+  terminateFund(value: string) {
+    return this.request('DELETE', `/funds/${id(value)}`);
+  }
+  listVendors(input: PaginationParams = {}) {
+    return this.page('/vendors', input);
+  }
+  getVendor(value: string) {
+    return this.request('GET', `/vendors/${id(value)}`);
+  }
+  listEntities(input: PaginationParams = {}) {
+    return this.page('/entities', input);
+  }
+  getEntity(value: string) {
+    return this.request('GET', `/entities/${id(value)}`);
+  }
+  getBusiness() {
+    return this.request('GET', '/business');
+  }
+  getBusinessBalance() {
+    return this.request('GET', '/business/balance');
+  }
+}
+export function clientFor(ctx: {
+  auth: { token: string; environment?: string };
+  config: Record<string, unknown>;
+}): Client {
+  return new Client({
+    token: ctx.auth.token,
+    environment: environment(ctx.auth.environment ?? ctx.config.environment)
+  });
 }

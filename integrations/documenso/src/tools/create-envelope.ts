@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { clientConfig } from '../lib/validation';
 import { spec } from '../spec';
 
 export let createEnvelopeTool = SlateTool.create(spec, {
@@ -9,7 +10,7 @@ export let createEnvelopeTool = SlateTool.create(spec, {
   description: `Create a new envelope (document or template) in Documenso. Optionally attach PDF files (base64-encoded), add recipients, and configure signing metadata in a single call. After creation, use the **Distribute Envelope** tool to send it to recipients.`,
   instructions: [
     'Files must be base64-encoded PDF content.',
-    'Recipients can be added during creation or separately afterwards.',
+    'Recipients can be added during creation or separately afterwards. Omitted name defaults to empty and omitted role to SIGNER.',
     'Use type TEMPLATE to create reusable templates.'
   ]
 })
@@ -65,36 +66,29 @@ export let createEnvelopeTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let meta: Record<string, unknown> = {};
-    if (ctx.input.subject) meta.subject = ctx.input.subject;
-    if (ctx.input.emailMessage) meta.message = ctx.input.emailMessage;
-    if (ctx.input.signingOrder) meta.signingOrder = ctx.input.signingOrder;
-    if (ctx.input.redirectUrl) meta.redirectUrl = ctx.input.redirectUrl;
-    if (ctx.input.language) meta.language = ctx.input.language;
-    if (ctx.input.timezone) meta.timezone = ctx.input.timezone;
-    if (ctx.input.dateFormat) meta.dateFormat = ctx.input.dateFormat;
-
-    let result = await client.createEnvelope(
+    const client = new Client(clientConfig(ctx));
+    const meta = {
+      subject: ctx.input.subject,
+      message: ctx.input.emailMessage,
+      signingOrder: ctx.input.signingOrder,
+      redirectUrl: ctx.input.redirectUrl,
+      language: ctx.input.language,
+      timezone: ctx.input.timezone,
+      dateFormat: ctx.input.dateFormat
+    };
+    const result = await client.createEnvelope(
       {
         title: ctx.input.title,
         type: ctx.input.type,
         folderId: ctx.input.folderId,
         recipients: ctx.input.recipients,
-        meta: Object.keys(meta).length > 0 ? meta : undefined
+        meta
       },
       ctx.input.files?.map(f => ({ name: f.fileName, data: f.fileData }))
     );
-
-    let envelopeId = String(result.id ?? result.envelopeId ?? '');
-
     return {
-      output: { envelopeId },
-      message: `Created envelope "${ctx.input.title}" with ID \`${envelopeId}\`.`
+      output: { envelopeId: result.id },
+      message: `Created draft envelope ${result.id}. It has not been sent.`
     };
   })
   .build();

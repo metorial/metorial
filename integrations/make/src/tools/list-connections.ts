@@ -1,19 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MakeClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { paging } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listConnections = SlateTool.create(spec, {
   name: 'List Connections',
   key: 'list_connections',
-  description: `Retrieve all connections for a given team. Connections represent authenticated links to external services used in scenarios.`,
+  description: `Retrieve a bounded page of connections for a given team. Connections represent authenticated links to external services used in scenarios.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      teamId: z.number().describe('Team ID to list connections for'),
+      teamId: z
+        .number()
+        .describe(
+          'Team ID; call list_teams after list_organizations to discover authorized IDs. to list connections for'
+        ),
       limit: z.number().optional().describe('Maximum number of connections to return'),
       offset: z.number().optional().describe('Number of connections to skip for pagination')
     })
@@ -26,41 +31,35 @@ export let listConnections = SlateTool.create(spec, {
           name: z.string().optional().describe('Connection name'),
           accountName: z.string().optional().describe('Account name'),
           accountType: z.string().optional().describe('Account/app type identifier'),
-          teamId: z.number().optional().describe('Team ID'),
+          teamId: z
+            .number()
+            .optional()
+            .describe(
+              'Team ID; call list_teams after list_organizations to discover authorized IDs.'
+            ),
           accountLabel: z.string().optional().describe('Human-readable account label'),
           expired: z.boolean().optional().describe('Whether the connection has expired')
         })
       ),
+      page: paging.optional(),
       total: z.number().optional().describe('Total number of connections')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MakeClient({
-      token: ctx.auth.token,
-      zoneUrl: ctx.config.zoneUrl
-    });
-
-    let result = await client.listConnections(ctx.input.teamId, {
-      limit: ctx.input.limit,
-      offset: ctx.input.offset
-    });
-
-    let connections = (result.connections ?? result ?? []).map((c: any) => ({
+    const client = clientFor(ctx);
+    const result = await client.listConnections(ctx.input.teamId, ctx.input);
+    const connections = result.connections.map(c => ({
       connectionId: c.id,
       name: c.name,
-      accountName: c.accountName,
-      accountType: c.accountType,
+      accountName: c.accountName ?? undefined,
+      accountType: c.accountType ?? undefined,
       teamId: c.teamId,
-      accountLabel: c.accountLabel,
+      accountLabel: c.accountLabel ?? undefined,
       expired: c.expired
     }));
-
     return {
-      output: {
-        connections,
-        total: result.pg?.total
-      },
-      message: `Found **${connections.length}** connection(s) in team ${ctx.input.teamId}.`
+      output: { connections, page: result.pg },
+      message: `Returned ${connections.length} connections in this page.`
     };
   })
   .build();

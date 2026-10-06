@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'mezmo',
   name: 'Mezmo',
   description:
-    'Mezmo observability platform for log ingestion, search, alerting, and telemetry pipeline management.',
+    'Mezmo Log Analysis for log ingestion, search, exports, views, alerts, boards, exclusion rules, usage and archiving.',
   metadata: {},
   config,
   auth

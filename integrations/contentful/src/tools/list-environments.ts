@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, pageInfo } from '../lib/helpers';
+import { limitSchema, pageOutput, selection, skipSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listEnvironments = SlateTool.create(spec, {
@@ -11,9 +12,10 @@ export let listEnvironments = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ ...selection, limit: limitSchema, skip: skipSchema }))
   .output(
     z.object({
+      ...pageOutput,
       environments: z
         .array(
           z.object({
@@ -31,10 +33,13 @@ export let listEnvironments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
-    let result = await client.getEnvironments();
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
+    let result = await client.getEnvironments({
+      limit: ctx.input.limit,
+      skip: ctx.input.skip
+    });
 
-    let environments = (result.items || []).map((e: any) => ({
+    let environments = result.items.map((e: any) => ({
       environmentId: e.sys?.id,
       name: e.name,
       status: e.sys?.status?.sys?.id,
@@ -43,7 +48,7 @@ export let listEnvironments = SlateTool.create(spec, {
     }));
 
     return {
-      output: { environments },
+      output: { ...pageInfo(result), environments },
       message: `Found **${environments.length}** environments.`
     };
   })

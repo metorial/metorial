@@ -1,18 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import { resourceSchema } from '../lib/types';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let updateAsset = SlateTool.create(spec, {
   name: 'Update Asset',
   key: 'update_asset',
-  description: `Update properties of an existing Cloudinary asset. Can modify tags, contextual metadata, structured metadata, display name, asset folder, access control, and moderation status. Can also rename the asset's public ID.`,
+  description: `Update properties of an existing Cloudinary asset. Can modify tags, contextual metadata, structured metadata, display name, asset folder, and moderation status. Can also rename the asset's public ID.`,
   instructions: [
+    'If a rename succeeds but a later update fails, read the immutable assetId before retrying.',
     'To rename an asset, provide both publicId and newPublicId.',
     'To update metadata or tags without renaming, omit newPublicId.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -46,88 +49,112 @@ export let updateAsset = SlateTool.create(spec, {
       moderationStatus: z
         .enum(['approved', 'rejected', 'pending'])
         .optional()
-        .describe('Update moderation status.')
+        .describe(
+          'Set image moderation to approved or rejected. The legacy pending value is a read state and is rejected before any update or rename.'
+        )
     })
   )
-  .output(
-    z.object({
-      assetId: z.string().describe('Immutable unique asset identifier.'),
-      publicId: z.string().describe('Public ID of the asset.'),
-      format: z.string().describe('File format.'),
-      resourceType: z.string().describe('Resource type.'),
-      createdAt: z.string().describe('Creation timestamp.'),
-      bytes: z.number().describe('File size in bytes.'),
-      url: z.string().describe('HTTP delivery URL.'),
-      secureUrl: z.string().describe('HTTPS delivery URL.'),
-      tags: z.array(z.string()).optional().describe('Current tags on the asset.')
-    })
-  )
+  .output(resourceSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let actions: string[] = [];
-
-    // Rename first if requested
-    if (ctx.input.newPublicId) {
-      await client.rename(
-        ctx.input.publicId,
-        ctx.input.newPublicId,
-        ctx.input.resourceType,
-        ctx.input.overwriteOnRename
+    const client = createClient(ctx),
+      input = ctx.input;
+    const hasUpdates = [
+      'tags',
+      'context',
+      'metadata',
+      'displayName',
+      'assetFolder',
+      'moderationStatus'
+    ].some(key => input[key as keyof typeof input] !== undefined);
+    if (!hasUpdates && input.newPublicId === undefined)
+      fail('Supply a newPublicId or an asset property to update.');
+    if (input.overwriteOnRename !== undefined && input.newPublicId === undefined)
+      fail('overwriteOnRename requires newPublicId.');
+    client.validateUpdate(input);
+    const before = await client.getResource(input.publicId, input.resourceType, input.type);
+    if (input.newPublicId !== undefined) {
+      const renamed = await client.rename(
+        input.publicId,
+        input.newPublicId,
+        input.resourceType,
+        input.overwriteOnRename,
+        input.type
       );
-      actions.push(`renamed to **${ctx.input.newPublicId}**`);
+      if (renamed.assetId !== before.assetId)
+        fail(
+          'The rename receipt belongs to another asset. Read the original immutable asset ID before retrying.',
+          'cloudinary_unconfirmed_mutation'
+        );
     }
-
-    let targetPublicId = ctx.input.newPublicId || ctx.input.publicId;
-
-    // Update other properties
-    let hasUpdates =
-      ctx.input.tags ||
-      ctx.input.context ||
-      ctx.input.metadata ||
-      ctx.input.displayName ||
-      ctx.input.assetFolder ||
-      ctx.input.moderationStatus;
-
+    const target = input.newPublicId ?? input.publicId;
     if (hasUpdates) {
-      await client.updateResource(targetPublicId, {
-        resourceType: ctx.input.resourceType,
-        type: ctx.input.type,
-        tags: ctx.input.tags,
-        context: ctx.input.context,
-        metadata: ctx.input.metadata,
-        displayName: ctx.input.displayName,
-        assetFolder: ctx.input.assetFolder,
-        moderationStatus: ctx.input.moderationStatus
-      });
-      if (ctx.input.tags) actions.push('updated tags');
-      if (ctx.input.context) actions.push('updated context metadata');
-      if (ctx.input.metadata) actions.push('updated structured metadata');
-      if (ctx.input.displayName) actions.push('updated display name');
-      if (ctx.input.assetFolder) actions.push('moved to folder');
-      if (ctx.input.moderationStatus)
-        actions.push(`set moderation to ${ctx.input.moderationStatus}`);
+      const receipt = await client.updateResource(target, input);
+      if (receipt.assetId !== before.assetId)
+        fail(
+          'The update receipt belongs to another asset. Read the original immutable asset ID before retrying.',
+          'cloudinary_unconfirmed_mutation'
+        );
     }
-
-    // Fetch updated resource
-    let resource = await client.getResource(
-      targetPublicId,
-      ctx.input.resourceType,
-      ctx.input.type
-    );
-
+    const resource = await client.getResourceByAssetId(before.assetId);
+    if (
+      resource.publicId !== target ||
+      (resource.type !== undefined && resource.type !== input.type)
+    )
+      fail(
+        'Cloudinary did not confirm the requested asset locator. Read current state before retrying.',
+        'cloudinary_unconfirmed_mutation'
+      );
+    for (const field of ['displayName', 'assetFolder'] as const)
+      if (input[field] !== undefined && resource[field] !== input[field])
+        fail(
+          'Cloudinary did not confirm the requested asset properties. Read current state before retrying.',
+          'cloudinary_unconfirmed_mutation'
+        );
+    if (
+      input.tags !== undefined &&
+      (resource.tags === undefined ||
+        JSON.stringify([...resource.tags].sort()) !== JSON.stringify([...input.tags].sort()))
+    )
+      fail(
+        'Cloudinary did not confirm the requested tags. Read current state before retrying.',
+        'cloudinary_unconfirmed_mutation'
+      );
+    if (
+      input.context !== undefined &&
+      Object.entries(input.context).some(([key, value]) => resource.context?.[key] !== value)
+    )
+      fail(
+        'Cloudinary did not confirm the requested context. Read current state before retrying.',
+        'cloudinary_unconfirmed_mutation'
+      );
+    if (
+      input.metadata !== undefined &&
+      Object.entries(input.metadata).some(([key, value]) => {
+        let expected: unknown = value;
+        try {
+          expected = JSON.parse(value);
+        } catch {}
+        return (
+          JSON.stringify(resource.metadata?.[key]) !== JSON.stringify(expected) &&
+          resource.metadata?.[key] !== value
+        );
+      })
+    )
+      fail(
+        'Cloudinary did not confirm the requested structured metadata. Read current state before retrying.',
+        'cloudinary_unconfirmed_mutation'
+      );
+    if (
+      input.moderationStatus !== undefined &&
+      !resource.moderation?.some(item => item.status === input.moderationStatus)
+    )
+      fail(
+        'Cloudinary did not confirm the requested moderation status. Read current state before retrying.',
+        'cloudinary_unconfirmed_mutation'
+      );
     return {
-      output: {
-        assetId: resource.assetId,
-        publicId: resource.publicId,
-        format: resource.format,
-        resourceType: resource.resourceType,
-        createdAt: resource.createdAt,
-        bytes: resource.bytes,
-        url: resource.url,
-        secureUrl: resource.secureUrl,
-        tags: resource.tags
-      },
-      message: `Updated asset **${resource.publicId}**: ${actions.length > 0 ? actions.join(', ') : 'no changes applied'}.`
+      output: resource,
+      message: `Updated asset **${resource.publicId}** and confirmed its immutable ID and requested state. Renames and overwrites can retain backups, cached copies and configured notification effects.`
     };
   })
   .build();

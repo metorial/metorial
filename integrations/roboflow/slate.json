@@ -1,17 +1,15 @@
 {
   "name": "@metorial/roboflow",
-  "description": "Manage computer vision projects, datasets, and models. Upload and annotate images, create dataset versions with preprocessing and augmentation, train object detection and classification models, and run inference via hosted or self-hosted APIs. Organize workspaces and projects, manage annotation jobs and labeler assignments, search images by visual similarity, monitor deployed model performance, and build multi-step workflows with 40+ pre-built blocks. Supports object detection, classification, instance segmentation, semantic segmentation, and keypoint detection. Access foundation models including CLIP, OCR, and YOLO-World, and browse public datasets on Roboflow Universe.",
+  "description": "Manage Roboflow computer vision projects and image datasets. Discover projects and image batches, upload and annotate images, search and tag datasets, generate and export dataset versions, start model training, run hosted object detection inference, and manage annotation jobs.",
   "categories": ["apis-and-http-requests"],
   "skills": [
+    "discover projects and image batches",
     "upload and manage images",
     "annotate image datasets",
     "train computer vision models",
-    "run model inference",
-    "create dataset versions",
+    "run object detection inference",
+    "create and export dataset versions",
     "manage annotation jobs",
-    "monitor model performance",
-    "search images visually",
-    "build inference workflows",
-    "browse public datasets"
+    "search images visually"
   ]
 }

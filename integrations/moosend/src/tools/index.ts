@@ -2,6 +2,7 @@ export { campaignAnalytics } from './campaign-analytics';
 export { createCampaign } from './create-campaign';
 export { deleteCampaign } from './delete-campaign';
 export { getCampaigns } from './get-campaigns';
+export { getSenders } from './get-senders';
 export { listSubscribers } from './list-subscribers';
 export { manageCustomField } from './manage-custom-field';
 export { manageMailingList } from './manage-mailing-list';

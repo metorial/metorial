@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -15,7 +15,7 @@ export let manageBackup = SlateTool.create(spec, {
     'If no collections are specified, all collections are backed up.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -52,6 +52,12 @@ export let manageBackup = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
     let { action, backend, backupId, includeCollections, excludeCollections } = ctx.input;
+
+    if (includeCollections?.length && excludeCollections?.length) {
+      throw createApiServiceError(
+        'Provide includeCollections or excludeCollections, not both.'
+      );
+    }
 
     let result: any;
 

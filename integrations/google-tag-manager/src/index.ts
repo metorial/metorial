@@ -13,8 +13,6 @@ import {
   manageWorkspace,
   updateAccount
 } from './tools';
-import { inboundWebhook, versionPublished, workspaceChanged } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     manageFolder,
     manageUserPermission
   ],
-  triggers: [inboundWebhook, versionPublished, workspaceChanged]
+  triggers: []
 });

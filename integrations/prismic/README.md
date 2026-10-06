@@ -1,41 +1,15 @@
-# <img src="https://provider-logos.metorial-cdn.com/prismic-logo.jpeg" height="20"> Prismic
+# Prismic
 
-Query, create, and manage structured content in a headless CMS repository. Read published content via REST or GraphQL APIs with filtering, sorting, pagination, and advanced predicates (full-text search, date ranges, geolocation). Manage content types and shared slices programmatically — create, read, update, and delete custom type schemas. Migrate content by creating and updating draft documents in a repository. Upload, update, and delete media assets (images, videos, documents) in the media library. Integrate third-party data sources via integration fields. Receive webhooks for document publish/unpublish events, release changes, and tag changes.
+Read structured repository content, manage custom types and shared slices, transfer media assets, and create or replace migration drafts. The integration exposes 20 tools: the original 18 keys plus exact shared-slice reads and media downloads. It does not publish documents or releases.
 
-## Tools
+Configure the repository subdomain, such as `my-repository`, rather than a URL. Content reads use the repository Content API access token; an empty token remains valid for a public repository. Custom types, shared slices and media use a generated Write API bearer token. Migration uses the configured migration token, with the Write API token as a fallback. Current provider documentation uses generated tokens. The existing email/password method remains available for compatibility with the historical login contract; current availability and account verification requirements were not verified live.
 
-### Get Document
+Call Get Repository Info to discover exact type IDs, language IDs and refs. Query Documents uses native predicates, integer page sizes from 1 to 100, and either numbered pages or an `after` cursor. Get Document identifies one exact ID or a UID/type/language combination. Returned API links omit the configured access token.
 
-Retrieve a single document by its ID or by its UID and type. Returns the full document with all field data.
+Custom-type and shared-slice updates replace their complete models; preserve fields you intend to keep. Successful writes are read back independently, including native 204 model updates. Exact IDs come from the corresponding list tools. Deletion is irreversible.
 
-### Get Repository Info
+List Assets follows the native cursor and `limit` contract. Upload Asset preserves the URL input, transfers real multipart bytes, and accepts at most 4 MiB from a public HTTPS source with public IPv4 resolution, no redirects, credentials or custom port. This is a conservative tool limit below provider limits. Tag names must already exist uniquely in the media library; missing or ambiguous names are refused before upload. Metadata writes use native tag IDs and exact readback. Download Asset prepares the exact asset's provider URL without inventing expiry or renewal metadata.
 
-Retrieve metadata about the Prismic repository, including available content types, tags, languages, refs (versions), and bookmarks. Useful for discovering what content types and tags exist before querying documents.
+Migration documents remain drafts. Create requires an explicit language unless the repository has exactly one. Update replaces all data and requires explicit replacement tags, including an empty array to clear them; type, language and alternate-language association cannot be changed through the native update endpoint. The current provider SDK can publish a migration release, but that capability is outside these tools. No draft read/delete endpoint is invented.
 
-### List Assets
-
-List and search assets in the Prismic media library. Supports filtering by type, keyword, tags, and cursor-based pagination. Requires a Write API token.
-
-### List Custom Types
-
-List all custom types defined in the Prismic repository. Returns the schema and metadata for each type. Requires a Write API token.
-
-### List Shared Slices
-
-List all shared slices in the Prismic repository. Shared slices are reusable page sections that can be used across multiple custom types. Requires a Write API token.
-
-### Create Migration Document
-
-Create a new document via the Migration API. Documents are created as drafts in a migration release and must be published through the Prismic UI. Requires a Migration API token.
-
-### Query Documents
-
-Search and retrieve published documents from the Prismic repository using filters, predicates, and sorting. Supports filtering by document type, tags, full-text search, and custom predicates. Results are paginated.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Private tests are active and fixture-gated. Controlled writes require an isolated repository, exact credential/configuration binding, independent complete native ownership/state proof, no concurrent changes or automation, and retained-effects acknowledgment. Model/media test resources require explicit retention and manual UI reconciliation; private permanent-delete scenarios are gated because editor-draft disuse cannot be independently inventoried. The migration scenarios additionally require a readable Content API release ref, accepted retained drafts and manual UI reconciliation. No provider calls or resource changes were made during this refresh; offline evidence does not establish live acceptance.

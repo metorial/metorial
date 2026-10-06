@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { currentVersion, recovery, resourceId, selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createEntry = SlateTool.create(spec, {
@@ -17,7 +18,8 @@ export let createEntry = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      contentTypeId: z.string().describe('The content type ID for the new entry.'),
+      ...selection,
+      contentTypeId: resourceId.describe('The content type ID for the new entry.'),
       fields: z
         .record(z.string(), z.any())
         .describe(
@@ -31,20 +33,24 @@ export let createEntry = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      entryId: z.string().describe('ID of the created entry.'),
-      contentTypeId: z.string().describe('Content type ID.'),
+      entryId: resourceId.describe('ID of the created entry.'),
+      contentTypeId: resourceId.describe('Content type ID.'),
       version: z.number().describe('Current version number.'),
       published: z.boolean().describe('Whether the entry was published.'),
       createdAt: z.string().optional().describe('ISO 8601 creation timestamp.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
     let entry = await client.createEntry(ctx.input.contentTypeId, ctx.input.fields);
 
     let published = false;
     if (ctx.input.publish) {
-      entry = await client.publishEntry(entry.sys.id, entry.sys.version);
+      try {
+        entry = await client.publishEntry(entry.sys.id, currentVersion(entry));
+      } catch {
+        throw recovery('entry', entry.sys.id, client.spaceId, client.environmentId);
+      }
       published = true;
     }
 
@@ -52,7 +58,7 @@ export let createEntry = SlateTool.create(spec, {
       output: {
         entryId: entry.sys.id,
         contentTypeId: ctx.input.contentTypeId,
-        version: entry.sys.version,
+        version: currentVersion(entry),
         published,
         createdAt: entry.sys.createdAt
       },

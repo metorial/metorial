@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaveClient } from '../lib/client';
 import { spec } from '../spec';
@@ -11,6 +11,7 @@ export let getUser = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('user:read'))
   .input(z.object({}))
   .output(
     z.object({

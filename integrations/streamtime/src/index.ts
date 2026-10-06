@@ -31,8 +31,6 @@ import {
   updateJob,
   updateTimeEntry
 } from './tools';
-import { inboundWebhook, newCompany, newInvoice, newJob } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -66,5 +64,5 @@ export let provider = Slate.create({
     listRoles,
     getOrganisation
   ],
-  triggers: [inboundWebhook, newJob, newInvoice, newCompany]
+  triggers: []
 });

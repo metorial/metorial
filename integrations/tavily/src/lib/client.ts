@@ -1,9 +1,22 @@
-import { createAxios } from 'slates';
-
-let http = createAxios({
-  baseURL: 'https://api.tavily.com'
-});
-
+import { createAuthenticatedAxios, pickDefined } from 'slates';
+import {
+  credential,
+  requestId,
+  requireValue,
+  safeJson,
+  upstream,
+  validateInput
+} from './contracts';
+import {
+  crawlResponse,
+  extractResponse,
+  mapResponse,
+  parse,
+  researchCreateResponse,
+  researchResponse,
+  searchResponse,
+  usageResponse
+} from './models';
 export interface SearchParams {
   query: string;
   searchDepth?: 'ultra-fast' | 'fast' | 'basic' | 'advanced';
@@ -40,7 +53,8 @@ export interface SearchResponse {
   results: SearchResult[];
   autoParameters?: Record<string, unknown>;
   responseTime: number;
-  requestId: string;
+  requestId?: string;
+  usageCredits?: number;
 }
 
 export interface ExtractParams {
@@ -69,7 +83,8 @@ export interface ExtractResponse {
   results: ExtractResult[];
   failedResults: ExtractFailedResult[];
   responseTime: number;
-  requestId: string;
+  requestId?: string;
+  usageCredits?: number;
 }
 
 export interface CrawlParams {
@@ -100,7 +115,8 @@ export interface CrawlResponse {
   baseUrl: string;
   results: CrawlResult[];
   responseTime: number;
-  requestId: string;
+  requestId?: string;
+  usageCredits?: number;
 }
 
 export interface MapParams {
@@ -121,7 +137,8 @@ export interface MapResponse {
   baseUrl: string;
   results: string[];
   responseTime: number;
-  requestId: string;
+  requestId?: string;
+  usageCredits?: number;
 }
 
 export interface ResearchParams {
@@ -133,8 +150,9 @@ export interface ResearchParams {
 
 export interface ResearchCreateResponse {
   requestId: string;
+  usageCredits?: number;
   createdAt: string;
-  status: string;
+  status: 'pending' | 'in_progress';
   input: string;
   model: string;
   responseTime: number;
@@ -148,6 +166,7 @@ export interface ResearchSource {
 
 export interface ResearchGetResponse {
   requestId: string;
+  usageCredits?: number;
   createdAt?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
   content?: string | Record<string, unknown>;
@@ -171,63 +190,99 @@ export interface UsageResponse {
 }
 
 export class Client {
-  private token: string;
-  private projectId?: string;
-
+  private readonly http: ReturnType<typeof createAuthenticatedAxios>;
+  private readonly token: string;
+  private readonly projectId?: string;
   constructor(config: { token: string; projectId?: string }) {
+    credential(config.token);
+    if (config.projectId !== undefined) credential(config.projectId);
     this.token = config.token;
     this.projectId = config.projectId;
-  }
-
-  private getHeaders(): Record<string, string> {
-    let headers: Record<string, string> = {
-      Authorization: `Bearer ${this.token}`,
-      'Content-Type': 'application/json'
-    };
-    if (this.projectId) {
-      headers['X-Project-ID'] = this.projectId;
-    }
-    return headers;
-  }
-
-  async search(params: SearchParams): Promise<SearchResponse> {
-    let body: Record<string, unknown> = {
-      query: params.query,
-      include_usage: true
-    };
-
-    if (params.searchDepth) body.search_depth = params.searchDepth;
-    if (params.topic) body.topic = params.topic;
-    if (params.maxResults !== undefined) body.max_results = params.maxResults;
-    if (params.chunksPerSource !== undefined) body.chunks_per_source = params.chunksPerSource;
-    if (params.timeRange) body.time_range = params.timeRange;
-    if (params.startDate) body.start_date = params.startDate;
-    if (params.endDate) body.end_date = params.endDate;
-    if (params.includeAnswer !== undefined) body.include_answer = params.includeAnswer;
-    if (params.includeRawContent !== undefined)
-      body.include_raw_content = params.includeRawContent;
-    if (params.includeImages !== undefined) body.include_images = params.includeImages;
-    if (params.includeImageDescriptions !== undefined)
-      body.include_image_descriptions = params.includeImageDescriptions;
-    if (params.includeDomains && params.includeDomains.length > 0)
-      body.include_domains = params.includeDomains;
-    if (params.excludeDomains && params.excludeDomains.length > 0)
-      body.exclude_domains = params.excludeDomains;
-    if (params.country) body.country = params.country;
-    if (params.autoParameters !== undefined) body.auto_parameters = params.autoParameters;
-    if (params.exactMatch !== undefined) body.exact_match = params.exactMatch;
-
-    let response = await http.post('/search', body, {
-      headers: this.getHeaders()
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.tavily.com',
+      authHeader: { value: `Bearer ${this.token}` },
+      timeout: 180000,
+      maxRedirects: 0,
+      maxContentLength: 8 * 1024 * 1024,
+      maxBodyLength: 1024 * 1024,
+      errorMapping: {
+        mapAxiosError: () => ({
+          message: 'Tavily request failed. Check API key, parameters and available credits.'
+        })
+      },
+      errorAdapter: upstream
     });
-
-    let data = response.data;
-
+  }
+  private async request(path: string, body?: Record<string, unknown>, timeout?: number) {
+    try {
+      if (body !== undefined) safeJson(body, [this.token]);
+      const response = await this.http.request({
+        method: body === undefined ? 'GET' : 'POST',
+        url: path,
+        timeout: timeout ?? (path.startsWith('/research/') ? 30000 : 180000),
+        data: body === undefined ? undefined : pickDefined(body),
+        headers:
+          path === '/usage' && this.projectId !== undefined
+            ? { 'X-Project-ID': this.projectId }
+            : undefined,
+        params: path.startsWith('/research/') ? { include_usage: true } : undefined
+      });
+      safeJson(
+        {
+          data: response.data,
+          headers: response.headers,
+          status: response.status,
+          statusText: response.statusText
+        },
+        [this.token]
+      );
+      const statuses =
+        path === '/research' ? [201] : path.startsWith('/research/') ? [200, 202] : [200];
+      requireValue(
+        statuses.includes(response.status),
+        'Tavily did not return the documented native response status. Reconcile any accepted request before retrying.'
+      );
+      return response;
+    } catch (error) {
+      throw upstream(error);
+    }
+  }
+  async search(params: SearchParams): Promise<SearchResponse> {
+    validateInput('web_search', params as unknown as Record<string, unknown>, this.token);
+    const d = parse(
+      searchResponse,
+      (
+        await this.request('/search', {
+          query: params.query,
+          include_usage: true,
+          search_depth: params.searchDepth,
+          topic: params.topic,
+          max_results: params.maxResults,
+          chunks_per_source: params.chunksPerSource,
+          time_range: params.timeRange,
+          start_date: params.startDate,
+          end_date: params.endDate,
+          include_answer: params.includeAnswer,
+          include_raw_content: params.includeRawContent,
+          include_images: params.includeImages,
+          include_image_descriptions: params.includeImageDescriptions,
+          include_domains: params.includeDomains,
+          exclude_domains: params.excludeDomains,
+          country: params.country,
+          auto_parameters: params.autoParameters,
+          exact_match: params.exactMatch
+        })
+      ).data
+    );
+    requireValue(
+      params.maxResults === undefined || d.results.length <= params.maxResults,
+      'Tavily returned more search results than requested. Credits may already have been consumed; reconcile before retrying.'
+    );
     return {
-      query: data.query,
-      answer: data.answer,
-      images: data.images,
-      results: (data.results || []).map((r: any) => ({
+      query: d.query,
+      answer: d.answer,
+      images: d.images,
+      results: d.results.map(r => ({
         title: r.title,
         url: r.url,
         content: r.content,
@@ -235,193 +290,192 @@ export class Client {
         rawContent: r.raw_content,
         favicon: r.favicon
       })),
-      autoParameters: data.auto_parameters,
-      responseTime: data.response_time,
-      requestId: data.request_id
+      autoParameters: d.auto_parameters,
+      responseTime: d.response_time,
+      requestId: d.request_id,
+      usageCredits: d.usage?.credits
     };
   }
-
   async extract(params: ExtractParams): Promise<ExtractResponse> {
-    let body: Record<string, unknown> = {
-      urls: params.urls,
-      include_usage: true
-    };
-
-    if (params.query) body.query = params.query;
-    if (params.chunksPerSource !== undefined) body.chunks_per_source = params.chunksPerSource;
-    if (params.extractDepth) body.extract_depth = params.extractDepth;
-    if (params.includeImages !== undefined) body.include_images = params.includeImages;
-    if (params.format) body.format = params.format;
-    if (params.timeout !== undefined) body.timeout = params.timeout;
-
-    let response = await http.post('/extract', body, {
-      headers: this.getHeaders()
-    });
-
-    let data = response.data;
-
+    validateInput('extract_content', params as unknown as Record<string, unknown>, this.token);
+    const d = parse(
+      extractResponse,
+      (
+        await this.request('/extract', {
+          urls: params.urls,
+          include_usage: true,
+          query: params.query,
+          chunks_per_source: params.chunksPerSource,
+          extract_depth: params.extractDepth,
+          include_images: params.includeImages,
+          format: params.format,
+          timeout: params.timeout
+        })
+      ).data
+    );
     return {
-      results: (data.results || []).map((r: any) => ({
+      results: d.results.map(r => ({
         url: r.url,
         rawContent: r.raw_content,
         images: r.images,
         favicon: r.favicon
       })),
-      failedResults: (data.failed_results || []).map((r: any) => ({
-        url: r.url,
-        error: r.error
-      })),
-      responseTime: data.response_time,
-      requestId: data.request_id
+      failedResults: d.failed_results,
+      responseTime: d.response_time,
+      requestId: d.request_id,
+      usageCredits: d.usage?.credits
     };
   }
-
   async crawl(params: CrawlParams): Promise<CrawlResponse> {
-    let body: Record<string, unknown> = {
-      url: params.url,
-      include_usage: true
-    };
-
-    if (params.instructions) body.instructions = params.instructions;
-    if (params.chunksPerSource !== undefined) body.chunks_per_source = params.chunksPerSource;
-    if (params.maxDepth !== undefined) body.max_depth = params.maxDepth;
-    if (params.maxBreadth !== undefined) body.max_breadth = params.maxBreadth;
-    if (params.limit !== undefined) body.limit = params.limit;
-    if (params.selectPaths && params.selectPaths.length > 0)
-      body.select_paths = params.selectPaths;
-    if (params.selectDomains && params.selectDomains.length > 0)
-      body.select_domains = params.selectDomains;
-    if (params.excludePaths && params.excludePaths.length > 0)
-      body.exclude_paths = params.excludePaths;
-    if (params.excludeDomains && params.excludeDomains.length > 0)
-      body.exclude_domains = params.excludeDomains;
-    if (params.allowExternal !== undefined) body.allow_external = params.allowExternal;
-    if (params.includeImages !== undefined) body.include_images = params.includeImages;
-    if (params.extractDepth) body.extract_depth = params.extractDepth;
-    if (params.format) body.format = params.format;
-    if (params.timeout !== undefined) body.timeout = params.timeout;
-
-    let response = await http.post('/crawl', body, {
-      headers: this.getHeaders()
-    });
-
-    let data = response.data;
-
+    validateInput('crawl_website', params as unknown as Record<string, unknown>, this.token);
+    const d = parse(
+      crawlResponse,
+      (
+        await this.request('/crawl', {
+          url: params.url,
+          include_usage: true,
+          instructions: params.instructions,
+          chunks_per_source: params.chunksPerSource,
+          max_depth: params.maxDepth,
+          max_breadth: params.maxBreadth,
+          limit: params.limit,
+          select_paths: params.selectPaths,
+          select_domains: params.selectDomains,
+          exclude_paths: params.excludePaths,
+          exclude_domains: params.excludeDomains,
+          allow_external: params.allowExternal,
+          include_images: params.includeImages,
+          extract_depth: params.extractDepth,
+          format: params.format,
+          timeout: params.timeout
+        })
+      ).data
+    );
     return {
-      baseUrl: data.base_url,
-      results: (data.results || []).map((r: any) => ({
+      baseUrl: d.base_url,
+      results: d.results.map(r => ({
         url: r.url,
         rawContent: r.raw_content,
         favicon: r.favicon
       })),
-      responseTime: data.response_time,
-      requestId: data.request_id
+      responseTime: d.response_time,
+      requestId: d.request_id,
+      usageCredits: d.usage?.credits
     };
   }
-
   async map(params: MapParams): Promise<MapResponse> {
-    let body: Record<string, unknown> = {
-      url: params.url,
-      include_usage: true
-    };
-
-    if (params.instructions) body.instructions = params.instructions;
-    if (params.maxDepth !== undefined) body.max_depth = params.maxDepth;
-    if (params.maxBreadth !== undefined) body.max_breadth = params.maxBreadth;
-    if (params.limit !== undefined) body.limit = params.limit;
-    if (params.selectPaths && params.selectPaths.length > 0)
-      body.select_paths = params.selectPaths;
-    if (params.selectDomains && params.selectDomains.length > 0)
-      body.select_domains = params.selectDomains;
-    if (params.excludePaths && params.excludePaths.length > 0)
-      body.exclude_paths = params.excludePaths;
-    if (params.excludeDomains && params.excludeDomains.length > 0)
-      body.exclude_domains = params.excludeDomains;
-    if (params.allowExternal !== undefined) body.allow_external = params.allowExternal;
-    if (params.timeout !== undefined) body.timeout = params.timeout;
-
-    let response = await http.post('/map', body, {
-      headers: this.getHeaders()
-    });
-
-    let data = response.data;
-
+    validateInput('map_website', params as unknown as Record<string, unknown>, this.token);
+    const d = parse(
+      mapResponse,
+      (
+        await this.request('/map', {
+          url: params.url,
+          include_usage: true,
+          instructions: params.instructions,
+          max_depth: params.maxDepth,
+          max_breadth: params.maxBreadth,
+          limit: params.limit,
+          select_paths: params.selectPaths,
+          select_domains: params.selectDomains,
+          exclude_paths: params.excludePaths,
+          exclude_domains: params.excludeDomains,
+          allow_external: params.allowExternal,
+          timeout: params.timeout
+        })
+      ).data
+    );
     return {
-      baseUrl: data.base_url,
-      results: data.results || [],
-      responseTime: data.response_time,
-      requestId: data.request_id
+      baseUrl: d.base_url,
+      results: d.results,
+      responseTime: d.response_time,
+      requestId: d.request_id,
+      usageCredits: d.usage?.credits
     };
   }
-
   async createResearch(params: ResearchParams): Promise<ResearchCreateResponse> {
-    let body: Record<string, unknown> = {
-      input: params.input
-    };
-
-    if (params.model) body.model = params.model;
-    if (params.outputSchema) body.output_schema = params.outputSchema;
-    if (params.citationFormat) body.citation_format = params.citationFormat;
-
-    let response = await http.post('/research', body, {
-      headers: this.getHeaders()
+    validateInput('research', params as unknown as Record<string, unknown>, this.token);
+    const response = await this.request('/research', {
+      input: params.input,
+      model: params.model,
+      output_schema: params.outputSchema,
+      citation_format: params.citationFormat
     });
-
-    let data = response.data;
-
-    return {
-      requestId: data.request_id,
-      createdAt: data.created_at,
-      status: data.status,
-      input: data.input,
-      model: data.model,
-      responseTime: data.response_time
-    };
+    let recoveryId: string | undefined;
+    try {
+      const raw = response.data as Record<string, unknown>;
+      requestId(raw.request_id);
+      safeJson(raw.request_id, [this.token]);
+      recoveryId = raw.request_id;
+      const d = parse(researchCreateResponse, raw);
+      requireValue(
+        d.input === params.input,
+        'Tavily accepted a different research input; reconcile the request before retrying.'
+      );
+      return {
+        requestId: d.request_id,
+        status: d.status,
+        createdAt: d.created_at,
+        input: d.input,
+        model: d.model,
+        responseTime: d.response_time,
+        usageCredits: d.usage?.credits
+      };
+    } catch (error) {
+      const safe = upstream(error);
+      if (recoveryId)
+        safe.data.reason = `The HTTP 201 receipt included research request ID ${recoveryId}, but its result could not be confirmed. Reconcile this exact ID before creating another job; credits and history may remain.`;
+      throw safe;
+    }
   }
 
-  async getResearch(requestId: string): Promise<ResearchGetResponse> {
-    let response = await http.get(`/research/${requestId}`, {
-      headers: this.getHeaders()
-    });
-
-    let data = response.data;
-
+  async getResearch(id: string, timeout?: number): Promise<ResearchGetResponse> {
+    requestId(id);
+    safeJson(id, [this.token]);
+    const response = await this.request(
+        `/research/${encodeURIComponent(id)}`,
+        undefined,
+        timeout
+      ),
+      d = parse(researchResponse, response.data);
+    requireValue(d.request_id === id, 'Tavily returned another research request.');
+    requireValue(
+      response.status === 202
+        ? ['pending', 'in_progress'].includes(d.status)
+        : ['completed', 'failed'].includes(d.status),
+      'Tavily research status does not match its HTTP receipt.'
+    );
+    if (d.status === 'completed')
+      requireValue(
+        d.content !== undefined && d.sources !== undefined && d.created_at !== undefined,
+        'Tavily completed research is missing its result or sources.'
+      );
     return {
-      requestId: data.request_id,
-      createdAt: data.created_at,
-      status: data.status,
-      content: data.content,
-      sources: data.sources?.map((s: any) => ({
-        title: s.title,
-        url: s.url,
-        favicon: s.favicon
-      })),
-      responseTime: data.response_time
+      requestId: d.request_id,
+      status: d.status,
+      createdAt: d.created_at,
+      content: d.content,
+      sources: d.sources,
+      responseTime: d.response_time,
+      usageCredits: d.usage?.credits
     };
   }
-
   async getUsage(): Promise<UsageResponse> {
-    let response = await http.get('/usage', {
-      headers: this.getHeaders()
-    });
-
-    let data = response.data;
-    let key = data.key || {};
-    let account = data.account || {};
-
+    const d = parse(usageResponse, (await this.request('/usage')).data),
+      k = d.key,
+      a = d.account;
     return {
-      usage: key.usage ?? 0,
-      limit: key.limit ?? null,
-      searchUsage: key.search_usage ?? account.search_usage ?? 0,
-      extractUsage: key.extract_usage ?? account.extract_usage ?? 0,
-      crawlUsage: key.crawl_usage ?? account.crawl_usage ?? 0,
-      mapUsage: key.map_usage ?? account.map_usage ?? 0,
-      researchUsage: key.research_usage ?? account.research_usage ?? 0,
-      currentPlan: account.current_plan ?? 'unknown',
-      planUsage: account.plan_usage ?? 0,
-      planLimit: account.plan_limit ?? 0,
-      paygoUsage: account.paygo_usage ?? 0,
-      paygoLimit: account.paygo_limit ?? 0
+      usage: k.usage,
+      limit: k.limit,
+      searchUsage: k.search_usage,
+      extractUsage: k.extract_usage,
+      crawlUsage: k.crawl_usage,
+      mapUsage: k.map_usage,
+      researchUsage: k.research_usage,
+      currentPlan: a.current_plan,
+      planUsage: a.plan_usage,
+      planLimit: a.plan_limit,
+      paygoUsage: a.paygo_usage,
+      paygoLimit: a.paygo_limit
     };
   }
 }

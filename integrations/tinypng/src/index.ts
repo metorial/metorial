@@ -8,10 +8,8 @@ import {
   saveToCloud
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [compressImage, resizeImage, convertImage, saveToCloud, getCompressionCount],
-  triggers: [inboundWebhook]
+  triggers: []
 });

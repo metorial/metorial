@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RipplingClient } from '../lib/client';
+import { mapEmployee } from '../lib/models';
 import { spec } from '../spec';
 
 export let getEmployee = SlateTool.create(spec, {
@@ -39,31 +40,15 @@ export let getEmployee = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
     let emp = await client.getEmployee(ctx.input.employeeId);
 
     return {
-      output: {
-        employeeId: emp.id || emp.roleId || ctx.input.employeeId,
-        name: emp.name,
-        firstName: emp.firstName,
-        lastName: emp.lastName,
-        workEmail: emp.workEmail,
-        personalEmail: emp.personalEmail,
-        employmentType: emp.employmentType,
-        title: emp.title,
-        department: emp.department,
-        roleState: emp.roleState,
-        startDate: emp.startDate,
-        endDate: emp.endDate,
-        phone: emp.phone || emp.phoneNumber,
-        workLocation: emp.workLocation,
-        isManager: emp.isManager,
-        uniqueId: emp.uniqueId,
-        compensation: emp.compensation,
-        customFields: emp.customFields
-      },
-      message: `Retrieved employee **${emp.name || `${emp.firstName} ${emp.lastName}` || ctx.input.employeeId}** (${emp.roleState || 'Unknown status'}).`
+      output: mapEmployee(emp),
+      message: 'Retrieved the requested employee.'
     };
   })
   .build();

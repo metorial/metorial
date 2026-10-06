@@ -12,8 +12,6 @@ import {
   searchPeople,
   searchStateLocalContracts
 } from './tools';
-import { pursuitAdded } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     lookupCodes,
     searchStateLocalContracts
   ],
-  triggers: [pursuitAdded]
+  triggers: []
 });

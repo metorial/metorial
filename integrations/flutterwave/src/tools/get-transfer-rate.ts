@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getTransferRate = SlateTool.create(spec, {
   name: 'Get Transfer Rate',
   key: 'get_transfer_rate',
-  description: `Check exchange rates and fees for cross-currency transfers. Returns the conversion rate and the amount that will be debited from your source currency balance. Use this before initiating a cross-currency transfer to understand costs.`,
+  description: `Get a cross-currency transfer rate quote with source and destination amounts. This read does not initiate a transfer or lock a rate.`,
   tags: {
     readOnly: true
   }
@@ -30,7 +30,7 @@ export let getTransferRate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
     let result = await client.getTransferRates(
       ctx.input.amount,

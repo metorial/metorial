@@ -1,0 +1,670 @@
+{
+  "list_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groupNames": {
+          "description": "Comma-separated group names to filter users by (e.g., \"admin,all_users\")",
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "description": "UUID of the user"
+              },
+              "name": {
+                "type": "string",
+                "description": "Full name of the user"
+              },
+              "email": {
+                "type": "string",
+                "description": "Email address of the user"
+              },
+              "status": {
+                "type": "string",
+                "description": "User status (active or archived)"
+              },
+              "workspaces": {
+                "description": "Workspaces the user belongs to",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "workspaceId": {
+                      "type": "string",
+                      "description": "ID of the workspace"
+                    },
+                    "workspaceName": {
+                      "type": "string",
+                      "description": "Name of the workspace"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "Status of the user in the workspace"
+                    },
+                    "groups": {
+                      "description": "Groups the user belongs to in this workspace",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "groupId": {
+                            "type": "string",
+                            "description": "ID of the group"
+                          },
+                          "groupName": {
+                            "type": "string",
+                            "description": "Name of the group"
+                          }
+                        },
+                        "required": ["groupId", "groupName"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["workspaceId", "workspaceName", "status"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["userId", "name", "email", "status"],
+            "additionalProperties": false
+          },
+          "description": "List of users"
+        }
+      },
+      "required": ["users"],
+      "additionalProperties": false
+    }
+  },
+  "get_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "description": "User UUID or email address to look up"
+        }
+      },
+      "required": ["identifier"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UUID of the user"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user"
+        },
+        "status": {
+          "type": "string",
+          "description": "User status (active or archived)"
+        },
+        "workspaces": {
+          "description": "Workspaces the user belongs to",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workspaceId": {
+                "type": "string",
+                "description": "ID of the workspace"
+              },
+              "workspaceName": {
+                "type": "string",
+                "description": "Name of the workspace"
+              },
+              "status": {
+                "type": "string",
+                "description": "Status of the user in the workspace"
+              },
+              "groups": {
+                "description": "Groups the user belongs to in this workspace",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "groupId": {
+                      "type": "string",
+                      "description": "ID of the group"
+                    },
+                    "groupName": {
+                      "type": "string",
+                      "description": "Name of the group"
+                    }
+                  },
+                  "required": ["groupId", "groupName"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["workspaceId", "workspaceName", "status"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["userId", "name", "email", "status"],
+      "additionalProperties": false
+    }
+  },
+  "create_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full name of the new user"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the new user"
+        },
+        "password": {
+          "description": "Password for the new user (5-100 characters)",
+          "type": "string"
+        },
+        "status": {
+          "default": "active",
+          "description": "Initial status of the user",
+          "type": "string",
+          "enum": ["active", "archived"]
+        },
+        "workspaces": {
+          "description": "Workspaces to assign the user to",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workspaceName": {
+                "type": "string",
+                "description": "Name of the workspace to assign the user to"
+              },
+              "workspaceId": {
+                "description": "ID of the workspace (optional, can use name instead)",
+                "type": "string"
+              },
+              "status": {
+                "default": "active",
+                "description": "User status in this workspace",
+                "type": "string",
+                "enum": ["active", "archived"]
+              },
+              "groups": {
+                "description": "Groups to assign the user to within this workspace",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "groupName": {
+                      "type": "string",
+                      "description": "Name of the group to add the user to"
+                    },
+                    "groupId": {
+                      "description": "ID of the group (optional)",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["groupName"]
+                }
+              }
+            },
+            "required": ["workspaceName"]
+          }
+        }
+      },
+      "required": ["name", "email"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "description": "UUID of the created user",
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the created user"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email of the created user"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the created user"
+        }
+      },
+      "required": ["name", "email", "status"],
+      "additionalProperties": false
+    }
+  },
+  "update_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "description": "User UUID or email address to identify the user to update"
+        },
+        "name": {
+          "description": "New name for the user",
+          "type": "string"
+        },
+        "email": {
+          "description": "New email address for the user",
+          "type": "string"
+        },
+        "password": {
+          "description": "New password for the user (5-100 characters)",
+          "type": "string"
+        },
+        "status": {
+          "description": "New status for the user",
+          "type": "string",
+          "enum": ["active", "archived"]
+        }
+      },
+      "required": ["identifier"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the update was successful"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "update_user_role": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "UUID of the workspace to update the role in"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user whose role to update"
+        },
+        "newRole": {
+          "type": "string",
+          "description": "The new role to assign (e.g., \"admin\", \"builder\", \"end-user\")"
+        }
+      },
+      "required": ["workspaceId", "email", "newRole"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the role update was successful"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "list_workspaces": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {}
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workspaceId": {
+                "type": "string",
+                "description": "UUID of the workspace"
+              },
+              "workspaceName": {
+                "type": "string",
+                "description": "Name of the workspace"
+              },
+              "status": {
+                "type": "string",
+                "description": "Status of the workspace"
+              },
+              "groups": {
+                "description": "Groups available in the workspace",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "groupId": {
+                      "type": "string",
+                      "description": "ID of the group"
+                    },
+                    "groupName": {
+                      "type": "string",
+                      "description": "Name of the group"
+                    }
+                  },
+                  "required": ["groupId", "groupName"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["workspaceId", "workspaceName", "status"],
+            "additionalProperties": false
+          },
+          "description": "List of workspaces"
+        }
+      },
+      "required": ["workspaces"],
+      "additionalProperties": false
+    }
+  },
+  "manage_user_workspaces": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UUID of the user whose workspace relations to manage"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["replaceAll", "updateOne"],
+          "description": "Operation mode: replaceAll replaces all workspace relations, updateOne updates a single relation"
+        },
+        "workspaces": {
+          "description": "Workspace relations to set (used with replaceAll mode)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workspaceId": {
+                "type": "string",
+                "description": "UUID of the workspace"
+              },
+              "workspaceName": {
+                "description": "Name of the workspace",
+                "type": "string"
+              },
+              "status": {
+                "description": "User status in this workspace",
+                "type": "string",
+                "enum": ["active", "archived"]
+              },
+              "groups": {
+                "description": "Groups to assign the user to",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "groupName": {
+                      "type": "string",
+                      "description": "Name of the group"
+                    },
+                    "groupId": {
+                      "description": "ID of the group (optional)",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["groupName"]
+                }
+              }
+            },
+            "required": ["workspaceId"]
+          }
+        },
+        "targetWorkspaceId": {
+          "description": "UUID of the specific workspace to update (used with updateOne mode)",
+          "type": "string"
+        },
+        "updateStatus": {
+          "description": "New status for the workspace relation (used with updateOne mode)",
+          "type": "string",
+          "enum": ["active", "archived"]
+        },
+        "updateGroups": {
+          "description": "New group assignments (used with updateOne mode)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "groupName": {
+                "type": "string",
+                "description": "Name of the group"
+              },
+              "groupId": {
+                "description": "ID of the group (optional)",
+                "type": "string"
+              }
+            },
+            "required": ["groupName"]
+          }
+        }
+      },
+      "required": ["userId", "mode"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the operation was successful"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "list_apps": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "UUID of the workspace to list apps from"
+        }
+      },
+      "required": ["workspaceId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "apps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "appId": {
+                "type": "string",
+                "description": "UUID of the application"
+              },
+              "appName": {
+                "type": "string",
+                "description": "Name of the application"
+              },
+              "slug": {
+                "type": "string",
+                "description": "URL slug of the application"
+              },
+              "versions": {
+                "description": "Available versions of the application",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "versionId": {
+                      "type": "string",
+                      "description": "ID of the app version"
+                    },
+                    "versionName": {
+                      "type": "string",
+                      "description": "Name of the app version"
+                    }
+                  },
+                  "required": ["versionId", "versionName"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["appId", "appName", "slug"],
+            "additionalProperties": false
+          },
+          "description": "List of applications in the workspace"
+        }
+      },
+      "required": ["apps"],
+      "additionalProperties": false
+    }
+  },
+  "export_app": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "UUID of the workspace containing the application"
+        },
+        "appId": {
+          "type": "string",
+          "description": "UUID of the application to export"
+        },
+        "exportTJDB": {
+          "default": false,
+          "description": "Whether to include ToolJet Database data in the export",
+          "type": "boolean"
+        },
+        "appVersion": {
+          "description": "Specific version name to export (e.g., \"v1\")",
+          "type": "string"
+        },
+        "exportAllVersions": {
+          "default": false,
+          "description": "Whether to export all versions of the application",
+          "type": "boolean"
+        }
+      },
+      "required": ["workspaceId", "appId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "exportData": {
+          "description": "The full exported application JSON"
+        },
+        "tooljetVersion": {
+          "description": "ToolJet version used for the export",
+          "type": "string"
+        }
+      },
+      "required": ["exportData"],
+      "additionalProperties": false
+    }
+  },
+  "import_app": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "UUID of the target workspace to import the application into"
+        },
+        "appName": {
+          "description": "Custom name for the imported application (overrides the original name)",
+          "type": "string"
+        },
+        "exportData": {
+          "description": "The full application JSON data from a previous export"
+        }
+      },
+      "required": ["workspaceId", "exportData"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the import was successful"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "trigger_workflow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "Unique ID of the workflow to trigger"
+        },
+        "workflowToken": {
+          "type": "string",
+          "description": "Bearer token for the workflow webhook (found in the workflow Triggers tab)"
+        },
+        "parameters": {
+          "description": "Key-value parameters to pass to the workflow",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["workflowId", "workflowToken"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "response": {
+          "description": "Response from the workflow execution"
+        }
+      },
+      "required": ["response"],
+      "additionalProperties": false
+    }
+  }
+}

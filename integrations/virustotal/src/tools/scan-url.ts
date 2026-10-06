@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let scanUrl = SlateTool.create(spec, {
   name: 'Scan URL',
   key: 'scan_url',
-  description: `Submit a URL for scanning by VirusTotal's 70+ URL scanners and blocklists. Returns an analysis ID that can be used to retrieve scan results once complete.`,
+  description: `Submit a URL for scanning by VirusTotal's partnered URL scanners and blocklists. Returns an analysis ID that can be used to retrieve scan results once complete.`,
   constraints: ['Public API users are limited to 4 requests per minute.'],
   tags: {
     destructive: false,
@@ -26,12 +27,13 @@ export let scanUrl = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    let client = new Client(ctx.auth);
     let result = await client.scanUrl(ctx.input.url);
 
     return {
       output: {
-        analysisId: result?.id ?? '',
+        analysisId: result.id,
         analysisType: result?.type ?? 'analysis',
         selfLink: result?.links?.self
       },

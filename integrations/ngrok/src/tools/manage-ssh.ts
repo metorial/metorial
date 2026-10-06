@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import type { SSHCertificateAuthority, SSHCredential } from '../lib/models';
 import { spec } from '../spec';
 
 let sshCredentialOutputSchema = z.object({
@@ -10,11 +11,13 @@ let sshCredentialOutputSchema = z.object({
   description: z.string().describe('Description'),
   metadata: z.string().describe('Metadata'),
   publicKey: z.string().describe('SSH public key'),
-  acl: z.array(z.string()).describe('ACL bind rules'),
+  acl: z
+    .array(z.string())
+    .describe('ACL bind rules; omitting ACL grants unrestricted binding'),
   ownerId: z.string().describe('Owner ID')
 });
 
-let mapSshCredential = (c: any) => ({
+let mapSshCredential = (c: SSHCredential) => ({
   sshCredentialId: c.id,
   uri: c.uri || '',
   createdAt: c.created_at || '',
@@ -35,7 +38,7 @@ let sshCaOutputSchema = z.object({
   keyType: z.string().describe('Key type (rsa, ecdsa, ed25519)')
 });
 
-let mapSshCa = (c: any) => ({
+let mapSshCa = (c: SSHCertificateAuthority) => ({
   sshCaId: c.id,
   uri: c.uri || '',
   createdAt: c.created_at || '',
@@ -53,8 +56,17 @@ export let listSshCredentials = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -66,6 +78,7 @@ export let listSshCredentials = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listSshCredentials({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -88,8 +101,11 @@ export let createSshCredential = SlateTool.create(spec, {
       publicKey: z.string().describe('SSH public key (e.g., "ssh-ed25519 AAAA...")'),
       description: z.string().optional().describe('Description (max 255 bytes)'),
       metadata: z.string().optional().describe('Metadata (max 4096 bytes)'),
-      acl: z.array(z.string()).optional().describe('ACL bind rules'),
-      ownerId: z.string().optional().describe('Owner user or bot user ID')
+      acl: z
+        .array(z.string())
+        .optional()
+        .describe('ACL bind rules; omitting ACL grants unrestricted binding'),
+      ownerId: z.string().optional().describe('Owner user or service user ID')
     })
   )
   .output(sshCredentialOutputSchema)
@@ -143,8 +159,17 @@ export let listSshCertificateAuthorities = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -156,6 +181,7 @@ export let listSshCertificateAuthorities = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listSshCertificateAuthorities({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -205,7 +231,7 @@ export let createSshCertificateAuthority = SlateTool.create(spec, {
 export let deleteSshCertificateAuthority = SlateTool.create(spec, {
   name: 'Delete SSH Certificate Authority',
   key: 'delete_ssh_certificate_authority',
-  description: `Delete an SSH certificate authority. Certificates signed by this CA will no longer be valid.`,
+  description: `Delete an SSH certificate authority from this account. Previously signed certificates retain their cryptographic validity until expiry or a trust configuration change.`,
   tags: { destructive: true }
 })
   .input(

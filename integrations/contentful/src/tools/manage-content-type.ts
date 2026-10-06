@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { currentVersion, invalid, resourceId, selection, versionSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let fieldSchema = z.object({
-  fieldId: z.string().describe('Unique field ID (used in API).'),
+  fieldId: resourceId.describe('Unique field ID (used in API).'),
   name: z.string().describe('Display name for the field.'),
   type: z
     .enum([
@@ -50,11 +51,11 @@ export let manageContentType = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...selection,
       action: z
         .enum(['create', 'update', 'activate', 'deactivate', 'delete'])
         .describe('Action to perform on the content type.'),
-      contentTypeId: z
-        .string()
+      contentTypeId: resourceId
         .optional()
         .describe('Content type ID. Required for update, activate, deactivate, and delete.'),
       name: z.string().optional().describe('Display name. Required for create and update.'),
@@ -67,22 +68,21 @@ export let manageContentType = SlateTool.create(spec, {
         .array(fieldSchema)
         .optional()
         .describe('Field definitions. Required for create and update.'),
-      version: z
-        .number()
+      version: versionSchema
         .optional()
         .describe('Current version. Fetched automatically if omitted.')
     })
   )
   .output(
     z.object({
-      contentTypeId: z.string().describe('Content type ID.'),
+      contentTypeId: resourceId.describe('Content type ID.'),
       action: z.string().describe('Action performed.'),
       version: z.number().optional().describe('Version after the action.'),
       name: z.string().optional().describe('Content type name.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
     let { action, contentTypeId } = ctx.input;
 
     let mapFields = (fields: any[]) =>
@@ -102,7 +102,7 @@ export let manageContentType = SlateTool.create(spec, {
     switch (action) {
       case 'create': {
         if (!ctx.input.name || !ctx.input.fields) {
-          throw new Error('name and fields are required for creating a content type');
+          throw invalid('name and fields are required for creating a content type');
         }
         result = await client.createContentType({
           name: ctx.input.name,
@@ -115,14 +115,14 @@ export let manageContentType = SlateTool.create(spec, {
       }
       case 'update': {
         if (!contentTypeId || !ctx.input.name || !ctx.input.fields) {
-          throw new Error(
+          throw invalid(
             'contentTypeId, name, and fields are required for updating a content type'
           );
         }
         let version = ctx.input.version;
-        if (!version) {
+        if (version === undefined) {
           let current = await client.getContentType(contentTypeId);
-          version = current.sys.version;
+          version = currentVersion(current);
         }
         result = await client.updateContentType(
           contentTypeId,
@@ -137,27 +137,27 @@ export let manageContentType = SlateTool.create(spec, {
         break;
       }
       case 'activate': {
-        if (!contentTypeId) throw new Error('contentTypeId is required');
+        if (!contentTypeId) throw invalid('contentTypeId is required');
         let version = ctx.input.version;
-        if (!version) {
+        if (version === undefined) {
           let current = await client.getContentType(contentTypeId);
-          version = current.sys.version;
+          version = currentVersion(current);
         }
         result = await client.publishContentType(contentTypeId, version!);
         break;
       }
       case 'deactivate': {
-        if (!contentTypeId) throw new Error('contentTypeId is required');
+        if (!contentTypeId) throw invalid('contentTypeId is required');
         let version = ctx.input.version;
-        if (!version) {
+        if (version === undefined) {
           let current = await client.getContentType(contentTypeId);
-          version = current.sys.version;
+          version = currentVersion(current);
         }
         result = await client.unpublishContentType(contentTypeId, version!);
         break;
       }
       case 'delete': {
-        if (!contentTypeId) throw new Error('contentTypeId is required');
+        if (!contentTypeId) throw invalid('contentTypeId is required');
         await client.deleteContentType(contentTypeId);
         break;
       }

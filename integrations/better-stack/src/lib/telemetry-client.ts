@@ -1,138 +1,54 @@
-import { createAxios } from 'slates';
-import type { PaginatedResponse } from './client';
+import { createApiServiceError } from 'slates';
+import { BetterStackApi, type ClientOptions, type PageOptions, pathId } from './api';
 
-export class TelemetryClient {
-  private axios: ReturnType<typeof createAxios>;
-
-  constructor(params: { token: string; teamName?: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://telemetry.betterstack.com/api/v2',
-      headers: {
-        Authorization: `Bearer ${params.token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    if (params.teamName) {
-      this.axios.defaults.headers.common['X-Team-Name'] = params.teamName;
-    }
+export type AlertContext = { dashboardId?: string; chartId?: string; explorationId?: string };
+export class TelemetryClient extends BetterStackApi {
+  constructor(options: ClientOptions) {
+    super(options, 'telemetry');
   }
-
-  // ---- Sources ----
-
-  async listSources(params?: {
-    page?: number;
-    perPage?: number;
-    name?: string;
-    platform?: string;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/sources', {
-      params: {
-        page: params?.page,
-        per_page: params?.perPage,
-        name: params?.name,
-        platform: params?.platform
-      }
-    });
-    return response.data;
+  listSources(params?: PageOptions) {
+    return this.page('/v2/sources', params, undefined, 50);
   }
-
-  async getSource(sourceId: string): Promise<any> {
-    let response = await this.axios.get(`/sources/${sourceId}`);
-    return response.data;
+  getSource(id: string) {
+    return this.get(`/v2/sources/${pathId(id)}`);
   }
-
-  async createSource(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/sources', data);
-    return response.data;
+  createSource(body: Record<string, unknown>) {
+    return this.post('/v2/sources', body);
   }
-
-  async updateSource(sourceId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/sources/${sourceId}`, data);
-    return response.data;
+  updateSource(id: string, body: Record<string, unknown>) {
+    return this.patch(`/v2/sources/${pathId(id)}`, body);
   }
-
-  async deleteSource(sourceId: string): Promise<void> {
-    await this.axios.delete(`/sources/${sourceId}`);
+  deleteSource(id: string) {
+    return this.remove(`/v2/sources/${pathId(id)}`);
   }
-
-  // ---- Dashboards ----
-
-  async listDashboards(params?: {
-    page?: number;
-    perPage?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/dashboards', {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+  listDashboards(params?: PageOptions & { query?: string }) {
+    return this.page('/v2/dashboards', params, { query: params?.query });
   }
-
-  async getDashboard(dashboardId: string): Promise<any> {
-    let response = await this.axios.get(`/dashboards/${dashboardId}`);
-    return response.data;
+  getDashboard(id: string) {
+    return this.get(`/v2/dashboards/${pathId(id)}`);
   }
-
-  // ---- Alerts ----
-
-  async listAlerts(params?: {
-    page?: number;
-    perPage?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/alerts', {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+  listAlerts(params?: PageOptions) {
+    return this.page('/v2/alerts', params);
   }
-
-  async getAlert(alertId: string): Promise<any> {
-    let response = await this.axios.get(`/alerts/${alertId}`);
-    return response.data;
+  private alertPath(context: AlertContext) {
+    if (context.explorationId && !context.dashboardId && !context.chartId)
+      return `/v2/explorations/${pathId(context.explorationId)}/alerts`;
+    if (context.dashboardId && context.chartId && !context.explorationId)
+      return `/v2/dashboards/${pathId(context.dashboardId)}/charts/${pathId(context.chartId)}/alerts`;
+    throw createApiServiceError(
+      'Provide explorationId, or both dashboardId and chartId. Call list_dashboards for dashboard and chart identifiers.'
+    );
   }
-
-  async createAlert(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/alerts', data);
-    return response.data;
+  getAlert(id: string) {
+    return this.get(`/v2/alerts/${pathId(id)}`);
   }
-
-  async updateAlert(alertId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/alerts/${alertId}`, data);
-    return response.data;
+  createAlert(body: Record<string, unknown>, context: AlertContext) {
+    return this.post(this.alertPath(context), body, false);
   }
-
-  async deleteAlert(alertId: string): Promise<void> {
-    await this.axios.delete(`/alerts/${alertId}`);
+  updateAlert(id: string, body: Record<string, unknown>) {
+    return this.patch(`/v2/alerts/${pathId(id)}`, body);
   }
-
-  // ---- Source Groups ----
-
-  async listSourceGroups(params?: {
-    page?: number;
-    perPage?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/sources-groups', {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
-  }
-
-  // ---- Connections (Query API credentials) ----
-
-  async listConnections(params?: {
-    page?: number;
-    perPage?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/connections', {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
-  }
-
-  async createConnection(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/connections', data);
-    return response.data;
-  }
-
-  async deleteConnection(connectionId: string): Promise<void> {
-    await this.axios.delete(`/connections/${connectionId}`);
+  deleteAlert(id: string) {
+    return this.remove(`/v2/alerts/${pathId(id)}`);
   }
 }

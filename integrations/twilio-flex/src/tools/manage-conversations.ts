@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConversationsClient } from '../lib/conversations-client';
+import { fail, validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let conversationSchema = z.object({
@@ -19,12 +20,18 @@ export let manageConversationsTool = SlateTool.create(spec, {
   key: 'manage_conversations',
   description: `Create, read, update, delete, or list Twilio Conversations. Conversations are the container for multi-party messaging across channels. Use this to set up new conversation threads, update their state, or retrieve conversation details.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque continuation from nextPageToken; retain the same resource and filters.'
+        ),
       action: z
         .enum(['create', 'get', 'update', 'delete', 'list'])
         .describe('Action to perform'),
@@ -32,6 +39,10 @@ export let manageConversationsTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Conversation SID (required for get/update/delete)'),
+      attributes: z
+        .string()
+        .optional()
+        .describe('Native JSON object of conversation attributes.'),
       friendlyName: z.string().optional().describe('Friendly name'),
       uniqueName: z.string().optional().describe('Unique name'),
       state: z
@@ -46,11 +57,21 @@ export let manageConversationsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Native continuation; omitted when this page is exhausted.'),
+      hasMore: z.boolean().optional().describe('Whether a next page is available.'),
       conversations: z.array(conversationSchema).describe('Conversation records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ConversationsClient(ctx.auth.token);
+    validateInput('manage_conversations', ctx.input);
+    let client = new ConversationsClient(
+      ctx.auth.token,
+      ctx.auth.accountSid,
+      ctx.input.pageToken
+    );
 
     if (ctx.input.action === 'list') {
       let result = await client.listConversations(ctx.input.pageSize);
@@ -65,13 +86,17 @@ export let manageConversationsTool = SlateTool.create(spec, {
         dateUpdated: c.date_updated
       }));
       return {
-        output: { conversations },
+        output: {
+          conversations,
+          nextPageToken: result.nextPageToken,
+          hasMore: result.hasMore
+        },
         message: `Found **${conversations.length}** conversations.`
       };
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.conversationSid) throw new Error('conversationSid is required');
+      if (!ctx.input.conversationSid) throw fail('conversationSid is required');
       let c = await client.getConversation(ctx.input.conversationSid);
       return {
         output: {
@@ -95,6 +120,7 @@ export let manageConversationsTool = SlateTool.create(spec, {
     if (ctx.input.action === 'create') {
       let params: Record<string, string | undefined> = {
         FriendlyName: ctx.input.friendlyName,
+        Attributes: ctx.input.attributes,
         UniqueName: ctx.input.uniqueName,
         State: ctx.input.state,
         MessagingServiceSid: ctx.input.messagingServiceSid,
@@ -122,9 +148,10 @@ export let manageConversationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.conversationSid) throw new Error('conversationSid is required');
+      if (!ctx.input.conversationSid) throw fail('conversationSid is required');
       let params: Record<string, string | undefined> = {
         FriendlyName: ctx.input.friendlyName,
+        Attributes: ctx.input.attributes,
         UniqueName: ctx.input.uniqueName,
         State: ctx.input.state,
         MessagingServiceSid: ctx.input.messagingServiceSid,
@@ -152,7 +179,7 @@ export let manageConversationsTool = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.conversationSid) throw new Error('conversationSid is required');
+    if (!ctx.input.conversationSid) throw fail('conversationSid is required');
     await client.deleteConversation(ctx.input.conversationSid);
     return {
       output: {

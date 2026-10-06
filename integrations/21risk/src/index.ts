@@ -13,13 +13,6 @@ import {
   listRiskModels,
   listSites
 } from './tools';
-import {
-  inboundWebhook,
-  newAuditTrigger,
-  newCorrectiveActionTrigger,
-  newMemberTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -35,5 +28,5 @@ export let provider = Slate.create({
     listPropertyInsuranceItems,
     getCopeData
   ],
-  triggers: [inboundWebhook, newAuditTrigger, newCorrectiveActionTrigger, newMemberTrigger]
+  triggers: []
 });

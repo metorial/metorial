@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,9 +15,11 @@ export let auth = SlateAuth.create()
       token: z.string().describe('Writer API key from AI Studio Admin Settings > API Keys')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('Enter a valid Writer API key.');
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token.trim()
         }
       };
     }

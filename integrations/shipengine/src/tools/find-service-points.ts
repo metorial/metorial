@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let findServicePoints = SlateTool.create(spec, {
@@ -18,7 +18,15 @@ export let findServicePoints = SlateTool.create(spec, {
         .array(
           z.object({
             carrierId: z.string().describe('Carrier ID to search'),
-            serviceCode: z.string().optional().describe('Specific service code')
+            serviceCode: z
+              .string()
+              .optional()
+              .describe('One service code; exclusive with serviceCodes'),
+            serviceCodes: z
+              .array(z.string())
+              .min(1)
+              .optional()
+              .describe('Service codes to search')
           })
         )
         .min(1)
@@ -36,9 +44,12 @@ export let findServicePoints = SlateTool.create(spec, {
         .describe('Structured address to search near'),
       latitude: z.number().optional().describe('Latitude coordinate'),
       longitude: z.number().optional().describe('Longitude coordinate'),
-      radius: z.number().optional().describe('Search radius'),
-      radiusUnit: z.enum(['km', 'mi']).optional().describe('Radius unit'),
-      maxResults: z.number().optional().describe('Maximum number of results')
+      radius: z.number().int().positive().optional().describe('Search radius'),
+      radiusUnit: z
+        .enum(['km', 'mi'])
+        .optional()
+        .describe('Use km. Legacy mi is unsupported by the provider.'),
+      maxResults: z.number().int().positive().optional().describe('Maximum number of results')
     })
   )
   .output(
@@ -48,7 +59,7 @@ export let findServicePoints = SlateTool.create(spec, {
           servicePointId: z.string().describe('Service point ID'),
           carrierCode: z.string().describe('Carrier code'),
           serviceCodes: z.array(z.string()).describe('Supported service codes'),
-          name: z.string().describe('Service point name'),
+          name: z.string().optional().describe('Provider company name for the service point'),
           addressLine1: z.string().describe('Street address'),
           cityLocality: z.string().optional().describe('City'),
           stateProvince: z.string().optional().describe('State/province'),
@@ -64,15 +75,36 @@ export let findServicePoints = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    const coordinates = ctx.input.latitude !== undefined || ctx.input.longitude !== undefined;
+    if (
+      Number(Boolean(ctx.input.addressQuery)) +
+        Number(Boolean(ctx.input.address)) +
+        Number(coordinates) !==
+        1 ||
+      (coordinates && (ctx.input.latitude === undefined || ctx.input.longitude === undefined))
+    )
+      throw createApiServiceError(
+        'Choose exactly one location: addressQuery, address, or both latitude and longitude.'
+      );
+    if (
+      (ctx.input.latitude !== undefined &&
+        (ctx.input.latitude < -90 || ctx.input.latitude > 90)) ||
+      (ctx.input.longitude !== undefined &&
+        (ctx.input.longitude < -180 || ctx.input.longitude > 180))
+    )
+      throw createApiServiceError('Provide valid latitude and longitude coordinates.');
+    if (ctx.input.radiusUnit === 'mi')
+      throw createApiServiceError(
+        'The provider accepts radius in kilometers. Set radiusUnit to km.'
+      );
+    if (ctx.input.providers.some(p => p.serviceCode && p.serviceCodes))
+      throw createApiServiceError('Choose serviceCode or serviceCodes for each provider.');
+    let client = createClient(ctx);
 
     let result = await client.listServicePoints({
       providers: ctx.input.providers.map(p => ({
         carrier_id: p.carrierId,
-        service_code: p.serviceCode
+        service_code: p.serviceCodes ?? (p.serviceCode ? [p.serviceCode] : undefined)
       })),
       address_query: ctx.input.addressQuery,
       address: ctx.input.address
@@ -87,7 +119,6 @@ export let findServicePoints = SlateTool.create(spec, {
       lat: ctx.input.latitude,
       long: ctx.input.longitude,
       radius: ctx.input.radius,
-      radius_unit: ctx.input.radiusUnit,
       max_results: ctx.input.maxResults
     });
 
@@ -95,16 +126,18 @@ export let findServicePoints = SlateTool.create(spec, {
       servicePointId: sp.service_point_id,
       carrierCode: sp.carrier_code,
       serviceCodes: sp.service_codes,
-      name: sp.name,
-      addressLine1: sp.address?.address_line1 ?? '',
-      cityLocality: sp.address?.city_locality,
-      stateProvince: sp.address?.state_province,
-      postalCode: sp.address?.postal_code,
-      countryCode: sp.address?.country_code ?? '',
+      name: sp.company_name,
+      addressLine1: sp.address_line1,
+      cityLocality: sp.city_locality,
+      stateProvince: sp.state_province,
+      postalCode: sp.postal_code,
+      countryCode: sp.country_code,
       latitude: sp.lat,
       longitude: sp.long,
-      distanceKm: sp.distance_in_km,
-      distanceMiles: sp.distance_in_miles,
+      distanceKm:
+        sp.distance_in_meters === undefined ? undefined : sp.distance_in_meters / 1000,
+      distanceMiles:
+        sp.distance_in_meters === undefined ? undefined : sp.distance_in_meters / 1609.344,
       features: sp.features
     }));
 

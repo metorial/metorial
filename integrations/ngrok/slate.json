@@ -1,6 +1,6 @@
 {
   "name": "@metorial/ngrok",
-  "description": "Manage ngrok's globally distributed gateway for secure application connectivity. Create and manage endpoints, tunnels, and traffic routing. Reserve custom domains and TCP addresses for exposing services. Manage TLS certificates, SSH credentials, and certificate authorities for secure connections. Configure IP policies to restrict access with allow/deny CIDR rules. Manage API keys, tunnel authtokens, and bot service accounts. Set up event subscriptions to export audit and traffic logs to destinations like AWS CloudWatch, Kinesis, Firehose, Azure Logs Ingestion, and Datadog. Manage secrets and vaults for sensitive configuration data.",
+  "description": "Manage ngrok cloud endpoints and traffic policies, reserved domains and TCP addresses, connected tunnels and agent sessions, IP policies, TLS certificates, SSH credentials and certificate authorities, API keys, authtokens, bot service accounts, vaults, secrets, and audit or traffic event delivery to supported cloud destinations.",
   "categories": ["apis-and-http-requests", "security"],
   "skills": [
     "manage endpoints and tunnels",
@@ -8,7 +8,7 @@
     "manage TLS certificates",
     "configure IP access policies",
     "manage API keys and authtokens",
-    "manage SSH credentials and certificates",
+    "manage SSH credentials and certificate authorities",
     "configure event log subscriptions",
     "export logs to cloud destinations",
     "manage bot service accounts",

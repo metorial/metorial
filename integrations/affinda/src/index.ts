@@ -20,8 +20,6 @@ import {
   updateDocument,
   uploadDocument
 } from './tools';
-import { documentEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     listDocumentTypes,
     listOrganizations
   ],
-  triggers: [documentEvents]
+  triggers: []
 });

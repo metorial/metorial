@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaveClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,9 +51,14 @@ export let listVendors = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('vendor:read'))
   .input(
     z.object({
-      businessId: z.string().describe('ID of the business to list vendors for'),
+      businessId: z
+        .string()
+        .describe(
+          'ID of the business to list vendors for. Call list_businesses to discover a permitted business ID.'
+        ),
       page: z.number().optional().describe('Page number (starts at 1, default: 1)'),
       pageSize: z.number().optional().describe('Number of results per page (default: 20)')
     })
@@ -70,11 +75,11 @@ export let listVendors = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.listVendors(
       ctx.input.businessId,
-      ctx.input.page || 1,
-      ctx.input.pageSize || 20
+      ctx.input.page ?? 1,
+      ctx.input.pageSize ?? 20
     );
 
-    let vendors = result.items.map((v: any) => ({
+    let vendors = result.items.map(v => ({
       vendorId: v.id,
       name: v.name,
       firstName: v.firstName,

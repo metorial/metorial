@@ -1,329 +1,274 @@
-import { createAxios } from 'slates';
-
-let BASE_URL = 'https://platform.brexapis.com';
-
-export interface PaginatedResponse<T> {
-  next_cursor: string | null;
-  items: T[];
-}
-
-export interface Money {
-  amount: number;
-  currency: string | null;
-}
-
+import { createAuthenticatedAxios } from 'slates';
+import { z } from 'zod';
+import {
+  accountDto,
+  budgetDto,
+  budgetId,
+  cardDto,
+  expenseDto,
+  organizationDto,
+  page,
+  transactionDto,
+  transferDto,
+  userDto,
+  vendorDto
+} from './schemas';
+import { apiError, exact, pageParams, parse, pathId, required } from './validation';
+export type Money = { amount: number; currency: string | null };
+export type BudgetType = 'budget' | 'spend_limit';
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
-
+  private axios;
   constructor(config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+    required(config.token, 'Token');
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.brex.com',
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 30000,
+      maxRedirects: 0,
+      errorAdapter: apiError,
+      paramsSerializer: { indexes: null }
     });
   }
-
-  // ── Users ──
-
-  async listUsers(params?: { cursor?: string; limit?: number; email?: string }) {
-    let response = await this.axios.get('/v2/users', { params });
-    return response.data as PaginatedResponse<any>;
+  private async request<S extends z.ZodType>(
+    method: 'get' | 'post' | 'put' | 'delete',
+    url: string,
+    schema: S,
+    data?: unknown,
+    params?: object,
+    key?: string
+  ): Promise<z.output<S>> {
+    const response = await this.axios.request({
+      method,
+      url,
+      data,
+      params,
+      headers:
+        key === undefined ? undefined : { 'Idempotency-Key': required(key, 'idempotencyKey') }
+    });
+    return parse(schema, response.data);
   }
-
-  async getUser(userId: string) {
-    let response = await this.axios.get(`/v2/users/${userId}`);
-    return response.data;
+  private async detail<S extends z.ZodType<{ id: string }>>(
+    url: string,
+    id: string,
+    schema: S
+  ) {
+    const v = await this.request('get', `${url}/${pathId(id)}`, schema);
+    exact(v.id, id);
+    return v;
   }
-
-  async getUserMe() {
-    let response = await this.axios.get('/v2/users/me');
-    return response.data;
+  listUsers(params?: { cursor?: string; limit?: number; email?: string }) {
+    return this.request(
+      'get',
+      '/v2/users',
+      page(userDto),
+      undefined,
+      pageParams(params ?? {})
+    );
   }
-
-  async inviteUser(userData: {
-    first_name: string;
-    last_name: string;
-    email: string;
-    manager_id?: string;
-    department_id?: string;
-    location_id?: string;
-  }) {
-    let response = await this.axios.post('/v2/users', userData);
-    return response.data;
+  getUser(id: string) {
+    return this.detail('/v2/users', id, userDto);
   }
-
-  async updateUser(userId: string, userData: Record<string, any>) {
-    let response = await this.axios.put(`/v2/users/${userId}`, userData);
-    return response.data;
+  getUserMe() {
+    return this.request('get', '/v2/users/me', userDto);
   }
-
-  async getUserLimit(userId: string) {
-    let response = await this.axios.get(`/v2/users/${userId}/limit`);
-    return response.data;
+  inviteUser(data: object, key?: string, inactive = false) {
+    return this.request(
+      'post',
+      inactive ? '/v2/users/create' : '/v2/users',
+      userDto,
+      data,
+      undefined,
+      key
+    );
   }
-
-  async setUserLimit(userId: string, limitData: { monthly_limit?: Money | null }) {
-    let response = await this.axios.post(`/v2/users/${userId}/limit`, limitData);
-    return response.data;
+  updateUser(id: string, data: object, key?: string) {
+    return this.request('put', `/v2/users/${pathId(id)}`, userDto, data, undefined, key);
   }
-
-  // ── Cards ──
-
-  async listCards(params?: { cursor?: string; limit?: number; user_id?: string }) {
-    let response = await this.axios.get('/v2/cards', { params });
-    return response.data as PaginatedResponse<any>;
+  listCards(params?: { cursor?: string; limit?: number; user_id?: string }) {
+    return this.request(
+      'get',
+      '/v2/cards',
+      page(cardDto),
+      undefined,
+      pageParams(params ?? {})
+    );
   }
-
-  async getCard(cardId: string) {
-    let response = await this.axios.get(`/v2/cards/${cardId}`);
-    return response.data;
+  getCard(id: string) {
+    return this.detail('/v2/cards', id, cardDto);
   }
-
-  async createCard(cardData: Record<string, any>) {
-    let response = await this.axios.post('/v2/cards', cardData);
-    return response.data;
+  createCard(data: object, key: string) {
+    return this.request('post', '/v2/cards', cardDto, data, undefined, key);
   }
-
-  async updateCard(cardId: string, cardData: Record<string, any>) {
-    let response = await this.axios.put(`/v2/cards/${cardId}`, cardData);
-    return response.data;
+  updateCard(id: string, data: object, key?: string) {
+    return this.request('put', `/v2/cards/${pathId(id)}`, cardDto, data, undefined, key);
   }
-
-  async lockCard(cardId: string, reason?: string) {
-    let response = await this.axios.post(`/v2/cards/${cardId}/lock`, { reason });
-    return response.data;
+  lockCard(id: string, reason: string) {
+    return this.request('post', `/v2/cards/${pathId(id)}/lock`, cardDto, { reason });
   }
-
-  async unlockCard(cardId: string) {
-    let response = await this.axios.post(`/v2/cards/${cardId}/unlock`, {});
-    return response.data;
+  unlockCard(id: string) {
+    return this.request('post', `/v2/cards/${pathId(id)}/unlock`, cardDto, {});
   }
-
-  async terminateCard(cardId: string, reason?: string) {
-    let response = await this.axios.post(`/v2/cards/${cardId}/terminate`, { reason });
-    return response.data;
+  terminateCard(id: string, reason: string) {
+    return this.request('post', `/v2/cards/${pathId(id)}/terminate`, cardDto, { reason });
   }
-
-  // ── Departments ──
-
-  async listDepartments(params?: { cursor?: string; limit?: number }) {
-    let response = await this.axios.get('/v2/departments', { params });
-    return response.data as PaginatedResponse<any>;
+  listDepartments(params?: { cursor?: string; limit?: number }) {
+    return this.request(
+      'get',
+      '/v2/departments',
+      page(organizationDto),
+      undefined,
+      pageParams(params ?? {})
+    );
   }
-
-  async getDepartment(departmentId: string) {
-    let response = await this.axios.get(`/v2/departments/${departmentId}`);
-    return response.data;
+  listLocations(params?: { cursor?: string; limit?: number }) {
+    return this.request(
+      'get',
+      '/v2/locations',
+      page(organizationDto),
+      undefined,
+      pageParams(params ?? {})
+    );
   }
-
-  // ── Locations ──
-
-  async listLocations(params?: { cursor?: string; limit?: number }) {
-    let response = await this.axios.get('/v2/locations', { params });
-    return response.data as PaginatedResponse<any>;
-  }
-
-  async getLocation(locationId: string) {
-    let response = await this.axios.get(`/v2/locations/${locationId}`);
-    return response.data;
-  }
-
-  // ── Expenses ──
-
-  async listCardExpenses(params?: {
+  listCardExpenses(params?: {
     cursor?: string;
     limit?: number;
     expand?: string[];
     updated_at_start?: string;
   }) {
-    let queryParams: Record<string, any> = { ...params };
-    if (params?.expand) {
-      queryParams['expand[]'] = params.expand;
-      queryParams.expand = undefined;
-    }
-    let response = await this.axios.get('/v1/expenses/card', { params: queryParams });
-    return response.data as PaginatedResponse<any>;
-  }
-
-  async getCardExpense(expenseId: string, expand?: string[]) {
-    let params: Record<string, any> = {};
-    if (expand) {
-      params['expand[]'] = expand;
-    }
-    let response = await this.axios.get(`/v1/expenses/card/${expenseId}`, { params });
-    return response.data;
-  }
-
-  async updateCardExpense(expenseId: string, expenseData: Record<string, any>) {
-    let response = await this.axios.put(`/v1/expenses/card/${expenseId}`, expenseData);
-    return response.data;
-  }
-
-  // ── Vendors ──
-
-  async listVendors(params?: { cursor?: string; limit?: number }) {
-    let response = await this.axios.get('/v1/vendors', { params });
-    return response.data as PaginatedResponse<any>;
-  }
-
-  async getVendor(vendorId: string) {
-    let response = await this.axios.get(`/v1/vendors/${vendorId}`);
-    return response.data;
-  }
-
-  async createVendor(vendorData: Record<string, any>, idempotencyKey: string) {
-    let response = await this.axios.post('/v1/vendors', vendorData, {
-      headers: { 'Idempotency-Key': idempotencyKey }
+    const { expand, ...rest } = params ?? {};
+    return this.request('get', '/v1/expenses', page(expenseDto), undefined, {
+      ...pageParams(rest, 100),
+      'expand[]': expand?.map(v => (v === 'receipts' ? 'receipts.download_uris' : v)),
+      'expense_type[]': ['CARD']
     });
-    return response.data;
   }
-
-  async updateVendor(vendorId: string, vendorData: Record<string, any>) {
-    let response = await this.axios.put(`/v1/vendors/${vendorId}`, vendorData);
-    return response.data;
-  }
-
-  async deleteVendor(vendorId: string) {
-    await this.axios.delete(`/v1/vendors/${vendorId}`);
-  }
-
-  // ── Transfers ──
-
-  async listTransfers(params?: { cursor?: string; limit?: number }) {
-    let response = await this.axios.get('/v2/transfers', { params });
-    return response.data as PaginatedResponse<any>;
-  }
-
-  async getTransfer(transferId: string) {
-    let response = await this.axios.get(`/v1/transfers/${transferId}`);
-    return response.data;
-  }
-
-  async createTransfer(transferData: Record<string, any>, idempotencyKey: string) {
-    let response = await this.axios.post('/v1/transfers', transferData, {
-      headers: { 'Idempotency-Key': idempotencyKey }
+  async getCardExpense(id: string, expand?: string[]) {
+    const v = await this.request('get', `/v1/expenses/${pathId(id)}`, expenseDto, undefined, {
+      'expand[]': expand?.map(v => (v === 'receipts' ? 'receipts.download_uris' : v))
     });
-    return response.data;
+    exact(v.id, id);
+    return v;
   }
-
-  // ── Budgets ──
-
-  async listBudgets(params?: { cursor?: string; limit?: number }) {
-    let response = await this.axios.get('/v2/budgets', { params });
-    return response.data as PaginatedResponse<any>;
+  updateCardExpense(id: string, data: object) {
+    return this.request('put', `/v1/expenses/card/${pathId(id)}`, expenseDto, data);
   }
-
-  async getBudget(budgetId: string) {
-    let response = await this.axios.get(`/v2/budgets/${budgetId}`);
-    return response.data;
+  listVendors(params?: { cursor?: string; limit?: number }) {
+    return this.request(
+      'get',
+      '/v1/vendors',
+      page(vendorDto),
+      undefined,
+      pageParams(params ?? {})
+    );
   }
-
-  async createBudget(budgetData: Record<string, any>) {
-    let response = await this.axios.post('/v2/budgets', budgetData);
-    return response.data;
+  getVendor(id: string) {
+    return this.detail('/v1/vendors', id, vendorDto);
   }
-
-  async updateBudget(budgetId: string, budgetData: Record<string, any>) {
-    let response = await this.axios.put(`/v2/budgets/${budgetId}`, budgetData);
-    return response.data;
+  createVendor(data: object, key: string) {
+    return this.request('post', '/v1/vendors', vendorDto, data, undefined, key);
   }
-
-  async archiveBudget(budgetId: string) {
-    let response = await this.axios.post(`/v2/budgets/${budgetId}/archive`, {});
-    return response.data;
+  updateVendor(id: string, data: object) {
+    return this.request('put', `/v1/vendors/${pathId(id)}`, vendorDto, data);
   }
-
-  // ── Transactions ──
-
-  async listCardTransactions(params?: {
+  async deleteVendor(id: string) {
+    await this.request('delete', `/v1/vendors/${pathId(id)}`, z.unknown());
+  }
+  listTransfers(params?: { cursor?: string; limit?: number }) {
+    return this.request(
+      'get',
+      '/v2/transfers',
+      page(transferDto),
+      undefined,
+      pageParams(params ?? {})
+    );
+  }
+  getTransfer(id: string) {
+    return this.detail('/v1/transfers', id, transferDto);
+  }
+  createTransfer(data: object, key: string) {
+    return this.request('post', '/v1/transfers', transferDto, data, undefined, key);
+  }
+  listBudgets(params?: { cursor?: string; limit?: number }, type: BudgetType = 'budget') {
+    return this.request(
+      'get',
+      type === 'budget' ? '/v2/budgets' : '/v2/spend_limits',
+      page(budgetDto),
+      undefined,
+      pageParams(params ?? {})
+    );
+  }
+  async getBudget(id: string, type: BudgetType = 'budget') {
+    const v = await this.request(
+      'get',
+      `${type === 'budget' ? '/v2/budgets' : '/v2/spend_limits'}/${pathId(id)}`,
+      budgetDto
+    );
+    exact(budgetId(v), id);
+    return v;
+  }
+  createBudget(data: object, key: string, type: BudgetType = 'budget') {
+    return this.request(
+      'post',
+      type === 'budget' ? '/v2/budgets' : '/v2/spend_limits',
+      budgetDto,
+      data,
+      undefined,
+      key
+    );
+  }
+  updateBudget(id: string, data: object, key: string, type: BudgetType = 'budget') {
+    return this.request(
+      'put',
+      `${type === 'budget' ? '/v2/budgets' : '/v2/spend_limits'}/${pathId(id)}`,
+      budgetDto,
+      data,
+      undefined,
+      key
+    );
+  }
+  async archiveBudget(id: string, type: BudgetType = 'budget') {
+    await this.request(
+      'post',
+      `${type === 'budget' ? '/v2/budgets' : '/v2/spend_limits'}/${pathId(id)}/archive`,
+      z.unknown()
+    );
+  }
+  listCardTransactions(params?: {
     cursor?: string;
     limit?: number;
     user_ids?: string[];
     posted_at_start?: string;
   }) {
-    let queryParams: Record<string, any> = { ...params };
-    if (params?.user_ids) {
-      queryParams['user_ids[]'] = params.user_ids;
-      queryParams.user_ids = undefined;
-    }
-    let response = await this.axios.get('/v2/transactions/card/primary', {
-      params: queryParams
-    });
-    return response.data as PaginatedResponse<any>;
+    return this.request(
+      'get',
+      '/v2/transactions/card/primary',
+      page(transactionDto),
+      undefined,
+      pageParams(params ?? {})
+    );
   }
-
-  async listCashTransactions(
-    accountId: string,
+  listCashTransactions(
+    id: string,
     params?: { cursor?: string; limit?: number; posted_at_start?: string }
   ) {
-    let response = await this.axios.get(`/v2/transactions/cash/${accountId}`, { params });
-    return response.data as PaginatedResponse<any>;
+    return this.request(
+      'get',
+      `/v2/transactions/cash/${pathId(id)}`,
+      page(transactionDto),
+      undefined,
+      pageParams(params ?? {})
+    );
   }
-
-  // ── Accounts ──
-
-  async listCardAccounts() {
-    let response = await this.axios.get('/v2/accounts/card');
-    return response.data as PaginatedResponse<any>;
+  listCardAccounts() {
+    return this.request('get', '/v2/accounts/card', z.array(accountDto));
   }
-
-  async listCashAccounts() {
-    let response = await this.axios.get('/v2/accounts/cash');
-    return response.data as PaginatedResponse<any>;
+  listCashAccounts() {
+    return this.request('get', '/v2/accounts/cash', page(accountDto));
   }
-
-  async getPrimaryCashAccount() {
-    let response = await this.axios.get('/v2/accounts/cash/primary');
-    return response.data;
+  getPrimaryCashAccount() {
+    return this.request('get', '/v2/accounts/cash/primary', accountDto);
   }
-
-  async getCashAccount(accountId: string) {
-    let response = await this.axios.get(`/v2/accounts/cash/${accountId}`);
-    return response.data;
-  }
-
-  // ── Webhooks ──
-
-  async listWebhooks() {
-    let response = await this.axios.get('/v1/webhooks');
-    return response.data as PaginatedResponse<any>;
-  }
-
-  async createWebhook(webhookData: { url: string; event_types: string[] }) {
-    let response = await this.axios.post('/v1/webhooks', webhookData);
-    return response.data;
-  }
-
-  async getWebhook(webhookId: string) {
-    let response = await this.axios.get(`/v1/webhooks/${webhookId}`);
-    return response.data;
-  }
-
-  async updateWebhook(webhookId: string, webhookData: { url: string; event_types: string[] }) {
-    let response = await this.axios.put(`/v1/webhooks/${webhookId}`, webhookData);
-    return response.data;
-  }
-
-  async deleteWebhook(webhookId: string) {
-    await this.axios.delete(`/v1/webhooks/${webhookId}`);
-  }
-
-  // ── Travel ──
-
-  async listTrips(params?: { cursor?: string; limit?: number }) {
-    let response = await this.axios.get('/v1/trips', { params });
-    return response.data as PaginatedResponse<any>;
-  }
-
-  async getTrip(tripId: string) {
-    let response = await this.axios.get(`/v1/trips/${tripId}`);
-    return response.data;
-  }
-
-  async listTripBookings(tripId: string, params?: { cursor?: string; limit?: number }) {
-    let response = await this.axios.get(`/v1/trips/${tripId}/bookings`, { params });
-    return response.data as PaginatedResponse<any>;
+  getCashAccount(id: string) {
+    return this.detail('/v2/accounts/cash', id, accountDto);
   }
 }

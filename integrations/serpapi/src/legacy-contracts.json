@@ -1,0 +1,1759 @@
+{
+  "web_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query string"
+        },
+        "engine": {
+          "default": "google",
+          "description": "Search engine to use",
+          "type": "string",
+          "enum": ["google", "bing", "duckduckgo", "yahoo", "yandex", "baidu", "naver"]
+        },
+        "location": {
+          "description": "Location to simulate search from (e.g., \"Austin, Texas\")",
+          "type": "string"
+        },
+        "language": {
+          "description": "Language code (e.g., \"en\", \"es\", \"fr\")",
+          "type": "string"
+        },
+        "country": {
+          "description": "Country code (e.g., \"us\", \"uk\", \"fr\")",
+          "type": "string"
+        },
+        "numResults": {
+          "description": "Number of results to return per page",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number (0-indexed offset for Google, 1-indexed for others)",
+          "type": "number"
+        },
+        "device": {
+          "description": "Device type to emulate",
+          "type": "string",
+          "enum": ["desktop", "tablet", "mobile"]
+        },
+        "safeSearch": {
+          "description": "Enable safe search filtering",
+          "type": "boolean"
+        },
+        "dateRange": {
+          "description": "Date range filter (e.g., \"d\" for past day, \"w\" for past week, \"m\" for past month, \"y\" for past year)",
+          "type": "string"
+        },
+        "noCache": {
+          "description": "Force fresh results instead of cached",
+          "type": "boolean"
+        }
+      },
+      "required": ["query", "engine"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "searchMetadata": {
+          "type": "object",
+          "properties": {
+            "searchId": {
+              "description": "Unique search identifier",
+              "type": "string"
+            },
+            "status": {
+              "description": "Search status",
+              "type": "string"
+            },
+            "totalResults": {
+              "description": "Total number of results found",
+              "type": "number"
+            },
+            "timeTaken": {
+              "description": "Time taken to process the search in seconds",
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "organicResults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "description": "Position in search results",
+                "type": "number"
+              },
+              "title": {
+                "description": "Title of the result",
+                "type": "string"
+              },
+              "link": {
+                "description": "URL of the result",
+                "type": "string"
+              },
+              "displayedLink": {
+                "description": "Displayed URL",
+                "type": "string"
+              },
+              "snippet": {
+                "description": "Text snippet from the result",
+                "type": "string"
+              },
+              "cachedPageLink": {
+                "description": "Link to cached version",
+                "type": "string"
+              },
+              "source": {
+                "description": "Source name",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Organic search results"
+        },
+        "answerBox": {
+          "description": "Direct answer box if present",
+          "type": "object",
+          "properties": {
+            "type": {
+              "description": "Type of answer box",
+              "type": "string"
+            },
+            "title": {
+              "description": "Title of the answer",
+              "type": "string"
+            },
+            "answer": {
+              "description": "Direct answer text",
+              "type": "string"
+            },
+            "snippet": {
+              "description": "Snippet text",
+              "type": "string"
+            },
+            "link": {
+              "description": "Source URL",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "knowledgeGraph": {
+          "description": "Knowledge graph panel if present",
+          "type": "object",
+          "properties": {
+            "title": {
+              "description": "Knowledge graph title",
+              "type": "string"
+            },
+            "type": {
+              "description": "Entity type",
+              "type": "string"
+            },
+            "description": {
+              "description": "Entity description",
+              "type": "string"
+            },
+            "source": {
+              "description": "Source information"
+            },
+            "imageUrl": {
+              "description": "Image URL",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "relatedSearches": {
+          "description": "Related search suggestions",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "description": "Related search query",
+                "type": "string"
+              },
+              "link": {
+                "description": "Link to related search",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "relatedQuestions": {
+          "description": "People also ask questions",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question": {
+                "description": "People also ask question",
+                "type": "string"
+              },
+              "snippet": {
+                "description": "Answer snippet",
+                "type": "string"
+              },
+              "title": {
+                "description": "Source title",
+                "type": "string"
+              },
+              "link": {
+                "description": "Source link",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["organicResults"],
+      "additionalProperties": false
+    }
+  },
+  "image_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Image search query (required unless using imageUrl for reverse image search)",
+          "type": "string"
+        },
+        "imageUrl": {
+          "description": "URL of an image for reverse image search (Google Lens). When provided, query is optional.",
+          "type": "string"
+        },
+        "engine": {
+          "default": "google_images",
+          "description": "Image search engine to use",
+          "type": "string",
+          "enum": [
+            "google_images",
+            "bing_images",
+            "yahoo_images",
+            "yandex_images",
+            "google_lens"
+          ]
+        },
+        "location": {
+          "description": "Location to simulate search from",
+          "type": "string"
+        },
+        "language": {
+          "description": "Language code (e.g., \"en\")",
+          "type": "string"
+        },
+        "country": {
+          "description": "Country code (e.g., \"us\")",
+          "type": "string"
+        },
+        "device": {
+          "description": "Device type to emulate",
+          "type": "string",
+          "enum": ["desktop", "tablet", "mobile"]
+        },
+        "safeSearch": {
+          "description": "Enable safe search filtering",
+          "type": "boolean"
+        },
+        "pageNumber": {
+          "description": "Page number for pagination (0-indexed)",
+          "type": "number"
+        },
+        "noCache": {
+          "description": "Force fresh results",
+          "type": "boolean"
+        }
+      },
+      "required": ["engine"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "description": "Position in results",
+                "type": "number"
+              },
+              "title": {
+                "description": "Image title",
+                "type": "string"
+              },
+              "link": {
+                "description": "Page URL containing the image",
+                "type": "string"
+              },
+              "source": {
+                "description": "Source website name",
+                "type": "string"
+              },
+              "thumbnailUrl": {
+                "description": "Thumbnail URL",
+                "type": "string"
+              },
+              "originalUrl": {
+                "description": "Original full-size image URL",
+                "type": "string"
+              },
+              "originalWidth": {
+                "description": "Original image width in pixels",
+                "type": "number"
+              },
+              "originalHeight": {
+                "description": "Original image height in pixels",
+                "type": "number"
+              },
+              "isProduct": {
+                "description": "Whether the image is a product",
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Image search results"
+        },
+        "suggestedSearches": {
+          "description": "Suggested related searches",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "description": "Suggested search name",
+                "type": "string"
+              },
+              "link": {
+                "description": "Link to suggested search",
+                "type": "string"
+              },
+              "thumbnailUrl": {
+                "description": "Thumbnail for the suggestion",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["images"],
+      "additionalProperties": false
+    }
+  },
+  "news_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "News search query (required unless using topicToken, storyToken, or publicationToken)",
+          "type": "string"
+        },
+        "engine": {
+          "default": "google_news",
+          "description": "News search engine to use",
+          "type": "string",
+          "enum": ["google_news", "bing_news", "duckduckgo_news"]
+        },
+        "topicToken": {
+          "description": "Google News topic token for browsing specific topics (mutually exclusive with query)",
+          "type": "string"
+        },
+        "storyToken": {
+          "description": "Google News story token for a specific story",
+          "type": "string"
+        },
+        "publicationToken": {
+          "description": "Google News publication token for a specific publication",
+          "type": "string"
+        },
+        "language": {
+          "description": "Language code (e.g., \"en\")",
+          "type": "string"
+        },
+        "country": {
+          "description": "Country code (e.g., \"us\")",
+          "type": "string"
+        },
+        "noCache": {
+          "description": "Force fresh results",
+          "type": "boolean"
+        }
+      },
+      "required": ["engine"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "newsResults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "description": "Position in results",
+                "type": "number"
+              },
+              "title": {
+                "description": "News article title",
+                "type": "string"
+              },
+              "link": {
+                "description": "Article URL",
+                "type": "string"
+              },
+              "snippet": {
+                "description": "Article snippet/summary",
+                "type": "string"
+              },
+              "date": {
+                "description": "Publication date",
+                "type": "string"
+              },
+              "sourceName": {
+                "description": "News source name",
+                "type": "string"
+              },
+              "sourceIcon": {
+                "description": "News source icon URL",
+                "type": "string"
+              },
+              "thumbnailUrl": {
+                "description": "Article thumbnail URL",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "News article results"
+        },
+        "menuLinks": {
+          "description": "Navigation menu links/topics (Google News)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "description": "Topic/menu link title",
+                "type": "string"
+              },
+              "topicToken": {
+                "description": "Token for navigating to this topic",
+                "type": "string"
+              },
+              "serpApiLink": {
+                "description": "SerpApi link for this topic",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["newsResults"],
+      "additionalProperties": false
+    }
+  },
+  "video_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Video search query"
+        },
+        "engine": {
+          "default": "youtube",
+          "description": "Video search engine to use",
+          "type": "string",
+          "enum": ["youtube", "google_videos"]
+        },
+        "language": {
+          "description": "Language code (e.g., \"en\")",
+          "type": "string"
+        },
+        "country": {
+          "description": "Country code (e.g., \"us\")",
+          "type": "string"
+        },
+        "sortBy": {
+          "description": "YouTube sort/filter token (e.g., \"CAI=\" for upload date)",
+          "type": "string"
+        },
+        "noCache": {
+          "description": "Force fresh results",
+          "type": "boolean"
+        }
+      },
+      "required": ["query", "engine"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "videoResults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "description": "Position in results",
+                "type": "number"
+              },
+              "title": {
+                "description": "Video title",
+                "type": "string"
+              },
+              "link": {
+                "description": "Video URL",
+                "type": "string"
+              },
+              "channelName": {
+                "description": "Channel or uploader name",
+                "type": "string"
+              },
+              "channelLink": {
+                "description": "Channel URL",
+                "type": "string"
+              },
+              "publishedDate": {
+                "description": "Publication date",
+                "type": "string"
+              },
+              "views": {
+                "description": "Number of views",
+                "type": "number"
+              },
+              "length": {
+                "description": "Video duration",
+                "type": "string"
+              },
+              "description": {
+                "description": "Video description snippet",
+                "type": "string"
+              },
+              "thumbnailUrl": {
+                "description": "Video thumbnail URL",
+                "type": "string"
+              },
+              "isLive": {
+                "description": "Whether the video is currently live",
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Video search results"
+        },
+        "nextPageToken": {
+          "description": "Token for fetching the next page of results (YouTube)",
+          "type": "string"
+        }
+      },
+      "required": ["videoResults"],
+      "additionalProperties": false
+    }
+  },
+  "shopping_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Product search query"
+        },
+        "engine": {
+          "default": "google_shopping",
+          "description": "Shopping engine to use",
+          "type": "string",
+          "enum": ["google_shopping", "amazon", "walmart", "ebay", "home_depot"]
+        },
+        "location": {
+          "description": "Location for geo-targeted results",
+          "type": "string"
+        },
+        "language": {
+          "description": "Language code",
+          "type": "string"
+        },
+        "country": {
+          "description": "Country code",
+          "type": "string"
+        },
+        "amazonDomain": {
+          "description": "Amazon domain (e.g., \"amazon.co.uk\"). Only used with amazon engine.",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number for pagination (1-indexed for Amazon/Walmart)",
+          "type": "number"
+        },
+        "sortBy": {
+          "description": "Sort order parameter",
+          "type": "string"
+        },
+        "device": {
+          "description": "Device type to emulate",
+          "type": "string",
+          "enum": ["desktop", "tablet", "mobile"]
+        },
+        "noCache": {
+          "description": "Force fresh results",
+          "type": "boolean"
+        }
+      },
+      "required": ["query", "engine"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "products": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "description": "Position in results",
+                "type": "number"
+              },
+              "title": {
+                "description": "Product title",
+                "type": "string"
+              },
+              "link": {
+                "description": "Product URL",
+                "type": "string"
+              },
+              "productId": {
+                "description": "Product identifier (ASIN for Amazon, etc.)",
+                "type": "string"
+              },
+              "price": {
+                "description": "Product price as displayed",
+                "type": "string"
+              },
+              "extractedPrice": {
+                "description": "Numeric price value",
+                "type": "number"
+              },
+              "rating": {
+                "description": "Product rating",
+                "type": "number"
+              },
+              "reviews": {
+                "description": "Number of reviews",
+                "type": "number"
+              },
+              "source": {
+                "description": "Seller/source name",
+                "type": "string"
+              },
+              "thumbnailUrl": {
+                "description": "Product thumbnail URL",
+                "type": "string"
+              },
+              "delivery": {
+                "description": "Delivery information",
+                "type": "string"
+              },
+              "isPrime": {
+                "description": "Whether the product has Prime shipping (Amazon)",
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Product search results"
+        },
+        "totalResults": {
+          "description": "Total number of results found",
+          "type": "number"
+        }
+      },
+      "required": ["products"],
+      "additionalProperties": false
+    }
+  },
+  "maps_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Search query (e.g., \"pizza near me\", \"hotels in Paris\")",
+          "type": "string"
+        },
+        "dataCid": {
+          "description": "Google CID to look up a specific place directly",
+          "type": "string"
+        },
+        "coordinates": {
+          "description": "GPS coordinates in \"@lat,lng,zoom\" format (e.g., \"@40.7455096,-74.0083012,14z\")",
+          "type": "string"
+        },
+        "language": {
+          "description": "Language code (e.g., \"en\")",
+          "type": "string"
+        },
+        "country": {
+          "description": "Country code (e.g., \"us\")",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number for pagination (0-indexed, increments of 20)",
+          "type": "number"
+        },
+        "noCache": {
+          "description": "Force fresh results",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "localResults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "description": "Position in results",
+                "type": "number"
+              },
+              "title": {
+                "description": "Business name",
+                "type": "string"
+              },
+              "placeId": {
+                "description": "Google Place ID",
+                "type": "string"
+              },
+              "dataId": {
+                "description": "Google data ID",
+                "type": "string"
+              },
+              "dataCid": {
+                "description": "Google CID",
+                "type": "string"
+              },
+              "rating": {
+                "description": "Average rating",
+                "type": "number"
+              },
+              "reviewCount": {
+                "description": "Number of reviews",
+                "type": "number"
+              },
+              "price": {
+                "description": "Price level indicator",
+                "type": "string"
+              },
+              "businessType": {
+                "description": "Type of business",
+                "type": "string"
+              },
+              "address": {
+                "description": "Full address",
+                "type": "string"
+              },
+              "phone": {
+                "description": "Phone number",
+                "type": "string"
+              },
+              "website": {
+                "description": "Website URL",
+                "type": "string"
+              },
+              "openState": {
+                "description": "Current open/closed state",
+                "type": "string"
+              },
+              "hours": {
+                "description": "Operating hours summary",
+                "type": "string"
+              },
+              "description": {
+                "description": "Business description",
+                "type": "string"
+              },
+              "latitude": {
+                "description": "GPS latitude",
+                "type": "number"
+              },
+              "longitude": {
+                "description": "GPS longitude",
+                "type": "number"
+              },
+              "thumbnailUrl": {
+                "description": "Business thumbnail URL",
+                "type": "string"
+              },
+              "serviceOptions": {
+                "description": "Available service options",
+                "type": "object",
+                "properties": {
+                  "dineIn": {
+                    "type": "boolean"
+                  },
+                  "takeout": {
+                    "type": "boolean"
+                  },
+                  "delivery": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Local business/place results"
+        },
+        "placeDetails": {
+          "description": "Detailed place information (when looking up a specific place)",
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "placeId": {
+              "type": "string"
+            },
+            "rating": {
+              "type": "number"
+            },
+            "reviewCount": {
+              "type": "number"
+            },
+            "address": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "website": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "hours": {}
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["localResults"],
+      "additionalProperties": false
+    }
+  },
+  "flights_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "departureAirport": {
+          "type": "string",
+          "description": "Departure airport IATA code (e.g., \"JFK\", \"LAX\")"
+        },
+        "arrivalAirport": {
+          "type": "string",
+          "description": "Arrival airport IATA code (e.g., \"LHR\", \"CDG\")"
+        },
+        "outboundDate": {
+          "type": "string",
+          "description": "Outbound date in YYYY-MM-DD format"
+        },
+        "returnDate": {
+          "description": "Return date in YYYY-MM-DD format (omit for one-way)",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Currency code (e.g., \"USD\", \"EUR\")",
+          "type": "string"
+        },
+        "language": {
+          "description": "Language code (e.g., \"en\")",
+          "type": "string"
+        },
+        "country": {
+          "description": "Country code (e.g., \"us\")",
+          "type": "string"
+        },
+        "travelClass": {
+          "description": "Travel class: 1=Economy, 2=Premium Economy, 3=Business, 4=First",
+          "type": "string",
+          "enum": ["1", "2", "3", "4"]
+        },
+        "adults": {
+          "description": "Number of adult passengers",
+          "type": "number"
+        },
+        "stops": {
+          "description": "Max stops: 0=non-stop, 1=up to 1, 2=up to 2, 3=any",
+          "type": "string",
+          "enum": ["0", "1", "2", "3"]
+        },
+        "noCache": {
+          "description": "Force fresh results",
+          "type": "boolean"
+        }
+      },
+      "required": ["departureAirport", "arrivalAirport", "outboundDate"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "bestFlights": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "airline": {
+                "description": "Airline name",
+                "type": "string"
+              },
+              "airlineLogo": {
+                "description": "Airline logo URL",
+                "type": "string"
+              },
+              "departureAirport": {
+                "description": "Departure airport name",
+                "type": "string"
+              },
+              "departureAirportCode": {
+                "description": "Departure airport IATA code",
+                "type": "string"
+              },
+              "departureTime": {
+                "description": "Departure time",
+                "type": "string"
+              },
+              "arrivalAirport": {
+                "description": "Arrival airport name",
+                "type": "string"
+              },
+              "arrivalAirportCode": {
+                "description": "Arrival airport IATA code",
+                "type": "string"
+              },
+              "arrivalTime": {
+                "description": "Arrival time",
+                "type": "string"
+              },
+              "duration": {
+                "description": "Flight duration in minutes",
+                "type": "number"
+              },
+              "stops": {
+                "description": "Number of stops",
+                "type": "number"
+              },
+              "price": {
+                "description": "Price in the local currency",
+                "type": "number"
+              },
+              "tripType": {
+                "description": "Type of trip (round trip, one way)",
+                "type": "string"
+              },
+              "layovers": {
+                "description": "Layover details",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "description": "Layover airport",
+                      "type": "string"
+                    },
+                    "duration": {
+                      "description": "Layover duration in minutes",
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Best flight options"
+        },
+        "otherFlights": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "airline": {
+                "description": "Airline name",
+                "type": "string"
+              },
+              "airlineLogo": {
+                "description": "Airline logo URL",
+                "type": "string"
+              },
+              "departureAirport": {
+                "description": "Departure airport name",
+                "type": "string"
+              },
+              "departureAirportCode": {
+                "description": "Departure airport IATA code",
+                "type": "string"
+              },
+              "departureTime": {
+                "description": "Departure time",
+                "type": "string"
+              },
+              "arrivalAirport": {
+                "description": "Arrival airport name",
+                "type": "string"
+              },
+              "arrivalAirportCode": {
+                "description": "Arrival airport IATA code",
+                "type": "string"
+              },
+              "arrivalTime": {
+                "description": "Arrival time",
+                "type": "string"
+              },
+              "duration": {
+                "description": "Flight duration in minutes",
+                "type": "number"
+              },
+              "stops": {
+                "description": "Number of stops",
+                "type": "number"
+              },
+              "price": {
+                "description": "Price in the local currency",
+                "type": "number"
+              },
+              "tripType": {
+                "description": "Type of trip (round trip, one way)",
+                "type": "string"
+              },
+              "layovers": {
+                "description": "Layover details",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "description": "Layover airport",
+                      "type": "string"
+                    },
+                    "duration": {
+                      "description": "Layover duration in minutes",
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Other available flight options"
+        },
+        "priceInsights": {
+          "description": "Price insight information",
+          "type": "object",
+          "properties": {
+            "lowestPrice": {
+              "description": "Lowest price found",
+              "type": "number"
+            },
+            "priceLevel": {
+              "description": "Price level indicator (low, typical, high)",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["bestFlights", "otherFlights"],
+      "additionalProperties": false
+    }
+  },
+  "scholar_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Search query for academic papers",
+          "type": "string"
+        },
+        "cites": {
+          "description": "Google Scholar result ID to find papers that cite this paper",
+          "type": "string"
+        },
+        "authorId": {
+          "description": "Google Scholar author ID to retrieve author profile and publications",
+          "type": "string"
+        },
+        "yearLow": {
+          "description": "Filter results from this year onward",
+          "type": "number"
+        },
+        "yearHigh": {
+          "description": "Filter results up to this year",
+          "type": "number"
+        },
+        "language": {
+          "description": "Language code (e.g., \"en\")",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number (0-indexed, each page has ~10 results)",
+          "type": "number"
+        },
+        "sortByDate": {
+          "description": "Sort results by date instead of relevance",
+          "type": "boolean"
+        },
+        "noCache": {
+          "description": "Force fresh results",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "scholarResults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "description": "Position in results",
+                "type": "number"
+              },
+              "title": {
+                "description": "Paper title",
+                "type": "string"
+              },
+              "link": {
+                "description": "Paper URL",
+                "type": "string"
+              },
+              "resultId": {
+                "description": "Google Scholar result ID",
+                "type": "string"
+              },
+              "snippet": {
+                "description": "Paper abstract snippet",
+                "type": "string"
+              },
+              "publicationInfo": {
+                "description": "Publication information summary",
+                "type": "string"
+              },
+              "authors": {
+                "description": "Paper authors",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "authorId": {
+                      "type": "string"
+                    },
+                    "link": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "citedByCount": {
+                "description": "Number of citations",
+                "type": "number"
+              },
+              "citedByLink": {
+                "description": "Link to citing papers",
+                "type": "string"
+              },
+              "year": {
+                "description": "Publication year",
+                "type": "string"
+              },
+              "pdfLink": {
+                "description": "Direct link to PDF if available",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Academic paper results"
+        },
+        "authorProfile": {
+          "description": "Author profile information (when searching by authorId)",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "affiliations": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "citedBy": {
+              "type": "number"
+            },
+            "interests": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "link": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "totalResults": {
+          "description": "Total number of results",
+          "type": "number"
+        }
+      },
+      "required": ["scholarResults"],
+      "additionalProperties": false
+    }
+  },
+  "google_trends": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Search term to analyze trends for (required unless fetching trending searches)",
+          "type": "string"
+        },
+        "dataType": {
+          "default": "interest_over_time",
+          "description": "Type of trends data to retrieve",
+          "type": "string",
+          "enum": [
+            "interest_over_time",
+            "compared_breakdown_by_region",
+            "related_queries",
+            "related_topics",
+            "trending_now"
+          ]
+        },
+        "geo": {
+          "description": "Geographic filter (e.g., \"US\", \"GB\", \"US-CA\" for California)",
+          "type": "string"
+        },
+        "category": {
+          "description": "Google Trends category ID",
+          "type": "number"
+        },
+        "timeRange": {
+          "description": "Time range (e.g., \"today 12-m\" for past 12 months, \"today 5-y\" for past 5 years, \"2020-01-01 2023-12-31\" for custom range)",
+          "type": "string"
+        },
+        "language": {
+          "description": "Language code",
+          "type": "string"
+        },
+        "noCache": {
+          "description": "Force fresh results",
+          "type": "boolean"
+        }
+      },
+      "required": ["dataType"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "interestOverTime": {
+          "description": "Interest over time data points",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "description": "Date of the data point",
+                "type": "string"
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "query": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "number"
+                    },
+                    "extractedValue": {
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "interestByRegion": {
+          "description": "Interest by region/subregion",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              },
+              "extractedValue": {
+                "type": "number"
+              },
+              "maxValueIndex": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "relatedQueries": {
+          "description": "Related search queries",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
+              "extractedValue": {
+                "type": "number"
+              },
+              "link": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "relatedTopics": {
+          "description": "Related topics",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
+              "extractedValue": {
+                "type": "number"
+              },
+              "link": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "trendingSearches": {
+          "description": "Currently trending searches",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              },
+              "link": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "jobs_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Job search query (e.g., \"software engineer\", \"marketing manager\")"
+        },
+        "location": {
+          "description": "Location to search in (e.g., \"New York, NY\")",
+          "type": "string"
+        },
+        "language": {
+          "description": "Language code (e.g., \"en\")",
+          "type": "string"
+        },
+        "country": {
+          "description": "Country code (e.g., \"us\")",
+          "type": "string"
+        },
+        "chips": {
+          "description": "Filter chips for refining results (e.g., date posted, job type)",
+          "type": "string"
+        },
+        "startIndex": {
+          "description": "Start index for pagination (increments of 10)",
+          "type": "number"
+        },
+        "noCache": {
+          "description": "Force fresh results",
+          "type": "boolean"
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "description": "Job title",
+                "type": "string"
+              },
+              "companyName": {
+                "description": "Company name",
+                "type": "string"
+              },
+              "location": {
+                "description": "Job location",
+                "type": "string"
+              },
+              "link": {
+                "description": "Job listing URL",
+                "type": "string"
+              },
+              "description": {
+                "description": "Job description snippet",
+                "type": "string"
+              },
+              "via": {
+                "description": "Job board source (e.g., \"via LinkedIn\", \"via Indeed\")",
+                "type": "string"
+              },
+              "detectedExtensions": {
+                "description": "Detected job details",
+                "type": "object",
+                "properties": {
+                  "postedAt": {
+                    "description": "When the job was posted",
+                    "type": "string"
+                  },
+                  "schedule": {
+                    "description": "Work schedule (e.g., \"Full-time\", \"Part-time\")",
+                    "type": "string"
+                  },
+                  "salary": {
+                    "description": "Salary information",
+                    "type": "string"
+                  },
+                  "workFromHome": {
+                    "description": "Whether remote work is available",
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "thumbnailUrl": {
+                "description": "Company logo URL",
+                "type": "string"
+              },
+              "jobId": {
+                "description": "Google Jobs job ID for detailed lookup",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Job listing results"
+        },
+        "chipsFilters": {
+          "description": "Available filter chips for refining search",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "description": "Filter type",
+                "type": "string"
+              },
+              "options": {
+                "description": "Filter options",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["jobs"],
+      "additionalProperties": false
+    }
+  },
+  "autocomplete": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Partial search query to get suggestions for"
+        },
+        "language": {
+          "description": "Language code (e.g., \"en\")",
+          "type": "string"
+        },
+        "country": {
+          "description": "Country code (e.g., \"us\")",
+          "type": "string"
+        },
+        "noCache": {
+          "description": "Force fresh results",
+          "type": "boolean"
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "description": "Suggested query text",
+                "type": "string"
+              },
+              "type": {
+                "description": "Suggestion type (e.g., \"regular\", \"entity\")",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Autocomplete suggestions"
+        }
+      },
+      "required": ["suggestions"],
+      "additionalProperties": false
+    }
+  },
+  "locations_lookup": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Location search query (e.g., \"Austin\", \"London\", \"Tokyo\")"
+        },
+        "limit": {
+          "description": "Maximum number of results to return (max 10)",
+          "type": "number"
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "locationId": {
+                "description": "SerpApi location ID",
+                "type": "number"
+              },
+              "googleId": {
+                "description": "Google location ID",
+                "type": "number"
+              },
+              "name": {
+                "description": "Location display name",
+                "type": "string"
+              },
+              "canonicalName": {
+                "description": "Full hierarchical name (e.g., \"Austin,Texas,United States\")",
+                "type": "string"
+              },
+              "countryCode": {
+                "description": "ISO country code",
+                "type": "string"
+              },
+              "targetType": {
+                "description": "Location type (e.g., \"DMA Region\", \"City\", \"Country\")",
+                "type": "string"
+              },
+              "reach": {
+                "description": "Audience size for this location",
+                "type": "number"
+              },
+              "gpsCoordinates": {
+                "description": "Latitude and longitude coordinates",
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Matching locations"
+        }
+      },
+      "required": ["locations"],
+      "additionalProperties": false
+    }
+  },
+  "account_info": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "description": "Account identifier",
+          "type": "string"
+        },
+        "accountEmail": {
+          "description": "Account email address",
+          "type": "string"
+        },
+        "planName": {
+          "description": "Current subscription plan name",
+          "type": "string"
+        },
+        "planMonthlyPrice": {
+          "description": "Monthly plan price",
+          "type": "number"
+        },
+        "searchesPerMonth": {
+          "description": "Monthly search allowance",
+          "type": "number"
+        },
+        "planSearchesLeft": {
+          "description": "Remaining searches in current plan",
+          "type": "number"
+        },
+        "extraCredits": {
+          "description": "Additional purchased credits",
+          "type": "number"
+        },
+        "totalSearchesLeft": {
+          "description": "Total available searches",
+          "type": "number"
+        },
+        "thisMonthUsage": {
+          "description": "Searches used this month",
+          "type": "number"
+        },
+        "lastHourSearches": {
+          "description": "Searches in the past hour",
+          "type": "number"
+        },
+        "rateLimitPerHour": {
+          "description": "Hourly rate limit",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

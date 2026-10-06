@@ -26,8 +26,6 @@ import {
   updateProposal,
   updateSection
 } from './tools';
-import { clientEvents, proposalEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -56,5 +54,5 @@ export let provider = Slate.create({
     listActivities,
     getAccount
   ],
-  triggers: [proposalEvents, clientEvents]
+  triggers: []
 });

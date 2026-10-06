@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -11,7 +11,11 @@ export let listUsers = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      email: z.string().optional().describe('Filter account users by email address')
+    })
+  )
   .output(
     z.object({
       users: z
@@ -26,10 +30,10 @@ export let listUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
-    let result = await client.listUsers();
-    let users = (result?.result?.users || result?.result || []).map((u: any) => ({
+    let result = await client.listUsers(ctx.input.email);
+    let users = result.result.users.map(u => ({
       userId: u.id,
       username: u.username,
       email: u.email

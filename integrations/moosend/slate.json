@@ -1,6 +1,6 @@
 {
   "name": "@metorial/moosend",
-  "description": "Create, send, and manage email marketing campaigns including regular, RSS, A/B testing, and transactional emails. Manage mailing lists, subscribers, custom fields, and segments. Add or remove subscribers, unsubscribe users, and bulk remove contacts. Create audience segments with criteria for targeted campaigns. Send transactional emails with dynamic personalized content. Retrieve campaign analytics including opens, clicks, complaints, and unsubscribes.",
+  "description": "Create and manage draft campaigns, discover verified senders, inspect campaign analytics, and manage email lists, subscribers, custom fields and segments. Send campaign or transactional messages to authorized audiences, with partial acceptance receipts and explicit subscription effects.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "create email campaigns",
@@ -12,7 +12,8 @@
     "manage custom fields",
     "schedule campaign delivery",
     "run A/B tests",
-    "bulk remove subscribers"
+    "bulk remove subscribers",
+    "discover verified senders"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/moosend.png"
 }

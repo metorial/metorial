@@ -1,163 +1,96 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
 import {
+  documentInput,
   documentOutputSchema,
-  lineItemInputSchema,
-  mapDocumentOutput,
-  mapLineItemInput
+  mapDocumentInput,
+  mapDocumentOutput
 } from '../lib/schemas';
-import { spec } from '../spec';
+import { tool } from '../lib/tool';
+import {
+  date,
+  dateInput,
+  idInput,
+  pageInput,
+  pageOutput,
+  safeInteger
+} from '../lib/validation';
 
-export let listEstimates = SlateTool.create(spec, {
+export const listEstimates = tool({
   name: 'List Estimates',
   key: 'list_estimates',
-  description: `Retrieve a list of estimates (quotes/proformas) from Quaderno. Estimates can later be converted to invoices.`,
-  tags: { readOnly: true }
-})
-  .input(
-    z.object({
-      query: z.string().optional().describe('Search query to filter estimates'),
-      page: z.number().optional().describe('Page number for pagination')
-    })
-  )
-  .output(
-    z.object({
-      estimates: z.array(documentOutputSchema)
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let result = await client.listEstimates({
-      q: ctx.input.query,
-      page: ctx.input.page
-    });
-
-    let estimates = (Array.isArray(result) ? result : []).map(mapDocumentOutput);
-
-    return {
-      output: { estimates },
-      message: `Found **${estimates.length}** estimate(s)`
-    };
+  description:
+    'List a cursor page of estimates. Date accepts a single day or start,end range.',
+  readOnly: true,
+  input: {
+    ...pageInput,
+    query: z.string().optional(),
+    date: z.string().optional(),
+    state: z.enum(['outstanding', 'accepted', 'declined', 'invoiced', 'late']).optional(),
+    contactId: idInput.optional()
+  },
+  output: { estimates: z.array(documentOutputSchema), ...pageOutput },
+  run: async (input, client) => ({
+    estimates: (
+      await client.list('proformas', input, {
+        q: input.query,
+        date: input.date,
+        state: input.state,
+        contact: input.contactId
+      })
+    ).map(mapDocumentOutput),
+    ...client.pagination
   })
-  .build();
-
-export let getEstimate = SlateTool.create(spec, {
+});
+export const getEstimate = tool({
   name: 'Get Estimate',
   key: 'get_estimate',
-  description: `Retrieve a single estimate by ID from Quaderno.`,
-  tags: { readOnly: true }
-})
-  .input(
-    z.object({
-      estimateId: z.string().describe('ID of the estimate to retrieve')
-    })
-  )
-  .output(documentOutputSchema)
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let doc = await client.getEstimate(ctx.input.estimateId);
-
-    return {
-      output: mapDocumentOutput(doc),
-      message: `Retrieved estimate **#${doc.number || doc.id}** — Total: ${doc.total} ${doc.currency || ''}`
-    };
-  })
-  .build();
-
-export let createEstimate = SlateTool.create(spec, {
+  description: 'Retrieve one estimate and its provider-calculated amounts.',
+  readOnly: true,
+  input: { estimateId: idInput },
+  output: documentOutputSchema.shape,
+  run: async (input, client) =>
+    mapDocumentOutput(await client.get('proformas', input.estimateId))
+});
+export const createEstimate = tool({
   name: 'Create Estimate',
   key: 'create_estimate',
-  description: `Create a new estimate (quote/proforma) in Quaderno. Estimates can be sent to clients and later converted to invoices.`,
-  tags: { destructive: false }
-})
-  .input(
-    z.object({
-      contactId: z.string().describe('ID of the contact to send the estimate to'),
-      currency: z.string().optional().describe('Currency code'),
-      issueDate: z.string().optional().describe('Issue date in YYYY-MM-DD format'),
-      subject: z.string().optional().describe('Subject line'),
-      notes: z.string().optional().describe('Notes'),
-      poNumber: z.string().optional().describe('Purchase order number'),
-      tag: z.string().optional().describe('Tag for categorization'),
-      items: z.array(lineItemInputSchema).min(1).describe('Line items for the estimate')
-    })
-  )
-  .output(documentOutputSchema)
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-
-    let data: Record<string, any> = {
-      contact_id: ctx.input.contactId,
-      items_attributes: ctx.input.items.map(mapLineItemInput)
-    };
-
-    if (ctx.input.currency) data.currency = ctx.input.currency;
-    if (ctx.input.issueDate) data.issue_date = ctx.input.issueDate;
-    if (ctx.input.subject) data.subject = ctx.input.subject;
-    if (ctx.input.notes) data.notes = ctx.input.notes;
-    if (ctx.input.poNumber) data.po_number = ctx.input.poNumber;
-    if (ctx.input.tag) data.tag = ctx.input.tag;
-
-    let doc = await client.createEstimate(data);
-
-    return {
-      output: mapDocumentOutput(doc),
-      message: `Created estimate **#${doc.number || doc.id}** for ${doc.total} ${doc.currency || ''}`
-    };
-  })
-  .build();
-
-export let deleteEstimate = SlateTool.create(spec, {
+  description:
+    'Create an estimate using the current proforma API. The provider sets issueDate. The record may be retained because current proforma deletion is not documented.',
+  input: {
+    ...documentInput,
+    validUntil: dateInput.optional(),
+    dueDays: safeInteger.nonnegative().optional()
+  },
+  output: documentOutputSchema.shape,
+  run: async (input, client) => {
+    const data = mapDocumentInput(input, 'proformas');
+    if (input.validUntil !== undefined) data.valid_until = date(input.validUntil);
+    if (input.dueDays !== undefined) data.due_days = input.dueDays;
+    return mapDocumentOutput(await client.create('proformas', data));
+  }
+});
+export const deleteEstimate = tool({
   name: 'Delete Estimate',
   key: 'delete_estimate',
-  description: `Delete an estimate from Quaderno.`,
-  tags: { destructive: true }
-})
-  .input(
-    z.object({
-      estimateId: z.string().describe('ID of the estimate to delete')
-    })
-  )
-  .output(
-    z.object({
-      success: z.boolean().describe('Whether the estimate was successfully deleted')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    await client.deleteEstimate(ctx.input.estimateId);
-
-    return {
-      output: { success: true },
-      message: `Deleted estimate **${ctx.input.estimateId}**`
-    };
-  })
-  .build();
-
-export let deliverEstimate = SlateTool.create(spec, {
+  description:
+    'Compatibility deletion for a legacy estimate ID using the historical estimates route. Current proforma deletion is not documented; do not assume new estimates are deletable.',
+  destructive: true,
+  input: { estimateId: idInput },
+  output: { success: z.boolean() },
+  run: async (input, client) => {
+    await client.remove('estimates', input.estimateId, true);
+    return { success: true };
+  }
+});
+export const deliverEstimate = tool({
   name: 'Deliver Estimate',
   key: 'deliver_estimate',
-  description: `Send an estimate to the client via email.`,
-  tags: { destructive: false }
-})
-  .input(
-    z.object({
-      estimateId: z.string().describe('ID of the estimate to deliver')
-    })
-  )
-  .output(
-    z.object({
-      success: z.boolean().describe('Whether the delivery was initiated')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    await client.deliverEstimate(ctx.input.estimateId);
-
-    return {
-      output: { success: true },
-      message: `Delivered estimate **${ctx.input.estimateId}** to client`
-    };
-  })
-  .build();
+  description:
+    'Ask Quaderno to email the estimate to its contact. This may finalize the record. A successful request confirms initiation, not receipt.',
+  input: { estimateId: idInput },
+  output: { success: z.boolean() },
+  run: async (input, client) => {
+    await client.deliver('proformas', input.estimateId);
+    return { success: true };
+  }
+});

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listLabels = SlateTool.create(spec, {
@@ -28,9 +28,26 @@ export let listLabels = SlateTool.create(spec, {
         .optional()
         .describe('Filter by creation date start (ISO 8601)'),
       createdAtEnd: z.string().optional().describe('Filter by creation date end (ISO 8601)'),
-      page: z.number().optional().describe('Page number (default 1)'),
-      pageSize: z.number().optional().describe('Results per page (default 25, max 200)'),
-      sortBy: z.enum(['created_at', 'ship_date']).optional().describe('Sort field'),
+      page: z
+        .number()
+        .int()
+        .positive()
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Page number (default 1)'),
+      pageSize: z
+        .number()
+        .int()
+        .positive()
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Results per page (default 25)'),
+      sortBy: z
+        .enum(['created_at', 'ship_date', 'modified_at', 'voided_at'])
+        .optional()
+        .describe(
+          'Sort field. Legacy ship_date is unsupported; choose created_at, modified_at or voided_at.'
+        ),
       sortDir: z.enum(['asc', 'desc']).optional().describe('Sort direction')
     })
   )
@@ -43,28 +60,25 @@ export let listLabels = SlateTool.create(spec, {
         z.object({
           labelId: z.string().describe('Label ID'),
           shipmentId: z.string().describe('Shipment ID'),
-          trackingNumber: z.string().describe('Tracking number'),
+          trackingNumber: z.string().optional().describe('Tracking number'),
           status: z.string().describe('Label status'),
-          carrierId: z.string().describe('Carrier ID'),
-          carrierCode: z.string().describe('Carrier code'),
-          serviceCode: z.string().describe('Service code'),
-          shipDate: z.string().describe('Ship date'),
-          createdAt: z.string().describe('Creation timestamp'),
-          shippingCost: z.number().describe('Shipping cost'),
-          currency: z.string().describe('Currency code'),
-          trackable: z.boolean().describe('Whether the shipment is trackable'),
-          voided: z.boolean().describe('Whether the label has been voided'),
-          labelFormat: z.string().describe('Label format'),
-          labelDownloadUrl: z.string().describe('URL to download the label')
+          carrierId: z.string().optional().describe('Carrier ID'),
+          carrierCode: z.string().optional().describe('Carrier code'),
+          serviceCode: z.string().optional().describe('Service code'),
+          shipDate: z.string().optional().describe('Ship date'),
+          createdAt: z.string().optional().describe('Creation timestamp'),
+          shippingCost: z.number().optional().describe('Shipping cost'),
+          currency: z.string().optional().describe('Currency code'),
+          trackable: z.boolean().optional().describe('Whether the shipment is trackable'),
+          voided: z.boolean().optional().describe('Whether the label has been voided'),
+          labelFormat: z.string().optional().describe('Label format'),
+          labelDownloadUrl: z.string().optional().describe('URL to download the label')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
     let result = await client.listLabels({
       label_status: ctx.input.labelStatus,
@@ -81,7 +95,7 @@ export let listLabels = SlateTool.create(spec, {
       sort_dir: ctx.input.sortDir
     });
 
-    let labels = (result.labels || []).map((l: any) => ({
+    let labels = result.labels.map(l => ({
       labelId: l.label_id,
       shipmentId: l.shipment_id,
       trackingNumber: l.tracking_number,
@@ -91,12 +105,12 @@ export let listLabels = SlateTool.create(spec, {
       serviceCode: l.service_code,
       shipDate: l.ship_date,
       createdAt: l.created_at,
-      shippingCost: l.shipment_cost?.amount ?? 0,
-      currency: l.shipment_cost?.currency ?? 'usd',
+      shippingCost: l.shipment_cost?.amount,
+      currency: l.shipment_cost?.currency,
       trackable: l.trackable,
       voided: l.voided,
       labelFormat: l.label_format,
-      labelDownloadUrl: l.label_download?.href ?? ''
+      labelDownloadUrl: l.label_download?.href
     }));
 
     return {

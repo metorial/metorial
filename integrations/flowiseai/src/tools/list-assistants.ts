@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FlowiseClient } from '../lib/client';
+import { FlowiseClient, parseFlowiseList } from '../lib/client';
 import { spec } from '../spec';
 
 export let listAssistants = SlateTool.create(spec, {
@@ -12,7 +12,11 @@ export let listAssistants = SlateTool.create(spec, {
     destructive: false
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      type: z.string().optional().describe('Assistant type filter: CUSTOM, OPENAI, or AZURE')
+    })
+  )
   .output(
     z.object({
       assistants: z
@@ -44,8 +48,8 @@ export let listAssistants = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let result = await client.listAssistants();
-    let assistants = Array.isArray(result) ? result : [];
+    let result = await client.listAssistants(ctx.input);
+    let { items: assistants } = parseFlowiseList(result);
 
     return {
       output: {

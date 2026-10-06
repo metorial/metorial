@@ -1,5 +1,7 @@
 export * from './copy-move-file';
 export * from './delete-files';
+export * from './download-file';
+export * from './get-bulk-job-status';
 export * from './get-file';
 export * from './get-file-metadata';
 export * from './list-files';

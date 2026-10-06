@@ -22,8 +22,6 @@ import {
   recordPayment,
   reservationAction
 } from './tools';
-import { paymentEvents, reservationEvents, resourceEvents, userEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     listVouchers,
     getSiteInfo
   ],
-  triggers: [reservationEvents, paymentEvents, userEvents, resourceEvents]
+  triggers: []
 });

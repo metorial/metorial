@@ -1,3 +1,4 @@
+export * from './get-account';
 export * from './list-connections';
 export * from './list-connector-types';
 export * from './list-groups';

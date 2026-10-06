@@ -44,8 +44,6 @@ import {
   updatePurchaseOrder,
   updateQuote
 } from './tools';
-import { contactChanges, inboundWebhook, invoiceChanges, paymentChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -92,5 +90,5 @@ export let provider = Slate.create({
     getOrganisation,
     getSettings
   ],
-  triggers: [inboundWebhook, invoiceChanges, contactChanges, paymentChanges]
+  triggers: []
 });

@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .enum(['us', 'eu'])
       .default('us')
       .describe(
-        'RudderStack data plane region. Determines the API base URL: US (api.rudderstack.com) or EU (api.eu.rudderstack.com).'
+        'RudderStack management API region. Determines the API base URL: US (api.rudderstack.com) or EU (api.eu.rudderstack.com).'
       )
   })
 );

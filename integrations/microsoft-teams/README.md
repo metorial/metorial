@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/microsoft-teams.svg" height="20"> Microsoft Teams
 
-Send, read, update, and delete messages in channels and chats. Create and manage teams, channels, and memberships. Schedule and manage online meetings, access call recordings and transcripts. Monitor user presence status in real time. Manage shifts, schedules, and time-off requests for frontline workers. Install and configure apps and tabs within teams. Send activity feed notifications to users. Subscribe to change notifications (webhooks) for messages, chats, teams, channels, memberships, presence, and meeting events. Create and manage tags for @mentioning user groups. Generate usage reports and import historical message data from other platforms.
+Send, read, update, and delete messages in channels and chats. Create and manage teams, channels, and memberships. Schedule and manage online meetings, access call recordings and transcripts. Monitor user presence status in real time. Manage shifts, schedules, and time-off requests for frontline workers. Install and configure apps and tabs within teams. Send activity feed notifications to users. Create and manage tags for @mentioning user groups. Generate usage reports and import historical message data from other platforms.
 
 ## Tools
 

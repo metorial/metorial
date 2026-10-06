@@ -19,6 +19,7 @@ export let listSchedules = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      returnedCount: z.number().int().nonnegative(),
       schedules: z.array(
         z.object({
           scheduleId: z.string(),
@@ -40,7 +41,7 @@ export let listSchedules = SlateTool.create(spec, {
       after: ctx.input.after
     });
 
-    let schedules = result.schedules.map((s: any) => ({
+    let schedules = result.schedules.map(s => ({
       scheduleId: s.id,
       name: s.name,
       timezone: s.timezone || undefined,
@@ -52,6 +53,7 @@ export let listSchedules = SlateTool.create(spec, {
     return {
       output: {
         schedules,
+        returnedCount: schedules.length,
         nextCursor: result.pagination_meta?.after || undefined
       },
       message: `Found **${schedules.length}** schedule(s).`

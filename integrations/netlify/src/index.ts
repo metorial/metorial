@@ -40,8 +40,6 @@ import {
   updateSnippet,
   updateSplitTest
 } from './tools';
-import { deployEvents, formSubmissionEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -84,5 +82,5 @@ export let provider = Slate.create({
     manageSiteMetadata,
     manageSiteFiles
   ],
-  triggers: [deployEvents, formSubmissionEvents]
+  triggers: []
 });

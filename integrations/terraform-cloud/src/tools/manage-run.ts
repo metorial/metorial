@@ -5,6 +5,7 @@ import { spec } from '../spec';
 
 export let manageRunTool = SlateTool.create(spec, {
   name: 'Manage Run',
+  tags: { destructive: true },
   key: 'manage_run',
   description: `Perform an action on an existing Terraform run. Apply a planned run, discard an unapplied plan, cancel a running operation, force-cancel a stuck run, or force-execute a run that is waiting in the queue.`,
   instructions: [
@@ -12,7 +13,7 @@ export let manageRunTool = SlateTool.create(spec, {
     'Use "discard" to discard a plan without applying.',
     'Use "cancel" to cancel an in-progress run gracefully.',
     'Use "force_cancel" to forcefully terminate a stuck run.',
-    'Use "force_execute" to skip the queue and run immediately.'
+    'Use "force_execute" only with explicit approval: it cancels prior incomplete runs, unlocks the workspace and starts the pending run. These actions are asynchronous; get_run reports current state.'
   ]
 })
   .input(
@@ -58,7 +59,7 @@ export let manageRunTool = SlateTool.create(spec, {
         action: ctx.input.action,
         success: true
       },
-      message: `Successfully performed **${ctx.input.action}** on run ${ctx.input.runId}.`
+      message: `Accepted **${ctx.input.action}** on run ${ctx.input.runId}.`
     };
   })
   .build();

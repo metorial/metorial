@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { clientConfig } from '../lib/validation';
 import { spec } from '../spec';
 
 export let duplicateEnvelopeTool = SlateTool.create(spec, {
@@ -19,13 +20,10 @@ export let duplicateEnvelopeTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = new Client(clientConfig(ctx));
 
     let result = await client.duplicateEnvelope(ctx.input.envelopeId);
-    let envelopeId = String(result.id ?? result.envelopeId ?? '');
+    let envelopeId = result.id;
 
     return {
       output: { envelopeId },

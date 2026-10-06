@@ -1,13 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let contextualAnswer = SlateTool.create(spec, {
   name: 'Contextual Answer',
   key: 'contextual_answer',
-  description: `Answer a question based on a provided context document. Returns an answer only if it can be found in the context, preventing hallucination. Returns null if the answer is not in the context.`,
+  description:
+    'DEPRECATED — use `chat_completion` instead. AI21 retired the specialized contextual answers API.',
+  instructions: [
+    'Use chat_completion with task instructions and supplied context, or maestro_run with validation requirements. These APIs do not reproduce the retired response semantics automatically.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true,
     destructive: false
   }
@@ -28,25 +32,9 @@ export let contextualAnswer = SlateTool.create(spec, {
       answerFound: z.boolean().describe('Whether an answer was found in the context')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.contextualAnswer({
-      context: ctx.input.context,
-      question: ctx.input.question
-    });
-
-    let answer = result.answer ?? null;
-
-    return {
-      output: {
-        answerId: result.id,
-        answer: answer ?? undefined,
-        answerFound: answer !== null
-      },
-      message: answer
-        ? `Answer found:\n\n> ${answer}`
-        : 'No answer could be found in the provided context.'
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'AI21 retired the specialized contextual answers API. Use chat_completion with explicit task instructions and context, or maestro_run with validation requirements.'
+    );
   })
   .build();

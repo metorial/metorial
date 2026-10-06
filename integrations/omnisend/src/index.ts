@@ -6,6 +6,7 @@ import {
   createProduct,
   deleteCategory,
   deleteProduct,
+  getBrand,
   getContact,
   getProduct,
   listAutomations,
@@ -13,11 +14,10 @@ import {
   listCategories,
   listContacts,
   listProducts,
+  replaceProduct,
   sendEvent,
   updateContact
 } from './tools';
-import { campaignChanges, contactChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,7 +34,9 @@ export let provider = Slate.create({
     listAutomations,
     listCategories,
     createCategory,
-    deleteCategory
+    deleteCategory,
+    getBrand,
+    replaceProduct
   ],
-  triggers: [inboundWebhook, contactChanges, campaignChanges]
+  triggers: []
 });

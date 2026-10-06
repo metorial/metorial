@@ -38,8 +38,6 @@ import {
   uploadVersion,
   uploadWorkerModule
 } from './tools';
-import { deploymentChanges, inboundWebhook, scriptChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -80,5 +78,5 @@ export let provider = Slate.create({
     queryTelemetry,
     listTelemetryKeys
   ],
-  triggers: [inboundWebhook, scriptChanges, deploymentChanges]
+  triggers: []
 });

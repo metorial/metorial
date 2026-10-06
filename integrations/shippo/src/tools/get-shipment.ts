@@ -30,9 +30,9 @@ export let getShipment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
-    let result = (await client.getShipment(ctx.input.shipmentId)) as Record<string, any>;
+    let result = await client.getShipment(ctx.input.shipmentId);
 
     return {
       output: {

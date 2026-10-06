@@ -14,8 +14,6 @@ import {
   updateTemplate,
   withdrawContract
 } from './tools';
-import { contractEvents, errorEvents, signerEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     deleteTemplate,
     manageCollaborators
   ],
-  triggers: [contractEvents, signerEvents, errorEvents]
+  triggers: []
 });

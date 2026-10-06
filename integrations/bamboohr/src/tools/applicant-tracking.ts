@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getJobListings = SlateTool.create(spec, {
@@ -19,13 +19,10 @@ export let getJobListings = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getJobSummaries();
-    let jobs = data?.jobSummaries || (Array.isArray(data) ? data : []);
+    let jobs = data;
 
     return {
       output: {
@@ -52,9 +49,14 @@ export let getApplications = SlateTool.create(spec, {
       newSince: z
         .string()
         .optional()
-        .describe('Only return applications created since this date (YYYY-MM-DDThh:mm:ssZ)'),
+        .describe(
+          'UTC timestamp in YYYY-MM-DD HH:mm:ss format; an ISO timestamp with timezone is also accepted and converted'
+        ),
       page: z.number().optional().describe('Page number for pagination'),
-      pageLimit: z.number().optional().describe('Number of results per page'),
+      pageLimit: z
+        .number()
+        .optional()
+        .describe('Legacy unsupported parameter; omit it and continue using page'),
       sortBy: z
         .string()
         .optional()
@@ -69,10 +71,7 @@ export let getApplications = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getApplications({
       jobId: ctx.input.jobId,
@@ -84,8 +83,8 @@ export let getApplications = SlateTool.create(spec, {
       sortOrder: ctx.input.sortOrder
     });
 
-    let applications = data?.applications || (Array.isArray(data) ? data : []);
-    let paginationComplete = data?.paginationComplete ?? true;
+    let applications = data.applications;
+    let paginationComplete = data.paginationComplete;
 
     return {
       output: {
@@ -117,10 +116,7 @@ export let getApplicationDetails = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let data = await client.getApplicationDetails(ctx.input.applicationId);
 
@@ -136,7 +132,7 @@ export let getApplicationDetails = SlateTool.create(spec, {
 export let updateApplicationStatus = SlateTool.create(spec, {
   name: 'Update Application Status',
   key: 'update_application_status',
-  description: `Change the status of a job application. Use the **Get Application Statuses** tool to discover valid status IDs.`,
+  description: `Change the status of an exact job application. Use list_resources with resourceType=application_statuses to discover valid active status IDs.`,
   tags: {
     readOnly: false,
     destructive: false
@@ -155,10 +151,7 @@ export let updateApplicationStatus = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     await client.changeApplicationStatus(ctx.input.applicationId, ctx.input.statusId);
 
@@ -193,10 +186,7 @@ export let addApplicationComment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     await client.addApplicationComment(ctx.input.applicationId, ctx.input.comment);
 

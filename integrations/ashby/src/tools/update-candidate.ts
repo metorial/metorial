@@ -1,6 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AshbyClient } from '../lib/client';
+import {
+  contactType,
+  email,
+  id,
+  invalid,
+  pageSchema,
+  row,
+  socialLinks,
+  str,
+  text,
+  warningsSchema
+} from '../lib/contracts';
 import { spec } from '../spec';
 
 export let updateCandidateTool = SlateTool.create(spec, {
@@ -43,96 +55,90 @@ export let updateCandidateTool = SlateTool.create(spec, {
         .describe('Social links to set on the candidate profile'),
       tagId: z.string().optional().describe('Tag ID to add to the candidate'),
       note: z.string().optional().describe('Note text to add to the candidate'),
-      projectId: z.string().optional().describe('Project ID to add the candidate to')
+      projectId: z.string().optional().describe('Project ID to add the candidate to'),
+      sendNotifications: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether profile-update subscribers should be notified. The provider defaults to true; notes are created without subscriber notifications.'
+        )
     })
   )
   .output(
     z.object({
       candidateId: z.string().describe('Candidate ID'),
       name: z.string().describe('Candidate full name'),
-      updatedAt: z.string().describe('Last updated timestamp')
+      updatedAt: z.string().describe('Last updated timestamp'),
+      warnings: warningsSchema,
+      pageInfo: pageSchema.optional(),
+      completedActions: z.array(z.string()).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AshbyClient({ token: ctx.auth.token });
-    let {
-      candidateId,
-      name,
-      email,
-      emailType,
-      phone,
-      phoneType,
-      socialLinks,
-      tagId,
-      note,
-      projectId
-    } = ctx.input;
-
-    // Update profile fields if any are provided
+    const client = new AshbyClient(ctx.auth),
+      input = ctx.input;
+    const candidateId = id(input.candidateId, 'Candidate ID');
+    contactType(input.emailType, input.email, 'email');
+    contactType(input.phoneType, input.phone, 'phoneNumber');
+    const profile = {
+      name: input.name === undefined ? undefined : text(input.name, 'Name'),
+      email: input.email === undefined ? undefined : email(input.email),
+      phoneNumber: input.phone === undefined ? undefined : text(input.phone, 'Phone'),
+      socialLinks:
+        input.socialLinks === undefined ? undefined : socialLinks(input.socialLinks),
+      sendNotifications: input.sendNotifications
+    };
+    const tagId = input.tagId === undefined ? undefined : id(input.tagId, 'Tag ID'),
+      projectId =
+        input.projectId === undefined ? undefined : id(input.projectId, 'Project ID'),
+      note = input.note === undefined ? undefined : text(input.note, 'Note');
+    const steps: { label: string; run: () => Promise<unknown> }[] = [];
     if (
-      name !== undefined ||
-      email !== undefined ||
-      phone !== undefined ||
-      socialLinks !== undefined
-    ) {
-      let updateParams: Record<string, any> = {};
-
-      if (name !== undefined) updateParams.name = name;
-
-      if (email !== undefined) {
-        updateParams.primaryEmailAddress = {
-          value: email,
-          type: emailType || 'Personal',
-          isPrimary: true
-        };
+      Object.entries(profile).some(
+        ([key, value]) => key !== 'sendNotifications' && value !== undefined
+      )
+    )
+      steps.push({
+        label: 'candidate.update',
+        run: () => client.exact('/candidate.update', { candidateId, ...profile }, candidateId)
+      });
+    if (tagId !== undefined)
+      steps.push({
+        label: 'candidate.addTag',
+        run: () => client.post('/candidate.addTag', { candidateId, tagId })
+      });
+    if (note !== undefined)
+      steps.push({
+        label: 'candidate.createNote',
+        run: () =>
+          client.post('/candidate.createNote', { candidateId, note, sendNotifications: false })
+      });
+    if (projectId !== undefined)
+      steps.push({
+        label: 'candidate.addProject',
+        run: () => client.post('/candidate.addProject', { candidateId, projectId })
+      });
+    if (!steps.length) invalid('Provide at least one profile, tag, note or project change.');
+    let candidate: Record<string, unknown> = {};
+    const completedActions = await client.sequence([
+      ...steps,
+      {
+        label: 'candidate.readback',
+        run: async () => {
+          candidate = row((await client.getCandidate(candidateId)).results);
+        }
       }
-
-      if (phone !== undefined) {
-        updateParams.primaryPhoneNumber = {
-          value: phone,
-          type: phoneType || 'Personal',
-          isPrimary: true
-        };
-      }
-
-      if (socialLinks !== undefined) {
-        updateParams.socialLinks = socialLinks;
-      }
-
-      await client.updateCandidate(candidateId, updateParams);
-    }
-
-    // Add tag if provided
-    if (tagId) {
-      await client.addCandidateTag(candidateId, tagId);
-    }
-
-    // Create note if provided
-    if (note) {
-      await client.createCandidateNote(candidateId, note);
-    }
-
-    // Add to project if provided
-    if (projectId) {
-      await client.addCandidateProject(candidateId, projectId);
-    }
-
-    // Fetch the final candidate state
-    let result = await client.getCandidate(candidateId);
-    let candidate = result.results;
-
-    let candidateName =
-      candidate.name ||
-      [candidate.firstName, candidate.lastName].filter(Boolean).join(' ') ||
-      'Unknown';
-
+    ]);
     return {
       output: {
-        candidateId: candidate.id,
-        name: candidateName,
-        updatedAt: candidate.updatedAt || new Date().toISOString()
+        candidateId: str(candidate.id),
+        name: str(candidate.name),
+        updatedAt: str(candidate.updatedAt),
+        warnings: client.warnings,
+        completedActions
       },
-      message: `Updated candidate **${candidateName}** (\`${candidate.id}\`).`
+      message:
+        'Candidate operations accepted and exact state read back. Operations are not atomic; notes and recruiting history may be retained.'
     };
   })
   .build();

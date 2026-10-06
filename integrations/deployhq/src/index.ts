@@ -21,8 +21,6 @@ import {
   listSshCommands,
   updateConfigFile
 } from './tools';
-import { deploymentEvents, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     createSshCommand,
     deleteSshCommand
   ],
-  triggers: [inboundWebhook, deploymentEvents]
+  triggers: []
 });

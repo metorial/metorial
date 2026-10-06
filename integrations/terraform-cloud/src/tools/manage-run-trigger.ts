@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { mapPagination, mapRunTrigger } from '../lib/mappers';
 import { spec } from '../spec';
 
 export let listRunTriggersTool = SlateTool.create(spec, {
@@ -13,11 +14,25 @@ export let listRunTriggersTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('The workspace ID to list run triggers for')
+      workspaceId: z.string().describe('The workspace ID to list run triggers for'),
+      type: z
+        .enum(['inbound', 'outbound'])
+        .optional()
+        .describe('Direction of the dependency; defaults to inbound'),
+      pageNumber: z.number().optional().describe('Positive page number'),
+      pageSize: z.number().optional().describe('Results per page, up to 100')
     })
   )
   .output(
     z.object({
+      pagination: z
+        .object({
+          currentPage: z.number(),
+          totalPages: z.number(),
+          totalCount: z.number(),
+          pageSize: z.number()
+        })
+        .optional(),
       runTriggers: z.array(
         z.object({
           runTriggerId: z.string(),
@@ -30,18 +45,12 @@ export let listRunTriggersTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let response = await client.listRunTriggers(ctx.input.workspaceId);
+    let response = await client.listRunTriggers(ctx.input.workspaceId, ctx.input);
 
-    let runTriggers = (response.data || []).map((d: any) => ({
-      runTriggerId: d.id || '',
-      sourceWorkspaceId: d.relationships?.sourceable?.data?.id || '',
-      sourceWorkspaceName:
-        d.attributes?.['sourceable-name'] || d.relationships?.sourceable?.data?.id || '',
-      createdAt: d.attributes?.['created-at'] || ''
-    }));
+    let runTriggers = response.data.map(mapRunTrigger);
 
     return {
-      output: { runTriggers },
+      output: { runTriggers, pagination: mapPagination(response.meta) },
       message: `Found **${runTriggers.length}** run trigger(s) for workspace ${ctx.input.workspaceId}.`
     };
   })

@@ -20,7 +20,7 @@ export let getTransferTool = SlateTool.create(spec, {
     z.object({
       transferId: z.string().describe('Transfer ID'),
       authorizationId: z.string().describe('Authorization ID'),
-      accountId: z.string().describe('Account ID'),
+      accountId: z.string().optional().describe('Account ID when returned by Plaid'),
       status: z
         .string()
         .describe(
@@ -36,7 +36,12 @@ export let getTransferTool = SlateTool.create(spec, {
         .any()
         .nullable()
         .optional()
-        .describe('Failure reason if failed or returned')
+        .describe('Failure reason if failed or returned'),
+      metadata: z
+        .record(z.string(), z.string())
+        .nullable()
+        .optional()
+        .describe('Transfer metadata when returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -61,7 +66,8 @@ export let getTransferTool = SlateTool.create(spec, {
         network: transfer.network,
         created: transfer.created,
         cancellable: transfer.cancellable,
-        failureReason: transfer.failure_reason ?? null
+        failureReason: transfer.failure_reason ?? null,
+        metadata: transfer.metadata
       },
       message: `Transfer \`${transfer.id}\` — **${transfer.type}** $${transfer.amount} — status: **${transfer.status}**.`
     };

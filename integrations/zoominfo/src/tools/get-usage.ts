@@ -15,17 +15,14 @@ export let getUsage = SlateTool.create(spec, {
   .output(
     z.object({
       usage: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .describe(
           'Usage statistics including credit consumption, API call counts, and remaining allowances'
         )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion
-    });
+    const client = Client.fromContext(ctx);
 
     let result = await client.getUsage();
 

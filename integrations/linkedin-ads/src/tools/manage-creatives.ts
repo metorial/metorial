@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, continuation, urn } from '../lib/client';
+import { accountIdField } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listCreatives = SlateTool.create(spec, {
@@ -12,15 +13,25 @@ export let listCreatives = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('r_ads', 'rw_ads'))
   .input(
     z.object({
       campaignId: z.string().describe('Numeric ID of the campaign'),
-      pageSize: z.number().optional().describe('Number of results per page'),
+      accountId: accountIdField
+        .optional()
+        .describe(
+          'Authorized account ID from list_ad_accounts. Omit only for bounded, unambiguous read-only account discovery.'
+        ),
+      pageSize: z.number().optional().describe('Number of results per page, from 1 to 100'),
       pageToken: z.string().optional().describe('Page token for pagination')
     })
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Continuation token for pageToken with the same filters'),
       creatives: z.array(
         z.object({
           creativeId: z.string().describe('ID of the creative (URN format)'),
@@ -29,7 +40,7 @@ export let listCreatives = SlateTool.create(spec, {
           intendedStatus: z.string().describe('Intended status (ACTIVE, PAUSED, ARCHIVED)'),
           content: z.any().optional().describe('Creative content configuration'),
           servingStatuses: z.array(z.string()).optional().describe('Current serving statuses'),
-          isTest: z.boolean().optional().describe('Whether this is a test creative')
+          isTest: z.boolean().optional().describe('Test flag derived from the parent account')
         })
       )
     })
@@ -38,6 +49,7 @@ export let listCreatives = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.getCreatives(ctx.input.campaignId, {
+      accountId: ctx.input.accountId,
       pageSize: ctx.input.pageSize,
       pageToken: ctx.input.pageToken
     });
@@ -53,7 +65,7 @@ export let listCreatives = SlateTool.create(spec, {
     }));
 
     return {
-      output: { creatives },
+      output: { creatives, nextPageToken: continuation(result) },
       message: `Found **${creatives.length}** creative(s) for campaign ${ctx.input.campaignId}.`
     };
   })
@@ -66,24 +78,31 @@ export let createCreative = SlateTool.create(spec, {
   instructions: [
     'The campaign URN must be in the format "urn:li:sponsoredCampaign:123456".',
     'Content structure depends on the creative type and campaign format.',
-    'For sponsored content, provide a reference to an existing post or inline content.'
+    'For Sponsored Content, provide a reference to an existing post; inline post creation is a separate API operation.'
   ],
   tags: {
     destructive: false,
     readOnly: false
   }
 })
+  .scopes(anyOf('rw_ads'))
   .input(
     z.object({
       campaignId: z.string().describe('Numeric ID of the campaign'),
+      accountId: accountIdField
+        .optional()
+        .describe(
+          'Authorized account ID from list_ad_accounts. Omit only for bounded, unambiguous read-only account discovery.'
+        ),
       intendedStatus: z
-        .enum(['ACTIVE', 'PAUSED', 'ARCHIVED'])
+        .enum(['ACTIVE', 'PAUSED', 'ARCHIVED', 'DRAFT'])
         .default('ACTIVE')
         .describe('Intended status of the creative'),
+      name: z.string().optional().describe('Name for this creative'),
       content: z
         .any()
         .describe('Creative content configuration (format depends on campaign type)'),
-      isTest: z.boolean().optional().describe('Whether this is a test creative')
+      isTest: z.boolean().optional().describe('Test flag derived from the parent account')
     })
   )
   .output(
@@ -94,21 +113,22 @@ export let createCreative = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let data: Record<string, any> = {
-      campaign: `urn:li:sponsoredCampaign:${ctx.input.campaignId}`,
+    let data: Record<string, unknown> = {
+      campaign: urn(ctx.input.campaignId, 'sponsoredCampaign'),
       intendedStatus: ctx.input.intendedStatus,
-      content: ctx.input.content
+      content: ctx.input.content,
+      name: ctx.input.name
     };
 
     if (ctx.input.isTest !== undefined) {
       data.isTest = ctx.input.isTest;
     }
 
-    let creativeId = await client.createCreative(data);
+    let creativeId = await client.createCreative(data, ctx.input.accountId);
 
     return {
       output: { creativeId },
-      message: `Created creative with ID **${creativeId}**.`
+      message: 'LinkedIn confirmed the requested operation.'
     };
   })
   .build();
@@ -116,20 +136,32 @@ export let createCreative = SlateTool.create(spec, {
 export let updateCreative = SlateTool.create(spec, {
   name: 'Update Creative',
   key: 'update_creative',
-  description: `Update an existing ad creative's status or content. Commonly used to activate, pause, or archive creatives.`,
+  description: `Update an existing ad creative's status or name. Commonly used to activate, pause, or archive creatives.`,
   tags: {
     destructive: false,
     readOnly: false
   }
 })
+  .scopes(anyOf('rw_ads'))
   .input(
     z.object({
       creativeId: z.string().describe('ID of the creative to update (URN format)'),
+      accountId: accountIdField
+        .optional()
+        .describe(
+          'Authorized account ID from list_ad_accounts. Omit only for bounded, unambiguous read-only account discovery.'
+        ),
       intendedStatus: z
-        .enum(['ACTIVE', 'PAUSED', 'ARCHIVED'])
+        .enum(['ACTIVE', 'PAUSED', 'ARCHIVED', 'DRAFT'])
         .optional()
         .describe('New intended status'),
-      content: z.any().optional().describe('New content configuration')
+      name: z.string().optional().describe('New creative name'),
+      content: z
+        .any()
+        .optional()
+        .describe(
+          'Legacy content input. Current API cannot replace content references; create a new creative instead'
+        )
     })
   )
   .output(
@@ -140,15 +172,16 @@ export let updateCreative = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let patch: Record<string, any> = {};
+    let patch: Record<string, unknown> = {};
+    if (ctx.input.name !== undefined) patch.name = ctx.input.name;
     if (ctx.input.intendedStatus) patch.intendedStatus = ctx.input.intendedStatus;
-    if (ctx.input.content) patch.content = ctx.input.content;
+    if (ctx.input.content !== undefined) patch.content = ctx.input.content;
 
-    await client.updateCreative(ctx.input.creativeId, { patch });
+    await client.updateCreative(ctx.input.creativeId, { patch }, ctx.input.accountId);
 
     return {
       output: { success: true },
-      message: `Updated creative **${ctx.input.creativeId}** successfully.`
+      message: 'LinkedIn confirmed the requested operation.'
     };
   })
   .build();

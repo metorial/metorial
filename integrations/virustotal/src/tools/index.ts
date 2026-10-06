@@ -2,6 +2,7 @@ export * from './add-comment';
 export * from './add-vote';
 export * from './get-analysis-status';
 export * from './get-comments';
+export * from './get-connection-context';
 export * from './get-domain-report';
 export * from './get-file-report';
 export * from './get-ip-report';

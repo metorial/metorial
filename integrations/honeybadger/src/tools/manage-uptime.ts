@@ -1,10 +1,19 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HoneybadgerClient } from '../lib/client';
+import type { Site } from '../lib/types';
+import { nextUrlSchema, projectIdSchema, requireUpdate } from '../lib/validation';
 import { spec } from '../spec';
 
 let siteSchema = z.object({
-  siteId: z.number().describe('Site ID'),
+  siteId: z
+    .number()
+    .optional()
+    .describe('Legacy numeric ID, only present if the provider returns a number'),
+  siteIdentifier: z
+    .string()
+    .optional()
+    .describe('Uptime site ID (UUID). Use this value in siteId inputs'),
   name: z.string().optional().describe('Site name'),
   url: z.string().optional().describe('URL being monitored'),
   active: z.boolean().optional().describe('Whether the site is being monitored'),
@@ -28,10 +37,11 @@ export let manageUptime = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextUrl: nextUrlSchema,
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete'])
         .describe('Action to perform'),
-      projectId: z.string().describe('Project ID'),
+      projectId: projectIdSchema,
       siteId: z.string().optional().describe('Site ID (required for get, update, delete)'),
       name: z.string().optional().describe('Site name (required for create)'),
       url: z.string().optional().describe('URL to monitor (required for create)'),
@@ -51,13 +61,17 @@ export let manageUptime = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextUrl: z
+        .string()
+        .optional()
+        .describe('Next-page URL, when another page may be available'),
       sites: z.array(siteSchema).optional().describe('List of sites (for list action)'),
       site: siteSchema.optional().describe('Site details (for get/create action)'),
       success: z.boolean().describe('Whether the operation succeeded')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HoneybadgerClient({ token: ctx.auth.token });
+    let client = new HoneybadgerClient(ctx.auth);
     let {
       action,
       projectId,
@@ -72,32 +86,49 @@ export let manageUptime = SlateTool.create(spec, {
       active
     } = ctx.input;
 
-    let mapSite = (s: any) => ({
-      siteId: s.id,
-      name: s.name,
-      url: s.url,
-      active: s.active,
-      frequency: s.frequency,
-      matchType: s.match_type,
-      match: s.match,
-      requestMethod: s.request_method,
-      state: s.state,
-      lastCheckedAt: s.last_checked_at,
-      validateSsl: s.validate_ssl
+    let mapSite = (s: Site) => ({
+      siteId: typeof s.id === 'number' ? s.id : undefined,
+      siteIdentifier: String(s.id),
+      name: s.name ?? undefined,
+      url: s.url ?? undefined,
+      active: s.active ?? undefined,
+      frequency: s.frequency ?? undefined,
+      matchType: s.match_type ?? undefined,
+      match: s.match ?? undefined,
+      requestMethod: s.request_method ?? undefined,
+      state: s.state ?? undefined,
+      lastCheckedAt: s.last_checked_at ?? undefined,
+      validateSsl: s.validate_ssl ?? undefined
     });
 
+    if (frequency !== undefined && ![1, 5, 15].includes(frequency))
+      throw createApiServiceError('frequency must be 1, 5, or 15 minutes.');
+    if (url !== undefined) {
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        throw createApiServiceError('Provide a valid HTTP or HTTPS monitoring URL.');
+      }
+      if (!['http:', 'https:'].includes(parsed.protocol))
+        throw createApiServiceError('Monitoring URLs must use HTTP or HTTPS.');
+    }
+    if (matchType && matchType !== 'success' && action === 'create' && !match)
+      throw createApiServiceError(
+        'match is required for exact, include, and exclude matching.'
+      );
     switch (action) {
       case 'list': {
-        let data = await client.listSites(projectId);
+        let data = await client.listSites(projectId, ctx.input.nextUrl);
         let sites = (data.results || []).map(mapSite);
         return {
-          output: { sites, success: true },
+          output: { sites, nextUrl: data.links?.next ?? undefined, success: true },
           message: `Found **${sites.length}** uptime check(s).`
         };
       }
 
       case 'get': {
-        if (!siteId) throw new Error('siteId is required for get action');
+        if (!siteId) throw createApiServiceError('siteId is required for get action');
         let site = await client.getSite(projectId, siteId);
         return {
           output: { site: mapSite(site), success: true },
@@ -106,7 +137,8 @@ export let manageUptime = SlateTool.create(spec, {
       }
 
       case 'create': {
-        if (!name || !url) throw new Error('name and url are required for create action');
+        if (!name || !url)
+          throw createApiServiceError('name and url are required for create action');
         let created = await client.createSite(projectId, {
           name,
           url,
@@ -124,7 +156,17 @@ export let manageUptime = SlateTool.create(spec, {
       }
 
       case 'update': {
-        if (!siteId) throw new Error('siteId is required for update action');
+        if (!siteId) throw createApiServiceError('siteId is required for update action');
+        requireUpdate(
+          name,
+          url,
+          frequency,
+          matchType,
+          match,
+          requestMethod,
+          validateSsl,
+          active
+        );
         await client.updateSite(projectId, siteId, {
           name,
           url,
@@ -142,7 +184,7 @@ export let manageUptime = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!siteId) throw new Error('siteId is required for delete action');
+        if (!siteId) throw createApiServiceError('siteId is required for delete action');
         await client.deleteSite(projectId, siteId);
         return {
           output: { success: true },
@@ -151,7 +193,7 @@ export let manageUptime = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw createApiServiceError(`Unknown action: ${action}`);
     }
   })
   .build();

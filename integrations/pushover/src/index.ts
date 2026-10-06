@@ -12,8 +12,6 @@ import {
   sendNotification,
   validateUser
 } from './tools';
-import { emergencyAcknowledged } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     listSounds,
     migrateSubscription
   ],
-  triggers: [emergencyAcknowledged]
+  triggers: []
 });

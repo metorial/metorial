@@ -9,8 +9,6 @@ import {
   updateRecord,
   uploadFile
 } from './tools';
-import { inboundWebhook, recordChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     getAppMetadata,
     uploadFile
   ],
-  triggers: [inboundWebhook, recordChanges]
+  triggers: []
 });

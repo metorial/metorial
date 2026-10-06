@@ -31,19 +31,6 @@ import {
   updateTask
 } from './tools';
 
-import {
-  inboundWebhook,
-  newContactTrigger,
-  newContractTrigger,
-  newEmployeeTrigger,
-  newEstimateTrigger,
-  newInvoiceTrigger,
-  newProductTrigger,
-  newProjectTrigger,
-  newTaskTrigger,
-  newTicketTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -75,16 +62,5 @@ export let provider = Slate.create({
     createTimeEntry,
     createExpense
   ],
-  triggers: [
-    inboundWebhook,
-    newContactTrigger,
-    newProjectTrigger,
-    newTaskTrigger,
-    newInvoiceTrigger,
-    newEstimateTrigger,
-    newContractTrigger,
-    newEmployeeTrigger,
-    newTicketTrigger,
-    newProductTrigger
-  ]
+  triggers: []
 });

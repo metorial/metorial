@@ -41,15 +41,6 @@ import {
   updateItemTool
 } from './tools';
 
-import {
-  billEventsTrigger,
-  contactEventsTrigger,
-  customerPaymentEventsTrigger,
-  expenseEventsTrigger,
-  inboundWebhook,
-  invoiceEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -91,12 +82,5 @@ export let provider = Slate.create({
     listSalesOrdersTool,
     createSalesOrderTool
   ],
-  triggers: [
-    inboundWebhook,
-    invoiceEventsTrigger,
-    contactEventsTrigger,
-    expenseEventsTrigger,
-    billEventsTrigger,
-    customerPaymentEventsTrigger
-  ]
+  triggers: []
 });

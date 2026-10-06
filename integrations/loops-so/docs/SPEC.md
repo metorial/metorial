@@ -1,72 +1,31 @@
-Now let me get the full list of webhook events from the Loops webhooks page:# Slates Specification for Loops.so
+# Loops API integration
 
-## Overview
+## Scope
 
-Loops is an email platform designed for SaaS companies that enables sending marketing, product, and transactional emails. It provides contact management, event tracking, mailing list management, and automated email workflows (called "loops") through both a web interface and API.
+Eleven tools cover contact create/update/find/delete, mailing-list subscriptions, property and published-template discovery, event submission, transactional sends, connected-team verification and read-only contact suppression. Campaign/content/workflow authoring, suppression removal and property-definition creation are outside this scope. No incoming trigger or webhook registration is provided.
 
 ## Authentication
 
-Loops uses **API key** authentication via Bearer token.
+An API key from Settings → API is sent as `Authorization: Bearer <key>` to the fixed `https://app.loops.so/api/v1` host. `get_current_team` uses `/api-key` to verify the key and return its team name; this endpoint does not expose a team ID. Keys are team-specific and feature access can vary; no OAuth scope catalog or extra setup identifiers are invented. [API introduction](https://loops.so/docs/api-reference/intro), [API key](https://loops.so/docs/api-reference/api-key).
 
-- Generate an API key from **Settings → API** in your Loops dashboard.
-- Include the key in the `Authorization` header of every request: `Authorization: Bearer <your_api_key>`.
-- The base URL for all API requests is `https://app.loops.so/api/v1/`.
-- API keys are scoped to a team. You can verify a key by making a `GET` request to `/api-key`, which returns the team name if valid.
-- There are no OAuth flows or additional scopes; a single API key grants access to all available API functionality for the team.
+## Contacts and subscriptions
 
-## Features
+`create_contact` requires email and fails when that email exists. `update_contact` is an upsert; email and userId may both identify/update a record. `find_contact` and `delete_contact` require exactly one selector. Lookup returns standard nullable fields, mailing-list status and custom properties; no match is an empty array. Writes require explicit successful provider responses and expose the provider ID. [Create](https://loops.so/docs/api-reference/create-contact), [update](https://loops.so/docs/api-reference/update-contact), [find](https://loops.so/docs/api-reference/find-contact), [delete](https://loops.so/docs/api-reference/delete-contact).
 
-### Contact Management
+Property dictionaries cannot replace reserved identifiers, event/subscription fields or explicitly supplied inputs. Values must be strings, finite numbers, booleans or null; null reset behavior is retained. Definitions must exist before use. `list_contact_properties` supports all/custom, and `list_mailing_lists` discovers list IDs. Mailing-list subscription values are explicit booleans. Unsubscribed contacts can still receive transactional emails and critical-notice campaigns. [Properties](https://loops.so/docs/contacts/properties), [property discovery](https://loops.so/docs/api-reference/list-contact-properties), [mailing lists](https://loops.so/docs/api-reference/list-mailing-lists).
 
-Create, find, update, and delete contacts in your audience. Contacts are identified by email address and/or a unique user ID. Each contact has default properties (email, first name, last name, source, user group, subscribed status) and can have any number of custom properties. Contacts can be subscribed or unsubscribed from your audience. When double opt-in is enabled, contacts created via forms must confirm before becoming active.
+`check_contact_suppression` returns the identified contact, observed suppression flag and quota. It never removes suppression or grants permission to email a contact. [Suppression lookup](https://loops.so/docs/api-reference/check-contact-suppression).
 
-### Contact Properties
+## Events and transactional sends
 
-Retrieve the list of all contact properties (both default and custom) defined on your account. Properties have a key, label, and type. Custom properties can be included when creating or updating contacts.
+`send_event` can create/update a contact, alter list membership and trigger workflow emails. `send_transactional_email` sends a real email, including to unsubscribed recipients, using a published template. Template variables retain the original string/number contract. Optional `idempotencyKey` is sent through the documented `Idempotency-Key` header on both operations, limited to 100 characters and the provider's 24-hour window. A successful response confirms submission/acceptance; delivery and workflow completion need independent observation. No uncertain operation is retried automatically. [Events](https://loops.so/docs/api-reference/send-event), [transactional sends](https://loops.so/docs/api-reference/send-transactional-email).
 
-### Mailing Lists
+The published-template tool retains the documented deprecated `/transactional` GET route rather than silently including draft/content resources from `/transactional-emails`. It returns one page, with integer page size 10–50, nextCursor and hasMore derived from continuation. Follow-up calls preserve page size and cursor. Template IDs, names and variable names retain their original output fields. [Supported legacy listing](https://loops.so/docs/api-reference/list-transactional-emails-v1), [distinct current content listing](https://loops.so/docs/api-reference/list-transactional-emails).
 
-Retrieve all mailing lists configured in your account. Each list has a name, optional description, and a public/private flag. Contacts can be subscribed to or unsubscribed from mailing lists when creating/updating contacts or sending events.
+Optional email file inputs retain filename/contentType/base64 content and map content to the provider's `data` field. Attachments require account enablement. The whole JSON request, including encoded bytes, must be smaller than 4 MB. No file bytes, credential headers or download URLs are returned. [Email attachments](https://loops.so/docs/transactional/attachments).
 
-### Events
+## Errors and verification
 
-Send named events associated with a contact (identified by email or user ID) to trigger automated email workflows ("loops"). Events can include custom event properties and mailing list subscriptions. If the contact does not exist, a new one will be created automatically.
+Errors expose safe status-specific guidance without upstream bodies, transport parents or configured credentials. Responses are validated before success is reported. Requests have finite timeouts, redirects disabled and no automatic retries. Baseline limits are 10 requests/second for ordinary API operations and 60/minute for content APIs; feature/rate-limit acceptance remains provider-dependent. [Current API reference and OpenAPI](https://loops.so/agents/api).
 
-### Transactional Email
-
-Send transactional emails using pre-built templates created in the Loops editor. Each transactional email is referenced by its unique ID. Data variables can be passed to populate dynamic content in the template. Supports file attachments (when enabled on the account) and dynamic email headers (subject, from, reply-to, CC, BCC). Supports idempotency keys to prevent duplicate sends. You can also list all published transactional email templates to discover available template IDs and their required data variables.
-
-## Events
-
-Loops supports outgoing webhooks that send HTTP POST requests to a configured endpoint when certain events occur. You configure a single webhook endpoint per account in **Settings → Webhooks**, where you receive a signing secret for request verification. You can selectively subscribe to specific event types.
-
-### Contact Events
-
-Notifications about changes to contacts in your audience:
-
-- **contact.created** — A new contact has been created. Includes full contact data. When double opt-in is enabled, this fires only after confirmation.
-- **contact.unsubscribed** — A contact has been unsubscribed from your audience.
-- **contact.deleted** — A contact has been deleted from your audience.
-- **contact.mailingList.subscribed** — A contact has been subscribed to a mailing list. Includes mailing list details.
-- **contact.mailingList.unsubscribed** — A contact has been unsubscribed from a mailing list. Includes mailing list details.
-
-### Email Sending Events
-
-Notifications about emails being dispatched to recipients:
-
-- **campaign.email.sent** — A campaign email was sent to a contact. Fires per recipient. Includes campaign ID and related mailing lists if applicable.
-- **loop.email.sent** — A loop (automated workflow) email was sent to a contact. Fires per recipient.
-- **transactional.email.sent** — A transactional email was sent.
-
-### Email Engagement Events
-
-Notifications about recipient interactions with sent emails. Each event includes the source type (campaign, loop, or transactional) and the related email identifiers:
-
-- **email.delivered** — Email successfully delivered to recipient.
-- **email.softBounced** — Email temporarily failed delivery (may be retried).
-- **email.hardBounced** — Email permanently failed delivery. Results in the contact being unsubscribed.
-- **email.opened** — Email was opened. Available for campaigns and loops only.
-- **email.clicked** — A link in the email was clicked. Available for campaigns and loops only.
-- **email.unsubscribed** — Recipient unsubscribed via the email's unsubscribe link. Available for campaigns and loops only.
-- **email.resubscribed** — Recipient resubscribed via the email's preference center. Available for campaigns and loops only.
-- **email.spamReported** — Recipient reported the email as spam.
+Private verification uses isolated synthetic contacts, independent team/record readbacks and preregistered identity-checked deletion. Contact writes require dedicated-team, controlled-domain, possible workflow-effect and retained-history authorization. Email/event scenarios additionally require suitable controlled templates/events and a nonce-bound independent observer; attachment acceptance requires observed decoded-byte hashes. Deleting a contact does not retract emails or erase provider history. Missing local credentials leave the suite active but live acceptance unverified.

@@ -9,10 +9,11 @@ let commentSchema = z.object({
   timestamp: z
     .number()
     .nullable()
+    .optional()
     .describe('Position in the track in milliseconds (for timed comments)'),
-  createdAt: z.string().describe('When the comment was posted'),
-  username: z.string().describe('Username of the commenter'),
-  userId: z.string().describe('User ID of the commenter')
+  createdAt: z.string().nullable().optional().describe('When the comment was posted'),
+  username: z.string().optional().describe('Username of the commenter'),
+  userId: z.string().optional().describe('User ID of the commenter')
 });
 
 export let getTrackComments = SlateTool.create(spec, {
@@ -24,6 +25,12 @@ export let getTrackComments = SlateTool.create(spec, {
   .input(
     z.object({
       trackId: z.string().describe('Track ID or URN'),
+      nextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact continuation URL returned by this list; keep the same resource and filters'
+        ),
       limit: z
         .number()
         .optional()
@@ -33,27 +40,33 @@ export let getTrackComments = SlateTool.create(spec, {
   .output(
     z.object({
       comments: z.array(commentSchema).describe('List of comments'),
+      nextHref: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native next page URL, when supplied'),
       hasMore: z.boolean().describe('Whether more comments are available')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.getTrackComments(ctx.input.trackId, {
-      limit: ctx.input.limit || 50
+      nextHref: ctx.input.nextHref,
+      limit: ctx.input.limit ?? 50
     });
 
     let comments = result.collection.map(c => ({
-      commentId: c.urn || String(c.id),
+      commentId: c.urn,
       body: c.body,
       timestamp: c.timestamp,
       createdAt: c.created_at,
-      username: c.user?.username || '',
-      userId: c.user?.urn || String(c.user?.id)
+      username: c.user?.username,
+      userId: c.user?.urn
     }));
 
     return {
-      output: { comments, hasMore: !!result.next_href },
+      output: { comments, hasMore: !!result.next_href, nextHref: result.next_href },
       message: `Retrieved **${comments.length}** comments on track ${ctx.input.trackId}.`
     };
   })
@@ -83,12 +96,16 @@ export let createComment = SlateTool.create(spec, {
     z.object({
       commentId: z.string().describe('Unique identifier (URN) of the created comment'),
       body: z.string().describe('Comment text'),
-      timestamp: z.number().nullable().describe('Position in the track in milliseconds'),
-      createdAt: z.string().describe('When the comment was posted')
+      timestamp: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Position in the track in milliseconds'),
+      createdAt: z.string().nullable().optional().describe('When the comment was posted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let comment = await client.createComment(
       ctx.input.trackId,
@@ -103,7 +120,7 @@ export let createComment = SlateTool.create(spec, {
         timestamp: comment.timestamp,
         createdAt: comment.created_at
       },
-      message: `Posted comment on track ${ctx.input.trackId}${ctx.input.timestamp ? ` at ${Math.round(ctx.input.timestamp / 1000)}s` : ''}.`
+      message: `Posted comment on track ${ctx.input.trackId}${ctx.input.timestamp !== undefined ? ` at ${Math.round(ctx.input.timestamp / 1000)}s` : ''}.`
     };
   })
   .build();

@@ -1,8 +1,30 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { getBaseUrl } from '../lib/helpers';
+import { invokeGusto } from '../lib/actions';
+import { companyIdSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  pagination: paginationSchema.optional(),
+  employment: z
+    .object({
+      effectiveDate: z.string().nullable().optional(),
+      active: z.boolean().nullable().optional(),
+      version: z.string().nullable().optional(),
+      runTerminationPayroll: z.boolean().nullable().optional(),
+      fileNewHireReport: z.boolean().nullable().optional(),
+      workLocationId: z.string().nullable().optional()
+    })
+    .optional(),
+  employeeId: z.string().describe('UUID of the employee'),
+  companyId: z.string().nullable().optional(),
+  firstName: z.string().nullable().optional().describe('First name'),
+  lastName: z.string().nullable().optional().describe('Last name'),
+  email: z.string().nullable().optional().describe('Email address'),
+  version: z.string().nullable().optional().describe('Current resource version'),
+  onboardingStatus: z.string().nullable().optional().describe('Onboarding status'),
+  terminated: z.boolean().nullable().optional().describe('Whether the employee is terminated')
+});
 
 export let manageEmployee = SlateTool.create(spec, {
   name: 'Manage Employee',
@@ -20,10 +42,20 @@ export let manageEmployee = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      fileNewHireReport: z
+        .boolean()
+        .optional()
+        .describe('Required for rehire: whether Gusto files a new-hire report.'),
+      workLocationId: z
+        .string()
+        .optional()
+        .describe(
+          'Required for rehire: exact company location UUID from manage_company_location.'
+        ),
       action: z
         .enum(['create', 'get', 'update', 'terminate', 'rehire'])
         .describe('The action to perform'),
-      companyId: z.string().optional().describe('Company UUID (required for create)'),
+      companyId: companyIdSchema.optional(),
       employeeId: z
         .string()
         .optional()
@@ -48,91 +80,6 @@ export let manageEmployee = SlateTool.create(spec, {
         .describe('Whether to run a termination payroll')
     })
   )
-  .output(
-    z.object({
-      employeeId: z.string().describe('UUID of the employee'),
-      firstName: z.string().optional().describe('First name'),
-      lastName: z.string().optional().describe('Last name'),
-      email: z.string().optional().describe('Email address'),
-      version: z.string().optional().describe('Current resource version'),
-      onboardingStatus: z.string().optional().describe('Onboarding status'),
-      terminated: z.boolean().optional().describe('Whether the employee is terminated')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: getBaseUrl(ctx.auth.environment)
-    });
-
-    let result: any;
-    let actionMessage: string;
-
-    switch (ctx.input.action) {
-      case 'create': {
-        if (!ctx.input.companyId)
-          throw new Error('companyId is required to create an employee');
-        result = await client.createEmployee(ctx.input.companyId, {
-          first_name: ctx.input.firstName,
-          last_name: ctx.input.lastName,
-          middle_initial: ctx.input.middleInitial,
-          email: ctx.input.email,
-          date_of_birth: ctx.input.dateOfBirth,
-          ssn: ctx.input.ssn
-        });
-        actionMessage = `Created employee **${ctx.input.firstName} ${ctx.input.lastName}**`;
-        break;
-      }
-      case 'get': {
-        if (!ctx.input.employeeId) throw new Error('employeeId is required');
-        result = await client.getEmployee(ctx.input.employeeId);
-        actionMessage = `Retrieved employee **${result.first_name} ${result.last_name}**`;
-        break;
-      }
-      case 'update': {
-        if (!ctx.input.employeeId) throw new Error('employeeId is required for update');
-        let updateData: Record<string, any> = {};
-        if (ctx.input.version) updateData.version = ctx.input.version;
-        if (ctx.input.firstName) updateData.first_name = ctx.input.firstName;
-        if (ctx.input.lastName) updateData.last_name = ctx.input.lastName;
-        if (ctx.input.middleInitial) updateData.middle_initial = ctx.input.middleInitial;
-        if (ctx.input.email) updateData.email = ctx.input.email;
-        if (ctx.input.dateOfBirth) updateData.date_of_birth = ctx.input.dateOfBirth;
-        if (ctx.input.ssn) updateData.ssn = ctx.input.ssn;
-        result = await client.updateEmployee(ctx.input.employeeId, updateData);
-        actionMessage = `Updated employee **${result.first_name} ${result.last_name}**`;
-        break;
-      }
-      case 'terminate': {
-        if (!ctx.input.employeeId) throw new Error('employeeId is required for terminate');
-        result = await client.terminateEmployee(ctx.input.employeeId, {
-          effective_date: ctx.input.effectiveDate,
-          run_termination_payroll: ctx.input.runTerminationPayroll
-        });
-        actionMessage = `Terminated employee ${ctx.input.employeeId} effective ${ctx.input.effectiveDate}`;
-        break;
-      }
-      case 'rehire': {
-        if (!ctx.input.employeeId) throw new Error('employeeId is required for rehire');
-        result = await client.rehireEmployee(ctx.input.employeeId, {
-          effective_date: ctx.input.effectiveDate
-        });
-        actionMessage = `Rehired employee ${ctx.input.employeeId} effective ${ctx.input.effectiveDate}`;
-        break;
-      }
-    }
-
-    return {
-      output: {
-        employeeId: result.uuid || result.id?.toString(),
-        firstName: result.first_name,
-        lastName: result.last_name,
-        email: result.email,
-        version: result.version,
-        onboardingStatus: result.onboarding_status,
-        terminated: result.terminated
-      },
-      message: actionMessage
-    };
-  })
+  .output(outputSchema)
+  .handleInvocation(ctx => invokeGusto('manage_employee', ctx.input, ctx.auth, outputSchema))
   .build();

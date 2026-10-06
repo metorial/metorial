@@ -1,18 +1,7 @@
 {
   "name": "@metorial/humanloop",
-  "description": "Manage LLM prompts, evaluations, and observability for AI applications. Create, version, and deploy prompts with templated variables. Run evaluations using code-based, AI-based, or human evaluators against datasets. Log LLM calls with inputs, outputs, latencies, token counts, and costs. Proxy calls to model providers (OpenAI, Anthropic, Cohere, AWS Bedrock) with automatic logging. Manage datasets of test cases for benchmarking. Configure and trace multi-step agent workflows and flows. Deploy prompt versions to different environments (staging, production). Organize files into directories and attach human feedback to logs.",
+  "description": "Retired: Humanloop shut down on September 8, 2025. The platform and API are no longer available. Existing tools are retained for compatibility and return a clear service-unavailable error. Work with data exported before the shutdown using your chosen replacement platform.",
   "categories": ["apis-and-http-requests"],
-  "skills": [
-    "manage prompt versions",
-    "run LLM evaluations",
-    "log LLM calls",
-    "proxy model provider calls",
-    "manage evaluation datasets",
-    "deploy to environments",
-    "trace agent workflows",
-    "attach human feedback",
-    "version tools and flows",
-    "organize files in directories"
-  ],
+  "skills": [],
   "logoUrl": "https://provider-logos.metorial-cdn.com/humanloop.jpeg"
 }

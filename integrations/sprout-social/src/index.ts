@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   createDraftPost,
   getCases,
+  getCurrentUser,
   getListeningMessages,
   getListeningMetrics,
   getMessages,
@@ -10,13 +11,14 @@ import {
   getPostAnalytics,
   getProfileAnalytics,
   getPublishingPost,
+  listCustomers,
   uploadMedia
 } from './tools';
-import { inboundWebhook, newCases, newMessages } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    listCustomers.build(),
+    getCurrentUser.build(),
     getMetadata.build(),
     getProfileAnalytics.build(),
     getPostAnalytics.build(),
@@ -28,5 +30,5 @@ export let provider = Slate.create({
     getCases.build(),
     getPublishingPost.build()
   ],
-  triggers: [inboundWebhook, newMessages.build(), newCases.build()]
+  triggers: []
 });

@@ -20,8 +20,6 @@ import {
   validateContent,
   webSearch
 } from './tools';
-import { taskCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     getFile,
     deleteFile
   ],
-  triggers: [taskCompleted]
+  triggers: []
 });

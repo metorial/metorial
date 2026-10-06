@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, nextCursorFrom } from '../lib/client';
+import { combinatorSchema, filterSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listDeals = SlateTool.create(spec, {
@@ -14,14 +15,18 @@ export let listDeals = SlateTool.create(spec, {
   .input(
     z.object({
       groupId: z.string().describe('ID of the group to list deals from'),
-      objectType: z.string().describe('Deal object type name (e.g. "Deals")'),
+      objectType: z
+        .string()
+        .describe('Exact deal object type name discovered with list_custom_fields'),
       limit: z
         .number()
         .min(1)
         .max(100)
         .optional()
         .describe('Number of results per page (1-100, default 20)'),
-      cursor: z.string().optional().describe('Pagination cursor from a previous response')
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      filter: filterSchema,
+      combinator: combinatorSchema
     })
   )
   .output(
@@ -58,14 +63,12 @@ export let listDeals = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listDeals(ctx.input.groupId, ctx.input.objectType, {
       limit: ctx.input.limit,
-      cursor: ctx.input.cursor
+      cursor: ctx.input.cursor,
+      filter: ctx.input.filter,
+      combinator: ctx.input.combinator
     });
 
-    let nextCursor: string | null = null;
-    if (result.pagination.nextLink) {
-      let url = new URL(result.pagination.nextLink);
-      nextCursor = url.searchParams.get('cursor');
-    }
+    const nextCursor = nextCursorFrom(result.pagination.nextLink);
 
     return {
       output: {

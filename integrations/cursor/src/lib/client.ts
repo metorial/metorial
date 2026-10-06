@@ -1,20 +1,10 @@
-import { createAxios } from 'slates';
-
-let BASE_URL = 'https://api.cursor.com';
+import { createCursorAxios } from './http';
 
 export class CloudAgentsClient {
-  private authHeader: string;
+  private axios: ReturnType<typeof createCursorAxios>;
 
   constructor(config: { token: string }) {
-    this.authHeader = `Basic ${Buffer.from(`${config.token}:`).toString('base64')}`;
-  }
-
-  private get axios() {
-    return createAxios({ baseURL: BASE_URL });
-  }
-
-  private get headers() {
-    return { Authorization: this.authHeader };
+    this.axios = createCursorAxios(config.token);
   }
 
   async getApiKeyInfo(): Promise<{
@@ -22,7 +12,7 @@ export class CloudAgentsClient {
     createdAt: string;
     userEmail: string;
   }> {
-    let response = await this.axios.get('/v0/me', { headers: this.headers });
+    let response = await this.axios.get('/v0/me');
     return response.data;
   }
 
@@ -31,52 +21,36 @@ export class CloudAgentsClient {
     nextCursor?: string;
   }> {
     let response = await this.axios.get('/v0/agents', {
-      headers: this.headers,
       params
     });
     return response.data;
   }
 
   async getAgent(agentId: string): Promise<Agent> {
-    let response = await this.axios.get(`/v0/agents/${agentId}`, {
-      headers: this.headers
-    });
+    let response = await this.axios.get(`/v0/agents/${encodeURIComponent(agentId)}`);
     return response.data;
   }
 
   async launchAgent(body: LaunchAgentInput): Promise<Agent> {
-    let response = await this.axios.post('/v0/agents', body, {
-      headers: this.headers
-    });
+    let response = await this.axios.post('/v0/agents', body);
     return response.data;
   }
 
   async addFollowUp(agentId: string, prompt: PromptInput): Promise<{ id: string }> {
     let response = await this.axios.post(
-      `/v0/agents/${agentId}/followup`,
-      { prompt },
-      {
-        headers: this.headers
-      }
+      `/v0/agents/${encodeURIComponent(agentId)}/followup`,
+      { prompt }
     );
     return response.data;
   }
 
   async stopAgent(agentId: string): Promise<{ id: string }> {
-    let response = await this.axios.post(
-      `/v0/agents/${agentId}/stop`,
-      {},
-      {
-        headers: this.headers
-      }
-    );
+    let response = await this.axios.post(`/v0/agents/${encodeURIComponent(agentId)}/stop`, {});
     return response.data;
   }
 
   async deleteAgent(agentId: string): Promise<{ id: string }> {
-    let response = await this.axios.delete(`/v0/agents/${agentId}`, {
-      headers: this.headers
-    });
+    let response = await this.axios.delete(`/v0/agents/${encodeURIComponent(agentId)}`);
     return response.data;
   }
 
@@ -84,18 +58,16 @@ export class CloudAgentsClient {
     id: string;
     messages: ConversationMessage[];
   }> {
-    let response = await this.axios.get(`/v0/agents/${agentId}/conversation`, {
-      headers: this.headers
-    });
+    let response = await this.axios.get(
+      `/v0/agents/${encodeURIComponent(agentId)}/conversation`
+    );
     return response.data;
   }
 
   async listArtifacts(agentId: string): Promise<{
     artifacts: Artifact[];
   }> {
-    let response = await this.axios.get(`/v0/agents/${agentId}/artifacts`, {
-      headers: this.headers
-    });
+    let response = await this.axios.get(`/v0/agents/${encodeURIComponent(agentId)}/artifacts`);
     return response.data;
   }
 
@@ -106,26 +78,24 @@ export class CloudAgentsClient {
     url: string;
     expiresAt: string;
   }> {
-    let response = await this.axios.get(`/v0/agents/${agentId}/artifacts/download`, {
-      headers: this.headers,
-      params: { path }
-    });
+    let response = await this.axios.get(
+      `/v0/agents/${encodeURIComponent(agentId)}/artifacts/download`,
+      {
+        params: { path }
+      }
+    );
     return response.data;
   }
 
   async listModels(): Promise<{ models: string[] }> {
-    let response = await this.axios.get('/v0/models', {
-      headers: this.headers
-    });
+    let response = await this.axios.get('/v0/models');
     return response.data;
   }
 
   async listRepositories(): Promise<{
     repositories: Repository[];
   }> {
-    let response = await this.axios.get('/v0/repositories', {
-      headers: this.headers
-    });
+    let response = await this.axios.get('/v0/repositories');
     return response.data;
   }
 }

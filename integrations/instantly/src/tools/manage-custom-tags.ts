@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageCustomTags = SlateTool.create(spec, {
@@ -32,6 +32,12 @@ export let manageCustomTags = SlateTool.create(spec, {
         .optional()
         .describe(
           'IDs of campaigns or accounts to assign/unassign the tag (for "assign"/"unassign" actions).'
+        ),
+      resourceType: z
+        .enum(['account', 'campaign'])
+        .optional()
+        .describe(
+          'Required for assign/unassign: whether the resource IDs identify sending accounts or campaigns.'
         ),
       search: z.string().optional().describe('Search tags by name (for "list" action).'),
       limit: z
@@ -75,13 +81,13 @@ export let manageCustomTags = SlateTool.create(spec, {
 
       let tags = result.items.map((t: any) => ({
         tagId: t.id,
-        name: t.name
+        name: t.label
       }));
 
       return {
         output: {
           tags,
-          nextStartingAfter: result.next_starting_after,
+          nextStartingAfter: result.next_starting_after ?? null,
           success: true
         },
         message: `Found **${tags.length}** custom tag(s).`
@@ -109,9 +115,15 @@ export let manageCustomTags = SlateTool.create(spec, {
       ctx.input.tagId &&
       ctx.input.resourceIds
     ) {
+      if (!ctx.input.resourceType || !ctx.input.resourceIds.length) {
+        throw invalid(
+          'Provide resourceType and a non-empty resourceIds array to assign or unassign tags.'
+        );
+      }
       await client.toggleTagResource({
         tagId: ctx.input.tagId,
         resourceIds: ctx.input.resourceIds,
+        resourceType: ctx.input.resourceType,
         assign: action === 'assign'
       });
       return {
@@ -120,9 +132,6 @@ export let manageCustomTags = SlateTool.create(spec, {
       };
     }
 
-    return {
-      output: { success: false },
-      message: 'Missing required parameters for the specified action.'
-    };
+    throw invalid('Provide the required fields for the selected action.');
   })
   .build();

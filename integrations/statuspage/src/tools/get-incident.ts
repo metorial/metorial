@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getIncident = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let getIncident = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageId: pageIdSchema,
       incidentId: z.string().describe('ID of the incident to retrieve')
     })
   )
@@ -53,7 +55,10 @@ export let getIncident = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, pageId: ctx.config.pageId });
+    let client = new Client({
+      token: ctx.auth.token,
+      pageId: ctx.input.pageId ?? ctx.config.pageId
+    });
     let incident = await client.getIncident(ctx.input.incidentId);
 
     return {
@@ -68,14 +73,14 @@ export let getIncident = SlateTool.create(spec, {
         createdAt: incident.created_at,
         updatedAt: incident.updated_at,
         resolvedAt: incident.resolved_at,
-        incidentUpdates: (incident.incident_updates || []).map((u: any) => ({
+        incidentUpdates: (incident.incident_updates || []).map(u => ({
           updateId: u.id,
           status: u.status,
           body: u.body,
           createdAt: u.created_at,
           updatedAt: u.updated_at
         })),
-        components: (incident.components || []).map((c: any) => ({
+        components: (incident.components || []).map(c => ({
           componentId: c.id,
           name: c.name,
           status: c.status

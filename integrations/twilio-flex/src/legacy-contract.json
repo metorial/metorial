@@ -1,0 +1,1437 @@
+{
+  "create_interaction": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "channelType": {
+          "type": "string",
+          "enum": ["sms", "whatsapp", "web", "voice", "email", "custom"],
+          "description": "Communication channel type"
+        },
+        "channelProperties": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Channel-specific properties as a JSON object (e.g., {\"type\": \"sms\", \"to\": \"+1234567890\", \"from\": \"+0987654321\"})"
+        },
+        "routingWorkflowSid": {
+          "type": "string",
+          "description": "TaskRouter Workflow SID for routing this interaction"
+        },
+        "routingWorkspaceSid": {
+          "type": "string",
+          "description": "TaskRouter Workspace SID"
+        },
+        "routingAttributes": {
+          "description": "Additional routing attributes as key-value pairs",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "interactionContextJson": {
+          "description": "JSON string with additional interaction context",
+          "type": "string"
+        }
+      },
+      "required": [
+        "channelType",
+        "channelProperties",
+        "routingWorkflowSid",
+        "routingWorkspaceSid"
+      ],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "interactionSid": {
+          "type": "string",
+          "description": "SID of the created interaction"
+        },
+        "channelSid": {
+          "description": "SID of the created channel",
+          "type": "string"
+        },
+        "url": {
+          "description": "URL of the interaction resource",
+          "type": "string"
+        }
+      },
+      "required": ["interactionSid"],
+      "additionalProperties": false
+    }
+  },
+  "manage_interaction_channel": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["get", "list", "close"],
+          "description": "Action to perform on the channel"
+        },
+        "interactionSid": {
+          "type": "string",
+          "description": "Interaction SID"
+        },
+        "channelSid": {
+          "description": "Channel SID (required for get/close)",
+          "type": "string"
+        }
+      },
+      "required": ["action", "interactionSid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "channelSid": {
+                "type": "string",
+                "description": "Channel SID"
+              },
+              "interactionSid": {
+                "description": "Interaction SID",
+                "type": "string"
+              },
+              "type": {
+                "description": "Channel type",
+                "type": "string"
+              },
+              "status": {
+                "description": "Channel status",
+                "type": "string"
+              }
+            },
+            "required": ["channelSid"],
+            "additionalProperties": false
+          },
+          "description": "Channel details"
+        }
+      },
+      "required": ["channels"],
+      "additionalProperties": false
+    }
+  },
+  "manage_interaction_participants": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["add", "remove", "list"],
+          "description": "Action to perform"
+        },
+        "interactionSid": {
+          "type": "string",
+          "description": "Interaction SID"
+        },
+        "channelSid": {
+          "type": "string",
+          "description": "Channel SID within the interaction"
+        },
+        "participantSid": {
+          "description": "Participant SID (required for remove)",
+          "type": "string"
+        },
+        "participantType": {
+          "description": "Type of participant to add",
+          "type": "string",
+          "enum": ["agent", "customer", "external", "supervisor", "unknown"]
+        },
+        "mediaProperties": {
+          "description": "Media properties for the participant (e.g., {\"from\": \"+1234567890\"})",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "routingAttributes": {
+          "description": "Routing attributes for agent participants",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["action", "interactionSid", "channelSid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "participantSid": {
+                "type": "string",
+                "description": "Participant SID"
+              },
+              "type": {
+                "description": "Participant type",
+                "type": "string"
+              },
+              "interactionSid": {
+                "description": "Interaction SID",
+                "type": "string"
+              },
+              "channelSid": {
+                "description": "Channel SID",
+                "type": "string"
+              }
+            },
+            "required": ["participantSid"],
+            "additionalProperties": false
+          },
+          "description": "List of participants"
+        }
+      },
+      "required": ["participants"],
+      "additionalProperties": false
+    }
+  },
+  "manage_workers": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "get", "update", "delete", "list"],
+          "description": "Action to perform"
+        },
+        "workspaceSid": {
+          "type": "string",
+          "description": "Workspace SID"
+        },
+        "workerSid": {
+          "description": "Worker SID (required for get/update/delete)",
+          "type": "string"
+        },
+        "friendlyName": {
+          "description": "Friendly name for the worker",
+          "type": "string"
+        },
+        "activitySid": {
+          "description": "Activity SID to set as current activity",
+          "type": "string"
+        },
+        "attributes": {
+          "description": "Worker attributes as JSON string",
+          "type": "string"
+        },
+        "targetWorkersExpression": {
+          "description": "Filter expression when listing workers (e.g., \"skills HAS 'support'\")",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results to return (max 1000)",
+          "type": "number"
+        }
+      },
+      "required": ["action", "workspaceSid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workerSid": {
+                "type": "string",
+                "description": "Worker SID"
+              },
+              "friendlyName": {
+                "description": "Friendly name",
+                "type": "string"
+              },
+              "activityName": {
+                "description": "Current activity name",
+                "type": "string"
+              },
+              "available": {
+                "description": "Whether the worker is available",
+                "type": "boolean"
+              },
+              "attributes": {
+                "description": "Worker attributes as JSON string",
+                "type": "string"
+              },
+              "dateCreated": {
+                "description": "Date created",
+                "type": "string"
+              },
+              "dateUpdated": {
+                "description": "Date last updated",
+                "type": "string"
+              }
+            },
+            "required": ["workerSid"],
+            "additionalProperties": false
+          },
+          "description": "Worker records"
+        }
+      },
+      "required": ["workers"],
+      "additionalProperties": false
+    }
+  },
+  "manage_task_queues": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "get", "update", "delete", "list"],
+          "description": "Action to perform"
+        },
+        "workspaceSid": {
+          "type": "string",
+          "description": "Workspace SID"
+        },
+        "taskQueueSid": {
+          "description": "Task Queue SID (required for get/update/delete)",
+          "type": "string"
+        },
+        "friendlyName": {
+          "description": "Friendly name for the queue",
+          "type": "string"
+        },
+        "targetWorkers": {
+          "description": "Worker target expression (e.g., \"skills HAS 'billing'\")",
+          "type": "string"
+        },
+        "maxReservedWorkers": {
+          "description": "Max number of workers reserved for a task",
+          "type": "number"
+        },
+        "reservationActivitySid": {
+          "description": "Activity SID for reserved workers",
+          "type": "string"
+        },
+        "assignmentActivitySid": {
+          "description": "Activity SID for assigned workers",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results to return",
+          "type": "number"
+        }
+      },
+      "required": ["action", "workspaceSid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "taskQueues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taskQueueSid": {
+                "type": "string",
+                "description": "Task Queue SID"
+              },
+              "friendlyName": {
+                "description": "Friendly name",
+                "type": "string"
+              },
+              "targetWorkers": {
+                "description": "Worker target expression",
+                "type": "string"
+              },
+              "maxReservedWorkers": {
+                "description": "Max reserved workers",
+                "type": "number"
+              },
+              "reservationActivitySid": {
+                "description": "Activity SID for reserved workers",
+                "type": "string"
+              },
+              "assignmentActivitySid": {
+                "description": "Activity SID for assigned workers",
+                "type": "string"
+              },
+              "dateCreated": {
+                "description": "Date created",
+                "type": "string"
+              },
+              "dateUpdated": {
+                "description": "Date last updated",
+                "type": "string"
+              }
+            },
+            "required": ["taskQueueSid"],
+            "additionalProperties": false
+          },
+          "description": "Task queue records"
+        }
+      },
+      "required": ["taskQueues"],
+      "additionalProperties": false
+    }
+  },
+  "manage_tasks": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "get", "update", "delete", "list"],
+          "description": "Action to perform"
+        },
+        "workspaceSid": {
+          "type": "string",
+          "description": "Workspace SID"
+        },
+        "taskSid": {
+          "description": "Task SID (required for get/update/delete)",
+          "type": "string"
+        },
+        "attributes": {
+          "description": "Task attributes as JSON string",
+          "type": "string"
+        },
+        "workflowSid": {
+          "description": "Workflow SID for routing (used in create)",
+          "type": "string"
+        },
+        "taskQueueSid": {
+          "description": "Task Queue SID to filter or assign",
+          "type": "string"
+        },
+        "priority": {
+          "description": "Task priority (higher = more important)",
+          "type": "number"
+        },
+        "timeout": {
+          "description": "Task timeout in seconds",
+          "type": "number"
+        },
+        "assignmentStatus": {
+          "description": "Assignment status to filter by or set (pending, reserved, assigned, wrapping, completed, canceled)",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Reason for completing/canceling a task",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results to return",
+          "type": "number"
+        }
+      },
+      "required": ["action", "workspaceSid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taskSid": {
+                "type": "string",
+                "description": "Task SID"
+              },
+              "assignmentStatus": {
+                "description": "Assignment status (pending, reserved, assigned, wrapping, completed, canceled)",
+                "type": "string"
+              },
+              "attributes": {
+                "description": "Task attributes as JSON string",
+                "type": "string"
+              },
+              "priority": {
+                "description": "Task priority",
+                "type": "number"
+              },
+              "reason": {
+                "description": "Reason for the task status change",
+                "type": "string"
+              },
+              "taskQueueFriendlyName": {
+                "description": "Task queue friendly name",
+                "type": "string"
+              },
+              "workerName": {
+                "description": "Assigned worker name",
+                "type": "string"
+              },
+              "workflowFriendlyName": {
+                "description": "Workflow friendly name",
+                "type": "string"
+              },
+              "age": {
+                "description": "Task age in seconds",
+                "type": "number"
+              },
+              "dateCreated": {
+                "description": "Date created",
+                "type": "string"
+              },
+              "dateUpdated": {
+                "description": "Date last updated",
+                "type": "string"
+              }
+            },
+            "required": ["taskSid"],
+            "additionalProperties": false
+          },
+          "description": "Task records"
+        }
+      },
+      "required": ["tasks"],
+      "additionalProperties": false
+    }
+  },
+  "manage_workflows": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "get", "update", "delete", "list"],
+          "description": "Action to perform"
+        },
+        "workspaceSid": {
+          "type": "string",
+          "description": "Workspace SID"
+        },
+        "workflowSid": {
+          "description": "Workflow SID (required for get/update/delete)",
+          "type": "string"
+        },
+        "friendlyName": {
+          "description": "Friendly name",
+          "type": "string"
+        },
+        "configuration": {
+          "description": "Workflow configuration as JSON string",
+          "type": "string"
+        },
+        "assignmentCallbackUrl": {
+          "description": "Assignment callback URL",
+          "type": "string"
+        },
+        "fallbackAssignmentCallbackUrl": {
+          "description": "Fallback assignment callback URL",
+          "type": "string"
+        },
+        "taskReservationTimeout": {
+          "description": "Task reservation timeout in seconds",
+          "type": "number"
+        },
+        "pageSize": {
+          "description": "Number of results to return",
+          "type": "number"
+        }
+      },
+      "required": ["action", "workspaceSid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workflowSid": {
+                "type": "string",
+                "description": "Workflow SID"
+              },
+              "friendlyName": {
+                "description": "Friendly name",
+                "type": "string"
+              },
+              "configuration": {
+                "description": "Workflow configuration as JSON string",
+                "type": "string"
+              },
+              "assignmentCallbackUrl": {
+                "description": "Assignment callback URL",
+                "type": "string"
+              },
+              "fallbackAssignmentCallbackUrl": {
+                "description": "Fallback assignment callback URL",
+                "type": "string"
+              },
+              "taskReservationTimeout": {
+                "description": "Task reservation timeout in seconds",
+                "type": "number"
+              },
+              "dateCreated": {
+                "description": "Date created",
+                "type": "string"
+              },
+              "dateUpdated": {
+                "description": "Date last updated",
+                "type": "string"
+              }
+            },
+            "required": ["workflowSid"],
+            "additionalProperties": false
+          },
+          "description": "Workflow records"
+        }
+      },
+      "required": ["workflows"],
+      "additionalProperties": false
+    }
+  },
+  "manage_activities": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "get", "update", "delete", "list"],
+          "description": "Action to perform"
+        },
+        "workspaceSid": {
+          "type": "string",
+          "description": "Workspace SID"
+        },
+        "activitySid": {
+          "description": "Activity SID (required for get/update/delete)",
+          "type": "string"
+        },
+        "friendlyName": {
+          "description": "Friendly name",
+          "type": "string"
+        },
+        "available": {
+          "description": "Whether workers in this activity should be available for task assignment",
+          "type": "boolean"
+        },
+        "pageSize": {
+          "description": "Number of results to return",
+          "type": "number"
+        }
+      },
+      "required": ["action", "workspaceSid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "activities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "activitySid": {
+                "type": "string",
+                "description": "Activity SID"
+              },
+              "friendlyName": {
+                "description": "Friendly name",
+                "type": "string"
+              },
+              "available": {
+                "description": "Whether workers in this activity are available for task assignment",
+                "type": "boolean"
+              },
+              "dateCreated": {
+                "description": "Date created",
+                "type": "string"
+              },
+              "dateUpdated": {
+                "description": "Date updated",
+                "type": "string"
+              }
+            },
+            "required": ["activitySid"],
+            "additionalProperties": false
+          },
+          "description": "Activity records"
+        }
+      },
+      "required": ["activities"],
+      "additionalProperties": false
+    }
+  },
+  "get_flex_configuration": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountSid": {
+          "description": "Account SID",
+          "type": "string"
+        },
+        "flexInstanceSid": {
+          "description": "Flex Instance SID",
+          "type": "string"
+        },
+        "runtimeDomain": {
+          "description": "Runtime domain",
+          "type": "string"
+        },
+        "serviceSid": {
+          "description": "Service SID",
+          "type": "string"
+        },
+        "chatServiceSid": {
+          "description": "Chat Service SID",
+          "type": "string"
+        },
+        "messagingServiceSid": {
+          "description": "Messaging Service SID",
+          "type": "string"
+        },
+        "uiLanguage": {
+          "description": "UI language",
+          "type": "string"
+        },
+        "uiVersion": {
+          "description": "UI version",
+          "type": "string"
+        },
+        "serverlessServiceSids": {
+          "description": "Serverless service SIDs",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "flexInsightsSid": {
+          "description": "Flex Insights SID",
+          "type": "string"
+        },
+        "dateCreated": {
+          "description": "Date created",
+          "type": "string"
+        },
+        "dateUpdated": {
+          "description": "Date updated",
+          "type": "string"
+        },
+        "attributes": {
+          "description": "Custom configuration attributes",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_flex_flows": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "get", "update", "delete", "list"],
+          "description": "Action to perform"
+        },
+        "flexFlowSid": {
+          "description": "Flex Flow SID (required for get/update/delete)",
+          "type": "string"
+        },
+        "friendlyName": {
+          "description": "Friendly name",
+          "type": "string"
+        },
+        "chatServiceSid": {
+          "description": "Chat Service SID",
+          "type": "string"
+        },
+        "channelType": {
+          "description": "Channel type",
+          "type": "string",
+          "enum": ["web", "sms", "facebook", "whatsapp", "custom"]
+        },
+        "contactIdentity": {
+          "description": "Contact identity",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Whether the Flex Flow is enabled",
+          "type": "boolean"
+        },
+        "integrationType": {
+          "description": "Integration type",
+          "type": "string",
+          "enum": ["studio", "external", "task"]
+        },
+        "integrationFlowSid": {
+          "description": "Studio Flow SID (for studio integration)",
+          "type": "string"
+        },
+        "integrationUrl": {
+          "description": "Webhook URL (for external integration)",
+          "type": "string"
+        },
+        "integrationWorkspaceSid": {
+          "description": "TaskRouter Workspace SID (for task integration)",
+          "type": "string"
+        },
+        "integrationWorkflowSid": {
+          "description": "TaskRouter Workflow SID (for task integration)",
+          "type": "string"
+        },
+        "integrationChannel": {
+          "description": "TaskRouter channel unique name (for task integration)",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results to return",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "flexFlows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "flexFlowSid": {
+                "type": "string",
+                "description": "Flex Flow SID"
+              },
+              "friendlyName": {
+                "description": "Friendly name",
+                "type": "string"
+              },
+              "channelType": {
+                "description": "Channel type (web, sms, facebook, whatsapp, custom)",
+                "type": "string"
+              },
+              "integrationType": {
+                "description": "Integration type (studio, external, task)",
+                "type": "string"
+              },
+              "contactIdentity": {
+                "description": "Contact identity",
+                "type": "string"
+              },
+              "enabled": {
+                "description": "Whether the Flex Flow is enabled",
+                "type": "boolean"
+              },
+              "chatServiceSid": {
+                "description": "Chat Service SID",
+                "type": "string"
+              },
+              "integrationFlowSid": {
+                "description": "Studio Flow SID (for studio integration)",
+                "type": "string"
+              },
+              "integrationUrl": {
+                "description": "Webhook URL (for external integration)",
+                "type": "string"
+              },
+              "dateCreated": {
+                "description": "Date created",
+                "type": "string"
+              },
+              "dateUpdated": {
+                "description": "Date updated",
+                "type": "string"
+              }
+            },
+            "required": ["flexFlowSid"],
+            "additionalProperties": false
+          },
+          "description": "Flex Flow records"
+        }
+      },
+      "required": ["flexFlows"],
+      "additionalProperties": false
+    }
+  },
+  "manage_conversations": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "get", "update", "delete", "list"],
+          "description": "Action to perform"
+        },
+        "conversationSid": {
+          "description": "Conversation SID (required for get/update/delete)",
+          "type": "string"
+        },
+        "friendlyName": {
+          "description": "Friendly name",
+          "type": "string"
+        },
+        "uniqueName": {
+          "description": "Unique name",
+          "type": "string"
+        },
+        "state": {
+          "description": "Conversation state",
+          "type": "string",
+          "enum": ["active", "inactive", "closed"]
+        },
+        "messagingServiceSid": {
+          "description": "Messaging Service SID",
+          "type": "string"
+        },
+        "timersInactive": {
+          "description": "ISO 8601 duration for inactive timer",
+          "type": "string"
+        },
+        "timersClosed": {
+          "description": "ISO 8601 duration for closed timer",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results to return",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "conversations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "conversationSid": {
+                "type": "string",
+                "description": "Conversation SID"
+              },
+              "friendlyName": {
+                "description": "Friendly name",
+                "type": "string"
+              },
+              "uniqueName": {
+                "description": "Unique name",
+                "type": "string"
+              },
+              "state": {
+                "description": "Conversation state (active, inactive, closed)",
+                "type": "string"
+              },
+              "chatServiceSid": {
+                "description": "Chat Service SID",
+                "type": "string"
+              },
+              "messagingServiceSid": {
+                "description": "Messaging Service SID",
+                "type": "string"
+              },
+              "dateCreated": {
+                "description": "Date created",
+                "type": "string"
+              },
+              "dateUpdated": {
+                "description": "Date updated",
+                "type": "string"
+              }
+            },
+            "required": ["conversationSid"],
+            "additionalProperties": false
+          },
+          "description": "Conversation records"
+        }
+      },
+      "required": ["conversations"],
+      "additionalProperties": false
+    }
+  },
+  "manage_conversation_participants": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["add", "remove", "update", "list", "get"],
+          "description": "Action to perform"
+        },
+        "conversationSid": {
+          "type": "string",
+          "description": "Conversation SID"
+        },
+        "participantSid": {
+          "description": "Participant SID (required for remove/update/get)",
+          "type": "string"
+        },
+        "identity": {
+          "description": "Chat participant identity (for chat-based participants)",
+          "type": "string"
+        },
+        "messagingBindingAddress": {
+          "description": "Phone number for SMS/WhatsApp participant (e.g., \"+1234567890\")",
+          "type": "string"
+        },
+        "messagingBindingProxyAddress": {
+          "description": "Twilio phone number for proxy (e.g., \"+0987654321\")",
+          "type": "string"
+        },
+        "roleSid": {
+          "description": "Role SID to assign to the participant",
+          "type": "string"
+        },
+        "attributes": {
+          "description": "JSON string of participant attributes",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results to return",
+          "type": "number"
+        }
+      },
+      "required": ["action", "conversationSid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "participantSid": {
+                "type": "string",
+                "description": "Participant SID"
+              },
+              "conversationSid": {
+                "description": "Conversation SID",
+                "type": "string"
+              },
+              "identity": {
+                "description": "Participant identity",
+                "type": "string"
+              },
+              "messagingBindingAddress": {
+                "description": "Messaging binding address (phone number)",
+                "type": "string"
+              },
+              "messagingBindingProxyAddress": {
+                "description": "Messaging binding proxy address",
+                "type": "string"
+              },
+              "roleSid": {
+                "description": "Role SID",
+                "type": "string"
+              },
+              "dateCreated": {
+                "description": "Date created",
+                "type": "string"
+              },
+              "dateUpdated": {
+                "description": "Date updated",
+                "type": "string"
+              }
+            },
+            "required": ["participantSid"],
+            "additionalProperties": false
+          },
+          "description": "Participant records"
+        }
+      },
+      "required": ["participants"],
+      "additionalProperties": false
+    }
+  },
+  "send_conversation_message": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "conversationSid": {
+          "type": "string",
+          "description": "Conversation SID"
+        },
+        "body": {
+          "description": "Message body text",
+          "type": "string"
+        },
+        "author": {
+          "description": "Identity of the message author",
+          "type": "string"
+        },
+        "attributes": {
+          "description": "JSON string of custom message attributes",
+          "type": "string"
+        },
+        "mediaContentType": {
+          "description": "Media content type (e.g., \"image/jpeg\")",
+          "type": "string"
+        },
+        "mediaSid": {
+          "description": "Media SID to attach",
+          "type": "string"
+        }
+      },
+      "required": ["conversationSid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "messageSid": {
+          "type": "string",
+          "description": "SID of the sent message"
+        },
+        "conversationSid": {
+          "type": "string",
+          "description": "Conversation SID"
+        },
+        "body": {
+          "description": "Message body",
+          "type": "string"
+        },
+        "author": {
+          "description": "Message author",
+          "type": "string"
+        },
+        "dateCreated": {
+          "description": "Date created",
+          "type": "string"
+        },
+        "index": {
+          "description": "Message index in the conversation",
+          "type": "number"
+        }
+      },
+      "required": ["messageSid", "conversationSid"],
+      "additionalProperties": false
+    }
+  },
+  "list_conversation_messages": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "conversationSid": {
+          "type": "string",
+          "description": "Conversation SID"
+        },
+        "order": {
+          "description": "Sort order by date (asc or desc)",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "pageSize": {
+          "description": "Number of messages to return (max 100)",
+          "type": "number"
+        }
+      },
+      "required": ["conversationSid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "messageSid": {
+                "type": "string",
+                "description": "Message SID"
+              },
+              "conversationSid": {
+                "description": "Conversation SID",
+                "type": "string"
+              },
+              "body": {
+                "description": "Message body",
+                "type": "string"
+              },
+              "author": {
+                "description": "Message author",
+                "type": "string"
+              },
+              "participantSid": {
+                "description": "Participant SID",
+                "type": "string"
+              },
+              "index": {
+                "description": "Message index",
+                "type": "number"
+              },
+              "dateCreated": {
+                "description": "Date created",
+                "type": "string"
+              },
+              "dateUpdated": {
+                "description": "Date updated",
+                "type": "string"
+              }
+            },
+            "required": ["messageSid"],
+            "additionalProperties": false
+          },
+          "description": "Message records"
+        }
+      },
+      "required": ["messages"],
+      "additionalProperties": false
+    }
+  },
+  "manage_studio_flows": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "get", "trigger", "list_executions", "get_execution"],
+          "description": "Action to perform"
+        },
+        "flowSid": {
+          "description": "Flow SID (required for get/trigger/list_executions/get_execution)",
+          "type": "string"
+        },
+        "executionSid": {
+          "description": "Execution SID (required for get_execution)",
+          "type": "string"
+        },
+        "to": {
+          "description": "Recipient phone number for trigger (e.g., \"+1234567890\")",
+          "type": "string"
+        },
+        "from": {
+          "description": "Sender phone number for trigger (e.g., \"+0987654321\")",
+          "type": "string"
+        },
+        "parameters": {
+          "description": "Additional parameters as key-value pairs for trigger",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "pageSize": {
+          "description": "Number of results to return",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "flows": {
+          "description": "Flow records",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "flowSid": {
+                "type": "string",
+                "description": "Flow SID"
+              },
+              "friendlyName": {
+                "description": "Friendly name",
+                "type": "string"
+              },
+              "status": {
+                "description": "Flow status (draft, published)",
+                "type": "string"
+              },
+              "version": {
+                "description": "Flow version",
+                "type": "number"
+              },
+              "revision": {
+                "description": "Flow revision",
+                "type": "number"
+              },
+              "commitMessage": {
+                "description": "Commit message",
+                "type": "string"
+              },
+              "dateCreated": {
+                "description": "Date created",
+                "type": "string"
+              },
+              "dateUpdated": {
+                "description": "Date updated",
+                "type": "string"
+              }
+            },
+            "required": ["flowSid"],
+            "additionalProperties": false
+          }
+        },
+        "executions": {
+          "description": "Execution records",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "executionSid": {
+                "type": "string",
+                "description": "Execution SID"
+              },
+              "flowSid": {
+                "description": "Flow SID",
+                "type": "string"
+              },
+              "status": {
+                "description": "Execution status",
+                "type": "string"
+              },
+              "contactChannelAddress": {
+                "description": "Contact channel address",
+                "type": "string"
+              },
+              "dateCreated": {
+                "description": "Date created",
+                "type": "string"
+              },
+              "dateUpdated": {
+                "description": "Date updated",
+                "type": "string"
+              }
+            },
+            "required": ["executionSid"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_workspace_statistics": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workspaceSid": {
+          "type": "string",
+          "description": "Workspace SID"
+        },
+        "scope": {
+          "default": "workspace",
+          "description": "Statistics scope",
+          "type": "string",
+          "enum": ["workspace", "task_queue", "worker"]
+        },
+        "taskQueueSid": {
+          "description": "Task Queue SID (required when scope is task_queue)",
+          "type": "string"
+        },
+        "workerSid": {
+          "description": "Worker SID (required when scope is worker)",
+          "type": "string"
+        },
+        "minutesFilter": {
+          "description": "Filter cumulative statistics to the last N minutes",
+          "type": "number"
+        },
+        "startDate": {
+          "description": "Start date for statistics window (ISO 8601)",
+          "type": "string"
+        },
+        "endDate": {
+          "description": "End date for statistics window (ISO 8601)",
+          "type": "string"
+        }
+      },
+      "required": ["workspaceSid", "scope"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "realtime": {
+          "description": "Real-time statistics",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "cumulative": {
+          "description": "Cumulative statistics",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "workspaceSid": {
+          "description": "Workspace SID",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

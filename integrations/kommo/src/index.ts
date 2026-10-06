@@ -26,13 +26,6 @@ import {
   updateLeadTool,
   updateTaskTool
 } from './tools';
-import {
-  companyEventsTrigger,
-  contactEventsTrigger,
-  leadEventsTrigger,
-  taskEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -61,5 +54,5 @@ export let provider = Slate.create({
     getAccountTool,
     listEventsTool
   ],
-  triggers: [leadEventsTrigger, contactEventsTrigger, companyEventsTrigger, taskEventsTrigger]
+  triggers: []
 });

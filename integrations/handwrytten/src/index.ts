@@ -14,8 +14,6 @@ import {
   manageTemplates,
   sendCard
 } from './tools';
-import { inboundWebhook, orderStatusChanged } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     listInserts,
     listReturnAddresses
   ],
-  triggers: [inboundWebhook, orderStatusChanged]
+  triggers: []
 });

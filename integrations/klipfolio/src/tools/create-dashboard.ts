@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { createdId, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let createDashboard = SlateTool.create(spec, {
@@ -25,6 +26,7 @@ export let createDashboard = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.createTab({
@@ -33,13 +35,12 @@ export let createDashboard = SlateTool.create(spec, {
       clientId: ctx.input.clientId
     });
 
-    let location = result?.meta?.location;
-    let dashboardId = location ? location.split('/').pop() : undefined;
+    let dashboardId = createdId(result, 'tabs');
 
     return {
       output: {
         dashboardId,
-        location
+        location: `/tabs/${dashboardId}`
       },
       message: `Created dashboard **${ctx.input.name}**${dashboardId ? ` with ID \`${dashboardId}\`` : ''}.`
     };

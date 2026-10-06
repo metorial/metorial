@@ -1,17 +1,17 @@
 {
   "name": "@metorial/salesflare",
-  "description": "Manage CRM data for B2B sales including accounts, contacts, opportunities, and pipelines. Create, read, update, and delete accounts (companies) and contacts with details like emails, phone numbers, addresses, tags, and custom fields. Manage sales opportunities with filtering by stage, owner, value, and close date. Create and track tasks, log meetings and calls, and write internal notes on account timelines. Configure and manage email workflows with scheduling and audience control. Manage tags, custom fields, users, teams, and email data sources. Access reference data such as currencies, pipeline stages, and filter fields.",
+  "description": "Discover and maintain CRM accounts, contacts, opportunities, tasks, internal notes and tags. Read current user/team identity, users, pipeline stages, currencies, custom-field definitions and workflows. Log intended meeting and call activities with explicit awareness of notification, automation and retention effects.",
   "categories": ["crm-and-sales-tools"],
   "skills": [
-    "manage accounts and contacts",
+    "maintain accounts and contacts",
     "track sales opportunities",
-    "manage sales pipelines",
+    "discover pipelines and stages",
     "create and assign tasks",
-    "log meetings and calls",
-    "manage email workflows",
-    "create internal notes",
-    "manage tags and custom fields",
-    "list and manage users",
-    "configure email data sources"
+    "list and maintain internal notes",
+    "maintain tags",
+    "discover custom fields",
+    "read users and current team identity",
+    "read workflows",
+    "log intended meeting and call activities"
   ]
 }

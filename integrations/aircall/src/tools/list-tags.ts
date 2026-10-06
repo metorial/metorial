@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTag } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listTags = SlateTool.create(spec, {
@@ -23,36 +24,29 @@ export let listTags = SlateTool.create(spec, {
         z.object({
           tagId: z.number().describe('Unique tag identifier'),
           tagName: z.string().describe('Tag name'),
-          createdAt: z.string().describe('Creation date as ISO string')
+          createdAt: z.string().optional().describe('Creation date as ISO string')
         })
       ),
+      perPage: z.number().optional(),
+      nextPageLink: z.string().nullable().optional(),
+      previousPageLink: z.string().nullable().optional(),
+      collectionLimit: z.number().optional(),
+      historyWindowMonths: z.number().optional(),
       totalCount: z.number().describe('Total number of tags'),
       currentPage: z.number().describe('Current page number')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth);
-
-    let result = await client.listTags({
-      page: ctx.input.page,
-      perPage: ctx.input.perPage
-    });
-
-    let tags = result.items.map((tag: any) => ({
-      tagId: tag.id,
-      tagName: tag.name,
-      createdAt: tag.created_at
-        ? new Date(tag.created_at * 1000).toISOString()
-        : new Date().toISOString()
-    }));
-
+    const result = await new Client(ctx.auth).listTags(ctx.input);
     return {
       output: {
-        tags,
+        tags: result.items.map(mapTag),
         totalCount: result.meta.total,
-        currentPage: result.meta.currentPage
+        currentPage: result.meta.currentPage,
+        perPage: result.meta.perPage,
+        nextPageLink: result.meta.nextPageLink
       },
-      message: `Found **${result.meta.total}** tags.`
+      message: `Retrieved ${result.items.length} tags. Supply decimal tag ID strings to list_calls.`
     };
   })
   .build();

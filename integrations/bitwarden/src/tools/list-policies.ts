@@ -11,6 +11,12 @@ let policySchema = z.object({
       'Policy type: 0=TwoFactorAuthentication, 1=MasterPassword, 2=PasswordGenerator, 3=SingleOrg, 4=RequireSso, 5=OrgDataOwnership, 6=DisableSend, 7=SendOptions, 8=ResetPassword, 9=MaxVaultTimeout, 10=DisablePersonalVaultExport'
     ),
   enabled: z.boolean().describe('Whether the policy is currently enabled'),
+  configurationAvailable: z
+    .boolean()
+    .optional()
+    .describe(
+      'Whether the provider exposed the configuration field; false means its current value is unknown.'
+    ),
   configuration: z
     .record(z.string(), z.any())
     .nullable()
@@ -34,8 +40,7 @@ export let listPolicies = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.auth.serverUrl
+      ...ctx.auth
     });
 
     let policies = await client.listPolicies();
@@ -44,7 +49,8 @@ export let listPolicies = SlateTool.create(spec, {
       policyId: p.id,
       policyType: p.type,
       enabled: p.enabled,
-      configuration: p.data
+      configurationAvailable: p.data !== undefined,
+      configuration: p.data ?? null
     }));
 
     return {

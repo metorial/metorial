@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let http = createAxios({
-  baseURL: 'https://api.bolna.ai'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -30,14 +27,8 @@ export let auth = SlateAuth.create()
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await http.get('/user/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data;
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let user = await new Client(ctx.output.token).getUserInfo();
 
       return {
         profile: {

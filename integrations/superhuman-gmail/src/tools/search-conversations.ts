@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
+import { GMAIL_FULL, GMAIL_MODIFY, GMAIL_READ } from '../auth';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -17,6 +18,7 @@ export let searchConversations = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf(GMAIL_FULL, GMAIL_MODIFY, GMAIL_READ))
   .input(
     z.object({
       query: z
@@ -45,12 +47,13 @@ export let searchConversations = SlateTool.create(spec, {
       conversations: z.array(
         z.object({
           threadId: z.string(),
-          snippet: z.string(),
-          historyId: z.string()
+          snippet: z.string().optional(),
+          historyId: z.string().optional()
         })
       ),
       nextPageToken: z.string().optional(),
-      resultSizeEstimate: z.number()
+      resultSizeEstimate: z.number().optional(),
+      returnedCount: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -75,8 +78,9 @@ export let searchConversations = SlateTool.create(spec, {
           historyId: t.historyId
         })),
         nextPageToken: result.nextPageToken,
-        resultSizeEstimate: result.resultSizeEstimate
+        resultSizeEstimate: result.resultSizeEstimate,
+        returnedCount: result.threads.length
       },
-      message: `Found **${result.resultSizeEstimate}** matching conversations; returned **${result.threads.length}**.`
+      message: `Returned **${result.threads.length}** conversations${result.nextPageToken ? '; use nextPageToken for the next page' : ''}.`
     };
   });

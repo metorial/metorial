@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listCommandResults = SlateTool.create(spec, {
@@ -16,6 +17,7 @@ export let listCommandResults = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       limit: z
         .number()
         .min(1)
@@ -39,14 +41,18 @@ export let listCommandResults = SlateTool.create(spec, {
         .array(
           z.object({
             resultId: z.string().describe('Command result ID'),
-            commandId: z.string().describe('Command ID'),
+            commandId: z
+              .string()
+              .describe(
+                'Legacy field containing the native command value; the API describes this as the executed command, not an independently verified ID'
+              ),
             commandName: z.string().describe('Command name'),
             systemId: z.string().describe('System ID that executed the command'),
             systemName: z.string().optional().describe('System name'),
             exitCode: z.number().optional().describe('Exit code (0 = success)'),
             output: z.string().optional().describe('Command stdout output'),
             error: z.string().optional().describe('Command stderr output'),
-            requestTime: z.string().describe('When the command was requested'),
+            requestTime: z.string().optional().describe('When the command was requested'),
             responseTime: z.string().optional().describe('When the command completed')
           })
         )
@@ -55,37 +61,37 @@ export let listCommandResults = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      let result = await client.listCommandResults({
+        limit: ctx.input.limit,
+        skip: ctx.input.skip,
+        filter: ctx.input.filter,
+        sort: ctx.input.sort
+      });
 
-    let result = await client.listCommandResults({
-      limit: ctx.input.limit,
-      skip: ctx.input.skip,
-      filter: ctx.input.filter,
-      sort: ctx.input.sort
-    });
+      let results = result.results.map(r => ({
+        resultId: r._id,
+        commandId: r.command,
+        commandName: r.name,
+        systemId: r.systemId,
+        systemName: r.system,
+        exitCode: r.response?.data?.exitCode ?? r.exitCode,
+        output: r.response?.data?.output,
+        error: r.response?.error,
+        requestTime: r.requestTime ?? undefined,
+        responseTime: r.responseTime ?? undefined
+      }));
 
-    let results = result.results.map(r => ({
-      resultId: r._id,
-      commandId: r.command,
-      commandName: r.name,
-      systemId: r.systemId ?? r.system,
-      systemName: r.system,
-      exitCode: r.response?.data?.exitCode ?? r.exitCode,
-      output: r.response?.data?.output,
-      error: r.response?.data?.error,
-      requestTime: r.requestTime,
-      responseTime: r.responseTime
-    }));
-
-    return {
-      output: {
-        results,
-        totalCount: result.totalCount
-      },
-      message: `Found **${result.totalCount}** command results. Returned **${results.length}**.`
-    };
+      return {
+        output: {
+          results,
+          totalCount: result.totalCount
+        },
+        message: `Found **${result.totalCount}** command results. Returned **${results.length}**.`
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
+    }
   })
   .build();

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StoryblokClient } from '../lib/client';
+import { branches, resolveSpace, spaceIdInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let componentOutputSchema = z.object({
@@ -13,7 +14,7 @@ let componentOutputSchema = z.object({
     .optional()
     .describe('Whether this can be nested inside other components'),
   schema: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .optional()
     .describe('Component field schema definition'),
   createdAt: z.string().optional().describe('Creation timestamp')
@@ -30,14 +31,15 @@ export let manageComponent = SlateTool.create(spec, {
     'Schema is a JSON object where keys are field names and values define field types (e.g. `{ "title": { "type": "text" }, "body": { "type": "richtext" } }`).'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      spaceId: spaceIdInput,
       action: z
-        .enum(['create', 'update', 'delete'])
+        .enum(['create', 'update', 'delete', 'get'])
         .describe('The component management action to perform'),
       componentId: z
         .string()
@@ -49,7 +51,7 @@ export let manageComponent = SlateTool.create(spec, {
         .describe('Technical name for the component (required for create)'),
       displayName: z.string().optional().describe('Human-friendly display name'),
       schema: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Field schema definition object'),
       isRoot: z
@@ -70,16 +72,48 @@ export let manageComponent = SlateTool.create(spec, {
   )
   .output(componentOutputSchema)
   .handleInvocation(async ctx => {
+    branches(
+      ctx.input,
+      {
+        create: [
+          'name',
+          'displayName',
+          'schema',
+          'isRoot',
+          'isNestable',
+          'componentGroupUuid',
+          'color',
+          'icon'
+        ],
+        update: [
+          'componentId',
+          'name',
+          'displayName',
+          'schema',
+          'isRoot',
+          'isNestable',
+          'componentGroupUuid',
+          'color',
+          'icon'
+        ],
+        delete: ['componentId'],
+        get: ['componentId']
+      }[ctx.input.action]
+    );
     let client = new StoryblokClient({
-      token: ctx.auth.token,
-      region: ctx.auth.region,
-      spaceId: ctx.config.spaceId
+      ...ctx.auth,
+      spaceId: resolveSpace(
+        ctx.input.spaceId,
+        ctx.config.spaceId,
+        ctx.auth.mode === 'oauth' ? ctx.auth.spaceId : undefined
+      )
     });
 
     let { action, componentId } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required to create a component');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required to create a component');
 
       let component = await client.createComponent({
         name: ctx.input.name,
@@ -106,27 +140,30 @@ export let manageComponent = SlateTool.create(spec, {
       };
     }
 
-    if (!componentId) throw new Error('componentId is required for this action');
+    if (!componentId) throw createApiServiceError('componentId is required for this action');
 
     if (action === 'delete') {
       await client.deleteComponent(componentId);
       return {
-        output: { componentId: Number.parseInt(componentId, 10) },
+        output: { componentId: Number(componentId) },
         message: `Deleted component \`${componentId}\`.`
       };
     }
 
     // action === 'update'
-    let component = await client.updateComponent(componentId, {
-      name: ctx.input.name,
-      displayName: ctx.input.displayName,
-      schema: ctx.input.schema,
-      isRoot: ctx.input.isRoot,
-      isNestable: ctx.input.isNestable,
-      componentGroupUuid: ctx.input.componentGroupUuid,
-      color: ctx.input.color,
-      icon: ctx.input.icon
-    });
+    let component =
+      action === 'get'
+        ? await client.getComponent(componentId)
+        : await client.updateComponent(componentId, {
+            name: ctx.input.name,
+            displayName: ctx.input.displayName,
+            schema: ctx.input.schema,
+            isRoot: ctx.input.isRoot,
+            isNestable: ctx.input.isNestable,
+            componentGroupUuid: ctx.input.componentGroupUuid,
+            color: ctx.input.color,
+            icon: ctx.input.icon
+          });
 
     return {
       output: {
@@ -138,7 +175,10 @@ export let manageComponent = SlateTool.create(spec, {
         schema: component.schema,
         createdAt: component.created_at
       },
-      message: `Updated component **${component.name}** (\`${component.id}\`).`
+      message:
+        action === 'get'
+          ? 'Retrieved the exact component.'
+          : `Updated component **${component.name}** (\`${component.id}\`).`
     };
   })
   .build();

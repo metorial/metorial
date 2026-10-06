@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwitchClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageClips = SlateTool.create(spec, {
@@ -39,6 +40,10 @@ export let manageClips = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter clips created before this date (RFC 3339)'),
+      accepted: z
+        .boolean()
+        .optional()
+        .describe('Whether Twitch accepted clip creation; availability is asynchronous'),
       cursor: z.string().optional().describe('Pagination cursor')
     })
   )
@@ -65,21 +70,26 @@ export let manageClips = SlateTool.create(spec, {
           })
         )
         .optional(),
+      accepted: z
+        .boolean()
+        .optional()
+        .describe('Whether Twitch accepted clip creation; availability is asynchronous'),
       cursor: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId);
+    validateInput('manage_clips', ctx.input, [ctx.auth.token]);
+    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId, ctx.auth.userId);
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.broadcasterId)
-        throw new Error('broadcasterId is required to create a clip');
+        throw createApiServiceError('broadcasterId is required to create a clip');
 
       let result = await client.createClip(ctx.input.broadcasterId, ctx.input.hasDelay);
 
       return {
-        output: { clipId: result.clipId, editUrl: result.editUrl },
-        message: `Clip created: [Edit clip](${result.editUrl})`
+        output: { clipId: result.clipId, editUrl: result.editUrl, accepted: true },
+        message: `Clip creation accepted. Availability is asynchronous; use action get with this clip ID to verify it.`
       };
     }
 

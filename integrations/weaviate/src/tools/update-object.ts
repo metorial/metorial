@@ -21,6 +21,10 @@ export let updateObject = SlateTool.create(spec, {
       objectId: z.string().describe('UUID of the object to update'),
       properties: z.record(z.string(), z.any()).describe('Properties to update'),
       vector: z.array(z.number()).optional().describe('Updated vector embedding'),
+      vectors: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Named vector embeddings keyed by vector name'),
       tenant: z.string().optional().describe('Tenant name for multi-tenant collections'),
       replaceAll: z
         .boolean()
@@ -39,19 +43,24 @@ export let updateObject = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let { collectionName, objectId, properties, vector, tenant, replaceAll } = ctx.input;
+    let { collectionName, objectId, properties, vector, vectors, tenant, replaceAll } =
+      ctx.input;
 
     if (replaceAll) {
       await client.updateObject(collectionName, objectId, {
         class: collectionName,
+        id: objectId,
         properties,
         vector,
+        vectors,
         tenant
       });
     } else {
       await client.patchObject(collectionName, objectId, {
         class: collectionName,
         properties,
+        vector,
+        vectors,
         tenant
       });
     }

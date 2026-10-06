@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VonageRestClient } from '../lib/client';
+import { invalid, protect, url } from '../lib/validation';
 import { spec } from '../spec';
 
 let capabilitiesSchema = z
@@ -52,18 +53,60 @@ let capabilitiesSchema = z
   .optional()
   .describe('Application capabilities configuration with webhook URLs');
 
+function mapCapabilities(
+  caps: z.infer<typeof capabilitiesSchema>
+): Record<string, unknown> | undefined {
+  if (caps === undefined) return undefined;
+  const result: Record<string, unknown> = {};
+  const webhook = (
+    value: { address: string; httpMethod?: string } | undefined,
+    defaultMethod: string
+  ) => {
+    if (value === undefined) return undefined;
+    const method = value.httpMethod ?? defaultMethod;
+    if (!['GET', 'POST'].includes(method))
+      throw invalid('Webhook httpMethod must be GET or POST.');
+    return { address: url(value.address), http_method: method };
+  };
+  const webhooks = (items: Record<string, unknown>) =>
+    Object.fromEntries(Object.entries(items).filter(([, value]) => value !== undefined));
+  if (caps.voice)
+    result.voice = {
+      webhooks: webhooks({
+        answer_url: webhook(caps.voice.webhooks?.answerUrl, 'GET'),
+        fallback_answer_url: webhook(caps.voice.webhooks?.fallbackAnswerUrl, 'GET'),
+        event_url: webhook(caps.voice.webhooks?.eventUrl, 'POST')
+      })
+    };
+  if (caps.messages)
+    result.messages = {
+      webhooks: webhooks({
+        inbound_url: webhook(caps.messages.webhooks?.inboundUrl, 'POST'),
+        status_url: webhook(caps.messages.webhooks?.statusUrl, 'POST')
+      })
+    };
+  if (caps.rtc)
+    result.rtc = {
+      webhooks: webhooks({ event_url: webhook(caps.rtc.webhooks?.eventUrl, 'POST') })
+    };
+  if (caps.vbc) result.vbc = {};
+  return result;
+}
+
 export let manageApplications = SlateTool.create(spec, {
   name: 'Manage Applications',
   key: 'manage_applications',
   description: `Create, list, update, or delete Vonage Applications. Applications are containers for capabilities (Voice, Messages, RTC, VBC) with their own webhook URLs and key pairs.
-Requires the **API Key, Secret & Application JWT** auth method.`,
+Uses API key and secret authentication. Creation requires a caller-owned public key; private keys are never returned. Updates preserve omitted native settings without a concurrency guarantee. Deletion is permanent.`,
   instructions: [
     'Use action "list" to see all applications.',
     'Use action "get" to retrieve a specific application.',
     'Use action "create" to make a new application with capabilities.',
     'Use action "update" to modify an existing application.',
     'Use action "delete" to remove an application.',
-    'The capabilities object configures which APIs the application uses and their webhook URLs.'
+    'The capabilities object configures selected APIs and webhook URLs. Omitted native settings are preserved on update.',
+    'Use publicKey from a saved keypair for create; keep the matching private key securely.',
+    'Read the exact application before update and prevent concurrent changes.'
   ],
   tags: {
     destructive: true,
@@ -79,6 +122,12 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
         .string()
         .optional()
         .describe('Application ID (required for get, update, delete)'),
+      publicKey: z
+        .string()
+        .optional()
+        .describe(
+          'RSA public key from a keypair you already saved; required before create. Keep the matching private key securely.'
+        ),
       name: z
         .string()
         .optional()
@@ -90,6 +139,10 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
   )
   .output(
     z.object({
+      totalPages: z.number().optional().describe('Total native pages'),
+      page: z.number().optional().describe('Current native page'),
+      pageSize: z.number().optional().describe('Native page size'),
+      nextPage: z.number().optional().describe('Next page; absent when complete'),
       totalItems: z.number().optional().describe('Total applications count (list action)'),
       applications: z
         .array(
@@ -119,6 +172,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
     })
   )
   .handleInvocation(async ctx => {
+    protect(ctx.input, [ctx.auth.apiSecret, ctx.auth.privateKey ?? '']);
     let client = new VonageRestClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret,
@@ -134,15 +188,14 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
         });
         return {
           output: {
-            totalItems: listResult.totalItems,
-            applications: listResult.applications
+            ...listResult
           },
           message: `Found **${listResult.totalItems}** application(s). Showing **${listResult.applications.length}** results.`
         };
       }
 
       case 'get': {
-        if (!ctx.input.applicationId) throw new Error('applicationId is required for get');
+        if (!ctx.input.applicationId) throw invalid('applicationId is required for get');
         let app = await client.getApplication(ctx.input.applicationId);
         return {
           output: { application: app },
@@ -151,73 +204,13 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
       }
 
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required for create');
+        if (!ctx.input.name) throw invalid('name is required for create');
 
-        let capabilitiesBody: Record<string, unknown> = {};
-        if (ctx.input.capabilities) {
-          let caps = ctx.input.capabilities;
-          if (caps.voice) {
-            capabilitiesBody.voice = {
-              webhooks: {
-                answer_url: caps.voice.webhooks?.answerUrl
-                  ? {
-                      address: caps.voice.webhooks.answerUrl.address,
-                      http_method: caps.voice.webhooks.answerUrl.httpMethod || 'GET'
-                    }
-                  : undefined,
-                fallback_answer_url: caps.voice.webhooks?.fallbackAnswerUrl
-                  ? {
-                      address: caps.voice.webhooks.fallbackAnswerUrl.address,
-                      http_method: caps.voice.webhooks.fallbackAnswerUrl.httpMethod || 'GET'
-                    }
-                  : undefined,
-                event_url: caps.voice.webhooks?.eventUrl
-                  ? {
-                      address: caps.voice.webhooks.eventUrl.address,
-                      http_method: caps.voice.webhooks.eventUrl.httpMethod || 'POST'
-                    }
-                  : undefined
-              }
-            };
-          }
-          if (caps.messages) {
-            capabilitiesBody.messages = {
-              webhooks: {
-                inbound_url: caps.messages.webhooks?.inboundUrl
-                  ? {
-                      address: caps.messages.webhooks.inboundUrl.address,
-                      http_method: caps.messages.webhooks.inboundUrl.httpMethod || 'POST'
-                    }
-                  : undefined,
-                status_url: caps.messages.webhooks?.statusUrl
-                  ? {
-                      address: caps.messages.webhooks.statusUrl.address,
-                      http_method: caps.messages.webhooks.statusUrl.httpMethod || 'POST'
-                    }
-                  : undefined
-              }
-            };
-          }
-          if (caps.rtc) {
-            capabilitiesBody.rtc = {
-              webhooks: {
-                event_url: caps.rtc.webhooks?.eventUrl
-                  ? {
-                      address: caps.rtc.webhooks.eventUrl.address,
-                      http_method: caps.rtc.webhooks.eventUrl.httpMethod || 'POST'
-                    }
-                  : undefined
-              }
-            };
-          }
-          if (caps.vbc) {
-            capabilitiesBody.vbc = {};
-          }
-        }
-
+        let capabilitiesBody = mapCapabilities(ctx.input.capabilities);
         let created = await client.createApplication({
           name: ctx.input.name,
-          capabilities: Object.keys(capabilitiesBody).length > 0 ? capabilitiesBody : undefined
+          publicKey: ctx.input.publicKey,
+          capabilities: capabilitiesBody
         });
         return {
           output: { application: created },
@@ -226,10 +219,10 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
       }
 
       case 'update': {
-        if (!ctx.input.applicationId) throw new Error('applicationId is required for update');
+        if (!ctx.input.applicationId) throw invalid('applicationId is required for update');
         let updated = await client.updateApplication(ctx.input.applicationId, {
           name: ctx.input.name,
-          capabilities: ctx.input.capabilities as Record<string, unknown> | undefined
+          capabilities: mapCapabilities(ctx.input.capabilities)
         });
         return {
           output: { application: updated },
@@ -238,7 +231,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
       }
 
       case 'delete': {
-        if (!ctx.input.applicationId) throw new Error('applicationId is required for delete');
+        if (!ctx.input.applicationId) throw invalid('applicationId is required for delete');
         await client.deleteApplication(ctx.input.applicationId);
         return {
           output: { success: true },

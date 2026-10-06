@@ -1,17 +1,29 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://api.scale.com/v1';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token?.trim()) {
+      throw createApiServiceError(
+        'A Scale AI API key is required. Reconnect with a valid API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
+      timeout: 30000,
       auth: {
         username: config.token,
         password: ''
-      }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Scale AI',
+          reason: 'scale_ai_api_error'
+        })
     });
   }
 
@@ -69,24 +81,10 @@ export class Client {
     return res.data;
   }
 
-  async setProjectOntology(
-    projectName: string,
-    params: {
-      name: string;
-      ontology: any[];
-    }
-  ) {
-    let res = await this.axios.post(
-      `/projects/${encodeURIComponent(projectName)}/setOntology`,
-      params
-    );
-    return res.data;
-  }
-
   // ─── Tasks ──────────────────────────────────────────────────
 
   async createTask(taskType: string, params: Record<string, any>) {
-    let res = await this.axios.post(`/task/${taskType}`, params);
+    let res = await this.axios.post(`/task/${encodeURIComponent(taskType)}`, params);
     return res.data;
   }
 
@@ -127,8 +125,8 @@ export class Client {
       query.customer_review_status = params.customerReviewStatus;
     if (params?.completedAfter) query.completed_after = params.completedAfter;
     if (params?.completedBefore) query.completed_before = params.completedBefore;
-    if (params?.createdAfter) query.created_after = params.createdAfter;
-    if (params?.createdBefore) query.created_before = params.createdBefore;
+    if (params?.createdAfter) query.start_time = params.createdAfter;
+    if (params?.createdBefore) query.end_time = params.createdBefore;
     if (params?.updatedAfter) query.updated_after = params.updatedAfter;
     if (params?.updatedBefore) query.updated_before = params.updatedBefore;
     if (params?.includeAttachmentUrl !== undefined)
@@ -157,19 +155,31 @@ export class Client {
     return res.data;
   }
 
+  async setTaskUniqueId(taskId: string, uniqueId: string) {
+    let res = await this.axios.post(`/task/${encodeURIComponent(taskId)}/unique_id`, {
+      unique_id: uniqueId
+    });
+    return res.data;
+  }
+
+  async clearTaskUniqueId(taskId: string) {
+    let res = await this.axios.delete(`/task/${encodeURIComponent(taskId)}/unique_id`);
+    return res.data;
+  }
+
   async setTaskTags(taskId: string, tags: string[]) {
-    let res = await this.axios.put(`/task/${encodeURIComponent(taskId)}/tags`, { tags });
+    let res = await this.axios.post(`/task/${encodeURIComponent(taskId)}/tags`, tags);
     return res.data;
   }
 
   async addTaskTags(taskId: string, tags: string[]) {
-    let res = await this.axios.post(`/task/${encodeURIComponent(taskId)}/tags`, { tags });
+    let res = await this.axios.put(`/task/${encodeURIComponent(taskId)}/tags`, tags);
     return res.data;
   }
 
   async deleteTaskTags(taskId: string, tags: string[]) {
     let res = await this.axios.delete(`/task/${encodeURIComponent(taskId)}/tags`, {
-      data: { tags }
+      data: tags
     });
     return res.data;
   }
@@ -280,21 +290,13 @@ export class Client {
     return res.data;
   }
 
-  async listFiles(params: { project: string; metadata?: string; cursor?: string }) {
-    let query: Record<string, any> = {
-      project: params.project
-    };
-    if (params.metadata) query.metadata = params.metadata;
-    if (params.cursor) query.cursor = params.cursor;
-
-    let res = await this.axios.get('/files', { params: query });
-    return res.data;
-  }
-
   // ─── Evaluation Tasks ──────────────────────────────────────
 
   async createEvaluationTask(taskType: string, params: Record<string, any>) {
-    let res = await this.axios.post(`/evaluation_tasks/${taskType}`, params);
+    let res = await this.axios.post(
+      `/evaluation_tasks/${encodeURIComponent(taskType)}`,
+      params
+    );
     return res.data;
   }
 }

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let findUserOrGroup = SlateTool.create(spec, {
@@ -65,6 +66,15 @@ export let findUserOrGroup = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let { lookupType, resourceId, query } = ctx.input;
 
+    if (
+      resourceId !== undefined &&
+      (query !== undefined ||
+        ctx.input.includeArchived !== undefined ||
+        ctx.input.cursor !== undefined)
+    )
+      throw invalid('ID lookup does not accept search filters.');
+    if (lookupType === 'group' && ctx.input.includeArchived !== undefined)
+      throw invalid('includeArchived applies only to user search.');
     if (lookupType === 'user') {
       if (resourceId) {
         let user = await client.getUser(resourceId);
@@ -77,7 +87,7 @@ export let findUserOrGroup = SlateTool.create(spec, {
                 displayName: user.displayName,
                 organizationRole: user.organizationRole,
                 isGuest: user.isGuest,
-                archivedAt: user.archivedAt ?? null
+                archivedAt: user.archivedAt
               }
             ]
           },
@@ -86,7 +96,7 @@ export let findUserOrGroup = SlateTool.create(spec, {
       }
 
       if (!query) {
-        throw new Error('Either resourceId or query must be provided');
+        throw invalid('Either resourceId or query must be provided');
       }
 
       let result = await client.searchUsers(
@@ -94,13 +104,13 @@ export let findUserOrGroup = SlateTool.create(spec, {
         ctx.input.includeArchived,
         ctx.input.cursor
       );
-      let users = (result.users || []).map((u: any) => ({
+      let users = result.users.map(u => ({
         userId: u.id,
         email: u.email,
         displayName: u.displayName,
         organizationRole: u.organizationRole,
         isGuest: u.isGuest,
-        archivedAt: u.archivedAt ?? null
+        archivedAt: u.archivedAt
       }));
 
       return {
@@ -108,7 +118,7 @@ export let findUserOrGroup = SlateTool.create(spec, {
           users,
           total: result.total,
           hasNextPage: result.hasNextPage,
-          nextCursor: result.nextCursor ?? null
+          nextCursor: result.nextCursor
         },
         message: `Found **${users.length}** user(s) matching "${query}"`
       };
@@ -132,11 +142,11 @@ export let findUserOrGroup = SlateTool.create(spec, {
     }
 
     if (!query) {
-      throw new Error('Either resourceId or query must be provided');
+      throw invalid('Either resourceId or query must be provided');
     }
 
     let result = await client.searchGroups(query, ctx.input.cursor);
-    let groups = (result.groups || []).map((g: any) => ({
+    let groups = result.groups.map(g => ({
       groupId: g.id,
       name: g.name,
       description: g.description
@@ -147,7 +157,7 @@ export let findUserOrGroup = SlateTool.create(spec, {
         groups,
         total: result.total,
         hasNextPage: result.hasNextPage,
-        nextCursor: result.nextCursor ?? null
+        nextCursor: result.nextCursor
       },
       message: `Found **${groups.length}** group(s) matching "${query}"`
     };

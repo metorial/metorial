@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateTask = SlateTool.create(spec, {
@@ -29,7 +29,7 @@ export let updateTask = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let data: Record<string, any> = {};
+    let data: Row = {};
     if (ctx.input.description !== undefined) data.description = ctx.input.description;
     if (ctx.input.accountId !== undefined) data.account = ctx.input.accountId;
     if (ctx.input.reminderDate !== undefined) data.reminder_date = ctx.input.reminderDate;

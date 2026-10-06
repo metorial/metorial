@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listTrashTool = SlateTool.create(spec, {
   name: 'List Trash',
   key: 'list_trash',
-  description: `List items in the Egnyte trash. Optionally scope to a specific folder path within the trash. Items in trash are retained according to the domain's retention policy (default 30 days, max 180 days).`,
+  description: `List one page of items in the Egnyte trash. Folder-path filtering is unsupported; use the returned exact item paths and IDs. Retention follows the domain's configured policy.`,
   tags: {
     readOnly: true
   }
@@ -16,7 +16,7 @@ export let listTrashTool = SlateTool.create(spec, {
       folderPath: z
         .string()
         .optional()
-        .describe('Path within the trash to list (omit for root trash listing)'),
+        .describe('Legacy unsupported filter; omit to list the current trash page'),
       offset: z.number().optional().describe('Pagination offset'),
       count: z.number().optional().describe('Number of items per page')
     })
@@ -28,6 +28,8 @@ export let listTrashTool = SlateTool.create(spec, {
           z.object({
             name: z.string(),
             path: z.string(),
+            trashId: z.string().optional().describe('Exact trash item identifier'),
+            itemType: z.string().optional(),
             isFolder: z.boolean().optional(),
             size: z.number().optional(),
             deletedBy: z.string().optional(),
@@ -35,43 +37,37 @@ export let listTrashTool = SlateTool.create(spec, {
           })
         )
         .describe('Items in the trash'),
-      totalCount: z.number().optional()
+      totalCount: z.number().optional(),
+      hasMore: z.boolean().optional(),
+      offset: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.listTrash(ctx.input.folderPath, {
       offset: ctx.input.offset,
       count: ctx.input.count
     })) as Record<string, unknown>;
 
-    let rawItems = Array.isArray(result.files)
-      ? result.files
-      : Array.isArray(result.folders)
-        ? [
-            ...(result.folders as unknown[]),
-            ...(Array.isArray(result.files) ? result.files : [])
-          ]
-        : Array.isArray(result.items)
-          ? result.items
-          : [];
+    let rawItems = result.items as Record<string, unknown>[];
 
     let items = rawItems.map((item: Record<string, unknown>) => ({
-      name: String(item.name || ''),
+      name: String(item.name),
+      trashId: String(item.id),
+      itemType: String(item.type),
       path: String(item.path || ''),
-      isFolder: typeof item.is_folder === 'boolean' ? item.is_folder : undefined,
+      isFolder: item.type === 'folder',
       size: typeof item.size === 'number' ? item.size : undefined,
       deletedBy: item.deleted_by ? String(item.deleted_by) : undefined,
-      deletedTime: item.deleted_time ? String(item.deleted_time) : undefined
+      deletedTime: item.delete_date ? String(item.delete_date) : undefined
     }));
 
     return {
       output: {
         items,
+        hasMore: typeof result.has_more === 'boolean' ? result.has_more : undefined,
+        offset: typeof result.offset === 'number' ? result.offset : (ctx.input.offset ?? 0),
         totalCount: typeof result.total_count === 'number' ? result.total_count : undefined
       },
       message: `Found **${items.length}** item(s) in trash${ctx.input.folderPath ? ` under ${ctx.input.folderPath}` : ''}`
@@ -86,7 +82,13 @@ export let restoreFromTrashTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      trashItemPath: z.string().describe('Path of the item in the trash to restore')
+      trashItemPath: z.string().describe('Original absolute path of the item to restore'),
+      trashId: z
+        .string()
+        .optional()
+        .describe(
+          'Exact trash ID, required when multiple deleted items share the original path'
+        )
     })
   )
   .output(
@@ -96,12 +98,9 @@ export let restoreFromTrashTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
-    await client.restoreFromTrash(ctx.input.trashItemPath);
+    await client.restoreFromTrash(ctx.input.trashItemPath, ctx.input.trashId);
 
     return {
       output: {
@@ -116,7 +115,7 @@ export let restoreFromTrashTool = SlateTool.create(spec, {
 export let emptyTrashTool = SlateTool.create(spec, {
   name: 'Empty Trash',
   key: 'empty_trash',
-  description: `Permanently delete all items in the Egnyte trash. This action cannot be undone. Only domain admins can perform this operation.`,
+  description: `Legacy whole-trash operation. The current Egnyte API only documents purging explicitly selected item IDs; this tool refuses the unsupported whole-trash request.`,
   tags: {
     destructive: true
   },
@@ -132,10 +131,7 @@ export let emptyTrashTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     await client.emptyTrash();
 

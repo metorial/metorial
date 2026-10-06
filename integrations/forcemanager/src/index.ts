@@ -20,15 +20,6 @@ import {
   manageSalesOrder,
   manageSalesOrderLine
 } from './tools';
-import {
-  accountChanges,
-  activityChanges,
-  contactChanges,
-  inboundWebhook,
-  opportunityChanges,
-  salesOrderChanges
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -51,12 +42,5 @@ export let provider = Slate.create({
     getValues,
     lookupExternalId
   ],
-  triggers: [
-    inboundWebhook,
-    accountChanges,
-    contactChanges,
-    opportunityChanges,
-    activityChanges,
-    salesOrderChanges
-  ]
+  triggers: []
 });

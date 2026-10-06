@@ -1,0 +1,267 @@
+{
+  "get_conversation_context": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "threadId": {
+        "type": "string"
+      },
+      "snippet": {
+        "type": "string"
+      },
+      "historyId": {
+        "type": "string"
+      },
+      "labelIdsAggregate": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Union of label IDs seen on messages in this thread."
+      },
+      "messages": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "messageId": {
+              "type": "string"
+            },
+            "threadId": {
+              "type": "string"
+            },
+            "labelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "snippet": {
+              "type": "string"
+            },
+            "internalDate": {
+              "type": "string"
+            },
+            "from": {
+              "type": "string"
+            },
+            "to": {
+              "type": "string"
+            },
+            "cc": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string"
+            },
+            "date": {
+              "type": "string"
+            },
+            "mimeMessageId": {
+              "type": "string"
+            },
+            "bodyText": {
+              "type": "string"
+            },
+            "bodyHtml": {
+              "type": "string"
+            },
+            "attachments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "attachmentId": {
+                    "type": "string"
+                  },
+                  "filename": {
+                    "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "number"
+                  }
+                },
+                "required": ["attachmentId", "filename", "mimeType", "size"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "messageId",
+            "threadId",
+            "labelIds",
+            "snippet",
+            "internalDate",
+            "attachments"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "replyHints": {
+        "type": "object",
+        "properties": {
+          "replyToMessageId": {
+            "type": "string"
+          },
+          "inReplyTo": {
+            "type": "string"
+          },
+          "references": {
+            "type": "string"
+          },
+          "suggestedTo": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "suggestedSubject": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "replyToMessageId",
+          "inReplyTo",
+          "references",
+          "suggestedTo",
+          "suggestedSubject"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "threadId",
+      "snippet",
+      "historyId",
+      "labelIdsAggregate",
+      "messages",
+      "replyHints"
+    ],
+    "additionalProperties": false
+  },
+  "search_conversations": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "conversations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "threadId": {
+              "type": "string"
+            },
+            "snippet": {
+              "type": "string"
+            },
+            "historyId": {
+              "type": "string"
+            }
+          },
+          "required": ["threadId", "snippet", "historyId"],
+          "additionalProperties": false
+        }
+      },
+      "nextPageToken": {
+        "type": "string"
+      },
+      "resultSizeEstimate": {
+        "type": "number"
+      }
+    },
+    "required": ["conversations", "resultSizeEstimate"],
+    "additionalProperties": false
+  },
+  "manage_reply_draft": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "draftId": {
+        "type": "string"
+      },
+      "messageId": {
+        "type": "string"
+      },
+      "threadId": {
+        "type": "string"
+      },
+      "subject": {
+        "type": "string"
+      },
+      "from": {
+        "type": "string"
+      },
+      "to": {
+        "type": "string"
+      },
+      "snippet": {
+        "type": "string"
+      },
+      "drafts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "draftId": {
+              "type": "string"
+            },
+            "messageId": {
+              "type": "string"
+            },
+            "threadId": {
+              "type": "string"
+            }
+          },
+          "required": ["draftId", "messageId", "threadId"],
+          "additionalProperties": false
+        }
+      },
+      "nextPageToken": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "triage_conversation": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "threadId": {
+        "type": "string"
+      },
+      "snippet": {
+        "type": "string"
+      },
+      "historyId": {
+        "type": "string"
+      },
+      "deleted": {
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "send_reply": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "messageId": {
+        "type": "string"
+      },
+      "threadId": {
+        "type": "string"
+      },
+      "labelIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": ["messageId", "threadId", "labelIds"],
+    "additionalProperties": false
+  }
+}

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectHumanloopOperation } from '../lib/retirement';
 import { spec } from '../spec';
 
 let datapointSchema = z.object({
@@ -26,14 +26,15 @@ let datapointSchema = z.object({
 export let manageDataset = SlateTool.create(spec, {
   name: 'Manage Dataset',
   key: 'manage_dataset',
-  description: `Create, update, retrieve, or delete datasets and their datapoints. Datasets are collections of test cases used for evaluations and fine-tuning. Each datapoint contains inputs, optional messages, and optional target outputs. Supports adding, removing, or replacing datapoints in a dataset.`,
+  description:
+    'DEPRECATED — Humanloop shut down on September 8, 2025. This operation is unavailable; the tool is retained only for compatibility.',
   instructions: [
-    'Use action "set" to replace all datapoints, "add" to append, or "remove" to delete specific datapoints.',
-    'When listing datapoints, use the "get" action with includeDatapoints set to true.'
+    'Humanloop is retired. Do not use this tool for new workflows; use data exported before September 8, 2025 with your chosen replacement platform.'
   ],
   tags: {
     destructive: false,
-    readOnly: false
+    readOnly: false,
+    deprecated: true
   }
 })
   .input(
@@ -75,82 +76,5 @@ export let manageDataset = SlateTool.create(spec, {
       total: z.number().optional().describe('Total count')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    if (ctx.input.action === 'list') {
-      let result = await client.listDatasets({
-        page: ctx.input.page,
-        size: ctx.input.size
-      });
-      return {
-        output: { datasets: result.records, total: result.total },
-        message: `Found **${result.total}** datasets.`
-      };
-    }
-
-    if (ctx.input.action === 'get') {
-      if (!ctx.input.datasetId) throw new Error('datasetId is required for get action');
-      let dataset = await client.getDataset(ctx.input.datasetId, {
-        includeDatapoints: ctx.input.includeDatapoints
-      });
-      return {
-        output: { dataset },
-        message: `Retrieved dataset **${dataset.name || dataset.path}**.`
-      };
-    }
-
-    if (ctx.input.action === 'create') {
-      let body: Record<string, any> = {};
-      if (ctx.input.path) body.path = ctx.input.path;
-      if (ctx.input.datasetId) body.id = ctx.input.datasetId;
-      if (ctx.input.datapointAction) body.action = ctx.input.datapointAction;
-      if (ctx.input.datapoints) body.datapoints = ctx.input.datapoints;
-      if (ctx.input.versionName) body.version_name = ctx.input.versionName;
-      if (ctx.input.versionDescription)
-        body.version_description = ctx.input.versionDescription;
-
-      let dataset = await client.upsertDataset(body);
-      return {
-        output: { dataset },
-        message: `Created/updated dataset **${dataset.name || dataset.path}** with ${ctx.input.datapoints?.length || 0} datapoints.`
-      };
-    }
-
-    if (ctx.input.action === 'update') {
-      if (!ctx.input.datasetId) throw new Error('datasetId is required for update action');
-      let body: Record<string, any> = {};
-      if (ctx.input.path) body.path = ctx.input.path;
-      if (ctx.input.name) body.name = ctx.input.name;
-      let dataset = await client.updateDataset(ctx.input.datasetId, body);
-      return {
-        output: { dataset },
-        message: `Updated dataset **${dataset.name || dataset.path}**.`
-      };
-    }
-
-    if (ctx.input.action === 'delete') {
-      if (!ctx.input.datasetId) throw new Error('datasetId is required for delete action');
-      await client.deleteDataset(ctx.input.datasetId);
-      return {
-        output: {},
-        message: `Deleted dataset **${ctx.input.datasetId}**.`
-      };
-    }
-
-    if (ctx.input.action === 'list_datapoints') {
-      if (!ctx.input.datasetId)
-        throw new Error('datasetId is required for list_datapoints action');
-      let result = await client.listDatapoints(ctx.input.datasetId, {
-        page: ctx.input.page,
-        size: ctx.input.size
-      });
-      return {
-        output: { datapoints: result.records, total: result.total },
-        message: `Found **${result.total}** datapoints in dataset.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
-  })
+  .handleInvocation(async () => rejectHumanloopOperation())
   .build();

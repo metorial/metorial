@@ -13,7 +13,7 @@ let voiceSchema = z.object({
 export let listVoices = SlateTool.create(spec, {
   name: 'List Voices',
   key: 'list_voices',
-  description: `List available voices for text-to-speech synthesis. Returns voice names, locales, genders, and available styles. Currently supports English (US).`,
+  description: `List available voices for text-to-speech synthesis. Returns voice names, locales, genders, and available styles.`,
   tags: {
     readOnly: true
   }

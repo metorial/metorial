@@ -1,16 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FalClient } from '../lib/client';
+import { addModelFiles, publicFalFileUrl, requireFalFile } from '../lib/files';
 import { spec } from '../spec';
 
 export let generateSpeech = SlateTool.create(spec, {
   name: 'Generate Speech',
   key: 'generate_speech',
   description: `Generate speech audio from text using Fal.ai text-to-speech models.
-Supports multiple languages, custom pronunciation, and voice cloning via reference audio.
-Returns a URL to the generated audio file.`,
+Model-specific options support language selection and reference-audio voice cloning when available.
+Provides a downloadable audio file. Inspect endpoint inputs with search_models using includeSchema=true.`,
   instructions: [
-    'Provide a referenceAudioUrl for voice cloning.',
+    'For fal-ai/f5-tts, provide referenceAudioUrl; model_type defaults to F5-TTS. For other models use additionalParams for their documented reference or voice fields.',
     'Use an appropriate TTS model endpoint for the modelId parameter.'
   ],
   tags: {
@@ -19,16 +20,31 @@ Returns a URL to the generated audio file.`,
 })
   .input(
     z.object({
-      modelId: z.string().describe('Model endpoint ID for TTS, e.g. "fal-ai/f5-tts"'),
-      text: z.string().describe('Text to convert to speech'),
+      fileRetentionSeconds: z
+        .number()
+        .int()
+        .min(60)
+        .max(31536000)
+        .optional()
+        .describe(
+          'Generated file lifetime in seconds. Omit to use account defaults; expired files cannot be recovered'
+        ),
+      modelId: z.string().min(1).describe('Model endpoint ID for TTS, e.g. "fal-ai/f5-tts"'),
+      text: z.string().min(1).describe('Text to convert to speech'),
+      textParameter: z
+        .enum(['text', 'gen_text', 'prompt'])
+        .optional()
+        .describe(
+          'Provider text field. Defaults to gen_text for fal-ai/f5-tts and text for other endpoints; consult the endpoint schema'
+        ),
       referenceAudioUrl: z
         .string()
         .optional()
-        .describe('Reference audio URL for voice cloning'),
+        .describe('F5-TTS reference audio URL for voice cloning; required by fal-ai/f5-tts'),
       referenceText: z
         .string()
         .optional()
-        .describe('Transcript of the reference audio for voice cloning'),
+        .describe('F5-TTS reference transcript; other models may use additionalParams'),
       language: z.string().optional().describe('Language code for the speech output'),
       additionalParams: z
         .record(z.string(), z.any())
@@ -38,7 +54,7 @@ Returns a URL to the generated audio file.`,
   )
   .output(
     z.object({
-      audioUrl: z.string().describe('URL of the generated audio file on fal CDN'),
+      audioUrl: z.string().optional().describe('Provider URL when the audio is hosted'),
       contentType: z.string().optional().describe('MIME type of the generated audio'),
       duration: z.number().optional().describe('Duration of the generated audio in seconds'),
       timings: z
@@ -51,29 +67,44 @@ Returns a URL to the generated audio file.`,
     let client = new FalClient(ctx.auth.token);
 
     let input: Record<string, any> = {
-      gen_text: ctx.input.text,
-      ...(ctx.input.additionalParams || {})
+      ...(ctx.input.additionalParams || {}),
+      [ctx.input.textParameter ??
+        (ctx.input.modelId.startsWith('fal-ai/f5-tts') ? 'gen_text' : 'text')]: ctx.input.text
     };
 
     if (ctx.input.referenceAudioUrl) input.ref_audio_url = ctx.input.referenceAudioUrl;
     if (ctx.input.referenceText) input.ref_text = ctx.input.referenceText;
     if (ctx.input.language) input.language = ctx.input.language;
 
+    if (ctx.input.modelId.startsWith('fal-ai/f5-tts')) {
+      input.model_type ??= 'F5-TTS';
+      if (!input.ref_audio_url)
+        throw createApiServiceError(
+          'fal-ai/f5-tts requires referenceAudioUrl for voice cloning.'
+        );
+    }
     ctx.progress('Generating speech...');
-    let result = await client.runModel(ctx.input.modelId, input);
+    let result = await client.runModel(ctx.input.modelId, input, {
+      fileRetentionSeconds: ctx.input.fileRetentionSeconds
+    });
 
-    let audioUrl = result.audio?.url || result.audio_url || result.audios?.[0]?.url || '';
-    let contentType = result.audio?.content_type || result.content_type;
-    let duration = result.audio?.duration || result.duration;
+    const audio = requireFalFile(
+      result.audio ?? result.audio_url ?? result.audios?.[0],
+      'audio'
+    );
+    const audioUrl = publicFalFileUrl(audio);
+    const contentType = audio.content_type ?? result.content_type ?? undefined;
+    const duration = audio.duration ?? result.duration ?? undefined;
+    await addModelFiles(ctx, { file: audio, result });
 
     return {
       output: {
         audioUrl,
         contentType,
         duration,
-        timings: result.timings
+        timings: result.timings ?? undefined
       },
-      message: `Generated speech audio using **${ctx.input.modelId}**.\n- ${audioUrl}`
+      message: `Generated downloadable speech audio using **${ctx.input.modelId}**.`
     };
   })
   .build();

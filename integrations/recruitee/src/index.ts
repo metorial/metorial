@@ -4,7 +4,10 @@ import {
   createCandidate,
   createOffer,
   deleteCandidate,
+  deleteOffer,
+  downloadCandidateFile,
   getCandidate,
+  getCurrentIdentity,
   getOffer,
   listDepartmentsLocations,
   listDisqualifyReasons,
@@ -17,11 +20,12 @@ import {
   updateCandidate,
   updateOffer
 } from './tools';
-import { candidateEvents, jobEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentIdentity,
+    deleteOffer,
+    downloadCandidateFile,
     createCandidate,
     getCandidate,
     updateCandidate,
@@ -38,5 +42,5 @@ export let provider = Slate.create({
     listDepartmentsLocations,
     listDisqualifyReasons
   ],
-  triggers: [candidateEvents, jobEvents]
+  triggers: []
 });

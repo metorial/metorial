@@ -1,6 +1,6 @@
 # <img src="logo.jpeg" height="20"> Synthflow Ai
 
-Create, configure, and manage AI-powered voice agents for automating inbound and outbound phone calls. Initiate live calls, monitor active conversations, and retrieve call history with transcripts and recordings. Upload domain knowledge bases, browse and assign voices, and provision phone numbers. Run simulations and test cases before deploying agents. Register custom actions to integrate external APIs during calls. Manage contacts, subaccounts, webhook logs, and export analytics. Supports post-call and inbound call webhooks for real-time notifications and dynamic call routing.
+Create and manage AI voice agents for inbound, outbound, and widget conversations. Initiate outbound calls and retrieve call history, transcripts, and downloadable recordings. Manage knowledge bases and text, web, or PDF sources, browse voices and provisioned phone numbers, and attach custom actions to agents. Manage contacts and agency subaccounts, retrieve usage analytics, and execute simulation suites with session results.
 
 ## License
 

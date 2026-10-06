@@ -19,8 +19,6 @@ import {
   trackPageview,
   trackTransaction
 } from './tools';
-import { gosquaredEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     getSmartGroupMembers,
     createSmartGroup
   ],
-  triggers: [gosquaredEvents]
+  triggers: []
 });

@@ -15,7 +15,9 @@ export let deleteDeal = SlateTool.create(spec, {
   .input(
     z.object({
       groupId: z.string().describe('ID of the group the deal belongs to'),
-      objectType: z.string().describe('Deal object type name (e.g. "Deals")'),
+      objectType: z
+        .string()
+        .describe('Exact deal object type name discovered with list_custom_fields'),
       dealId: z.string().describe('ID of the deal to delete')
     })
   )

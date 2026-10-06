@@ -18,8 +18,6 @@ import {
   shareFolder,
   uploadFile
 } from './tools';
-import { fileChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     getAccountInfo,
     fileRevisions
   ],
-  triggers: [inboundWebhook, fileChanges]
+  triggers: []
 });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TaskRouterClient } from '../lib/taskrouter-client';
+import { fail, validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getWorkspaceStatisticsTool = SlateTool.create(spec, {
@@ -17,7 +18,9 @@ export let getWorkspaceStatisticsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceSid: z.string().describe('Workspace SID'),
+      workspaceSid: z
+        .string()
+        .describe('Workspace SID. Call list_workspaces to discover authorized workspaces.'),
       scope: z
         .enum(['workspace', 'task_queue', 'worker'])
         .default('workspace')
@@ -43,6 +46,7 @@ export let getWorkspaceStatisticsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('get_workspace_statistics', ctx.input);
     let client = new TaskRouterClient(ctx.auth.token, ctx.auth.accountSid);
 
     let params: Record<string, string | undefined> = {
@@ -54,15 +58,14 @@ export let getWorkspaceStatisticsTool = SlateTool.create(spec, {
     let result: any;
 
     if (ctx.input.scope === 'task_queue') {
-      if (!ctx.input.taskQueueSid)
-        throw new Error('taskQueueSid is required for task_queue scope');
+      if (!ctx.input.taskQueueSid) throw fail('taskQueueSid is required for task_queue scope');
       result = await client.getTaskQueueStatistics(
         ctx.input.workspaceSid,
         ctx.input.taskQueueSid,
         params
       );
     } else if (ctx.input.scope === 'worker') {
-      if (!ctx.input.workerSid) throw new Error('workerSid is required for worker scope');
+      if (!ctx.input.workerSid) throw fail('workerSid is required for worker scope');
       result = await client.getWorkerStatistics(
         ctx.input.workspaceSid,
         ctx.input.workerSid,

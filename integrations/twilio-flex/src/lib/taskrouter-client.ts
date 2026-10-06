@@ -1,29 +1,24 @@
-import { createAxios } from 'slates';
 import { encodeFormBody } from './client';
+import { createTwilioAxios } from './http';
+import { pathId } from './validation';
 
 export class TaskRouterClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createTwilioAxios>;
 
-  constructor(token: string, _accountSid: string) {
-    this.axios = createAxios({
-      baseURL: `https://taskrouter.twilio.com/v1/Workspaces`,
-      headers: {
-        Authorization: `Basic ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
+  constructor(token: string, accountSid: string, pageToken?: string) {
+    this.axios = createTwilioAxios('taskrouter', token, accountSid, pageToken);
   }
 
   // Workspaces
   async listWorkspaces(pageSize?: number): Promise<any> {
     let response = await this.axios.get('', {
-      params: { PageSize: pageSize || 50 }
+      params: { PageSize: pageSize ?? 50 }
     });
     return response.data;
   }
 
   async getWorkspace(workspaceSid: string): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}`);
+    let response = await this.axios.get(`/${pathId(workspaceSid)}`);
     return response.data;
   }
 
@@ -31,7 +26,7 @@ export class TaskRouterClient {
     workspaceSid: string,
     params: Record<string, string | undefined>
   ): Promise<any> {
-    let response = await this.axios.post(`/${workspaceSid}`, encodeFormBody(params));
+    let response = await this.axios.post(`/${pathId(workspaceSid)}`, encodeFormBody(params));
     return response.data;
   }
 
@@ -40,12 +35,14 @@ export class TaskRouterClient {
     workspaceSid: string,
     params?: Record<string, string | undefined>
   ): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Workers`, { params });
+    let response = await this.axios.get(`/${pathId(workspaceSid)}/Workers`, { params });
     return response.data;
   }
 
   async getWorker(workspaceSid: string, workerSid: string): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Workers/${workerSid}`);
+    let response = await this.axios.get(
+      `/${pathId(workspaceSid)}/Workers/${pathId(workerSid)}`
+    );
     return response.data;
   }
 
@@ -53,7 +50,10 @@ export class TaskRouterClient {
     workspaceSid: string,
     params: Record<string, string | undefined>
   ): Promise<any> {
-    let response = await this.axios.post(`/${workspaceSid}/Workers`, encodeFormBody(params));
+    let response = await this.axios.post(
+      `/${pathId(workspaceSid)}/Workers`,
+      encodeFormBody(params)
+    );
     return response.data;
   }
 
@@ -63,26 +63,28 @@ export class TaskRouterClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/${workspaceSid}/Workers/${workerSid}`,
+      `/${pathId(workspaceSid)}/Workers/${pathId(workerSid)}`,
       encodeFormBody(params)
     );
     return response.data;
   }
 
   async deleteWorker(workspaceSid: string, workerSid: string): Promise<void> {
-    await this.axios.delete(`/${workspaceSid}/Workers/${workerSid}`);
+    await this.axios.delete(`/${pathId(workspaceSid)}/Workers/${pathId(workerSid)}`);
   }
 
   // Activities
   async listActivities(workspaceSid: string, pageSize?: number): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Activities`, {
-      params: { PageSize: pageSize || 50 }
+    let response = await this.axios.get(`/${pathId(workspaceSid)}/Activities`, {
+      params: { PageSize: pageSize ?? 50 }
     });
     return response.data;
   }
 
   async getActivity(workspaceSid: string, activitySid: string): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Activities/${activitySid}`);
+    let response = await this.axios.get(
+      `/${pathId(workspaceSid)}/Activities/${pathId(activitySid)}`
+    );
     return response.data;
   }
 
@@ -91,7 +93,7 @@ export class TaskRouterClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/${workspaceSid}/Activities`,
+      `/${pathId(workspaceSid)}/Activities`,
       encodeFormBody(params)
     );
     return response.data;
@@ -103,26 +105,28 @@ export class TaskRouterClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/${workspaceSid}/Activities/${activitySid}`,
+      `/${pathId(workspaceSid)}/Activities/${pathId(activitySid)}`,
       encodeFormBody(params)
     );
     return response.data;
   }
 
   async deleteActivity(workspaceSid: string, activitySid: string): Promise<void> {
-    await this.axios.delete(`/${workspaceSid}/Activities/${activitySid}`);
+    await this.axios.delete(`/${pathId(workspaceSid)}/Activities/${pathId(activitySid)}`);
   }
 
   // Task Queues
   async listTaskQueues(workspaceSid: string, pageSize?: number): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/TaskQueues`, {
-      params: { PageSize: pageSize || 50 }
+    let response = await this.axios.get(`/${pathId(workspaceSid)}/TaskQueues`, {
+      params: { PageSize: pageSize ?? 50 }
     });
     return response.data;
   }
 
   async getTaskQueue(workspaceSid: string, taskQueueSid: string): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/TaskQueues/${taskQueueSid}`);
+    let response = await this.axios.get(
+      `/${pathId(workspaceSid)}/TaskQueues/${pathId(taskQueueSid)}`
+    );
     return response.data;
   }
 
@@ -131,7 +135,7 @@ export class TaskRouterClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/${workspaceSid}/TaskQueues`,
+      `/${pathId(workspaceSid)}/TaskQueues`,
       encodeFormBody(params)
     );
     return response.data;
@@ -143,26 +147,28 @@ export class TaskRouterClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/${workspaceSid}/TaskQueues/${taskQueueSid}`,
+      `/${pathId(workspaceSid)}/TaskQueues/${pathId(taskQueueSid)}`,
       encodeFormBody(params)
     );
     return response.data;
   }
 
   async deleteTaskQueue(workspaceSid: string, taskQueueSid: string): Promise<void> {
-    await this.axios.delete(`/${workspaceSid}/TaskQueues/${taskQueueSid}`);
+    await this.axios.delete(`/${pathId(workspaceSid)}/TaskQueues/${pathId(taskQueueSid)}`);
   }
 
   // Workflows
   async listWorkflows(workspaceSid: string, pageSize?: number): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Workflows`, {
-      params: { PageSize: pageSize || 50 }
+    let response = await this.axios.get(`/${pathId(workspaceSid)}/Workflows`, {
+      params: { PageSize: pageSize ?? 50 }
     });
     return response.data;
   }
 
   async getWorkflow(workspaceSid: string, workflowSid: string): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Workflows/${workflowSid}`);
+    let response = await this.axios.get(
+      `/${pathId(workspaceSid)}/Workflows/${pathId(workflowSid)}`
+    );
     return response.data;
   }
 
@@ -170,7 +176,10 @@ export class TaskRouterClient {
     workspaceSid: string,
     params: Record<string, string | undefined>
   ): Promise<any> {
-    let response = await this.axios.post(`/${workspaceSid}/Workflows`, encodeFormBody(params));
+    let response = await this.axios.post(
+      `/${pathId(workspaceSid)}/Workflows`,
+      encodeFormBody(params)
+    );
     return response.data;
   }
 
@@ -180,14 +189,14 @@ export class TaskRouterClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/${workspaceSid}/Workflows/${workflowSid}`,
+      `/${pathId(workspaceSid)}/Workflows/${pathId(workflowSid)}`,
       encodeFormBody(params)
     );
     return response.data;
   }
 
   async deleteWorkflow(workspaceSid: string, workflowSid: string): Promise<void> {
-    await this.axios.delete(`/${workspaceSid}/Workflows/${workflowSid}`);
+    await this.axios.delete(`/${pathId(workspaceSid)}/Workflows/${pathId(workflowSid)}`);
   }
 
   // Tasks
@@ -195,12 +204,12 @@ export class TaskRouterClient {
     workspaceSid: string,
     params?: Record<string, string | undefined>
   ): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Tasks`, { params });
+    let response = await this.axios.get(`/${pathId(workspaceSid)}/Tasks`, { params });
     return response.data;
   }
 
   async getTask(workspaceSid: string, taskSid: string): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Tasks/${taskSid}`);
+    let response = await this.axios.get(`/${pathId(workspaceSid)}/Tasks/${pathId(taskSid)}`);
     return response.data;
   }
 
@@ -208,7 +217,10 @@ export class TaskRouterClient {
     workspaceSid: string,
     params: Record<string, string | undefined>
   ): Promise<any> {
-    let response = await this.axios.post(`/${workspaceSid}/Tasks`, encodeFormBody(params));
+    let response = await this.axios.post(
+      `/${pathId(workspaceSid)}/Tasks`,
+      encodeFormBody(params)
+    );
     return response.data;
   }
 
@@ -218,50 +230,14 @@ export class TaskRouterClient {
     params: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.post(
-      `/${workspaceSid}/Tasks/${taskSid}`,
+      `/${pathId(workspaceSid)}/Tasks/${pathId(taskSid)}`,
       encodeFormBody(params)
     );
     return response.data;
   }
 
   async deleteTask(workspaceSid: string, taskSid: string): Promise<void> {
-    await this.axios.delete(`/${workspaceSid}/Tasks/${taskSid}`);
-  }
-
-  // Reservations
-  async listReservations(workspaceSid: string, taskSid: string): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Tasks/${taskSid}/Reservations`);
-    return response.data;
-  }
-
-  async getReservation(
-    workspaceSid: string,
-    taskSid: string,
-    reservationSid: string
-  ): Promise<any> {
-    let response = await this.axios.get(
-      `/${workspaceSid}/Tasks/${taskSid}/Reservations/${reservationSid}`
-    );
-    return response.data;
-  }
-
-  async updateReservation(
-    workspaceSid: string,
-    taskSid: string,
-    reservationSid: string,
-    params: Record<string, string | undefined>
-  ): Promise<any> {
-    let response = await this.axios.post(
-      `/${workspaceSid}/Tasks/${taskSid}/Reservations/${reservationSid}`,
-      encodeFormBody(params)
-    );
-    return response.data;
-  }
-
-  // Worker Channels
-  async listWorkerChannels(workspaceSid: string, workerSid: string): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Workers/${workerSid}/Channels`);
-    return response.data;
+    await this.axios.delete(`/${pathId(workspaceSid)}/Tasks/${pathId(taskSid)}`);
   }
 
   // Statistics
@@ -269,7 +245,7 @@ export class TaskRouterClient {
     workspaceSid: string,
     params?: Record<string, string | undefined>
   ): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Statistics`, { params });
+    let response = await this.axios.get(`/${pathId(workspaceSid)}/Statistics`, { params });
     return response.data;
   }
 
@@ -279,7 +255,7 @@ export class TaskRouterClient {
     params?: Record<string, string | undefined>
   ): Promise<any> {
     let response = await this.axios.get(
-      `/${workspaceSid}/TaskQueues/${taskQueueSid}/Statistics`,
+      `/${pathId(workspaceSid)}/TaskQueues/${pathId(taskQueueSid)}/Statistics`,
       { params }
     );
     return response.data;
@@ -290,9 +266,12 @@ export class TaskRouterClient {
     workerSid: string,
     params?: Record<string, string | undefined>
   ): Promise<any> {
-    let response = await this.axios.get(`/${workspaceSid}/Workers/${workerSid}/Statistics`, {
-      params
-    });
+    let response = await this.axios.get(
+      `/${pathId(workspaceSid)}/Workers/${pathId(workerSid)}/Statistics`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 }

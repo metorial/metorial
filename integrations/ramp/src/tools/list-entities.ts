@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { recordSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listEntities = SlateTool.create(spec, {
@@ -28,18 +29,17 @@ export let listEntities = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      entity: z.any().optional().describe('Single entity object (when entityId is provided)'),
-      entities: z.array(z.any()).optional().describe('List of entity objects'),
+      entity: recordSchema
+        .optional()
+        .describe('Single entity object (when entityId is provided)'),
+      entities: z.array(recordSchema).optional().describe('List of entity objects'),
       nextCursor: z.string().optional().describe('Cursor for fetching the next page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = clientFor(ctx);
 
-    if (ctx.input.entityId) {
+    if (ctx.input.entityId !== undefined) {
       let entity = await client.getEntity(ctx.input.entityId);
       return {
         output: { entity },

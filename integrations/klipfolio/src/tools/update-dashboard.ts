@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let updateDashboard = SlateTool.create(spec, {
@@ -8,8 +9,11 @@ export let updateDashboard = SlateTool.create(spec, {
   key: 'update_dashboard',
   description: `Update a dashboard's name, description, layout, or klip instances. Can also manage share rights and add/remove klips from the dashboard.`,
   tags: {
-    destructive: false
-  }
+    destructive: true
+  },
+  constraints: [
+    'Layout replaces the full layout and removes Klips omitted from it. Sharing can expose dashboard data. Multiple changes execute sequentially; earlier successful changes remain if a later request fails.'
+  ]
 })
   .input(
     z.object({
@@ -18,7 +22,9 @@ export let updateDashboard = SlateTool.create(spec, {
       description: z.string().optional().describe('New description for the dashboard'),
       layout: z
         .object({
-          type: z.string().describe('Layout type (e.g., "100", "30_60")'),
+          type: z
+            .string()
+            .describe('Layout type, such as "grid"; use the type returned by get_dashboard'),
           state: z
             .record(z.string(), z.any())
             .describe('Layout state mapping klip instance IDs to regions')
@@ -60,6 +66,17 @@ export let updateDashboard = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
+    if (
+      ctx.input.name === undefined &&
+      ctx.input.description === undefined &&
+      ctx.input.layout === undefined &&
+      ctx.input.addKlips === undefined &&
+      ctx.input.removeKlipInstanceIds === undefined &&
+      ctx.input.shareRights === undefined &&
+      ctx.input.removeShareRightGroupIds === undefined
+    )
+      throw createApiServiceError('Provide at least one change.', { reason: 'invalid_input' });
     let client = new Client({ token: ctx.auth.token });
     let actions: string[] = [];
 

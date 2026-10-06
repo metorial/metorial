@@ -10,8 +10,6 @@ import {
   listTasks,
   manageTask
 } from './tools';
-import { inboundWebhook, taskCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     captureWebsite,
     getAccount
   ],
-  triggers: [inboundWebhook, taskCompleted]
+  triggers: []
 });

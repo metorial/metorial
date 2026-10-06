@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,12 +16,19 @@ export let exportAnalytics = SlateTool.create(spec, {
     z.object({
       fromDate: z
         .string()
+        .datetime({ offset: true })
         .optional()
         .describe('Start datetime in ISO format (e.g., "2024-01-01T00:00:00Z")'),
       toDate: z
         .string()
+        .datetime({ offset: true })
         .optional()
-        .describe('End datetime in ISO format (e.g., "2024-03-31T23:59:59Z")')
+        .describe('End datetime in ISO format (e.g., "2024-03-31T23:59:59Z")'),
+      agentId: z.string().optional().describe('Filter by agent model ID from list_agents'),
+      typeOfCall: z
+        .enum(['inbound', 'outbound', 'widget'])
+        .optional()
+        .describe('Filter by agent call type')
     })
   )
   .output(
@@ -30,10 +37,16 @@ export let exportAnalytics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let from = ctx.input.fromDate ? Date.parse(ctx.input.fromDate) : undefined;
+    let to = ctx.input.toDate ? Date.parse(ctx.input.toDate) : Date.now();
+    if (from !== undefined && (from > to || to - from > 120 * 86400000))
+      throw createApiServiceError('Use an increasing date range of at most 120 days.');
+    let client = new Client(ctx.auth);
     let result = await client.exportAnalytics({
       from_date: ctx.input.fromDate,
-      to_date: ctx.input.toDate
+      to_date: ctx.input.toDate,
+      model_id: ctx.input.agentId,
+      type_of_call: ctx.input.typeOfCall
     });
 
     return {

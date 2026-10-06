@@ -1,16 +1,15 @@
 {
   "name": "@metorial/softr",
-  "description": "Manage users, databases, tables, and records in Softr no-code applications. Create and delete app users, generate magic links for passwordless authentication, sync users, and validate JWT tokens. Perform full CRUD operations on databases, tables, table fields (schema), and records. Search and filter records within tables. Integrate Softr data with external systems via its Database and Studio APIs.",
+  "description": "Manage native Softr databases, tables, fields, records and table views. Request app-user creation, deletion, synchronization, activation or deactivation with truthful acceptance state; preserve sensitive magic-link and explicit JWT validation workflows. Read native pages and optionally prepare bounded JSON downloads.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools", "security"],
   "skills": [
-    "create and delete users",
-    "generate magic links",
-    "sync users",
-    "validate JWT tokens",
-    "manage databases",
-    "manage tables and fields",
-    "create and update records",
-    "search and filter records",
-    "manage table schema"
+    "discover databases, tables and views",
+    "manage database and table schema",
+    "create, read, update and delete records",
+    "search and filter native record pages",
+    "download bounded record JSON",
+    "request app-user lifecycle and synchronization",
+    "generate sensitive magic sign-in links",
+    "validate user JWTs on the published app"
   ]
 }

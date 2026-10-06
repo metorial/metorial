@@ -14,7 +14,9 @@ export let createWorkspaceTool = SlateTool.create(spec, {
       organizationId: z
         .string()
         .optional()
-        .describe('UUID of the organization to associate the workspace with.')
+        .describe(
+          'Organization ID from list_organizations. Optional for deployments with one applicable organization.'
+        )
     })
   )
   .output(

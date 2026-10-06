@@ -1,241 +1,383 @@
-import { createAxios } from 'slates';
+import { ServiceError } from '@lowerdeck/error';
+import { createAuthenticatedAxios, pickDefined, requestAxios } from 'slates';
+import { z } from 'zod';
+import { privateReceipt, serviceFailure, tokenValue } from './http';
+import {
+  apiVersion,
+  dataset,
+  documentId,
+  documentPage,
+  input,
+  invalid,
+  malformed,
+  nativeAsset,
+  nativeDataset,
+  nativeHook,
+  nativeProfile,
+  nativeProject,
+  opaqueId,
+  parse,
+  projectId,
+  record
+} from './schemas';
 
 export interface SanityClientConfig {
   token: string;
-  projectId: string;
-  dataset: string;
-  apiVersion: string;
+  projectId?: string;
+  dataset?: string;
+  apiVersion?: string;
 }
-
+export const clientFor = (ctx: {
+  auth: { token: string };
+  input: { projectId?: string; dataset?: string };
+  config: Record<string, unknown>;
+}) =>
+  new SanityClient({
+    token: ctx.auth.token,
+    projectId:
+      ctx.input.projectId ??
+      (typeof ctx.config.projectId === 'string' ? ctx.config.projectId : undefined),
+    dataset:
+      ctx.input.dataset ??
+      (typeof ctx.config.dataset === 'string' ? ctx.config.dataset : 'production'),
+    apiVersion:
+      typeof ctx.config.apiVersion === 'string' ? ctx.config.apiVersion : '2024-01-01'
+  });
 export class SanityClient {
-  private config: SanityClientConfig;
-
+  readonly token: string;
+  readonly apiVersion: string;
+  readonly projectId?: string;
+  readonly dataset?: string;
   constructor(config: SanityClientConfig) {
-    this.config = config;
+    this.token = tokenValue(config.token);
+    this.apiVersion = input(
+      apiVersion,
+      config.apiVersion ?? '2024-01-01',
+      'Provide an actual API version date in YYYY-MM-DD format.'
+    );
+    this.projectId =
+      config.projectId === undefined
+        ? undefined
+        : input(
+            projectId,
+            config.projectId,
+            'Call list_projects and provide an exact project ID.'
+          );
+    this.dataset =
+      config.dataset === undefined
+        ? undefined
+        : input(
+            dataset,
+            config.dataset,
+            'Call manage_datasets with action list and provide a valid dataset name.'
+          );
   }
-
-  private get dataAxios() {
-    return createAxios({
-      baseURL: `https://${this.config.projectId}.api.sanity.io/v${this.config.apiVersion}`,
-      headers: {
-        Authorization: `Bearer ${this.config.token}`
-      }
+  project() {
+    if (!this.projectId)
+      throw invalid(
+        'Call list_projects and pass projectId to this tool. Older stored project settings remain supported.'
+      );
+    return this.projectId;
+  }
+  lake() {
+    if (!this.dataset)
+      throw invalid('Call manage_datasets with action list and pass dataset.');
+    return encodeURIComponent(this.dataset);
+  }
+  async request<T extends z.ZodType>(
+    shape: T,
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    path: string,
+    data?: unknown,
+    params?: Record<string, unknown>,
+    management = false,
+    cdn = false,
+    contentType = 'application/json'
+  ) {
+    const baseURL = management
+      ? `https://api.sanity.io/v${this.apiVersion}`
+      : `https://${this.project()}.${cdn ? 'apicdn' : 'api'}.sanity.io/v${this.apiVersion}`;
+    const ax = createAuthenticatedAxios({
+      baseURL,
+      authHeader: { value: `Bearer ${this.token}` },
+      contentType,
+      timeout: 60000,
+      maxRedirects: 0,
+      maxContentLength: 32 * 1024 * 1024,
+      maxBodyLength: 32 * 1024 * 1024
     });
+    const response = await requestAxios(
+      'Sanity request',
+      () =>
+        ax.request<unknown>({
+          method,
+          url: path,
+          data,
+          params: params ? pickDefined(params) : undefined
+        }),
+      serviceFailure
+    );
+    if (response.status !== 200) throw malformed();
+    privateReceipt(this.token)(response.data);
+    return parse(shape, response.data);
   }
-
-  private get managementAxios() {
-    return createAxios({
-      baseURL: `https://api.sanity.io/v${this.config.apiVersion}`,
-      headers: {
-        Authorization: `Bearer ${this.config.token}`
-      }
-    });
-  }
-
-  // ── GROQ Query ──
-
   async query(
-    groqQuery: string,
-    params?: Record<string, any>,
-    options?: {
-      perspective?: string;
-      useCdn?: boolean;
-    }
+    query: string,
+    params?: Record<string, unknown>,
+    options?: { perspective?: string; useCdn?: boolean }
   ) {
-    let ax = options?.useCdn
-      ? createAxios({
-          baseURL: `https://${this.config.projectId}.apicdn.sanity.io/v${this.config.apiVersion}`,
-          headers: { Authorization: `Bearer ${this.config.token}` }
-        })
-      : this.dataAxios;
-
-    let response = await ax.post(
-      `/data/query/${this.config.dataset}`,
-      {
-        query: groqQuery,
-        params: params || {}
-      },
-      {
-        params: options?.perspective ? { perspective: options.perspective } : undefined
-      }
+    return this.request(
+      z
+        .object({ result: z.unknown(), ms: z.number().optional() })
+        .passthrough()
+        .refine(value => Object.hasOwn(value, 'result')),
+      'POST',
+      `/data/query/${this.lake()}`,
+      { query, params: params ?? {} },
+      options?.perspective ? { perspective: options.perspective } : undefined,
+      false,
+      options?.useCdn
     );
-
-    return response.data;
   }
-
-  // ── Document Operations ──
-
-  async getDocument(documentId: string) {
-    let response = await this.dataAxios.get(`/data/doc/${this.config.dataset}/${documentId}`);
-    return response.data;
-  }
-
-  async getDocuments(documentIds: string[]) {
-    let ids = documentIds.join(',');
-    let response = await this.dataAxios.get(`/data/doc/${this.config.dataset}/${ids}`);
-    return response.data;
-  }
-
-  async mutate(
-    mutations: any[],
+  async getDocuments(
+    ids: string[],
     options?: {
-      returnIds?: boolean;
-      returnDocuments?: boolean;
-      visibility?: 'sync' | 'async' | 'deferred';
-      dryRun?: boolean;
-      autoGenerateArrayKeys?: boolean;
-      transactionId?: string;
-    }
-  ) {
-    let response = await this.dataAxios.post(
-      `/data/mutate/${this.config.dataset}`,
-      { mutations },
-      {
-        params: {
-          returnIds: options?.returnIds ?? true,
-          returnDocuments: options?.returnDocuments ?? false,
-          visibility: options?.visibility,
-          dryRun: options?.dryRun,
-          autoGenerateArrayKeys: options?.autoGenerateArrayKeys,
-          transactionId: options?.transactionId
-        }
-      }
-    );
-    return response.data;
-  }
-
-  // ── Document History ──
-
-  async getDocumentRevision(
-    documentId: string,
-    options: {
       revision?: string;
       time?: string;
+      lastRevision?: boolean;
+      includeAllVersions?: boolean;
     }
   ) {
-    let response = await this.dataAxios.get(
-      `/data/history/${this.config.dataset}/documents/${documentId}`,
-      { params: options }
+    const historical =
+      options?.revision !== undefined ||
+      options?.time !== undefined ||
+      options?.lastRevision === true;
+    const encoded = ids
+      .map(id =>
+        encodeURIComponent(input(documentId, id, 'Provide an exact valid document ID.'))
+      )
+      .join(',');
+    const response = await this.request(
+      documentPage,
+      'GET',
+      historical
+        ? `/data/history/${this.lake()}/documents/${encoded}`
+        : `/data/doc/${this.lake()}/${encoded}`,
+      undefined,
+      options
     );
-    return response.data;
+    if (
+      response.documents.some(
+        doc =>
+          !ids.includes(doc._id) &&
+          !(
+            options?.includeAllVersions &&
+            ids.some(
+              id =>
+                doc._id === `drafts.${id}` ||
+                (doc._id.startsWith('versions.') && doc._id.endsWith(`.${id}`))
+            )
+          )
+      )
+    )
+      throw malformed();
+    return response;
   }
-
-  // ── Asset Upload ──
-
-  async uploadImage(fileData: ArrayBuffer | string, filename?: string, contentType?: string) {
-    let response = await this.dataAxios.post(
-      `/assets/images/${this.config.dataset}`,
-      fileData,
-      {
-        params: filename ? { filename } : undefined,
-        headers: {
-          'Content-Type': contentType || 'application/octet-stream'
-        }
-      }
+  async getDocument(id: string) {
+    return this.getDocuments([id]);
+  }
+  async getDocumentRevision(id: string, options: { revision?: string; time?: string }) {
+    return this.getDocuments([id], options);
+  }
+  async mutate(mutations: Record<string, unknown>[], options?: Record<string, unknown>) {
+    return this.request(
+      z
+        .object({
+          transactionId: opaqueId,
+          results: z.array(
+            z
+              .object({
+                operation: z.string(),
+                id: documentId.optional(),
+                documentId: documentId.optional(),
+                document: record.optional()
+              })
+              .passthrough()
+              .refine(
+                value =>
+                  (value.id !== undefined || value.documentId !== undefined) &&
+                  !(
+                    value.id !== undefined &&
+                    value.documentId !== undefined &&
+                    value.id !== value.documentId
+                  )
+              )
+          )
+        })
+        .passthrough(),
+      'POST',
+      `/data/mutate/${this.lake()}`,
+      { mutations },
+      { returnIds: true, returnDocuments: false, ...options }
     );
-    return response.data;
   }
-
-  async uploadFile(fileData: ArrayBuffer | string, filename?: string, contentType?: string) {
-    let response = await this.dataAxios.post(
-      `/assets/files/${this.config.dataset}`,
-      fileData,
-      {
-        params: filename ? { filename } : undefined,
-        headers: {
-          'Content-Type': contentType || 'application/octet-stream'
-        }
-      }
-    );
-    return response.data;
-  }
-
-  // ── Projects ──
-
   async listProjects() {
-    let response = await this.managementAxios.get('/projects');
-    return response.data;
+    return this.request(
+      z.array(nativeProject),
+      'GET',
+      '/projects',
+      undefined,
+      undefined,
+      true
+    );
   }
-
-  async getProject(projectId?: string) {
-    let id = projectId || this.config.projectId;
-    let response = await this.managementAxios.get(`/projects/${id}`);
-    return response.data;
+  async getProject(id = this.project()) {
+    const exact = input(projectId, id, 'Provide an exact project ID.');
+    const response = await this.request(
+      nativeProject,
+      'GET',
+      `/projects/${encodeURIComponent(exact)}`,
+      undefined,
+      undefined,
+      true
+    );
+    if (response.id !== exact) throw malformed();
+    return response;
   }
-
-  // ── Datasets ──
-
-  async listDatasets(projectId?: string) {
-    let id = projectId || this.config.projectId;
-    let response = await this.managementAxios.get(`/projects/${id}/datasets`);
-    return response.data;
+  async listDatasets(id = this.project()) {
+    const exact = input(projectId, id, 'Provide an exact project ID.');
+    return this.request(
+      z.array(nativeDataset),
+      'GET',
+      `/projects/${encodeURIComponent(exact)}/datasets`,
+      undefined,
+      undefined,
+      true
+    );
   }
-
+  async getDataset(name: string) {
+    const exact = input(dataset, name, 'Provide a valid dataset name.');
+    const matches = (await this.listDatasets()).filter(item => item.name === exact);
+    if (matches.length !== 1)
+      throw invalid(
+        'The exact dataset is unavailable in native discovery. Check its name and token permissions.'
+      );
+    return matches[0]!;
+  }
   async createDataset(name: string, aclMode?: 'public' | 'private' | 'custom') {
-    let response = await this.managementAxios.put(
-      `/projects/${this.config.projectId}/datasets/${name}`,
-      aclMode ? { aclMode } : undefined
+    await this.request(
+      record,
+      'PUT',
+      `/projects/${this.project()}/datasets/${encodeURIComponent(name)}`,
+      aclMode ? { aclMode } : {},
+      undefined,
+      true
     );
-    return response.data;
+    const result = await this.getDataset(name);
+    if (aclMode && result.aclMode !== aclMode) throw malformed();
+    return result;
   }
-
   async deleteDataset(name: string) {
-    let response = await this.managementAxios.delete(
-      `/projects/${this.config.projectId}/datasets/${name}`
+    const result = await this.request(
+      z.object({ deleted: z.literal(true) }),
+      'DELETE',
+      `/projects/${this.project()}/datasets/${encodeURIComponent(name)}`,
+      undefined,
+      undefined,
+      true
     );
-    return response.data;
+    if ((await this.listDatasets()).some(item => item.name === name)) throw malformed();
+    return result;
   }
-
-  // ── Webhooks ──
-
   async listWebhooks() {
-    let response = await this.dataAxios.get(`/hooks/projects/${this.config.projectId}`);
-    return response.data;
+    return this.request(z.array(nativeHook), 'GET', `/hooks/projects/${this.project()}`);
   }
-
-  async createWebhook(webhook: {
-    type?: 'document' | 'transaction';
-    name: string;
-    url: string;
-    dataset: string;
-    apiVersion: string;
-    description?: string;
-    rule?: {
-      on?: ('create' | 'update' | 'delete')[];
-      filter?: string;
-      projection?: string;
-    };
-    httpMethod?: string;
-    includeDrafts?: boolean;
-    headers?: Record<string, string>;
-    secret?: string;
-    isDisabledByUser?: boolean;
-  }) {
-    let response = await this.dataAxios.post(`/hooks/projects/${this.config.projectId}`, {
-      type: webhook.type || 'document',
-      ...webhook
-    });
-    return response.data;
-  }
-
-  async deleteWebhook(webhookId: string) {
-    let response = await this.dataAxios.delete(
-      `/hooks/projects/${this.config.projectId}/${webhookId}`
+  async getWebhook(id: string) {
+    const result = await this.request(
+      nativeHook,
+      'GET',
+      `/hooks/projects/${this.project()}/${encodeURIComponent(input(opaqueId, id, 'Provide an exact webhook ID.'))}`
     );
-    return response.data;
+    if (result.id !== id) throw malformed();
+    return result;
   }
-
-  async getWebhook(webhookId: string) {
-    let response = await this.dataAxios.get(
-      `/hooks/projects/${this.config.projectId}/${webhookId}`
+  async createWebhook(body: Record<string, unknown>) {
+    const result = await this.request(
+      nativeHook,
+      'POST',
+      `/hooks/projects/${this.project()}`,
+      body
     );
-    return response.data;
+    const read = await this.getWebhook(result.id);
+    for (const key of [
+      'type',
+      'name',
+      'url',
+      'dataset',
+      'apiVersion',
+      'httpMethod',
+      'includeDrafts'
+    ])
+      if (body[key] !== undefined && JSON.stringify(body[key]) !== JSON.stringify(read[key]))
+        throw malformed();
+    if (body.rule !== undefined) {
+      const requested = record.safeParse(body.rule);
+      const returned = record.safeParse(read.rule);
+      if (!requested.success || !returned.success) throw malformed();
+      for (const [key, value] of Object.entries(requested.data))
+        if (JSON.stringify(value) !== JSON.stringify(returned.data[key])) throw malformed();
+    }
+    return read;
   }
-
-  // ── Users ──
-
+  async deleteWebhook(id: string) {
+    await this.request(
+      z.object({ deleted: z.literal(1) }),
+      'DELETE',
+      `/hooks/projects/${this.project()}/${encodeURIComponent(input(opaqueId, id, 'Provide an exact webhook ID.'))}`
+    );
+    if ((await this.listWebhooks()).some(hook => hook.id === id && !hook.deletedAt))
+      throw malformed();
+    return { deleted: true };
+  }
+  async uploadAsset(
+    type: 'image' | 'file',
+    bytes: Buffer,
+    filename?: string,
+    contentType?: string
+  ) {
+    const result = await this.request(
+      z.object({ document: nativeAsset }),
+      'POST',
+      `/assets/${type === 'image' ? 'images' : 'files'}/${this.lake()}`,
+      bytes,
+      filename ? { filename } : undefined,
+      false,
+      false,
+      contentType ?? 'application/octet-stream'
+    );
+    if (
+      result.document._type !== `sanity.${type}Asset` ||
+      result.document.size !== bytes.length
+    )
+      throw malformed();
+    return result;
+  }
   async getCurrentUser() {
-    let response = await this.managementAxios.get('/users/me');
-    return response.data;
+    return this.request(nativeProfile, 'GET', '/users/me', undefined, undefined, true);
+  }
+  async profile() {
+    try {
+      const user = await this.getCurrentUser();
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        imageUrl: user.profileImage ?? undefined
+      };
+    } catch (error) {
+      if (!(error instanceof ServiceError) || error.data.upstreamStatus !== 401) throw error;
+      await this.listProjects();
+      return { name: 'Sanity API token — project access verified' };
+    }
   }
 }

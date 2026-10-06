@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getObject = SlateTool.create(spec, {
   name: 'Get Object',
   key: 'get_object',
-  description: `Retrieve a specific object from a collection by its UUID. Optionally include the vector embedding and classification info in the response.`,
+  description: `Retrieve a specific object from a collection by its UUID. Optionally include vector embeddings in the response.`,
   tags: {
     readOnly: true
   }
@@ -29,6 +29,11 @@ export let getObject = SlateTool.create(spec, {
         class: z.string().describe('Collection name'),
         properties: z.record(z.string(), z.any()).describe('Object property values'),
         vector: z.array(z.number()).optional().describe('Vector embedding if requested'),
+        vectors: z
+          .record(z.string(), z.any())
+          .optional()
+          .describe('Named vector embeddings if requested'),
+        tenant: z.string().optional().describe('Tenant name'),
         creationTimeUnix: z.number().optional().describe('Creation timestamp'),
         lastUpdateTimeUnix: z.number().optional().describe('Last update timestamp')
       })
@@ -47,6 +52,8 @@ export let getObject = SlateTool.create(spec, {
         class: result.class,
         properties: result.properties,
         vector: result.vector,
+        vectors: result.vectors,
+        tenant: result.tenant,
         creationTimeUnix: result.creationTimeUnix,
         lastUpdateTimeUnix: result.lastUpdateTimeUnix
       },

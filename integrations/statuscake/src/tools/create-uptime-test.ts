@@ -93,7 +93,7 @@ export let createUptimeTest = SlateTool.create(spec, {
       ...rest
     } = ctx.input;
 
-    let data: Record<string, any> = {
+    let data: Record<string, unknown> = {
       ...rest,
       test_type: testType,
       website_url: websiteUrl,
@@ -110,14 +110,14 @@ export let createUptimeTest = SlateTool.create(spec, {
     if (customHeader !== undefined) data.custom_header = customHeader;
     if (basicUsername !== undefined) data.basic_username = basicUsername;
     if (basicPassword !== undefined) data.basic_password = basicPassword;
-    if (statusCodes) data.status_codes = statusCodes;
+    if (statusCodes) data.status_codes_csv = statusCodes.join(',');
     if (userAgent !== undefined) data.user_agent = userAgent;
     if (triggerRate !== undefined) data.trigger_rate = triggerRate;
     if (dnsIps) data.dns_ips = dnsIps;
     if (dnsServer !== undefined) data.dns_server = dnsServer;
 
     let result = await client.createUptimeTest(data);
-    let testId = String(result?.data?.new_id ?? result?.new_id ?? '');
+    let testId = result.data.new_id;
 
     return {
       output: { testId },

@@ -22,6 +22,10 @@ export let getConcurrency = SlateTool.create(spec, {
       remainingPurchaseLimit: z
         .number()
         .describe('Remaining concurrency that can be purchased'),
+      reservedInboundConcurrency: z
+        .number()
+        .optional()
+        .describe('Concurrency reserved for inbound calls'),
       concurrencyBurstEnabled: z.boolean().describe('Whether burst mode is enabled'),
       concurrencyBurstLimit: z.number().describe('Maximum concurrency when burst is enabled')
     })
@@ -32,6 +36,7 @@ export let getConcurrency = SlateTool.create(spec, {
 
     return {
       output: {
+        reservedInboundConcurrency: data.reserved_inbound_concurrency,
         currentConcurrency: data.current_concurrency,
         concurrencyLimit: data.concurrency_limit,
         baseConcurrency: data.base_concurrency,

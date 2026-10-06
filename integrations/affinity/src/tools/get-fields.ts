@@ -14,9 +14,13 @@ let fieldSchema = z.object({
   valueType: z
     .number()
     .describe(
-      'Type of value this field holds (0=person, 1=org, 2=dropdown, 3=number, 4=date, 5=location, 6=text, 7=ranked-dropdown)'
+      'Type of value this field holds (0=person, 1=organization, 2=single-line text or dropdown, 3=number, 4=date, 5=location, 6=long text, 7=ranked dropdown)'
     ),
   allowsMultiple: z.boolean().describe('Whether the field accepts multiple values'),
+  trackChanges: z
+    .boolean()
+    .optional()
+    .describe('Whether this field supports historical change tracking.'),
   dropdownOptions: z
     .array(
       z.object({
@@ -36,7 +40,7 @@ export let getFields = SlateTool.create(spec, {
   description: `Retrieve field definitions (custom columns) from Affinity. Fields can be global or specific to a list. Use this to discover available fields and their IDs before reading or writing field values.
 
 **Value types:**
-- **0** = Person, **1** = Organization, **2** = Dropdown, **3** = Number, **4** = Date, **5** = Location, **6** = Text, **7** = Ranked dropdown`,
+- **0** = Person, **1** = Organization, **2** = Single-line text or dropdown, **3** = Number, **4** = Date, **5** = Location, **6** = Long text, **7** = Ranked dropdown`,
   tags: {
     readOnly: true
   }
@@ -65,14 +69,15 @@ export let getFields = SlateTool.create(spec, {
       withModifiedNames: ctx.input.withModifiedNames
     });
 
-    let fields = (Array.isArray(result) ? result : []).map((f: any) => ({
+    let fields = (Array.isArray(result) ? result : []).map(f => ({
       fieldId: f.id,
       name: f.name,
       listId: f.list_id ?? null,
       enrichmentSource: f.enrichment_source ?? null,
       valueType: f.value_type,
       allowsMultiple: f.allows_multiple ?? false,
-      dropdownOptions: (f.dropdown_options ?? []).map((o: any) => ({
+      trackChanges: f.track_changes,
+      dropdownOptions: (f.dropdown_options ?? []).map(o => ({
         optionId: o.id,
         text: o.text,
         rank: o.rank ?? null,

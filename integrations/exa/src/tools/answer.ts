@@ -41,7 +41,7 @@ Ideal for factual questions, research queries, and getting quick answers grounde
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
 
     let response = await client.answer({
       query: ctx.input.query,

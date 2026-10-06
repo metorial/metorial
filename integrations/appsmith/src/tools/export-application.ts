@@ -1,14 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let exportApplication = SlateTool.create(spec, {
   name: 'Export Application',
   key: 'export_application',
-  description: `Export an Appsmith application as a JSON object. The exported JSON contains the full application definition including pages, queries, JS objects, and widget configurations. Datasource credentials are excluded for security.`,
+  description: `Export an Appsmith application to a downloadable JSON file. Known decrypted credential fields are removed. Query text, widget configuration and embedded business data can remain sensitive.`,
   constraints: [
-    'Datasource credentials are not included in the export and must be reconfigured after import.'
+    'The file is limited to 4 MiB after removal of known credential fields. Review remaining application data before sharing.'
   ],
   tags: {
     readOnly: true
@@ -23,26 +23,29 @@ export let exportApplication = SlateTool.create(spec, {
     z.object({
       applicationJson: z
         .any()
-        .describe('The full exported application definition as a JSON object.'),
-      applicationName: z.string().optional().describe('The name of the exported application.')
+        .optional()
+        .describe('Deprecated inline export field; use the downloadable JSON file.'),
+      applicationName: z.string().optional().describe('The name of the exported application.'),
+      filename: z.string().optional().describe('Download filename.'),
+      size: z.number().optional().describe('File size in bytes.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
+    const result = await clientFor(ctx).exportApplication(ctx.input.applicationId);
+    const filename = `application-${ctx.input.applicationId}.json`;
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(result.bytes, { headers: { 'Content-Type': 'application/json' } }),
+      filename
     });
-
-    let exportedData = await client.exportApplication(ctx.input.applicationId);
-
-    let appName = exportedData?.exportedApplication?.name ?? exportedData?.name ?? 'Unknown';
-
     return {
       output: {
-        applicationJson: exportedData,
-        applicationName: appName
+        applicationName: result.name,
+        filename,
+        size: Buffer.byteLength(result.bytes)
       },
-      message: `Exported application **${appName}**.`
+      message:
+        'Application JSON file is ready. Review embedded queries and business data before sharing.'
     };
   })
   .build();

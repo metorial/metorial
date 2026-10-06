@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .default('https://api.fillout.com')
       .describe(
-        'Base URL for the Fillout API. Change this if using a self-hosted or EU instance (e.g. https://eu-api.fillout.com).'
+        'Base URL for the Fillout API. Use the public HTTPS origin shown in Developer settings; EU: https://eu-api.fillout.com, Canada: https://ca-api.fillout.com. An OAuth-resolved origin takes precedence.'
       )
   })
 );

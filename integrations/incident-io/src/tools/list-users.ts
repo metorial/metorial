@@ -19,6 +19,7 @@ export let listUsers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      returnedCount: z.number().int().nonnegative(),
       users: z.array(
         z.object({
           userId: z.string(),
@@ -39,7 +40,7 @@ export let listUsers = SlateTool.create(spec, {
       after: ctx.input.after
     });
 
-    let users = result.users.map((u: any) => ({
+    let users = result.users.map(u => ({
       userId: u.id,
       name: u.name || undefined,
       email: u.email || undefined,
@@ -50,6 +51,7 @@ export let listUsers = SlateTool.create(spec, {
     return {
       output: {
         users,
+        returnedCount: users.length,
         nextCursor: result.pagination_meta?.after || undefined
       },
       message: `Found **${users.length}** user(s).`

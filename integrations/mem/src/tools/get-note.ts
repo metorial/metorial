@@ -24,7 +24,26 @@ export let getNote = SlateTool.create(spec, {
       content: z.string().nullable().describe('Full markdown content of the note.'),
       collectionIds: z.array(z.string()).describe('IDs of collections the note belongs to.'),
       createdAt: z.string().describe('Creation timestamp in ISO 8601 format.'),
-      updatedAt: z.string().describe('Last updated timestamp in ISO 8601 format.')
+      updatedAt: z.string().describe('Last updated timestamp in ISO 8601 format.'),
+      version: z
+        .number()
+        .optional()
+        .describe('Exact current content version required by update_note.'),
+      trashedAt: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'Trash timestamp, or null for an active note. Trashed notes remain readable.'
+        ),
+      audioRecordingIds: z
+        .array(z.string())
+        .optional()
+        .describe('Audio recording IDs currently linked to the note.'),
+      attachmentMetadata: z
+        .array(z.object({ attachmentId: z.string(), kind: z.string() }))
+        .optional()
+        .describe('Native attachment IDs and kinds currently linked to the note.')
     })
   )
   .handleInvocation(async ctx => {
@@ -39,7 +58,14 @@ export let getNote = SlateTool.create(spec, {
         content: note.content,
         collectionIds: note.collection_ids,
         createdAt: note.created_at,
-        updatedAt: note.updated_at
+        updatedAt: note.updated_at,
+        version: note.version,
+        trashedAt: note.trashed_at,
+        audioRecordingIds: note.audio_recording_ids,
+        attachmentMetadata: note.attachment_metadata.map(item => ({
+          attachmentId: item.attachment_id,
+          kind: item.attachment_kind
+        }))
       },
       message: `Retrieved note **${note.title}** (${note.id}).`
     };

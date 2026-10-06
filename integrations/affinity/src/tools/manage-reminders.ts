@@ -11,12 +11,17 @@ let reminderSchema = z.object({
   opportunityId: z.number().nullable().describe('ID of the associated opportunity'),
   content: z.string().nullable().describe('Reminder text'),
   dueDate: z.string().nullable().describe('When the reminder is due'),
-  status: z.number().nullable().describe('Reminder status (0=active, 1=completed)'),
+  status: z.number().nullable().describe('Reminder status (0=completed, 1=active, 2=overdue)'),
   type: z.number().nullable().describe('Reminder type (0=one-time, 1=recurring)'),
   resetType: z
     .number()
     .nullable()
-    .describe('Recurring reset type (0=none, 1=email, 2=meeting, 3=any interaction)'),
+    .describe('Recurring reset type (0=interaction, 1=email, 2=meeting)'),
+  reminderDays: z
+    .number()
+    .nullable()
+    .optional()
+    .describe('Days until a recurring reminder is due again.'),
   createdAt: z.string().nullable().describe('Creation timestamp')
 });
 
@@ -56,17 +61,18 @@ export let listReminders = SlateTool.create(spec, {
       pageToken: ctx.input.pageToken
     });
 
-    let reminders = (result.reminders ?? result ?? []).map((r: any) => ({
+    let reminders = (result.reminders ?? result ?? []).map(r => ({
       reminderId: r.id,
-      ownerId: r.owner_id,
-      personId: r.person_id ?? null,
-      organizationId: r.organization_id ?? null,
-      opportunityId: r.opportunity_id ?? null,
+      ownerId: r.owner.id,
+      personId: r.person?.id ?? null,
+      organizationId: r.organization?.id ?? null,
+      opportunityId: r.opportunity?.id ?? null,
       content: r.content ?? null,
       dueDate: r.due_date ?? null,
       status: r.status ?? null,
       type: r.type ?? null,
       resetType: r.reset_type ?? null,
+      reminderDays: r.reminder_days ?? null,
       createdAt: r.created_at ?? null
     }));
 
@@ -86,7 +92,7 @@ export let createReminder = SlateTool.create(spec, {
   description: `Create a new reminder in Affinity, attached to a person, organization, or opportunity. Supports one-time and recurring reminders.
 
 **Reminder types:** 0 = one-time, 1 = recurring
-**Reset types (for recurring):** 0 = none, 1 = on email, 2 = on meeting, 3 = on any interaction`,
+**Reset types (for recurring):** 0 = on interaction, 1 = on email, 2 = on meeting. Recurring reminders require reminderDays. Creating or updating a reminder may notify its owner.`,
   tags: {
     destructive: false
   }
@@ -106,7 +112,12 @@ export let createReminder = SlateTool.create(spec, {
       resetType: z
         .number()
         .optional()
-        .describe('Reset trigger for recurring reminders (0=none, 1=email, 2=meeting, 3=any)')
+        .describe('Reset trigger for recurring reminders (0=interaction, 1=email, 2=meeting)'),
+      reminderDays: z
+        .number()
+        .optional()
+        .describe('Required positive number of days for recurring reminders.'),
+      isCompleted: z.boolean().optional().describe('Whether the reminder is completed.')
     })
   )
   .output(reminderSchema)
@@ -121,21 +132,24 @@ export let createReminder = SlateTool.create(spec, {
       organizationId: ctx.input.organizationId,
       opportunityId: ctx.input.opportunityId,
       type: ctx.input.type,
-      resetType: ctx.input.resetType
+      resetType: ctx.input.resetType,
+      reminderDays: ctx.input.reminderDays,
+      isCompleted: ctx.input.isCompleted
     });
 
     return {
       output: {
         reminderId: r.id,
-        ownerId: r.owner_id,
-        personId: r.person_id ?? null,
-        organizationId: r.organization_id ?? null,
-        opportunityId: r.opportunity_id ?? null,
+        ownerId: r.owner.id,
+        personId: r.person?.id ?? null,
+        organizationId: r.organization?.id ?? null,
+        opportunityId: r.opportunity?.id ?? null,
         content: r.content ?? null,
         dueDate: r.due_date ?? null,
         status: r.status ?? null,
         type: r.type ?? null,
         resetType: r.reset_type ?? null,
+        reminderDays: r.reminder_days ?? null,
         createdAt: r.created_at ?? null
       },
       message: `Created reminder (ID: ${r.id}) due on ${r.due_date}.`
@@ -156,9 +170,25 @@ export let updateReminder = SlateTool.create(spec, {
       reminderId: z.number().describe('ID of the reminder to update'),
       content: z.string().optional().describe('New reminder text'),
       dueDate: z.string().optional().describe('New due date (ISO 8601 format)'),
-      status: z.number().optional().describe('New status (0=active, 1=completed)'),
+      status: z
+        .number()
+        .optional()
+        .describe(
+          'New status (0=completed, 1=active). Overdue status 2 is calculated by the provider.'
+        ),
       type: z.number().optional().describe('New reminder type (0=one-time, 1=recurring)'),
-      resetType: z.number().optional().describe('New reset type for recurring')
+      resetType: z
+        .number()
+        .optional()
+        .describe('New reset type (0=interaction, 1=email, 2=meeting).'),
+      reminderDays: z
+        .number()
+        .optional()
+        .describe('Required positive number of days when selecting recurring type.'),
+      isCompleted: z
+        .boolean()
+        .optional()
+        .describe('Completion state; must agree with status if both are provided.')
     })
   )
   .output(reminderSchema)
@@ -170,21 +200,24 @@ export let updateReminder = SlateTool.create(spec, {
       dueDate: ctx.input.dueDate,
       status: ctx.input.status,
       type: ctx.input.type,
-      resetType: ctx.input.resetType
+      resetType: ctx.input.resetType,
+      reminderDays: ctx.input.reminderDays,
+      isCompleted: ctx.input.isCompleted
     });
 
     return {
       output: {
         reminderId: r.id,
-        ownerId: r.owner_id,
-        personId: r.person_id ?? null,
-        organizationId: r.organization_id ?? null,
-        opportunityId: r.opportunity_id ?? null,
+        ownerId: r.owner.id,
+        personId: r.person?.id ?? null,
+        organizationId: r.organization?.id ?? null,
+        opportunityId: r.opportunity?.id ?? null,
         content: r.content ?? null,
         dueDate: r.due_date ?? null,
         status: r.status ?? null,
         type: r.type ?? null,
         resetType: r.reset_type ?? null,
+        reminderDays: r.reminder_days ?? null,
         createdAt: r.created_at ?? null
       },
       message: `Updated reminder (ID: ${r.id}).`

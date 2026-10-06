@@ -75,7 +75,7 @@ Manage account-level settings including security, meeting defaults, recording be
 
 Zoom supports webhooks for real-time event notifications. Zoom utilizes webhooks to notify third-party applications about events that occur in a Zoom account. Event notifications are sent as HTTP POST requests in JSON to the endpoint you specify in your Marketplace app.
 
-Webhooks require configuring Event Subscriptions in your Zoom Marketplace app, specifying an HTTPS endpoint URL, and setting the integration's `secretToken` to the app's webhook Secret Token. For Zoom's challenge-response check, each webhook trigger returns the supplied `plainToken` together with its HMAC-SHA256 hexadecimal `encryptedToken` synchronously. Ordinary notifications remain asynchronous and follow a `$object.$action` naming convention (e.g., `meeting.started`, `user.created`).
+Webhooks require configuring Event Subscriptions in your Zoom Marketplace app and specifying an external HTTPS receiver. The receiver handles Zoom's Secret Token verification and challenge-response protocol. Notifications follow a `$object.$action` naming convention (e.g., `meeting.started`, `user.created`). This integration does not receive webhook events.
 
 Event types are grouped into the following categories:
 

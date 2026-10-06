@@ -1,18 +1,19 @@
 {
   "name": "@metorial/bamboohr",
-  "description": "Manage employee data, directory, and HR workflows in BambooHR. Create, retrieve, and update employee records including personal information, job details, compensation, and custom fields. Handle time off requests, approvals, and balances. Track employee hours with clock-in/clock-out and timesheet entries. Manage benefits, dependents, and benefit plans. Generate employee reports in CSV, PDF, JSON, or XML formats. Create and track employee goals, training records, and performance data. Manage job listings and applicant tracking. Upload and organize employee and company files and photos. Access tabular data such as job history, compensation, and education. Configure webhooks to monitor employee data changes in real time.",
+  "description": "Read and update visible BambooHR employee records and tables, time off, timesheets, goals and training records. Discover employee IDs, current reports and active applicant statuses. Read company benefit summaries and employee dependents, retrieve applicant tracking data, generate reports and download employee or company files. Permissions and company configuration determine availability.",
   "categories": ["hr-and-recruiting"],
   "skills": [
     "manage employee records",
     "track time off requests",
     "clock in and out",
     "generate HR reports",
-    "manage benefits administration",
     "track employee goals",
     "manage applicant tracking",
     "upload employee files",
     "manage training records",
-    "configure employee webhooks"
+    "read benefit summaries",
+    "discover employee and report IDs",
+    "download employee files"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/bamboohr.svg"
 }

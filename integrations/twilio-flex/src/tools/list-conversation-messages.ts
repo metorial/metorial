@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConversationsClient } from '../lib/conversations-client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let messageSchema = z.object({
@@ -24,6 +25,12 @@ export let listConversationMessagesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque continuation from nextPageToken; retain the same resource and filters.'
+        ),
       conversationSid: z.string().describe('Conversation SID'),
       order: z.enum(['asc', 'desc']).optional().describe('Sort order by date (asc or desc)'),
       pageSize: z.number().optional().describe('Number of messages to return (max 100)')
@@ -31,11 +38,21 @@ export let listConversationMessagesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Native continuation; omitted when this page is exhausted.'),
+      hasMore: z.boolean().optional().describe('Whether a next page is available.'),
       messages: z.array(messageSchema).describe('Message records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ConversationsClient(ctx.auth.token);
+    validateInput('list_conversation_messages', ctx.input);
+    let client = new ConversationsClient(
+      ctx.auth.token,
+      ctx.auth.accountSid,
+      ctx.input.pageToken
+    );
 
     let result = await client.listMessages(
       ctx.input.conversationSid,
@@ -54,7 +71,7 @@ export let listConversationMessagesTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { messages },
+      output: { messages, nextPageToken: result.nextPageToken, hasMore: result.hasMore },
       message: `Found **${messages.length}** messages in conversation **${ctx.input.conversationSid}**.`
     };
   })

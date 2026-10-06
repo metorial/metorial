@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateRecord = SlateTool.create(spec, {
@@ -31,10 +31,7 @@ export let updateRecord = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.appBaseUrl,
-      token: ctx.auth?.token
-    });
+    const client = clientFor(ctx);
 
     await client.updateRecord(ctx.input.dataType, ctx.input.recordId, ctx.input.fields);
 

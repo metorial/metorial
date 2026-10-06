@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getAnalysisStatus = SlateTool.create(spec, {
@@ -49,22 +50,35 @@ export let getAnalysisStatus = SlateTool.create(spec, {
           })
         )
         .optional()
-        .describe('Detailed per-engine results (only when completed)')
+        .describe('Available per-engine results; in-progress analyses may be partial')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    let client = new Client(ctx.auth);
     let result = await client.getAnalysis(ctx.input.analysisId);
     let attrs = result?.attributes ?? {};
 
-    let engineResults: Record<string, any> | undefined;
+    let engineResults:
+      | Record<
+          string,
+          {
+            category?: string;
+            engineName?: string;
+            engineVersion?: string;
+            result?: string | null;
+            method?: string;
+            engineUpdate?: string;
+          }
+        >
+      | undefined;
     if (attrs.results) {
       engineResults = {};
-      for (let [engine, data] of Object.entries(attrs.results as Record<string, any>)) {
+      for (let [engine, data] of Object.entries(attrs.results)) {
         engineResults[engine] = {
           category: data.category,
           engineName: data.engine_name,
-          engineVersion: data.engine_version,
+          engineVersion: data.engine_version ?? undefined,
           result: data.result,
           method: data.method,
           engineUpdate: data.engine_update
@@ -74,7 +88,7 @@ export let getAnalysisStatus = SlateTool.create(spec, {
 
     return {
       output: {
-        analysisId: result?.id ?? '',
+        analysisId: result.id,
         status: attrs.status ?? 'unknown',
         stats: attrs.stats
           ? {
@@ -91,7 +105,7 @@ export let getAnalysisStatus = SlateTool.create(spec, {
         date: attrs.date?.toString(),
         results: engineResults
       },
-      message: `**Analysis** \`${ctx.input.analysisId}\` — **Status:** ${attrs.status ?? 'unknown'}${attrs.stats ? `\n- Malicious: ${attrs.stats.malicious ?? 0}\n- Suspicious: ${attrs.stats.suspicious ?? 0}\n- Harmless: ${attrs.stats.harmless ?? 0}\n- Undetected: ${attrs.stats.undetected ?? 0}` : ''}`
+      message: `Analysis status: ${attrs.status}. Available statistics are returned without treating missing results as clean.`
     };
   })
   .build();

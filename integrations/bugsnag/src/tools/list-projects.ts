@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugsnagClient } from '../lib/client';
+import { pageInput, pageOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let projectSchema = z.object({
@@ -32,6 +33,7 @@ export let listProjects = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...pageInput,
       organizationId: z.string().describe('Organization ID to list projects for'),
       perPage: z
         .number()
@@ -41,38 +43,40 @@ export let listProjects = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pageOutput,
       projects: z.array(projectSchema).describe('List of projects')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
+    let client = new BugsnagClient(ctx.auth);
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
     if (!orgId)
-      throw new Error(
+      throw createApiServiceError(
         'Organization ID is required. Provide it in the input or set it in the config.'
       );
 
     let projects = await client.listProjects(orgId, {
-      perPage: ctx.input.perPage
+      perPage: ctx.input.perPage,
+      pageUrl: ctx.input.pageUrl
     });
 
-    let mapped = projects.map((p: any) => ({
-      projectId: p.id,
-      name: p.name,
-      slug: p.slug,
-      type: p.type,
-      apiKey: p.api_key,
-      releaseStages: p.release_stages,
-      language: p.language,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at,
-      openErrorCount: p.open_error_count,
-      url: p.url,
-      htmlUrl: p.html_url
+    let mapped = projects.map(p => ({
+      projectId: p.id ?? undefined,
+      name: p.name ?? undefined,
+      slug: p.slug ?? undefined,
+      type: p.type ?? undefined,
+      apiKey: p.api_key ?? undefined,
+      releaseStages: p.release_stages ?? undefined,
+      language: p.language ?? undefined,
+      createdAt: p.created_at ?? undefined,
+      updatedAt: p.updated_at ?? undefined,
+      openErrorCount: p.open_error_count ?? undefined,
+      url: p.url ?? undefined,
+      htmlUrl: p.html_url ?? undefined
     }));
 
     return {
-      output: { projects: mapped },
+      output: { projects: mapped, ...client.pageInfo },
       message: `Found **${mapped.length}** project(s) in the organization.`
     };
   })

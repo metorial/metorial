@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput, paginationOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let agentSchema = z.object({
@@ -19,13 +20,14 @@ let agentSchema = z.object({
 export let listAgents = SlateTool.create(spec, {
   name: 'List Agents',
   key: 'list_agents',
-  description: `List connected Buildkite agents in your organization. Returns agent names, versions, connection states, metadata tags, and whether they are currently running a job. Only connected agents are returned.`,
+  description: `List connected and stopping Buildkite agents in your organization. Returns names, versions, connection states, metadata tags and current job IDs. Use get_agent to inspect a known stopped or disconnected agent.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      ...organizationInput,
       name: z.string().optional().describe('Filter agents by name'),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
       perPage: z.number().optional().describe('Number of results per page (max 100)')
@@ -33,14 +35,12 @@ export let listAgents = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...paginationOutput,
       agents: z.array(agentSchema)
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     let agents = await client.listAgents({
       name: ctx.input.name,
@@ -48,7 +48,7 @@ export let listAgents = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let mapped = agents.map((a: any) => ({
+    let mapped = agents.map(a => ({
       agentId: a.id,
       name: a.name,
       hostname: a.hostname,
@@ -62,7 +62,7 @@ export let listAgents = SlateTool.create(spec, {
     }));
 
     return {
-      output: { agents: mapped },
-      message: `Found **${mapped.length}** connected agent(s).`
+      output: { agents: mapped, ...client.pagination },
+      message: `Found **${mapped.length}** connected or stopping agent(s).`
     };
   });

@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { anyOf, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { dataObject, resourceSchema } from '../lib/response';
 import { createClient } from '../lib/utils';
 import { spec } from '../spec';
 
@@ -11,6 +12,7 @@ export let getContract = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('contracts:read'))
   .input(
     z.object({
       contractId: z.string().describe('The unique ID of the contract to retrieve')
@@ -18,14 +20,16 @@ export let getContract = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      contract: z.record(z.string(), z.any()).describe('Full contract details')
+      contract: resourceSchema.describe('Full contract details')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
     let result = await client.getContract(ctx.input.contractId);
-    let contract = result?.data ?? result;
+    let contract = dataObject(result, 'contract');
+    if (String(contract.id) !== ctx.input.contractId)
+      throw createApiServiceError('Deel returned a different resource identity.');
 
     return {
       output: { contract },

@@ -14,8 +14,6 @@ import {
   listWorkspaces,
   updateWorkspace
 } from './tools';
-import { newImageGenerated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     getMediaAsset,
     deleteMediaAsset
   ],
-  triggers: [newImageGenerated]
+  triggers: []
 });

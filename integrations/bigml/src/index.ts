@@ -17,8 +17,6 @@ import {
   trainModel,
   updateResource
 } from './tools';
-import { inboundWebhook, newResource, resourceCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     deleteResource,
     manageProject
   ],
-  triggers: [inboundWebhook, newResource, resourceCompleted]
+  triggers: []
 });

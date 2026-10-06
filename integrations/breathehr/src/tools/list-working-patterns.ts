@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageParams, paginationSchema, readRows } from '../lib/response';
 import { spec } from '../spec';
 
 export let listWorkingPatterns = SlateTool.create(spec, {
@@ -19,26 +20,23 @@ export let listWorkingPatterns = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: paginationSchema.optional(),
       workingPatterns: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .describe('List of working pattern records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    const client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
-    let result = await client.listWorkingPatterns({
-      page: ctx.input.page,
-      perPage: ctx.input.perPage
-    });
-
-    let workingPatterns = result?.working_patterns || [];
-
+    const result = await client.list(
+      'working_patterns',
+      { ...pageParams(ctx.input, false) },
+      false
+    );
+    const workingPatterns = readRows(result, 'working_patterns');
     return {
-      output: { workingPatterns },
+      output: { workingPatterns, pagination: result.pagination },
       message: `Retrieved **${workingPatterns.length}** working pattern(s).`
     };
   })

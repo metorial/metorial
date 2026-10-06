@@ -13,7 +13,7 @@ export let deleteWorkspaceTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('The UUID of the workspace to delete.')
+      workspaceId: z.string().describe('Workspace ID from list_workspaces.')
     })
   )
   .output(

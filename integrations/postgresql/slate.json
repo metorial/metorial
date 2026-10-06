@@ -12,8 +12,7 @@
     "create and alter tables",
     "manage indexes",
     "create and refresh views and materialized views",
-    "manage database roles",
-    "poll tables for row changes"
+    "manage database roles"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/postgresql.png"
 }

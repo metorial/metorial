@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FivetranClient } from '../lib/client';
+import { connectionId, groupId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let connectionOutputSchema = z.object({
-  connectionId: z.string().describe('Unique identifier of the connection'),
-  groupId: z.string().describe('Group this connection belongs to'),
+  connectionId: connectionId,
+  groupId: groupId,
   service: z.string().describe('Connector service type'),
   schema: z.string().optional().describe('Schema name in the destination'),
   paused: z.boolean().optional().describe('Whether the connection is paused'),
@@ -20,8 +21,14 @@ let connectionOutputSchema = z.object({
   succeededAt: z.string().optional().nullable().describe('Last successful sync timestamp'),
   failedAt: z.string().optional().nullable().describe('Last failed sync timestamp'),
   createdAt: z.string().optional().describe('Timestamp when the connection was created'),
-  config: z.record(z.string(), z.any()).optional().describe('Service-specific configuration'),
-  setupTests: z.array(z.record(z.string(), z.any())).optional().describe('Setup test results')
+  config: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Stored configuration is omitted to protect source credentials'),
+  setupTests: z
+    .array(z.record(z.string(), z.any()))
+    .optional()
+    .describe('Setup test statuses; diagnostic messages and details are omitted')
 });
 
 let mapConnection = (c: any) => ({
@@ -30,29 +37,28 @@ let mapConnection = (c: any) => ({
   service: c.service,
   schema: c.schema,
   paused: c.paused,
-  setupState: c.setup_state,
-  syncState: c.sync_state,
+  setupState: c.status.setup_state,
+  syncState: c.status.sync_state,
   syncFrequency: c.sync_frequency,
   scheduleType: c.schedule_type,
   dailySyncTime: c.daily_sync_time,
   succeededAt: c.succeeded_at,
   failedAt: c.failed_at,
   createdAt: c.created_at,
-  config: c.config,
   setupTests: c.setup_tests
 });
 
 export let getConnection = SlateTool.create(spec, {
   name: 'Get Connection',
   key: 'get_connection',
-  description: `Retrieve full details of a specific connection (connector), including its configuration, status, and setup test results.`,
+  description: `Retrieve full details of a specific connection (connector), including its status and safe setup-test results. Stored source credentials are omitted.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the connection to retrieve')
+      connectionId: connectionId
     })
   )
   .output(connectionOutputSchema)
@@ -62,7 +68,7 @@ export let getConnection = SlateTool.create(spec, {
 
     return {
       output: mapConnection(c),
-      message: `Retrieved connection **${c.schema || c.id}** (service: ${c.service}, state: ${c.sync_state}).`
+      message: `Retrieved connection **${c.schema || c.id}** (service: ${c.service}, state: ${c.status.sync_state}).`
     };
   })
   .build();
@@ -78,7 +84,7 @@ export let createConnection = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      groupId: z.string().describe('ID of the group to create the connection in'),
+      groupId: groupId,
       service: z
         .string()
         .describe('Connector service type identifier (e.g., "github", "salesforce")'),
@@ -86,6 +92,14 @@ export let createConnection = SlateTool.create(spec, {
         .record(z.string(), z.any())
         .optional()
         .describe('Service-specific configuration object'),
+      destinationSchemaNames: z
+        .enum(['FIVETRAN_NAMING', 'SOURCE_NAMING'])
+        .optional()
+        .describe('Destination schema naming convention; required for some services'),
+      authorization: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Service-specific authorization credentials; never returned'),
       paused: z
         .boolean()
         .optional()
@@ -121,11 +135,14 @@ export let createConnection = SlateTool.create(spec, {
       group_id: ctx.input.groupId,
       service: ctx.input.service
     };
-    if (ctx.input.config) body.config = ctx.input.config;
+    if (ctx.input.config !== undefined) body.config = ctx.input.config;
+    if (ctx.input.destinationSchemaNames !== undefined)
+      body.destination_schema_names = ctx.input.destinationSchemaNames;
+    if (ctx.input.authorization !== undefined) body.auth = ctx.input.authorization;
     if (ctx.input.paused !== undefined) body.paused = ctx.input.paused;
     if (ctx.input.syncFrequency !== undefined) body.sync_frequency = ctx.input.syncFrequency;
-    if (ctx.input.scheduleType) body.schedule_type = ctx.input.scheduleType;
-    if (ctx.input.dailySyncTime) body.daily_sync_time = ctx.input.dailySyncTime;
+    if (ctx.input.scheduleType !== undefined) body.schedule_type = ctx.input.scheduleType;
+    if (ctx.input.dailySyncTime !== undefined) body.daily_sync_time = ctx.input.dailySyncTime;
     if (ctx.input.trustCertificates !== undefined)
       body.trust_certificates = ctx.input.trustCertificates;
     if (ctx.input.trustFingerprints !== undefined)
@@ -148,7 +165,7 @@ export let updateConnection = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the connection to update'),
+      connectionId: connectionId,
       config: z
         .record(z.string(), z.any())
         .optional()
@@ -172,11 +189,11 @@ export let updateConnection = SlateTool.create(spec, {
     let client = new FivetranClient(ctx.auth.token);
 
     let body: Record<string, any> = {};
-    if (ctx.input.config) body.config = ctx.input.config;
+    if (ctx.input.config !== undefined) body.config = ctx.input.config;
     if (ctx.input.paused !== undefined) body.paused = ctx.input.paused;
     if (ctx.input.syncFrequency !== undefined) body.sync_frequency = ctx.input.syncFrequency;
-    if (ctx.input.scheduleType) body.schedule_type = ctx.input.scheduleType;
-    if (ctx.input.dailySyncTime) body.daily_sync_time = ctx.input.dailySyncTime;
+    if (ctx.input.scheduleType !== undefined) body.schedule_type = ctx.input.scheduleType;
+    if (ctx.input.dailySyncTime !== undefined) body.daily_sync_time = ctx.input.dailySyncTime;
     if (ctx.input.trustCertificates !== undefined)
       body.trust_certificates = ctx.input.trustCertificates;
     if (ctx.input.trustFingerprints !== undefined)
@@ -194,14 +211,14 @@ export let updateConnection = SlateTool.create(spec, {
 export let deleteConnection = SlateTool.create(spec, {
   name: 'Delete Connection',
   key: 'delete_connection',
-  description: `Delete a connection (connector) and all its synced data. This action is irreversible.`,
+  description: `Delete a connection (connector). Data already written to the destination is retained. This action is irreversible.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the connection to delete')
+      connectionId: connectionId
     })
   )
   .output(

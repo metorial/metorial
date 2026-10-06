@@ -29,7 +29,7 @@ export let createRefund = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
     let result = await client.createRefund(ctx.input.transactionId, {
       amount: ctx.input.amount,

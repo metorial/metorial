@@ -1,7 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DialpadClient } from '../lib/client';
+import { malformed } from '../lib/contracts';
+import { invoke } from '../lib/operations';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  callCenters: z.array(
+    z.object({
+      callCenterId: z.string().describe('Call center ID'),
+      name: z.string().optional(),
+      description: z.string().optional(),
+      officeId: z.string().optional(),
+      state: z.string().optional().describe('Call center state (active, deleted, pending)'),
+      dateCreated: z.string().optional()
+    })
+  ),
+  nextCursor: z.string().optional()
+});
 
 export let listCallCentersTool = SlateTool.create(spec, {
   name: 'List Call Centers',
@@ -13,53 +28,17 @@ export let listCallCentersTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      officeId: z.string().describe('Office ID to list call centers for'),
+      officeId: z
+        .string()
+        .describe('Office ID returned by list_offices to list call centers for'),
       cursor: z.string().optional().describe('Pagination cursor')
     })
   )
-  .output(
-    z.object({
-      callCenters: z.array(
-        z.object({
-          callCenterId: z.string().describe('Call center ID'),
-          name: z.string().optional(),
-          description: z.string().optional(),
-          officeId: z.string().optional(),
-          state: z
-            .string()
-            .optional()
-            .describe('Call center state (active, deleted, pending)'),
-          dateCreated: z.string().optional()
-        })
-      ),
-      nextCursor: z.string().optional()
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new DialpadClient({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment
-    });
-
-    let result = await client.listCallCenters(ctx.input.officeId, {
-      cursor: ctx.input.cursor
-    });
-
-    let callCenters = (result.items || []).map((cc: any) => ({
-      callCenterId: String(cc.id),
-      name: cc.name,
-      description: cc.description,
-      officeId: cc.office_id ? String(cc.office_id) : undefined,
-      state: cc.state,
-      dateCreated: cc.date_created
-    }));
-
-    return {
-      output: {
-        callCenters,
-        nextCursor: result.cursor || undefined
-      },
-      message: `Found **${callCenters.length}** call center(s) in office ${ctx.input.officeId}`
-    };
+    const result = await invoke(ctx, 'list_call_centers');
+    const output = outputSchema.safeParse(result.output);
+    if (!output.success) malformed();
+    return { output: output.data, message: result.message };
   })
   .build();

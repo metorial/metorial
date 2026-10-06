@@ -32,8 +32,6 @@ import {
   searchContacts,
   searchDeals
 } from './tools';
-import { campaignEvents, contactEvents, dealEvents, smsEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -68,5 +66,5 @@ export let provider = Slate.create({
     listUsers,
     manageWebhooks
   ],
-  triggers: [contactEvents, dealEvents, campaignEvents, smsEvents]
+  triggers: []
 });

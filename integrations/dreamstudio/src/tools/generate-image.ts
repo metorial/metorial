@@ -40,16 +40,16 @@ let stylePresetEnum = z
 export let generateImage = SlateTool.create(spec, {
   name: 'Generate Image',
   key: 'generate_image',
-  description: `Generate images from text prompts using Stability AI's Stable Diffusion models. Supports multiple model tiers with different quality/speed tradeoffs:
+  description: `DEPRECATED — use \`generate_image_file\` instead. Generate images from text prompts using Stability AI's Stable Diffusion models. Supports multiple model tiers with different quality/speed tradeoffs:
 - **Ultra**: Highest quality, 1MP output (8 credits)
 - **Core**: Fast, high-quality, 1.5MP output with style presets (3 credits)
 - **SD 3.5 Large**: Detailed generation, 1MP output (6.5 credits)
 - **SD 3.5 Large Turbo**: Faster variant of Large (4 credits)
 - **SD 3.5 Medium**: Balanced quality and speed (3.5 credits)`,
   instructions: [
+    'Use generate_image_file to receive a downloadable file with current generation controls.',
     'Provide a detailed prompt for best results. The more descriptive, the better the output.',
     'Use negative prompts to exclude unwanted elements from the generated image.',
-    'Turbo models do not support negative prompts.',
     'Style presets are only available with the Core model.'
   ],
   constraints: [
@@ -57,6 +57,7 @@ export let generateImage = SlateTool.create(spec, {
     'Maximum prompt length: 10,000 characters.'
   ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }
@@ -72,9 +73,7 @@ export let generateImage = SlateTool.create(spec, {
         .string()
         .max(10000)
         .optional()
-        .describe(
-          'What to exclude from the generated image. Not supported with turbo models.'
-        ),
+        .describe('What to exclude from the generated image.'),
       aspectRatio: aspectRatioEnum,
       seed: z
         .number()

@@ -1,13 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectUnavailableDelighted, unavailableMessage } from '../lib/unavailable';
 import { spec } from '../spec';
 
 export let getAutopilotConfig = SlateTool.create(spec, {
   name: 'Get Autopilot Configuration',
   key: 'get_autopilot_config',
-  description: `Retrieve the Autopilot configuration for email or SMS, including active status and survey frequency.`,
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }
@@ -26,27 +29,17 @@ export let getAutopilotConfig = SlateTool.create(spec, {
       updatedAt: z.number().describe('Unix timestamp when Autopilot was last updated')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let config = await client.getAutopilotConfig(ctx.input.platform);
-
-    let frequencyDays = Math.round(config.frequency / 86400);
-
-    return {
-      output: config,
-      message: `${ctx.input.platform.toUpperCase()} Autopilot is **${config.active ? 'active' : 'inactive'}** with a frequency of ${frequencyDays} days.`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();
 
 export let addToAutopilot = SlateTool.create(spec, {
   name: 'Add to Autopilot',
   key: 'add_to_autopilot',
-  description: `Add a person to Autopilot for recurring surveys. Use email platform for email-based surveys or SMS platform for text-based surveys.`,
-  instructions: [
-    'For email Autopilot, provide personEmail. For SMS Autopilot, provide personPhoneNumber.'
-  ],
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }
@@ -78,29 +71,17 @@ export let addToAutopilot = SlateTool.create(spec, {
         .describe('Properties associated with the membership')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.addToAutopilot(ctx.input.platform, {
-      personEmail: ctx.input.personEmail,
-      personPhoneNumber: ctx.input.personPhoneNumber,
-      personId: ctx.input.personId,
-      personName: ctx.input.personName,
-      properties: ctx.input.properties
-    });
-
-    return {
-      output: result,
-      message: `Added **${ctx.input.personEmail || ctx.input.personPhoneNumber}** to ${ctx.input.platform} Autopilot.`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();
 
 export let listAutopilotMembers = SlateTool.create(spec, {
   name: 'List Autopilot Members',
   key: 'list_autopilot_members',
-  description: `List people currently enrolled in Autopilot for email or SMS recurring surveys. Includes next scheduled survey details.`,
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }
@@ -134,28 +115,17 @@ export let listAutopilotMembers = SlateTool.create(spec, {
         .describe('List of Autopilot members')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let members = await client.listAutopilotMembers(ctx.input.platform, {
-      perPage: ctx.input.perPage,
-      personId: ctx.input.personId,
-      personEmail: ctx.input.personEmail,
-      personPhoneNumber: ctx.input.personPhoneNumber
-    });
-
-    return {
-      output: { members },
-      message: `Retrieved **${members.length}** ${ctx.input.platform} Autopilot member(s).`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();
 
 export let removeFromAutopilot = SlateTool.create(spec, {
   name: 'Remove from Autopilot',
   key: 'remove_from_autopilot',
-  description: `Remove a person from Autopilot, cancelling their scheduled recurring surveys. Does not delete the person or their existing responses.`,
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: true,
     readOnly: false
   }
@@ -175,18 +145,5 @@ export let removeFromAutopilot = SlateTool.create(spec, {
       person: z.any().nullable().describe('Removed person details')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.removeFromAutopilot(ctx.input.platform, {
-      personId: ctx.input.personId,
-      personEmail: ctx.input.personEmail,
-      personPhoneNumber: ctx.input.personPhoneNumber
-    });
-
-    return {
-      output: result,
-      message: `Removed **${ctx.input.personEmail || ctx.input.personPhoneNumber || ctx.input.personId}** from ${ctx.input.platform} Autopilot.`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();

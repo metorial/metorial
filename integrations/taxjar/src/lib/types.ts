@@ -95,14 +95,15 @@ export interface TaxJurisdictions {
 }
 
 export interface TaxCalculationResult {
-  order_total_amount: number;
-  shipping: number;
+  order_total_amount?: number;
+  shipping?: number;
   taxable_amount: number;
   amount_to_collect: number;
   rate: number;
   has_nexus: boolean;
   freight_taxable: boolean;
   tax_source?: string;
+  exemption_type?: string;
   jurisdictions?: TaxJurisdictions;
   breakdown?: TaxBreakdown;
 }
@@ -207,6 +208,8 @@ export interface Order {
   amount?: number;
   shipping?: number;
   sales_tax?: number;
+  customer_id?: string;
+  exemption_type?: string;
   line_items?: OrderLineItem[];
 }
 
@@ -283,6 +286,8 @@ export interface Refund {
   amount?: number;
   shipping?: number;
   sales_tax?: number;
+  customer_id?: string;
+  exemption_type?: string;
   line_items?: OrderLineItem[];
 }
 
@@ -352,7 +357,7 @@ export interface ValidatedAddress {
   zip: string;
   state: string;
   city: string;
-  street: string;
+  street?: string;
   country: string;
 }
 

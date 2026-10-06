@@ -6,18 +6,19 @@ import {
   deleteLead,
   getActivities,
   getCampaign,
+  getCampaignSequences,
   getCampaignStats,
+  getDatabaseFilters,
   getLead,
   getTeamInfo,
   listCampaignLeads,
   listCampaigns,
+  manageSubscriptions,
   manageUnsubscribes,
   searchPeopleDatabase,
   updateCampaign,
   updateLead
 } from './tools';
-import { activityEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,7 +35,10 @@ export let provider = Slate.create({
     getActivities,
     manageUnsubscribes,
     searchPeopleDatabase,
-    getTeamInfo
+    getTeamInfo,
+    manageSubscriptions,
+    getDatabaseFilters,
+    getCampaignSequences
   ],
-  triggers: [activityEvent]
+  triggers: []
 });

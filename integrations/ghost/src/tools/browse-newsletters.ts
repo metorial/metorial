@@ -1,24 +1,28 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GhostAdminClient } from '../lib/client';
+import { getClient } from '../lib/client';
+import { pagination } from '../lib/schemas';
 import { spec } from '../spec';
 
-let newsletterSchema = z.object({
-  newsletterId: z.string().describe('Unique newsletter ID'),
-  uuid: z.string().describe('Newsletter UUID'),
-  name: z.string().describe('Newsletter name'),
-  slug: z.string().describe('URL-friendly slug'),
-  description: z.string().nullable().describe('Newsletter description'),
-  status: z.string().describe('Newsletter status (active or archived)'),
-  senderName: z.string().nullable().describe('Displayed sender name'),
-  senderEmail: z.string().nullable().describe('Sender email address'),
-  senderReplyTo: z.string().describe('Reply-to setting'),
-  subscribeOnSignup: z.boolean().describe('Auto-subscribe new members'),
-  visibility: z.string().describe('Newsletter visibility'),
-  sortOrder: z.number().describe('Sort order'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp')
-});
+let newsletterSchema = z
+  .object({
+    newsletterId: z.string().describe('Unique newsletter ID'),
+    uuid: z.string().optional().describe('Newsletter UUID'),
+    name: z.string().optional().describe('Newsletter name'),
+    slug: z.string().optional().describe('URL-friendly slug'),
+    description: z.string().nullable().optional().describe('Newsletter description'),
+    status: z.string().optional().describe('Newsletter status (active or archived)'),
+    senderName: z.string().nullable().optional().describe('Displayed sender name'),
+    senderEmail: z.string().nullable().optional().describe('Sender email address'),
+    senderReplyTo: z.string().optional().describe('Reply-to setting'),
+    subscribeOnSignup: z.boolean().optional().describe('Auto-subscribe new members'),
+    visibility: z.string().optional().describe('Newsletter visibility'),
+    sortOrder: z.number().optional().describe('Sort order'),
+    createdAt: z.string().optional().describe('Creation timestamp'),
+    updatedAt: z.string().optional().describe('Last update timestamp')
+  })
+  .partial()
+  .required({ newsletterId: true });
 
 let paginationSchema = z.object({
   page: z.number(),
@@ -53,10 +57,7 @@ export let browseNewsletters = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GhostAdminClient({
-      domain: ctx.config.adminDomain,
-      apiKey: ctx.auth.token
-    });
+    let client = getClient(ctx);
 
     let result = await client.browseNewsletters({
       filter: ctx.input.filter,
@@ -70,30 +71,23 @@ export let browseNewsletters = SlateTool.create(spec, {
       uuid: n.uuid,
       name: n.name,
       slug: n.slug,
-      description: n.description ?? null,
+      description: n.description,
       status: n.status,
-      senderName: n.sender_name ?? null,
-      senderEmail: n.sender_email ?? null,
+      senderName: n.sender_name,
+      senderEmail: n.sender_email,
       senderReplyTo: n.sender_reply_to,
-      subscribeOnSignup: n.subscribe_on_signup ?? false,
+      subscribeOnSignup: n.subscribe_on_signup,
       visibility: n.visibility,
-      sortOrder: n.sort_order ?? 0,
+      sortOrder: n.sort_order,
       createdAt: n.created_at,
       updatedAt: n.updated_at
     }));
 
-    let pagination = result.meta?.pagination ?? {
-      page: 1,
-      limit: 15,
-      pages: 1,
-      total: newsletters.length,
-      next: null,
-      prev: null
-    };
+    let pageInfo = pagination(result, newsletters.length);
 
     return {
-      output: { newsletters, pagination },
-      message: `Found **${pagination.total}** newsletters.`
+      output: { newsletters, pagination: pageInfo },
+      message: `Found **${pageInfo.total}** newsletters.`
     };
   })
   .build();

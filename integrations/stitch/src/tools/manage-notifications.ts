@@ -1,7 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { StitchConnectClient } from '../lib/client';
+import { resolveRegion, StitchConnectClient } from '../lib/client';
 import { spec } from '../spec';
+
+const safeHookUrl = (value: string) => {
+  try {
+    return new URL(value).origin;
+  } catch {
+    throw createApiServiceError('Stitch returned an invalid hook URL.');
+  }
+};
 
 export let listNotifications = SlateTool.create(spec, {
   name: 'List Notifications',
@@ -41,8 +49,8 @@ export let listNotifications = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let [rawEmails, rawHooks] = await Promise.all([
@@ -50,17 +58,17 @@ export let listNotifications = SlateTool.create(spec, {
       client.listHooks()
     ]);
 
-    let customEmails = rawEmails.map((e: any) => ({
+    let customEmails = rawEmails.map(e => ({
       emailId: e.id,
-      email: e.email,
-      disabled: e.disabled ?? false,
+      email: e.email_address,
+      disabled: e.disabled_at != null,
       createdAt: e.created_at || null
     }));
 
-    let hooks = rawHooks.map((h: any) => ({
+    let hooks = rawHooks.map(h => ({
       hookId: h.id,
-      url: h.url,
-      disabled: h.disabled ?? false,
+      url: safeHookUrl(h.config.url),
+      disabled: h.disabled_at != null,
       createdAt: h.created_at || null
     }));
 
@@ -76,7 +84,7 @@ export let manageCustomEmail = SlateTool.create(spec, {
   key: 'manage_custom_email',
   description: `Create, enable, disable, or delete a custom email notification recipient. Custom emails receive alerts about replication issues and status changes.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -100,26 +108,27 @@ export let manageCustomEmail = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let { action, email, emailId } = ctx.input;
 
     if (action === 'create') {
-      if (!email) throw new Error('Email address is required for create action');
+      if (!email) throw createApiServiceError('Email address is required for create action');
       let result = await client.createCustomEmail(email);
       return {
         output: {
           emailId: result.id,
-          email: result.email,
-          disabled: result.disabled ?? false
+          email: result.email_address,
+          disabled: result.disabled_at != null
         },
         message: `Created email notification for **${email}**.`
       };
     }
 
-    if (!emailId) throw new Error('emailId is required for enable/disable/delete actions');
+    if (!emailId)
+      throw createApiServiceError('emailId is required for enable/disable/delete actions');
 
     if (action === 'delete') {
       await client.deleteCustomEmail(emailId);
@@ -138,9 +147,9 @@ export let manageCustomEmail = SlateTool.create(spec, {
     let result = await client.updateCustomEmail(emailId, disabled);
     return {
       output: {
-        emailId: result.id || emailId,
-        email: result.email || null,
-        disabled: result.disabled ?? disabled
+        emailId,
+        email: null,
+        disabled: result.disabled_at != null
       },
       message: `${disabled ? 'Disabled' : 'Enabled'} email notification **${emailId}**.`
     };
@@ -153,13 +162,19 @@ export let managePostLoadHook = SlateTool.create(spec, {
   description: `Create, enable, disable, or delete a post-load webhook. Post-load hooks fire each time data is loaded into the destination, allowing you to trigger downstream processing such as SQL transformations, Lambda functions, or other HTTP-based workflows.`,
   constraints: ['A maximum of 10 post-load hooks can be configured per account.'],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
       action: z.enum(['create', 'enable', 'disable', 'delete']).describe('Action to perform'),
       url: z.string().optional().describe('Webhook URL (required for "create" action)'),
+      destinationId: z
+        .number()
+        .optional()
+        .describe(
+          'Destination triggering this hook. Omit only when exactly one destination exists.'
+        ),
       hookId: z
         .number()
         .optional()
@@ -177,26 +192,27 @@ export let managePostLoadHook = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let { action, url, hookId } = ctx.input;
 
     if (action === 'create') {
-      if (!url) throw new Error('URL is required for create action');
-      let result = await client.createHook(url);
+      if (!url) throw createApiServiceError('URL is required for create action');
+      let result = await client.createHook(url, ctx.input.destinationId);
       return {
         output: {
           hookId: result.id,
-          url: result.url,
-          disabled: result.disabled ?? false
+          url: safeHookUrl(result.config.url),
+          disabled: result.disabled_at != null
         },
-        message: `Created post-load hook for **${url}**.`
+        message: `Created post-load hook **${result.id}**.`
       };
     }
 
-    if (!hookId) throw new Error('hookId is required for enable/disable/delete actions');
+    if (!hookId)
+      throw createApiServiceError('hookId is required for enable/disable/delete actions');
 
     if (action === 'delete') {
       await client.deleteHook(hookId);
@@ -215,9 +231,9 @@ export let managePostLoadHook = SlateTool.create(spec, {
     let result = await client.updateHook(hookId, disabled);
     return {
       output: {
-        hookId: result.id || hookId,
-        url: result.url || null,
-        disabled: result.disabled ?? disabled
+        hookId: result.id,
+        url: safeHookUrl(result.config.url),
+        disabled: result.disabled_at != null
       },
       message: `${disabled ? 'Disabled' : 'Enabled'} post-load hook **${hookId}**.`
     };

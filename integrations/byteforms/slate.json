@@ -10,7 +10,6 @@
     "list forms",
     "retrieve form submissions",
     "export submission data",
-    "poll for new submissions",
     "access form metadata",
     "paginate submission results"
   ],

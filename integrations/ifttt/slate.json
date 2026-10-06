@@ -1,22 +1,18 @@
 {
   "name": "@metorial/ifttt",
-  "description": "Automate workflows by connecting 900+ services through conditional Applets composed of triggers, queries, and actions. Manage connections between services on behalf of users, subscribe to trigger events from connected services, execute actions programmatically, and retrieve data via queries. Send and receive arbitrary HTTP requests through the Webhooks service to integrate with any public API. Notify IFTTT of real-time changes via the Realtime API for near-instant Applet execution. Handle connection lifecycle events (enabled/disabled) and trigger event webhooks. Run JavaScript runtime scripts to process trigger events without a dedicated backend.",
+  "description": "Read IFTTT Platform service and connection context, discover field options, query connected services, replace user configuration, and submit actions or realtime polling notifications. Maker Webhooks execution is currently unavailable.",
   "categories": [
     "apis-and-http-requests",
     "iot-and-device-control",
     "task-and-project-management"
   ],
   "skills": [
-    "manage automated connections",
-    "subscribe to trigger events",
-    "execute service actions",
+    "read connection configuration",
+    "discover connected field options",
     "query connected services",
-    "send webhook requests",
-    "receive webhook notifications",
-    "configure trigger fields",
-    "enable and disable connections",
-    "run runtime scripts",
-    "notify real-time changes"
+    "replace user feature configuration",
+    "submit service actions",
+    "notify realtime changes"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/ifttt.png"
 }

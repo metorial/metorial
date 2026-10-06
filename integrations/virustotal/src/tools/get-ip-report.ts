@@ -1,12 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getIpReport = SlateTool.create(spec, {
   name: 'Get IP Report',
   key: 'get_ip_report',
-  description: `Retrieve the reputation and contextual report for an IP address. Returns detection results, WHOIS data, geolocation, AS owner, SSL certificates, and community reputation.`,
+  description: `Retrieve the reputation and contextual report for an IP address. Returns detection results, WHOIS data, geolocation, AS owner, and community reputation.`,
+  constraints: [
+    'Use non-sensitive public indicators; submitted or queried indicators may be scanned and included in the community dataset.'
+  ],
   tags: {
     readOnly: true
   }
@@ -51,19 +55,14 @@ export let getIpReport = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    let client = new Client(ctx.auth);
     let result = await client.getIpReport(ctx.input.ipAddress);
     let attrs = result?.attributes ?? {};
 
-    let malicious = attrs.last_analysis_stats?.malicious ?? 0;
-    let total = Object.values(attrs.last_analysis_stats ?? {}).reduce(
-      (sum: number, v) => sum + (typeof v === 'number' ? v : 0),
-      0
-    );
-
     return {
       output: {
-        ipId: result?.id ?? '',
+        ipId: result.id,
         reputation: attrs.reputation,
         asOwner: attrs.as_owner,
         asn: attrs.asn,
@@ -89,7 +88,8 @@ export let getIpReport = SlateTool.create(spec, {
         tags: attrs.tags,
         lastAnalysisDate: attrs.last_analysis_date?.toString()
       },
-      message: `**IP report for** \`${ctx.input.ipAddress}\`\n- **Detection:** ${malicious}/${total} engines flagged as malicious\n- **AS Owner:** ${attrs.as_owner ?? 'N/A'}\n- **Country:** ${attrs.country ?? 'N/A'}\n- **Reputation:** ${attrs.reputation ?? 'N/A'}`
+      message:
+        'Retrieved the available VirusTotal report. Missing analysis statistics are not a zero-detection result.'
     };
   })
   .build();

@@ -19,8 +19,6 @@ import {
   searchSbomDependencies,
   searchSecurityItems
 } from './tools';
-import { inboundWebhook, newPullRequests, newSecurityItems } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     getCommitAnalysis,
     manageRepositoryToken
   ],
-  triggers: [inboundWebhook, newPullRequests, newSecurityItems]
+  triggers: []
 });

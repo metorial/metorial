@@ -7,6 +7,9 @@ export let updateSingleType = SlateTool.create(spec, {
   name: 'Update Single Type',
   key: 'update_single_type',
   description: `Update a Strapi single type entry. Single types have only one entry (e.g., homepage, site settings). Only provided fields are updated.`,
+  constraints: [
+    'Strapi 5 REST writes publish immediately by default when Draft & Publish is enabled. Pass status=draft to keep changes in the draft. Instance hooks can have external effects. For Strapi 4 omit status and use the documented publishedAt field explicitly.'
+  ],
   tags: {
     destructive: false
   }
@@ -17,7 +20,10 @@ export let updateSingleType = SlateTool.create(spec, {
         .string()
         .describe('Singular API ID of the single type (e.g., "homepage", "global")'),
       fields: z.record(z.string(), z.any()).describe('Field values to update'),
-      status: z.enum(['draft', 'published']).optional().describe('Publication status to set'),
+      status: z
+        .enum(['draft', 'published'])
+        .optional()
+        .describe('Strapi 5 publication status; omit on Strapi 4 writes'),
       locale: z.string().optional().describe('Locale of the content to update')
     })
   )
@@ -27,10 +33,7 @@ export let updateSingleType = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.updateSingleType(ctx.input.contentType, ctx.input.fields, {
       status: ctx.input.status,

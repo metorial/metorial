@@ -35,14 +35,14 @@ export let getInvoice = SlateTool.create(spec, {
         .describe('Document type (Invoice, Credit Note, etc.)'),
       createdAt: z.string().nullable().optional().describe('Creation timestamp'),
       updatedAt: z.string().nullable().optional().describe('Last update timestamp'),
-      rawData: z.any().optional().describe('Complete raw invoice data')
+      rawData: z
+        .any()
+        .optional()
+        .describe('Native data with documented credential fields omitted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let inv = await client.getInvoice(ctx.input.invoiceId);
 
@@ -55,7 +55,7 @@ export let getInvoice = SlateTool.create(spec, {
         dueDate: inv['due-date'] ?? inv.due_date ?? null,
         supplier: inv.supplier ?? null,
         currency: inv.currency ?? null,
-        totalAmount: inv.total ?? inv.total ?? null,
+        totalAmount: inv.total ?? null,
         invoiceLines: inv['invoice-lines'] ?? inv.invoice_lines ?? null,
         paymentTerm: inv['payment-term'] ?? inv.payment_term ?? null,
         documentType: inv['document-type'] ?? inv.document_type ?? null,

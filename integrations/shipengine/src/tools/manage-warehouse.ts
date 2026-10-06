@@ -1,13 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  type AddressInput,
+  type CreateWarehouseRequest,
+  createClient,
+  type WarehouseResponse
+} from '../lib/client';
 import { spec } from '../spec';
 
 let addressSchema = z.object({
   name: z.string().optional().describe('Name'),
   companyName: z.string().optional().describe('Company name'),
   phone: z.string().optional().describe('Phone number'),
-  addressLine1: z.string().describe('Street address line 1'),
+  addressLine1: z.string().min(1).describe('Street address line 1'),
   addressLine2: z.string().optional().describe('Street address line 2'),
   cityLocality: z.string().optional().describe('City'),
   stateProvince: z.string().optional().describe('State/province'),
@@ -19,7 +24,7 @@ let warehouseOutputSchema = z.object({
   warehouseId: z.string().describe('Warehouse ID'),
   name: z.string().describe('Warehouse name'),
   createdAt: z.string().describe('Creation timestamp'),
-  isDefault: z.boolean().describe('Whether this is the default warehouse'),
+  isDefault: z.boolean().optional().describe('Whether this is the default warehouse'),
   originAddress: addressSchema.describe('Origin/ship-from address'),
   returnAddress: addressSchema.describe('Return address')
 });
@@ -40,10 +45,7 @@ export let listWarehouses = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
     let result = await client.listWarehouses();
 
@@ -76,10 +78,7 @@ export let createWarehouse = SlateTool.create(spec, {
   )
   .output(warehouseOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
     let result = await client.createWarehouse({
       name: ctx.input.name,
@@ -115,13 +114,10 @@ export let updateWarehouse = SlateTool.create(spec, {
   )
   .output(warehouseOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
-    let update: any = {};
-    if (ctx.input.name) update.name = ctx.input.name;
+    let update: Partial<CreateWarehouseRequest> = {};
+    if (ctx.input.name !== undefined) update.name = ctx.input.name;
     if (ctx.input.originAddress)
       update.origin_address = mapAddressToApi(ctx.input.originAddress);
     if (ctx.input.returnAddress)
@@ -156,10 +152,7 @@ export let deleteWarehouse = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
     await client.deleteWarehouse(ctx.input.warehouseId);
 
@@ -170,7 +163,7 @@ export let deleteWarehouse = SlateTool.create(spec, {
   })
   .build();
 
-let mapAddressToApi = (addr: any) => ({
+let mapAddressToApi = (addr: z.infer<typeof addressSchema>) => ({
   name: addr.name,
   company_name: addr.companyName,
   phone: addr.phone,
@@ -182,19 +175,19 @@ let mapAddressToApi = (addr: any) => ({
   country_code: addr.countryCode
 });
 
-let mapAddressFromApi = (addr: any) => ({
+let mapAddressFromApi = (addr: AddressInput) => ({
   name: addr?.name,
   companyName: addr?.company_name,
   phone: addr?.phone,
-  addressLine1: addr?.address_line1 ?? '',
+  addressLine1: addr.address_line1,
   addressLine2: addr?.address_line2,
   cityLocality: addr?.city_locality,
   stateProvince: addr?.state_province,
   postalCode: addr?.postal_code,
-  countryCode: addr?.country_code ?? ''
+  countryCode: addr.country_code
 });
 
-let mapWarehouseOutput = (w: any) => ({
+let mapWarehouseOutput = (w: WarehouseResponse) => ({
   warehouseId: w.warehouse_id,
   name: w.name,
   createdAt: w.created_at,

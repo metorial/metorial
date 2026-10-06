@@ -1,23 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  botIdSchema,
+  conversationIdSchema,
+  conversationSchema,
+  pageSchema,
+  paginationSchema
+} from '../lib/schemas';
 import { spec } from '../spec';
-
-let conversationSchema = z.object({
-  conversationId: z.string().describe('Unique conversation identifier'),
-  name: z.string().describe('Conversation name'),
-  botId: z.string().describe('ID of the associated bot'),
-  createdAt: z.number().describe('Unix timestamp of creation in seconds')
-});
-
-let paginationSchema = z.object({
-  count: z.number(),
-  total: z.number(),
-  perPage: z.number(),
-  totalPages: z.number(),
-  nextPage: z.number().nullable(),
-  previousPage: z.number().nullable()
-});
 
 export let listConversations = SlateTool.create(spec, {
   name: 'List Conversations',
@@ -29,9 +20,10 @@ export let listConversations = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      botId: z.string().optional().describe('Filter conversations by bot ID'),
+      botId: botIdSchema.optional(),
       keyword: z.string().optional().describe('Search conversations by partial name match'),
-      page: z.number().optional().describe('Page number for pagination')
+      includeDocumentIds: z.boolean().optional().describe('Include focus mode document IDs.'),
+      page: pageSchema
     })
   )
   .output(
@@ -46,6 +38,7 @@ export let listConversations = SlateTool.create(spec, {
     let result = await client.listConversations({
       botId: ctx.input.botId,
       keyword: ctx.input.keyword,
+      includeDocumentIds: ctx.input.includeDocumentIds,
       page: ctx.input.page
     });
 
@@ -58,21 +51,25 @@ export let listConversations = SlateTool.create(spec, {
 export let getConversation = SlateTool.create(spec, {
   name: 'Get Conversation',
   key: 'get_conversation',
-  description: `Retrieve details of a specific conversation by its ID.`,
+  description: `Retrieve a conversation by its ID. Call list_conversations to discover available conversations.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      conversationId: z.string().describe('ID of the conversation to retrieve')
+      conversationId: conversationIdSchema,
+      includeDocumentIds: z.boolean().optional().describe('Include focus mode document IDs.')
     })
   )
   .output(conversationSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let conversation = await client.getConversation(ctx.input.conversationId);
+    let conversation = await client.getConversation(
+      ctx.input.conversationId,
+      ctx.input.includeDocumentIds
+    );
 
     return {
       output: conversation,
@@ -83,7 +80,7 @@ export let getConversation = SlateTool.create(spec, {
 export let createConversation = SlateTool.create(spec, {
   name: 'Create Conversation',
   key: 'create_conversation',
-  description: `Start a new conversation with an AI bot. Optionally enable focus mode by specifying document IDs to restrict the bot's knowledge to only those documents.`,
+  description: `Start a new conversation with an AI bot discovered with list_bots. Optionally enable focus mode by specifying document IDs to restrict the bot's knowledge to only those documents.`,
   constraints: [
     'Focus mode supports up to 1,000 document IDs.',
     'Documents must exist in folders the bot has access to.'
@@ -91,12 +88,15 @@ export let createConversation = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('Name for the conversation'),
-      botId: z.string().describe('ID of the bot to associate with this conversation'),
+      name: z.string().min(1).describe('Name for the conversation'),
+      botId: botIdSchema,
       documentIds: z
-        .array(z.string())
+        .array(z.string().min(1))
+        .max(1000)
         .optional()
-        .describe('Document IDs for focus mode (limits bot knowledge to these documents)')
+        .describe(
+          'Document IDs from list_documents for focus mode, limiting bot knowledge to these documents.'
+        )
     })
   )
   .output(conversationSchema)
@@ -122,7 +122,7 @@ export let createConversation = SlateTool.create(spec, {
 export let updateConversation = SlateTool.create(spec, {
   name: 'Update Conversation',
   key: 'update_conversation',
-  description: `Update an existing conversation's name, associated bot, or focus mode documents.`,
+  description: `Update a conversation's name, bot, or focus mode documents. Call list_conversations and list_bots to discover IDs.`,
   constraints: [
     'Focus mode supports up to 1,000 document IDs.',
     'Documents must exist in folders the bot has access to.'
@@ -130,13 +130,16 @@ export let updateConversation = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      conversationId: z.string().describe('ID of the conversation to update'),
-      name: z.string().describe('New name for the conversation'),
-      botId: z.string().describe('ID of the bot to associate'),
+      conversationId: conversationIdSchema,
+      name: z.string().min(1).describe('New name for the conversation'),
+      botId: botIdSchema,
       documentIds: z
-        .array(z.string())
+        .array(z.string().min(1))
+        .max(1000)
         .optional()
-        .describe('Document IDs for focus mode (limits bot knowledge to these documents)')
+        .describe(
+          'Document IDs from list_documents for focus mode. Pass an empty array to clear the selected documents.'
+        )
     })
   )
   .output(conversationSchema)
@@ -158,14 +161,14 @@ export let updateConversation = SlateTool.create(spec, {
 export let deleteConversation = SlateTool.create(spec, {
   name: 'Delete Conversation',
   key: 'delete_conversation',
-  description: `Permanently delete a conversation and its message history.`,
+  description: `Permanently delete a conversation and its message history. Call list_conversations to discover conversation IDs.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      conversationId: z.string().describe('ID of the conversation to delete')
+      conversationId: conversationIdSchema
     })
   )
   .output(

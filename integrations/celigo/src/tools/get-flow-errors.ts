@@ -1,7 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  errors: z.array(z.any()).describe('List of error objects'),
+  retryData: z.any().optional().describe('Retry data dictionary keyed by retryDataKey'),
+  nextPageUrl: z
+    .string()
+    .optional()
+    .describe('URL for the next page of results, if more errors exist')
+});
 
 export let getFlowErrors = SlateTool.create(spec, {
   name: 'Get Flow Errors',
@@ -17,6 +27,14 @@ export let getFlowErrors = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUrl: z
+        .string()
+        .optional()
+        .describe('Native next URL from this same flow and processor with unchanged filters.'),
+      flowJobId: z
+        .string()
+        .optional()
+        .describe('Optional parent job ID belonging to this flow; requires occurredAtFrom.'),
       flowId: z.string().describe('ID of the flow'),
       processorId: z.string().describe('ID of the export or import step within the flow'),
       occurredAtFrom: z
@@ -29,39 +47,14 @@ export let getFlowErrors = SlateTool.create(spec, {
         .describe('Filter errors occurring on or before this time (ISO 8601 UTC)')
     })
   )
-  .output(
-    z.object({
-      errors: z.array(z.any()).describe('List of error objects'),
-      retryData: z.any().optional().describe('Retry data dictionary keyed by retryDataKey'),
-      nextPageUrl: z
-        .string()
-        .optional()
-        .describe('URL for the next page of results, if more errors exist')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let params: Record<string, string> = {};
-    if (ctx.input.occurredAtFrom) params.occurredAt_gte = ctx.input.occurredAtFrom;
-    if (ctx.input.occurredAtTo) params.occurredAt_lte = ctx.input.occurredAtTo;
-
-    let result = await client.getFlowErrors(ctx.input.flowId, ctx.input.processorId, params);
-
-    let errors = result.errors || [];
-    let retryData = result.retryData;
-    let nextPageUrl = result.nextPageURL;
-
-    return {
-      output: {
-        errors,
-        retryData,
-        nextPageUrl
-      },
-      message: `Retrieved **${errors.length}** error(s) for flow **${ctx.input.flowId}** / processor **${ctx.input.processorId}**.${nextPageUrl ? ' More results available via pagination.' : ''}`
-    };
+    const result = await invoke('get_flow_errors', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

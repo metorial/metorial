@@ -4,6 +4,7 @@ export { createWorkflow } from './create-workflow';
 export { deleteCredential } from './delete-credential';
 export { deleteExecution } from './delete-execution';
 export { deleteWorkflow } from './delete-workflow';
+export { discoverApi } from './discover-api';
 export { generateAudit } from './generate-audit';
 export { getCredentialSchema } from './get-credential-schema';
 export { getExecution } from './get-execution';

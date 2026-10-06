@@ -10,8 +10,8 @@ export let assignProjectToChatTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The project to assign'),
-      chatId: z.string().describe('The chat to associate with the project')
+      projectId: z.string().min(1).describe('The project to assign'),
+      chatId: z.string().min(1).describe('The chat to associate with the project')
     })
   )
   .output(

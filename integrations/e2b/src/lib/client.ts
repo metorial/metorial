@@ -1,87 +1,121 @@
-import { createAxios } from 'slates';
+import { randomBytes } from 'node:crypto';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  pickDefined,
+  requestAxios
+} from 'slates';
+import { z } from 'zod';
 
-let api = createAxios({
-  baseURL: 'https://api.e2b.app'
+const createdSandboxSchema = z.object({ sandboxID: z.string().min(1) });
+const sandboxSchema = z.object({
+  sandboxID: z.string().min(1),
+  templateID: z.string().min(1),
+  clientID: z.string(),
+  alias: z.string().optional(),
+  startedAt: z.string().min(1),
+  endAt: z.string().min(1),
+  cpuCount: z.number(),
+  memoryMB: z.number(),
+  metadata: z.record(z.string(), z.string()).optional(),
+  state: z.enum(['running', 'paused']),
+  volumeMounts: z.array(z.object({ name: z.string(), path: z.string() })).optional()
+});
+const snapshotSchema = z.object({
+  snapshotID: z.string().min(1),
+  names: z.array(z.string())
+});
+const templateSchema = z.object({
+  templateID: z.string().min(1),
+  buildID: z.string(),
+  cpuCount: z.number(),
+  memoryMB: z.number(),
+  diskSizeMB: z.number().optional(),
+  public: z.boolean(),
+  aliases: z.array(z.string()),
+  names: z.array(z.string()).optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  buildStatus: z.string().optional()
+});
+const webhookSchema = z.object({
+  id: z.string().min(1),
+  teamId: z.string().min(1),
+  name: z.string(),
+  createdAt: z.string(),
+  enabled: z.boolean(),
+  url: z.string(),
+  events: z.array(z.string())
+});
+const volumeSchema = z.object({ volumeID: z.string().min(1), name: z.string() });
+const lifecycleEventSchema = z.object({
+  id: z.string().min(1),
+  version: z.string(),
+  type: z.string(),
+  timestamp: z.string(),
+  eventData: z.record(z.string(), z.unknown()).nullish(),
+  sandboxId: z.string(),
+  sandboxBuildId: z.string(),
+  sandboxExecutionId: z.string(),
+  sandboxTeamId: z.string(),
+  sandboxTemplateId: z.string()
 });
 
+function parseResponse<T>(schema: z.ZodType<T>, data: unknown): T {
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) {
+    throw createApiServiceError('E2B returned an unexpected response. Please try again.', {
+      reason: 'e2b_invalid_response'
+    });
+  }
+  return parsed.data;
+}
+
+const mapSandbox = (data: z.infer<typeof sandboxSchema>) => ({
+  sandboxId: data.sandboxID,
+  templateId: data.templateID,
+  name: data.alias ?? '',
+  clientId: data.clientID,
+  startedAt: data.startedAt,
+  endAt: data.endAt,
+  cpuCount: data.cpuCount,
+  memoryMb: data.memoryMB,
+  metadata: data.metadata,
+  state: data.state,
+  volumeMounts: data.volumeMounts
+});
+const mapSnapshot = (data: z.infer<typeof snapshotSchema>, sandboxId = '') => ({
+  snapshotId: data.snapshotID,
+  names: data.names,
+  sandboxId,
+  // These legacy output fields are retained for compatibility; the API does not return them.
+  templateId: '',
+  createdAt: ''
+});
+const mapWebhook = ({ id, ...data }: z.infer<typeof webhookSchema>) => ({
+  webhookId: id,
+  ...data
+});
+const mapVolume = ({ volumeID, ...data }: z.infer<typeof volumeSchema>) => ({
+  volumeId: volumeID,
+  ...data
+});
+
+export type SandboxInfo = ReturnType<typeof mapSandbox>;
+export type SandboxListItem = SandboxInfo;
+export type SnapshotInfo = ReturnType<typeof mapSnapshot>;
+export type WebhookConfig = ReturnType<typeof mapWebhook>;
+export type VolumeInfo = ReturnType<typeof mapVolume>;
 export interface CreateSandboxParams {
   templateId?: string;
   timeout?: number;
   autoPause?: boolean;
   metadata?: Record<string, string>;
   envVars?: Record<string, string>;
+  volumeMounts?: { name: string; path: string }[];
 }
-
-export interface SandboxInfo {
-  sandboxId: string;
-  templateId: string;
-  name: string;
-  clientId: string;
-  startedAt: string;
-  endAt: string;
-  cpuCount?: number;
-  memoryMb?: number;
-  metadata?: Record<string, string>;
-  state?: string;
-}
-
-export interface SandboxListItem {
-  sandboxId: string;
-  templateId: string;
-  name: string;
-  clientId: string;
-  startedAt: string;
-  endAt: string;
-  cpuCount?: number;
-  memoryMb?: number;
-  metadata?: Record<string, string>;
-  state?: string;
-}
-
-export interface SnapshotInfo {
-  snapshotId: string;
-  sandboxId: string;
-  templateId: string;
-  createdAt: string;
-  metadata?: Record<string, string>;
-}
-
-export interface TemplateInfo {
-  templateId: string;
-  buildId: string;
-  cpuCount: number;
-  memoryMb: number;
-  diskSizeMb?: number;
-  public: boolean;
-  aliases: string[];
-  createdAt?: string;
-  updatedAt?: string;
-  buildStatus?: string;
-}
-
-export interface LifecycleEvent {
-  version: string;
-  eventId: string;
-  type: string;
-  eventData: any;
-  sandboxId: string;
-  sandboxBuildId: string;
-  sandboxExecutionId: string;
-  sandboxTeamId: string;
-  sandboxTemplateId: string;
-  timestamp: string;
-}
-
-export interface WebhookConfig {
-  webhookId: string;
-  teamId: string;
-  name: string;
-  createdAt: string;
-  enabled: boolean;
-  url: string;
-  events: string[];
-}
-
 export interface CreateWebhookParams {
   name: string;
   url: string;
@@ -89,407 +123,259 @@ export interface CreateWebhookParams {
   events: string[];
   signatureSecret?: string;
 }
-
-export interface UpdateWebhookParams {
-  name?: string;
-  url?: string;
-  enabled?: boolean;
-  events?: string[];
-  signatureSecret?: string;
-}
-
-export interface VolumeInfo {
-  volumeId: string;
-  name: string;
-}
+export type UpdateWebhookParams = Partial<CreateWebhookParams>;
 
 export class E2BClient {
-  private token: string;
+  private api;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
+    if (!config.token?.trim()) {
+      throw createApiServiceError('An E2B API key is required. Reconnect with your API key.');
+    }
+    this.api = createAuthenticatedAxios({
+      baseURL: 'https://api.e2b.app',
+      authHeader: { name: 'X-API-Key', value: config.token },
+      timeout: 120000
+    });
   }
 
-  private headers() {
-    return {
-      'X-API-Key': this.token,
-      'Content-Type': 'application/json'
-    };
+  private request(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    path: string,
+    data?: unknown,
+    params?: Record<string, unknown>
+  ) {
+    return requestAxios(
+      `${method} ${path}`,
+      () =>
+        this.api.request<unknown>({
+          method,
+          url: path,
+          data,
+          params
+        }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'E2B',
+          reason: 'e2b_api_error',
+          operation
+        })
+    );
   }
-
-  // ─── Sandboxes ───
 
   async createSandbox(params: CreateSandboxParams): Promise<SandboxInfo> {
-    let body: Record<string, any> = {};
-    if (params.templateId) body.templateID = params.templateId;
-    if (params.timeout !== undefined) body.timeout = params.timeout;
-    if (params.autoPause !== undefined) body.autoPause = params.autoPause;
-    if (params.metadata) body.metadata = params.metadata;
-    if (params.envVars) body.envVars = params.envVars;
-
-    let response = await api.post('/sandboxes', body, {
-      headers: this.headers()
-    });
-
-    let data = response.data;
-    return {
-      sandboxId: data.sandboxID || data.sandboxId,
-      templateId: data.templateID || data.templateId,
-      name: data.name || data.alias || '',
-      clientId: data.clientID || data.clientId || '',
-      startedAt: data.startedAt || '',
-      endAt: data.endAt || '',
-      cpuCount: data.cpuCount,
-      memoryMb: data.memoryMB || data.memoryMb,
-      metadata: data.metadata,
-      state: data.state
-    };
+    const response = await this.request(
+      'POST',
+      '/v2/sandboxes',
+      pickDefined({
+        templateID: params.templateId ?? 'base',
+        timeout: params.timeout,
+        autoPause: params.autoPause,
+        metadata: params.metadata,
+        envVars: params.envVars,
+        volumeMounts: params.volumeMounts
+      })
+    );
+    const sandbox = parseResponse(createdSandboxSchema, response.data);
+    // The creation response has no timestamps or resource sizes; read the detail endpoint.
+    try {
+      return await this.getSandbox(sandbox.sandboxID);
+    } catch (error) {
+      try {
+        await this.killSandbox(sandbox.sandboxID);
+      } catch {
+        throw createApiServiceError(
+          `Sandbox ${sandbox.sandboxID} was created, but its details could not be read or its cleanup confirmed. Use kill_sandbox to remove it.`,
+          { reason: 'e2b_create_readback_failed', parent: error }
+        );
+      }
+      throw error;
+    }
   }
 
-  async listSandboxes(opts?: {
-    state?: string[];
-    metadata?: Record<string, string>;
-    limit?: number;
-    nextToken?: string;
-  }): Promise<{ sandboxes: SandboxListItem[]; nextToken?: string }> {
-    let params: Record<string, any> = {};
-    if (opts?.limit) params.limit = opts.limit;
-    if (opts?.nextToken) params.nextToken = opts.nextToken;
-    if (opts?.state && opts.state.length > 0) {
-      params.state = opts.state.join(',');
-    }
-    if (opts?.metadata) {
-      for (let [key, value] of Object.entries(opts.metadata)) {
-        params[`metadata[${key}]`] = value;
-      }
-    }
-
-    let response = await api.get('/sandboxes', {
-      headers: this.headers(),
-      params
-    });
-
-    let items = Array.isArray(response.data)
-      ? response.data
-      : response.data?.sandboxes || response.data?.items || [];
-
+  async listSandboxes(
+    opts: {
+      state?: string[];
+      metadata?: Record<string, string>;
+      limit?: number;
+      nextToken?: string;
+    } = {}
+  ) {
+    // Match the SDK's nested query encoding: metadata pairs are decoded separately.
+    const metadata = opts.metadata
+      ? new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(opts.metadata).map(([key, value]) => [
+              encodeURIComponent(key),
+              encodeURIComponent(value)
+            ])
+          )
+        ).toString()
+      : undefined;
+    const response = await this.request(
+      'GET',
+      '/v2/sandboxes',
+      undefined,
+      pickDefined({
+        limit: opts.limit,
+        nextToken: opts.nextToken,
+        state: opts.state?.join(','),
+        metadata
+      })
+    );
     return {
-      sandboxes: items.map((s: any) => ({
-        sandboxId: s.sandboxID || s.sandboxId,
-        templateId: s.templateID || s.templateId,
-        name: s.name || s.alias || '',
-        clientId: s.clientID || s.clientId || '',
-        startedAt: s.startedAt || '',
-        endAt: s.endAt || '',
-        cpuCount: s.cpuCount,
-        memoryMb: s.memoryMB || s.memoryMb,
-        metadata: s.metadata,
-        state: s.state
-      })),
-      nextToken: response.data?.nextToken
+      sandboxes: parseResponse(z.array(sandboxSchema), response.data).map(mapSandbox),
+      nextToken: getResponseHeaderValue(response.headers, 'X-Next-Token') || undefined
     };
   }
 
   async getSandbox(sandboxId: string): Promise<SandboxInfo> {
-    let response = await api.get(`/sandboxes/${sandboxId}`, {
-      headers: this.headers()
-    });
-    let s = response.data;
-    return {
-      sandboxId: s.sandboxID || s.sandboxId,
-      templateId: s.templateID || s.templateId,
-      name: s.name || s.alias || '',
-      clientId: s.clientID || s.clientId || '',
-      startedAt: s.startedAt || '',
-      endAt: s.endAt || '',
-      cpuCount: s.cpuCount,
-      memoryMb: s.memoryMB || s.memoryMb,
-      metadata: s.metadata,
-      state: s.state
-    };
+    const response = await this.request('GET', `/sandboxes/${encodeURIComponent(sandboxId)}`);
+    return mapSandbox(parseResponse(sandboxSchema, response.data));
   }
-
   async killSandbox(sandboxId: string): Promise<void> {
-    await api.delete(`/sandboxes/${sandboxId}`, {
-      headers: this.headers()
-    });
+    await this.request('DELETE', `/sandboxes/${encodeURIComponent(sandboxId)}`);
   }
-
   async pauseSandbox(sandboxId: string): Promise<void> {
-    await api.post(
-      `/sandboxes/${sandboxId}/pause`,
-      {},
-      {
-        headers: this.headers()
-      }
-    );
+    await this.request('POST', `/sandboxes/${encodeURIComponent(sandboxId)}/pause`, {});
   }
-
   async resumeSandbox(sandboxId: string, timeout?: number): Promise<SandboxInfo> {
-    let body: Record<string, any> = {};
-    if (timeout !== undefined) body.timeout = timeout;
-
-    let response = await api.post(`/sandboxes/${sandboxId}/connect`, body, {
-      headers: this.headers()
-    });
-    let s = response.data;
-    return {
-      sandboxId: s.sandboxID || s.sandboxId || sandboxId,
-      templateId: s.templateID || s.templateId || '',
-      name: s.name || s.alias || '',
-      clientId: s.clientID || s.clientId || '',
-      startedAt: s.startedAt || '',
-      endAt: s.endAt || '',
-      cpuCount: s.cpuCount,
-      memoryMb: s.memoryMB || s.memoryMb,
-      metadata: s.metadata,
-      state: s.state
-    };
+    await this.request(
+      'POST',
+      `/v2/sandboxes/${encodeURIComponent(sandboxId)}/connect`,
+      pickDefined({ timeout })
+    );
+    return this.getSandbox(sandboxId);
   }
-
   async setSandboxTimeout(sandboxId: string, timeout: number): Promise<void> {
-    await api.post(
-      `/sandboxes/${sandboxId}/timeout`,
-      { timeout },
-      {
-        headers: this.headers()
-      }
+    await this.request('POST', `/sandboxes/${encodeURIComponent(sandboxId)}/timeout`, {
+      timeout
+    });
+  }
+  async createSnapshot(sandboxId: string, name?: string): Promise<SnapshotInfo> {
+    const response = await this.request(
+      'POST',
+      `/sandboxes/${encodeURIComponent(sandboxId)}/snapshots`,
+      pickDefined({ name })
     );
+    return mapSnapshot(parseResponse(snapshotSchema, response.data), sandboxId);
   }
-
-  // ─── Snapshots ───
-
-  async createSnapshot(sandboxId: string): Promise<SnapshotInfo> {
-    let response = await api.post(
-      `/sandboxes/${sandboxId}/snapshots`,
-      {},
-      {
-        headers: this.headers()
-      }
+  async listSnapshots(
+    opts: {
+      sandboxId?: string;
+      templateId?: string;
+      name?: string;
+      limit?: number;
+      nextToken?: string;
+    } = {}
+  ) {
+    if (opts.templateId !== undefined) {
+      throw createApiServiceError(
+        'E2B does not support filtering snapshots by source template ID. Use sandboxId for the source sandbox, or name for the snapshot name or ID.'
+      );
+    }
+    const response = await this.request(
+      'GET',
+      '/snapshots',
+      undefined,
+      pickDefined({
+        sandboxID: opts.sandboxId,
+        name: opts.name,
+        limit: opts.limit,
+        nextToken: opts.nextToken
+      })
     );
-    let d = response.data;
     return {
-      snapshotId: d.snapshotID || d.snapshotId || d.id,
-      sandboxId: d.sandboxID || d.sandboxId || sandboxId,
-      templateId: d.templateID || d.templateId || '',
-      createdAt: d.createdAt || '',
-      metadata: d.metadata
+      snapshots: parseResponse(z.array(snapshotSchema), response.data).map(data =>
+        mapSnapshot(data, opts.sandboxId)
+      ),
+      nextToken: getResponseHeaderValue(response.headers, 'X-Next-Token') || undefined
     };
   }
-
-  async listSnapshots(opts?: {
-    sandboxId?: string;
-    templateId?: string;
-    limit?: number;
-    nextToken?: string;
-  }): Promise<{ snapshots: SnapshotInfo[]; nextToken?: string }> {
-    let params: Record<string, any> = {};
-    if (opts?.sandboxId) params.sandboxId = opts.sandboxId;
-    if (opts?.templateId) params.templateId = opts.templateId;
-    if (opts?.limit) params.limit = opts.limit;
-    if (opts?.nextToken) params.nextToken = opts.nextToken;
-
-    let response = await api.get('/snapshots', {
-      headers: this.headers(),
-      params
-    });
-
-    let items = Array.isArray(response.data)
-      ? response.data
-      : response.data?.snapshots || response.data?.items || [];
-
+  async listTemplates(opts: { limit?: number; nextToken?: string } = {}) {
+    const response = await this.request('GET', '/v2/templates', undefined, pickDefined(opts));
     return {
-      snapshots: items.map((d: any) => ({
-        snapshotId: d.snapshotID || d.snapshotId || d.id,
-        sandboxId: d.sandboxID || d.sandboxId || '',
-        templateId: d.templateID || d.templateId || '',
-        createdAt: d.createdAt || '',
-        metadata: d.metadata
-      })),
-      nextToken: response.data?.nextToken
+      templates: parseResponse(z.array(templateSchema), response.data).map(
+        ({ templateID, buildID, memoryMB, diskSizeMB, ...data }) => ({
+          templateId: templateID,
+          buildId: buildID,
+          memoryMb: memoryMB,
+          diskSizeMb: diskSizeMB,
+          ...data
+        })
+      ),
+      nextToken: getResponseHeaderValue(response.headers, 'X-Next-Token') || undefined
     };
   }
-
-  // ─── Templates ───
-
-  async listTemplates(): Promise<TemplateInfo[]> {
-    let response = await api.get('/templates', {
-      headers: this.headers()
-    });
-    let items = Array.isArray(response.data)
-      ? response.data
-      : response.data?.templates || response.data?.items || [];
-    return items.map((t: any) => ({
-      templateId: t.templateID || t.templateId,
-      buildId: t.buildID || t.buildId || '',
-      cpuCount: t.cpuCount || 0,
-      memoryMb: t.memoryMB || t.memoryMb || 0,
-      diskSizeMb: t.diskSizeMB || t.diskSizeMb,
-      public: t.public || false,
-      aliases: t.aliases || [],
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
-      buildStatus: t.buildStatus
-    }));
-  }
-
-  async getTemplateBuildStatus(
-    templateId: string,
-    buildId: string
-  ): Promise<{ status: string; logs?: string[] }> {
-    let response = await api.get(`/templates/${templateId}/builds/${buildId}/status`, {
-      headers: this.headers()
-    });
-    return {
-      status: response.data.status,
-      logs: response.data.logs
-    };
-  }
-
   async deleteTemplate(templateId: string): Promise<void> {
-    await api.delete(`/templates/${templateId}`, {
-      headers: this.headers()
-    });
+    await this.request('DELETE', `/templates/${encodeURIComponent(templateId)}`);
   }
-
-  // ─── Lifecycle Events ───
-
-  async getLifecycleEvents(opts?: {
-    sandboxId?: string;
-    offset?: number;
-    limit?: number;
-    orderAsc?: boolean;
-  }): Promise<LifecycleEvent[]> {
-    let params: Record<string, any> = {};
-    if (opts?.offset !== undefined) params.offset = opts.offset;
-    if (opts?.limit !== undefined) params.limit = opts.limit;
-    if (opts?.orderAsc !== undefined) params.orderAsc = opts.orderAsc;
-
-    let path = opts?.sandboxId ? `/events/sandboxes/${opts.sandboxId}` : '/events/sandboxes';
-
-    let response = await api.get(path, {
-      headers: this.headers(),
-      params
-    });
-
-    let items = Array.isArray(response.data) ? response.data : response.data?.events || [];
-    return items.map((e: any) => ({
-      version: e.version || '',
-      eventId: e.id || '',
-      type: e.type || '',
-      eventData: e.eventData,
-      sandboxId: e.sandboxId || e.sandboxID || '',
-      sandboxBuildId: e.sandboxBuildId || e.sandboxBuildID || '',
-      sandboxExecutionId: e.sandboxExecutionId || e.sandboxExecutionID || '',
-      sandboxTeamId: e.sandboxTeamId || e.sandboxTeamID || '',
-      sandboxTemplateId: e.sandboxTemplateId || e.sandboxTemplateID || '',
-      timestamp: e.timestamp || ''
-    }));
-  }
-
-  // ─── Webhooks ───
-
-  async createWebhook(params: CreateWebhookParams): Promise<WebhookConfig> {
-    let response = await api.post('/events/webhooks', params, {
-      headers: this.headers()
-    });
-    let d = response.data;
-    return {
-      webhookId: d.id || d.webhookId || d.webhookID,
-      teamId: d.teamID || d.teamId || '',
-      name: d.name || '',
-      createdAt: d.createdAt || '',
-      enabled: d.enabled ?? true,
-      url: d.url || '',
-      events: d.events || []
-    };
-  }
-
-  async listWebhooks(): Promise<WebhookConfig[]> {
-    let response = await api.get('/events/webhooks', {
-      headers: this.headers()
-    });
-    let items = Array.isArray(response.data) ? response.data : response.data?.webhooks || [];
-    return items.map((d: any) => ({
-      webhookId: d.id || d.webhookId || d.webhookID,
-      teamId: d.teamID || d.teamId || '',
-      name: d.name || '',
-      createdAt: d.createdAt || '',
-      enabled: d.enabled ?? true,
-      url: d.url || '',
-      events: d.events || []
-    }));
-  }
-
-  async getWebhook(webhookId: string): Promise<WebhookConfig> {
-    let response = await api.get(`/events/webhooks/${webhookId}`, {
-      headers: this.headers()
-    });
-    let d = response.data;
-    return {
-      webhookId: d.id || d.webhookId || d.webhookID,
-      teamId: d.teamID || d.teamId || '',
-      name: d.name || '',
-      createdAt: d.createdAt || '',
-      enabled: d.enabled ?? true,
-      url: d.url || '',
-      events: d.events || []
-    };
-  }
-
-  async updateWebhook(webhookId: string, params: UpdateWebhookParams): Promise<WebhookConfig> {
-    let response = await api.patch(`/events/webhooks/${webhookId}`, params, {
-      headers: this.headers()
-    });
-    let d = response.data;
-    return {
-      webhookId: d.id || d.webhookId || d.webhookID,
-      teamId: d.teamID || d.teamId || '',
-      name: d.name || '',
-      createdAt: d.createdAt || '',
-      enabled: d.enabled ?? true,
-      url: d.url || '',
-      events: d.events || []
-    };
-  }
-
-  async deleteWebhook(webhookId: string): Promise<void> {
-    await api.delete(`/events/webhooks/${webhookId}`, {
-      headers: this.headers()
-    });
-  }
-
-  // ─── Volumes ───
-
-  async listVolumes(): Promise<VolumeInfo[]> {
-    let response = await api.get('/volumes', {
-      headers: this.headers()
-    });
-    let items = Array.isArray(response.data) ? response.data : response.data?.volumes || [];
-    return items.map((v: any) => ({
-      volumeId: v.volumeID || v.volumeId || v.id,
-      name: v.name || ''
-    }));
-  }
-
-  async createVolume(name: string): Promise<VolumeInfo> {
-    let response = await api.post(
-      '/volumes',
-      { name },
-      {
-        headers: this.headers()
-      }
+  async getLifecycleEvents(
+    opts: { sandboxId?: string; offset?: number; limit?: number; orderAsc?: boolean } = {}
+  ) {
+    const path = opts.sandboxId
+      ? `/events/sandboxes/${encodeURIComponent(opts.sandboxId)}`
+      : '/events/sandboxes';
+    const response = await this.request(
+      'GET',
+      path,
+      undefined,
+      pickDefined({
+        offset: opts.offset,
+        limit: opts.limit,
+        orderAsc: opts.orderAsc
+      })
     );
-    let v = response.data;
-    return {
-      volumeId: v.volumeID || v.volumeId || v.id,
-      name: v.name || ''
-    };
+    return parseResponse(z.array(lifecycleEventSchema), response.data).map(
+      ({ id, ...data }) => ({ eventId: id, ...data })
+    );
   }
-
+  async createWebhook(params: CreateWebhookParams): Promise<WebhookConfig> {
+    const response = await this.request(
+      'POST',
+      '/events/webhooks',
+      pickDefined({
+        ...params,
+        signatureSecret: params.signatureSecret ?? randomBytes(32).toString('hex')
+      })
+    );
+    return mapWebhook(parseResponse(webhookSchema, response.data));
+  }
+  async listWebhooks(): Promise<WebhookConfig[]> {
+    const response = await this.request('GET', '/events/webhooks');
+    return parseResponse(z.array(webhookSchema), response.data).map(mapWebhook);
+  }
+  async getWebhook(webhookId: string): Promise<WebhookConfig> {
+    const response = await this.request(
+      'GET',
+      `/events/webhooks/${encodeURIComponent(webhookId)}`
+    );
+    return mapWebhook(parseResponse(webhookSchema, response.data));
+  }
+  async updateWebhook(webhookId: string, params: UpdateWebhookParams): Promise<WebhookConfig> {
+    const data = pickDefined(params);
+    if (Object.keys(data).length === 0)
+      throw createApiServiceError('Provide at least one webhook field to update.');
+    const response = await this.request(
+      'PATCH',
+      `/events/webhooks/${encodeURIComponent(webhookId)}`,
+      data
+    );
+    return mapWebhook(parseResponse(webhookSchema, response.data));
+  }
+  async deleteWebhook(webhookId: string): Promise<void> {
+    await this.request('DELETE', `/events/webhooks/${encodeURIComponent(webhookId)}`);
+  }
+  async listVolumes(): Promise<VolumeInfo[]> {
+    const response = await this.request('GET', '/volumes');
+    return parseResponse(z.array(volumeSchema), response.data).map(mapVolume);
+  }
+  async createVolume(name: string): Promise<VolumeInfo> {
+    const response = await this.request('POST', '/volumes', { name });
+    return mapVolume(parseResponse(volumeSchema, response.data));
+  }
   async deleteVolume(volumeId: string): Promise<void> {
-    await api.delete(`/volumes/${volumeId}`, {
-      headers: this.headers()
-    });
+    await this.request('DELETE', `/volumes/${encodeURIComponent(volumeId)}`);
   }
 }

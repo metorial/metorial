@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, mapMemory } from '../lib/client';
 import { spec } from '../spec';
 
 export let getMemory = SlateTool.create(spec, {
@@ -13,7 +13,11 @@ export let getMemory = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      memoryId: z.string().describe('Unique identifier of the memory to retrieve'),
+      memoryId: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Unique identifier of the memory to retrieve'),
       includeHistory: z
         .boolean()
         .optional()
@@ -22,16 +26,20 @@ export let getMemory = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      memoryId: z.string().describe('Unique memory identifier'),
+      memoryId: z.string().trim().min(1).describe('Unique memory identifier'),
       memory: z.string().describe('Memory content text'),
-      userId: z.string().optional().describe('Associated user ID'),
-      agentId: z.string().optional().describe('Associated agent ID'),
-      appId: z.string().optional().describe('Associated app ID'),
-      runId: z.string().optional().describe('Associated run ID'),
-      hash: z.string().optional().describe('Content hash'),
+      userId: z.string().trim().min(1).optional().describe('Associated user ID'),
+      agentId: z.string().trim().min(1).optional().describe('Associated agent ID'),
+      appId: z.string().trim().min(1).optional().describe('Associated app ID'),
+      runId: z.string().trim().min(1).optional().describe('Associated run ID'),
+      hash: z.string().trim().min(1).optional().describe('Content hash'),
       metadata: z.record(z.string(), z.unknown()).optional().describe('Memory metadata'),
-      createdAt: z.string().optional().describe('Creation timestamp'),
-      updatedAt: z.string().optional().describe('Last update timestamp'),
+      createdAt: z.string().trim().min(1).optional().describe('Creation timestamp'),
+      updatedAt: z.string().trim().min(1).optional().describe('Last update timestamp'),
+      expirationDate: z
+        .string()
+        .optional()
+        .describe('Date after which the memory is hidden from search'),
       history: z
         .array(z.record(z.string(), z.unknown()))
         .optional()
@@ -41,30 +49,19 @@ export let getMemory = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      orgId: ctx.config.orgId,
-      projectId: ctx.config.projectId
+      legacyScope: ctx.config
     });
 
-    let mem = (await client.getMemory(ctx.input.memoryId)) as Record<string, unknown>;
+    let mem = await client.getMemory(ctx.input.memoryId);
 
     let history: Record<string, unknown>[] | undefined;
     if (ctx.input.includeHistory) {
-      let historyResult = await client.getMemoryHistory(ctx.input.memoryId);
-      history = historyResult as Record<string, unknown>[];
+      history = await client.getMemoryHistory(ctx.input.memoryId);
     }
 
     return {
       output: {
-        memoryId: String(mem.id || ''),
-        memory: String(mem.memory || ''),
-        userId: mem.user_id ? String(mem.user_id) : undefined,
-        agentId: mem.agent_id ? String(mem.agent_id) : undefined,
-        appId: mem.app_id ? String(mem.app_id) : undefined,
-        runId: mem.run_id ? String(mem.run_id) : undefined,
-        hash: mem.hash ? String(mem.hash) : undefined,
-        metadata: mem.metadata as Record<string, unknown> | undefined,
-        createdAt: mem.created_at ? String(mem.created_at) : undefined,
-        updatedAt: mem.updated_at ? String(mem.updated_at) : undefined,
+        ...mapMemory(mem),
         history
       },
       message: `Retrieved memory **${ctx.input.memoryId}**: "${String(mem.memory || '').substring(0, 100)}${String(mem.memory || '').length > 100 ? '...' : ''}"${history ? ` with ${history.length} history entries` : ''}.`

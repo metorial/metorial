@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { nonempty, nullableText, numeric, uid } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getAccount = SlateTool.create(spec, {
@@ -23,19 +24,18 @@ export let getAccount = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.getAccount();
-
+    const client = new BannerbearClient(ctx.auth);
+    const result = await client.getAccount();
+    const output = {
+      accountUid: uid(result.uid),
+      planName: nullableText(result.paid_plan_name),
+      apiUsage: numeric(result.api_usage),
+      apiQuota: numeric(result.api_quota),
+      createdAt: nonempty(result.created_at)
+    };
     return {
-      output: {
-        accountUid: result.uid,
-        planName: result.paid_plan_name || null,
-        apiUsage: result.api_usage,
-        apiQuota: result.api_quota,
-        createdAt: result.created_at
-      },
-      message: `Account **${result.paid_plan_name || 'Free'}** — API usage: ${result.api_usage}/${result.api_quota} this month.`
+      output,
+      message: `Retrieved the authenticated account's actual usage and quota (${output.apiUsage}/${output.apiQuota}).`
     };
   })
   .build();

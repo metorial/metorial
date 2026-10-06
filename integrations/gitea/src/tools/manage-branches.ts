@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let branchSchema = z.object({
@@ -20,10 +21,10 @@ export let listBranches = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page')
     })
   )
   .output(
@@ -32,7 +33,7 @@ export let listBranches = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let branches = await client.listBranches(ctx.input.owner, ctx.input.repo, {
       page: ctx.input.page,
       limit: ctx.input.limit
@@ -62,9 +63,9 @@ export let createBranch = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      branchName: z.string().describe('Name for the new branch'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      branchName: z.string().min(1).describe('Name for the new branch'),
       sourceBranch: z
         .string()
         .optional()
@@ -73,7 +74,7 @@ export let createBranch = SlateTool.create(spec, {
   )
   .output(branchSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let b = await client.createBranch(
       ctx.input.owner,
       ctx.input.repo,
@@ -103,9 +104,9 @@ export let deleteBranch = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      branchName: z.string().describe('Name of the branch to delete')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      branchName: z.string().min(1).describe('Name of the branch to delete')
     })
   )
   .output(
@@ -114,7 +115,7 @@ export let deleteBranch = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     await client.deleteBranch(ctx.input.owner, ctx.input.repo, ctx.input.branchName);
 
     return {

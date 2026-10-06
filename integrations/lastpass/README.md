@@ -1,41 +1,27 @@
-# <img src="https://provider-logos.metorial-cdn.com/lastpass-logo.png" height="20"> Lastpass
+# LastPass
 
-Manage enterprise password management users, groups, and shared folders. Provision and deprovision user accounts, retrieve user data including security scores and login history, create and manage groups, view shared folder details and permissions, and query audit event logs for security monitoring. Supports batch user operations and event reporting filtered by date range and user.
+Manage administrative user metadata, group memberships, shared-folder permissions and audit reports through the LastPass Enterprise API. This integration uses a company ID and Enterprise provisioning hash. It does not read vault contents, passwords, shared-folder sites or downloadable vault files.
 
-## Tools
+Configure the account number from the Admin Console account menu and the provisioning hash from **Advanced > Enterprise API**. These credentials identify a configured company; they do not verify a current person. Resetting the hash invalidates its previous value. AD Connector keys and the separate early-access REST API `lpkey_` keys do not authenticate this API.
 
-### Deprovision User
+| Tool | Behavior |
+| --- | --- |
+| Get Users | Exact email lookup or one page of user metadata; follow `nextPageIndex` when native total confirms more results. Maximum 2,000 users per page. |
+| Get Shared Folders | Administrative folder IDs, names, available security scores and recipient permissions; numeric permissions are decoded accurately. |
+| Get Event Report | Up to 10,000 events in the account reporting time zone; pass the native `next` timestamp to continue. |
+| Provision Users | Submit new users, names and groups. Invitations and audit history can remain after the call. |
+| Deprovision User | Deactivate retains membership/data; remove retains a personal account and vault; delete permanently removes the account and vault. |
+| Manage User | Send reset email, disable MFA, or disable an account. Combined actions run sequentially and report earlier receipts if a later action fails. |
+| Manage Group Membership | Submit additions/removals. Group membership can grant access beyond administrative metadata. |
 
-Remove or deactivate a user from the LastPass Enterprise account. Choose between deactivating (blocks login, retains data), removing (removes from enterprise but keeps personal account), or fully deleting the account.
+`WARN` is a partial or uncertain result, never a claim that every requested change completed. Inspect native warnings and current user state before retrying; writes are not automatically retried. Missing native fields remain omitted. A timeout, malformed receipt or failed later action does not prove that earlier actions or notifications were reversed.
 
-### Get Event Report
+Requires a LastPass Business account with the Enterprise API enabled and appropriate administrative permissions. Provisioning does not manage groups for preconfigured SSO applications. The separate REST API remains early access and is outside this integration.
 
-Query the audit event log for the LastPass Enterprise account. Retrieve events such as login attempts, password changes, shared folder activity, and administrative actions within a specified date range. Optionally filter by user.
+The private suite is active and live-unverified. Read scenarios require an explicitly configured company, controlled existing user and bounded reporting interval. Real administrative mutations are gated before effect because this API cannot prove complete vault/sharing/policy ownership or reverse emails, MFA resets and audit history. No cleanup guarantee is inferred from a user disappearing from a metadata page.
 
-### Get Shared Folders
-
-Retrieve all shared folders in the LastPass Enterprise account with their contained sites, user permissions (read-only, admin, give access), and security scores.
-
-### Get Users
-
-Retrieve user account data from LastPass Enterprise. Fetch a specific user by email or list all users with their security scores, login history, group memberships, and account status.
-
-### Manage Group Membership
-
-Add or remove users from groups in LastPass Enterprise. Supports batch operations to modify group memberships for multiple users at once.
-
-### Manage User
-
-Perform administrative actions on a LastPass user account. Reset the master password, disable multifactor authentication, or disable the user account.
-
-### Provision Users
-
-Create new user accounts in LastPass Enterprise. Add one or more users by email, optionally assigning them to groups and setting a full name. Provisioned users receive an email with a temporary password or activation link.
+Official reference: [Enterprise API user data](https://support.lastpass.com/s/document-item?bundleId=lastpass&topicId=LastPass%2Fapi_get_user_data.html&_LANG=enus), [Enterprise API commands](https://support.lastpass.com/s/document-item?bundleId=lastpass&topicId=LastPass%2Faccess_the_documentation_of_the_enterprise_api.html&_LANG=enus), [separate REST API quick start](https://developer.lastpass.com/content/quick-start.md).
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE)

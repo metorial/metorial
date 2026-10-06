@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { destinationOutputSchema } from '../lib/models';
 import { spec } from '../spec';
 
 export let createTransformation = SlateTool.create(spec, {
@@ -11,11 +12,11 @@ When **publish** is false (default), the transformation is created as a draft an
   instructions: [
     'The code must export a transformEvent function, e.g.: export function transformEvent(event) { return event; }',
     'Use "javascript" or "pythonfaas" as the language value.',
-    'Destination IDs can only be connected when publish is set to true.'
+    'Destination IDs can only be connected when publish is set to true. Connecting replaces any transformation already associated with a destination.'
   ],
   tags: {
     readOnly: false,
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -24,13 +25,19 @@ When **publish** is false (default), the transformation is created as a draft an
       code: z.string().describe('Transformation function code'),
       language: z
         .enum(['javascript', 'pythonfaas'])
-        .describe('Programming language: "javascript" or "pythonfaas" (Python 3.11)'),
+        .describe('Programming language: "javascript" or "pythonfaas" (Python)'),
       description: z.string().optional().describe('Description of the transformation'),
       publish: z
         .boolean()
         .optional()
         .describe(
           'If true, publishes the transformation and makes it live for incoming traffic. Defaults to false.'
+        ),
+      events: z
+        .array(z.unknown())
+        .optional()
+        .describe(
+          'Optional synthetic JSON events used to validate code during creation; validation executes the supplied code.'
         ),
       destinationIds: z
         .array(z.string())
@@ -48,7 +55,10 @@ When **publish** is false (default), the transformation is created as a draft an
       codeVersion: z.string().nullable().describe('Code version number'),
       language: z.string().describe('Programming language used'),
       createdAt: z.string().describe('Creation timestamp'),
-      updatedAt: z.string().describe('Last update timestamp')
+      updatedAt: z.string().describe('Last update timestamp'),
+      destinations: destinationOutputSchema.describe(
+        'Current destination associations when reported by the provider.'
+      )
     })
   )
   .handleInvocation(async ctx => {
@@ -63,7 +73,8 @@ When **publish** is false (default), the transformation is created as a draft an
       language: ctx.input.language,
       description: ctx.input.description,
       publish: ctx.input.publish,
-      destinationIds: ctx.input.destinationIds
+      destinationIds: ctx.input.destinationIds,
+      events: ctx.input.events
     });
 
     let published = ctx.input.publish ? 'published' : 'draft';
@@ -78,7 +89,8 @@ When **publish** is false (default), the transformation is created as a draft an
         codeVersion: result.codeVersion ?? null,
         language: result.language,
         createdAt: result.createdAt,
-        updatedAt: result.updatedAt
+        updatedAt: result.updatedAt,
+        destinations: result.destinations
       },
       message: `Created ${published} transformation **${result.name}** (ID: \`${result.id}\`).`
     };

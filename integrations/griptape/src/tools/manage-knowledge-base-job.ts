@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageKnowledgeBaseJob = SlateTool.create(spec, {
@@ -19,7 +20,7 @@ export let manageKnowledgeBaseJob = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      action: z.enum(['create', 'get', 'list']).describe('Operation to perform'),
+      action: z.enum(['create', 'get', 'list', 'cancel']).describe('Operation to perform'),
       knowledgeBaseId: z
         .string()
         .optional()
@@ -29,8 +30,8 @@ export let manageKnowledgeBaseJob = SlateTool.create(spec, {
         .array(z.enum(['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED']))
         .optional()
         .describe('Filter jobs by status (for list)'),
-      page: z.number().optional().describe('Page number (for list)'),
-      pageSize: z.number().optional().describe('Page size (for list)')
+      page: z.number().int().min(1).optional().describe('Page number (for list)'),
+      pageSize: z.number().int().min(1).optional().describe('Page size (for list)')
     })
   )
   .output(
@@ -38,6 +39,11 @@ export let manageKnowledgeBaseJob = SlateTool.create(spec, {
       knowledgeBaseJobId: z.string().optional().describe('ID of the job'),
       knowledgeBaseId: z.string().optional().describe('ID of the knowledge base'),
       status: z.string().optional().describe('Current status of the job'),
+      cancelled: z.boolean().optional(),
+      completedAt: z.string().optional(),
+      bytesIngested: z.number().optional(),
+      errors: z.array(z.unknown()).optional(),
+      statusDetail: z.unknown().optional(),
       createdAt: z.string().optional().describe('Creation timestamp'),
       jobs: z
         .array(
@@ -49,6 +55,7 @@ export let manageKnowledgeBaseJob = SlateTool.create(spec, {
         )
         .optional()
         .describe('List of jobs (for list action)'),
+      pagination: paginationSchema.optional().describe('Page navigation metadata'),
       totalCount: z.number().optional().describe('Total jobs count (for list action)')
     })
   )
@@ -57,28 +64,53 @@ export let manageKnowledgeBaseJob = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.knowledgeBaseId)
-        throw new Error('knowledgeBaseId is required for create');
+        throw createApiServiceError('knowledgeBaseId is required for create');
       let result = await client.createKnowledgeBaseJob(ctx.input.knowledgeBaseId);
       return {
         output: {
           knowledgeBaseJobId: result.knowledge_base_job_id,
           knowledgeBaseId: result.knowledge_base_id,
           status: result.status,
+          completedAt: result.completed_at ?? undefined,
+          bytesIngested: result.bytes_ingested,
+          errors: result.errors,
+          statusDetail: result.status_detail,
           createdAt: result.created_at
         },
         message: `Created knowledge base job **${result.knowledge_base_job_id}** with status **${result.status}**.`
       };
     }
 
+    if (ctx.input.action === 'cancel') {
+      if (!ctx.input.knowledgeBaseJobId)
+        throw createApiServiceError('knowledgeBaseJobId is required for cancel.');
+      let result = await client.cancelKnowledgeBaseJob(ctx.input.knowledgeBaseJobId);
+      return {
+        output: {
+          knowledgeBaseJobId: result.knowledge_base_job_id,
+          knowledgeBaseId: result.knowledge_base_id,
+          status: result.status,
+          cancelled: result.status === 'CANCELLED',
+          createdAt: result.created_at,
+          completedAt: result.completed_at ?? undefined
+        },
+        message: `Knowledge base job ${result.knowledge_base_job_id} is ${result.status}.`
+      };
+    }
+
     if (ctx.input.action === 'get') {
       if (!ctx.input.knowledgeBaseJobId)
-        throw new Error('knowledgeBaseJobId is required for get');
+        throw createApiServiceError('knowledgeBaseJobId is required for get');
       let result = await client.getKnowledgeBaseJob(ctx.input.knowledgeBaseJobId);
       return {
         output: {
           knowledgeBaseJobId: result.knowledge_base_job_id,
           knowledgeBaseId: result.knowledge_base_id,
           status: result.status,
+          completedAt: result.completed_at ?? undefined,
+          bytesIngested: result.bytes_ingested,
+          errors: result.errors,
+          statusDetail: result.status_detail,
           createdAt: result.created_at
         },
         message: `Knowledge base job **${result.knowledge_base_job_id}** is **${result.status}**.`
@@ -86,7 +118,8 @@ export let manageKnowledgeBaseJob = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'list') {
-      if (!ctx.input.knowledgeBaseId) throw new Error('knowledgeBaseId is required for list');
+      if (!ctx.input.knowledgeBaseId)
+        throw createApiServiceError('knowledgeBaseId is required for list');
       let result = await client.listKnowledgeBaseJobs(ctx.input.knowledgeBaseId, {
         page: ctx.input.page,
         pageSize: ctx.input.pageSize,
@@ -98,11 +131,15 @@ export let manageKnowledgeBaseJob = SlateTool.create(spec, {
         createdAt: j.created_at
       }));
       return {
-        output: { jobs, totalCount: result.pagination.totalCount },
+        output: {
+          jobs,
+          pagination: result.pagination,
+          totalCount: result.pagination.totalCount
+        },
         message: `Found **${result.pagination.totalCount}** job(s) for knowledge base ${ctx.input.knowledgeBaseId}.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

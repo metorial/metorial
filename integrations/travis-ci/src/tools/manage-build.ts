@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, TravisCIClient } from '../lib/client';
+import type { Build } from '../lib/types';
 import { spec } from '../spec';
 
 export let manageBuild = SlateTool.create(spec, {
@@ -28,17 +29,17 @@ export let manageBuild = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
-    let result: any;
+    let result: Build;
     if (ctx.input.action === 'cancel') {
       result = await client.cancelBuild(ctx.input.buildId);
     } else {
       result = await client.restartBuild(ctx.input.buildId);
     }
 
-    let build = result.build || result;
+    let build = result;
 
     return {
       output: {
@@ -47,7 +48,7 @@ export let manageBuild = SlateTool.create(spec, {
         state: build.state,
         repositorySlug: build.repository?.slug
       },
-      message: `Build **#${build.number || ctx.input.buildId}** has been **${ctx.input.action === 'cancel' ? 'cancelled' : 'restarted'}**.`
+      message: `Build **#${build.number || ctx.input.buildId}** accepted the **${ctx.input.action}** request. Current state: **${build.state || 'pending'}**.`
     };
   })
   .build();

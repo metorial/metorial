@@ -10,8 +10,6 @@ import {
   reverseLookup,
   verifyEmail
 } from './tools';
-import { clearoutEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     autocompleteCompany,
     getCredits
   ],
-  triggers: [clearoutEvents]
+  triggers: []
 });

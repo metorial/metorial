@@ -9,8 +9,6 @@ import {
   reintegrateDocuments,
   reparseDocuments
 } from './tools';
-import { documentParsed, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     reparseDocuments,
     reintegrateDocuments
   ],
-  triggers: [inboundWebhook, documentParsed]
+  triggers: []
 });

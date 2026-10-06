@@ -18,8 +18,6 @@ import {
   listZaps,
   testActionStep
 } from './tools';
-import { inboundWebhook, zapRunActivity } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     getZapRuns,
     createWorkflowStep
   ],
-  triggers: [inboundWebhook, zapRunActivity]
+  triggers: []
 });

@@ -2,12 +2,14 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getCompanyTool,
+  getResourceTool,
   getUserTool,
   initiateCallTool,
   listCallCentersTool,
   listCallsTool,
   listContactsTool,
   listOfficesTool,
+  listResourcesTool,
   listUsersTool,
   manageBlockedNumberTool,
   manageCallCenterTool,
@@ -17,8 +19,6 @@ import {
   manageUserTool,
   sendSmsTool
 } from './tools';
-import { callEventTrigger, contactEventTrigger, smsEventTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,7 +36,9 @@ export let provider = Slate.create({
     managePhoneNumberTool,
     listOfficesTool,
     manageBlockedNumberTool,
-    getCompanyTool
+    getCompanyTool,
+    getResourceTool,
+    listResourcesTool
   ],
-  triggers: [callEventTrigger, smsEventTrigger, contactEventTrigger]
+  triggers: []
 });

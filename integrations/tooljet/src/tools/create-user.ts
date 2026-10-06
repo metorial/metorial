@@ -1,100 +1,100 @@
-import { SlateTool } from 'slates';
-import { z } from 'zod';
+import { pickDefined, SlateTool } from 'slates';
 import { Client } from '../lib/client';
+import { mappedUser, userSchema } from '../lib/schemas';
+import { fail, id, text, z } from '../lib/validation';
 import { spec } from '../spec';
 
-let workspaceAssignmentSchema = z.object({
-  workspaceName: z.string().describe('Name of the workspace to assign the user to'),
-  workspaceId: z
+const assignment = z.object({
+  workspaceName: z
     .string()
     .optional()
-    .describe('ID of the workspace (optional, can use name instead)'),
-  status: z
-    .enum(['active', 'archived'])
-    .optional()
-    .default('active')
-    .describe('User status in this workspace'),
+    .describe('Workspace name from list_workspaces; provide name or ID.'),
+  workspaceId: z.string().optional().describe('Workspace UUID from list_workspaces.'),
+  status: z.enum(['active', 'archived']).optional().default('active'),
   groups: z
-    .array(
-      z.object({
-        groupName: z.string().describe('Name of the group to add the user to'),
-        groupId: z.string().optional().describe('ID of the group (optional)')
-      })
-    )
+    .array(z.object({ groupName: z.string().optional(), groupId: z.string().optional() }))
     .optional()
-    .describe('Groups to assign the user to within this workspace')
 });
-
-export let createUser = SlateTool.create(spec, {
+export const createUser = SlateTool.create(spec, {
   name: 'Create User',
   key: 'create_user',
-  description: `Create a new user on the ToolJet instance with name, email, optional password, and workspace assignments including group memberships.`,
-  tags: {
-    destructive: false
-  }
+  description:
+    'Create a user on the Enterprise self-hosted instance with explicit workspace assignments. Omitting password sends an invite email. Returned status is native and may be invited even when active was requested.',
+  instructions: [
+    'Discover workspace and group IDs using list_workspaces. Native creation accepts active or invited; the legacy archived value is refused with guidance to archive after creation.',
+    'User and invite/audit history may remain after archiving; do not blindly retry an uncertain creation.'
+  ],
+  tags: { destructive: false }
 })
   .input(
     z.object({
-      name: z.string().describe('Full name of the new user'),
-      email: z.string().describe('Email address of the new user'),
-      password: z.string().optional().describe('Password for the new user (5-100 characters)'),
-      status: z
-        .enum(['active', 'archived'])
+      name: z.string(),
+      email: z.string(),
+      password: z
+        .string()
         .optional()
-        .default('active')
-        .describe('Initial status of the user'),
+        .describe(
+          'Password; omitting it sends an invitation. Server password policy applies.'
+        ),
+      status: z.enum(['active', 'archived', 'invited']).optional().default('active'),
       workspaces: z
-        .array(workspaceAssignmentSchema)
+        .array(assignment)
         .optional()
-        .describe('Workspaces to assign the user to')
+        .describe('Explicit native workspace assignments are required at invocation.')
     })
   )
-  .output(
-    z.object({
-      userId: z.string().optional().describe('UUID of the created user'),
-      name: z.string().describe('Name of the created user'),
-      email: z.string().describe('Email of the created user'),
-      status: z.string().describe('Status of the created user')
-    })
-  )
+  .output(userSchema.extend({ verification: z.string().optional() }))
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
-
-    let body: any = {
-      name: ctx.input.name,
-      email: ctx.input.email,
-      status: ctx.input.status
-    };
-
-    if (ctx.input.password) {
-      body.password = ctx.input.password;
-    }
-
-    if (ctx.input.workspaces) {
-      body.workspaces = ctx.input.workspaces.map(w => ({
+    text(ctx.input.name, 'user name');
+    text(ctx.input.email, 'user email');
+    if (ctx.input.password !== undefined) text(ctx.input.password, 'password');
+    if (ctx.input.status === 'archived')
+      fail(
+        'Native creation accepts active or invited. Create the user, then use update_user with archived.',
+        'unsupported_status'
+      );
+    if (ctx.input.workspaces === undefined)
+      fail(
+        'Provide an explicit workspaces array using list_workspaces. It is required by the public API.'
+      );
+    const workspaces = ctx.input.workspaces.map(w => {
+      if (!w.workspaceId && !w.workspaceName)
+        fail('Each workspace needs a UUID or name from list_workspaces.');
+      if (w.workspaceId) id(w.workspaceId, 'workspace UUID');
+      if (w.workspaceName) text(w.workspaceName, 'workspace name');
+      const groups = w.groups?.map(g => {
+        if (!g.groupId && !g.groupName) fail('Each group needs a UUID or name.');
+        return pickDefined({ id: g.groupId, name: g.groupName });
+      });
+      return pickDefined({
         id: w.workspaceId,
         name: w.workspaceName,
-        status: w.status ?? 'active',
-        groups: w.groups?.map(g => ({
-          id: g.groupId,
-          name: g.groupName
-        }))
-      }));
-    }
-
-    let result = await client.createUser(body);
-
-    return {
-      output: {
-        userId: result?.id,
+        status: w.status,
+        groups
+      });
+    });
+    const user = await new Client(ctx.auth, ctx.config).createUser(
+      pickDefined({
         name: ctx.input.name,
         email: ctx.input.email,
-        status: ctx.input.status ?? 'active'
-      },
-      message: `Created user **${ctx.input.name}** (${ctx.input.email}) with status **${ctx.input.status ?? 'active'}**.`
+        password: ctx.input.password,
+        status: ctx.input.status,
+        workspaces
+      })
+    );
+    if (
+      user.email.toLowerCase() !== ctx.input.email.toLowerCase() ||
+      user.name !== ctx.input.name
+    )
+      fail(
+        'Creation returned a contradictory native user. Reconcile the exact ID before any retry.',
+        'creation_unverified',
+        { userId: user.id }
+      );
+    return {
+      output: { ...mappedUser(user), verification: 'native_creation_response' },
+      message:
+        'ToolJet returned the created user; inspect the native invitation and membership state.'
     };
   })
   .build();

@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getBenefitsOverview = SlateTool.create(spec, {
   name: 'Get Benefits Overview',
   key: 'get_benefits_overview',
-  description: `Retrieve benefits information including benefit plans, deduction types, and optionally benefit coverages and dependents for a specific employee. Provides a comprehensive view of the company's benefits setup.`,
+  description: `Retrieve visible company benefit plan summaries and deduction types. When employeeId is supplied, also retrieve company coverage levels and dependents for that exact employee. Company coverage levels are not proof of an employee's enrollment.`,
   tags: {
     readOnly: true,
     destructive: false
@@ -17,7 +17,9 @@ export let getBenefitsOverview = SlateTool.create(spec, {
       employeeId: z
         .string()
         .optional()
-        .describe('If provided, also fetch benefit coverages and dependents for this employee')
+        .describe(
+          "If provided, also fetch company coverage levels and this employee's dependents"
+        )
     })
   )
   .output(
@@ -29,29 +31,31 @@ export let getBenefitsOverview = SlateTool.create(spec, {
       coverages: z
         .any()
         .optional()
-        .describe('Employee benefit coverages (if employeeId provided)'),
+        .describe('Company coverage levels, not employee enrollment (if employeeId provided)'),
       dependents: z.any().optional().describe('Employee dependents (if employeeId provided)')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
     let [deductionTypes, plans] = await Promise.all([
       client.getBenefitDeductionTypes(),
       client.getBenefitPlans()
     ]);
 
-    let output: any = {
-      deductionTypes: Array.isArray(deductionTypes) ? deductionTypes : [],
+    let output: {
+      deductionTypes: Record<string, unknown>[];
+      plans: unknown;
+      coverages?: unknown;
+      dependents?: unknown;
+    } = {
+      deductionTypes,
       plans
     };
 
     if (ctx.input.employeeId) {
       let [coverages, dependents] = await Promise.all([
-        client.getBenefitCoverages(ctx.input.employeeId),
+        client.getBenefitCoverages(),
         client.getEmployeeDependents(ctx.input.employeeId)
       ]);
       output.coverages = coverages;
@@ -61,7 +65,7 @@ export let getBenefitsOverview = SlateTool.create(spec, {
     return {
       output,
       message: ctx.input.employeeId
-        ? `Retrieved benefits overview including coverages and dependents for employee **${ctx.input.employeeId}**.`
+        ? `Retrieved company benefit summaries and coverage levels, plus visible dependents for employee **${ctx.input.employeeId}**.`
         : `Retrieved benefits overview with deduction types and plans.`
     };
   })

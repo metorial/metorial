@@ -24,6 +24,9 @@ Supports pagination for large result sets.`,
         .describe('Filter sandboxes by metadata key-value pairs.'),
       limit: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
         .describe('Maximum number of sandboxes to return (max 100).'),
       nextToken: z

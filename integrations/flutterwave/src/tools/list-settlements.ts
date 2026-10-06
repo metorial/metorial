@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageFields, pageOutput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listSettlements = SlateTool.create(spec, {
@@ -22,6 +23,7 @@ export let listSettlements = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pageFields,
       settlements: z
         .array(
           z.object({
@@ -48,9 +50,9 @@ export let listSettlements = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
-    if (ctx.input.settlementId) {
+    if (ctx.input.settlementId !== undefined) {
       let result = await client.getSettlement(ctx.input.settlementId);
       let s = result.data;
       return {
@@ -103,7 +105,7 @@ export let listSettlements = SlateTool.create(spec, {
     }));
 
     return {
-      output: { settlements },
+      output: { settlements, ...pageOutput(result) },
       message: `Found **${settlements.length}** settlements.`
     };
   })

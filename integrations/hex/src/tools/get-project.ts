@@ -7,10 +7,32 @@ let sharingSchema = z
   .object({
     workspace: z.string().optional(),
     publicWeb: z.string().optional(),
-    users: z.array(z.object({ userId: z.string(), accessLevel: z.string() })).optional(),
-    groups: z.array(z.object({ groupId: z.string(), accessLevel: z.string() })).optional(),
+    users: z
+      .array(
+        z.object({
+          userId: z.string().optional(),
+          email: z.string().optional(),
+          accessLevel: z.string()
+        })
+      )
+      .optional(),
+    groups: z
+      .array(
+        z.object({
+          groupId: z.string().optional(),
+          name: z.string().optional(),
+          accessLevel: z.string()
+        })
+      )
+      .optional(),
     collections: z
-      .array(z.object({ collectionId: z.string(), accessLevel: z.string() }))
+      .array(
+        z.object({
+          collectionId: z.string().optional(),
+          name: z.string().optional(),
+          accessLevel: z.string()
+        })
+      )
       .optional()
   })
   .optional();
@@ -40,9 +62,19 @@ export let getProject = SlateTool.create(spec, {
       status: z.string().nullable(),
       categories: z.array(z.string()),
       creator: z
-        .object({ userId: z.string(), email: z.string(), name: z.string() })
+        .object({
+          userId: z.string().optional(),
+          email: z.string(),
+          name: z.string().optional()
+        })
         .nullable(),
-      owner: z.object({ userId: z.string(), email: z.string(), name: z.string() }).nullable(),
+      owner: z
+        .object({
+          userId: z.string().optional(),
+          email: z.string(),
+          name: z.string().optional()
+        })
+        .nullable(),
       createdAt: z.string(),
       updatedAt: z.string(),
       publishedAt: z.string().nullable(),
@@ -50,7 +82,10 @@ export let getProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
     let project = await client.getProject(ctx.input.projectId, ctx.input.includeSharing);
 
     return {

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, nextCursor } from '../lib/client';
 import { spec } from '../spec';
 
 let botSummarySchema = z.object({
@@ -9,7 +9,10 @@ let botSummarySchema = z.object({
   meetingUrl: z.unknown().describe('Meeting URL'),
   joinAt: z.string().nullable().describe('Scheduled join time'),
   status: z.string().describe('Current status'),
-  createdAt: z.string().describe('Creation timestamp'),
+  createdAt: z
+    .string()
+    .optional()
+    .describe('Bot creation timestamp when supplied by Recall.ai'),
   videoUrl: z.string().nullable().describe('Pre-signed URL for the recording, if available')
 });
 
@@ -27,15 +30,28 @@ export let listBotsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      cursor: z.string().optional().describe('Pagination cursor for fetching next page'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Continuation value from nextCursor; may be a page number or cursor'),
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Page number; nextCursor carries the next page'),
+      status: z
+        .array(z.string())
+        .optional()
+        .describe('Statuses to filter; overrides statusIn when provided'),
       joinAtAfter: z
         .string()
         .optional()
-        .describe('Filter bots scheduled after this ISO 8601 timestamp'),
+        .describe('Filter bots scheduled after this date (YYYY-MM-DD)'),
       joinAtBefore: z
         .string()
         .optional()
-        .describe('Filter bots scheduled before this ISO 8601 timestamp'),
+        .describe('Filter bots scheduled before this date (YYYY-MM-DD)'),
       statusIn: z
         .string()
         .optional()
@@ -46,16 +62,20 @@ export let listBotsTool = SlateTool.create(spec, {
       ordering: z
         .string()
         .optional()
-        .describe('Field to order by, e.g. "-created_at" for newest first'),
+        .describe('Legacy ordering hint; Recall.ai controls result order'),
       pageSize: z
         .number()
         .optional()
-        .describe('Number of results per page (default varies by API)')
+        .describe('Legacy page-size hint; Recall.ai chooses the page size')
     })
   )
   .output(
     z.object({
-      totalCount: z.number().describe('Total number of matching bots'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider-wide total when supplied by Recall.ai; omitted when unavailable'),
+      returnedCount: z.number().optional().describe('Number of results on this page'),
       nextCursor: z
         .string()
         .nullable()
@@ -71,6 +91,8 @@ export let listBotsTool = SlateTool.create(spec, {
 
     let result = await client.listBots({
       cursor: ctx.input.cursor,
+      page: ctx.input.page,
+      status: ctx.input.status,
       joinAtAfter: ctx.input.joinAtAfter,
       joinAtBefore: ctx.input.joinAtBefore,
       statusIn: ctx.input.statusIn,
@@ -79,20 +101,13 @@ export let listBotsTool = SlateTool.create(spec, {
       pageSize: ctx.input.pageSize
     });
 
-    let nextCursor: string | null = null;
-    if (result.next) {
-      try {
-        let url = new URL(result.next);
-        nextCursor = url.searchParams.get('cursor');
-      } catch {
-        nextCursor = result.next;
-      }
-    }
+    let cursor = nextCursor(result.next);
 
     return {
       output: {
         totalCount: result.count,
-        nextCursor,
+        returnedCount: result.results.length,
+        nextCursor: cursor,
         bots: result.results.map(bot => ({
           botId: bot.id,
           botName: bot.botName,
@@ -103,7 +118,7 @@ export let listBotsTool = SlateTool.create(spec, {
           videoUrl: bot.videoUrl
         }))
       },
-      message: `Found **${result.count}** bots. Showing ${result.results.length} results${nextCursor ? ' (more available)' : ''}.`
+      message: `Retrieved ${result.results.length} results${cursor ? ' (more available)' : ''}.`
     };
   })
   .build();

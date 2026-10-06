@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let cancelDeployment = SlateTool.create(spec, {
@@ -16,10 +17,7 @@ export let cancelDeployment = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe('Organization name (uses default from config if not set)'),
+      organization: organizationInput,
       projectName: z.string().describe('Project name'),
       stackName: z.string().describe('Stack name'),
       deploymentId: z.string().describe('ID of the deployment to cancel')
@@ -27,18 +25,20 @@ export let cancelDeployment = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      cancelled: z.boolean()
+      cancelled: z
+        .boolean()
+        .describe(
+          'Whether the provider accepted the cancellation request; read deployment status to confirm termination'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
 
     await client.cancelDeployment(
       org,
@@ -49,7 +49,7 @@ export let cancelDeployment = SlateTool.create(spec, {
 
     return {
       output: { cancelled: true },
-      message: `Cancelled deployment **${ctx.input.deploymentId}** on stack **${org}/${ctx.input.projectName}/${ctx.input.stackName}**`
+      message: `Cancellation request accepted for deployment **${ctx.input.deploymentId}** on stack **${org}/${ctx.input.projectName}/${ctx.input.stackName}**. Read deployment status to confirm termination.`
     };
   })
   .build();

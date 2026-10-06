@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'superhuman-gmail',
   name: 'Superhuman Gmail',
   description:
-    'Conversation-first Gmail workflows: search threads, load full context for triage, batch-style label and mailbox actions, threaded reply drafts, send, and history-based change detection.',
+    'Gmail-backed conversation search, context, triage, reply drafts, sending, mailbox identity and file downloads. This uses the Gmail API, independently of Superhuman Mail native features.',
   metadata: {},
   config,
   auth

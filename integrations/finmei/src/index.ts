@@ -16,8 +16,6 @@ import {
   managePayment,
   manageProduct
 } from './tools';
-import { inboundWebhook, newCustomer, newExpense, newInvoice, newPayment } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     listCurrencies,
     getProfile
   ],
-  triggers: [inboundWebhook, newInvoice, newPayment, newCustomer, newExpense]
+  triggers: []
 });

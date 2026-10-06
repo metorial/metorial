@@ -4,9 +4,10 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let incidentSchema = z.object({
-  incidentNumber: z.string().describe('Unique incident number'),
+  incidentNumber: z.string().optional().describe('Unique incident number'),
   currentPhase: z
     .string()
+    .optional()
     .describe('Current phase of the incident (UNACKED, ACKED, RESOLVED)'),
   alertCount: z.number().optional().describe('Number of alerts in this incident'),
   entityId: z.string().optional().describe('Entity ID for the incident'),
@@ -41,6 +42,7 @@ export let listIncidents = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      returnedCount: z.number().int(),
       incidents: z.array(incidentSchema).describe('List of incidents')
     })
   )
@@ -51,10 +53,10 @@ export let listIncidents = SlateTool.create(spec, {
     });
 
     let data = await client.listIncidents();
-    let incidents = data?.incidents ?? [];
+    let incidents = data.incidents;
 
     return {
-      output: { incidents },
+      output: { incidents, returnedCount: incidents.length },
       message: `Found **${incidents.length}** incident(s).`
     };
   })

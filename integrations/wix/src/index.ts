@@ -16,15 +16,6 @@ import {
   managePricingPlans,
   manageProducts
 } from './tools';
-import {
-  blogEvents,
-  bookingEvents,
-  catalogEvents,
-  contactEvents,
-  ecommerceEvents,
-  siteEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -43,12 +34,5 @@ export let provider = Slate.create({
     manageMedia,
     manageOrderFulfillments
   ],
-  triggers: [
-    ecommerceEvents,
-    catalogEvents,
-    contactEvents,
-    bookingEvents,
-    blogEvents,
-    siteEvents
-  ]
+  triggers: []
 });

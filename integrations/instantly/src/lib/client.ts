@@ -1,15 +1,130 @@
-import { createAxios } from 'slates';
+import {
+  AuthConfigSecretRedactor,
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getApiErrorStatus,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+
+export let invalid = (message: string) => createApiServiceError(message);
+
+export let apiError = (error: unknown) => {
+  let rawStatus = getApiErrorStatus(error);
+  let status =
+    typeof rawStatus === 'number' && Number.isInteger(rawStatus)
+      ? rawStatus
+      : typeof rawStatus === 'string' && /^\d{3}$/.test(rawStatus)
+        ? Number(rawStatus)
+        : undefined;
+  if (status !== undefined && (status < 100 || status > 599)) status = undefined;
+  return buildApiServiceError(
+    { response: { status } },
+    {
+      providerLabel: 'Instantly',
+      reason: 'instantly_api_error',
+      extractResponse: () => ({ status }),
+      extractMessage: () =>
+        status === 401 || status === 403
+          ? 'Check that the API key is a V2 key with the required resource permissions.'
+          : status === 404
+            ? 'The requested resource was not found in this workspace.'
+            : status === 429
+              ? 'The workspace rate limit was reached. Wait before retrying.'
+              : 'The request could not be confirmed. Read back before retrying a mutation.',
+      parent: {}
+    }
+  );
+};
+
+export let pathId = (value: string) => {
+  if (!value.trim() || /[\r\n]/.test(value))
+    throw invalid('Provide a non-empty resource identifier.');
+  return encodeURIComponent(value);
+};
+
+export let page = (value: unknown) => {
+  if (
+    !isApiErrorRecord(value) ||
+    !Array.isArray(value.items) ||
+    !value.items.every(isApiErrorRecord)
+  ) {
+    throw invalid('Instantly returned an invalid list response.');
+  }
+  let cursor = value.next_starting_after;
+  if (cursor !== undefined && cursor !== null && typeof cursor !== 'string') {
+    throw invalid('Instantly returned an invalid pagination cursor.');
+  }
+  return { items: value.items as Record<string, any>[], next_starting_after: cursor ?? null };
+};
+
+export let entity = (value: unknown): Record<string, any> => {
+  if (!isApiErrorRecord(value))
+    throw invalid('Instantly returned an invalid resource response.');
+  if (value.success === false || value.status === 'error')
+    throw invalid('Instantly did not confirm this operation. Read back before retrying.');
+  return value;
+};
+
+export let validateVariables = (values: Record<string, unknown> | undefined) => {
+  if (
+    values &&
+    Object.values(values).some(
+      value =>
+        (value !== null && !['string', 'number', 'boolean'].includes(typeof value)) ||
+        (typeof value === 'number' && !Number.isFinite(value))
+    )
+  ) {
+    throw invalid(
+      'Custom variable values must be strings, finite numbers, booleans, or null.'
+    );
+  }
+};
+
+export let emailAddresses = (value: unknown): string[] | undefined => {
+  if (typeof value === 'string')
+    return value
+      .split(',')
+      .map(item => item.trim())
+      .filter(Boolean);
+  if (Array.isArray(value) && value.every(item => typeof item === 'string')) return value;
+  return undefined;
+};
+
+export let leadVerificationStatus = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) return undefined;
+  let labels: Record<number, string> = {
+    1: 'verified',
+    11: 'pending',
+    12: 'pending_verification_job',
+    '-1': 'invalid',
+    '-2': 'risky',
+    '-3': 'catch_all',
+    '-4': 'job_change'
+  };
+  return typeof value === 'number' ? (labels[value] ?? String(value)) : String(value);
+};
 
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim() || /[\r\n]/.test(config.token)) {
+      throw invalid('Provide an Instantly V2 API key.');
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.instantly.ai/api/v2',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      timeout: 30_000,
+      maxRedirects: 0,
+      paramsSerializer: { indexes: null },
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: apiError
+    });
+    let redactor = new AuthConfigSecretRedactor(config);
+    this.axios.interceptors.response.use(response => {
+      response.data = redactor.redactEmbedded(response.data);
+      return response;
     });
   }
 
@@ -33,12 +148,12 @@ export class Client {
         tag_ids: params.tagIds
       }
     });
-    return res.data as { items: any[]; next_starting_after: string | null };
+    return page(res.data);
   }
 
   async getCampaign(campaignId: string) {
-    let res = await this.axios.get(`/campaigns/${campaignId}`);
-    return res.data;
+    let res = await this.axios.get(`/campaigns/${pathId(campaignId)}`);
+    return entity(res.data);
   }
 
   async createCampaign(data: { name: string; campaignSchedule?: any; sequences?: any[] }) {
@@ -47,27 +162,27 @@ export class Client {
       campaign_schedule: data.campaignSchedule,
       sequences: data.sequences
     });
-    return res.data;
+    return entity(res.data);
   }
 
   async updateCampaign(campaignId: string, data: Record<string, any>) {
-    let res = await this.axios.patch(`/campaigns/${campaignId}`, data);
-    return res.data;
+    let res = await this.axios.patch(`/campaigns/${pathId(campaignId)}`, data);
+    return entity(res.data);
   }
 
   async deleteCampaign(campaignId: string) {
-    let res = await this.axios.delete(`/campaigns/${campaignId}`);
-    return res.data;
+    let res = await this.axios.delete(`/campaigns/${pathId(campaignId)}`);
+    return entity(res.data);
   }
 
   async activateCampaign(campaignId: string) {
-    let res = await this.axios.post(`/campaigns/${campaignId}/activate`);
-    return res.data;
+    let res = await this.axios.post(`/campaigns/${pathId(campaignId)}/activate`);
+    return entity(res.data);
   }
 
   async pauseCampaign(campaignId: string) {
-    let res = await this.axios.post(`/campaigns/${campaignId}/pause`);
-    return res.data;
+    let res = await this.axios.post(`/campaigns/${pathId(campaignId)}/pause`);
+    return entity(res.data);
   }
 
   // ─── Campaign Analytics ─────────────────────────────────────
@@ -162,18 +277,23 @@ export class Client {
     } = {}
   ) {
     let res = await this.axios.post('/leads/list', {
-      campaign_id: params.campaignId,
+      campaign: params.campaignId,
       list_id: params.listId,
-      interest_status: params.interestStatus,
       starting_after: params.startingAfter,
       limit: params.limit
     });
-    return res.data as { items: any[]; next_starting_after: string | null };
+    let result = page(res.data);
+    if (params.interestStatus !== undefined) {
+      result.items = result.items.filter(
+        lead => lead.lt_interest_status === params.interestStatus
+      );
+    }
+    return result;
   }
 
   async getLead(leadId: string) {
-    let res = await this.axios.get(`/leads/${leadId}`);
-    return res.data;
+    let res = await this.axios.get(`/leads/${pathId(leadId)}`);
+    return entity(res.data);
   }
 
   async createLead(data: {
@@ -206,17 +326,17 @@ export class Client {
       skip_if_in_campaign: data.skipIfInCampaign,
       custom_variables: data.customVariables
     });
-    return res.data;
+    return entity(res.data);
   }
 
   async updateLead(leadId: string, data: Record<string, any>) {
-    let res = await this.axios.patch(`/leads/${leadId}`, data);
-    return res.data;
+    let res = await this.axios.patch(`/leads/${pathId(leadId)}`, data);
+    return entity(res.data);
   }
 
   async deleteLead(leadId: string) {
-    let res = await this.axios.delete(`/leads/${leadId}`);
-    return res.data;
+    let res = await this.axios.delete(`/leads/${pathId(leadId)}`);
+    return entity(res.data);
   }
 
   async updateLeadInterestStatus(data: {
@@ -231,7 +351,7 @@ export class Client {
       campaign_id: data.campaignId,
       list_id: data.listId
     });
-    return res.data;
+    return { accepted: true, asynchronous: res.status === 202 };
   }
 
   async moveLeads(data: {
@@ -242,13 +362,13 @@ export class Client {
     toListId?: string;
   }) {
     let res = await this.axios.post('/leads/move', {
-      lead_ids: data.leadIds,
-      from_campaign_id: data.fromCampaignId,
+      ids: data.leadIds,
+      campaign: data.fromCampaignId,
       to_campaign_id: data.toCampaignId,
-      from_list_id: data.fromListId,
+      list_id: data.fromListId,
       to_list_id: data.toListId
     });
-    return res.data;
+    return entity(res.data);
   }
 
   // ─── Email Accounts ─────────────────────────────────────────
@@ -271,32 +391,32 @@ export class Client {
         tag_ids: params.tagIds
       }
     });
-    return res.data as { items: any[]; next_starting_after: string | null };
+    return page(res.data);
   }
 
   async getAccount(email: string) {
-    let res = await this.axios.get(`/accounts/${encodeURIComponent(email)}`);
-    return res.data;
+    let res = await this.axios.get(`/accounts/${pathId(email)}`);
+    return entity(res.data);
   }
 
   async updateAccount(email: string, data: Record<string, any>) {
-    let res = await this.axios.patch(`/accounts/${encodeURIComponent(email)}`, data);
-    return res.data;
+    let res = await this.axios.patch(`/accounts/${pathId(email)}`, data);
+    return entity(res.data);
   }
 
   async deleteAccount(email: string) {
-    let res = await this.axios.delete(`/accounts/${encodeURIComponent(email)}`);
-    return res.data;
+    let res = await this.axios.delete(`/accounts/${pathId(email)}`);
+    return entity(res.data);
   }
 
   async pauseAccount(email: string) {
-    let res = await this.axios.post(`/accounts/${encodeURIComponent(email)}/pause`);
-    return res.data;
+    let res = await this.axios.post(`/accounts/${pathId(email)}/pause`);
+    return entity(res.data);
   }
 
   async resumeAccount(email: string) {
-    let res = await this.axios.post(`/accounts/${encodeURIComponent(email)}/resume`);
-    return res.data;
+    let res = await this.axios.post(`/accounts/${pathId(email)}/resume`);
+    return entity(res.data);
   }
 
   // ─── Emails ─────────────────────────────────────────────────
@@ -329,17 +449,17 @@ export class Client {
         preview_only: params.previewOnly
       }
     });
-    return res.data as { items: any[]; next_starting_after: string | null };
+    return page(res.data);
   }
 
   async getEmail(emailId: string) {
-    let res = await this.axios.get(`/emails/${emailId}`);
-    return res.data;
+    let res = await this.axios.get(`/emails/${pathId(emailId)}`);
+    return entity(res.data);
   }
 
   async getUnreadCount() {
     let res = await this.axios.get('/emails/unread/count');
-    return res.data;
+    return entity(res.data);
   }
 
   async replyToEmail(data: {
@@ -347,30 +467,31 @@ export class Client {
     from: string;
     to: string;
     body: string;
+    subject: string;
     cc?: string[];
     bcc?: string[];
   }) {
     let res = await this.axios.post('/emails/reply', {
       reply_to_uuid: data.replyToEmailId,
-      from: data.from,
-      to: data.to,
-      body: data.body,
-      cc: data.cc,
-      bcc: data.bcc
+      eaccount: data.from,
+      subject: data.subject,
+      body: { html: data.body },
+      cc_address_email_list: data.cc?.join(','),
+      bcc_address_email_list: data.bcc?.join(',')
     });
-    return res.data;
+    return entity(res.data);
   }
 
   // ─── Email Verification ─────────────────────────────────────
 
   async verifyEmail(email: string) {
     let res = await this.axios.post('/email-verification', { email });
-    return res.data;
+    return entity(res.data);
   }
 
   async getVerificationStatus(email: string) {
-    let res = await this.axios.get(`/email-verification/${encodeURIComponent(email)}`);
-    return res.data;
+    let res = await this.axios.get(`/email-verification/${pathId(email)}`);
+    return entity(res.data);
   }
 
   // ─── Lead Lists ─────────────────────────────────────────────
@@ -385,27 +506,27 @@ export class Client {
         search: params.search
       }
     });
-    return res.data as { items: any[]; next_starting_after: string | null };
+    return page(res.data);
   }
 
   async getLeadList(listId: string) {
-    let res = await this.axios.get(`/lead-lists/${listId}`);
-    return res.data;
+    let res = await this.axios.get(`/lead-lists/${pathId(listId)}`);
+    return entity(res.data);
   }
 
   async createLeadList(name: string) {
     let res = await this.axios.post('/lead-lists', { name });
-    return res.data;
+    return entity(res.data);
   }
 
   async updateLeadList(listId: string, name: string) {
-    let res = await this.axios.patch(`/lead-lists/${listId}`, { name });
-    return res.data;
+    let res = await this.axios.patch(`/lead-lists/${pathId(listId)}`, { name });
+    return entity(res.data);
   }
 
   async deleteLeadList(listId: string) {
-    let res = await this.axios.delete(`/lead-lists/${listId}`);
-    return res.data;
+    let res = await this.axios.delete(`/lead-lists/${pathId(listId)}`);
+    return entity(res.data);
   }
 
   // ─── Lead Labels ────────────────────────────────────────────
@@ -417,27 +538,48 @@ export class Client {
         starting_after: params.startingAfter
       }
     });
-    return res.data as { items: any[]; next_starting_after: string | null };
+    return page(res.data);
   }
 
   async getLeadLabel(labelId: string) {
-    let res = await this.axios.get(`/lead-labels/${labelId}`);
-    return res.data;
+    let res = await this.axios.get(`/lead-labels/${pathId(labelId)}`);
+    return entity(res.data);
   }
 
-  async createLeadLabel(data: { name: string; color?: string }) {
-    let res = await this.axios.post('/lead-labels', data);
-    return res.data;
+  async createLeadLabel(data: {
+    name: string;
+    interestStatusLabel: string;
+    description?: string;
+  }) {
+    let res = await this.axios.post(
+      '/lead-labels',
+      pickDefined({
+        label: data.name,
+        interest_status_label: data.interestStatusLabel,
+        description: data.description
+      })
+    );
+    return entity(res.data);
   }
 
-  async updateLeadLabel(labelId: string, data: { name?: string; color?: string }) {
-    let res = await this.axios.patch(`/lead-labels/${labelId}`, data);
-    return res.data;
+  async updateLeadLabel(
+    labelId: string,
+    data: { name?: string; interestStatusLabel?: string; description?: string }
+  ) {
+    let res = await this.axios.patch(
+      `/lead-labels/${pathId(labelId)}`,
+      pickDefined({
+        label: data.name,
+        interest_status_label: data.interestStatusLabel,
+        description: data.description
+      })
+    );
+    return entity(res.data);
   }
 
   async deleteLeadLabel(labelId: string) {
-    let res = await this.axios.delete(`/lead-labels/${labelId}`);
-    return res.data;
+    let res = await this.axios.delete(`/lead-labels/${pathId(labelId)}`);
+    return entity(res.data);
   }
 
   // ─── Block List Entries ─────────────────────────────────────
@@ -449,17 +591,17 @@ export class Client {
         starting_after: params.startingAfter
       }
     });
-    return res.data as { items: any[]; next_starting_after: string | null };
+    return page(res.data);
   }
 
   async createBlockListEntry(data: { entry: string; entry_type?: string }) {
-    let res = await this.axios.post('/block-lists-entries', data);
-    return res.data;
+    let res = await this.axios.post('/block-lists-entries', { bl_value: data.entry });
+    return entity(res.data);
   }
 
   async deleteBlockListEntry(entryId: string) {
-    let res = await this.axios.delete(`/block-lists-entries/${entryId}`);
-    return res.data;
+    let res = await this.axios.delete(`/block-lists-entries/${pathId(entryId)}`);
+    return entity(res.data);
   }
 
   // ─── Custom Tags ────────────────────────────────────────────
@@ -474,101 +616,55 @@ export class Client {
         search: params.search
       }
     });
-    return res.data as { items: any[]; next_starting_after: string | null };
+    return page(res.data);
   }
 
   async createCustomTag(data: { name: string }) {
-    let res = await this.axios.post('/custom-tags', data);
-    return res.data;
+    let res = await this.axios.post('/custom-tags', { label: data.name });
+    return entity(res.data);
   }
 
   async deleteCustomTag(tagId: string) {
-    let res = await this.axios.delete(`/custom-tags/${tagId}`);
-    return res.data;
+    let res = await this.axios.delete(`/custom-tags/${pathId(tagId)}`);
+    return entity(res.data);
   }
 
-  async toggleTagResource(data: { tagId: string; resourceIds: string[]; assign: boolean }) {
+  async toggleTagResource(data: {
+    tagId: string;
+    resourceIds: string[];
+    assign: boolean;
+    resourceType: 'account' | 'campaign';
+  }) {
     let res = await this.axios.post('/custom-tags/toggle-resource', {
-      tag_id: data.tagId,
+      tag_ids: [data.tagId],
+      resource_type: data.resourceType === 'account' ? 1 : 2,
       resource_ids: data.resourceIds,
       assign: data.assign
     });
-    return res.data;
-  }
-
-  // ─── Webhooks ───────────────────────────────────────────────
-
-  async listWebhooks(
-    params: {
-      limit?: number;
-      startingAfter?: string;
-      campaign?: string;
-      eventType?: string;
-    } = {}
-  ) {
-    let res = await this.axios.get('/webhooks', {
-      params: {
-        limit: params.limit,
-        starting_after: params.startingAfter,
-        campaign: params.campaign,
-        event_type: params.eventType
-      }
-    });
-    return res.data as { items: any[]; next_starting_after: string | null };
-  }
-
-  async createWebhook(data: {
-    targetHookUrl: string;
-    eventType: string;
-    campaignId?: string;
-    name?: string;
-    headers?: Record<string, string>;
-  }) {
-    let res = await this.axios.post('/webhooks', {
-      target_hook_url: data.targetHookUrl,
-      event_type: data.eventType,
-      campaign: data.campaignId,
-      name: data.name,
-      headers: data.headers
-    });
-    return res.data;
-  }
-
-  async getWebhook(webhookId: string) {
-    let res = await this.axios.get(`/webhooks/${webhookId}`);
-    return res.data;
-  }
-
-  async deleteWebhook(webhookId: string) {
-    let res = await this.axios.delete(`/webhooks/${webhookId}`);
-    return res.data;
+    return entity(res.data);
   }
 
   // ─── Account-Campaign Mappings ──────────────────────────────
 
   async listAccountCampaignMappings(
-    params: { limit?: number; startingAfter?: string; campaignId?: string } = {}
+    email: string,
+    params: { limit?: number; startingAfter?: string } = {}
   ) {
-    let res = await this.axios.get('/account-campaign-mappings', {
-      params: {
-        limit: params.limit,
-        starting_after: params.startingAfter,
-        campaign_id: params.campaignId
-      }
+    let res = await this.axios.get(`/account-campaign-mappings/${pathId(email)}`, {
+      params: { limit: params.limit, starting_after: params.startingAfter }
     });
-    return res.data as { items: any[]; next_starting_after: string | null };
+    return page(res.data);
   }
 
-  async createAccountCampaignMapping(data: { campaignId: string; accountEmail: string }) {
-    let res = await this.axios.post('/account-campaign-mappings', {
-      campaign_id: data.campaignId,
-      email: data.accountEmail
-    });
-    return res.data;
+  async getCurrentWorkspace() {
+    let res = await this.axios.get('/workspaces/current');
+    return entity(res.data);
   }
 
-  async deleteAccountCampaignMapping(mappingId: string) {
-    let res = await this.axios.delete(`/account-campaign-mappings/${mappingId}`);
-    return res.data;
+  async getBackgroundJob(jobId: string) {
+    let res = await this.axios.get(`/background-jobs/${pathId(jobId)}`, {
+      params: { data_fields: 'success_count,failed_count,total_to_process' }
+    });
+    return entity(res.data);
   }
 }

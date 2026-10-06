@@ -1,0 +1,206 @@
+{
+  "create_library": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "code": {
+        "type": "string"
+      },
+      "language": {
+        "type": "string",
+        "enum": ["javascript", "pythonfaas"]
+      }
+    },
+    "required": ["name", "code", "language"],
+    "additionalProperties": false
+  },
+  "create_transformation": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "code": {
+        "type": "string"
+      },
+      "language": {
+        "type": "string",
+        "enum": ["javascript", "pythonfaas"]
+      },
+      "publish": {
+        "type": "boolean"
+      },
+      "destinationIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": ["name", "code", "language"],
+    "additionalProperties": false
+  },
+  "delete_library": {
+    "type": "object",
+    "properties": {
+      "libraryId": {
+        "type": "string"
+      }
+    },
+    "required": ["libraryId"],
+    "additionalProperties": false
+  },
+  "delete_transformation": {
+    "type": "object",
+    "properties": {
+      "transformationId": {
+        "type": "string"
+      }
+    },
+    "required": ["transformationId"],
+    "additionalProperties": false
+  },
+  "get_library": {
+    "type": "object",
+    "properties": {
+      "libraryId": {
+        "type": "string"
+      }
+    },
+    "required": ["libraryId"],
+    "additionalProperties": false
+  },
+  "get_transformation": {
+    "type": "object",
+    "properties": {
+      "transformationId": {
+        "type": "string"
+      }
+    },
+    "required": ["transformationId"],
+    "additionalProperties": false
+  },
+  "list_libraries": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "list_library_versions": {
+    "type": "object",
+    "properties": {
+      "libraryId": {
+        "type": "string"
+      },
+      "count": {
+        "type": "number"
+      },
+      "orderBy": {
+        "type": "string",
+        "enum": ["asc", "desc"]
+      }
+    },
+    "required": ["libraryId"],
+    "additionalProperties": false
+  },
+  "list_transformation_versions": {
+    "type": "object",
+    "properties": {
+      "transformationId": {
+        "type": "string"
+      },
+      "count": {
+        "type": "number"
+      },
+      "orderBy": {
+        "type": "string",
+        "enum": ["asc", "desc"]
+      }
+    },
+    "required": ["transformationId"],
+    "additionalProperties": false
+  },
+  "list_transformations": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "publish": {
+    "type": "object",
+    "properties": {
+      "transformations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "versionId": {
+              "type": "string"
+            },
+            "testInput": {
+              "type": "array",
+              "items": {}
+            }
+          },
+          "required": ["versionId"],
+          "additionalProperties": false
+        }
+      },
+      "libraries": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "versionId": {
+              "type": "string"
+            }
+          },
+          "required": ["versionId"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "update_library": {
+    "type": "object",
+    "properties": {
+      "libraryId": {
+        "type": "string"
+      },
+      "code": {
+        "type": "string"
+      },
+      "publish": {
+        "type": "boolean"
+      }
+    },
+    "required": ["libraryId"],
+    "additionalProperties": false
+  },
+  "update_transformation": {
+    "type": "object",
+    "properties": {
+      "transformationId": {
+        "type": "string"
+      },
+      "name": {
+        "type": "string"
+      },
+      "code": {
+        "type": "string"
+      },
+      "publish": {
+        "type": "boolean"
+      },
+      "destinationIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": ["transformationId"],
+    "additionalProperties": false
+  }
+}

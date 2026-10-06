@@ -29,8 +29,6 @@ import {
   updatePage,
   updateSite
 } from './tools';
-import { bookingEvents, contactEvents, formResponseEvents, orderEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,5 +60,5 @@ export let provider = Slate.create({
     listOrders,
     listWorkspaces
   ],
-  triggers: [bookingEvents, orderEvents, formResponseEvents, contactEvents]
+  triggers: []
 });

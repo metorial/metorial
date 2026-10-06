@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let deleteCandidate = SlateTool.create(spec, {
   name: 'Delete Candidate',
   key: 'delete_candidate',
-  description: `Permanently delete a candidate from Recruitee. This removes the candidate and all associated data including placements, notes, and attachments.`,
+  description: `Delete a candidate and return its confirmed deletion timestamp. Deleted records may remain in provider history or be retrievable; this does not guarantee erasure of associated data.`,
   instructions: [
-    'This action is irreversible. Make sure you have the correct candidate ID before proceeding.'
+    'Verify the exact candidate ID and retention requirements before deleting. Provider history and restoration rules remain applicable.'
   ],
   tags: {
     destructive: true,
@@ -23,23 +23,27 @@ export let deleteCandidate = SlateTool.create(spec, {
   .output(
     z.object({
       candidateId: z.number().describe('ID of the deleted candidate'),
-      deleted: z.boolean().describe('Whether the candidate was successfully deleted')
+      deleted: z.boolean().describe('Whether Recruitee confirmed a deletion timestamp'),
+      deletedAt: z.string().optional().describe('Provider deletion timestamp'),
+      retainedHistoryPossible: z
+        .boolean()
+        .optional()
+        .describe('Provider history or restoration may remain')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
+    let client = await RecruiteeClient.forContext(ctx);
 
-    await client.deleteCandidate(ctx.input.candidateId);
+    let result = await client.deleteCandidate(ctx.input.candidateId);
 
     return {
       output: {
         candidateId: ctx.input.candidateId,
-        deleted: true
+        deleted: true,
+        deletedAt: String(result.candidate.deleted_at),
+        retainedHistoryPossible: true
       },
-      message: `Deleted candidate ID ${ctx.input.candidateId}.`
+      message: `Confirmed deletion of candidate ID ${ctx.input.candidateId}; provider retention rules remain.`
     };
   })
   .build();

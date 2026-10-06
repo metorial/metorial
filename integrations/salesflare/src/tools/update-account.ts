@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { associationChanges, Client, id, object, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateAccount = SlateTool.create(spec, {
@@ -61,7 +61,7 @@ export let updateAccount = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let data: Record<string, any> = {};
+    let data: Row = {};
     if (ctx.input.name !== undefined) data.name = ctx.input.name;
     if (ctx.input.domain !== undefined) data.domain = ctx.input.domain;
     if (ctx.input.website !== undefined) data.website = ctx.input.website;
@@ -84,34 +84,38 @@ export let updateAccount = SlateTool.create(spec, {
       };
     }
 
-    let result = await client.updateAccount(ctx.input.accountId, data);
-
-    // Handle contact associations
-    if (ctx.input.contactIds || ctx.input.removeContactIds) {
-      let contactUpdates: Array<{ id: number; _dirty?: boolean; _deleted?: boolean }> = [];
-      if (ctx.input.contactIds) {
-        contactUpdates.push(...ctx.input.contactIds.map(id => ({ id, _dirty: true })));
-      }
-      if (ctx.input.removeContactIds) {
-        contactUpdates.push(...ctx.input.removeContactIds.map(id => ({ id, _deleted: true })));
-      }
-      if (contactUpdates.length > 0) {
-        await client.updateAccountContacts(ctx.input.accountId, contactUpdates);
-      }
-    }
-
-    // Handle user associations
-    if (ctx.input.userIds || ctx.input.removeUserIds) {
-      let userUpdates: Array<{ id: number; _dirty?: boolean; _deleted?: boolean }> = [];
-      if (ctx.input.userIds) {
-        userUpdates.push(...ctx.input.userIds.map(id => ({ id, _dirty: true })));
-      }
-      if (ctx.input.removeUserIds) {
-        userUpdates.push(...ctx.input.removeUserIds.map(id => ({ id, _deleted: true })));
-      }
-      if (userUpdates.length > 0) {
-        await client.updateAccountUsers(ctx.input.accountId, userUpdates);
-      }
+    id(ctx.input.accountId, 'account ID');
+    const contacts = associationChanges(
+      ctx.input.contactIds,
+      ctx.input.removeContactIds,
+      'contact IDs'
+    );
+    const users = associationChanges(ctx.input.userIds, ctx.input.removeUserIds, 'user IDs');
+    if (!Object.keys(data).length && !contacts.length && !users.length)
+      throw createApiServiceError('Provide at least one account or association change.');
+    if (Object.keys(data).length) await client.updateAccount(ctx.input.accountId, data);
+    if (contacts.length) await client.updateAccountContacts(ctx.input.accountId, contacts);
+    if (users.length) await client.updateAccountUsers(ctx.input.accountId, users);
+    const result = await client.getAccount(ctx.input.accountId);
+    for (const [kind, changes] of [
+      ['contacts', contacts],
+      ['users', users]
+    ] as const) {
+      if (!changes.length) continue;
+      const rows = result[kind];
+      if (!Array.isArray(rows))
+        throw createApiServiceError(
+          'The account update was accepted, but association readback is unavailable. Inspect the account before retrying.'
+        );
+      const ids = rows.map(row => (typeof row === 'number' ? id(row) : id(object(row).id)));
+      if (
+        changes.some(change =>
+          '_dirty' in change ? !ids.includes(change.id) : ids.includes(change.id)
+        )
+      )
+        throw createApiServiceError(
+          'Association readback did not confirm all changes. Earlier changes may have applied; inspect the account before retrying.'
+        );
     }
 
     return {

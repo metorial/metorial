@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'bitwarden',
   name: 'Bitwarden',
   description:
-    'Open-source password manager and secrets management platform for organizations.',
+    'Manage organization members, groups, collection permissions, policies and event logs using the Bitwarden organization Public API.',
   metadata: {},
   config,
   auth

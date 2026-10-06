@@ -31,6 +31,7 @@ export let getStreamPropertiesTool = SlateTool.create(spec, {
       streams: z.array(
         z.object({
           streamName: z.string(),
+          streamNamespace: z.string().optional(),
           syncModes: z.array(z.string()),
           defaultCursorField: z.array(z.string()).optional(),
           sourceDefinedCursorField: z.boolean().optional(),
@@ -52,6 +53,7 @@ export let getStreamPropertiesTool = SlateTool.create(spec, {
       output: {
         streams: streams.map(s => ({
           streamName: s.streamName,
+          streamNamespace: s.streamnamespace,
           syncModes: s.syncModes,
           defaultCursorField: s.defaultCursorField,
           sourceDefinedCursorField: s.sourceDefinedCursorField,

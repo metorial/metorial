@@ -19,14 +19,6 @@ import {
   sendChatMessage,
   updateTeam
 } from './tools';
-import {
-  channelChangeTrigger,
-  channelMessageTrigger,
-  chatMessageTrigger,
-  membershipChangeTrigger,
-  teamChangeTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,11 +40,5 @@ export let provider = Slate.create({
     manageTags,
     manageShifts
   ],
-  triggers: [
-    channelMessageTrigger,
-    chatMessageTrigger,
-    teamChangeTrigger,
-    membershipChangeTrigger,
-    channelChangeTrigger
-  ]
+  triggers: []
 });

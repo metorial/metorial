@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listKnowledgeBases = SlateTool.create(spec, {
@@ -17,8 +17,10 @@ export let listKnowledgeBases = SlateTool.create(spec, {
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
       pageSize: z
         .number()
+        .multipleOf(1)
+        .positive()
         .optional()
-        .describe('Number of results per page (max 1000, default 50)')
+        .describe('Number of results per page')
     })
   )
   .output(
@@ -31,10 +33,7 @@ export let listKnowledgeBases = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let result = await client.listKnowledgeBases(ctx.input.cursor, ctx.input.pageSize);
 
@@ -69,10 +68,7 @@ export let getKnowledgeBase = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let kb = await client.getKnowledgeBase(ctx.input.knowledgeBaseId);
 
@@ -80,7 +76,7 @@ export let getKnowledgeBase = SlateTool.create(spec, {
       output: {
         knowledgeBase: kb
       },
-      message: `Retrieved knowledge base **${(kb as Record<string, unknown>).name || ctx.input.knowledgeBaseId}**.`
+      message: `Retrieved knowledge base **${kb.name || ctx.input.knowledgeBaseId}**.`
     };
   })
   .build();
@@ -96,7 +92,7 @@ export let createKnowledgeBase = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('Name for the new knowledge base'),
+      name: z.string().trim().min(1).describe('Name for the new knowledge base'),
       description: z.string().optional().describe('Description of the knowledge base'),
       connectionId: z
         .string()
@@ -120,10 +116,7 @@ export let createKnowledgeBase = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let kb = await client.createKnowledgeBase({
       name: ctx.input.name,
@@ -154,7 +147,7 @@ export let updateKnowledgeBase = SlateTool.create(spec, {
   .input(
     z.object({
       knowledgeBaseId: z.string().describe('The ID of the knowledge base to update'),
-      name: z.string().optional().describe('New name for the knowledge base'),
+      name: z.string().trim().min(1).optional().describe('New name for the knowledge base'),
       description: z.string().optional().describe('New description'),
       indexingParams: z
         .record(z.string(), z.unknown())
@@ -168,11 +161,17 @@ export let updateKnowledgeBase = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
+    if (
+      ctx.input.name === undefined &&
+      ctx.input.description === undefined &&
+      ctx.input.indexingParams === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide a name, description, or indexingParams to update the knowledge base.'
+      );
+    }
     let kb = await client.updateKnowledgeBase(ctx.input.knowledgeBaseId, {
       name: ctx.input.name,
       description: ctx.input.description,
@@ -208,10 +207,7 @@ export let deleteKnowledgeBase = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     await client.deleteKnowledgeBase(ctx.input.knowledgeBaseId);
 
@@ -244,10 +240,7 @@ export let syncKnowledgeBase = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let result = await client.syncKnowledgeBase(ctx.input.knowledgeBaseId);
 
@@ -275,8 +268,17 @@ export let listKnowledgeBaseResources = SlateTool.create(spec, {
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
       pageSize: z
         .number()
+        .multipleOf(1)
+        .min(1)
+        .max(100)
         .optional()
-        .describe('Number of results per page (max 100, default 50)')
+        .describe('Number of results per page (1 to 100, default 50)'),
+      direction: z
+        .enum(['next', 'prev'])
+        .optional()
+        .describe(
+          'Pagination direction: next for older resources, prev for newer resources; defaults to next'
+        )
     })
   )
   .output(
@@ -289,15 +291,13 @@ export let listKnowledgeBaseResources = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     let result = await client.listKnowledgeBaseResources(
       ctx.input.knowledgeBaseId,
       ctx.input.cursor,
-      ctx.input.pageSize
+      ctx.input.pageSize,
+      ctx.input.direction
     );
 
     return {
@@ -332,10 +332,7 @@ export let deleteKnowledgeBaseResource = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx);
 
     await client.deleteKnowledgeBaseResource(ctx.input.knowledgeBaseId, ctx.input.resourceId);
 

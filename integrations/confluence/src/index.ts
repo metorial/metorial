@@ -35,15 +35,6 @@ import {
   updatePage,
   uploadAttachment
 } from './tools';
-import {
-  attachmentEvents,
-  blogEvents,
-  commentEvents,
-  labelEvents,
-  pageEvents,
-  spaceEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -81,5 +72,5 @@ export let provider = Slate.create({
     setPageProperty,
     deletePageProperty
   ],
-  triggers: [pageEvents, blogEvents, commentEvents, spaceEvents, attachmentEvents, labelEvents]
+  triggers: []
 });

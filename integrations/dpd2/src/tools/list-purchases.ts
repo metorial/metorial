@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listPurchases = SlateTool.create(spec, {
@@ -55,7 +56,10 @@ export let listPurchases = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Filter for purchases with unshipped tangible goods'),
-      page: z.number().optional().describe('Page number for pagination (100 records per page)')
+      page: z
+        .number()
+        .optional()
+        .describe('1-based page; omitted means page 1. Continue until endOfResults is true.')
     })
   )
   .output(
@@ -63,9 +67,10 @@ export let listPurchases = SlateTool.create(spec, {
       purchases: z.array(
         z.object({
           purchaseId: z.number().describe('Unique purchase ID'),
-          status: z.string().describe('Purchase status code')
+          status: z.string().optional().describe('Purchase status code when supplied')
         })
-      )
+      ),
+      ...pageSchema
     })
   )
   .handleInvocation(async ctx => {
@@ -74,11 +79,16 @@ export let listPurchases = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let purchases = await client.listPurchases(ctx.input);
+    let result = await client.listPurchases(ctx.input);
 
     return {
-      output: { purchases },
-      message: `Found **${purchases.length}** purchase(s)${ctx.input.page ? ` on page ${ctx.input.page}` : ''}.`
+      output: {
+        purchases: result.items,
+        page: result.page,
+        nextPage: result.nextPage,
+        endOfResults: result.endOfResults
+      },
+      message: `Retrieved ${result.items.length} purchases on page ${result.page}${result.endOfResults ? '; end of results confirmed' : ''}.`
     };
   })
   .build();

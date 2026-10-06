@@ -1,16 +1,28 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AshbyClient } from '../lib/client';
+import {
+  email,
+  invalid,
+  optionalString,
+  pageSchema,
+  row,
+  rows,
+  str,
+  text,
+  unexpected,
+  warningsSchema
+} from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getCandidateTool = SlateTool.create(spec, {
   name: 'Get Candidate',
   key: 'get_candidate',
-  description: `Retrieves detailed information about a candidate. Can look up by ID or search by email/name. When searching by email or name, returns the first matching candidate.`,
+  description: `Gets the exact candidate by ID or by an unambiguous email/name search. Multiple matches require a refined search or an exact ID; visibility depends on API-key permissions.`,
   instructions: [
     'Provide at least one of candidateId, email, or name to look up a candidate.',
     'When candidateId is provided, it takes priority and fetches the candidate directly.',
-    'When email or name is provided, a search is performed and the first match is returned.'
+    'Email/name search must return exactly one match; refine ambiguous results or provide candidateId.'
   ],
   tags: {
     readOnly: true
@@ -50,62 +62,94 @@ export let getCandidateTool = SlateTool.create(spec, {
           })
         )
         .describe('Custom field values set on the candidate'),
+      location: z.record(z.string(), z.unknown()).nullable().optional(),
+      customFieldsAvailable: z.boolean().optional(),
+      applicationIds: z.array(z.string()).optional(),
+      resumeFileHandle: z.record(z.string(), z.unknown()).nullable().optional(),
+      fileHandles: z.array(z.record(z.string(), z.unknown())).optional(),
       createdAt: z.string().describe('Creation timestamp'),
-      updatedAt: z.string().describe('Last update timestamp')
+      updatedAt: z.string().describe('Last update timestamp'),
+      warnings: warningsSchema,
+      pageInfo: pageSchema.optional(),
+      completedActions: z.array(z.string()).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AshbyClient({ token: ctx.auth.token });
-
-    if (!ctx.input.candidateId && !ctx.input.email && !ctx.input.name) {
-      throw new Error('At least one of candidateId, email, or name must be provided');
+    const client = new AshbyClient(ctx.auth);
+    let candidateId = ctx.input.candidateId;
+    if (candidateId === undefined) {
+      if (ctx.input.email === undefined && ctx.input.name === undefined)
+        invalid('Provide candidateId, email or name.');
+      const matches = rows(
+        (
+          await client.post('/candidate.search', {
+            email: ctx.input.email === undefined ? undefined : email(ctx.input.email),
+            name:
+              ctx.input.name === undefined ? undefined : text(ctx.input.name, 'Search name'),
+            limit: 100
+          })
+        ).results
+      );
+      if (matches.length === 0)
+        invalid(
+          'No visible candidate matched. Check permissions or select an exact candidate ID.'
+        );
+      if (matches.length !== 1)
+        invalid(
+          'Candidate search is ambiguous. Use list_organization candidates or refine the search, then provide the exact candidateId.'
+        );
+      candidateId = str(matches[0]?.id);
     }
-
-    let candidate: any;
-
-    if (ctx.input.candidateId) {
-      let result = await client.getCandidate(ctx.input.candidateId);
-      candidate = result.results;
-    } else {
-      let searchParams: { email?: string; name?: string } = {};
-      if (ctx.input.email !== undefined) searchParams.email = ctx.input.email;
-      if (ctx.input.name !== undefined) searchParams.name = ctx.input.name;
-
-      let result = await client.searchCandidates(searchParams);
-      let candidates = result.results;
-
-      if (!candidates || candidates.length === 0) {
-        throw new Error(`No candidate found matching the search criteria`);
-      }
-
-      candidate = candidates[0];
-    }
-
-    let output = {
-      candidateId: candidate.id,
-      name: candidate.name || '',
-      primaryEmail: candidate.primaryEmailAddress?.value || undefined,
-      primaryPhone: candidate.primaryPhoneNumber?.value || undefined,
-      tags: (candidate.tags || []).map((t: any) => ({
-        tagId: t.id,
-        title: t.title || t.name || ''
-      })),
-      emails: (candidate.emailAddresses || []).map((e: any) => e.value || e),
-      phoneNumbers: (candidate.phoneNumbers || []).map((p: any) => p.value || p),
-      socialProfiles: (candidate.socialLinks || []).map((s: any) => s.url || s),
-      locations: (candidate.locations || []).map((l: any) => l.name || l.location || l),
-      customFields: (candidate.customFields || []).map((f: any) => ({
-        fieldId: f.id || f.fieldId || '',
-        title: f.title || f.name || '',
-        value: f.value
-      })),
-      createdAt: candidate.createdAt,
-      updatedAt: candidate.updatedAt
-    };
-
+    const candidate = row((await client.getCandidate(candidateId)).results);
+    const location =
+      candidate.location === null || candidate.location === undefined
+        ? undefined
+        : row(candidate.location);
+    const fields = candidate.customFields === undefined ? [] : rows(candidate.customFields);
     return {
-      output,
-      message: `Retrieved candidate **${output.name}**${output.primaryEmail ? ` (${output.primaryEmail})` : ''}`
+      output: {
+        candidateId: str(candidate.id),
+        name: str(candidate.name),
+        primaryEmail:
+          candidate.primaryEmailAddress === null
+            ? undefined
+            : optionalString(row(candidate.primaryEmailAddress).value),
+        primaryPhone:
+          candidate.primaryPhoneNumber === null
+            ? undefined
+            : optionalString(row(candidate.primaryPhoneNumber).value),
+        tags: rows(candidate.tags).map(t => ({ tagId: str(t.id), title: str(t.title) })),
+        emails: rows(candidate.emailAddresses).map(e => str(e.value)),
+        phoneNumbers: rows(candidate.phoneNumbers).map(p => str(p.value)),
+        socialProfiles: rows(candidate.socialLinks).map(s => str(s.url)),
+        locations: location
+          ? [
+              Object.values(location)
+                .filter(v => typeof v === 'string' && v)
+                .join(', ')
+            ]
+          : [],
+        location:
+          candidate.location === undefined || candidate.location === null
+            ? candidate.location
+            : row(candidate.location),
+        customFields: fields.map(f => ({
+          fieldId: str(f.id),
+          title: str(f.title),
+          value: f.value
+        })),
+        customFieldsAvailable: candidate.customFields !== undefined,
+        applicationIds: Array.isArray(candidate.applicationIds)
+          ? candidate.applicationIds.map(str)
+          : unexpected(),
+        resumeFileHandle:
+          candidate.resumeFileHandle === null ? null : row(candidate.resumeFileHandle),
+        fileHandles: rows(candidate.fileHandles),
+        createdAt: str(candidate.createdAt),
+        updatedAt: str(candidate.updatedAt),
+        warnings: client.warnings
+      },
+      message: 'Retrieved the exact visible candidate.'
     };
   })
   .build();

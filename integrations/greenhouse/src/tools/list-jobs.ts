@@ -1,18 +1,29 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GreenhouseClient } from '../lib/client';
-import { mapJob } from '../lib/mappers';
+import { jobOutputSchema, mapJob } from '../lib/mappers';
 import { spec } from '../spec';
-
-export let listJobsTool = SlateTool.create(spec, {
-  name: 'List Jobs',
+export const listJobsTool = SlateTool.create(spec, {
   key: 'list_jobs',
-  description: `List and filter jobs in Greenhouse. Filter by status (open, closed, draft), department, or office. Returns paginated results with department, office, and opening information.`,
-  tags: { readOnly: true }
+  name: 'List Jobs',
+  description:
+    'List jobs by status, department or office. Returns department and office IDs; expanded v1 relationship names are unavailable.',
+  tags: { readOnly: true, destructive: false }
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (starts at 1)'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque nextCursor from the preceding response. Pass cursor alone for subsequent pages.'
+        ),
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy first-page selector. Only page 1 is supported; use cursor for subsequent pages.'
+        ),
       perPage: z
         .number()
         .optional()
@@ -24,55 +35,20 @@ export let listJobsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      jobs: z.array(
-        z.object({
-          jobId: z.string(),
-          name: z.string(),
-          requisitionId: z.string().nullable(),
-          status: z.string().nullable(),
-          confidential: z.boolean(),
-          departments: z.array(z.object({ departmentId: z.string(), name: z.string() })),
-          offices: z.array(z.object({ officeId: z.string(), name: z.string() })),
-          openings: z.array(
-            z.object({
-              openingId: z.string(),
-              status: z.string().nullable(),
-              openedAt: z.string().nullable(),
-              closedAt: z.string().nullable()
-            })
-          ),
-          createdAt: z.string().nullable(),
-          updatedAt: z.string().nullable()
-        })
-      ),
-      hasMore: z.boolean()
+      jobs: z.array(jobOutputSchema),
+      hasMore: z.boolean(),
+      nextCursor: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GreenhouseClient({
-      token: ctx.auth.token,
-      onBehalfOf: ctx.config.onBehalfOf
-    });
-    let perPage = ctx.input.perPage || 50;
-
-    let results = await client.listJobs({
-      page: ctx.input.page,
-      perPage,
-      status: ctx.input.status,
-      departmentId: ctx.input.departmentId
-        ? Number.parseInt(ctx.input.departmentId, 10)
-        : undefined,
-      officeId: ctx.input.officeId ? Number.parseInt(ctx.input.officeId, 10) : undefined
-    });
-
-    let jobs = results.map(mapJob);
-
+    const page = await new GreenhouseClient(ctx.auth, ctx.config).listJobs(ctx.input);
     return {
       output: {
-        jobs,
-        hasMore: results.length >= perPage
+        jobs: page.items.map(mapJob),
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor
       },
-      message: `Found ${jobs.length} job(s)${ctx.input.status ? ` with status "${ctx.input.status}"` : ''}.`
+      message: `Retrieved ${page.items.length} result(s).`
     };
   })
   .build();

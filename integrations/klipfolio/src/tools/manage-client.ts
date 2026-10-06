@@ -1,12 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { createdId, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageClient = SlateTool.create(spec, {
   name: 'Manage Client',
   key: 'manage_client',
   description: `Create, update, or delete a client account for agency/multi-tenant setups. Manage client properties and status.`,
+  constraints: [
+    'Client provisioning and seat changes can affect account charges and access. Deleting a client is permanent; verify its identity and contained assets first.'
+  ],
   instructions: [
     'Use action "create" to add a new client, "update" to modify, or "delete" to remove.',
     'Client statuses include: active, trial, setup, disabled.'
@@ -30,10 +34,12 @@ export let manageClient = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required when creating a client');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required when creating a client');
 
       let result = await client.createClient({
         name: ctx.input.name,
@@ -43,8 +49,7 @@ export let manageClient = SlateTool.create(spec, {
         externalId: ctx.input.externalId
       });
 
-      let location = result?.meta?.location;
-      let clientId = location ? location.split('/').pop() : undefined;
+      let clientId = createdId(result, 'clients');
 
       return {
         output: { clientId, success: true },
@@ -53,7 +58,19 @@ export let manageClient = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.clientId) throw new Error('clientId is required when updating');
+      if (
+        ctx.input.name === undefined &&
+        ctx.input.description === undefined &&
+        ctx.input.status === undefined &&
+        ctx.input.seats === undefined &&
+        ctx.input.externalId === undefined
+      )
+        throw createApiServiceError(
+          'Provide at least one supported field or association to update.',
+          { reason: 'invalid_input' }
+        );
+      if (!ctx.input.clientId)
+        throw createApiServiceError('clientId is required when updating');
 
       await client.updateClient(ctx.input.clientId, {
         name: ctx.input.name,
@@ -70,7 +87,8 @@ export let manageClient = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.clientId) throw new Error('clientId is required when deleting');
+      if (!ctx.input.clientId)
+        throw createApiServiceError('clientId is required when deleting');
       await client.deleteClient(ctx.input.clientId);
 
       return {
@@ -79,6 +97,6 @@ export let manageClient = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

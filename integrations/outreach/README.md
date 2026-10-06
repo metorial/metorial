@@ -1,81 +1,19 @@
-# <img src="https://provider-logos.metorial-cdn.com/outreach.png" height="20"> Outreach
+# Outreach
 
-Manage sales engagement data and automation in Outreach. Create, read, update, and delete prospects (contacts/leads) and accounts (companies). Build and manage sequences — automated multi-step outreach campaigns — including adding/removing prospects and tracking their progress through sequence states. Send and track emails with delivery, open, bounce, and reply metrics. Log and manage phone calls with dispositions and purposes. Create and manage tasks, opportunities, templates, snippets, and custom objects. Invite and manage users, roles, and teams. Perform bulk operations and data imports. Access audit logs, compliance requests, and Kaia conversation intelligence recordings. Subscribe to webhooks for real-time notifications on changes to accounts, prospects, mailings, sequences, tasks, opportunities, and more.
+Manage prospects, accounts, sales tasks, opportunities, sequences and reusable email content through Outreach's OAuth REST API.
 
-## Tools
+The integration has 19 tools: prospect and account create/read/update/delete and discovery; sequence creation, updates and activation/deactivation; enrollment discovery and pause/resume/finish; email delivery/engagement readback; task updates; opportunity create/update and discovery; template/snippet create/update; external call logging; user and metadata discovery. Opportunity features require the appropriate Outreach subscription and user permissions. User listing identifies organization users, not the authenticated user.
 
-### Log Call
+Use `list_metadata` to discover sending mailboxes, call dispositions/purposes, prospect stages, opportunity stages and configured custom-field definitions. Mailbox credentials are excluded. Custom-field writes use provider keys such as `custom1`, with the configured field's type and validation rules.
 
-Log a phone call in Outreach. Records call details including direction, outcome (disposition), purpose, duration, and notes.
+OAuth permissions and the user's organization governance both apply. Access tokens expire according to the provider response; refresh tokens rotate. Refresh promptly and reconnect if the rotating refresh token expires. Production OAuth credentials support external organizations; developer credentials have additional authorization restrictions. The distinct limited server-to-server protocol is not supported by this integration.
 
-### Get Prospect
+Lists support cursor pagination: pass `nextPageAfter` back as `pageAfter`, keeping filters and sorting unchanged. Existing `pageOffset` remains available from 0 to 10,000; never combine it with a cursor. Counts are omitted when absent or truncated.
 
-Retrieve a single prospect by ID from Outreach. Returns full contact information, engagement stats, and custom fields.
+Creating enrollment immediately starts automation. Check the intended prospect, sequence and mailbox before calling it. Sequence activation can start processing existing enrollments. This integration reads mailings and logs calls; it does not send standalone email/SMS or dial phone numbers.
 
-### List Accounts
+Compatibility inputs remain available with explicit validation: `bodyText` is derived and read-only, so write `bodyHtml`; snippet `read_only` sharing is unsupported; opportunity `externalSource` and call `disposition` are unsupported writable attributes. Calls require the current `outcome` plus direction, prospect and user. Enrollment `disabled` is provider-managed; request `paused`, `active` or `finished`. Task completion is written through the provider's `completed` attribute. A supplied prospect email or phone replaces that corresponding list with one value; an empty string clears it.
 
-Search and list accounts (companies) from Outreach. Supports filtering by name, domain, and owner. Returns paginated results.
+API errors conceal tokens and provider response details. Read back uncertain writes before retrying. No webhook or polling triggers are registered.
 
-### List Mailings
-
-List sent emails (mailings) from Outreach. Filter by prospect, sequence, or tracking status. Mailings include delivery tracking data such as bounced, delivered, opened, and replied status.
-
-### List Opportunities
-
-List sales opportunities from Outreach. Filter by account, owner, or stage. Returns paginated results with deal details.
-
-### List Prospects
-
-Search and list prospects from Outreach. Supports filtering by email, name, account, owner, and tags. Returns paginated results.
-
-### List Sequences
-
-List sequences (automated campaigns) from Outreach. Filter by name, enabled state, owner, or tags. Returns paginated results.
-
-### List Tasks
-
-List tasks from Outreach. Filter by state, type, owner, or prospect. Tasks include action items, calls, emails, and in-person tasks assigned to users.
-
-### List Users
-
-List users in the Outreach organization. Returns user profiles with names, emails, and roles.
-
-### Manage Account
-
-Create, update, or delete an account (company) in Outreach. Use this to manage company records including name, domain, industry, and other account details.
-
-### Manage Opportunity
-
-Create or update a sales opportunity in Outreach. Opportunities track deals through the sales pipeline with stages, amounts, and close dates.
-
-### Manage Prospect
-
-Create, update, or delete a prospect (contact/lead) in Outreach. Use this to add new prospects, modify existing prospect information, or remove prospects. Prospects can be associated with accounts and include contact details, engagement data, and custom fields.
-
-### Manage Sequence Enrollment
-
-Add a prospect to a sequence, or update/manage their enrollment state. A sequence state represents a prospect's position and status within a sequence. Use the **create** action to enroll a prospect in a sequence, or **update** to pause/resume enrollment.
-
-### Manage Sequence
-
-Create or update a sequence (automated outreach campaign) in Outreach. Sequences are multi-step campaigns that automate prospect engagement through emails, calls, and tasks.
-
-### Manage Snippet
-
-Create or update a reusable text snippet in Outreach. Snippets are reusable text blocks that can be inserted into emails and templates for consistent messaging.
-
-### Manage Task
-
-Update a task in Outreach. Mark tasks as completed, change status, due date, or other task properties. Tasks are automatically created by sequences or can be manually assigned. Use this to manage task state.
-
-### Manage Template
-
-Create or update an email template in Outreach. Templates are reusable email content used in sequences and one-off emails. They support subject, body, and personalization.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[Official REST API documentation](https://developers.outreach.io/api/reference)

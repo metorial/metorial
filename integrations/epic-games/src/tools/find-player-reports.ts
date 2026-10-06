@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { EosGameServicesClient } from '../lib/client';
+import { gameClient } from '../lib/client';
+import { pagingSchema } from '../lib/types';
+import { identifier, time } from '../lib/validation';
 import { spec } from '../spec';
 
 let reportSchema = z.object({
@@ -48,33 +50,29 @@ At least one of **reportingPlayerId** or **reportedPlayerId** must be provided. 
   .output(
     z.object({
       reports: z.array(reportSchema).describe('Matching player reports'),
+      paging: pagingSchema.optional().describe('Native offset, limit and total.'),
       total: z.number().optional().describe('Total number of matching reports')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EosGameServicesClient({
-      token: ctx.auth.token,
-      deploymentId: ctx.config.deploymentId
-    });
-
-    let data = await client.findPlayerReports({
-      reportingPlayerId: ctx.input.reportingPlayerId,
-      reportedPlayerId: ctx.input.reportedPlayerId,
-      reasonId: ctx.input.reasonId,
-      startTime: ctx.input.startTime,
-      endTime: ctx.input.endTime,
-      order: ctx.input.order,
-      limit: ctx.input.limit,
-      offset: ctx.input.offset,
-      pagination: true
-    });
-
-    let reports = data.elements ?? [];
-    let total = data.paging?.total;
-
+    if (!ctx.input.reportingPlayerId && !ctx.input.reportedPlayerId)
+      throw createApiServiceError('Supply reportingPlayerId or reportedPlayerId.');
+    if (ctx.input.reportingPlayerId)
+      identifier(ctx.input.reportingPlayerId, 'Reporting player');
+    if (ctx.input.reportedPlayerId) identifier(ctx.input.reportedPlayerId, 'Reported player');
+    if (ctx.input.startTime) time(ctx.input.startTime, 'Start time');
+    if (ctx.input.endTime) time(ctx.input.endTime, 'End time');
+    if (
+      ctx.input.startTime &&
+      ctx.input.endTime &&
+      Date.parse(ctx.input.startTime) > Date.parse(ctx.input.endTime)
+    )
+      throw createApiServiceError('startTime must not follow endTime.');
+    const data = await gameClient(ctx).findPlayerReports({ ...ctx.input, pagination: true });
     return {
-      output: { reports, total },
-      message: `Found **${reports.length}** player report(s)${total !== undefined ? ` out of ${total} total` : ''}.`
+      output: { reports: data.elements, total: data.paging.total, paging: data.paging },
+      message:
+        'Returned one native player-report page; the report and moderation history is retained.'
     };
   })
   .build();

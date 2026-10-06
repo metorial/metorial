@@ -18,7 +18,7 @@ export let createNote = SlateTool.create(spec, {
       mentionUserIds: z
         .array(z.number())
         .optional()
-        .describe('User IDs to mention in the note'),
+        .describe('User IDs to mention; this can notify those users in the note'),
       date: z.string().optional().describe('Note date (ISO 8601). Defaults to current time.')
     })
   )
@@ -39,7 +39,7 @@ export let createNote = SlateTool.create(spec, {
     if (ctx.input.date) data.date = ctx.input.date;
 
     let result = await client.createNote(data);
-    let noteId = result.id ?? 0;
+    let noteId = result.id;
 
     return {
       output: {

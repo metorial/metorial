@@ -44,10 +44,7 @@ Returns repository metadata including clone status, external source, and default
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
     let data = await client.listRepositories({
       query: ctx.input.query,
@@ -56,22 +53,22 @@ Returns repository metadata including clone status, external source, and default
     });
 
     let repos = data.repositories;
-    let repositories = (repos.nodes || []).map((r: any) => ({
+    let repositories = (repos.nodes || []).map(r => ({
       repositoryId: r.id,
       name: r.name,
       url: r.url,
-      description: r.description || undefined,
+      description: r.description ?? undefined,
       cloned: r.mirrorInfo?.cloned,
-      serviceType: r.externalRepository?.serviceType || undefined,
-      defaultBranch: r.defaultBranch?.name || undefined
+      serviceType: r.externalRepository?.serviceType ?? undefined,
+      defaultBranch: r.defaultBranch?.name ?? undefined
     }));
 
     return {
       output: {
         repositories,
-        totalCount: repos.totalCount || 0,
-        hasNextPage: repos.pageInfo?.hasNextPage || false,
-        endCursor: repos.pageInfo?.endCursor || undefined
+        totalCount: repos.totalCount,
+        hasNextPage: repos.pageInfo.hasNextPage,
+        endCursor: repos.pageInfo?.endCursor ?? undefined
       },
       message: `Found **${repos.totalCount}** repositories${ctx.input.query ? ` matching "${ctx.input.query}"` : ''}. Showing ${repositories.length}.`
     };

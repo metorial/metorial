@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, continuation, urn } from '../lib/client';
+import { accountIdField } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listConversionRules = SlateTool.create(spec, {
@@ -13,15 +14,20 @@ export let listConversionRules = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('rw_conversions'))
   .input(
     z.object({
-      accountId: z.string().describe('Numeric ID of the ad account'),
+      accountId: accountIdField,
       pageSize: z.number().optional().describe('Number of results per page'),
       pageToken: z.string().optional().describe('Page token for pagination')
     })
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Continuation token for pageToken with the same filters'),
       conversionRules: z.array(
         z.object({
           conversionRuleId: z.number().describe('Numeric ID of the conversion rule'),
@@ -66,7 +72,7 @@ export let listConversionRules = SlateTool.create(spec, {
     }));
 
     return {
-      output: { conversionRules },
+      output: { conversionRules, nextPageToken: continuation(result, true) },
       message: `Found **${conversionRules.length}** conversion rule(s).`
     };
   })
@@ -86,10 +92,15 @@ export let createConversionRule = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(anyOf('rw_conversions'))
   .input(
     z.object({
-      accountId: z.string().describe('Numeric ID of the ad account'),
+      accountId: accountIdField,
       name: z.string().describe('Name for the conversion rule'),
+      enabled: z
+        .boolean()
+        .optional()
+        .describe('Enable matching for this conversion rule; false creates a disabled rule'),
       type: z
         .string()
         .describe('Conversion type (e.g., PURCHASE, SIGN_UP, LEAD, ADD_TO_CART)'),
@@ -121,7 +132,8 @@ export let createConversionRule = SlateTool.create(spec, {
 
     let conversionRuleId = await client.createConversionRule({
       name: ctx.input.name,
-      account: `urn:li:sponsoredAccount:${ctx.input.accountId}`,
+      enabled: ctx.input.enabled,
+      account: urn(ctx.input.accountId, 'sponsoredAccount'),
       conversionMethod: ctx.input.conversionMethod,
       type: ctx.input.type,
       postClickAttributionWindowSize: ctx.input.postClickAttributionWindowSize,
@@ -131,7 +143,7 @@ export let createConversionRule = SlateTool.create(spec, {
 
     return {
       output: { conversionRuleId },
-      message: `Created conversion rule **${ctx.input.name}** (type: ${ctx.input.type}) with ID **${conversionRuleId}**.`
+      message: 'LinkedIn confirmed the requested operation.'
     };
   })
   .build();
@@ -141,7 +153,7 @@ export let sendConversionEvents = SlateTool.create(spec, {
   key: 'send_conversion_events',
   description: `Send conversion events to LinkedIn's Conversions API (CAPI). Connect online and offline conversion data to LinkedIn for campaign attribution. Supports both hashed email and LinkedIn click ID for user matching.`,
   instructions: [
-    'User IDs support the following idType values: SHA256_EMAIL (SHA-256 hashed email), LINKEDIN_FIRST_PARTY_ADS_TRACKING_UUID (li_fat_id cookie), ACXIOM_ID, ORACLE_MOAT_ID.',
+    'Provide supported matching identifiers or both firstName and lastName per event; SHA256_EMAIL is a SHA-256 email hash. Acceptance does not prove attribution or matching.',
     'conversionHappenedAt should be an epoch timestamp in milliseconds.',
     'The conversion field should reference a conversion rule URN (e.g., "urn:lla:llaPartnerConversion:123456").'
   ],
@@ -154,6 +166,7 @@ export let sendConversionEvents = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(anyOf('rw_conversions'))
   .input(
     z.object({
       events: z
@@ -216,7 +229,7 @@ export let sendConversionEvents = SlateTool.create(spec, {
       user:
         event.userIds || event.userInfo
           ? {
-              userIds: event.userIds,
+              userIds: event.userIds ?? [],
               userInfo: event.userInfo
             }
           : undefined
@@ -226,7 +239,7 @@ export let sendConversionEvents = SlateTool.create(spec, {
 
     return {
       output: { success: true, eventCount: ctx.input.events.length },
-      message: `Successfully sent **${ctx.input.events.length}** conversion event(s) to LinkedIn.`
+      message: `LinkedIn accepted **${ctx.input.events.length}** conversion event(s) to LinkedIn.`
     };
   })
   .build();

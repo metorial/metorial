@@ -35,8 +35,6 @@ import {
   updateMemberScopesTool,
   updateProjectTool
 } from './tools';
-import { transcriptionCallbackTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -74,5 +72,5 @@ export let provider = Slate.create({
     getBillingFieldsTool,
     listPurchasesTool
   ],
-  triggers: [transcriptionCallbackTrigger]
+  triggers: []
 });

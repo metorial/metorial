@@ -31,13 +31,13 @@ export let registerTracking = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
-    let result = (await client.registerTrackingWebhook({
+    let result = await client.registerTrackingWebhook({
       carrier: ctx.input.carrier,
       tracking_number: ctx.input.trackingNumber,
       metadata: ctx.input.metadata
-    })) as Record<string, any>;
+    });
 
     return {
       output: {

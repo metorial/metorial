@@ -1,0 +1,699 @@
+{
+  "web_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The search query to execute"
+        },
+        "searchDepth": {
+          "description": "Controls latency vs relevance tradeoff. Defaults to \"basic\"",
+          "type": "string",
+          "enum": ["ultra-fast", "fast", "basic", "advanced"]
+        },
+        "topic": {
+          "description": "Category to tailor result sources. Defaults to \"general\"",
+          "type": "string",
+          "enum": ["general", "news", "finance"]
+        },
+        "maxResults": {
+          "description": "Maximum number of results to return (0-20). Defaults to 5",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "chunksPerSource": {
+          "description": "Max content chunks per source (1-3). Only for advanced/fast depth",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "timeRange": {
+          "description": "Filter results by time range",
+          "type": "string",
+          "enum": ["day", "week", "month", "year"]
+        },
+        "startDate": {
+          "description": "Filter results after this date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "endDate": {
+          "description": "Filter results before this date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "includeAnswer": {
+          "description": "Include an LLM-generated answer. Use \"advanced\" for higher quality",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": ["basic", "advanced"]
+            }
+          ]
+        },
+        "includeRawContent": {
+          "description": "Include full cleaned page content in markdown or text format",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "enum": ["markdown", "text"]
+            }
+          ]
+        },
+        "includeImages": {
+          "description": "Include image results",
+          "type": "boolean"
+        },
+        "includeImageDescriptions": {
+          "description": "Add descriptions to image results",
+          "type": "boolean"
+        },
+        "includeDomains": {
+          "description": "Only include results from these domains",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludeDomains": {
+          "description": "Exclude results from these domains",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "country": {
+          "description": "Two-letter country code to boost results from (only works with \"general\" topic)",
+          "type": "string"
+        },
+        "autoParameters": {
+          "description": "Let Tavily auto-configure parameters based on query intent",
+          "type": "boolean"
+        },
+        "exactMatch": {
+          "description": "Only return results containing exact quoted phrases from the query",
+          "type": "boolean"
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The executed search query"
+        },
+        "answer": {
+          "description": "LLM-generated answer based on search results",
+          "type": "string"
+        },
+        "images": {
+          "description": "Image search results",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "Image URL"
+              },
+              "description": {
+                "description": "Image description",
+                "type": "string"
+              }
+            },
+            "required": ["url"],
+            "additionalProperties": false
+          }
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Result page title"
+              },
+              "url": {
+                "type": "string",
+                "description": "Result page URL"
+              },
+              "content": {
+                "type": "string",
+                "description": "Content snippet or summary"
+              },
+              "score": {
+                "type": "number",
+                "description": "Relevance score"
+              },
+              "rawContent": {
+                "description": "Full cleaned page content",
+                "type": "string"
+              },
+              "favicon": {
+                "description": "Favicon URL",
+                "type": "string"
+              }
+            },
+            "required": ["title", "url", "content", "score"],
+            "additionalProperties": false
+          },
+          "description": "Ranked search results"
+        },
+        "autoParameters": {
+          "description": "Auto-configured parameters used",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "responseTime": {
+          "type": "number",
+          "description": "Time to complete the request in seconds"
+        }
+      },
+      "required": ["query", "results", "responseTime"],
+      "additionalProperties": false
+    }
+  },
+  "extract_content": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "urls": {
+          "minItems": 1,
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "URLs to extract content from (1-20)"
+        },
+        "query": {
+          "description": "Query to rerank extracted content chunks by relevance",
+          "type": "string"
+        },
+        "chunksPerSource": {
+          "description": "Max relevant chunks per source (1-5). Requires a query",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "extractDepth": {
+          "description": "Extraction depth. \"advanced\" retrieves tables and embedded content",
+          "type": "string",
+          "enum": ["basic", "advanced"]
+        },
+        "includeImages": {
+          "description": "Include images found on the pages",
+          "type": "boolean"
+        },
+        "format": {
+          "description": "Output format for extracted content. Defaults to \"markdown\"",
+          "type": "string",
+          "enum": ["markdown", "text"]
+        },
+        "timeout": {
+          "description": "Maximum seconds before timeout (1-60)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 60
+        }
+      },
+      "required": ["urls"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "Source URL"
+              },
+              "rawContent": {
+                "type": "string",
+                "description": "Full extracted content"
+              },
+              "images": {
+                "description": "Image URLs found on the page",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "favicon": {
+                "description": "Favicon URL",
+                "type": "string"
+              }
+            },
+            "required": ["url", "rawContent"],
+            "additionalProperties": false
+          },
+          "description": "Successfully extracted pages"
+        },
+        "failedResults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "URL that failed extraction"
+              },
+              "error": {
+                "type": "string",
+                "description": "Error message"
+              }
+            },
+            "required": ["url", "error"],
+            "additionalProperties": false
+          },
+          "description": "URLs that could not be extracted"
+        },
+        "responseTime": {
+          "type": "number",
+          "description": "Time to complete the request in seconds"
+        }
+      },
+      "required": ["results", "failedResults", "responseTime"],
+      "additionalProperties": false
+    }
+  },
+  "crawl_website": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "The root URL to begin crawling"
+        },
+        "instructions": {
+          "description": "Natural language instructions to guide the crawler (e.g., \"Find all documentation pages\")",
+          "type": "string"
+        },
+        "chunksPerSource": {
+          "description": "Max content chunks per source (1-5)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "maxDepth": {
+          "description": "How far from the base URL to explore (1-5). Defaults to 1",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "maxBreadth": {
+          "description": "Max links to follow per page level (1-500). Defaults to 20",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "limit": {
+          "description": "Total links to process before stopping. Defaults to 50",
+          "type": "number",
+          "minimum": 1
+        },
+        "selectPaths": {
+          "description": "Regex patterns to select only URLs with specific path patterns",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "selectDomains": {
+          "description": "Regex patterns to limit crawling to specific domains",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludePaths": {
+          "description": "Regex patterns to exclude URLs matching specific path patterns",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludeDomains": {
+          "description": "Regex patterns to exclude specific domains",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowExternal": {
+          "description": "Include links to external domains. Defaults to true",
+          "type": "boolean"
+        },
+        "includeImages": {
+          "description": "Include images in crawl results",
+          "type": "boolean"
+        },
+        "extractDepth": {
+          "description": "Content extraction depth. \"advanced\" costs 2 credits per 5 extractions",
+          "type": "string",
+          "enum": ["basic", "advanced"]
+        },
+        "format": {
+          "description": "Content output format. Defaults to \"markdown\"",
+          "type": "string",
+          "enum": ["markdown", "text"]
+        },
+        "timeout": {
+          "description": "Maximum seconds before timeout (10-150). Defaults to 150",
+          "type": "number",
+          "minimum": 10,
+          "maximum": 150
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "description": "The root URL that was crawled"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "Crawled page URL"
+              },
+              "rawContent": {
+                "type": "string",
+                "description": "Extracted page content"
+              },
+              "favicon": {
+                "description": "Favicon URL",
+                "type": "string"
+              }
+            },
+            "required": ["url", "rawContent"],
+            "additionalProperties": false
+          },
+          "description": "Crawled pages with extracted content"
+        },
+        "responseTime": {
+          "type": "number",
+          "description": "Time to complete the request in seconds"
+        }
+      },
+      "required": ["baseUrl", "results", "responseTime"],
+      "additionalProperties": false
+    }
+  },
+  "map_website": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "The root URL to begin mapping"
+        },
+        "instructions": {
+          "description": "Natural language instructions to guide URL discovery",
+          "type": "string"
+        },
+        "maxDepth": {
+          "description": "How far from the base URL to explore (1-5). Defaults to 1",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "maxBreadth": {
+          "description": "Max links to follow per page level (1-500). Defaults to 20",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "limit": {
+          "description": "Total links to process before stopping. Defaults to 50",
+          "type": "number",
+          "minimum": 1
+        },
+        "selectPaths": {
+          "description": "Regex patterns to select only URLs with specific path patterns",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "selectDomains": {
+          "description": "Regex patterns to limit mapping to specific domains",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludePaths": {
+          "description": "Regex patterns to exclude URLs matching specific path patterns",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludeDomains": {
+          "description": "Regex patterns to exclude specific domains",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowExternal": {
+          "description": "Include links to external domains. Defaults to true",
+          "type": "boolean"
+        },
+        "timeout": {
+          "description": "Maximum seconds before timeout (10-150). Defaults to 150",
+          "type": "number",
+          "minimum": 10,
+          "maximum": 150
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "description": "The root URL that was mapped"
+        },
+        "urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of discovered URLs"
+        },
+        "totalUrls": {
+          "type": "number",
+          "description": "Total number of URLs discovered"
+        },
+        "responseTime": {
+          "type": "number",
+          "description": "Time to complete the request in seconds"
+        }
+      },
+      "required": ["baseUrl", "urls", "totalUrls", "responseTime"],
+      "additionalProperties": false
+    }
+  },
+  "research": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The research task or question to investigate"
+        },
+        "model": {
+          "description": "Research model to use. Defaults to \"auto\"",
+          "type": "string",
+          "enum": ["mini", "pro", "auto"]
+        },
+        "outputSchema": {
+          "description": "JSON Schema defining the desired structure for the research output",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "citationFormat": {
+          "description": "Citation format style. Defaults to \"numbered\"",
+          "type": "string",
+          "enum": ["numbered", "mla", "apa", "chicago"]
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique research task identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Task status: pending, in_progress, completed, or failed"
+        },
+        "content": {
+          "description": "Research report content (string or structured object if outputSchema was provided)"
+        },
+        "sources": {
+          "description": "Sources cited in the research report",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Source title"
+              },
+              "url": {
+                "type": "string",
+                "description": "Source URL"
+              },
+              "favicon": {
+                "description": "Source favicon URL",
+                "type": "string"
+              }
+            },
+            "required": ["title", "url"],
+            "additionalProperties": false
+          }
+        },
+        "createdAt": {
+          "description": "Timestamp when the task was created",
+          "type": "string"
+        },
+        "responseTime": {
+          "type": "number",
+          "description": "Time elapsed in seconds"
+        }
+      },
+      "required": ["requestId", "status", "responseTime"],
+      "additionalProperties": false
+    }
+  },
+  "get_usage": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "totalCreditsUsed": {
+          "type": "number",
+          "description": "Total credits used this billing cycle"
+        },
+        "creditsLimit": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Usage cap (null if unlimited)"
+        },
+        "searchCreditsUsed": {
+          "type": "number",
+          "description": "Credits consumed by search requests"
+        },
+        "extractCreditsUsed": {
+          "type": "number",
+          "description": "Credits consumed by extract requests"
+        },
+        "crawlCreditsUsed": {
+          "type": "number",
+          "description": "Credits consumed by crawl requests"
+        },
+        "mapCreditsUsed": {
+          "type": "number",
+          "description": "Credits consumed by map requests"
+        },
+        "researchCreditsUsed": {
+          "type": "number",
+          "description": "Credits consumed by research requests"
+        },
+        "currentPlan": {
+          "type": "string",
+          "description": "Active subscription plan name"
+        },
+        "planCreditsUsed": {
+          "type": "number",
+          "description": "Plan credits consumed this cycle"
+        },
+        "planCreditsLimit": {
+          "type": "number",
+          "description": "Plan credit ceiling"
+        },
+        "paygoCreditsUsed": {
+          "type": "number",
+          "description": "Pay-as-you-go credits used"
+        },
+        "paygoCreditsLimit": {
+          "type": "number",
+          "description": "Pay-as-you-go credit ceiling"
+        }
+      },
+      "required": [
+        "totalCreditsUsed",
+        "creditsLimit",
+        "searchCreditsUsed",
+        "extractCreditsUsed",
+        "crawlCreditsUsed",
+        "mapCreditsUsed",
+        "researchCreditsUsed",
+        "currentPlan",
+        "planCreditsUsed",
+        "planCreditsLimit",
+        "paygoCreditsUsed",
+        "paygoCreditsLimit"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

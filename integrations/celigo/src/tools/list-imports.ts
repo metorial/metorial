@@ -1,49 +1,55 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  nextPageUrl: z.string().optional().describe('Next native page, when present.'),
+  imports: z
+    .array(
+      z.object({
+        importId: z.string().describe('Unique import identifier'),
+        name: z.string().optional().describe('Import name'),
+        lastModified: z.string().optional().describe('Last modification timestamp'),
+        connectionId: z.string().optional().describe('Associated connection ID')
+      })
+    )
+    .describe('List of imports')
+});
 
 export let listImports = SlateTool.create(spec, {
   name: 'List Imports',
   key: 'list_imports',
-  description: `Retrieve all imports in your Celigo account. Imports are used to insert data into an application and can run standalone or within a flow.`,
+  description: `Retrieve a page of imports in your Celigo account. Imports are used to insert data into an application and can run standalone or within a flow.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
-  .output(
+  .input(
     z.object({
-      imports: z
-        .array(
-          z.object({
-            importId: z.string().describe('Unique import identifier'),
-            name: z.string().optional().describe('Import name'),
-            lastModified: z.string().optional().describe('Last modification timestamp'),
-            connectionId: z.string().optional().describe('Associated connection ID')
-          })
-        )
-        .describe('List of imports')
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Maximum records on this native page.'),
+      externalId: z.string().optional().describe('Exact native externalId filter.'),
+      nextPageUrl: z
+        .string()
+        .optional()
+        .describe('Next URL from the preceding page, with the same filters and limit.')
     })
   )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let imports = await client.listImports();
-
-    let mapped = imports.map((i: any) => ({
-      importId: i._id,
-      name: i.name,
-      lastModified: i.lastModified,
-      connectionId: i._connectionId
-    }));
-
-    return {
-      output: { imports: mapped },
-      message: `Found **${mapped.length}** import(s).`
-    };
+    const result = await invoke('list_imports', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

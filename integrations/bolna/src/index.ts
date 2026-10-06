@@ -10,6 +10,7 @@ import {
   listAgents,
   listExecutions,
   listPhoneNumbers,
+  listVoiceProviders,
   listVoices,
   makeCall,
   manageBatch,
@@ -18,8 +19,6 @@ import {
   stopCall,
   updateAgent
 } from './tools';
-import { callStatus } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,7 +37,8 @@ export let provider = Slate.create({
     listPhoneNumbers,
     setupInbound,
     listVoices,
+    listVoiceProviders,
     getAccountInfo
   ],
-  triggers: [callStatus]
+  triggers: []
 });

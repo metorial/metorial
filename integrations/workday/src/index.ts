@@ -5,24 +5,28 @@ import {
   createCustomObject,
   deleteCustomObject,
   executeWql,
+  getCurrentUser,
   getCustomObject,
   getCustomReport,
   getInboxTasks,
   getOrganizationWorkers,
+  getResource,
   getTimeBlocks,
   getTimeOffEntries,
   getWorker,
   listCustomObjects,
   listOrganizations,
+  listResources,
   listWorkers,
   requestTimeOff,
   updateCustomObject
 } from './tools';
-import { inboundWebhook, workerChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    getResource,
+    listResources,
     listWorkers,
     getWorker,
     getTimeOffEntries,
@@ -40,5 +44,5 @@ export let provider = Slate.create({
     updateCustomObject,
     deleteCustomObject
   ],
-  triggers: [inboundWebhook, workerChanges]
+  triggers: []
 });

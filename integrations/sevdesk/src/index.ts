@@ -29,8 +29,6 @@ import {
   sendInvoice,
   updateContact
 } from './tools';
-import { inboundWebhook, newContact, newInvoice, newVoucher } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,5 +60,5 @@ export let provider = Slate.create({
     addCommunicationWay,
     manageAccountingContact
   ],
-  triggers: [inboundWebhook, newContact, newInvoice, newVoucher]
+  triggers: []
 });

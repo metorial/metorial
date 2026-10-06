@@ -4,6 +4,7 @@ import {
   createEnvelopeTool,
   deleteEnvelopeTool,
   distributeEnvelopeTool,
+  downloadEnvelopeFileTool,
   duplicateEnvelopeTool,
   findEnvelopesTool,
   getAuditLogTool,
@@ -14,8 +15,6 @@ import {
   updateEnvelopeTool,
   useTemplateTool
 } from './tools';
-import { documentEventTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,7 +29,8 @@ export let provider = Slate.create({
     manageFieldsTool,
     useTemplateTool,
     manageFoldersTool,
-    getAuditLogTool
+    getAuditLogTool,
+    downloadEnvelopeFileTool
   ],
-  triggers: [documentEventTrigger]
+  triggers: []
 });

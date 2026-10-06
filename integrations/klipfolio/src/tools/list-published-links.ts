@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listPublishedLinks = SlateTool.create(spec, {
@@ -14,7 +15,12 @@ export let listPublishedLinks = SlateTool.create(spec, {
   .input(
     z.object({
       clientId: z.string().optional().describe('Filter by client ID'),
-      dashboardId: z.string().optional().describe('Filter by dashboard ID'),
+      dashboardId: z
+        .string()
+        .optional()
+        .describe(
+          'Dashboard ID whose published links to list; required by the current API. Discover IDs with list_dashboards.'
+        ),
       limit: z.number().optional().describe('Maximum number of results (max 100)'),
       offset: z.number().optional().describe('Index of first result to return')
     })
@@ -31,10 +37,13 @@ export let listPublishedLinks = SlateTool.create(spec, {
           dateLastAccessed: z.string().optional()
         })
       ),
-      total: z.number().optional()
+      total: z.number().optional(),
+      nextOffset: z.number().optional(),
+      hasMore: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listPublishedLinks({
@@ -53,10 +62,18 @@ export let listPublishedLinks = SlateTool.create(spec, {
       dateLastAccessed: link.date_last_accessed
     }));
 
+    const offset = ctx.input.offset ?? 0;
+    const hasMore =
+      result.data.length > 0 &&
+      (typeof result.meta?.total === 'number'
+        ? offset + publishedLinks.length < result.meta.total
+        : publishedLinks.length === (ctx.input.limit ?? 25));
     return {
       output: {
         publishedLinks,
-        total: result?.meta?.total
+        total: result?.meta?.total,
+        hasMore,
+        nextOffset: hasMore ? offset + publishedLinks.length : undefined
       },
       message: `Found **${publishedLinks.length}** published link(s)${result?.meta?.total ? ` out of ${result.meta.total} total` : ''}.`
     };

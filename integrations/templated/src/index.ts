@@ -20,8 +20,6 @@ import {
   mergeRenders,
   updateTemplate
 } from './tools';
-import { editorEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     deleteFonts,
     getAccount
   ],
-  triggers: [editorEvent]
+  triggers: []
 });

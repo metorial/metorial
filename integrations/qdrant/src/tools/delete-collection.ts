@@ -24,7 +24,7 @@ export let deleteCollection = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 

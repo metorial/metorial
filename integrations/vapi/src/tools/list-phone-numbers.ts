@@ -16,6 +16,9 @@ export let listPhoneNumbers = SlateTool.create(spec, {
     z.object({
       limit: z
         .number()
+        .int()
+        .min(0)
+        .max(1000)
         .optional()
         .describe('Maximum number of phone numbers to return (default 100)'),
       createdAfter: z
@@ -36,6 +39,7 @@ export let listPhoneNumbers = SlateTool.create(spec, {
             phoneNumberId: z.string().describe('ID of the phone number'),
             provider: z.string().optional().describe('Phone number provider'),
             number: z.string().optional().describe('Phone number in E.164 format'),
+            sipUri: z.string().optional().describe('SIP address for an inbound SIP number'),
             name: z.string().optional().describe('Name of the phone number'),
             status: z.string().optional().describe('Status (active, activating, blocked)'),
             assistantId: z.string().optional().describe('Assigned assistant ID'),
@@ -49,10 +53,10 @@ export let listPhoneNumbers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, ctx.auth.region);
 
     let params: Record<string, any> = {};
-    if (ctx.input.limit) params.limit = ctx.input.limit;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
     if (ctx.input.createdAfter) params.createdAtGt = ctx.input.createdAfter;
     if (ctx.input.createdBefore) params.createdAtLt = ctx.input.createdBefore;
 
@@ -64,6 +68,7 @@ export let listPhoneNumbers = SlateTool.create(spec, {
           phoneNumberId: pn.id,
           provider: pn.provider,
           number: pn.number,
+          sipUri: pn.sipUri,
           name: pn.name,
           status: pn.status,
           assistantId: pn.assistantId,

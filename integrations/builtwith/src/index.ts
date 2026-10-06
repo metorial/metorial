@@ -16,8 +16,6 @@ import {
   resolveCompanyUrl,
   searchProducts
 } from './tools';
-import { inboundWebhook, newTechnologyDetection } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     freeLookup,
     getFinancialData
   ] as any,
-  triggers: [inboundWebhook, newTechnologyDetection] as any
+  triggers: []
 });

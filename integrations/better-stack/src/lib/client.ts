@@ -1,341 +1,157 @@
-import { createAxios } from 'slates';
+import { BetterStackApi, type ClientOptions, type PageOptions, pathId } from './api';
 
-export interface PaginatedResponse<T> {
-  data: T[];
-  pagination?: {
-    first?: string;
-    last?: string;
-    prev?: string;
-    next?: string;
-  };
-}
+export type { PaginatedResponse } from './api';
 
-export class UptimeClient {
-  private axios: ReturnType<typeof createAxios>;
-
-  constructor(params: { token: string; teamName?: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://uptime.betterstack.com/api/v2',
-      headers: {
-        Authorization: `Bearer ${params.token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    if (params.teamName) {
-      this.axios.defaults.headers.common['X-Team-Name'] = params.teamName;
+export class UptimeClient extends BetterStackApi {
+  constructor(options: ClientOptions) {
+    super(options, 'uptime');
+  }
+  listMonitors(
+    params?: PageOptions & {
+      pronounceableName?: string;
+      url?: string;
     }
-  }
-
-  // ---- Monitors ----
-
-  async listMonitors(params?: {
-    page?: number;
-    perPage?: number;
-    pronounceableName?: string;
-    url?: string;
-    monitorType?: string;
-    paused?: boolean;
-    sort?: string;
-    monitorGroupId?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/monitors', {
-      params: {
-        page: params?.page,
-        per_page: params?.perPage,
-        pronounceable_name: params?.pronounceableName,
-        url: params?.url,
-        monitor_type: params?.monitorType,
-        paused: params?.paused,
-        sort: params?.sort,
-        monitor_group_id: params?.monitorGroupId
-      }
+  ) {
+    return this.page('/v2/monitors', params, {
+      pronounceable_name: params?.pronounceableName,
+      url: params?.url
     });
-    return response.data;
   }
-
-  async getMonitor(monitorId: string): Promise<any> {
-    let response = await this.axios.get(`/monitors/${monitorId}`);
-    return response.data;
+  getMonitor(id: string) {
+    return this.get(`/v2/monitors/${pathId(id)}`);
   }
-
-  async createMonitor(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/monitors', data);
-    return response.data;
+  createMonitor(body: Record<string, unknown>) {
+    return this.post('/v2/monitors', body);
   }
-
-  async updateMonitor(monitorId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/monitors/${monitorId}`, data);
-    return response.data;
+  updateMonitor(id: string, body: Record<string, unknown>) {
+    return this.patch(`/v2/monitors/${pathId(id)}`, body);
   }
-
-  async deleteMonitor(monitorId: string): Promise<void> {
-    await this.axios.delete(`/monitors/${monitorId}`);
+  deleteMonitor(id: string) {
+    return this.remove(`/v2/monitors/${pathId(id)}`);
   }
-
-  // ---- Monitor Groups ----
-
-  async listMonitorGroups(params?: {
-    page?: number;
-    perPage?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/monitor-groups', {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+  listHeartbeats(params?: PageOptions) {
+    return this.page('/v2/heartbeats', params);
   }
-
-  // ---- Heartbeats ----
-
-  async listHeartbeats(params?: {
-    page?: number;
-    perPage?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/heartbeats', {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+  getHeartbeat(id: string) {
+    return this.get(`/v2/heartbeats/${pathId(id)}`);
   }
-
-  async getHeartbeat(heartbeatId: string): Promise<any> {
-    let response = await this.axios.get(`/heartbeats/${heartbeatId}`);
-    return response.data;
+  createHeartbeat(body: Record<string, unknown>) {
+    return this.post('/v2/heartbeats', body);
   }
-
-  async createHeartbeat(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/heartbeats', data);
-    return response.data;
+  updateHeartbeat(id: string, body: Record<string, unknown>) {
+    return this.patch(`/v2/heartbeats/${pathId(id)}`, body);
   }
-
-  async updateHeartbeat(heartbeatId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/heartbeats/${heartbeatId}`, data);
-    return response.data;
+  deleteHeartbeat(id: string) {
+    return this.remove(`/v2/heartbeats/${pathId(id)}`);
   }
-
-  async deleteHeartbeat(heartbeatId: string): Promise<void> {
-    await this.axios.delete(`/heartbeats/${heartbeatId}`);
-  }
-
-  // ---- Incidents ----
-
-  async listIncidents(params?: {
-    page?: number;
-    perPage?: number;
-    from?: string;
-    to?: string;
-    monitorId?: string;
-    heartbeatId?: string;
-    resolved?: boolean;
-    acknowledged?: boolean;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/incidents', {
-      params: {
-        page: params?.page,
-        per_page: params?.perPage,
+  listIncidents(
+    params?: PageOptions & {
+      from?: string;
+      to?: string;
+      monitorId?: string;
+      heartbeatId?: string;
+      resolved?: boolean;
+      acknowledged?: boolean;
+    }
+  ) {
+    return this.page(
+      '/v3/incidents',
+      params,
+      {
         from: params?.from,
         to: params?.to,
         monitor_id: params?.monitorId,
         heartbeat_id: params?.heartbeatId,
         resolved: params?.resolved,
         acknowledged: params?.acknowledged
-      }
-    });
-    return response.data;
+      },
+      50
+    );
   }
-
-  async getIncident(incidentId: string): Promise<any> {
-    let response = await this.axios.get(`/incidents/${incidentId}`);
-    return response.data;
+  getIncident(id: string) {
+    return this.get(`/v3/incidents/${pathId(id)}`);
   }
-
-  async createIncident(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/incidents', data);
-    return response.data;
+  createIncident(body: Record<string, unknown>) {
+    return this.post('/v3/incidents', body);
   }
-
-  async acknowledgeIncident(incidentId: string, acknowledgedBy?: string): Promise<any> {
-    let body: Record<string, any> = {};
-    if (acknowledgedBy) {
-      body.acknowledged_by = acknowledgedBy;
-    }
-    let response = await this.axios.post(`/incidents/${incidentId}/acknowledge`, body);
-    return response.data;
+  acknowledgeIncident(id: string, acknowledgedBy?: string) {
+    return this.post(
+      `/v3/incidents/${pathId(id)}/acknowledge`,
+      { acknowledged_by: acknowledgedBy },
+      false
+    );
   }
-
-  async resolveIncident(incidentId: string, resolvedBy?: string): Promise<any> {
-    let body: Record<string, any> = {};
-    if (resolvedBy) {
-      body.resolved_by = resolvedBy;
-    }
-    let response = await this.axios.post(`/incidents/${incidentId}/resolve`, body);
-    return response.data;
+  resolveIncident(id: string, resolvedBy?: string) {
+    return this.post(
+      `/v3/incidents/${pathId(id)}/resolve`,
+      { resolved_by: resolvedBy },
+      false
+    );
   }
-
-  async deleteIncident(incidentId: string): Promise<void> {
-    await this.axios.delete(`/incidents/${incidentId}`);
+  deleteIncident(id: string) {
+    return this.remove(`/v3/incidents/${pathId(id)}`);
   }
-
-  async getIncidentTimeline(
-    incidentId: string,
-    params?: { page?: number; perPage?: number }
-  ): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get(`/incidents/${incidentId}/timeline`, {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+  getIncidentTimeline(id: string) {
+    return this.page(`/v3/incidents/${pathId(id)}/timeline`);
   }
-
-  // ---- Status Pages ----
-
-  async listStatusPages(params?: {
-    page?: number;
-    perPage?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/status-pages', {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+  listStatusPages(params?: PageOptions) {
+    return this.page('/v2/status-pages', params);
   }
-
-  async getStatusPage(statusPageId: string): Promise<any> {
-    let response = await this.axios.get(`/status-pages/${statusPageId}`);
-    return response.data;
+  getStatusPage(id: string) {
+    return this.get(`/v2/status-pages/${pathId(id)}`);
   }
-
-  async createStatusPage(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/status-pages', data);
-    return response.data;
+  createStatusPage(body: Record<string, unknown>) {
+    return this.post('/v2/status-pages', body);
   }
-
-  async updateStatusPage(statusPageId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/status-pages/${statusPageId}`, data);
-    return response.data;
+  updateStatusPage(id: string, body: Record<string, unknown>) {
+    return this.patch(`/v2/status-pages/${pathId(id)}`, body);
   }
-
-  async deleteStatusPage(statusPageId: string): Promise<void> {
-    await this.axios.delete(`/status-pages/${statusPageId}`);
+  deleteStatusPage(id: string) {
+    return this.remove(`/v2/status-pages/${pathId(id)}`);
   }
-
-  // ---- Status Page Resources ----
-
-  async listStatusPageResources(
-    statusPageId: string,
-    params?: { page?: number; perPage?: number }
-  ): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get(`/status-pages/${statusPageId}/resources`, {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+  listOnCallCalendars(params?: PageOptions) {
+    return this.page('/v2/on-calls', params);
   }
-
-  async createStatusPageResource(
-    statusPageId: string,
-    data: Record<string, any>
-  ): Promise<any> {
-    let response = await this.axios.post(`/status-pages/${statusPageId}/resources`, data);
-    return response.data;
+  getOnCallCalendar(id: string) {
+    return this.get(`/v2/on-calls/${pathId(id)}`);
   }
-
-  async deleteStatusPageResource(statusPageId: string, resourceId: string): Promise<void> {
-    await this.axios.delete(`/status-pages/${statusPageId}/resources/${resourceId}`);
+  createOnCallCalendar(body: Record<string, unknown>) {
+    return this.post('/v2/on-calls', body);
   }
-
-  // ---- Status Page Reports ----
-
-  async createStatusPageReport(statusPageId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/status-pages/${statusPageId}/status-reports`, data);
-    return response.data;
+  updateOnCallCalendar(id: string, body: Record<string, unknown>) {
+    return this.patch(`/v2/on-calls/${pathId(id)}`, body);
   }
-
-  // ---- On-Call Calendars ----
-
-  async listOnCallCalendars(params?: {
-    page?: number;
-    perPage?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/on-calls', {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+  deleteOnCallCalendar(id: string) {
+    return this.remove(`/v2/on-calls/${pathId(id)}`);
   }
-
-  async getOnCallCalendar(calendarId: string): Promise<any> {
-    let response = await this.axios.get(`/on-calls/${calendarId}`);
-    return response.data;
+  listEscalationPolicies(params?: PageOptions) {
+    return this.page('/v3/policies', params);
   }
-
-  async createOnCallCalendar(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/on-calls', data);
-    return response.data;
+  getEscalationPolicy(id: string) {
+    return this.get(`/v3/policies/${pathId(id)}`);
   }
-
-  async updateOnCallCalendar(calendarId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/on-calls/${calendarId}`, data);
-    return response.data;
+  createEscalationPolicy(body: Record<string, unknown>) {
+    return this.post('/v3/policies', body);
   }
-
-  async deleteOnCallCalendar(calendarId: string): Promise<void> {
-    await this.axios.delete(`/on-calls/${calendarId}`);
+  updateEscalationPolicy(id: string, body: Record<string, unknown>) {
+    return this.patch(`/v3/policies/${pathId(id)}`, body);
   }
-
-  // ---- Escalation Policies ----
-
-  async listEscalationPolicies(params?: {
-    page?: number;
-    perPage?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/policies', {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+  deleteEscalationPolicy(id: string) {
+    return this.remove(`/v3/policies/${pathId(id)}`);
   }
-
-  async getEscalationPolicy(policyId: string): Promise<any> {
-    let response = await this.axios.get(`/policies/${policyId}`);
-    return response.data;
+  listIncomingWebhooks(params?: PageOptions) {
+    return this.page('/v2/incoming-webhooks', params);
   }
-
-  async createEscalationPolicy(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/policies', data);
-    return response.data;
+  getIncomingWebhook(id: string) {
+    return this.get(`/v2/incoming-webhooks/${pathId(id)}`);
   }
-
-  async updateEscalationPolicy(policyId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/policies/${policyId}`, data);
-    return response.data;
+  createIncomingWebhook(body: Record<string, unknown>) {
+    return this.post('/v2/incoming-webhooks', body);
   }
-
-  async deleteEscalationPolicy(policyId: string): Promise<void> {
-    await this.axios.delete(`/policies/${policyId}`);
+  updateIncomingWebhook(id: string, body: Record<string, unknown>) {
+    return this.patch(`/v2/incoming-webhooks/${pathId(id)}`, body);
   }
-
-  // ---- Incoming Webhooks ----
-
-  async listIncomingWebhooks(params?: {
-    page?: number;
-    perPage?: number;
-  }): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.get('/incoming-webhooks', {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
-  }
-
-  async getIncomingWebhook(webhookId: string): Promise<any> {
-    let response = await this.axios.get(`/incoming-webhooks/${webhookId}`);
-    return response.data;
-  }
-
-  async createIncomingWebhook(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/incoming-webhooks', data);
-    return response.data;
-  }
-
-  async updateIncomingWebhook(webhookId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/incoming-webhooks/${webhookId}`, data);
-    return response.data;
-  }
-
-  async deleteIncomingWebhook(webhookId: string): Promise<void> {
-    await this.axios.delete(`/incoming-webhooks/${webhookId}`);
+  deleteIncomingWebhook(id: string) {
+    return this.remove(`/v2/incoming-webhooks/${pathId(id)}`);
   }
 }

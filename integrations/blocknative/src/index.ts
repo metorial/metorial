@@ -10,8 +10,6 @@ import {
   predictBaseFee
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -23,5 +21,5 @@ export let provider = Slate.create({
     decodeL2Batch,
     getBlob
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

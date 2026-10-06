@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getUser = SlateTool.create(spec, {
@@ -24,17 +24,17 @@ export let getUser = SlateTool.create(spec, {
     z.object({
       userId: z.string(),
       email: z.string(),
-      firstName: z.string(),
-      lastName: z.string(),
+      firstName: z.string().nullable(),
+      lastName: z.string().nullable(),
       active: z.boolean(),
-      userType: z.string().optional(),
+      userType: z.string().nullable().optional(),
       createdAt: z.string().optional(),
-      lastActive: z.string().optional(),
-      metadata: z.record(z.string(), z.any()).optional(),
+      lastActive: z.string().nullable().optional(),
+      metadata: z.record(z.string(), z.any()).nullable().optional(),
       groups: z
         .array(
           z.object({
-            groupId: z.number(),
+            groupId: z.number().nullable(),
             groupName: z.string()
           })
         )
@@ -42,7 +42,7 @@ export let getUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.getUser(ctx.input.userId, ctx.input.includeGroups);
     let u = result.data;

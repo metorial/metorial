@@ -13,15 +13,19 @@ export let listFollowUps = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageSize: z.number().int().min(1).max(250).optional(),
+      after: z.string().optional().describe('Cursor from the previous page'),
       incidentId: z.string().optional().describe('Filter follow-ups by incident ID'),
       incidentMode: z
-        .enum(['standard', 'retrospective', 'test', 'tutorial'])
+        .enum(['standard', 'retrospective', 'test', 'tutorial', 'stream'])
         .optional()
         .describe('Filter by incident mode')
     })
   )
   .output(
     z.object({
+      returnedCount: z.number().int().nonnegative(),
+      nextCursor: z.string().optional(),
       followUps: z.array(
         z.object({
           followUpId: z.string(),
@@ -42,10 +46,12 @@ export let listFollowUps = SlateTool.create(spec, {
 
     let result = await client.listFollowUps({
       incidentId: ctx.input.incidentId,
-      incidentMode: ctx.input.incidentMode
+      incidentMode: ctx.input.incidentMode,
+      pageSize: ctx.input.pageSize,
+      after: ctx.input.after
     });
 
-    let followUps = result.follow_ups.map((f: any) => ({
+    let followUps = result.follow_ups.map(f => ({
       followUpId: f.id,
       title: f.title || undefined,
       status: f.status || undefined,
@@ -58,7 +64,11 @@ export let listFollowUps = SlateTool.create(spec, {
     }));
 
     return {
-      output: { followUps },
+      output: {
+        followUps,
+        returnedCount: followUps.length,
+        nextCursor: result.pagination_meta?.after
+      },
       message: `Found **${followUps.length}** follow-up(s).`
     };
   })

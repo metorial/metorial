@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listSystems = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listSystems = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       limit: z
         .number()
         .min(1)
@@ -56,41 +58,41 @@ export let listSystems = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      let result = await client.listSystems({
+        limit: ctx.input.limit,
+        skip: ctx.input.skip,
+        filter: ctx.input.filter,
+        fields: ctx.input.fields,
+        sort: ctx.input.sort
+      });
 
-    let result = await client.listSystems({
-      limit: ctx.input.limit,
-      skip: ctx.input.skip,
-      filter: ctx.input.filter,
-      fields: ctx.input.fields,
-      sort: ctx.input.sort
-    });
+      let systems = result.results.map(s => ({
+        systemId: s._id,
+        displayName: s.displayName,
+        hostname: s.hostname,
+        os: s.os,
+        osFamily: s.osFamily,
+        version: s.version,
+        arch: s.arch,
+        agentVersion: s.agentVersion,
+        active: s.active,
+        remoteIP: s.remoteIP,
+        serialNumber: s.serialNumber,
+        lastContact: s.lastContact,
+        created: s.created
+      }));
 
-    let systems = result.results.map(s => ({
-      systemId: s._id,
-      displayName: s.displayName,
-      hostname: s.hostname,
-      os: s.os,
-      osFamily: s.osFamily,
-      version: s.version,
-      arch: s.arch,
-      agentVersion: s.agentVersion,
-      active: s.active,
-      remoteIP: s.remoteIP,
-      serialNumber: s.serialNumber,
-      lastContact: s.lastContact,
-      created: s.created
-    }));
-
-    return {
-      output: {
-        systems,
-        totalCount: result.totalCount
-      },
-      message: `Found **${result.totalCount}** systems. Returned **${systems.length}** systems.`
-    };
+      return {
+        output: {
+          systems,
+          totalCount: result.totalCount
+        },
+        message: `Found **${result.totalCount}** systems. Returned **${systems.length}** systems.`
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
+    }
   })
   .build();

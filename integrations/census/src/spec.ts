@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'census',
   name: 'Census',
   description:
-    'Census is a reverse ETL and data activation platform that syncs data from cloud data warehouses into 200+ business applications.',
+    'Census, now Fivetran Activations, syncs warehouse data to business applications. Manage workspace syncs, monitor runs and discover connection metadata.',
   metadata: {},
   config,
   auth

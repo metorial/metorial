@@ -21,8 +21,6 @@ import {
   updateGroup,
   updateUser
 } from './tools';
-import { inboundWebhook, newVideo } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     managePortfolio,
     listPortfolios
   ],
-  triggers: [inboundWebhook, newVideo]
+  triggers: []
 });

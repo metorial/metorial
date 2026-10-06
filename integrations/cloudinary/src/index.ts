@@ -2,7 +2,9 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   deleteAssets,
+  downloadAsset,
   getAsset,
+  getEnvironmentContext,
   getUsage,
   listAssets,
   manageFolders,
@@ -11,8 +13,6 @@ import {
   updateAsset,
   uploadAsset
 } from './tools';
-import { assetEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,7 +24,9 @@ export let provider = Slate.create({
     manageTags,
     listAssets,
     manageFolders,
-    getUsage
+    getUsage,
+    getEnvironmentContext,
+    downloadAsset
   ],
-  triggers: [assetEvent]
+  triggers: []
 });

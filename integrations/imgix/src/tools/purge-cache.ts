@@ -1,54 +1,60 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImgixClient } from '../lib/client';
+import { sourceId } from '../lib/schemas';
+import { publicUrl } from '../lib/validation';
 import { spec } from '../spec';
-
-export let purgeCache = SlateTool.create(spec, {
+export const purgeCache = SlateTool.create(spec, {
   name: 'Purge Cache',
   key: 'purge_cache',
-  description: `Purge a cached asset from the Imgix CDN. When an asset is updated at the origin, use this to force Imgix to fetch the newest version. Purging an asset URL automatically removes all derivative (transformed) versions. For watermark or blend sub-images, enable the subImage flag to cascade purges to all parent images.`,
+  description:
+    'Request a purge of a URL associated with the current imgix account. Removes cached derivatives, so later rendering may re-fetch origin and incur charges. Sub-image purge cascades to parent images. It does not delete origin data or retained history.',
   constraints: [
-    'Duplicate purge requests for the same URL within 10 seconds may return a 409 status.',
-    'Rate limit: 10 requests per second.'
+    'Duplicate requests within 10 seconds can return HTTP 409; do not automatically repeat a purge.'
   ],
-  tags: {
-    destructive: true
-  }
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
       url: z
         .string()
         .describe(
-          'Fully qualified URL of the asset to purge (e.g., "https://example.imgix.net/image.jpg"). No query parameters needed.'
+          'Exact absolute URL belonging to the account. Percent-encode spaces; ordinary asset purge needs no transformation parameters.'
         ),
-      subImage: z
-        .boolean()
+      subImage: z.boolean().optional(),
+      sourceId: sourceId
         .optional()
         .describe(
-          'Set to true if purging a watermark, blend, or mask sub-image to cascade purge to parent images'
-        ),
-      sourceId: z.string().optional().describe('Source ID, required when subImage is true')
+          'Required for sub-image purge; discover the parent source with list_sources.'
+        )
     })
   )
-  .output(
-    z.object({
-      purgeId: z.string().describe('Unique identifier for the purge request')
-    })
-  )
+  .output(z.object({ purgeId: z.string() }))
   .handleInvocation(async ctx => {
-    let client = new ImgixClient(ctx.auth.token);
-
-    let result = await client.purge(ctx.input.url, {
-      subImage: ctx.input.subImage,
-      sourceId: ctx.input.sourceId
-    });
-
-    let purgeId = result.data?.attributes?.purge_id ?? result.data?.id ?? '';
-
+    const parsed = publicUrl(ctx.input.url);
+    if (parsed.protocol !== 'https:')
+      throw createApiServiceError('Use an HTTPS imgix asset URL for purge.', { parent: {} });
+    if (ctx.input.subImage && !ctx.input.sourceId)
+      throw createApiServiceError('sourceId is required for a sub-image purge.', {
+        parent: {}
+      });
+    if (
+      ctx.input.subImage &&
+      !parsed.searchParams.has('mark') &&
+      !parsed.searchParams.has('blend')
+    )
+      throw createApiServiceError(
+        'A sub-image purge URL must contain the documented mark or blend parameter.',
+        { parent: {} }
+      );
+    if (/\s/.test(ctx.input.url))
+      throw createApiServiceError('Percent-encode spaces in the exact purge URL.', {
+        parent: {}
+      });
+    const result = await new ImgixClient(ctx.auth.token).purge(ctx.input.url, ctx.input);
     return {
-      output: { purgeId },
-      message: `Purged **${ctx.input.url}**${ctx.input.subImage ? ' (including parent images)' : ''}. Purge ID: \`${purgeId}\`.`
+      output: { purgeId: result.data.id },
+      message: `Purge request ${result.data.id} was accepted. Origin data, usage history, and client caches may remain.`
     };
   })
   .build();

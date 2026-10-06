@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OneLoginClient } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageApp = SlateTool.create(spec, {
@@ -21,14 +22,17 @@ export let manageApp = SlateTool.create(spec, {
       visible: z.boolean().optional().describe('Whether the app is visible in the portal'),
       policyId: z.number().optional().describe('Security policy ID to apply'),
       configuration: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('App-specific configuration settings'),
       parameters: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Custom parameter mappings'),
-      provisioning: z.record(z.string(), z.any()).optional().describe('Provisioning settings'),
+      provisioning: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provisioning settings'),
       allowAssumedSignin: z.boolean().optional().describe('Allow assumed sign-in')
     })
   )
@@ -40,13 +44,10 @@ export let manageApp = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
     if (ctx.input.action === 'create') {
-      let body: Record<string, any> = {
+      let body: Record<string, unknown> = {
         connector_id: ctx.input.connectorId,
         name: ctx.input.name
       };
@@ -67,8 +68,8 @@ export let manageApp = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.appId) throw new Error('appId is required for update');
-      let body: Record<string, any> = {};
+      if (!ctx.input.appId) fail('appId is required for update');
+      let body: Record<string, unknown> = {};
       if (ctx.input.name !== undefined) body.name = ctx.input.name;
       if (ctx.input.description !== undefined) body.description = ctx.input.description;
       if (ctx.input.visible !== undefined) body.visible = ctx.input.visible;
@@ -87,7 +88,7 @@ export let manageApp = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.appId) throw new Error('appId is required for delete');
+      if (!ctx.input.appId) fail('appId is required for delete');
       await client.deleteApp(ctx.input.appId);
       return {
         output: { appId: ctx.input.appId, success: true },
@@ -95,5 +96,5 @@ export let manageApp = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    fail(`Unknown action: ${ctx.input.action}`);
   });

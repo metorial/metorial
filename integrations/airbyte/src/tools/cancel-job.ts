@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let cancelJobTool = SlateTool.create(spec, {
   name: 'Cancel Job',
   key: 'cancel_job',
-  description: `Cancel a running Airbyte sync or reset job. Returns the updated job status after cancellation.`,
+  description: `Request cancellation of an Airbyte sync or reset job. Returns the current job status; use get_job to confirm failed, succeeded or cancelled. The incomplete status can retry and is not terminal.`,
   tags: {
     destructive: true
   }
@@ -35,7 +35,7 @@ export let cancelJobTool = SlateTool.create(spec, {
         jobType: job.jobType,
         connectionId: job.connectionId
       },
-      message: `Cancelled job **${job.jobId}** (status: ${job.status}).`
+      message: `Cancellation requested for job **${job.jobId}** (status: ${job.status}).`
     };
   })
   .build();

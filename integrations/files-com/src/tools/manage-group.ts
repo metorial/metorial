@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { nativeId, optionalText, reject, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageGroup = SlateTool.create(spec, {
@@ -65,10 +66,7 @@ export let manageGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let { action, groupId } = ctx.input;
 
@@ -79,11 +77,11 @@ export let manageGroup = SlateTool.create(spec, {
       });
 
       let groups = result.groups.map((g: Record<string, unknown>) => ({
-        groupId: Number(g.id),
-        name: String(g.name ?? ''),
-        notes: g.notes ? String(g.notes) : undefined,
-        userIds: g.user_ids ? String(g.user_ids) : undefined,
-        adminIds: g.admin_ids ? String(g.admin_ids) : undefined
+        groupId: nativeId(g.id),
+        name: text(g.name),
+        notes: optionalText(g.notes),
+        userIds: optionalText(g.user_ids),
+        adminIds: optionalText(g.admin_ids)
       }));
 
       return {
@@ -93,7 +91,7 @@ export let manageGroup = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!groupId) throw new Error('groupId is required for delete');
+      if (!groupId) reject('groupId is required for delete');
       await client.deleteGroup(groupId);
       return {
         output: { deleted: true },
@@ -115,14 +113,14 @@ export let manageGroup = SlateTool.create(spec, {
     if (ctx.input.allowedIps !== undefined) data.allowed_ips = ctx.input.allowedIps;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create');
+      if (!ctx.input.name) reject('name is required for create');
       let result = await client.createGroup(data);
       return {
         output: {
           group: {
-            groupId: Number(result.id),
-            name: String(result.name ?? ''),
-            notes: result.notes ? String(result.notes) : undefined
+            groupId: nativeId(result.id),
+            name: text(result.name),
+            notes: optionalText(result.notes)
           }
         },
         message: `Created group **${result.name}** (ID: ${result.id})`
@@ -130,14 +128,14 @@ export let manageGroup = SlateTool.create(spec, {
     }
 
     // update
-    if (!groupId) throw new Error('groupId is required for update');
+    if (!groupId) reject('groupId is required for update');
     let result = await client.updateGroup(groupId, data);
     return {
       output: {
         group: {
-          groupId: Number(result.id),
-          name: String(result.name ?? ''),
-          notes: result.notes ? String(result.notes) : undefined
+          groupId: nativeId(result.id),
+          name: text(result.name),
+          notes: optionalText(result.notes)
         }
       },
       message: `Updated group **${result.name}** (ID: ${result.id})`

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let createOpportunity = SlateTool.create(spec, {
@@ -53,18 +53,18 @@ export let createOpportunity = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let data: Record<string, any> = {
+    let data: Row = {
       account: ctx.input.accountId
     };
     if (ctx.input.name) data.name = ctx.input.name;
-    if (ctx.input.ownerId) data.owner = ctx.input.ownerId;
-    if (ctx.input.stageId) data.stage = ctx.input.stageId;
+    if (ctx.input.ownerId !== undefined) data.owner = ctx.input.ownerId;
+    if (ctx.input.stageId !== undefined) data.stage = ctx.input.stageId;
     if (ctx.input.value !== undefined) data.value = ctx.input.value;
-    if (ctx.input.currencyId) data.currency = ctx.input.currencyId;
+    if (ctx.input.currencyId !== undefined) data.currency = ctx.input.currencyId;
     if (ctx.input.closeDate) data.close_date = ctx.input.closeDate;
     if (ctx.input.probability !== undefined) data.probability = ctx.input.probability;
-    if (ctx.input.assigneeId) data.assignee = ctx.input.assigneeId;
-    if (ctx.input.mainContactId) data.main_contact = ctx.input.mainContactId;
+    if (ctx.input.assigneeId !== undefined) data.assignee = ctx.input.assigneeId;
+    if (ctx.input.mainContactId !== undefined) data.main_contact = ctx.input.mainContactId;
     if (ctx.input.tags) data.tags = ctx.input.tags;
     if (ctx.input.startDate) data.start_date = ctx.input.startDate;
     if (ctx.input.recurringPricePerUnit !== undefined)
@@ -76,7 +76,7 @@ export let createOpportunity = SlateTool.create(spec, {
     if (ctx.input.custom) data.custom = ctx.input.custom;
 
     let result = await client.createOpportunity(data);
-    let opportunityId = result.id ?? 0;
+    let opportunityId = result.id;
 
     return {
       output: {

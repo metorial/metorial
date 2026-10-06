@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,8 @@ export let auth = SlateAuth.create()
       apiKey: z.string().describe('Your AI21 Studio API key')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim())
+        throw createApiServiceError('Enter a valid AI21 Studio API key.');
       return {
         output: {
           token: ctx.input.apiKey

@@ -1,393 +1,247 @@
-import { createAxios } from 'slates';
+import { createAuthenticatedAxios, pickDefined } from 'slates';
+import type { z } from 'zod';
+import {
+  actionSchema,
+  articleSchema,
+  contactSchema,
+  pageSchema,
+  paymentSchema,
+  profileSchema,
+  references,
+  salesSchema,
+  voucherListSchema,
+  voucherSchema
+} from './schemas';
+import {
+  apiError,
+  dateOnly,
+  exact,
+  fail,
+  integer,
+  pageParams,
+  parse,
+  parseJsonMoney,
+  pathId,
+  required,
+  searchText
+} from './validation';
 
-let BASE_URL = 'https://api.lexware.io/v1';
+export const BASE_URL = 'https://api.lexware.io/v1';
+export const resourcePaths = {
+  contact: 'contacts',
+  invoice: 'invoices',
+  quotation: 'quotations',
+  credit_note: 'credit-notes',
+  order_confirmation: 'order-confirmations',
+  article: 'articles',
+  voucher: 'vouchers'
+} as const;
+export type ResourceType = keyof typeof resourcePaths;
+export type ReferenceType = keyof typeof references;
+type Filters = {
+  page?: number;
+  size?: number;
+  [key: string]: string | number | boolean | undefined;
+};
+type SalesOptions = { finalize?: boolean; precedingSalesVoucherId?: string };
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
-
+  private http: ReturnType<typeof createAuthenticatedAxios>;
   constructor(params: { token: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${params.token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${required(params.token, 'Connection token')}` },
+      headers: { Accept: 'application/json' },
+      timeout: 30000,
+      maxRedirects: 0,
+      transformResponse: [parseJsonMoney],
+      errorAdapter: apiError
     });
   }
-
-  // ── Profile ──
-
-  async getProfile(): Promise<any> {
-    let response = await this.http.get('/profile');
-    return response.data;
-  }
-
-  // ── Contacts ──
-
-  async createContact(contact: any): Promise<any> {
-    let response = await this.http.post('/contacts', contact);
-    return response.data;
-  }
-
-  async getContact(contactId: string): Promise<any> {
-    let response = await this.http.get(`/contacts/${contactId}`);
-    return response.data;
-  }
-
-  async updateContact(contactId: string, contact: any): Promise<any> {
-    let response = await this.http.put(`/contacts/${contactId}`, contact);
-    return response.data;
-  }
-
-  async listContacts(filters?: {
-    email?: string;
-    name?: string;
-    number?: number;
-    customer?: boolean;
-    vendor?: boolean;
-    page?: number;
-  }): Promise<any> {
-    let params: Record<string, string> = {};
-    if (filters?.email) params.email = filters.email;
-    if (filters?.name) params.name = filters.name;
-    if (filters?.number !== undefined) params.number = String(filters.number);
-    if (filters?.customer !== undefined) params.customer = String(filters.customer);
-    if (filters?.vendor !== undefined) params.vendor = String(filters.vendor);
-    if (filters?.page !== undefined) params.page = String(filters.page);
-
-    let response = await this.http.get('/contacts', { params });
-    return response.data;
-  }
-
-  // ── Invoices ──
-
-  async createInvoice(
-    invoice: any,
-    options?: { finalize?: boolean; precedingSalesVoucherId?: string }
-  ): Promise<any> {
-    let params: Record<string, string> = {};
-    if (options?.finalize) params.finalize = 'true';
-    if (options?.precedingSalesVoucherId)
-      params.precedingSalesVoucherId = options.precedingSalesVoucherId;
-
-    let response = await this.http.post('/invoices', invoice, { params });
-    return response.data;
-  }
-
-  async getInvoice(invoiceId: string): Promise<any> {
-    let response = await this.http.get(`/invoices/${invoiceId}`);
-    return response.data;
-  }
-
-  async downloadInvoiceFile(invoiceId: string): Promise<any> {
-    let response = await this.http.get(`/invoices/${invoiceId}/file`, {
-      responseType: 'arraybuffer'
+  private async get<S extends z.ZodType>(
+    path: string,
+    schema: S,
+    params?: Filters
+  ): Promise<z.output<S>> {
+    const response = await this.http.get<unknown>(path, {
+      params: params ? pickDefined(params) : undefined
     });
-    return response.data;
+    return parse(schema, response.data);
   }
-
-  // ── Credit Notes ──
-
-  async createCreditNote(
-    creditNote: any,
-    options?: { finalize?: boolean; precedingSalesVoucherId?: string }
-  ): Promise<any> {
-    let params: Record<string, string> = {};
-    if (options?.finalize) params.finalize = 'true';
-    if (options?.precedingSalesVoucherId)
-      params.precedingSalesVoucherId = options.precedingSalesVoucherId;
-
-    let response = await this.http.post('/credit-notes', creditNote, { params });
-    return response.data;
+  private async write(
+    path: string,
+    data: unknown,
+    method: 'post' | 'put',
+    params?: SalesOptions
+  ) {
+    try {
+      const response = await this.http[method]<unknown>(path, data, {
+        params: params ? pickDefined(params) : undefined
+      });
+      return parse(actionSchema, response.data);
+    } catch (error) {
+      const safe = apiError(error);
+      safe.data.operationOutcome = 'unconfirmed';
+      throw safe;
+    }
   }
-
-  async getCreditNote(creditNoteId: string): Promise<any> {
-    let response = await this.http.get(`/credit-notes/${creditNoteId}`);
-    return response.data;
+  async getProfile() {
+    return this.get('/profile', profileSchema);
   }
-
-  // ── Quotations ──
-
-  async createQuotation(quotation: any, options?: { finalize?: boolean }): Promise<any> {
-    let params: Record<string, string> = {};
-    if (options?.finalize) params.finalize = 'true';
-
-    let response = await this.http.post('/quotations', quotation, { params });
-    return response.data;
+  async createContact(data: unknown) {
+    return this.write('/contacts', data, 'post');
   }
-
-  async getQuotation(quotationId: string): Promise<any> {
-    let response = await this.http.get(`/quotations/${quotationId}`);
-    return response.data;
+  async getContact(id: string) {
+    const value = await this.get(`/contacts/${pathId(id)}`, contactSchema);
+    exact(value.id, id);
+    return value;
   }
-
-  // ── Order Confirmations ──
-
-  async createOrderConfirmation(
-    orderConfirmation: any,
-    options?: { finalize?: boolean; precedingSalesVoucherId?: string }
-  ): Promise<any> {
-    let params: Record<string, string> = {};
-    if (options?.finalize) params.finalize = 'true';
-    if (options?.precedingSalesVoucherId)
-      params.precedingSalesVoucherId = options.precedingSalesVoucherId;
-
-    let response = await this.http.post('/order-confirmations', orderConfirmation, { params });
-    return response.data;
+  async updateContact(id: string, data: unknown) {
+    const value = await this.write(`/contacts/${pathId(id)}`, data, 'put');
+    exact(value.id, id);
+    return value;
   }
-
-  async getOrderConfirmation(orderConfirmationId: string): Promise<any> {
-    let response = await this.http.get(`/order-confirmations/${orderConfirmationId}`);
-    return response.data;
-  }
-
-  // ── Delivery Notes ──
-
-  async createDeliveryNote(
-    deliveryNote: any,
-    options?: { finalize?: boolean; precedingSalesVoucherId?: string }
-  ): Promise<any> {
-    let params: Record<string, string> = {};
-    if (options?.finalize) params.finalize = 'true';
-    if (options?.precedingSalesVoucherId)
-      params.precedingSalesVoucherId = options.precedingSalesVoucherId;
-
-    let response = await this.http.post('/delivery-notes', deliveryNote, { params });
-    return response.data;
-  }
-
-  async getDeliveryNote(deliveryNoteId: string): Promise<any> {
-    let response = await this.http.get(`/delivery-notes/${deliveryNoteId}`);
-    return response.data;
-  }
-
-  // ── Dunnings ──
-
-  async createDunning(
-    dunning: any,
-    options?: { finalize?: boolean; precedingSalesVoucherId?: string }
-  ): Promise<any> {
-    let params: Record<string, string> = {};
-    if (options?.finalize) params.finalize = 'true';
-    if (options?.precedingSalesVoucherId)
-      params.precedingSalesVoucherId = options.precedingSalesVoucherId;
-
-    let response = await this.http.post('/dunnings', dunning, { params });
-    return response.data;
-  }
-
-  async getDunning(dunningId: string): Promise<any> {
-    let response = await this.http.get(`/dunnings/${dunningId}`);
-    return response.data;
-  }
-
-  // ── Down Payment Invoices ──
-
-  async getDownPaymentInvoice(invoiceId: string): Promise<any> {
-    let response = await this.http.get(`/down-payment-invoices/${invoiceId}`);
-    return response.data;
-  }
-
-  // ── Articles ──
-
-  async createArticle(article: any): Promise<any> {
-    let response = await this.http.post('/articles', article);
-    return response.data;
-  }
-
-  async getArticle(articleId: string): Promise<any> {
-    let response = await this.http.get(`/articles/${articleId}`);
-    return response.data;
-  }
-
-  async updateArticle(articleId: string, article: any): Promise<any> {
-    let response = await this.http.put(`/articles/${articleId}`, article);
-    return response.data;
-  }
-
-  async deleteArticle(articleId: string): Promise<any> {
-    let response = await this.http.delete(`/articles/${articleId}`);
-    return response.data;
-  }
-
-  async listArticles(filters?: {
-    articleNumber?: string;
-    gtin?: string;
-    type?: string;
-    page?: number;
-  }): Promise<any> {
-    let params: Record<string, string> = {};
-    if (filters?.articleNumber) params.articleNumber = filters.articleNumber;
-    if (filters?.gtin) params.gtin = filters.gtin;
-    if (filters?.type) params.type = filters.type;
-    if (filters?.page !== undefined) params.page = String(filters.page);
-
-    let response = await this.http.get('/articles', { params });
-    return response.data;
-  }
-
-  // ── Vouchers (Bookkeeping) ──
-
-  async createVoucher(voucher: any): Promise<any> {
-    let response = await this.http.post('/vouchers', voucher);
-    return response.data;
-  }
-
-  async getVoucher(voucherId: string): Promise<any> {
-    let response = await this.http.get(`/vouchers/${voucherId}`);
-    return response.data;
-  }
-
-  async updateVoucher(voucherId: string, voucher: any): Promise<any> {
-    let response = await this.http.put(`/vouchers/${voucherId}`, voucher);
-    return response.data;
-  }
-
-  async uploadVoucherFile(
-    voucherId: string,
-    file: Buffer,
-    filename: string,
-    contentType: string
-  ): Promise<any> {
-    let formData = new FormData();
-    let blob = new Blob([file], { type: contentType });
-    formData.append('file', blob, filename);
-
-    let response = await this.http.post(`/vouchers/${voucherId}/files`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+  async listContacts(filters: Filters = {}) {
+    pageParams(filters);
+    integer(typeof filters.number === 'number' ? filters.number : undefined, 'number');
+    return this.get('/contacts', pageSchema(contactSchema), {
+      ...filters,
+      name: searchText(typeof filters.name === 'string' ? filters.name : undefined)
     });
-    return response.data;
   }
-
-  // ── Voucherlist ──
-
-  async listVouchers(filters?: {
-    voucherType?: string;
-    voucherStatus?: string;
-    voucherDateFrom?: string;
-    voucherDateTo?: string;
-    createdDateFrom?: string;
-    createdDateTo?: string;
-    updatedDateFrom?: string;
-    updatedDateTo?: string;
-    contactId?: string;
-    voucherNumber?: string;
-    page?: number;
-    size?: number;
-    sort?: string;
-  }): Promise<any> {
-    let params: Record<string, string> = {};
-    if (filters?.voucherType) params.voucherType = filters.voucherType;
-    if (filters?.voucherStatus) params.voucherStatus = filters.voucherStatus;
-    if (filters?.voucherDateFrom) params.voucherDateFrom = filters.voucherDateFrom;
-    if (filters?.voucherDateTo) params.voucherDateTo = filters.voucherDateTo;
-    if (filters?.createdDateFrom) params.createdDateFrom = filters.createdDateFrom;
-    if (filters?.createdDateTo) params.createdDateTo = filters.createdDateTo;
-    if (filters?.updatedDateFrom) params.updatedDateFrom = filters.updatedDateFrom;
-    if (filters?.updatedDateTo) params.updatedDateTo = filters.updatedDateTo;
-    if (filters?.contactId) params.contactId = filters.contactId;
-    if (filters?.voucherNumber) params.voucherNumber = filters.voucherNumber;
-    if (filters?.page !== undefined) params.page = String(filters.page);
-    if (filters?.size !== undefined) params.size = String(filters.size);
-    if (filters?.sort) params.sort = filters.sort;
-
-    let response = await this.http.get('/voucherlist', { params });
-    return response.data;
+  async createInvoice(data: unknown, options?: SalesOptions) {
+    return this.createSales('invoice', data, options);
   }
-
-  // ── Files ──
-
-  async uploadFile(file: Buffer, filename: string, contentType: string): Promise<any> {
-    let formData = new FormData();
-    let blob = new Blob([file], { type: contentType });
-    formData.append('file', blob, filename);
-
-    let response = await this.http.post('/files', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+  async createCreditNote(data: unknown, options?: SalesOptions) {
+    return this.createSales('credit_note', data, options);
+  }
+  async createQuotation(data: unknown, options?: SalesOptions) {
+    return this.createSales('quotation', data, options);
+  }
+  async createOrderConfirmation(data: unknown, options?: SalesOptions) {
+    return this.createSales('order_confirmation', data, options);
+  }
+  private async createSales(
+    kind: 'invoice' | 'quotation' | 'credit_note' | 'order_confirmation',
+    data: unknown,
+    options?: SalesOptions
+  ) {
+    if (options?.precedingSalesVoucherId !== undefined)
+      required(options.precedingSalesVoucherId, 'precedingSalesVoucherId');
+    return this.write(`/${resourcePaths[kind]}`, data, 'post', options);
+  }
+  async getInvoice(id: string) {
+    const value = await this.get(`/invoices/${pathId(id)}`, salesSchema);
+    exact(value.id, id);
+    return value;
+  }
+  async createArticle(data: unknown) {
+    return this.write('/articles', data, 'post');
+  }
+  async getArticle(id: string) {
+    const value = await this.get(`/articles/${pathId(id)}`, articleSchema);
+    exact(value.id, id);
+    return value;
+  }
+  async updateArticle(id: string, data: unknown) {
+    const value = await this.write(`/articles/${pathId(id)}`, data, 'put');
+    exact(value.id, id);
+    return value;
+  }
+  async deleteArticle(id: string) {
+    try {
+      await this.http.delete(`/articles/${pathId(id)}`);
+    } catch (error) {
+      const safe = apiError(error);
+      safe.data.operationOutcome = 'unconfirmed';
+      throw safe;
+    }
+  }
+  async listArticles(filters: Filters = {}) {
+    pageParams(filters);
+    return this.get('/articles', pageSchema(articleSchema), {
+      ...filters,
+      type: typeof filters.type === 'string' ? filters.type.toUpperCase() : undefined
     });
-    return response.data;
   }
-
-  async downloadFile(fileId: string): Promise<any> {
-    let response = await this.http.get(`/files/${fileId}`, {
-      responseType: 'arraybuffer'
+  async createVoucher(data: unknown) {
+    return this.write('/vouchers', data, 'post');
+  }
+  async getVoucher(id: string) {
+    const value = await this.get(`/vouchers/${pathId(id)}`, voucherSchema);
+    exact(value.id, id);
+    return value;
+  }
+  async updateVoucher(id: string, data: unknown) {
+    const value = await this.write(`/vouchers/${pathId(id)}`, data, 'put');
+    exact(value.id, id);
+    return value;
+  }
+  async listVouchers(filters: Filters = {}) {
+    pageParams(filters);
+    required(
+      typeof filters.voucherType === 'string' ? filters.voucherType : undefined,
+      'voucherType (use any for all types)'
+    );
+    required(
+      typeof filters.voucherStatus === 'string' ? filters.voucherStatus : undefined,
+      'voucherStatus (use any for all statuses)'
+    );
+    for (const prefix of ['voucherDate', 'createdDate', 'updatedDate']) {
+      const from = filters[`${prefix}From`],
+        to = filters[`${prefix}To`];
+      dateOnly(typeof from === 'string' ? from : undefined, `${prefix}From`);
+      dateOnly(typeof to === 'string' ? to : undefined, `${prefix}To`);
+      if (typeof from === 'string' && typeof to === 'string' && from > to)
+        fail(`${prefix}From must not be after ${prefix}To.`);
+    }
+    if (
+      filters.sort !== undefined &&
+      (typeof filters.sort !== 'string' ||
+        !/^(voucherDate|voucherNumber|createdDate|updatedDate)(,(ASC|DESC))?$/.test(
+          filters.sort
+        ))
+    )
+      fail('sort must use a supported field and optional ASC or DESC direction.');
+    return this.get('/voucherlist', pageSchema(voucherListSchema), {
+      ...filters,
+      voucherNumber: searchText(
+        typeof filters.voucherNumber === 'string' ? filters.voucherNumber : undefined
+      )
     });
-    return response.data;
   }
-
-  // ── Payments ──
-
-  async getPayment(paymentId: string): Promise<any> {
-    let response = await this.http.get(`/payments/${paymentId}`);
-    return response.data;
+  async getPayment(id: string) {
+    return this.get(`/payments/${pathId(id)}`, paymentSchema);
   }
-
-  // ── Payment Conditions ──
-
-  async listPaymentConditions(): Promise<any> {
-    let response = await this.http.get('/payment-conditions');
-    return response.data;
+  async getResource(type: ResourceType, id: string) {
+    const schema =
+      type === 'article'
+        ? articleSchema
+        : type === 'contact'
+          ? contactSchema
+          : type === 'voucher'
+            ? voucherSchema
+            : salesSchema;
+    const value = await this.get(`/${resourcePaths[type]}/${pathId(id)}`, schema);
+    exact(value.id, id);
+    return value;
   }
-
-  // ── Posting Categories ──
-
-  async listPostingCategories(): Promise<any> {
-    let response = await this.http.get('/posting-categories');
-    return response.data;
-  }
-
-  // ── Print Layouts ──
-
-  async listPrintLayouts(): Promise<any> {
-    let response = await this.http.get('/print-layouts');
-    return response.data;
-  }
-
-  // ── Countries ──
-
-  async listCountries(): Promise<any> {
-    let response = await this.http.get('/countries');
-    return response.data;
-  }
-
-  // ── Recurring Templates ──
-
-  async getRecurringTemplate(templateId: string): Promise<any> {
-    let response = await this.http.get(`/recurring-templates/${templateId}`);
-    return response.data;
-  }
-
-  async listRecurringTemplates(): Promise<any> {
-    let response = await this.http.get('/recurring-templates');
-    return response.data;
-  }
-
-  // ── Event Subscriptions ──
-
-  async createEventSubscription(eventType: string, callbackUrl: string): Promise<any> {
-    let response = await this.http.post('/event-subscriptions', {
-      eventType,
-      callbackUrl
-    });
-    return response.data;
-  }
-
-  async getEventSubscription(subscriptionId: string): Promise<any> {
-    let response = await this.http.get(`/event-subscriptions/${subscriptionId}`);
-    return response.data;
-  }
-
-  async listEventSubscriptions(): Promise<any> {
-    let response = await this.http.get('/event-subscriptions');
-    return response.data;
-  }
-
-  async deleteEventSubscription(subscriptionId: string): Promise<void> {
-    await this.http.delete(`/event-subscriptions/${subscriptionId}`);
+  async listReferenceData(
+    type: 'posting_categories'
+  ): Promise<z.output<typeof references.posting_categories>>;
+  async listReferenceData(
+    type: 'payment_conditions'
+  ): Promise<z.output<typeof references.payment_conditions>>;
+  async listReferenceData(type: 'countries'): Promise<z.output<typeof references.countries>>;
+  async listReferenceData(
+    type: 'print_layouts'
+  ): Promise<z.output<typeof references.print_layouts>>;
+  async listReferenceData(type: ReferenceType) {
+    if (type === 'posting_categories')
+      return this.get('/posting-categories', references.posting_categories);
+    if (type === 'payment_conditions')
+      return this.get('/payment-conditions', references.payment_conditions);
+    if (type === 'countries') return this.get('/countries', references.countries);
+    return this.get('/print-layouts', references.print_layouts);
   }
 }

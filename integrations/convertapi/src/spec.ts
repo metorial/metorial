@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'convertapi',
   name: 'ConvertAPI',
   description:
-    'Cloud-based file conversion and document management API supporting 300+ file formats. Convert documents, manipulate PDFs, extract data, and generate documents.',
+    'Convert files, process PDFs, retrieve conversion results, and manage temporary file storage.',
   metadata: {},
   config,
   auth

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { recordSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getReimbursement = SlateTool.create(spec, {
@@ -18,14 +19,11 @@ export let getReimbursement = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      reimbursement: z.any().describe('Full reimbursement object')
+      reimbursement: recordSchema.describe('Full reimbursement object')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = clientFor(ctx);
 
     let reimbursement = await client.getReimbursement(ctx.input.reimbursementId);
 

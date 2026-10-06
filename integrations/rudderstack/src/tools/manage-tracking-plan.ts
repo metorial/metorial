@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ControlPlaneClient } from '../lib/client';
+import { ControlPlaneClient, stringField } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageTrackingPlan = SlateTool.create(spec, {
@@ -12,7 +12,7 @@ Also supports upserting or removing events within a tracking plan.`,
     'Tracking plan names must be 3-65 characters, start with a letter, and contain only letters, numbers, underscores, commas, spaces, dashes, and dots.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -30,9 +30,11 @@ Also supports upserting or removing events within a tracking plan.`,
       name: z.string().optional().describe('Tracking plan name (required for create)'),
       description: z.string().optional().describe('Tracking plan description'),
       events: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .optional()
-        .describe('Events to upsert into the tracking plan (for upsert_events action)'),
+        .describe(
+          'Individual event objects to upsert sequentially: properties for the current API, id/property IDs for existing catalog entries, or rules for the older endpoint. A later failure does not roll back earlier updates.'
+        ),
       eventId: z
         .string()
         .optional()
@@ -47,98 +49,62 @@ Also supports upserting or removing events within a tracking plan.`,
         .boolean()
         .optional()
         .describe('Whether the tracking plan or event was deleted'),
+      events: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Accepted event records; updates can take several minutes to appear.'),
       success: z.boolean().describe('Whether the operation succeeded')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ControlPlaneClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
+    let client = new ControlPlaneClient({ token: ctx.auth.token, region: ctx.config.region });
     let { action, trackingPlanId, name, description, events, eventId } = ctx.input;
-
     if (action === 'create') {
-      if (!name) throw new Error('Name is required when creating a tracking plan.');
-
-      let result = await client.createTrackingPlan({ name, description });
-      let plan = result.trackingPlan || result;
-
+      if (!name?.trim()) throw createApiServiceError('Name is required for create.');
+      let plan = await client.createTrackingPlan({ name, description });
       return {
         output: {
-          trackingPlanId: plan.id,
-          name: plan.name,
+          trackingPlanId: stringField(plan.id, 'the tracking plan ID'),
+          name: typeof plan.name === 'string' ? plan.name : undefined,
           success: true
         },
-        message: `Created tracking plan **${plan.name}** (\`${plan.id}\`).`
+        message: 'Created the tracking plan.'
       };
     }
-
+    if (!trackingPlanId) throw createApiServiceError('Tracking plan ID is required.');
     if (action === 'update') {
-      if (!trackingPlanId) throw new Error('Tracking plan ID is required for update.');
-
-      let result = await client.updateTrackingPlan(trackingPlanId, { name, description });
-      let plan = result.trackingPlan || result;
-
+      let plan = await client.updateTrackingPlan(trackingPlanId, { name, description });
       return {
         output: {
-          trackingPlanId: plan.id || trackingPlanId,
-          name: plan.name || name,
+          trackingPlanId: stringField(plan.id, 'the tracking plan ID'),
+          name: typeof plan.name === 'string' ? plan.name : undefined,
           success: true
         },
-        message: `Updated tracking plan \`${trackingPlanId}\`.`
+        message: 'Updated the tracking plan.'
       };
     }
-
     if (action === 'delete') {
-      if (!trackingPlanId) throw new Error('Tracking plan ID is required for delete.');
-
       await client.deleteTrackingPlan(trackingPlanId);
-
       return {
-        output: {
-          trackingPlanId,
-          deleted: true,
-          success: true
-        },
-        message: `Deleted tracking plan \`${trackingPlanId}\`.`
+        output: { trackingPlanId, deleted: true, success: true },
+        message: 'Deleted the tracking plan.'
       };
     }
-
-    if (action === 'upsert_events') {
-      if (!trackingPlanId)
-        throw new Error('Tracking plan ID is required for upserting events.');
-      if (!events || events.length === 0)
-        throw new Error('Events array is required for upsert_events action.');
-
-      await client.upsertTrackingPlanEvents(trackingPlanId, events);
-
-      return {
-        output: {
-          trackingPlanId,
-          success: true
-        },
-        message: `Upserted **${events.length}** event(s) into tracking plan \`${trackingPlanId}\`.`
-      };
-    }
-
     if (action === 'delete_event') {
-      if (!trackingPlanId)
-        throw new Error('Tracking plan ID is required for deleting an event.');
-      if (!eventId) throw new Error('Event ID is required for delete_event action.');
-
+      if (!eventId) throw createApiServiceError('Event ID is required for delete_event.');
       await client.deleteTrackingPlanEvent(trackingPlanId, eventId);
-
       return {
-        output: {
-          trackingPlanId,
-          deleted: true,
-          success: true
-        },
-        message: `Deleted event \`${eventId}\` from tracking plan \`${trackingPlanId}\`.`
+        output: { trackingPlanId, deleted: true, success: true },
+        message: 'Removed the event from the tracking plan; the data catalog event remains.'
       };
     }
-
-    throw new Error(`Unknown action: ${action}`);
+    if (!events?.length)
+      throw createApiServiceError('Provide at least one event for upsert_events.');
+    let acceptedEvents = await client.upsertTrackingPlanEvents(trackingPlanId, events);
+    return {
+      output: { trackingPlanId, success: true, events: acceptedEvents },
+      message:
+        'Accepted the event updates. Read the tracking plan events to verify asynchronous processing. Earlier events may have been accepted if a later event fails.'
+    };
   })
   .build();

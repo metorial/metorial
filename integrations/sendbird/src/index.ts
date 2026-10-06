@@ -20,8 +20,6 @@ import {
   updateGroupChannel,
   updateUser
 } from './tools';
-import { chatEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     moderateChannel,
     blockUser
   ],
-  triggers: [chatEvents]
+  triggers: []
 });

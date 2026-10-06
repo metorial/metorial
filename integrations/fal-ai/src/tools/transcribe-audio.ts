@@ -1,7 +1,26 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FalClient } from '../lib/client';
 import { spec } from '../spec';
+
+const transcriptionSchema = z.object({
+  text: z.string(),
+  language: z.string().nullish(),
+  inferred_languages: z.array(z.string()).nullish(),
+  chunks: z
+    .array(
+      z.object({
+        text: z.string(),
+        timestamp: z.array(z.number().nullable()).nullish(),
+        speaker: z.string().nullish()
+      })
+    )
+    .nullish(),
+  diarization_segments: z
+    .array(z.object({ timestamp: z.array(z.number().nullable()), speaker: z.string() }))
+    .nullish(),
+  timings: z.record(z.string(), z.any()).nullish()
+});
 
 export let transcribeAudio = SlateTool.create(spec, {
   name: 'Transcribe Audio',
@@ -14,7 +33,7 @@ Provide an audio URL and receive a full transcription with optional metadata.`,
     'Provide the audio file as a publicly accessible URL or upload it first using the Upload File tool.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -37,11 +56,13 @@ Provide an audio URL and receive a full transcription with optional metadata.`,
         .optional()
         .describe('Enable speaker diarization to identify different speakers'),
       chunkLevel: z
-        .enum(['segment', 'word'])
+        .enum(['none', 'segment', 'word'])
         .optional()
         .describe('Level of timestamp chunking for the output'),
       numSpeakers: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Expected number of speakers for diarization')
     })
@@ -55,7 +76,7 @@ Provide an audio URL and receive a full transcription with optional metadata.`,
           z.object({
             text: z.string().describe('Transcribed text for this chunk'),
             timestamp: z
-              .array(z.number())
+              .array(z.number().nullable())
               .optional()
               .describe('Start and end timestamps in seconds'),
             speaker: z.string().optional().describe('Speaker label if diarization is enabled')
@@ -63,6 +84,14 @@ Provide an audio URL and receive a full transcription with optional metadata.`,
         )
         .optional()
         .describe('Transcription chunks with timestamps and optional speaker labels'),
+      inferredLanguages: z
+        .array(z.string())
+        .optional()
+        .describe('Languages inferred by the transcription model'),
+      diarizationSegments: z
+        .array(z.object({ timestamp: z.array(z.number().nullable()), speaker: z.string() }))
+        .optional()
+        .describe('Speaker segments when diarization is enabled'),
       timings: z
         .record(z.string(), z.any())
         .optional()
@@ -86,20 +115,28 @@ Provide an audio URL and receive a full transcription with optional metadata.`,
     ctx.progress('Transcribing audio...');
     let result = await client.runModel(modelId, input);
 
-    let chunks = (result.chunks || []).map((c: any) => ({
+    const parsed = transcriptionSchema.safeParse(result);
+    if (!parsed.success)
+      throw createApiServiceError(
+        'The selected model did not return a valid transcription. Inspect its output schema with search_models or use run_model for other output shapes.'
+      );
+    const transcription = parsed.data;
+    let chunks = (transcription.chunks ?? []).map(c => ({
       text: c.text,
-      timestamp: c.timestamp,
-      speaker: c.speaker
+      timestamp: c.timestamp ?? undefined,
+      speaker: c.speaker ?? undefined
     }));
 
     return {
       output: {
-        text: result.text || '',
-        language: result.language,
+        text: transcription.text,
+        language: transcription.language ?? transcription.inferred_languages?.[0],
+        inferredLanguages: transcription.inferred_languages ?? undefined,
+        diarizationSegments: transcription.diarization_segments ?? undefined,
         chunks: chunks.length > 0 ? chunks : undefined,
-        timings: result.timings
+        timings: transcription.timings ?? undefined
       },
-      message: `Transcribed audio using **${modelId}**. Detected language: ${result.language || 'unknown'}. Text length: ${(result.text || '').length} characters.`
+      message: `Transcribed audio using **${modelId}**. Detected language: ${transcription.language ?? transcription.inferred_languages?.[0] ?? 'unknown'}. Text length: ${transcription.text.length} characters.`
     };
   })
   .build();

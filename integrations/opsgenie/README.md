@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/opsgenie.png" height="20"> Opsgenie
 
-Create, manage, and resolve alerts and incidents with priority levels, responders, and rich metadata. Track asynchronous alert and incident request status. Configure on-call schedules with rotations and temporary overrides, and query who is currently on-call. Define escalation policies to notify responders in order when alerts go unacknowledged. Manage teams, users, and services. Receive webhook notifications for alert activity such as creation, acknowledgment, and closure.
+Create, manage, and resolve alerts and incidents with priority levels, responders, and rich metadata. Track asynchronous alert and incident request status. Configure on-call schedules with rotations and temporary overrides, and query who is currently on-call. Define escalation policies to notify responders in order when alerts go unacknowledged. Manage teams, users, and services.
 
 ## Tools
 

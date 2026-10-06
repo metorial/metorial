@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, optionalNumber, optionalRow, optionalText, rows } from '../lib/client';
 import { spec } from '../spec';
 
 export let discoverCompanies = SlateTool.create(spec, {
@@ -27,6 +27,12 @@ export let discoverCompanies = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Filter by industry (e.g., ["Software", "Internet"])'),
+      organizationDomains: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Exact company domains to include, passed to the documented organization filter.'
+        ),
       companyType: z
         .array(z.string())
         .optional()
@@ -34,8 +40,18 @@ export let discoverCompanies = SlateTool.create(spec, {
       headquartersCountry: z.string().optional().describe('Filter by headquarters country'),
       headquartersState: z.string().optional().describe('Filter by headquarters state'),
       headquartersCity: z.string().optional().describe('Filter by headquarters city'),
-      headcountMin: z.number().optional().describe('Minimum employee headcount'),
-      headcountMax: z.number().optional().describe('Maximum employee headcount'),
+      headcountMin: z
+        .number()
+        .optional()
+        .describe(
+          'Minimum employee headcount; must align with Hunter bucket starts: 0,1,11,51,201,501,1001,5001,10001'
+        ),
+      headcountMax: z
+        .number()
+        .optional()
+        .describe(
+          'Maximum employee headcount; must align with bucket ends: 10,50,200,500,1000,5000,10000'
+        ),
       limit: z
         .number()
         .min(1)
@@ -47,7 +63,8 @@ export let discoverCompanies = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      totalCount: z.number().describe('Total number of companies matching the query'),
+      totalCount: z.number().optional().describe('Provider-reported total matching companies'),
+      returnedCount: z.number().describe('Companies returned in this page'),
       companies: z
         .array(
           z.object({
@@ -64,55 +81,85 @@ export let discoverCompanies = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let headquartersLocation: Record<string, any> | undefined;
+    const { headcountMin: min, headcountMax: max } = ctx.input;
+    const ranges: [number, number, string][] = [
+      [1, 10, '1-10'],
+      [11, 50, '11-50'],
+      [51, 200, '51-200'],
+      [201, 500, '201-500'],
+      [501, 1000, '501-1000'],
+      [1001, 5000, '1001-5000'],
+      [5001, 10000, '5001-10000'],
+      [10001, Number.POSITIVE_INFINITY, '10001+']
+    ];
     if (
+      (min !== undefined && ![0, ...ranges.map(r => r[0])].includes(min)) ||
+      (max !== undefined && !ranges.map(r => r[1]).includes(max)) ||
+      (min !== undefined && max !== undefined && min > max)
+    )
+      throw createApiServiceError(
+        'Hunter supports headcount buckets. Minimum must be 0, 1, 11, 51, 201, 501, 1001, 5001 or 10001; maximum must be 10, 50, 200, 500, 1000, 5000 or 10000. Omit an upper bound for 10001+. Arbitrary partial buckets cannot be filtered accurately.'
+      );
+    const headcount =
+      min === undefined && max === undefined
+        ? undefined
+        : ranges
+            .filter(r => r[0] >= (min ?? 0) && r[1] <= (max ?? Number.POSITIVE_INFINITY))
+            .map(r => r[2]);
+    const location =
       ctx.input.headquartersCountry ||
       ctx.input.headquartersState ||
       ctx.input.headquartersCity
-    ) {
-      headquartersLocation = {};
-      if (ctx.input.headquartersCountry)
-        headquartersLocation.country = ctx.input.headquartersCountry;
-      if (ctx.input.headquartersState)
-        headquartersLocation.state = ctx.input.headquartersState;
-      if (ctx.input.headquartersCity) headquartersLocation.city = ctx.input.headquartersCity;
-    }
-
-    let headcount: Record<string, any> | undefined;
-    if (ctx.input.headcountMin !== undefined || ctx.input.headcountMax !== undefined) {
-      headcount = {};
-      if (ctx.input.headcountMin !== undefined) headcount.min = ctx.input.headcountMin;
-      if (ctx.input.headcountMax !== undefined) headcount.max = ctx.input.headcountMax;
-    }
-
-    let result = await client.discoverCompanies({
+        ? {
+            country: ctx.input.headquartersCountry,
+            state: ctx.input.headquartersState,
+            city: ctx.input.headquartersCity
+          }
+        : undefined;
+    if (location && (location.city || location.state) && !location.country)
+      throw createApiServiceError(
+        'Provide headquartersCountry when filtering by city or state.'
+      );
+    if (location?.country?.toUpperCase() === 'US' && location.city && !location.state)
+      throw createApiServiceError('Provide headquartersState when filtering by a US city.');
+    const result = await new Client({ token: ctx.auth.token }).discoverCompanies({
       query: ctx.input.query,
-      headquartersLocation,
+      organization: ctx.input.organizationDomains
+        ? { domain: ctx.input.organizationDomains }
+        : undefined,
+      headquartersLocation: location
+        ? {
+            include: [
+              Object.fromEntries(
+                Object.entries(location).filter(([, value]) => value !== undefined)
+              )
+            ]
+          }
+        : undefined,
       industry: ctx.input.industry,
       headcount,
-      companyType: ctx.input.companyType,
+      companyType: ctx.input.companyType?.map(value =>
+        value === 'private' ? 'privately held' : value === 'public' ? 'public company' : value
+      ),
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
-
-    let companies = (result.data?.companies || result.data || []).map((c: any) => ({
-      domain: c.domain ?? null,
-      name: c.name ?? null,
-      industry: c.industry ?? null,
-      headcount: c.headcount ?? null,
-      country: c.country ?? null,
-      city: c.city ?? null,
-      emailCount: c.email_count ?? null
+    const companies = rows(result.data).map(c => ({
+      domain: optionalText(c.domain) ?? null,
+      name: optionalText(c.organization) ?? null,
+      industry: optionalText(c.industry) ?? null,
+      headcount: optionalText(c.headcount) ?? null,
+      country: optionalText(c.country) ?? null,
+      city: optionalText(c.city) ?? null,
+      emailCount: optionalNumber(optionalRow(c.emails_count).total) ?? null
     }));
-
     return {
       output: {
-        totalCount: result.meta?.total ?? companies.length,
-        companies
+        companies,
+        totalCount: optionalNumber(result.meta.results),
+        returnedCount: companies.length
       },
-      message: `Discovered **${companies.length}** companies matching the query.`
+      message: `Retrieved **${companies.length}** matching companies.`
     };
   })
   .build();

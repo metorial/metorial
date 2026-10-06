@@ -15,8 +15,7 @@
     "upload documents and media",
     "track job milestones",
     "manage financial worksheets",
-    "retrieve company settings",
-    "subscribe to webhook events"
+    "retrieve company settings"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/acculynx.jpeg"
 }

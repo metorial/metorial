@@ -1,9 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SerpApiClient } from '../lib/client';
+import { number, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 let locationSchema = z.object({
+  nativeLocationId: z
+    .string()
+    .optional()
+    .describe(
+      'Exact native opaque location ID; use this or canonicalName for location targeting.'
+    ),
   locationId: z.number().optional().describe('SerpApi location ID'),
   googleId: z.number().optional().describe('Google location ID'),
   name: z.string().optional().describe('Location display name'),
@@ -17,7 +24,10 @@ let locationSchema = z.object({
     .optional()
     .describe('Location type (e.g., "DMA Region", "City", "Country")'),
   reach: z.number().optional().describe('Audience size for this location'),
-  gpsCoordinates: z.array(z.number()).optional().describe('Latitude and longitude coordinates')
+  gpsCoordinates: z
+    .array(z.number())
+    .optional()
+    .describe('Native [longitude, latitude] coordinates')
 });
 
 export let locationsLookupTool = SlateTool.create(spec, {
@@ -45,7 +55,8 @@ export let locationsLookupTool = SlateTool.create(spec, {
     let data = await client.getLocations(ctx.input.query, ctx.input.limit);
 
     let locations = (Array.isArray(data) ? data : []).map((l: any) => ({
-      locationId: l.id,
+      nativeLocationId: text(l.id),
+      locationId: number(l.id),
       googleId: l.google_id,
       name: l.name,
       canonicalName: l.canonical_name,

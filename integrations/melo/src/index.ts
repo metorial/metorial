@@ -12,8 +12,6 @@ import {
   searchProperties,
   updateSavedSearch
 } from './tools';
-import { newPropertyMatch, propertyEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     locationAutocomplete,
     getPointsOfInterest
   ],
-  triggers: [propertyEvents, newPropertyMatch]
+  triggers: []
 });

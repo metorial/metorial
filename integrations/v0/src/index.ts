@@ -28,11 +28,13 @@ import {
   updateEnvVarsTool,
   updateProjectTool
 } from './tools';
-import { chatEventTrigger } from './triggers';
-
+import { currentTools } from './tools/current-chat';
+import { versionTools } from './tools/versions';
 export let provider = Slate.create({
   spec,
   tools: [
+    ...currentTools,
+    ...versionTools,
     listProjectsTool,
     createProjectTool,
     getProjectTool,
@@ -60,5 +62,5 @@ export let provider = Slate.create({
     assignProjectToChatTool,
     getAccountInfoTool
   ],
-  triggers: [chatEventTrigger]
+  triggers: []
 });

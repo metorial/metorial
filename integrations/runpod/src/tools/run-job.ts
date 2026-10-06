@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let runJob = SlateTool.create(spec, {
   name: 'Run Serverless Job',
   key: 'run_job',
-  description: `Submit a job to a Serverless endpoint. Choose between **synchronous** execution (waits for result, best for quick tasks under 30s) or **asynchronous** execution (returns immediately with a job ID for polling). Optionally specify a webhook URL to receive results when complete.`,
+  description: `Submit a job to a Serverless endpoint. Choose between **synchronous** execution (waits for result, best for shorter jobs, waits up to 90 seconds) or **asynchronous** execution (returns immediately with a job ID for polling). Optionally specify a webhook URL to receive results when complete.`,
   instructions: [
-    'Use synchronous mode for quick inference tasks (under 30 seconds).',
+    'Use synchronous mode for shorter inference tasks (waits up to 90 seconds; unfinished jobs still return an ID).',
     'Use asynchronous mode for long-running tasks; poll the job status using the Get Job Status tool.',
     'The input payload depends on the specific model/handler deployed at the endpoint.'
   ],
@@ -19,7 +19,11 @@ export let runJob = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      endpointId: z.string().describe('ID of the Serverless endpoint to submit the job to'),
+      endpointId: z
+        .string()
+        .describe(
+          'ID of a queue-based Serverless endpoint. Call list_endpoints to discover endpoints.'
+        ),
       jobInput: z
         .record(z.string(), z.any())
         .describe('Input payload for the handler (model-specific parameters)'),
@@ -33,19 +37,31 @@ export let runJob = SlateTool.create(spec, {
         .describe('URL to receive a POST callback when the job completes'),
       executionTimeout: z
         .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(5000)
+        .max(604800000)
         .optional()
         .describe('Max execution time in ms once a worker picks up the job'),
-      ttl: z.number().optional().describe('Total job lifespan in ms from submission'),
+      ttl: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(10000)
+        .max(604800000)
+        .optional()
+        .describe('Total job lifespan in ms from submission'),
       lowPriority: z.boolean().optional().describe('Submit as low priority job')
     })
   )
   .output(
     z.object({
+      endpointId: z.string().describe('Endpoint that owns the job.'),
+      error: z.any().nullable().describe('Provider job error when processing failed.'),
+      delayTime: z.number().nullable().describe('Time waiting in queue, in milliseconds.'),
       jobId: z.string().describe('Unique job identifier'),
       status: z
         .string()
         .describe(
-          'Job status: IN_QUEUE, IN_PROGRESS, COMPLETED, FAILED, CANCELLED, TIMED_OUT'
+          'Job status: IN_QUEUE, IN_PROGRESS, RUNNING, COMPLETED, FAILED, CANCELLED, TIMED_OUT'
         ),
       jobOutput: z
         .any()
@@ -68,7 +84,11 @@ export let runJob = SlateTool.create(spec, {
       payload.webhook = ctx.input.webhookUrl;
     }
 
-    if (ctx.input.executionTimeout || ctx.input.ttl || ctx.input.lowPriority !== undefined) {
+    if (
+      ctx.input.executionTimeout !== undefined ||
+      ctx.input.ttl !== undefined ||
+      ctx.input.lowPriority !== undefined
+    ) {
       payload.policy = {
         executionTimeout: ctx.input.executionTimeout,
         ttl: ctx.input.ttl,
@@ -84,6 +104,9 @@ export let runJob = SlateTool.create(spec, {
     }
 
     let output = {
+      endpointId: ctx.input.endpointId,
+      error: result.error ?? null,
+      delayTime: result.delayTime ?? null,
       jobId: result.id,
       status: result.status,
       jobOutput: result.output ?? null,

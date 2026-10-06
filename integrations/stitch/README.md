@@ -1,57 +1,29 @@
-# <img src="https://provider-logos.metorial-cdn.com/stitch.png" height="20"> Stitch
+# Stitch
 
-Manage data pipelines that replicate data from SaaS applications, databases, and other sources into data warehouses like Redshift, BigQuery, Snowflake, and PostgreSQL. Create and configure data sources (integrations), set up destination warehouses, select streams and fields for replication, and schedule extraction frequency. Push arbitrary data via the Import API using JSON payloads with schema validation. Monitor extraction and load job status, manage post-load webhook notifications that trigger when data loading completes, and configure custom email notifications. Supports partner account provisioning, OAuth source configuration, and upsert or append-only loading behavior.
+Manage Stitch Data sources, warehouse destinations, stream selection, schedules and notifications. Validate or ingest JSON records, inspect recent job history, and download extraction logs.
 
-## Tools
+Connect tools require an account access token from Account Settings and an eligible plan. Import tools require a separate source token from Integration Settings. Set the account region when connecting; existing connections retain their saved region. Source metadata supplies the account ID when available. An optional configured client ID remains available for empty accounts and Import-only validation.
 
-### Create Source
+| Tools | Purpose |
+| --- | --- |
+| `list_sources`, `get_source`, `create_source`, `update_source`, `delete_source` | Source discovery and configuration |
+| `list_source_types` | Available types and required connection properties |
+| `get_destination`, `create_destination`, `update_destination`, `delete_destination` | Warehouse configuration and type discovery |
+| `list_streams`, `get_stream`, `update_stream_selection` | Table schemas, field selection and replication metadata |
+| `start_replication`, `stop_replication` | Start extraction or request cancellation |
+| `list_extractions`, `list_loads` | One page of recent job history, with continuation |
+| `get_extraction_logs` | Download a log file |
+| `list_notifications`, `manage_custom_email`, `manage_post_load_hook` | Notification recipients and post-load callbacks |
+| `push_data`, `validate_data`, `get_import_status` | Ingestion, non-persistent validation and regional API health |
 
-Creates a new data source (integration) in Stitch. After creation, the source may require additional configuration steps (OAuth, field selection) before it becomes fully configured and starts replicating data.
+A destination's name can be set during creation; renaming through the documented update API is unavailable. Update its connection properties or rename it in the dashboard. Standard plans support one destination; other plans may support multiple destinations. Creating a destination can map unmapped sources unless `ignoreUnmappedSources` is true.
 
-### Delete Source
+Batch acceptance does not confirm warehouse loading. Stopping extraction does not cancel already buffered loads or erase destination data. Connection credentials are excluded from returned properties; hook URLs expose only their origin.
 
-Permanently deletes a data source (integration) from the Stitch account. This stops all data replication for the source and removes its configuration.
+Extraction listing contains the latest completed run per source from the past 60 days, rather than active jobs or full run history. Failed connection checks remain available as diagnostic results. Stream updates and deletions require the documented provider acknowledgments before reporting success.
 
-### Get Source
-
-Retrieves detailed information about a specific data source (integration) including its configuration properties, connection status, and report card. Can also check the last connection status.
-
-### List Source Types
-
-Lists all available data source types that can be configured in Stitch, or retrieves the configuration details for a specific source type. Use this to discover available integrations and understand what properties are required to create a source.
-
-### List Sources
-
-Lists all configured data sources (integrations) in the Stitch account. Returns source metadata including type, name, status, and configuration details. Use this to get an overview of all data pipelines or find a specific source ID.
-
-### Get Destination
-
-Retrieves the current destination (data warehouse) configuration. Stitch supports only a single destination per account. Also supports listing available destination types for discovery.
-
-### List Notifications
-
-Lists all configured notifications for the Stitch account, including custom email recipients and post-load webhook hooks. Use this to see the current notification setup.
-
-### List Streams
-
-Lists all available streams (tables) for a data source, including their selection status and replication metadata. Use this to discover what data is available for replication and which streams are currently selected.
-
-### Push Data
-
-Pushes data records into Stitch via the Import API (Batch endpoint). Use this to send data from any source — including sources Stitch doesn't have a native integration for — into the destination warehouse. Supports both upsert (with primary keys) and append-only (without primary keys) loading.
-
-### Start Replication
-
-Initiates a replication (sync) job for a data source. This triggers Stitch to extract data from the source and load it into the destination. The source must be fully configured before starting replication.
-
-### Update Source
-
-Updates an existing data source's configuration. Can modify display name, connection properties, replication schedule, and pause/resume the source. The source type cannot be changed after creation.
+[Developer documentation](https://help.qlik.com/en-US/stitch/developers) · [Connect API](https://www.stitchdata.com/docs/developers/stitch-connect/api) · [Import API](https://help.qlik.com/en-US/stitch/developers/import-api/api)
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE)

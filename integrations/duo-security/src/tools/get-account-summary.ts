@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { requireValue, status, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getAccountSummary = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let getAccountSummary = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      unavailable: z.array(z.enum(['summary', 'settings'])).optional(),
       summary: z
         .object({
           adminCount: z.number().optional(),
@@ -36,17 +38,29 @@ export let getAccountSummary = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('get_account_summary', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let [infoResult, settingsResult] = await Promise.all([
-      client.getAccountInfo().catch(() => null),
-      client.getAccountSettings().catch(() => null)
+      client.getAccountInfo().catch(error => {
+        if (status(error) === 403) return null;
+        throw error;
+      }),
+      client.getAccountSettings().catch(error => {
+        if (status(error) === 403) return null;
+        throw error;
+      })
     ]);
 
+    requireValue(
+      infoResult || settingsResult,
+      'The Admin API application needs Grant read information or Grant settings for account context.'
+    );
     let summary = infoResult
       ? {
           adminCount: infoResult.response?.admin_count,
@@ -59,7 +73,7 @@ export let getAccountSummary = SlateTool.create(spec, {
     let settings = settingsResult
       ? {
           lockoutThreshold: settingsResult.response?.lockout_threshold,
-          lockoutExpireDuration: settingsResult.response?.lockout_expire_duration,
+          lockoutExpireDuration: settingsResult.response?.lockout_expire_duration ?? undefined,
           inactiveUserExpiration: settingsResult.response?.inactive_user_expiration,
           smsMessage: settingsResult.response?.sms_message || undefined,
           fraudEmail: settingsResult.response?.fraud_email || undefined,
@@ -69,7 +83,14 @@ export let getAccountSummary = SlateTool.create(spec, {
       : undefined;
 
     return {
-      output: { summary, settings },
+      output: {
+        summary,
+        settings,
+        unavailable: [
+          ...(!infoResult ? ['summary' as const] : []),
+          ...(!settingsResult ? ['settings' as const] : [])
+        ]
+      },
       message: `Retrieved account summary${summary?.userCount !== undefined ? ` — **${summary.userCount}** users, **${summary.integrationCount}** integrations` : ''}.`
     };
   })

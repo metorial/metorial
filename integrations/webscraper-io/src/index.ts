@@ -16,8 +16,6 @@ import {
   manageScheduler,
   updateSitemap
 } from './tools';
-import { scrapingJobCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     manageScheduler,
     getAccount
   ],
-  triggers: [scrapingJobCompleted]
+  triggers: []
 });

@@ -1,0 +1,287 @@
+{
+  "search_contacts": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "contacts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": "Array of contact preview records"
+      },
+      "totalResults": {
+        "description": "Total number of matching contacts",
+        "type": "number"
+      },
+      "currentPage": {
+        "description": "Current page number",
+        "type": "number"
+      },
+      "totalPages": {
+        "description": "Total number of pages",
+        "type": "number"
+      }
+    },
+    "required": ["contacts"],
+    "additionalProperties": false
+  },
+  "search_companies": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": "Array of company preview records"
+      },
+      "totalResults": {
+        "description": "Total number of matching companies",
+        "type": "number"
+      },
+      "currentPage": {
+        "description": "Current page number",
+        "type": "number"
+      },
+      "totalPages": {
+        "description": "Total number of pages",
+        "type": "number"
+      }
+    },
+    "required": ["companies"],
+    "additionalProperties": false
+  },
+  "enrich_contacts": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "contacts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": "Enriched contact records with full profile data"
+      },
+      "matchCount": {
+        "type": "number",
+        "description": "Number of successfully matched contacts"
+      }
+    },
+    "required": ["contacts", "matchCount"],
+    "additionalProperties": false
+  },
+  "enrich_companies": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": "Enriched company records with full profile data"
+      },
+      "matchCount": {
+        "type": "number",
+        "description": "Number of successfully matched companies"
+      }
+    },
+    "required": ["companies", "matchCount"],
+    "additionalProperties": false
+  },
+  "search_intent": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "results": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": "Intent search results with company and signal data"
+      },
+      "totalResults": {
+        "description": "Total matching results",
+        "type": "number"
+      }
+    },
+    "required": ["results"],
+    "additionalProperties": false
+  },
+  "enrich_intent": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "intentSignals": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": "Intent signals for the company, including topics, scores, and recommended contacts"
+      }
+    },
+    "required": ["intentSignals"],
+    "additionalProperties": false
+  },
+  "search_scoops": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "scoops": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": "Scoop records with details about projects, leadership changes, etc."
+      },
+      "totalResults": {
+        "description": "Total matching scoops",
+        "type": "number"
+      }
+    },
+    "required": ["scoops"],
+    "additionalProperties": false
+  },
+  "search_news": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "articles": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": "News articles and coverage"
+      },
+      "totalResults": {
+        "description": "Total matching articles",
+        "type": "number"
+      }
+    },
+    "required": ["articles"],
+    "additionalProperties": false
+  },
+  "websights_lookup": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "results": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": "Resolved company profiles, ISP information, and IP geolocation details for each IP address"
+      }
+    },
+    "required": ["results"],
+    "additionalProperties": false
+  },
+  "get_usage": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "usage": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Usage statistics including credit consumption, API call counts, and remaining allowances"
+      }
+    },
+    "required": ["usage"],
+    "additionalProperties": false
+  },
+  "enrich_corporate_hierarchy": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "hierarchy": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Corporate hierarchy data including parent, ultimate parent, and subsidiary relationships"
+      }
+    },
+    "required": ["hierarchy"],
+    "additionalProperties": false
+  },
+  "enrich_technographics": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "technologies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": "Technology stack data including product names, categories, and install dates"
+      }
+    },
+    "required": ["technologies"],
+    "additionalProperties": false
+  },
+  "compliance_check": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "results": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "description": "Compliance check results with opt-out status and preference data"
+      }
+    },
+    "required": ["results"],
+    "additionalProperties": false
+  }
+}

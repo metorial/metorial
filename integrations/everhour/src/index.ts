@@ -41,16 +41,6 @@ import {
   updateTask,
   updateTimeRecord
 } from './tools';
-import {
-  clientEvents,
-  estimateEvents,
-  projectEvents,
-  sectionEvents,
-  taskEvents,
-  timeEvents,
-  timerEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -94,13 +84,5 @@ export let provider = Slate.create({
     deleteSection,
     getReport
   ].map(action => action.build()) as any,
-  triggers: [
-    projectEvents,
-    taskEvents,
-    timeEvents,
-    timerEvents,
-    sectionEvents,
-    clientEvents,
-    estimateEvents
-  ].map(action => action.build()) as any
+  triggers: []
 });

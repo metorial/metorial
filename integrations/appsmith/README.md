@@ -1,65 +1,17 @@
-# <img src="https://provider-logos.metorial-cdn.com/appsmith.png" height="20"> Appsmith
+# Appsmith
 
-Manage and interact with Appsmith, an open-source low-code platform for building internal tools and dashboards. Trigger workflow automations via webhook URLs, monitor instance health, and manage applications and workspaces. Import and export applications as JSON, connect to datasources, embed apps in external sites, and retrieve audit logs. Note: most management operations rely on internal session-based APIs rather than a formally documented public API, so programmatic capabilities are limited. Key actions include triggering workflows with HTTP POST requests, checking instance health status, exporting and importing applications, managing workspace users and roles, and querying audit logs for user and application events.
+Thirteen tools cover instance health and public configuration, verified current users, workspace and base-application discovery, workspace/application lifecycle operations, application JSON download/import, page and datasource metadata, and native workflow acknowledgements.
 
-## Tools
+Management uses Appsmith’s version-sensitive dashboard session API, not a stable public management API. Connect to the exact HTTPS instance origin using a native password account. Login obtains the native CSRF cookie, verifies the issued session against `/users/me`, and binds its instance and user. SSO-only accounts cannot use password login. Failed attempts can lock an account for 24 hours. Existing stored sessions retain their original `token` and legacy instance configuration fallback; reconnect to establish stronger instance/user binding.
 
-### Check Instance Health
+Unauthenticated health and instance-information calls accept an explicit instance origin. A connected session cannot be redirected to a different origin. Discovery follows current `/workspaces/home` and `/applications/home` routes; these return native unpaginated inventories, bounded to 1,000 records. Application exact reads resolve only authorized base applications, not arbitrary Git branches. Native omitted fields remain omitted.
 
-Check whether an Appsmith instance is operational. This endpoint does not require authentication and can be used to monitor self-hosted instances.
+Application updates preserve `false` public access through the dedicated `changeAccess` route. Name and public-access updates are separate writes; a later failure can leave an earlier change applied. Writes require exact native receipts and independent reads. Publication acknowledges the native publish action and does not prove external query execution. Workspace deletion archives records; history and downstream effects can remain.
 
-### Export Application
+Export produces a downloadable JSON file of at most 4 MiB after known `decryptedFields` and `invisibleActionFields` are removed. Query text, widget configuration, Git metadata and embedded business data can remain sensitive. The legacy `applicationJson` output field is optional and omitted. Import accepts export JSON text or an object, refuses populated known credential fields, and sends the native multipart `file` part with a fresh CSRF prerequisite. Reconfigure datasources after import.
 
-Export an Appsmith application as a JSON object. The exported JSON contains the full application definition including pages, queries, JS objects, and widget configurations. Datasource credentials are excluded for security.
+Workflows require self-hosted Business support and a controlled native webhook URL from the same instance. The URL carries its own credential; no session cookie is forwarded. Responses distinguish HTTP acknowledgement (including 202) from completion. Check native run history; no cancellation, refund or reversal is promised.
 
-### Get Current User
+The retained `query_audit_logs` contract is deprecated and refuses locally because its historical route/filters are unverified against the current enterprise API contract. Business users can use **Admin Settings > Others > Audit logs**. This does not assert when an enterprise route was removed.
 
-Retrieve the profile of the currently authenticated user, including their name, email, and role information.
-
-### Get Instance Info
-
-Retrieve configuration and feature information about an Appsmith instance, including feature flags, license plan, and available authentication providers. This unauthenticated endpoint is useful for monitoring instance configuration.
-
-### Import Application
-
-Import an Appsmith application into a workspace from a JSON definition. The JSON should be in the format produced by the export application tool. Datasource credentials must be reconfigured after import.
-
-### List Applications
-
-List all applications in a given workspace. Applications are the main building blocks in Appsmith, containing pages, datasources, queries, and JS objects.
-
-### List Datasources
-
-List all datasources configured in a workspace. Datasources represent connections to databases (PostgreSQL, MySQL, MongoDB, etc.) and APIs (REST, GraphQL) used by applications. Credentials are never exposed.
-
-### List Pages
-
-List all pages in an Appsmith application. Pages are the main navigational units within an application, each containing widgets, queries, and JS objects.
-
-### List Workspaces
-
-List all workspaces accessible to the authenticated user. Workspaces are the organizational unit in Appsmith that group applications, datasources, and users together.
-
-### Manage Application
-
-Create, update, delete, publish, clone, or fork an Appsmith application. Provides full lifecycle management for applications within workspaces.
-
-### Manage Workspace
-
-Create, update, or delete an Appsmith workspace. Can also retrieve workspace details and members. To create a workspace, provide a name. To update or delete, provide the workspace ID.
-
-### Query Audit Logs
-
-Query audit logs from an Appsmith instance. Audit logs record notable events including application CRUD, user login/signup, query executions, datasource changes, and configuration updates. **Requires Business or Enterprise edition.**
-
-### Trigger Workflow
-
-Trigger an Appsmith workflow by sending a POST request to its webhook URL. The workflow receives the provided JSON payload as input parameters and may return a response. Requires Business or Enterprise edition.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+The private suite is active and statically checked, with offline intercepted SDK and ownership evidence. Live provider acceptance, edition availability, session rotation, multipart uploads, downloaded bytes and resource retirement require a controlled profile and remain unverified.

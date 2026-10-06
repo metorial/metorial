@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,9 @@ export let listConfigurations = SlateTool.create(spec, {
       project: z
         .string()
         .optional()
-        .describe('Project name. Falls back to the configured default project.'),
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        ),
       environment: z
         .enum(['dev', 'staging', 'prod'])
         .optional()
@@ -55,9 +57,6 @@ export let listConfigurations = SlateTool.create(spec, {
     });
 
     let project = ctx.input.project || ctx.config.project;
-    if (!project) {
-      throw new Error('Project name is required.');
-    }
 
     let data = await client.listConfigurations({
       project,
@@ -73,7 +72,7 @@ export let listConfigurations = SlateTool.create(spec, {
       environments: c.env,
       parameters: c.parameters,
       createdAt: c.created_at,
-      updatedAt: c.updated_at
+      updatedAt: c.updated_at ?? undefined
     }));
 
     return {
@@ -97,7 +96,9 @@ export let createConfiguration = SlateTool.create(spec, {
       project: z
         .string()
         .optional()
-        .describe('Project name. Falls back to the configured default project.'),
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        ),
       name: z.string().describe('Name for the configuration'),
       provider: z.string().describe('LLM provider (e.g., "openai", "anthropic")'),
       parameters: z
@@ -122,7 +123,8 @@ export let createConfiguration = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the configuration was created')
+      success: z.boolean().describe('Whether the configuration was created'),
+      configurationId: z.string().optional().describe('ID of the created configuration')
     })
   )
   .handleInvocation(async ctx => {
@@ -132,11 +134,18 @@ export let createConfiguration = SlateTool.create(spec, {
     });
 
     let project = ctx.input.project || ctx.config.project;
-    if (!project) {
-      throw new Error('Project name is required.');
-    }
 
-    await client.createConfiguration({
+    if (
+      !['chat', 'completion'].includes(String(ctx.input.parameters.call_type)) ||
+      typeof ctx.input.parameters.model !== 'string' ||
+      !ctx.input.parameters.model.trim()
+    )
+      throw createApiServiceError(
+        'parameters must include call_type (chat or completion) and a nonempty model.'
+      );
+    if (ctx.input.environments?.some(env => !['dev', 'staging', 'prod'].includes(env)))
+      throw createApiServiceError('Environments must be dev, staging, or prod.');
+    let data = await client.createConfiguration({
       project,
       name: ctx.input.name,
       provider: ctx.input.provider,
@@ -147,7 +156,7 @@ export let createConfiguration = SlateTool.create(spec, {
     });
 
     return {
-      output: { success: true },
+      output: { success: true, configurationId: data.insertedId },
       message: `Created configuration **${ctx.input.name}**.`
     };
   })
@@ -164,7 +173,9 @@ export let updateConfiguration = SlateTool.create(spec, {
       project: z
         .string()
         .optional()
-        .describe('Project name. Falls back to the configured default project.'),
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        ),
       name: z.string().describe('Configuration name'),
       provider: z.string().describe('LLM provider'),
       parameters: z.record(z.string(), z.any()).describe('Updated model parameters'),
@@ -188,10 +199,17 @@ export let updateConfiguration = SlateTool.create(spec, {
     });
 
     let project = ctx.input.project || ctx.config.project;
-    if (!project) {
-      throw new Error('Project name is required.');
-    }
 
+    if (
+      !['chat', 'completion'].includes(String(ctx.input.parameters.call_type)) ||
+      typeof ctx.input.parameters.model !== 'string' ||
+      !ctx.input.parameters.model.trim()
+    )
+      throw createApiServiceError(
+        'parameters must include call_type (chat or completion) and a nonempty model.'
+      );
+    if (ctx.input.environments?.some(env => !['dev', 'staging', 'prod'].includes(env)))
+      throw createApiServiceError('Environments must be dev, staging, or prod.');
     await client.updateConfiguration(ctx.input.configurationId, {
       project,
       name: ctx.input.name,

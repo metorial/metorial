@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageContinuation, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 let projectOutputSchema = z.object({
@@ -53,14 +54,15 @@ export let createProject = SlateTool.create(spec, {
   )
   .output(projectOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'create_project');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = { name: ctx.input.name };
-    if (ctx.input.assigneeId) body.assignee_id = ctx.input.assigneeId;
-    if (ctx.input.status) body.status = ctx.input.status;
-    if (ctx.input.details) body.details = ctx.input.details;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.customFields) {
+    if (ctx.input.assigneeId !== undefined) body.assignee_id = ctx.input.assigneeId;
+    if (ctx.input.status !== undefined) body.status = ctx.input.status;
+    if (ctx.input.details !== undefined) body.details = ctx.input.details;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.customFields !== undefined) {
       body.custom_fields = ctx.input.customFields.map(cf => ({
         custom_field_definition_id: cf.customFieldDefinitionId,
         value: cf.value
@@ -89,6 +91,7 @@ export let getProject = SlateTool.create(spec, {
   )
   .output(projectOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'get_project');
     let client = new Client(ctx.auth);
     let project = await client.getProject(ctx.input.projectId);
 
@@ -126,6 +129,7 @@ export let updateProject = SlateTool.create(spec, {
   )
   .output(projectOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'update_project');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {};
@@ -168,6 +172,7 @@ export let deleteProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'delete_project');
     let client = new Client(ctx.auth);
     await client.deleteProject(ctx.input.projectId);
 
@@ -203,29 +208,40 @@ export let searchProjects = SlateTool.create(spec, {
   .output(
     z.object({
       projects: z.array(projectOutputSchema).describe('Matching project records'),
-      count: z.number().describe('Number of results returned')
+      count: z.number().describe('Number of results returned'),
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('A full page suggests another page may be available'),
+      nextPageNumber: z.number().optional().describe('Next page to request when available'),
+      atSearchLimit: z
+        .boolean()
+        .optional()
+        .describe('Narrow filters when the 100,000-result window is reached')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'search_projects');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {
       page_number: ctx.input.pageNumber,
       page_size: ctx.input.pageSize
     };
-    if (ctx.input.sortBy) body.sort_by = ctx.input.sortBy;
-    if (ctx.input.sortDirection) body.sort_direction = ctx.input.sortDirection;
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.assigneeIds) body.assignee_ids = ctx.input.assigneeIds;
-    if (ctx.input.statuses) body.statuses = ctx.input.statuses;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
+    if (ctx.input.sortBy !== undefined) body.sort_by = ctx.input.sortBy;
+    if (ctx.input.sortDirection !== undefined) body.sort_direction = ctx.input.sortDirection;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.assigneeIds !== undefined) body.assignee_ids = ctx.input.assigneeIds;
+    if (ctx.input.statuses !== undefined) body.statuses = ctx.input.statuses;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
 
     let projects = await client.searchProjects(body);
 
     return {
       output: {
         projects: projects.map(mapProject),
-        count: projects.length
+        count: projects.length,
+        ...pageContinuation(ctx.input, projects.length)
       },
       message: `Found **${projects.length}** projects matching the search criteria.`
     };

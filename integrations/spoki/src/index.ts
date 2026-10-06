@@ -15,8 +15,6 @@ import {
   sendTemplate,
   startAutomation
 } from './tools';
-import { chatEvents, contactEvents, messageEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     listDeals,
     manageLists
   ],
-  triggers: [contactEvents, messageEvents, chatEvents]
+  triggers: []
 });

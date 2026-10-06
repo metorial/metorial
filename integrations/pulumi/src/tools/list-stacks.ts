@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listStacks = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let listStacks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organization: z.string().optional().describe('Filter stacks by organization name'),
+      organization: organizationInput,
       project: z.string().optional().describe('Filter stacks by project name'),
       tagName: z.string().optional().describe('Filter stacks by tag name'),
       tagValue: z
@@ -23,7 +24,11 @@ export let listStacks = SlateTool.create(spec, {
       continuationToken: z
         .string()
         .optional()
-        .describe('Pagination token from a previous response')
+        .describe('Request one page starting at this continuation token'),
+      maxResults: z
+        .number()
+        .optional()
+        .describe('Positive page size. Omit this and continuationToken to retrieve all pages.')
     })
   )
   .output(
@@ -37,13 +42,14 @@ export let listStacks = SlateTool.create(spec, {
           resourceCount: z.number().optional()
         })
       ),
-      continuationToken: z.string().optional()
+      continuationToken: z.string().optional(),
+      returnedCount: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
     let org = ctx.input.organization || ctx.config.organization;
@@ -53,10 +59,11 @@ export let listStacks = SlateTool.create(spec, {
       project: ctx.input.project,
       tagName: ctx.input.tagName,
       tagValue: ctx.input.tagValue,
-      continuationToken: ctx.input.continuationToken
+      continuationToken: ctx.input.continuationToken,
+      maxResults: ctx.input.maxResults
     });
 
-    let stacks = (result.stacks || []).map((s: any) => ({
+    let stacks = result.stacks.map(s => ({
       organizationName: s.orgName,
       projectName: s.projectName,
       stackName: s.stackName,
@@ -67,7 +74,8 @@ export let listStacks = SlateTool.create(spec, {
     return {
       output: {
         stacks,
-        continuationToken: result.continuationToken
+        continuationToken: result.continuationToken,
+        returnedCount: stacks.length
       },
       message: `Found **${stacks.length}** stack(s)${org ? ` in organization **${org}**` : ''}${ctx.input.project ? ` under project **${ctx.input.project}**` : ''}.${result.continuationToken ? ' More results available with continuation token.' : ''}`
     };

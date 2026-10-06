@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { optionalText, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let searchHistory = SlateTool.create(spec, {
@@ -52,10 +53,7 @@ export let searchHistory = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.listActionLogs({
       path: ctx.input.path,
@@ -69,17 +67,17 @@ export let searchHistory = SlateTool.create(spec, {
     });
 
     let logs = result.logs.map((log: Record<string, unknown>) => ({
-      action: String(log.action ?? ''),
-      path: log.path ? String(log.path) : undefined,
-      folder: log.folder ? String(log.folder) : undefined,
-      source: log.src ? String(log.src) : undefined,
-      destination: log.destination ? String(log.destination) : undefined,
-      username: log.username ? String(log.username) : undefined,
+      action: text(log.action),
+      path: optionalText(log.path),
+      folder: optionalText(log.folder),
+      source: optionalText(log.source),
+      destination: optionalText(log.destination),
+      username: optionalText(log.username),
       userId: typeof log.user_id === 'number' ? log.user_id : undefined,
-      interface: log.interface ? String(log.interface) : undefined,
-      ip: log.ip ? String(log.ip) : undefined,
-      createdAt: log.created_at ? String(log.created_at) : undefined,
-      failureType: log.failure_type ? String(log.failure_type) : undefined
+      interface: optionalText(log.interface),
+      ip: optionalText(log.ip),
+      createdAt: optionalText(log.when),
+      failureType: optionalText(log.failure_type)
     }));
 
     return {

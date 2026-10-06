@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StoryblokClient } from '../lib/client';
+import { branches, resolveSpace, spaceIdInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let storyOutputSchema = z.object({
@@ -15,7 +16,7 @@ let storyOutputSchema = z.object({
   parentId: z.number().optional().describe('Parent folder ID'),
   createdAt: z.string().optional().describe('Creation timestamp'),
   publishedAt: z.string().optional().describe('Publication timestamp'),
-  content: z.record(z.string(), z.any()).optional().describe('Story content object')
+  content: z.record(z.string(), z.unknown()).optional().describe('Story content object')
 });
 
 export let manageStory = SlateTool.create(spec, {
@@ -29,12 +30,13 @@ export let manageStory = SlateTool.create(spec, {
     'To **delete** a story, set action to "delete" and provide the storyId.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      spaceId: spaceIdInput,
       action: z
         .enum(['create', 'update', 'delete', 'publish', 'unpublish'])
         .describe('The story management action to perform'),
@@ -45,7 +47,7 @@ export let manageStory = SlateTool.create(spec, {
       name: z.string().optional().describe('Story name (required for create)'),
       slug: z.string().optional().describe('URL slug for the story'),
       content: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe(
           'Story content object. Must include a "component" field matching a component name.'
@@ -62,16 +64,29 @@ export let manageStory = SlateTool.create(spec, {
   )
   .output(storyOutputSchema)
   .handleInvocation(async ctx => {
+    branches(
+      ctx.input,
+      {
+        create: ['name', 'slug', 'content', 'parentId', 'isStartpage', 'isFolder', 'path'],
+        update: ['storyId', 'name', 'slug', 'content', 'parentId', 'isStartpage', 'path'],
+        delete: ['storyId'],
+        publish: ['storyId', 'language'],
+        unpublish: ['storyId']
+      }[ctx.input.action]
+    );
     let client = new StoryblokClient({
-      token: ctx.auth.token,
-      region: ctx.auth.region,
-      spaceId: ctx.config.spaceId
+      ...ctx.auth,
+      spaceId: resolveSpace(
+        ctx.input.spaceId,
+        ctx.config.spaceId,
+        ctx.auth.mode === 'oauth' ? ctx.auth.spaceId : undefined
+      )
     });
 
     let { action, storyId } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required to create a story');
+      if (!ctx.input.name) throw createApiServiceError('Name is required to create a story');
 
       let story = await client.createStory({
         name: ctx.input.name,
@@ -102,12 +117,12 @@ export let manageStory = SlateTool.create(spec, {
       };
     }
 
-    if (!storyId) throw new Error('storyId is required for this action');
+    if (!storyId) throw createApiServiceError('storyId is required for this action');
 
     if (action === 'delete') {
       await client.deleteStory(storyId);
       return {
-        output: { storyId: Number.parseInt(storyId, 10) },
+        output: { storyId: Number(storyId) },
         message: `Deleted story \`${storyId}\`.`
       };
     }
@@ -121,11 +136,13 @@ export let manageStory = SlateTool.create(spec, {
           name: story.name,
           slug: story.slug,
           fullSlug: story.full_slug,
-          published: true,
+          published: story.published,
           publishedAt: story.published_at,
           content: story.content
         },
-        message: `Published story **${story.name}** (\`${story.id}\`).`
+        message: ctx.input.language
+          ? 'Publication request accepted; the returned state is the current story state, not a translation-specific confirmation.'
+          : 'Story publication verified.'
       };
     }
 
@@ -138,7 +155,7 @@ export let manageStory = SlateTool.create(spec, {
           name: story.name,
           slug: story.slug,
           fullSlug: story.full_slug,
-          published: false,
+          published: story.published,
           content: story.content
         },
         message: `Unpublished story **${story.name}** (\`${story.id}\`).`

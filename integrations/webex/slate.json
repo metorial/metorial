@@ -1,18 +1,16 @@
 {
   "name": "@metorial/cisco-webex",
-  "description": "Send, read, and manage messages in spaces (rooms) with support for text, Markdown, file attachments, and interactive Adaptive Cards. Create and manage spaces, teams, and space memberships. Schedule, update, and delete meetings, manage meeting invitees, polls, Q&A, and chat. Access and manage meeting recordings and transcripts. Query and manage people, organizations, licenses, and roles. Control Webex Calling features including call forwarding, voicemail, call queues, hunt groups, and auto attendants. Manage and configure Webex RoomOS devices and workspaces. Register webhooks for real-time notifications on messages, rooms, memberships, meetings, participants, recordings, transcripts, and telephony events. Perform administrative actions including audit events, hybrid services, compliance, and organization-wide management.",
+  "description": "Send and manage messages, spaces, space memberships and teams. Schedule and manage meetings, discover people and the authenticated person or bot, and read meeting recordings. Prepare exact message files and authorized recording files for download. Webex scopes, roles, licenses, retention and file-scanning policies apply.",
   "categories": ["email-and-messaging", "scheduling-and-calendars"],
   "skills": [
     "send and manage messages",
     "create and manage spaces",
+    "manage space memberships",
+    "discover and manage teams",
     "schedule and manage meetings",
-    "manage meeting recordings",
-    "access meeting transcripts",
-    "control calling features",
-    "manage devices and workspaces",
-    "register event webhooks",
-    "send adaptive cards",
-    "administer organization settings"
+    "discover people and current identity",
+    "read meeting recordings",
+    "download message and recording files"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/webex.png"
 }

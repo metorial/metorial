@@ -1,0 +1,1557 @@
+{
+  "get_employee": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID to look up. Use \"0\" for the current authenticated user."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of field names to include (e.g., [\"firstName\", \"lastName\", \"workEmail\", \"jobTitle\", \"department\", \"hireDate\"])"
+        }
+      },
+      "required": ["employeeId", "fields"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The requested employee fields and their values"
+        }
+      },
+      "required": ["employeeId", "fields"],
+      "additionalProperties": false
+    }
+  },
+  "get_employee_directory": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fieldNames": {
+          "type": "array",
+          "items": {},
+          "description": "The field definitions used in the directory"
+        },
+        "employees": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of employee directory entries"
+        }
+      },
+      "required": ["fieldNames", "employees"],
+      "additionalProperties": false
+    }
+  },
+  "create_employee": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "firstName": {
+          "type": "string",
+          "description": "Employee first name"
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Employee last name"
+        },
+        "workEmail": {
+          "description": "Work email address",
+          "type": "string"
+        },
+        "jobTitle": {
+          "description": "Job title",
+          "type": "string"
+        },
+        "department": {
+          "description": "Department name",
+          "type": "string"
+        },
+        "division": {
+          "description": "Division name",
+          "type": "string"
+        },
+        "location": {
+          "description": "Work location",
+          "type": "string"
+        },
+        "hireDate": {
+          "description": "Hire date in YYYY-MM-DD format",
+          "type": "string"
+        },
+        "additionalFields": {
+          "description": "Additional fields as key-value pairs (field name to value)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["firstName", "lastName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The ID of the newly created employee"
+        },
+        "location": {
+          "description": "The URL/location of the new employee resource",
+          "type": "string"
+        }
+      },
+      "required": ["employeeId"],
+      "additionalProperties": false
+    }
+  },
+  "update_employee": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID to update"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Fields to update as key-value pairs (e.g., { \"jobTitle\": \"Senior Engineer\", \"department\": \"Engineering\" })"
+        }
+      },
+      "required": ["employeeId", "fields"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The updated employee ID"
+        },
+        "updatedFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of field names that were updated"
+        }
+      },
+      "required": ["employeeId", "updatedFields"],
+      "additionalProperties": false
+    }
+  },
+  "get_table_data": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "tableName": {
+          "type": "string",
+          "description": "The table name (e.g., \"jobInfo\", \"compensation\", \"education\")"
+        }
+      },
+      "required": ["employeeId", "tableName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "tableName": {
+          "type": "string",
+          "description": "The table name"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Table row data"
+        }
+      },
+      "required": ["employeeId", "tableName", "rows"],
+      "additionalProperties": false
+    }
+  },
+  "upsert_table_row": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "tableName": {
+          "type": "string",
+          "description": "The table name (e.g., \"jobInfo\", \"compensation\", \"education\")"
+        },
+        "rowId": {
+          "description": "If updating, the ID of the existing row to update",
+          "type": "string"
+        },
+        "rowData": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Row data as key-value pairs"
+        }
+      },
+      "required": ["employeeId", "tableName", "rowData"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "tableName": {
+          "type": "string",
+          "description": "The table name"
+        },
+        "action": {
+          "type": "string",
+          "description": "Whether the row was \"created\" or \"updated\""
+        }
+      },
+      "required": ["employeeId", "tableName", "action"],
+      "additionalProperties": false
+    }
+  },
+  "delete_table_row": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "tableName": {
+          "type": "string",
+          "description": "The table name"
+        },
+        "rowId": {
+          "type": "string",
+          "description": "The ID of the row to delete"
+        }
+      },
+      "required": ["employeeId", "tableName", "rowId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "tableName": {
+          "type": "string",
+          "description": "The table name"
+        },
+        "rowId": {
+          "type": "string",
+          "description": "The deleted row ID"
+        }
+      },
+      "required": ["employeeId", "tableName", "rowId"],
+      "additionalProperties": false
+    }
+  },
+  "get_time_off_requests": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "string",
+          "description": "Start date in YYYY-MM-DD format"
+        },
+        "end": {
+          "type": "string",
+          "description": "End date in YYYY-MM-DD format"
+        },
+        "employeeId": {
+          "description": "Filter by a specific employee ID",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter by status: \"approved\", \"denied\", \"superceded\", \"requested\", \"canceled\"",
+          "type": "string"
+        },
+        "type": {
+          "description": "Filter by time off type ID",
+          "type": "string"
+        }
+      },
+      "required": ["start", "end"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of time off requests"
+        }
+      },
+      "required": ["requests"],
+      "additionalProperties": false
+    }
+  },
+  "create_time_off_request": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "timeOffTypeId": {
+          "type": "string",
+          "description": "The time off type ID (use Get Time Off Types to find available types)"
+        },
+        "start": {
+          "type": "string",
+          "description": "Start date in YYYY-MM-DD format"
+        },
+        "end": {
+          "type": "string",
+          "description": "End date in YYYY-MM-DD format"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Number of days/hours requested"
+        },
+        "status": {
+          "default": "requested",
+          "description": "Initial status for the request",
+          "type": "string",
+          "enum": ["requested", "approved"]
+        },
+        "notes": {
+          "description": "Notes keyed by date (YYYY-MM-DD)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "dates": {
+          "description": "Specific amounts per date (YYYY-MM-DD to hours/days)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      },
+      "required": ["employeeId", "timeOffTypeId", "start", "end", "amount", "status"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the request was created successfully"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "update_time_off_request_status": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "The time off request ID"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["approved", "denied", "canceled"],
+          "description": "New status for the request"
+        },
+        "note": {
+          "description": "Optional note explaining the status change",
+          "type": "string"
+        }
+      },
+      "required": ["requestId", "status"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "The request ID"
+        },
+        "status": {
+          "type": "string",
+          "description": "The new status"
+        }
+      },
+      "required": ["requestId", "status"],
+      "additionalProperties": false
+    }
+  },
+  "get_whos_out": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "start": {
+          "description": "Start date in YYYY-MM-DD format (defaults to today)",
+          "type": "string"
+        },
+        "end": {
+          "description": "End date in YYYY-MM-DD format (defaults to 14 days from start)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of who's out entries"
+        }
+      },
+      "required": ["entries"],
+      "additionalProperties": false
+    }
+  },
+  "get_time_off_balances": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "asOfDate": {
+          "description": "Calculate balances as of this date (YYYY-MM-DD). Defaults to today.",
+          "type": "string"
+        }
+      },
+      "required": ["employeeId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "balances": {
+          "description": "Time off balance data by category"
+        }
+      },
+      "required": ["employeeId", "balances"],
+      "additionalProperties": false
+    }
+  },
+  "get_time_off_types": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timeOffTypes": {
+          "description": "Map of time off type categories and their types"
+        }
+      },
+      "required": ["timeOffTypes"],
+      "additionalProperties": false
+    }
+  },
+  "get_timesheet_entries": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "string",
+          "description": "Start date in YYYY-MM-DD format"
+        },
+        "end": {
+          "type": "string",
+          "description": "End date in YYYY-MM-DD format"
+        },
+        "employeeIds": {
+          "description": "Specific employee IDs to filter by",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["start", "end"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timesheetEntries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Timesheet hour entries"
+        },
+        "clockEntries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Clock-in/clock-out entries"
+        }
+      },
+      "required": ["timesheetEntries", "clockEntries"],
+      "additionalProperties": false
+    }
+  },
+  "clock_in_out": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["clock_in", "clock_out"],
+          "description": "Whether to clock in or clock out"
+        },
+        "start": {
+          "description": "Start time in ISO 8601 format (required for clock_in)",
+          "type": "string"
+        },
+        "timezone": {
+          "description": "Timezone for the entry (e.g., \"America/New_York\")",
+          "type": "string"
+        },
+        "note": {
+          "description": "Optional note for the clock entry",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "Project ID to associate with (clock_in only)",
+          "type": "string"
+        },
+        "taskId": {
+          "description": "Task ID to associate with (clock_in only)",
+          "type": "string"
+        }
+      },
+      "required": ["employeeId", "action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "action": {
+          "type": "string",
+          "description": "The action performed"
+        }
+      },
+      "required": ["employeeId", "action"],
+      "additionalProperties": false
+    }
+  },
+  "add_timesheet_entry": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date for the entry in YYYY-MM-DD format"
+        },
+        "hours": {
+          "type": "number",
+          "description": "Number of hours worked"
+        },
+        "note": {
+          "description": "Optional note for the entry",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "Project ID to associate with",
+          "type": "string"
+        },
+        "taskId": {
+          "description": "Task ID to associate with",
+          "type": "string"
+        }
+      },
+      "required": ["employeeId", "date", "hours"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date of the entry"
+        },
+        "hours": {
+          "type": "number",
+          "description": "Hours logged"
+        }
+      },
+      "required": ["employeeId", "date", "hours"],
+      "additionalProperties": false
+    }
+  },
+  "generate_custom_report": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of field names to include in the report"
+        },
+        "format": {
+          "default": "JSON",
+          "description": "Report output format",
+          "type": "string",
+          "enum": ["JSON", "CSV", "PDF", "XML"]
+        },
+        "title": {
+          "description": "Title for the report",
+          "type": "string"
+        },
+        "lastChangedSince": {
+          "description": "Only include employees changed since this date (YYYY-MM-DDThh:mm:ssZ)",
+          "type": "string"
+        }
+      },
+      "required": ["fields", "format"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "description": "Report title",
+          "type": "string"
+        },
+        "format": {
+          "type": "string",
+          "description": "The format of the report"
+        },
+        "reportData": {
+          "description": "The report data (structure depends on format; JSON returns structured data)"
+        }
+      },
+      "required": ["format", "reportData"],
+      "additionalProperties": false
+    }
+  },
+  "get_company_report": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "description": "The report ID"
+        },
+        "format": {
+          "default": "JSON",
+          "description": "Report output format",
+          "type": "string",
+          "enum": ["JSON", "CSV", "PDF", "XML"]
+        },
+        "lastChangedSince": {
+          "description": "Only include employees changed since this date (YYYY-MM-DDThh:mm:ssZ)",
+          "type": "string"
+        }
+      },
+      "required": ["reportId", "format"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "description": "The report ID"
+        },
+        "format": {
+          "type": "string",
+          "description": "The format of the report"
+        },
+        "reportData": {
+          "description": "The report data"
+        }
+      },
+      "required": ["reportId", "format", "reportData"],
+      "additionalProperties": false
+    }
+  },
+  "get_goals": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "filter": {
+          "description": "Filter goals by status",
+          "type": "string",
+          "enum": ["all", "open", "closed"]
+        }
+      },
+      "required": ["employeeId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "goals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of goals"
+        }
+      },
+      "required": ["employeeId", "goals"],
+      "additionalProperties": false
+    }
+  },
+  "create_goal": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Goal title"
+        },
+        "description": {
+          "description": "Goal description",
+          "type": "string"
+        },
+        "percentComplete": {
+          "description": "Initial progress percentage (0-100)",
+          "type": "number"
+        },
+        "dueDate": {
+          "description": "Due date in YYYY-MM-DD format",
+          "type": "string"
+        },
+        "sharedWithEmployeeIds": {
+          "description": "Employee IDs to share this goal with",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "alignsWithOptionId": {
+          "description": "ID of the organizational objective to align with",
+          "type": "string"
+        }
+      },
+      "required": ["employeeId", "title"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "goalId": {
+          "type": "string",
+          "description": "The created goal ID"
+        },
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        }
+      },
+      "required": ["goalId", "employeeId"],
+      "additionalProperties": false
+    }
+  },
+  "update_goal": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "goalId": {
+          "type": "string",
+          "description": "The goal ID to update"
+        },
+        "action": {
+          "default": "update",
+          "description": "Action to perform on the goal",
+          "type": "string",
+          "enum": ["update", "close", "reopen"]
+        },
+        "title": {
+          "description": "New title",
+          "type": "string"
+        },
+        "description": {
+          "description": "New description",
+          "type": "string"
+        },
+        "percentComplete": {
+          "description": "Updated progress percentage (0-100)",
+          "type": "number"
+        },
+        "dueDate": {
+          "description": "New due date in YYYY-MM-DD format",
+          "type": "string"
+        },
+        "sharedWithEmployeeIds": {
+          "description": "Updated list of employee IDs to share with",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["employeeId", "goalId", "action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "goalId": {
+          "type": "string",
+          "description": "The goal ID"
+        },
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "action": {
+          "type": "string",
+          "description": "The action performed"
+        }
+      },
+      "required": ["goalId", "employeeId", "action"],
+      "additionalProperties": false
+    }
+  },
+  "add_goal_comment": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "goalId": {
+          "type": "string",
+          "description": "The goal ID"
+        },
+        "text": {
+          "type": "string",
+          "description": "Comment text"
+        }
+      },
+      "required": ["employeeId", "goalId", "text"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "goalId": {
+          "type": "string",
+          "description": "The goal ID"
+        },
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        }
+      },
+      "required": ["goalId", "employeeId"],
+      "additionalProperties": false
+    }
+  },
+  "get_training_types": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "trainingTypes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of training types"
+        }
+      },
+      "required": ["trainingTypes"],
+      "additionalProperties": false
+    }
+  },
+  "get_employee_training_records": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "trainingTypeId": {
+          "description": "Optionally filter by training type ID",
+          "type": "string"
+        }
+      },
+      "required": ["employeeId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "trainingRecords": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of training records"
+        }
+      },
+      "required": ["employeeId", "trainingRecords"],
+      "additionalProperties": false
+    }
+  },
+  "add_training_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "trainingTypeId": {
+          "type": "string",
+          "description": "The training type ID"
+        },
+        "completed": {
+          "type": "string",
+          "description": "Completion date in YYYY-MM-DD format"
+        },
+        "instructor": {
+          "description": "Instructor name",
+          "type": "string"
+        },
+        "hours": {
+          "description": "Hours spent on training",
+          "type": "number"
+        },
+        "credits": {
+          "description": "Credits earned",
+          "type": "number"
+        },
+        "costAmount": {
+          "description": "Training cost amount",
+          "type": "number"
+        },
+        "costCurrency": {
+          "description": "Currency code (e.g., \"USD\")",
+          "type": "string"
+        },
+        "notes": {
+          "description": "Additional notes",
+          "type": "string"
+        }
+      },
+      "required": ["employeeId", "trainingTypeId", "completed"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "description": "The employee ID"
+        },
+        "trainingTypeId": {
+          "type": "string",
+          "description": "The training type ID"
+        },
+        "completed": {
+          "type": "string",
+          "description": "Completion date"
+        }
+      },
+      "required": ["employeeId", "trainingTypeId", "completed"],
+      "additionalProperties": false
+    }
+  },
+  "get_benefits_overview": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "description": "If provided, also fetch benefit coverages and dependents for this employee",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deductionTypes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Benefit deduction types"
+        },
+        "plans": {
+          "description": "Benefit plans"
+        },
+        "coverages": {
+          "description": "Employee benefit coverages (if employeeId provided)"
+        },
+        "dependents": {
+          "description": "Employee dependents (if employeeId provided)"
+        }
+      },
+      "required": ["deductionTypes", "plans"],
+      "additionalProperties": false
+    }
+  },
+  "list_files": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "description": "Employee ID to list files for. Omit to list company files.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "File categories with their files"
+        },
+        "scope": {
+          "type": "string",
+          "description": "Whether these are \"employee\" or \"company\" files"
+        }
+      },
+      "required": ["categories", "scope"],
+      "additionalProperties": false
+    }
+  },
+  "upload_file": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "description": "Employee ID to upload file for. Omit for company files.",
+          "type": "string"
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Category ID to upload the file into"
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Name for the file"
+        },
+        "fileContent": {
+          "type": "string",
+          "description": "File content as a text string"
+        },
+        "shareWithEmployee": {
+          "description": "Whether to share the file with the employee (employee files only)",
+          "type": "boolean"
+        }
+      },
+      "required": ["categoryId", "fileName", "fileContent"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "description": "Whether the file was uploaded to \"employee\" or \"company\""
+        },
+        "fileName": {
+          "type": "string",
+          "description": "The name of the uploaded file"
+        }
+      },
+      "required": ["scope", "fileName"],
+      "additionalProperties": false
+    }
+  },
+  "delete_file": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "string",
+          "description": "The file ID to delete"
+        },
+        "employeeId": {
+          "description": "Employee ID (required for employee files, omit for company files)",
+          "type": "string"
+        }
+      },
+      "required": ["fileId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "string",
+          "description": "The deleted file ID"
+        },
+        "scope": {
+          "type": "string",
+          "description": "Whether the file was from \"employee\" or \"company\""
+        }
+      },
+      "required": ["fileId", "scope"],
+      "additionalProperties": false
+    }
+  },
+  "get_job_listings": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of job summaries"
+        }
+      },
+      "required": ["jobs"],
+      "additionalProperties": false
+    }
+  },
+  "get_applications": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "description": "Filter by job ID",
+          "type": "string"
+        },
+        "applicationStatusId": {
+          "description": "Filter by application status ID",
+          "type": "string"
+        },
+        "newSince": {
+          "description": "Only return applications created since this date (YYYY-MM-DDThh:mm:ssZ)",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number for pagination",
+          "type": "number"
+        },
+        "pageLimit": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "sortBy": {
+          "description": "Field to sort by (e.g., \"created_date\", \"first_name\")",
+          "type": "string"
+        },
+        "sortOrder": {
+          "description": "Sort order",
+          "type": "string",
+          "enum": ["ASC", "DESC"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of applications"
+        },
+        "paginationComplete": {
+          "type": "boolean",
+          "description": "Whether all results have been returned"
+        }
+      },
+      "required": ["applications", "paginationComplete"],
+      "additionalProperties": false
+    }
+  },
+  "get_application_details": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applicationId": {
+          "type": "string",
+          "description": "The application ID"
+        }
+      },
+      "required": ["applicationId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "application": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Application details"
+        }
+      },
+      "required": ["application"],
+      "additionalProperties": false
+    }
+  },
+  "update_application_status": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applicationId": {
+          "type": "string",
+          "description": "The application ID"
+        },
+        "statusId": {
+          "type": "string",
+          "description": "The new status ID"
+        }
+      },
+      "required": ["applicationId", "statusId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applicationId": {
+          "type": "string",
+          "description": "The application ID"
+        },
+        "statusId": {
+          "type": "string",
+          "description": "The new status ID"
+        }
+      },
+      "required": ["applicationId", "statusId"],
+      "additionalProperties": false
+    }
+  },
+  "add_application_comment": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applicationId": {
+          "type": "string",
+          "description": "The application ID"
+        },
+        "comment": {
+          "type": "string",
+          "description": "The comment text"
+        }
+      },
+      "required": ["applicationId", "comment"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applicationId": {
+          "type": "string",
+          "description": "The application ID"
+        }
+      },
+      "required": ["applicationId"],
+      "additionalProperties": false
+    }
+  },
+  "get_account_fields": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of field definitions"
+        }
+      },
+      "required": ["fields"],
+      "additionalProperties": false
+    }
+  },
+  "get_account_metadata": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "include": {
+          "description": "Which metadata to include. Defaults to all.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["lists", "tables", "users"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "lists": {
+          "description": "List definitions and values (departments, locations, etc.)"
+        },
+        "tables": {
+          "description": "Table definitions"
+        },
+        "users": {
+          "description": "User accounts"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

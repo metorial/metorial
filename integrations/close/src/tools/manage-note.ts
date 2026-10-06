@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -34,7 +34,7 @@ export let manageNote = SlateTool.create(spec, {
   .output(
     z.object({
       noteId: z.string().describe('Unique identifier of the note'),
-      leadId: z.string().describe('Lead ID the note is attached to'),
+      leadId: z.string().optional().describe('Lead ID the note is attached to, when provided'),
       note: z.string().describe('The note content/body text'),
       userId: z.string().optional().describe('User ID who created/updated the note'),
       contactId: z.string().optional().describe('Contact ID associated with the note'),
@@ -43,46 +43,30 @@ export let manageNote = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-
-    let isUpdate = !!ctx.input.noteId;
-    let result: any;
-
-    if (isUpdate) {
-      let updateData: Record<string, any> = {
-        note: ctx.input.note
-      };
-      if (ctx.input.leadId) updateData.lead_id = ctx.input.leadId;
-      if (ctx.input.contactId) updateData.contact_id = ctx.input.contactId;
-
-      result = await client.updateNote(ctx.input.noteId!, updateData);
-    } else {
-      if (!ctx.input.leadId) {
-        throw new Error('leadId is required when creating a new note');
-      }
-
-      let createData: Record<string, any> = {
-        lead_id: ctx.input.leadId,
-        note: ctx.input.note
-      };
-      if (ctx.input.contactId) createData.contact_id = ctx.input.contactId;
-
-      result = await client.createNote(createData);
-    }
-
+    const input = ctx.input;
+    if (input.noteId === undefined && input.leadId === undefined)
+      throw createApiServiceError('leadId is required when creating a note.');
+    const client = new Client(ctx.auth);
+    const body = pickDefined({
+      lead_id: input.leadId,
+      contact_id: input.contactId,
+      note: input.note
+    });
+    const note =
+      input.noteId !== undefined
+        ? await client.updateNote(input.noteId, body)
+        : await client.createNote(body);
     return {
       output: {
-        noteId: result.id,
-        leadId: result.lead_id,
-        note: result.note,
-        userId: result.user_id,
-        contactId: result.contact_id,
-        dateCreated: result.date_created,
-        dateUpdated: result.date_updated
+        noteId: note.id,
+        leadId: note.lead_id ?? undefined,
+        note: note.note,
+        userId: note.user_id ?? undefined,
+        contactId: note.contact_id ?? undefined,
+        dateCreated: note.date_created,
+        dateUpdated: note.date_updated
       },
-      message: isUpdate
-        ? `Updated note \`${result.id}\` on lead \`${result.lead_id}\`.`
-        : `Created note \`${result.id}\` on lead \`${result.lead_id}\`.`
+      message: `${input.noteId !== undefined ? 'Updated' : 'Created'} note **${note.id}**.`
     };
   })
   .build();

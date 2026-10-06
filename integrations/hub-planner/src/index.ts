@@ -19,8 +19,6 @@ import {
   searchResources,
   searchTimeEntries
 } from './tools';
-import { bookingEvents, projectEvents, resourceEvents, timeEntryEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     manageHoliday,
     listBookingCategories
   ],
-  triggers: [projectEvents, bookingEvents, resourceEvents, timeEntryEvents]
+  triggers: []
 });

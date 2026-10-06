@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getApiStatus,
   getCustomer,
   getProduct,
   getPurchase,
@@ -15,11 +16,10 @@ import {
   verifyNotification,
   verifySubscriber
 } from './tools';
-import { purchaseNotification } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getApiStatus,
     listStorefronts,
     getStorefront,
     listProducts,
@@ -34,5 +34,5 @@ export let provider = Slate.create({
     verifySubscriber,
     verifyNotification
   ],
-  triggers: [purchaseNotification]
+  triggers: []
 });

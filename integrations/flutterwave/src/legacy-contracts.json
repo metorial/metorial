@@ -1,0 +1,1282 @@
+{
+  "list_transactions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "Start date for filtering (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date for filtering (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number for pagination",
+          "type": "number"
+        },
+        "status": {
+          "description": "Filter by transaction status",
+          "type": "string",
+          "enum": ["successful", "failed", "pending"]
+        },
+        "currency": {
+          "description": "Filter by currency code (e.g. NGN, USD, GHS)",
+          "type": "string"
+        },
+        "customerEmail": {
+          "description": "Filter by customer email address",
+          "type": "string"
+        },
+        "paymentType": {
+          "description": "Filter by payment type (card, account, ussd, mobilemoney)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "transactionId": {
+                "type": "number",
+                "description": "Flutterwave transaction ID"
+              },
+              "txRef": {
+                "type": "string",
+                "description": "Your unique transaction reference"
+              },
+              "flwRef": {
+                "type": "string",
+                "description": "Flutterwave reference"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Transaction amount"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Transaction currency"
+              },
+              "chargedAmount": {
+                "type": "number",
+                "description": "Amount charged to customer"
+              },
+              "appFee": {
+                "description": "Application fee",
+                "type": "number"
+              },
+              "merchantFee": {
+                "description": "Merchant fee",
+                "type": "number"
+              },
+              "status": {
+                "type": "string",
+                "description": "Transaction status (successful, failed, pending)"
+              },
+              "paymentType": {
+                "type": "string",
+                "description": "Payment method used (card, account, mobilemoney, etc.)"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Transaction creation timestamp"
+              },
+              "customerEmail": {
+                "description": "Customer email",
+                "type": "string"
+              },
+              "customerName": {
+                "description": "Customer name",
+                "type": "string"
+              }
+            },
+            "required": [
+              "transactionId",
+              "txRef",
+              "flwRef",
+              "amount",
+              "currency",
+              "chargedAmount",
+              "status",
+              "paymentType",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of transactions"
+        },
+        "totalCount": {
+          "description": "Total number of matching transactions",
+          "type": "number"
+        },
+        "currentPage": {
+          "description": "Current page number",
+          "type": "number"
+        },
+        "totalPages": {
+          "description": "Total number of pages",
+          "type": "number"
+        }
+      },
+      "required": ["transactions"],
+      "additionalProperties": false
+    }
+  },
+  "verify_transaction": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transactionId": {
+          "description": "Flutterwave transaction ID to verify",
+          "type": "number"
+        },
+        "txRef": {
+          "description": "Your unique transaction reference to verify",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transactionId": {
+          "type": "number",
+          "description": "Flutterwave transaction ID"
+        },
+        "txRef": {
+          "type": "string",
+          "description": "Your unique transaction reference"
+        },
+        "flwRef": {
+          "type": "string",
+          "description": "Flutterwave reference"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Transaction amount"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Transaction currency"
+        },
+        "chargedAmount": {
+          "type": "number",
+          "description": "Amount charged to the customer"
+        },
+        "appFee": {
+          "description": "Application fee",
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "description": "Transaction status"
+        },
+        "paymentType": {
+          "type": "string",
+          "description": "Payment method used"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Transaction timestamp"
+        },
+        "customerEmail": {
+          "description": "Customer email",
+          "type": "string"
+        },
+        "customerName": {
+          "description": "Customer name",
+          "type": "string"
+        },
+        "customerPhone": {
+          "description": "Customer phone number",
+          "type": "string"
+        },
+        "cardToken": {
+          "description": "Card token for future tokenized charges",
+          "type": "string"
+        },
+        "cardFirst6": {
+          "description": "First 6 digits of the card",
+          "type": "string"
+        },
+        "cardLast4": {
+          "description": "Last 4 digits of the card",
+          "type": "string"
+        },
+        "cardType": {
+          "description": "Card brand (VISA, MASTERCARD, etc.)",
+          "type": "string"
+        },
+        "narration": {
+          "description": "Transaction narration/description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transactionId",
+        "txRef",
+        "flwRef",
+        "amount",
+        "currency",
+        "chargedAmount",
+        "status",
+        "paymentType",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "create_transfer": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountBank": {
+          "type": "string",
+          "description": "Recipient bank code (e.g. \"044\" for Access Bank). Use List Banks tool to find codes."
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Recipient account number"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount to transfer"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Transfer currency (e.g. NGN, USD, EUR, GHS, KES)"
+        },
+        "narration": {
+          "type": "string",
+          "description": "Description/reason for the transfer"
+        },
+        "reference": {
+          "description": "Your unique reference for the transfer",
+          "type": "string"
+        },
+        "debitCurrency": {
+          "description": "Currency to debit from your balance (for cross-currency transfers)",
+          "type": "string"
+        },
+        "beneficiaryName": {
+          "description": "Recipient name (required for international transfers)",
+          "type": "string"
+        }
+      },
+      "required": ["accountBank", "accountNumber", "amount", "currency", "narration"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transferId": {
+          "type": "number",
+          "description": "Flutterwave transfer ID"
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Recipient account number"
+        },
+        "bankName": {
+          "description": "Recipient bank name",
+          "type": "string"
+        },
+        "fullName": {
+          "description": "Recipient full name",
+          "type": "string"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Transfer amount"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Transfer currency"
+        },
+        "fee": {
+          "description": "Transfer fee",
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "description": "Transfer status"
+        },
+        "reference": {
+          "description": "Transfer reference",
+          "type": "string"
+        },
+        "narration": {
+          "description": "Transfer narration",
+          "type": "string"
+        },
+        "requiresApproval": {
+          "description": "Whether the transfer needs approval",
+          "type": "boolean"
+        },
+        "createdAt": {
+          "description": "Transfer creation timestamp",
+          "type": "string"
+        }
+      },
+      "required": ["transferId", "accountNumber", "amount", "currency", "status"],
+      "additionalProperties": false
+    }
+  },
+  "list_transfers": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transferId": {
+          "description": "Specific transfer ID to retrieve details for",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number for pagination",
+          "type": "number"
+        },
+        "status": {
+          "description": "Filter by status",
+          "type": "string"
+        },
+        "from": {
+          "description": "Start date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date (YYYY-MM-DD)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transfers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "transferId": {
+                "type": "number",
+                "description": "Transfer ID"
+              },
+              "accountNumber": {
+                "description": "Recipient account number",
+                "type": "string"
+              },
+              "bankName": {
+                "description": "Bank name",
+                "type": "string"
+              },
+              "fullName": {
+                "description": "Recipient name",
+                "type": "string"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Transfer amount"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Transfer currency"
+              },
+              "fee": {
+                "description": "Transfer fee",
+                "type": "number"
+              },
+              "status": {
+                "type": "string",
+                "description": "Transfer status"
+              },
+              "reference": {
+                "description": "Transfer reference",
+                "type": "string"
+              },
+              "narration": {
+                "description": "Transfer description",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["transferId", "amount", "currency", "status"],
+            "additionalProperties": false
+          },
+          "description": "List of transfers"
+        }
+      },
+      "required": ["transfers"],
+      "additionalProperties": false
+    }
+  },
+  "get_transfer_rate": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number",
+          "description": "Destination amount to transfer"
+        },
+        "destinationCurrency": {
+          "type": "string",
+          "description": "Currency to send (e.g. USD, EUR, GBP)"
+        },
+        "sourceCurrency": {
+          "type": "string",
+          "description": "Currency to debit from your balance (e.g. NGN, KES, GHS)"
+        }
+      },
+      "required": ["amount", "destinationCurrency", "sourceCurrency"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "rate": {
+          "type": "number",
+          "description": "Exchange rate applied"
+        },
+        "sourceAmount": {
+          "type": "number",
+          "description": "Amount to be debited in source currency"
+        },
+        "sourceCurrency": {
+          "type": "string",
+          "description": "Source currency code"
+        },
+        "destinationAmount": {
+          "type": "number",
+          "description": "Amount to be received in destination currency"
+        },
+        "destinationCurrency": {
+          "type": "string",
+          "description": "Destination currency code"
+        }
+      },
+      "required": [
+        "rate",
+        "sourceAmount",
+        "sourceCurrency",
+        "destinationAmount",
+        "destinationCurrency"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "get_transaction_fee": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number",
+          "description": "Transaction amount to calculate fees for"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code (e.g. NGN, USD, GHS)"
+        },
+        "feeType": {
+          "description": "Type of fee to check (defaults to transaction)",
+          "type": "string",
+          "enum": ["transaction", "transfer"]
+        }
+      },
+      "required": ["amount", "currency"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "chargeAmount": {
+          "description": "Total charge amount",
+          "type": "number"
+        },
+        "fee": {
+          "type": "number",
+          "description": "Total fee amount"
+        },
+        "flutterwaveFee": {
+          "description": "Flutterwave platform fee",
+          "type": "number"
+        },
+        "merchantFee": {
+          "description": "Merchant fee",
+          "type": "number"
+        },
+        "stampDutyFee": {
+          "description": "Stamp duty fee",
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Fee currency"
+        }
+      },
+      "required": ["fee", "currency"],
+      "additionalProperties": false
+    }
+  },
+  "manage_payment_plans": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "list", "get", "update"],
+          "description": "Action to perform"
+        },
+        "planId": {
+          "description": "Plan ID (required for get/update)",
+          "type": "number"
+        },
+        "name": {
+          "description": "Plan name (for create)",
+          "type": "string"
+        },
+        "amount": {
+          "description": "Billing amount per cycle (for create)",
+          "type": "number"
+        },
+        "interval": {
+          "description": "Billing interval (for create)",
+          "type": "string",
+          "enum": ["daily", "weekly", "monthly", "quarterly", "yearly"]
+        },
+        "duration": {
+          "description": "Number of billing cycles (for create, default: 48)",
+          "type": "number"
+        },
+        "updateName": {
+          "description": "New plan name (for update)",
+          "type": "string"
+        },
+        "updateStatus": {
+          "description": "New plan status (for update)",
+          "type": "string",
+          "enum": ["active", "cancelled"]
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "plans": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "planId": {
+                "type": "number",
+                "description": "Payment plan ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Plan name"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Billing amount per cycle"
+              },
+              "interval": {
+                "type": "string",
+                "description": "Billing interval (daily, weekly, monthly, quarterly, yearly)"
+              },
+              "duration": {
+                "description": "Number of billing cycles",
+                "type": "number"
+              },
+              "status": {
+                "type": "string",
+                "description": "Plan status (active, cancelled)"
+              },
+              "currency": {
+                "description": "Plan currency",
+                "type": "string"
+              },
+              "planToken": {
+                "description": "Plan token for referencing in charges",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["planId", "name", "amount", "interval", "status"],
+            "additionalProperties": false
+          },
+          "description": "Payment plan(s) returned"
+        }
+      },
+      "required": ["plans"],
+      "additionalProperties": false
+    }
+  },
+  "manage_subscriptions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "cancel", "activate"],
+          "description": "Action to perform"
+        },
+        "subscriptionId": {
+          "description": "Subscription ID (required for cancel/activate)",
+          "type": "number"
+        },
+        "email": {
+          "description": "Filter by customer email (for list)",
+          "type": "string"
+        },
+        "planId": {
+          "description": "Filter by payment plan ID (for list)",
+          "type": "number"
+        },
+        "status": {
+          "description": "Filter by status (for list)",
+          "type": "string",
+          "enum": ["active", "cancelled"]
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "subscriptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "subscriptionId": {
+                "type": "number",
+                "description": "Subscription ID"
+              },
+              "amount": {
+                "description": "Subscription amount",
+                "type": "number"
+              },
+              "customerEmail": {
+                "description": "Customer email",
+                "type": "string"
+              },
+              "customerId": {
+                "description": "Customer ID",
+                "type": "number"
+              },
+              "planId": {
+                "description": "Associated payment plan ID",
+                "type": "number"
+              },
+              "status": {
+                "type": "string",
+                "description": "Subscription status (active, cancelled)"
+              },
+              "createdAt": {
+                "description": "Subscription creation timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["subscriptionId", "status"],
+            "additionalProperties": false
+          },
+          "description": "Subscription(s) returned"
+        }
+      },
+      "required": ["subscriptions"],
+      "additionalProperties": false
+    }
+  },
+  "create_virtual_account": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Customer email address"
+        },
+        "txRef": {
+          "type": "string",
+          "description": "Unique transaction reference"
+        },
+        "isPermanent": {
+          "description": "true for static/permanent account, false for dynamic/temporary",
+          "type": "boolean"
+        },
+        "amount": {
+          "description": "Expected payment amount (required for dynamic accounts)",
+          "type": "number"
+        },
+        "currency": {
+          "description": "Currency (NGN or GHS)",
+          "type": "string",
+          "enum": ["NGN", "GHS"]
+        },
+        "bvn": {
+          "description": "Bank Verification Number (required for permanent accounts in production)",
+          "type": "string"
+        },
+        "firstname": {
+          "description": "Customer first name",
+          "type": "string"
+        },
+        "lastname": {
+          "description": "Customer last name",
+          "type": "string"
+        },
+        "phonenumber": {
+          "description": "Customer phone number",
+          "type": "string"
+        },
+        "narration": {
+          "description": "Account description/narration",
+          "type": "string"
+        }
+      },
+      "required": ["email", "txRef"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "orderRef": {
+          "description": "Order reference for tracking the virtual account",
+          "type": "string"
+        },
+        "accountNumber": {
+          "type": "string",
+          "description": "Generated virtual account number"
+        },
+        "bankName": {
+          "type": "string",
+          "description": "Bank name for the virtual account"
+        },
+        "amount": {
+          "description": "Expected amount (for dynamic accounts)",
+          "type": "number"
+        },
+        "expiryDate": {
+          "description": "Account expiry date (for dynamic accounts)",
+          "type": "string"
+        }
+      },
+      "required": ["accountNumber", "bankName"],
+      "additionalProperties": false
+    }
+  },
+  "pay_bill": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "billerCode": {
+          "type": "string",
+          "description": "Biller code (e.g. BIL099 for MTN Nigeria)"
+        },
+        "itemCode": {
+          "type": "string",
+          "description": "Bill item code (e.g. AT099 for MTN Airtime)"
+        },
+        "country": {
+          "type": "string",
+          "description": "Country code (e.g. NG, GH, KE)"
+        },
+        "customer": {
+          "type": "string",
+          "description": "Customer identifier (phone number, meter number, smartcard number, etc.)"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Bill amount to pay"
+        },
+        "type": {
+          "type": "string",
+          "description": "Bill type (AIRTIME, DATA, DSTV, GOTV, PHCN, etc.)"
+        },
+        "recurrence": {
+          "description": "Payment recurrence schedule",
+          "type": "string",
+          "enum": ["ONCE", "HOURLY", "DAILY", "WEEKLY", "MONTHLY"]
+        },
+        "reference": {
+          "description": "Your unique reference for the payment",
+          "type": "string"
+        }
+      },
+      "required": ["billerCode", "itemCode", "country", "customer", "amount", "type"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Payment status"
+        },
+        "message": {
+          "type": "string",
+          "description": "Response message from the provider"
+        },
+        "reference": {
+          "description": "Payment reference",
+          "type": "string"
+        }
+      },
+      "required": ["status", "message"],
+      "additionalProperties": false
+    }
+  },
+  "list_bill_categories": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "billerCode": {
+          "description": "Get items for a specific biller code",
+          "type": "string"
+        },
+        "category": {
+          "description": "Filter billers by category code",
+          "type": "string"
+        },
+        "country": {
+          "description": "Filter billers by country code (e.g. NG, GH, KE)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "categories": {
+          "description": "Bill categories with biller codes and item codes",
+          "type": "array",
+          "items": {}
+        },
+        "billers": {
+          "description": "Billers matching the filter criteria",
+          "type": "array",
+          "items": {}
+        },
+        "items": {
+          "description": "Items for the specified biller",
+          "type": "array",
+          "items": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "create_refund": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transactionId": {
+          "type": "number",
+          "description": "Flutterwave transaction ID to refund"
+        },
+        "amount": {
+          "description": "Amount to refund (omit for full refund)",
+          "type": "number"
+        },
+        "comments": {
+          "description": "Reason for the refund",
+          "type": "string"
+        }
+      },
+      "required": ["transactionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "refundId": {
+          "type": "number",
+          "description": "Refund ID"
+        },
+        "transactionId": {
+          "type": "number",
+          "description": "Original transaction ID"
+        },
+        "amountRefunded": {
+          "type": "number",
+          "description": "Amount refunded"
+        },
+        "status": {
+          "type": "string",
+          "description": "Refund status"
+        },
+        "destination": {
+          "description": "Refund destination (card, wallet, etc.)",
+          "type": "string"
+        },
+        "createdAt": {
+          "description": "Refund creation timestamp",
+          "type": "string"
+        }
+      },
+      "required": ["refundId", "transactionId", "amountRefunded", "status"],
+      "additionalProperties": false
+    }
+  },
+  "list_refunds": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "refundId": {
+          "description": "Specific refund ID to retrieve",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number for pagination",
+          "type": "number"
+        },
+        "from": {
+          "description": "Start date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date (YYYY-MM-DD)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "refunds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "refundId": {
+                "type": "number",
+                "description": "Refund ID"
+              },
+              "transactionId": {
+                "description": "Original transaction ID",
+                "type": "number"
+              },
+              "flwRef": {
+                "description": "Flutterwave reference",
+                "type": "string"
+              },
+              "amountRefunded": {
+                "type": "number",
+                "description": "Amount refunded"
+              },
+              "status": {
+                "type": "string",
+                "description": "Refund status"
+              },
+              "destination": {
+                "description": "Refund destination",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              },
+              "comment": {
+                "description": "Refund comment",
+                "type": "string"
+              }
+            },
+            "required": ["refundId", "amountRefunded", "status"],
+            "additionalProperties": false
+          },
+          "description": "List of refunds"
+        }
+      },
+      "required": ["refunds"],
+      "additionalProperties": false
+    }
+  },
+  "list_settlements": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "settlementId": {
+          "description": "Specific settlement ID to retrieve",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number for pagination",
+          "type": "number"
+        },
+        "from": {
+          "description": "Start date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "to": {
+          "description": "End date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "subaccountId": {
+          "description": "Filter by subaccount ID",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "settlements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "settlementId": {
+                "type": "number",
+                "description": "Settlement ID"
+              },
+              "merchantName": {
+                "description": "Merchant/business name",
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "description": "Settlement status"
+              },
+              "currency": {
+                "description": "Settlement currency",
+                "type": "string"
+              },
+              "grossAmount": {
+                "description": "Gross amount before deductions",
+                "type": "number"
+              },
+              "appFee": {
+                "description": "Application fee",
+                "type": "number"
+              },
+              "merchantFee": {
+                "description": "Merchant fee",
+                "type": "number"
+              },
+              "chargeback": {
+                "description": "Chargeback amount",
+                "type": "number"
+              },
+              "refund": {
+                "description": "Refund amount",
+                "type": "number"
+              },
+              "netAmount": {
+                "description": "Net amount settled",
+                "type": "number"
+              },
+              "transactionCount": {
+                "description": "Number of transactions in this settlement",
+                "type": "number"
+              },
+              "transactionDate": {
+                "description": "Transaction date",
+                "type": "string"
+              },
+              "dueDate": {
+                "description": "Settlement due date",
+                "type": "string"
+              },
+              "processedDate": {
+                "description": "Date settlement was processed",
+                "type": "string"
+              }
+            },
+            "required": ["settlementId", "status"],
+            "additionalProperties": false
+          },
+          "description": "List of settlements"
+        }
+      },
+      "required": ["settlements"],
+      "additionalProperties": false
+    }
+  },
+  "resolve_bank_account": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["resolve", "list_banks"],
+          "description": "Action: resolve an account or list banks"
+        },
+        "accountNumber": {
+          "description": "Bank account number to resolve",
+          "type": "string"
+        },
+        "accountBank": {
+          "description": "Bank code (e.g. \"044\" for Access Bank)",
+          "type": "string"
+        },
+        "countryCode": {
+          "description": "Country code for listing banks (e.g. NG, GH, KE, ZA)",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountName": {
+          "description": "Resolved account holder name",
+          "type": "string"
+        },
+        "accountNumber": {
+          "description": "Account number",
+          "type": "string"
+        },
+        "banks": {
+          "description": "List of banks (when action is list_banks)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "bankId": {
+                "description": "Bank ID",
+                "type": "number"
+              },
+              "bankCode": {
+                "type": "string",
+                "description": "Bank code"
+              },
+              "bankName": {
+                "type": "string",
+                "description": "Bank name"
+              }
+            },
+            "required": ["bankCode", "bankName"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_beneficiaries": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "list", "get", "delete"],
+          "description": "Action to perform"
+        },
+        "beneficiaryId": {
+          "description": "Beneficiary ID (for get/delete)",
+          "type": "number"
+        },
+        "accountNumber": {
+          "description": "Account number (for create)",
+          "type": "string"
+        },
+        "accountBank": {
+          "description": "Bank code (for create)",
+          "type": "string"
+        },
+        "beneficiaryName": {
+          "description": "Recipient full name (for create)",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "beneficiaries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "beneficiaryId": {
+                "type": "number",
+                "description": "Beneficiary ID"
+              },
+              "accountNumber": {
+                "description": "Beneficiary account number",
+                "type": "string"
+              },
+              "bankCode": {
+                "description": "Bank code",
+                "type": "string"
+              },
+              "bankName": {
+                "description": "Bank name",
+                "type": "string"
+              },
+              "fullName": {
+                "description": "Beneficiary full name",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["beneficiaryId"],
+            "additionalProperties": false
+          },
+          "description": "Beneficiary record(s)"
+        },
+        "deleted": {
+          "description": "Whether the beneficiary was deleted",
+          "type": "boolean"
+        }
+      },
+      "required": ["beneficiaries"],
+      "additionalProperties": false
+    }
+  }
+}

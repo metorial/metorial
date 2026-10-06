@@ -14,8 +14,6 @@ import {
   getTradesQuotes,
   searchTickers
 } from './tools';
-import { inboundWebhook, newTickerNews, stockPriceChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     getTickerNews,
     getMarketStatus
   ],
-  triggers: [inboundWebhook, newTickerNews, stockPriceChange]
+  triggers: []
 });

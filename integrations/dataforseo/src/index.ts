@@ -20,8 +20,6 @@ import {
   rankedKeywords,
   serpSearch
 } from './tools';
-import { taskCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     aiOptimization,
     getTaskResult
   ],
-  triggers: [taskCompleted]
+  triggers: []
 });

@@ -1,162 +1,49 @@
-Now let me get more details on the webhook event types and the full REST API feature set:Now I have enough information to write the specification.
+# Pulumi integration API specification
 
-# Slates Specification for Pulumi
+The integration exposes 20 tools for Pulumi Cloud. It uses the public [Cloud REST API](https://www.pulumi.com/docs/reference/cloud-rest-api/) and its [published OpenAPI specification](https://api.pulumi.com/api/openapi/pulumi-spec.json).
 
-## Overview
+## Connection
 
-Pulumi Cloud is an infrastructure-as-code platform that provides state management, secrets management, and deployment orchestration for cloud infrastructure. Its REST API allows programmatic management of organizations, projects, stacks, environments, deployments, policies, and team access. The API base URL is `https://api.pulumi.com` for the managed service, or a custom URL for self-hosted instances.
+Authenticate with an access token using `Authorization: token <access-token>`. API requests use `Accept: application/vnd.pulumi+8`; ESC definition downloads use `application/x-yaml`. The API origin defaults to `https://api.pulumi.com` and is stored with the credential. Self-hosted origins must use HTTPS and contain no path, query, fragment or embedded credentials. Existing connections can retain their stored API-origin configuration as a compatibility fallback.
 
-## Authentication
+The token is verified against `GET /api/user`. `get_current_user` returns identity and organization memberships. Organization-scoped tools accept an organization login and can use the optional configured default. Personal, organization and team tokens remain subject to their provider permissions and product entitlements.
 
-Pulumi Cloud uses **Access Token** authentication for its REST API. There are three types of access tokens:
+## Supported workflows
 
-- **Personal Access Tokens (PATs):** Scoped to an individual user's permissions. Available to all Pulumi Cloud users. Can be created at `https://app.pulumi.com/account/tokens`.
-- **Organization Access Tokens:** Scoped to organization-level permissions (member or admin). Available to Enterprise and Business Critical editions only.
-- **Team Access Tokens:** Scoped to the permissions of a specific team. Available to Enterprise and Business Critical editions only.
+| Workflow | Public tools | Provider API |
+| --- | --- | --- |
+| Identity | `get_current_user` | `GET /api/user` |
+| Stacks | `list_stacks`, `get_stack`, `create_stack`, `delete_stack` | `/api/user/stacks`, `/api/stacks/{organization}/{project}/{stack}` and project stack collection |
+| Tags and history | `manage_stack_tags`, `list_stack_updates` | Stack `/tags`, `/updates` |
+| Deployments | `trigger_deployment`, `get_deployment`, `list_deployments`, `cancel_deployment` | Stack `/deployments`, deployment `/logs`, `/cancel`; organization `/deployments` |
+| ESC | `list_environments`, `manage_environment`, `open_environment` | `/api/esc/environments/{organization}`, full environment path and `/open` session paths |
+| Resource search | `search_resources` | `GET /api/orgs/{organization}/search/resourcesv2` |
+| Organization reads | `list_org_members`, `list_policy_packs`, `list_audit_logs` | Organization `/members`, `/policypacks`, `/auditlogs` |
+| Credentials | `manage_access_tokens` | `/api/user/tokens` and token item paths |
+| Webhooks | `manage_webhooks` | Organization or stack `/hooks` |
 
-All requests must be authenticated using a token via the `Authorization` HTTP header. The header must be in the form `Authorization: token {token}` where `{token}` is your access token value. Tokens can be viewed, created, or revoked on the Access Tokens page.
+## Results and lifecycle behavior
 
-The following headers are required for all operations: `Accept: application/vnd.pulumi+8` and `Content-Type: application/json`.
+Stack outputs come from the dedicated outputs endpoint. Secret values remain in their provider-stored encrypted representation. Stack deletion removes the stack record; it does not run an infrastructure destroy. Forced deletion can discard state.
 
-Tokens can optionally be configured with an expiration period of up to two years, or set to never expire.
+Deployment creation confirms acceptance and returns the provider deployment ID, version and optional console URL. Read the deployment to inspect its current status. Supported operations are update, preview, refresh and destroy. They use the stack's saved settings unless inheritance is disabled. Cancellation is a request, not confirmation of a terminal state. Deployment logs follow provider continuation tokens. A deployment's operation comes from the current `pulumiOperation` field, with older `operation` responses accepted for compatibility.
 
-Example request:
+ESC creation posts the project and environment name to the organization collection. Reading returns a downloadable YAML definition and useful file metadata. The legacy optional `yamlContent` output remains in the schema but is no longer populated. Updating sends the entire YAML definition; error or unknown-severity diagnostics fail explicitly, while warning-only HTTP 200 responses retain their confirmed success. Diagnostic text is omitted because it can contain definition values. Opening creates an evaluation session and can reveal secrets or mint dynamic credentials.
 
-```
-curl -H "Accept: application/vnd.pulumi+8" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: token pul-abc123..." \
-     https://api.pulumi.com/api/user/stacks
-```
+Stack, environment, member and credential collections follow cursor pagination by default, up to 100 pages. Explicit cursor or result-limit inputs request one page. Deployment lists use page numbers starting at 1 and page sizes from 1 to 100. Their status filter is local to the fetched page; the provider total is unfiltered. Search exposes provider pagination metadata without following arbitrary returned URLs. The current search API accepts the same exposed parameters and response shape as its deprecated predecessor. Page-based search is limited to 10,000 results; larger cursor searches require Enterprise access and pagination is not transactional. Audit-log pagination remains explicit and plan-gated.
 
-## Features
+Token lists return metadata only, including credential kind when available; Pulumi can include refresh-token metadata as well as personal tokens. Token creation returns the new personal-token secret once. Webhook results omit shared-secret material. Creating an inactive webhook prevents deliveries; enabled webhooks can contact the configured receiver.
 
-### Organization Management
+The client rejects unsafe origins and relative resource-path segments, validates responses, preserves upstream error status and validated retry hints, enforces a 30-second timeout and does not follow redirects. Error parents contain safe status metadata rather than raw HTTP request/response objects. Stack update history accepts the documented nonnegative page/pageSize values; page 0 retrieves all history.
 
-Manage Pulumi Cloud organizations including viewing organization details and managing membership. Organizations serve as the top-level container for projects, stacks, teams, and policies.
+## Official references
 
-### Stack Management
-
-Manage projects and stacks, including creating, listing, and deleting stacks. View stack outputs, configuration, tags, and update history. Stacks are the core deployment unit representing an instance of a Pulumi program.
-
-- Stacks are organized under projects within organizations.
-- Stack tags can be applied for categorization and querying.
-- Stack configuration (including environment bindings and secrets provider) can be managed via the API.
-
-### Deployments
-
-Configure and manage Pulumi Deployments, which enable you to execute Pulumi updates and other operations through Pulumi Cloud. Trigger operations like `update`, `preview`, `destroy`, and `refresh` remotely.
-
-- Configure deployment settings per stack (source context, operation context, GitHub integration).
-- View deployment status, logs, and history.
-- Pause, resume, and cancel in-progress deployments.
-- Manage customer-managed deployment runners.
-
-### Stack Updates
-
-Stack updates are operations that create, update, or delete resources in a Pulumi stack. The Stack Updates API allows you to list updates, check status, and view detailed events for each operation.
-
-- View resource changes, policy checks, and detailed events for each update.
-
-### Environments (Pulumi ESC)
-
-Access, share, and manage secrets, passwords, API keys, and configuration. Environments support importing one into another for composability and inheritance. Every change is versioned, enabling easy rollback.
-
-- Create, read, update, and delete ESC environments.
-- Open environments to resolve and retrieve computed values and secrets.
-
-### Services
-
-Services are a way to group and organize related resources in Pulumi Cloud. The Services API allows you to create, manage, and organize collections of resources that work together to provide a specific capability.
-
-- Add and remove stacks and environments as items in a service.
-
-### Policy Management
-
-Apply and enforce compliance policies across your infrastructure. Manage policy packs (collections of rules) and policy groups (bindings of packs to stacks).
-
-- View policy violation results for stack updates.
-
-### Resource Search
-
-Query and search resources under management. Search across all cloud resources managed by Pulumi in your organization, filtering by resource type, properties, and other metadata. Useful for auditing and incident response.
-
-### Audit Logs
-
-Audit logs enable you to track the activity of users within an organization. They display what a user did, when they did it and where by recording user actions. The logs are immutable and record all user actions.
-
-- Export in JSON, CSV, or CEF format for SIEM integration.
-- Available to organizations using the Enterprise and Business Critical editions.
-
-### Access Token Management
-
-Personal Access Tokens (PATs) are credentials that can be used to authenticate with the Pulumi Cloud API. The Personal Access Tokens API allows you to manage these tokens programmatically.
-
-- List, create, and delete tokens.
-
-### Schedules
-
-Configure scheduled operations for stacks such as recurring drift detection, updates, or TTL (time-to-live) stack destruction.
-
-### AI Agent (Neo)
-
-The Agent Tasks API allows you to create and manage AI agent tasks in Pulumi Cloud. These endpoints enable you to create tasks, monitor their status, respond to agent requests, and retrieve task events.
-
-- These endpoints are currently in preview status. The API may change before general availability.
-
-### Data Export
-
-Export data from Pulumi Cloud for external analysis and reporting.
-
-### Registry
-
-Access and publish packages to the Pulumi Registry.
-
-## Events
-
-Pulumi Cloud supports webhooks that notify external services of events occurring within your organization or specific stacks/environments.
-
-### Stack Events
-
-Events related to stack lifecycle operations. Can be scoped to organization-wide or individual stack webhooks.
-
-- **Stack created/deleted** — Triggered when a stack is created or deleted (organization webhooks only).
-- **Preview succeeded/failed** — Triggered when a stack preview operation completes.
-- **Update succeeded/failed** — Triggered when a stack update operation completes.
-- **Destroy succeeded/failed** — Triggered when a stack destroy operation completes.
-- **Refresh succeeded/failed** — Triggered when a stack refresh operation completes.
-
-### Deployment Events
-
-Events related to Pulumi Deployments execution.
-
-- **Deployment queued/started/succeeded/failed** — Triggered at various stages of a deployment lifecycle.
-
-### Drift Detection & Remediation Events
-
-Events related to drift detection and remediation runs.
-
-- **Drift detected** — Triggered when infrastructure drift is found.
-- **Drift detection succeeded/failed** — Triggered when a drift detection run completes.
-- **Drift remediation succeeded/failed** — Triggered when a drift remediation run completes.
-
-### Policy Violation Events
-
-Events related to policy compliance checks.
-
-- **Mandatory policy violation** — Triggered when a mandatory policy is violated.
-- **Advisory policy violation** — Triggered when an advisory policy is violated.
-
-### Environment Events (ESC)
-
-ESC Webhooks allow you to notify external services of events happening within your ESC environments. For example, you can trigger a notification whenever a new revision of an environment is created.
-
-- **Environment revision created** — Triggered when a new version of an environment is saved.
-- **Imported environment changed** — Triggered when an imported (parent) environment changes.
-
-### Webhook Configuration Options
-
-- Webhooks can target generic JSON endpoints, Slack, Microsoft Teams, or trigger Pulumi Deployments directly.
-- Event filtering is available using groups (e.g., `stacks`, `deployments`) or individual event filters.
-- An optional shared secret can be provided for HMAC signature verification of payloads.
-- Webhooks do not guarantee ordered delivery of events.
+- [REST API and authentication](https://www.pulumi.com/docs/reference/cloud-rest-api/)
+- [Users](https://www.pulumi.com/docs/reference/cloud-rest-api/users/)
+- [Stacks](https://www.pulumi.com/docs/reference/cloud-rest-api/stacks/)
+- [Stack updates](https://www.pulumi.com/docs/reference/cloud-rest-api/stack-updates/)
+- [Deployments](https://www.pulumi.com/docs/reference/cloud-rest-api/deployments/)
+- [ESC environments](https://www.pulumi.com/docs/reference/cloud-rest-api/environments/)
+- [Resource search](https://www.pulumi.com/docs/reference/cloud-rest-api/resource-search/)
+- [Organizations](https://www.pulumi.com/docs/reference/cloud-rest-api/organizations/)
+- [Access tokens](https://www.pulumi.com/docs/reference/cloud-rest-api/access-tokens/)

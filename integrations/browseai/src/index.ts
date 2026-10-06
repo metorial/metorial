@@ -13,8 +13,6 @@ import {
   runTask,
   updateCookies
 } from './tools';
-import { dataChanged, tableExportCompleted, taskCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     createWebhook,
     deleteWebhook
   ],
-  triggers: [taskCompleted, dataChanged, tableExportCompleted]
+  triggers: []
 });

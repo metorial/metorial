@@ -6,14 +6,15 @@ import { spec } from '../spec';
 export let updateWorkspaceTool = SlateTool.create(spec, {
   name: 'Update Workspace',
   key: 'update_workspace',
+  tags: { destructive: true },
   description: `Update an existing Airbyte workspace. Modify the workspace name or notification settings.`
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('The UUID of the workspace to update.'),
+      workspaceId: z.string().describe('Workspace ID from list_workspaces.'),
       name: z.string().optional().describe('New name for the workspace.'),
       notifications: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Updated notification configuration for the workspace.')
     })
@@ -28,7 +29,7 @@ export let updateWorkspaceTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let updateData: Record<string, any> = {};
+    let updateData: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
     if (ctx.input.notifications !== undefined)
       updateData.notifications = ctx.input.notifications;

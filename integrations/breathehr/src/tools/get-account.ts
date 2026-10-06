@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { readAccount } from '../lib/response';
 import { spec } from '../spec';
 
 export let getAccount = SlateTool.create(spec, {
@@ -14,21 +15,16 @@ export let getAccount = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      account: z.record(z.string(), z.any()).describe('Account details')
+      account: z.record(z.string(), z.unknown()).describe('Account details')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let result = await client.getAccount();
-    let account = result?.account || result;
-
-    return {
-      output: { account },
-      message: `Retrieved account **${account?.name || 'unknown'}**.`
-    };
+    const account = readAccount(
+      await new Client({
+        token: ctx.auth.token,
+        environment: ctx.config.environment
+      }).getAccount()
+    );
+    return { output: { account }, message: 'Retrieved the authenticated account.' };
   })
   .build();

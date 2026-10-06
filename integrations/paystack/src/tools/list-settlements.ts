@@ -1,7 +1,42 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PaystackClient } from '../lib/client';
+
+import {
+  exactId,
+  optionalNumericId,
+  pagination,
+  records,
+  validateOutput
+} from '../lib/transport';
 import { spec } from '../spec';
+
+const listSettlementsOutput = z.object({
+  settlements: z.array(
+    z.object({
+      settlementId: z.number().optional().describe('Settlement ID'),
+      exactSettlementId: z
+        .string()
+        .describe(
+          'Exact provider resource ID; legacy numeric ID is omitted outside its safe range'
+        ),
+      totalAmount: z.number().describe('Total settlement amount'),
+      currency: z.string().describe('Currency'),
+      status: z.string().describe('Settlement status'),
+      settledAt: z.string().nullable().describe('Settlement date')
+    })
+  ),
+  totalCount: z.number().optional().describe('Total settlements'),
+  currentPage: z.number().optional().describe('Current page'),
+  totalPages: z.number().optional().describe('Total pages'),
+  nextCursor: z.string().nullable().optional().describe('Provider next cursor, when returned'),
+  previousCursor: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Provider previous cursor, when returned'),
+  perPage: z.number().optional().describe('Observed provider page size')
+});
 
 export let listSettlements = SlateTool.create(spec, {
   name: 'List Settlements',
@@ -20,51 +55,25 @@ export let listSettlements = SlateTool.create(spec, {
       subaccount: z.string().optional().describe('Filter by subaccount code')
     })
   )
-  .output(
-    z.object({
-      settlements: z.array(
-        z.object({
-          settlementId: z.number().describe('Settlement ID'),
-          totalAmount: z.number().describe('Total settlement amount'),
-          currency: z.string().describe('Currency'),
-          status: z.string().describe('Settlement status'),
-          settledAt: z.string().nullable().describe('Settlement date')
-        })
-      ),
-      totalCount: z.number().describe('Total settlements'),
-      currentPage: z.number().describe('Current page'),
-      totalPages: z.number().describe('Total pages')
-    })
-  )
+  .output(listSettlementsOutput)
   .handleInvocation(async ctx => {
-    let client = new PaystackClient({ token: ctx.auth.token });
-
-    let result = await client.listSettlements({
-      perPage: ctx.input.perPage,
-      page: ctx.input.page,
-      from: ctx.input.from,
-      to: ctx.input.to,
-      subaccount: ctx.input.subaccount
-    });
-
-    let settlements = (result.data ?? []).map((s: any) => ({
-      settlementId: s.id,
-      totalAmount: s.total_amount ?? s.amount ?? 0,
-      currency: s.currency ?? '',
-      status: s.status ?? '',
-      settledAt: s.settled_date ?? s.settled_at ?? null
-    }));
-
-    let meta = result.meta ?? {};
-
+    const client = new PaystackClient({ token: ctx.auth.token });
+    const result = await client.listSettlements(ctx.input);
+    const output = {
+      settlements: records(result.data).map(item => ({
+        settlementId: optionalNumericId(item.id),
+        exactSettlementId: exactId(item.id),
+        totalAmount: item.total_amount,
+        currency: item.currency,
+        status: item.status,
+        settledAt: item.settlement_date ?? null
+      })),
+      ...pagination(result.meta)
+    };
     return {
-      output: {
-        settlements,
-        totalCount: meta.total ?? 0,
-        currentPage: meta.page ?? 1,
-        totalPages: meta.pageCount ?? 1
-      },
-      message: `Found **${meta.total ?? settlements.length}** settlements.`
+      output: validateOutput(listSettlementsOutput, output),
+      message:
+        'Retrieved the requested page; continuation and counts are included only when returned by Paystack.'
     };
   })
   .build();

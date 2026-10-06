@@ -6,18 +6,20 @@ import { spec } from '../spec';
 export let getCaptions = SlateTool.create(spec, {
   name: 'Get Captions',
   key: 'get_captions',
-  description: `Retrieves captions for a completed transcription job in SubRip (SRT) or Web Video Text Tracks (VTT) format. Useful for generating subtitle files from transcriptions.`,
+  description: `DEPRECATED — use \`download_captions\` instead. Retrieves captions for a completed transcription job in SubRip (SRT) or Web Video Text Tracks (VTT) format. Useful for generating subtitle files from transcriptions.`,
   instructions: [
+    'Use download_captions to get a downloadable subtitle file.',
     'The transcription job must have status "transcribed" before fetching captions.'
   ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }
 })
   .input(
     z.object({
-      jobId: z.string().describe('ID of the completed transcription job'),
+      jobId: z.string().min(1).describe('ID of the completed transcription job'),
       format: z
         .enum(['srt', 'vtt'])
         .describe('Caption format: "srt" for SubRip or "vtt" for WebVTT'),

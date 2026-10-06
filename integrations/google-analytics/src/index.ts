@@ -15,8 +15,6 @@ import {
   sendEvents,
   validateEvents
 } from './tools';
-import { inboundWebhook, propertyChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     manageAudiences,
     auditDataAccess
   ],
-  triggers: [inboundWebhook, propertyChange]
+  triggers: []
 });

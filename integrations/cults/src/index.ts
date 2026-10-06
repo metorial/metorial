@@ -21,8 +21,6 @@ import {
   updateCreation,
   updatePrintlist
 } from './tools';
-import { inboundWebhook, newOrderTrigger, newSaleTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     createDiscount,
     notifyDownloaders
   ],
-  triggers: [inboundWebhook, newSaleTrigger, newOrderTrigger]
+  triggers: []
 });

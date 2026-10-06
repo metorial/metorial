@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, mapEntityRoles } from '../lib/client';
 import { spec } from '../spec';
 
 let keywordSchema = z.object({
@@ -11,7 +11,11 @@ let keywordSchema = z.object({
 let entitySchema = z.object({
   entityId: z.string().optional().describe('Unique entity ID'),
   name: z.string().describe('Entity name'),
-  roles: z.array(z.string()).optional().describe('Roles defined for this entity'),
+  roles: z.array(z.string()).optional().describe('Role names defined for this entity'),
+  roleDetails: z
+    .array(z.object({ roleId: z.string().optional(), name: z.string() }))
+    .optional()
+    .describe('Role identifiers and names'),
   lookups: z
     .array(z.string())
     .optional()
@@ -50,7 +54,7 @@ export let listEntities = SlateTool.create(spec, {
         entities: (entities ?? []).map((e: Record<string, unknown>) => ({
           entityId: e.id,
           name: e.name,
-          roles: e.roles as string[] | undefined,
+          ...mapEntityRoles(e.roles as Parameters<typeof mapEntityRoles>[0]),
           lookups: e.lookups as string[] | undefined,
           builtin: e.builtin as boolean | undefined
         }))
@@ -88,7 +92,7 @@ export let getEntity = SlateTool.create(spec, {
       output: {
         entityId: entity.id,
         name: entity.name,
-        roles: entity.roles,
+        ...mapEntityRoles(entity.roles),
         lookups: entity.lookups,
         builtin: entity.builtin,
         keywords: (entity.keywords ?? []).map((k: Record<string, unknown>) => ({
@@ -112,7 +116,10 @@ export let createEntity = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Name of the new entity'),
-      roles: z.array(z.string()).describe('Roles for the entity (at least one required)'),
+      roles: z
+        .array(z.string())
+        .min(1)
+        .describe('Roles for the entity (at least one required)'),
       lookups: z
         .array(z.enum(['keywords', 'free-text']))
         .optional()
@@ -141,7 +148,7 @@ export let createEntity = SlateTool.create(spec, {
       output: {
         entityId: entity.id,
         name: entity.name,
-        roles: entity.roles,
+        ...mapEntityRoles(entity.roles),
         lookups: entity.lookups,
         builtin: entity.builtin,
         keywords: entity.keywords
@@ -187,7 +194,7 @@ export let updateEntity = SlateTool.create(spec, {
       output: {
         entityId: entity.id,
         name: entity.name,
-        roles: entity.roles,
+        ...mapEntityRoles(entity.roles),
         lookups: entity.lookups,
         builtin: entity.builtin,
         keywords: entity.keywords
@@ -237,7 +244,7 @@ export let manageEntityKeywords = SlateTool.create(spec, {
   key: 'manage_entity_keywords',
   description: `Add or remove keywords and synonyms for a keyword-type entity. Use this to expand the vocabulary of an entity by adding new canonical keywords with their synonym expressions, or to remove existing ones.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -250,7 +257,7 @@ export let manageEntityKeywords = SlateTool.create(spec, {
       synonyms: z
         .array(z.string())
         .optional()
-        .describe('Synonym expressions (required for add_keyword)'),
+        .describe('Synonym expressions for add_keyword; defaults to an empty list'),
       synonym: z
         .string()
         .optional()
@@ -278,10 +285,12 @@ export let manageEntityKeywords = SlateTool.create(spec, {
     } else if (action === 'delete_keyword') {
       await client.deleteEntityKeyword(entityName, keyword);
     } else if (action === 'add_synonym') {
-      if (!ctx.input.synonym) throw new Error('synonym is required for add_synonym action');
+      if (!ctx.input.synonym)
+        throw createApiServiceError('Provide synonym for the add_synonym action.');
       await client.addEntityKeywordSynonym(entityName, keyword, ctx.input.synonym);
     } else if (action === 'delete_synonym') {
-      if (!ctx.input.synonym) throw new Error('synonym is required for delete_synonym action');
+      if (!ctx.input.synonym)
+        throw createApiServiceError('Provide synonym for the delete_synonym action.');
       await client.deleteEntityKeywordSynonym(entityName, keyword, ctx.input.synonym);
     }
 

@@ -7,8 +7,6 @@ import {
   manageMonitoredDomain,
   searchCertificates
 } from './tools';
-import { certificateEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -18,5 +16,5 @@ export let provider = Slate.create({
     authorizeCertificate,
     authorizePublicKey
   ],
-  triggers: [certificateEvents]
+  triggers: []
 });

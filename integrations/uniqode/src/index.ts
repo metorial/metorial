@@ -17,8 +17,6 @@ import {
   updateNfcTag,
   updateQrCode
 } from './tools';
-import { inboundWebhook, newFormResponse, newGeofence, newQrCode } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     manageLandingPage,
     getFormResponses
   ],
-  triggers: [inboundWebhook, newQrCode, newFormResponse, newGeofence]
+  triggers: []
 });

@@ -13,7 +13,7 @@ let networkVolumeSchema = z.object({
 export let listNetworkVolumes = SlateTool.create(spec, {
   name: 'List Network Volumes',
   key: 'list_network_volumes',
-  description: `List all persistent network storage volumes in your RunPod account. Network volumes can be attached to Pods and Serverless endpoints, and they persist across restarts.`,
+  description: `List all persistent network storage volumes in your Runpod account. Network volumes can be attached to Pods and Serverless endpoints, and they persist across restarts.`,
   tags: {
     readOnly: true
   }

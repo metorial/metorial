@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { EgnyteClient } from '../lib/client';
+import { integer, invalid, record, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let createWorkflowTool = SlateTool.create(spec, {
@@ -16,8 +17,18 @@ export let createWorkflowTool = SlateTool.create(spec, {
       steps: z
         .array(
           z.object({
+            name: z.string().optional().describe('Step name; defaults to its position'),
             stepType: z.enum(['REVIEW', 'APPROVAL']).describe('Step type'),
-            assignees: z.array(z.string()).describe('Usernames of assignees for this step'),
+            assigneeIds: z
+              .array(z.number())
+              .optional()
+              .describe('Exact numeric user IDs for this step'),
+            assignees: z
+              .array(z.string())
+              .optional()
+              .describe(
+                'Legacy usernames; each is resolved to one exact user. Use either these or assigneeIds'
+              ),
             dueDate: z.string().optional().describe('Due date for this step (ISO 8601)'),
             minMustComplete: z
               .number()
@@ -38,21 +49,44 @@ export let createWorkflowTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
-    let steps = ctx.input.steps.map(step => ({
-      stepType: step.stepType,
-      assignees: step.assignees,
-      dueDate: step.dueDate,
-      minMustComplete: step.minMustComplete,
-      signatureRequired: step.signatureRequired
-    }));
+    if (!ctx.input.steps.length) throw invalid('Provide at least one workflow step.');
+    let steps = await Promise.all(
+      ctx.input.steps.map(async (step, index) => {
+        if ((step.assignees !== undefined) === (step.assigneeIds !== undefined))
+          throw invalid('Provide either usernames or numeric assignee IDs for each step.');
+        const assignees =
+          step.assigneeIds ??
+          (await Promise.all(
+            (step.assignees ?? []).map(name => client.resolveUsername(name))
+          ));
+        if (!assignees.length || new Set(assignees).size !== assignees.length)
+          throw invalid('Each step requires distinct assignees.');
+        assignees.forEach(id => integer(id, 1));
+        if (step.minMustComplete !== undefined)
+          integer(step.minMustComplete, 1, assignees.length);
+        if (step.dueDate !== undefined && !Number.isFinite(Date.parse(step.dueDate)))
+          throw invalid('Provide an ISO-8601 workflow due date.');
+        if (step.signatureRequired !== undefined && step.stepType !== 'APPROVAL')
+          throw invalid('Signature settings apply only to approval steps.');
+        return {
+          name: step.name === undefined ? `Step ${index + 1}` : text(step.name),
+          type: step.stepType,
+          stepOptions: {
+            assignees,
+            dueDate: step.dueDate,
+            minMustComplete: step.minMustComplete,
+            ...(step.stepType === 'APPROVAL'
+              ? { signatureRequired: step.signatureRequired ?? false }
+              : {})
+          }
+        };
+      })
+    );
 
     let result = (await client.createWorkflow({
-      name: ctx.input.name,
+      name: text(ctx.input.name),
       workflowType: ctx.input.workflowType,
       file: { groupId: ctx.input.fileGroupId },
       steps
@@ -112,21 +146,21 @@ export let getWorkflowTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.getWorkflow(ctx.input.workflowId)) as Record<string, unknown>;
 
     let steps = Array.isArray(result.steps)
       ? result.steps.map((s: Record<string, unknown>) => ({
-          stepType: s.stepType ? String(s.stepType) : undefined,
+          stepType: s.type ? String(s.type) : undefined,
           status: s.status ? String(s.status) : undefined,
           tasks: Array.isArray(s.tasks)
             ? s.tasks.map((t: Record<string, unknown>) => ({
                 taskId: t.id ? String(t.id) : undefined,
-                assignee: t.assignee ? String(t.assignee) : undefined,
+                assignee:
+                  t.assignee && typeof t.assignee === 'object'
+                    ? String(record(t.assignee).username ?? '')
+                    : undefined,
                 status: t.status ? String(t.status) : undefined,
                 completionDate: t.completionDate ? String(t.completionDate) : undefined
               }))
@@ -187,10 +221,7 @@ export let listWorkflowTasksTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.listWorkflowTasks({
       offset: ctx.input.offset,
@@ -228,7 +259,7 @@ export let listWorkflowTasksTool = SlateTool.create(spec, {
 export let cancelWorkflowTool = SlateTool.create(spec, {
   name: 'Cancel Workflow',
   key: 'cancel_workflow',
-  description: `Cancel an in-progress workflow in Egnyte. All pending tasks in the workflow will be cancelled.`,
+  description: `Request cancellation of an in-progress workflow in Egnyte. Cancellation may finish asynchronously.`,
   tags: {
     destructive: true
   }
@@ -241,23 +272,27 @@ export let cancelWorkflowTool = SlateTool.create(spec, {
   .output(
     z.object({
       workflowId: z.string(),
-      cancelled: z.boolean()
+      cancelled: z.boolean(),
+      status: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     await client.cancelWorkflow(ctx.input.workflowId);
+    const state = await client.getWorkflow(ctx.input.workflowId);
+    if (!['BEING_CANCELLED', 'CANCELLED'].includes(String(state.status)))
+      throw invalid(
+        'Workflow cancellation was requested, but the resulting state is not confirmed.'
+      );
 
     return {
       output: {
         workflowId: ctx.input.workflowId,
-        cancelled: true
+        cancelled: state.status === 'CANCELLED',
+        status: String(state.status)
       },
-      message: `Cancelled workflow **${ctx.input.workflowId}**`
+      message: `Workflow cancellation ${state.status === 'CANCELLED' ? 'completed' : 'is pending'} for **${ctx.input.workflowId}**`
     };
   })
   .build();

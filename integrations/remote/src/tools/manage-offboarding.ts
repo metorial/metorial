@@ -1,100 +1,145 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { spec } from '../spec';
-
-export let manageOffboarding = SlateTool.create(spec, {
-  name: 'Manage Offboarding',
-  key: 'manage_offboarding',
-  description: `Create, list, or retrieve offboarding (termination) requests. Initiate an employee offboarding by specifying the employment, termination date, and reason. Track the offboarding status through the review and payroll submission process.`,
-  tags: {
-    destructive: false
-  }
-})
-  .input(
-    z.object({
-      action: z.enum(['create', 'list', 'get']).describe('Action to perform'),
-      offboardingId: z.string().optional().describe('Offboarding request ID (for get)'),
-      employmentId: z.string().optional().describe('Employment ID (for create, list filter)'),
-      terminationDate: z
-        .string()
-        .optional()
-        .describe('Planned termination date (YYYY-MM-DD) for create'),
-      terminationReason: z.string().optional().describe('Reason for termination'),
-      additionalComments: z
-        .string()
-        .optional()
-        .describe('Additional comments about the offboarding'),
-      confidential: z.boolean().optional().describe('Whether the offboarding is confidential'),
-      type: z
-        .string()
-        .optional()
-        .describe('Offboarding type (e.g., termination, resignation)'),
-      proposedLastWorkingDate: z
-        .string()
-        .optional()
-        .describe('Proposed last working date (YYYY-MM-DD)'),
-      status: z.string().optional().describe('Filter by status when listing'),
-      page: z.number().optional().describe('Page number'),
-      pageSize: z.number().optional().describe('Page size')
-    })
-  )
-  .output(
-    z.object({
-      offboarding: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe('Single offboarding record'),
-      offboardings: z
-        .array(z.record(z.string(), z.any()))
-        .optional()
-        .describe('List of offboarding records'),
-      totalCount: z.number().optional().describe('Total count for list')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment ?? 'production'
-    });
-
-    if (ctx.input.action === 'create') {
-      let result = await client.createOffboarding({
-        employmentId: ctx.input.employmentId!,
-        terminationDate: ctx.input.terminationDate!,
-        terminationReason: ctx.input.terminationReason,
-        additionalComments: ctx.input.additionalComments,
-        confidential: ctx.input.confidential,
-        type: ctx.input.type,
-        proposedLastWorkingDate: ctx.input.proposedLastWorkingDate
+import { collection, pageOutput, pageParams, single } from '../lib/client';
+import { remoteTool } from '../lib/tool';
+import {
+  date,
+  fail,
+  id,
+  jsonObject,
+  pageSchema,
+  pageSizeSchema,
+  paginationOutput,
+  type RecordData,
+  recordSchema,
+  rejectFields,
+  required
+} from '../lib/validation';
+export let manageOffboarding = remoteTool(
+  {
+    name: 'Manage Offboarding',
+    key: 'manage_offboarding',
+    description:
+      'Read or submit a termination offboarding request. Submission starts provider review; it does not complete termination or guarantee the proposed date. The API requires explicit termination details and risk answers.',
+    tags: { destructive: true }
+  },
+  z.object({
+    action: z.enum(['create', 'list', 'get']),
+    offboardingId: z.string().optional(),
+    employmentId: z.string().optional(),
+    terminationDate: z
+      .string()
+      .optional()
+      .describe('Proposed termination date, subject to Remote review.'),
+    terminationReason: z.string().optional(),
+    additionalComments: z.string().optional(),
+    confidential: z.boolean().optional(),
+    type: z.string().optional(),
+    proposedLastWorkingDate: z
+      .string()
+      .optional()
+      .describe(
+        'Legacy unsupported field; the current endpoint accepts a proposed termination date.'
+      ),
+    status: z.string().optional().describe('Legacy unsupported list filter.'),
+    page: pageSchema,
+    pageSize: pageSizeSchema,
+    terminationDetails: recordSchema
+      .optional()
+      .describe(
+        'Current termination_details fields, including required reason_description, risk_assessment_reasons, will_challenge_termination, confidential, proposed_termination_date, and termination_reason.'
+      ),
+    includeConfidential: z.boolean().optional()
+  }),
+  z.object({
+    offboarding: recordSchema.optional(),
+    offboardings: z.array(recordSchema).optional(),
+    ...paginationOutput
+  }),
+  async (client, input) => {
+    if (input.action === 'list') {
+      rejectFields(
+        input,
+        ['status'],
+        'The current offboarding list does not document a status filter. Omit status and inspect the returned page.'
+      );
+      let value = await client.get('/offboardings', {
+        ...pageParams(input),
+        employment_id: input.employmentId === undefined ? undefined : id(input.employmentId),
+        type: input.type,
+        include_confidential: input.includeConfidential
       });
-      let offboarding = result?.data ?? result?.offboarding ?? result;
       return {
-        output: { offboarding },
-        message: `Created offboarding request for employment **${ctx.input.employmentId}** with termination date **${ctx.input.terminationDate}**.`
+        output: { offboardings: collection(value, 'offboardings'), ...pageOutput(value) },
+        message: 'Retrieved an offboarding page.'
       };
     }
-
-    if (ctx.input.action === 'get') {
-      let result = await client.getOffboarding(ctx.input.offboardingId!);
-      let offboarding = result?.data ?? result?.offboarding ?? result;
+    if (input.action === 'get')
       return {
-        output: { offboarding },
-        message: `Retrieved offboarding **${ctx.input.offboardingId}**.`
+        output: {
+          offboarding: await client.entity('/offboardings', 'offboarding', input.offboardingId)
+        },
+        message: 'Retrieved the current offboarding request.'
       };
-    }
-
-    // list
-    let result = await client.listOffboardings({
-      employmentId: ctx.input.employmentId,
-      status: ctx.input.status,
-      page: ctx.input.page,
-      pageSize: ctx.input.pageSize
-    });
-    let offboardings = result?.data ?? result?.offboardings ?? [];
-    let totalCount = result?.total_count ?? offboardings.length;
+    rejectFields(
+      input,
+      ['proposedLastWorkingDate'],
+      'Current termination requests accept a proposed termination date rather than proposedLastWorkingDate. Supply terminationDate or terminationDetails.proposed_termination_date with the required risk answers.'
+    );
+    if (input.type !== undefined && input.type !== 'termination')
+      fail(
+        'The current create endpoint supports termination requests only. Resignations use a separate provider workflow.'
+      );
+    let details: RecordData = input.terminationDetails
+      ? { ...jsonObject(input.terminationDetails, 'Termination details') }
+      : {};
+    for (let [key, value] of [
+      ['proposed_termination_date', input.terminationDate],
+      ['termination_reason', input.terminationReason],
+      ['additional_comments', input.additionalComments],
+      ['confidential', input.confidential]
+    ] as const)
+      if (value !== undefined) {
+        if (details[key] !== undefined && details[key] !== value)
+          fail(`Conflicting ${key} values. Provide a consistent termination request.`);
+        details[key] = value;
+      }
+    details.proposed_termination_date = date(
+      details.proposed_termination_date,
+      'Proposed termination date'
+    );
+    required(details.termination_reason, 'Termination reason');
+    required(details.reason_description, 'Termination reason description');
+    if (
+      typeof details.confidential !== 'boolean' ||
+      typeof details.will_challenge_termination !== 'boolean'
+    )
+      fail(
+        'Provide explicit confidential and will_challenge_termination booleans in terminationDetails. Do not infer personnel risk answers.'
+      );
+    if (
+      !Array.isArray(details.risk_assessment_reasons) ||
+      !details.risk_assessment_reasons.length ||
+      details.risk_assessment_reasons.some(reason => typeof reason !== 'string' || !reason)
+    )
+      fail(
+        'Provide at least one explicit risk_assessment_reasons value in terminationDetails, using the current provider requirements.'
+      );
+    if (details.will_challenge_termination === true)
+      required(details.will_challenge_termination_description, 'Challenge risk description');
+    let employmentId = id(input.employmentId, 'Employment ID');
+    await client.employment(employmentId);
+    let offboarding = single(
+      await client.post('/offboardings', {
+        type: 'termination',
+        employment_id: employmentId,
+        termination_details: details
+      }),
+      'offboarding'
+    );
     return {
-      output: { offboardings, totalCount },
-      message: `Found **${totalCount}** offboarding request(s).`
+      output: { offboarding },
+      message:
+        'Remote accepted the termination request for review. Termination completion and the proposed date are not confirmed.'
     };
-  });
+  }
+);

@@ -8,7 +8,7 @@ export let generateUploadUrl = SlateTool.create(spec, {
   key: 'generate_upload_url',
   description: `Generate a temporary upload URL for uploading a file to Convex file storage.
 The returned URL can be used to POST file content directly. After uploading, a storage ID is returned that can be referenced in documents.
-Requires deploy key authentication.`,
+Requires a deployed mutation that returns ctx.storage.generateUploadUrl().`,
   instructions: [
     'The returned URL is temporary and should be used immediately',
     'POST file content to the URL with the appropriate Content-Type header',
@@ -18,7 +18,20 @@ Requires deploy key authentication.`,
     readOnly: false
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      functionPath: z
+        .string()
+        .optional()
+        .describe(
+          'Deployed mutation returning ctx.storage.generateUploadUrl(), such as files:generateUploadUrl. Required to generate the URL.'
+        ),
+      args: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Arguments expected by the upload mutation.')
+    })
+  )
   .output(
     z.object({
       uploadUrl: z.string().describe('Temporary URL for uploading a file via POST')
@@ -32,7 +45,7 @@ Requires deploy key authentication.`,
     });
 
     ctx.progress('Generating upload URL...');
-    let uploadUrl = await client.generateUploadUrl();
+    let uploadUrl = await client.generateUploadUrl(ctx.input.functionPath, ctx.input.args);
 
     return {
       output: {

@@ -1,23 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AdminClient } from '../lib/client';
+import {
+  botIdSchema,
+  resolveBotId,
+  resolveWorkspaceId,
+  workspaceIdSchema
+} from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listBotIssuesTool = SlateTool.create(spec, {
   name: 'List Bot Issues',
   key: 'list_bot_issues',
-  description: `List or retrieve issues reported for a bot. Issues help diagnose and track problems with bot behavior and conversation flows.`,
+  description: `List or retrieve issues reported for a bot. Issues help diagnose and track problems with bot behavior and conversation flows. Call list_workspaces to discover workspace IDs, then list_bots to discover bot IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      botId: z.string().optional().describe('Bot ID. Falls back to config botId.'),
-      workspaceId: z
-        .string()
-        .optional()
-        .describe('Workspace ID. Falls back to config workspaceId.'),
+      botId: botIdSchema,
+      workspaceId: workspaceIdSchema,
       issueId: z.string().optional().describe('Specific issue ID to retrieve details for'),
       nextToken: z.string().optional().describe('Pagination token for listing')
     })
@@ -30,12 +33,11 @@ export let listBotIssuesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let botId = ctx.input.botId || ctx.config.botId;
-    if (!botId) throw new Error('botId is required (provide in input or config)');
+    let botId = resolveBotId(ctx.input.botId, ctx.config);
 
     let client = new AdminClient({
       token: ctx.auth.token,
-      workspaceId: ctx.input.workspaceId || ctx.config.workspaceId
+      workspaceId: resolveWorkspaceId(ctx.input.workspaceId, ctx.config)
     });
 
     if (ctx.input.issueId) {

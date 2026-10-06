@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { workspaceClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteSync = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let deleteSync = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId,
       syncId: z.number().describe('ID of the sync to delete.')
     })
   )
@@ -22,10 +24,7 @@ export let deleteSync = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = await workspaceClient(ctx);
 
     await client.deleteSync(ctx.input.syncId);
 

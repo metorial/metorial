@@ -1,16 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PrismaClient } from '../lib/client';
+import { mapConnection, mapDatabase, PrismaClient } from '../lib/client';
+import { connectionOutputSchema, databaseIdInput } from '../lib/schemas';
 import { spec } from '../spec';
-
-let connectionSchema = z.object({
-  connectionId: z.string().describe('Connection identifier'),
-  connectionString: z.string().optional().describe('Full connection string'),
-  directHost: z.string().optional().describe('Direct TCP connection host'),
-  directPort: z.number().optional().describe('Direct TCP connection port'),
-  directUser: z.string().optional().describe('Direct connection username'),
-  directPassword: z.string().optional().describe('Direct connection password')
-});
 
 export let getDatabase = SlateTool.create(spec, {
   name: 'Get Database',
@@ -22,7 +14,7 @@ export let getDatabase = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      databaseId: z.string().describe('ID of the database to retrieve')
+      databaseId: databaseIdInput
     })
   )
   .output(
@@ -40,7 +32,7 @@ export let getDatabase = SlateTool.create(spec, {
       projectId: z.string().optional().describe('Parent project ID'),
       projectName: z.string().optional().describe('Parent project name'),
       connections: z
-        .array(connectionSchema)
+        .array(connectionOutputSchema)
         .optional()
         .describe('Available connection configurations')
     })
@@ -49,41 +41,14 @@ export let getDatabase = SlateTool.create(spec, {
     let client = new PrismaClient(ctx.auth.token);
     let db = await client.getDatabase(ctx.input.databaseId);
 
-    let connections = (db.connections ?? []).map(c => ({
-      connectionId: c.id,
-      connectionString: c.connectionString,
-      directHost: c.directConnection?.host,
-      directPort: c.directConnection?.port,
-      directUser: c.directConnection?.user,
-      directPassword: c.directConnection?.password
-    }));
-
-    // Fall back to apiKeys if connections not available
-    if (connections.length === 0 && db.apiKeys) {
-      connections = db.apiKeys.map(k => ({
-        connectionId: k.id,
-        connectionString: k.connectionString,
-        directHost: k.ppgDirectConnection?.host,
-        directPort: k.ppgDirectConnection?.port,
-        directUser: k.ppgDirectConnection?.user,
-        directPassword: k.ppgDirectConnection?.password
-      }));
-    }
+    let connections = (db.connections ?? db.apiKeys)?.map(mapConnection);
 
     return {
       output: {
-        databaseId: db.id,
-        databaseName: db.name,
-        region: db.region,
-        status: db.status,
-        createdAt: db.createdAt,
-        isDefault: db.isDefault,
-        connectionString: db.connectionString ?? db.apiKeys?.[0]?.connectionString,
-        projectId: db.project?.id,
-        projectName: db.project?.name,
+        ...mapDatabase(db),
         connections
       },
-      message: `Database **${db.name}** is in region **${db.region ?? 'unknown'}** with status **${db.status ?? 'unknown'}**.`
+      message: `Database **${db.name}** is in region **${mapDatabase(db).region ?? 'unknown'}** with status **${db.status ?? 'unknown'}**.`
     };
   })
   .build();

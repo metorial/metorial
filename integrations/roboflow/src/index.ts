@@ -5,25 +5,31 @@ import {
   createProjectTool,
   createVersionTool,
   deleteImagesTool,
+  deleteProjectTool,
   exportDatasetTool,
   getImageTool,
   getProjectTool,
   getVersionTool,
   listAnnotationJobsTool,
+  listBatchesTool,
   listProjectsTool,
   manageImageTagsTool,
   runInferenceTool,
   searchImagesTool,
   trainModelTool,
   uploadAnnotationTool,
-  uploadImageTool
+  uploadImageTool,
+  whoAmITool
 } from './tools';
-import { batchWebhookTrigger } from './triggers';
 
 export let provider = Slate.create({
   spec,
+  triggers: [],
   tools: [
     listProjectsTool,
+    whoAmITool,
+    listBatchesTool,
+    deleteProjectTool,
     getProjectTool,
     createProjectTool,
     uploadImageTool,
@@ -39,6 +45,5 @@ export let provider = Slate.create({
     createAnnotationJobTool,
     exportDatasetTool,
     uploadAnnotationTool
-  ],
-  triggers: [batchWebhookTrigger]
+  ]
 });

@@ -8,7 +8,7 @@ export let createScheduleOverride = SlateTool.create(spec, {
   key: 'create_schedule_override',
   description: `Create an override on an on-call schedule. Overrides temporarily replace the scheduled on-call person for a specific rotation and layer during a given time window.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -28,7 +28,7 @@ export let createScheduleOverride = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      overrideId: z.string().optional(),
+      overrideId: z.string(),
       scheduleId: z.string(),
       startAt: z.string(),
       endAt: z.string()
@@ -46,14 +46,14 @@ export let createScheduleOverride = SlateTool.create(spec, {
       userId: ctx.input.userId
     });
 
-    let override = result.override || {};
+    let override = result.override;
 
     return {
       output: {
-        overrideId: override.id || undefined,
-        scheduleId: ctx.input.scheduleId,
-        startAt: ctx.input.startAt,
-        endAt: ctx.input.endAt
+        overrideId: override.id,
+        scheduleId: override.schedule_id,
+        startAt: override.start_at,
+        endAt: override.end_at
       },
       message: `Schedule override created from ${ctx.input.startAt} to ${ctx.input.endAt}.`
     };

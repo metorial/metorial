@@ -32,8 +32,6 @@ import {
   updateTag,
   updateTicket
 } from './tools';
-import { ticketEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -68,5 +66,5 @@ export let provider = Slate.create({
     getAccount,
     listSatisfactionSurveys
   ],
-  triggers: [ticketEvents]
+  triggers: []
 });

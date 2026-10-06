@@ -24,11 +24,16 @@ export let createCollector = SlateTool.create(spec, {
           'embedded_survey'
         ])
         .describe('Type of collector'),
-      name: z.string().optional().describe('Name for the collector'),
+      name: z
+        .string()
+        .optional()
+        .describe('Name for the collector, required by the current API'),
       thankYouMessage: z
         .string()
         .optional()
-        .describe('Custom thank-you message shown after completion'),
+        .describe(
+          'Legacy documented thank-you message field; the provider recommends its newer thank_you_page form'
+        ),
       closeDate: z
         .string()
         .optional()
@@ -46,7 +51,13 @@ export let createCollector = SlateTool.create(spec, {
         .optional()
         .describe('Level of response anonymity'),
       password: z.string().optional().describe('Password required to access the survey'),
-      responseLimit: z.number().optional().describe('Maximum number of responses to collect'),
+      responseLimit: z
+        .number()
+        .int()
+        .nonnegative()
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Maximum number of responses to collect'),
       senderEmail: z.string().optional().describe('Sender email for email collectors')
     })
   )
@@ -109,7 +120,13 @@ export let updateCollector = SlateTool.create(spec, {
         .optional()
         .describe('Anonymity level'),
       password: z.string().optional().describe('Survey access password'),
-      responseLimit: z.number().optional().describe('Max responses'),
+      responseLimit: z
+        .number()
+        .int()
+        .nonnegative()
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Max responses'),
       status: z.enum(['open', 'closed']).optional().describe('Open or close the collector')
     })
   )
@@ -156,7 +173,7 @@ export let updateCollector = SlateTool.create(spec, {
 export let listCollectors = SlateTool.create(spec, {
   name: 'List Collectors',
   key: 'list_collectors',
-  description: `List all collectors for a survey, with optional sorting and pagination. Returns collector IDs, types, and status information.`,
+  description: `List one native page of collectors for a survey, with optional sorting and pagination. Returns collector IDs, types, and status information.`,
   tags: {
     readOnly: true
   }
@@ -164,8 +181,14 @@ export let listCollectors = SlateTool.create(spec, {
   .input(
     z.object({
       surveyId: z.string().describe('ID of the survey'),
-      page: z.number().optional().describe('Page number'),
-      perPage: z.number().optional().describe('Results per page'),
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Page number'),
+      perPage: z.number().int().min(1).max(1000).optional().describe('Results per page'),
       sortBy: z
         .enum(['id', 'date_modified', 'type', 'status', 'name'])
         .optional()
@@ -187,7 +210,10 @@ export let listCollectors = SlateTool.create(spec, {
         })
       ),
       page: z.number(),
-      total: z.number()
+      total: z.number(),
+      perPage: z.number(),
+      hasMore: z.boolean(),
+      nextPage: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -204,11 +230,12 @@ export let listCollectors = SlateTool.create(spec, {
       include: 'type,status,response_count,date_modified,url'
     });
 
-    let collectors = (result.data || []).map((c: any) => ({
+    let collectors = result.data.map(c => ({
       collectorId: c.id,
       name: c.name,
       type: c.type,
-      status: c.status,
+      status: typeof c.status === 'string' ? c.status : undefined,
+      statusFlag: typeof c.status === 'boolean' ? c.status : undefined,
       responseCount: c.response_count,
       url: c.url,
       dateModified: c.date_modified
@@ -217,10 +244,13 @@ export let listCollectors = SlateTool.create(spec, {
     return {
       output: {
         collectors,
-        page: result.page || 1,
-        total: result.total || collectors.length
+        page: result.page,
+        total: result.total,
+        perPage: result.per_page,
+        hasMore: result.nextPage !== undefined,
+        nextPage: result.nextPage
       },
-      message: `Found **${result.total || collectors.length}** collectors for the survey.`
+      message: `Found **${result.total}** collectors for the survey.`
     };
   })
   .build();
@@ -228,7 +258,7 @@ export let listCollectors = SlateTool.create(spec, {
 export let deleteCollector = SlateTool.create(spec, {
   name: 'Delete Collector',
   key: 'delete_collector',
-  description: `Permanently delete a collector and all its associated responses.`,
+  description: `Delete an exact collector and confirm it is no longer available. This can affect survey distribution and does not prove erasure of previously collected data.`,
   tags: {
     destructive: true
   }

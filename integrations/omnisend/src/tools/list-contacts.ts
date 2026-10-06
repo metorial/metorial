@@ -52,9 +52,8 @@ export let listContacts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OmnisendClient(ctx.auth.token);
-
-    let result = await client.listContacts({
+    let client = new OmnisendClient(ctx.auth, ctx.config.apiVersion);
+    let output = await client.listContacts({
       email: ctx.input.email,
       phone: ctx.input.phone,
       status: ctx.input.status,
@@ -64,33 +63,6 @@ export let listContacts = SlateTool.create(spec, {
       after: ctx.input.cursor,
       updatedAfter: ctx.input.updatedAfter
     });
-
-    let contacts = (result.contacts || []).map((c: any) => ({
-      contactId: c.contactID,
-      email: c.email,
-      firstName: c.firstName,
-      lastName: c.lastName,
-      phone: c.phone,
-      status: c.status,
-      tags: c.tags,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt
-    }));
-
-    let nextCursor = result.paging?.next
-      ? (new URL(result.paging.next).searchParams.get('after') ?? undefined)
-      : undefined;
-    let previousCursor = result.paging?.previous
-      ? (new URL(result.paging.previous).searchParams.get('before') ?? undefined)
-      : undefined;
-
-    return {
-      output: {
-        contacts,
-        nextCursor,
-        previousCursor
-      },
-      message: `Retrieved **${contacts.length}** contacts${nextCursor ? ' (more available)' : ''}.`
-    };
+    return { output, message: 'Retrieved contact page.' };
   })
   .build();

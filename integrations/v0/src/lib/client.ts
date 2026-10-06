@@ -1,13 +1,22 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+import type { Chat, Deployment, EnvVar, Hook, List, Project, User, Version } from './types';
 
 export class V0Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
+      authHeader: { value: `Bearer ${token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'v0',
+          reason: 'v0_api_error',
+          extractMessage: () =>
+            'The request was rejected. Check account access, resource IDs, and API limits.'
+        }),
       baseURL: 'https://api.v0.dev/v1',
       headers: {
-        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     });
@@ -15,8 +24,8 @@ export class V0Client {
 
   // ── Projects ──
 
-  async listProjects(): Promise<any> {
-    let response = await this.axios.get('/projects');
+  async listProjects(): Promise<List<Project>> {
+    let response = await this.axios.get<List<Project>>('/projects');
     return response.data;
   }
 
@@ -28,13 +37,13 @@ export class V0Client {
     privacy?: 'private' | 'team';
     vercelProjectId?: string;
     environmentVariables?: Array<{ key: string; value: string }>;
-  }): Promise<any> {
-    let response = await this.axios.post('/projects', params);
+  }): Promise<Project> {
+    let response = await this.axios.post<Project>('/projects', params);
     return response.data;
   }
 
-  async getProject(projectId: string): Promise<any> {
-    let response = await this.axios.get(`/projects/${projectId}`);
+  async getProject(projectId: string): Promise<Project> {
+    let response = await this.axios.get<Project>(`/projects/${encodeURIComponent(projectId)}`);
     return response.data;
   }
 
@@ -46,24 +55,32 @@ export class V0Client {
       instructions?: string;
       privacy?: 'private' | 'team';
     }
-  ): Promise<any> {
-    let response = await this.axios.patch(`/projects/${projectId}`, params);
+  ): Promise<Project> {
+    let response = await this.axios.patch<Project>(
+      `/projects/${encodeURIComponent(projectId)}`,
+      params
+    );
     return response.data;
   }
 
-  async deleteProject(projectId: string): Promise<any> {
-    let response = await this.axios.delete(`/projects/${projectId}`);
+  async deleteProject(projectId: string): Promise<{ id: string; deleted: boolean }> {
+    let response = await this.axios.delete<{ id: string; deleted: boolean }>(
+      `/projects/${encodeURIComponent(projectId)}`
+    );
     return response.data;
   }
 
   // ── Environment Variables ──
 
-  async listEnvVars(projectId: string, decrypted?: boolean): Promise<any> {
+  async listEnvVars(projectId: string, decrypted?: boolean): Promise<List<EnvVar>> {
     let params: Record<string, string> = {};
     if (decrypted !== undefined) {
       params.decrypted = String(decrypted);
     }
-    let response = await this.axios.get(`/projects/${projectId}/env-vars`, { params });
+    let response = await this.axios.get<List<EnvVar>>(
+      `/projects/${encodeURIComponent(projectId)}/env-vars`,
+      { params }
+    );
     return response.data;
   }
 
@@ -73,8 +90,11 @@ export class V0Client {
       environmentVariables: Array<{ key: string; value: string }>;
       upsert?: boolean;
     }
-  ): Promise<any> {
-    let response = await this.axios.post(`/projects/${projectId}/env-vars`, params);
+  ): Promise<List<EnvVar>> {
+    let response = await this.axios.post<List<EnvVar>>(
+      `/projects/${encodeURIComponent(projectId)}/env-vars`,
+      params
+    );
     return response.data;
   }
 
@@ -83,15 +103,24 @@ export class V0Client {
     params: {
       environmentVariables: Array<{ id: string; value: string }>;
     }
-  ): Promise<any> {
-    let response = await this.axios.patch(`/projects/${projectId}/env-vars`, params);
+  ): Promise<List<EnvVar>> {
+    let response = await this.axios.patch<List<EnvVar>>(
+      `/projects/${encodeURIComponent(projectId)}/env-vars`,
+      params
+    );
     return response.data;
   }
 
-  async deleteEnvVars(projectId: string, environmentVariableIds: string[]): Promise<any> {
-    let response = await this.axios.post(`/projects/${projectId}/env-vars/delete`, {
-      environmentVariableIds
-    });
+  async deleteEnvVars(
+    projectId: string,
+    environmentVariableIds: string[]
+  ): Promise<List<{ id: string; deleted: boolean }>> {
+    let response = await this.axios.post<List<{ id: string; deleted: boolean }>>(
+      `/projects/${encodeURIComponent(projectId)}/env-vars/delete`,
+      {
+        environmentVariableIds
+      }
+    );
     return response.data;
   }
 
@@ -103,7 +132,7 @@ export class V0Client {
     isFavorite?: boolean;
     vercelProjectId?: string;
     branch?: string;
-  }): Promise<any> {
+  }): Promise<List<Chat>> {
     let query: Record<string, string> = {};
     if (params?.limit !== undefined) query.limit = String(params.limit);
     if (params?.offset !== undefined) query.offset = String(params.offset);
@@ -111,7 +140,7 @@ export class V0Client {
     if (params?.vercelProjectId) query.vercelProjectId = params.vercelProjectId;
     if (params?.branch) query.branch = params.branch;
 
-    let response = await this.axios.get('/chats', { params: query });
+    let response = await this.axios.get<List<Chat>>('/chats', { params: query });
     return response.data;
   }
 
@@ -124,13 +153,13 @@ export class V0Client {
     designSystemId?: string;
     metadata?: Record<string, string>;
     attachments?: Array<{ url: string }>;
-  }): Promise<any> {
-    let response = await this.axios.post('/chats', params);
+  }): Promise<Chat> {
+    let response = await this.axios.post<Chat>('/chats', { ...params, mcpServerIds: [] });
     return response.data;
   }
 
   async initChat(params: {
-    type?: 'files' | 'repo' | 'registry' | 'zip';
+    type: 'files' | 'repo' | 'registry' | 'zip' | 'template';
     name?: string;
     chatPrivacy?: 'public' | 'private' | 'team-edit' | 'team' | 'unlisted';
     projectId?: string;
@@ -141,18 +170,20 @@ export class V0Client {
     zip?: { url: string };
     lockAllFiles?: boolean;
     templateId?: string;
-  }): Promise<any> {
-    let response = await this.axios.post('/chats/init', params);
+  }): Promise<Chat> {
+    let response = await this.axios.post<Chat>('/chats/init', params);
     return response.data;
   }
 
-  async getChat(chatId: string): Promise<any> {
-    let response = await this.axios.get(`/chats/${chatId}`);
+  async getChat(chatId: string): Promise<Chat> {
+    let response = await this.axios.get<Chat>(`/chats/${encodeURIComponent(chatId)}`);
     return response.data;
   }
 
-  async deleteChat(chatId: string): Promise<any> {
-    let response = await this.axios.delete(`/chats/${chatId}`);
+  async deleteChat(chatId: string): Promise<{ id: string; deleted: boolean }> {
+    let response = await this.axios.delete<{ id: string; deleted: boolean }>(
+      `/chats/${encodeURIComponent(chatId)}`
+    );
     return response.data;
   }
 
@@ -164,13 +195,22 @@ export class V0Client {
       responseMode?: 'sync' | 'async';
       attachments?: Array<{ url: string }>;
     }
-  ): Promise<any> {
-    let response = await this.axios.post(`/chats/${chatId}/messages`, params);
+  ): Promise<Chat> {
+    let response = await this.axios.post<Chat>(
+      `/chats/${encodeURIComponent(chatId)}/messages`,
+      { ...params, mcpServerIds: [] }
+    );
     return response.data;
   }
 
-  async assignProjectToChat(projectId: string, chatId: string): Promise<any> {
-    let response = await this.axios.post(`/projects/${projectId}/assign`, { chatId });
+  async assignProjectToChat(
+    projectId: string,
+    chatId: string
+  ): Promise<{ id: string; assigned: boolean }> {
+    let response = await this.axios.post<{ id: string; assigned: boolean }>(
+      `/projects/${encodeURIComponent(projectId)}/assign`,
+      { chatId }
+    );
     return response.data;
   }
 
@@ -180,8 +220,8 @@ export class V0Client {
     projectId: string;
     chatId: string;
     versionId: string;
-  }): Promise<any> {
-    let response = await this.axios.get('/deployments', { params });
+  }): Promise<List<Deployment>> {
+    let response = await this.axios.get<List<Deployment>>('/deployments', { params });
     return response.data;
   }
 
@@ -189,37 +229,81 @@ export class V0Client {
     projectId: string;
     chatId: string;
     versionId: string;
-  }): Promise<any> {
-    let response = await this.axios.post('/deployments', params);
+  }): Promise<Deployment> {
+    let response = await this.axios.post<Deployment>('/deployments', params);
     return response.data;
   }
 
-  async getDeployment(deploymentId: string): Promise<any> {
-    let response = await this.axios.get(`/deployments/${deploymentId}`);
+  async getDeployment(deploymentId: string): Promise<Deployment> {
+    let response = await this.axios.get<Deployment>(
+      `/deployments/${encodeURIComponent(deploymentId)}`
+    );
     return response.data;
   }
 
-  async deleteDeployment(deploymentId: string): Promise<any> {
-    let response = await this.axios.delete(`/deployments/${deploymentId}`);
+  async deleteDeployment(deploymentId: string): Promise<{ id: string; deleted: boolean }> {
+    let response = await this.axios.delete<{ id: string; deleted: boolean }>(
+      `/deployments/${encodeURIComponent(deploymentId)}`
+    );
     return response.data;
   }
 
-  async getDeploymentLogs(deploymentId: string, since?: string): Promise<any> {
+  async getDeploymentLogs(
+    deploymentId: string,
+    since?: string
+  ): Promise<{
+    logs: Array<{
+      createdAt: string;
+      deploymentId: string;
+      id: string;
+      text: string;
+      type: string;
+      level?: string;
+    }>;
+    nextSince?: number;
+    object: string;
+  }> {
     let params: Record<string, string> = {};
-    if (since) params.since = since;
-    let response = await this.axios.get(`/deployments/${deploymentId}/logs`, { params });
+    if (since !== undefined) {
+      const timestamp = /^\d+$/.test(since)
+        ? Number(since)
+        : Math.floor(Date.parse(since) / 1000);
+      if (!Number.isFinite(timestamp) || timestamp < 0)
+        throw createApiServiceError(
+          'since must be an ISO timestamp or a non-negative Unix timestamp in seconds.'
+        );
+      params.since = String(timestamp);
+    }
+    let response = await this.axios.get<{
+      logs: Array<{
+        createdAt: string;
+        deploymentId: string;
+        id: string;
+        text: string;
+        type: string;
+        level?: string;
+      }>;
+      nextSince?: number;
+      object: string;
+    }>(`/deployments/${encodeURIComponent(deploymentId)}/logs`, { params });
     return response.data;
   }
 
-  async getDeploymentErrors(deploymentId: string): Promise<any> {
-    let response = await this.axios.get(`/deployments/${deploymentId}/errors`);
+  async getDeploymentErrors(
+    deploymentId: string
+  ): Promise<{ fullErrorText?: string; errorType?: string; formattedError?: string }> {
+    let response = await this.axios.get<{
+      fullErrorText?: string;
+      errorType?: string;
+      formattedError?: string;
+    }>(`/deployments/${encodeURIComponent(deploymentId)}/errors`);
     return response.data;
   }
 
   // ── Hooks (Webhooks) ──
 
-  async listHooks(): Promise<any> {
-    let response = await this.axios.get('/hooks');
+  async listHooks(): Promise<List<Hook>> {
+    let response = await this.axios.get<List<Hook>>('/hooks');
     return response.data;
   }
 
@@ -228,35 +312,56 @@ export class V0Client {
     events: string[];
     url: string;
     chatId?: string;
-  }): Promise<any> {
-    let response = await this.axios.post('/hooks', params);
+  }): Promise<Hook> {
+    let response = await this.axios.post<Hook>('/hooks', params);
     return response.data;
   }
 
-  async getHook(hookId: string): Promise<any> {
-    let response = await this.axios.get(`/hooks/${hookId}`);
+  async getHook(hookId: string): Promise<Hook> {
+    let response = await this.axios.get<Hook>(`/hooks/${encodeURIComponent(hookId)}`);
     return response.data;
   }
 
-  async deleteHook(hookId: string): Promise<any> {
-    let response = await this.axios.delete(`/hooks/${hookId}`);
+  async deleteHook(hookId: string): Promise<{ id: string; deleted: boolean }> {
+    let response = await this.axios.delete<{ id: string; deleted: boolean }>(
+      `/hooks/${encodeURIComponent(hookId)}`
+    );
     return response.data;
   }
 
   // ── User ──
 
-  async getUser(): Promise<any> {
-    let response = await this.axios.get('/user');
+  async getUser(): Promise<User> {
+    let response = await this.axios.get<User>('/user');
     return response.data;
   }
 
-  async getBilling(): Promise<any> {
-    let response = await this.axios.get('/user/billing');
+  async getBilling(): Promise<Record<string, unknown>> {
+    let response = await this.axios.get<Record<string, unknown>>('/user/billing');
     return response.data;
   }
 
-  async getPlan(): Promise<any> {
-    let response = await this.axios.get('/user/plan');
+  async getPlan(): Promise<Record<string, unknown>> {
+    let response = await this.axios.get<Record<string, unknown>>('/user/plan');
     return response.data;
+  }
+
+  async listVersions(chatId: string, params: { limit?: number; cursor?: string }) {
+    return (
+      await this.axios.get<
+        List<Version> & {
+          pagination: { hasMore: boolean; nextCursor?: string };
+          meta?: { totalCount: number };
+        }
+      >(`/chats/${encodeURIComponent(chatId)}/versions`, { params })
+    ).data;
+  }
+
+  async getVersion(chatId: string, versionId: string) {
+    return (
+      await this.axios.get<Version>(
+        `/chats/${encodeURIComponent(chatId)}/versions/${encodeURIComponent(versionId)}`
+      )
+    ).data;
   }
 }

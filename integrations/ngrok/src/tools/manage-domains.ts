@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import type { ReservedDomain } from '../lib/models';
 import { spec } from '../spec';
 
 let refSchema = z
@@ -52,7 +53,7 @@ let domainOutputSchema = z.object({
     .describe('ACME challenge CNAME target')
 });
 
-let mapDomain = (d: any) => ({
+let mapDomain = (d: ReservedDomain) => ({
   domainId: d.id,
   domain: d.domain,
   uri: d.uri,
@@ -91,6 +92,12 @@ export let listDomains = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z
         .string()
         .optional()
@@ -107,6 +114,7 @@ export let listDomains = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listDomains({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -189,7 +197,7 @@ export let updateDomain = SlateTool.create(spec, {
   name: 'Update Reserved Domain',
   key: 'update_domain',
   description: `Update an existing reserved domain's description, metadata, or certificate configuration.`,
-  tags: { destructive: false }
+  tags: { destructive: true }
 })
   .input(
     z.object({

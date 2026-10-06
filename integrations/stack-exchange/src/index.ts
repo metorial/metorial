@@ -14,8 +14,6 @@ import {
   postQuestion,
   searchQuestions
 } from './tools';
-import { inboundWebhook, newAnswers, newQuestions } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     getPostRevisions,
     listSites
   ],
-  triggers: [inboundWebhook, newQuestions, newAnswers]
+  triggers: []
 });

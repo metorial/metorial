@@ -1,69 +1,50 @@
-# <img src="https://provider-logos.metorial-cdn.com/bamboohr.svg" height="20"> Bamboohr
+# BambooHR
 
-Manage employee data, directory, and HR workflows in BambooHR. Create, retrieve, and update employee records including personal information, job details, compensation, and custom fields. Handle time off requests, approvals, and balances. Track employee hours with clock-in/clock-out and timesheet entries. Manage benefits, dependents, and benefit plans. Generate employee reports in CSV, PDF, JSON, or XML formats. Create and track employee goals, training records, and performance data. Manage job listings and applicant tracking. Upload and organize employee and company files and photos. Access tabular data such as job history, compensation, and education. Configure webhooks to monitor employee data changes in real time.
+Manage visible employee records, employee tables, time off, timesheets, goals, training records, applicant tracking and files. The integration exposes 39 tools. Permissions, company configuration and licensed BambooHR features determine which resources and fields are available.
+
+## Connect an account
+
+Use OAuth or an API key and the company subdomain, such as `example` for `example.bamboohr.com`. API keys use HTTP Basic authentication; OAuth uses a bearer token. Refreshing OAuth requires the redirect URI saved at connection time. Reconnect older connections that lack this value, or older API-key connections that lack the explicit authentication mode. Prior OAuth connections retain their documented expiration state as the authentication-mode evidence; ambiguous stored credentials are refused. The authenticated company owns the connection; old duplicate company configuration is ignored.
+
+`get_current_user` requests only the caller's first and last name through employee ID `0`. An integration account without an employee binding can return only ID `0`; use a selected visible employee ID for employee-specific work. Names and other fields omitted by permissions are not empty employee values.
 
 ## Tools
 
-### Get Account Fields
+| Area | Tools |
+| --- | --- |
+| Identity and discovery | `get_current_user`, `list_resources` for employees, current reports and application statuses |
+| Employees | `get_employee`, `get_employee_directory`, `create_employee`, `update_employee` |
+| Employee tables | `get_table_data`, `upsert_table_row`, `delete_table_row` |
+| Time off | `get_time_off_requests`, `create_time_off_request`, `update_time_off_request_status`, `get_whos_out`, `get_time_off_balances`, `get_time_off_types` |
+| Time tracking | `get_timesheet_entries`, `clock_in_out`, `add_timesheet_entry` |
+| Reports | `generate_custom_report`, `get_company_report` |
+| Goals | `get_goals`, `create_goal`, `update_goal`, `add_goal_comment` |
+| Training | `get_training_types`, `get_employee_training_records`, `add_training_record` |
+| Benefits | `get_benefits_overview` reads company benefits and coverage levels, plus employee dependents when selected |
+| Files | `list_files`, `upload_file`, `download_file`, `delete_file` |
+| Applicant tracking | `get_job_listings`, `get_applications`, `get_application_details`, `update_application_status`, `add_application_comment` |
+| Metadata | `get_account_fields`, `get_account_metadata` |
 
-Retrieve all available employee field definitions for the BambooHR account. Returns field IDs, names, types, and aliases. Useful for discovering what fields can be used in employee requests, reports, and webhook configurations.
+Employee discovery returns one cursor page. Directory sharing and field permissions can restrict visible records; the reported employee total is not a verified readable company headcount. Goals return at most 50 visible records. Applications use native page numbers and an explicit completion flag; the old `pageLimit` argument is unsupported.
 
-### Get Job Listings
+Employee reads accept up to 400 exact field IDs, including documented dotted subfield IDs. Updates report only submitted fields whose values were verified by an exact readback. Employment-status table changes and employee photos are outside direct employee-field updates.
 
-Retrieve all job listings from BambooHR's applicant tracking system. Returns job summaries including titles, statuses, departments, and locations.
+Table creation and updates use the current v1.1 endpoints. Updates report which submitted values were read back exactly; omitted or normalized fields remain unverified. Creation acknowledges the request without guessing a row ID. Use `get_table_data` to identify and verify the new row before further changes.
 
-### Get Benefits Overview
+## Reports and downloads
 
-Retrieve benefits information including benefit plans, deduction types, and optionally benefit coverages and dependents for a specific employee. Provides a comprehensive view of the company's benefits setup.
+Current saved reports discovered by `list_resources` use a separate ID namespace. Supply `reportSource=current` to read one JSON page with `page` and `pageSize`. The default `reportSource=legacy` preserves the documented deprecated saved-report API and its separate report IDs. Legacy report formats are JSON, CSV, PDF and XML. Ad-hoc reports also use BambooHR's documented deprecated report API. `onlyCurrent` selects the current value of historical fields; it does not limit results to active employees. Saved-report `lastChangedSince` is unsupported; use an ad-hoc report's change filter instead.
 
-### Create Employee
+JSON reports return structured data. Other report formats and file downloads produce downloadable files. `download_file` checks the exact file ID in its selected employee or company folder first. Uploads accept literal UTF-8 text under 20 MB, not base64. Select a category that permits uploads. Files that do not permit deletion are refused; invisible metadata does not prove deletion.
 
-Create a new employee record in BambooHR. At minimum, first name and last name are required. You can include additional fields like email, job title, department, hire date, and any other standard or custom fields.
+## Mutation limits
 
-### List Files
+A goal requires a title, due date and sharing that includes its owner. Updates preserve omitted optional goal fields through the documented v1.1 endpoint. Training cost amount and currency must be supplied together; zero is preserved. Hour entries are created without an existing entry ID. Historical clock-in timestamps need an IANA timezone; clock-out does not support notes.
 
-List files for an employee or the company. Returns file metadata organized by categories, including file IDs, names, sizes, and dates. Specify an employee ID for employee files, or omit it to list company-level files.
+Time-off approval may complete only the caller's workflow step and leave the request pending. Balance visibility can be partial, and discretionary policies can report zero. Who's-out results include holidays and may contain multiple occurrences for an employee. HR and ATS writes can retain history or trigger company workflows; verify the exact resource before retrying a request with uncertain completion.
 
-### Get Employee Directory
-
-Retrieve the full company employee directory, including all employees' names, contact information, job titles, departments, and other directory fields. Useful for getting an overview of the entire organization.
-
-### Get Employee
-
-Retrieve detailed information about a specific employee by their ID. Specify which fields to include in the response — common fields include name, email, job title, department, hire date, status, and more. Use the **Get Account Fields** tool to discover all available field names.
-
-### Get Employee Goals
-
-Retrieve goals for a specific employee. Optionally filter by status. Returns goal details including title, description, progress, due date, and sharing information.
-
-### Get Employee Table Data
-
-Retrieve tabular data for an employee. Tables include job history, compensation, education, and other structured data. Use the **Get Account Metadata** tool to discover available table names.
-
-### Generate Custom Report
-
-Generate a custom report by specifying which employee fields to include. Returns data for all current employees with the requested fields. Supports JSON, CSV, PDF, and XML formats. Use the **Get Account Fields** tool to discover all available field names.
-
-### Get Time Off Requests
-
-Retrieve time off requests within a date range. Optionally filter by employee, status, or time off type. Returns all matching requests with their details including dates, status, type, and notes.
-
-### Get Timesheet Entries
-
-Retrieve timesheet entries and clock entries for a date range. Optionally filter by specific employee IDs. Returns both timesheet hour entries and clock-in/clock-out entries.
-
-### Get Training Types
-
-Retrieve all training types configured in BambooHR, including their IDs, names, categories, and whether they are required. Also returns associated categories.
-
-### Update Employee
-
-Update one or more fields on an existing employee record. Pass the employee ID and the fields to update. Both standard fields (firstName, lastName, jobTitle, department, etc.) and custom fields are supported.
+No event subscriptions are provided.
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE)

@@ -47,8 +47,6 @@ import {
   updateGroup,
   updateUser
 } from './tools';
-import { courseChanges, enrollmentChanges, gradeChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -98,5 +96,5 @@ export let provider = Slate.create({
     createCalendarItem,
     listTerms
   ],
-  triggers: [inboundWebhook, courseChanges, enrollmentChanges, gradeChanges]
+  triggers: []
 });

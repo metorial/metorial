@@ -3,17 +3,18 @@ import { spec } from './spec';
 import {
   analyzeSentiment,
   deleteJob,
+  downloadCaptions,
   extractTopics,
   getAccount,
   getCaptions,
   getTranscript,
   getTranscriptionJob,
   identifyLanguage,
+  listJobs,
   listTranscriptionJobs,
   manageCustomVocabulary,
   submitTranscriptionJob
 } from './tools';
-import { jobCompleted } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -22,7 +23,9 @@ export let provider = Slate.create({
     getTranscriptionJob,
     getTranscript,
     listTranscriptionJobs,
+    listJobs,
     deleteJob,
+    downloadCaptions,
     analyzeSentiment,
     extractTopics,
     identifyLanguage,
@@ -30,5 +33,5 @@ export let provider = Slate.create({
     getCaptions,
     getAccount
   ],
-  triggers: [jobCompleted]
+  triggers: []
 });

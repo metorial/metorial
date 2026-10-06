@@ -18,15 +18,6 @@ import {
   manageTaskList,
   manageTimeEntry
 } from './tools';
-import {
-  commentEvents,
-  messageEvents,
-  milestoneEvents,
-  projectEvents,
-  taskEvents,
-  timeEntryEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -47,12 +38,5 @@ export let provider = Slate.create({
     manageProjectPeople,
     getActivity
   ],
-  triggers: [
-    taskEvents,
-    projectEvents,
-    milestoneEvents,
-    timeEntryEvents,
-    commentEvents,
-    messageEvents
-  ]
+  triggers: []
 });

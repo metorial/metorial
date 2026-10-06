@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugsnagClient } from '../lib/client';
+import { pageInput, pageOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let pivotValueSchema = z.object({
@@ -20,7 +21,12 @@ export let getPivots = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...pageInput,
       projectId: z.string().describe('Project ID'),
+      perPage: z
+        .number()
+        .optional()
+        .describe('Results per page when listing pivot values (1 to 100)'),
       pivotField: z
         .string()
         .optional()
@@ -31,6 +37,7 @@ export let getPivots = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pageOutput,
       pivots: z
         .array(
           z.object({
@@ -47,28 +54,28 @@ export let getPivots = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
+    let client = new BugsnagClient(ctx.auth);
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('Project ID is required.');
+    if (!projectId) throw createApiServiceError('Project ID is required.');
 
     if (ctx.input.pivotField) {
-      let values = await client.getPivotValues(projectId, ctx.input.pivotField);
-      let pivotValues = (Array.isArray(values) ? values : []).map((v: any) => ({
-        name: v.name || v.value,
-        eventsCount: v.events_count ?? v.events,
-        proportion: v.proportion
+      let values = await client.getPivotValues(projectId, ctx.input.pivotField, ctx.input);
+      let pivotValues = values.map(v => ({
+        name: v.event_field_value ?? undefined,
+        eventsCount: v.events ?? undefined,
+        proportion: v.proportion ?? undefined
       }));
 
       return {
-        output: { pivotValues },
+        output: { pivotValues, ...client.pageInfo },
         message: `Found **${pivotValues.length}** values for pivot **${ctx.input.pivotField}**.`
       };
     }
 
     let pivots = await client.listProjectPivots(projectId);
-    let mapped = (Array.isArray(pivots) ? pivots : []).map((p: any) => ({
-      displayId: p.display_id,
-      name: p.name
+    let mapped = pivots.map(p => ({
+      displayId: p.event_field_display_id ?? undefined,
+      name: p.name ?? undefined
     }));
 
     return {

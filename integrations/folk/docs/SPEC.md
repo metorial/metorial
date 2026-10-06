@@ -1,93 +1,64 @@
-# Slates Specification for Folk
+# Folk integration
 
-## Overview
+## Authentication and API version
 
-Folk is a lightweight, relationship-focused CRM that manages contacts (people and companies), deals, and pipelines. It captures contacts from email, LinkedIn, and other sources, organizes them into customizable groups with custom fields, and supports email sequences, interaction tracking, notes, and reminders.
+Create an API key in workspace Settings > API. Requests use `Authorization: Bearer <key>` against `https://api.folk.app/v1` and pin `X-API-Version: 2025-06-09`. Access follows the associated user's group permissions; administrator visibility of group names does not imply access to every group's records. Authentication verifies `/users/me`, which identifies a user rather than a workspace. The existing `api_key` method, `apiKey` input, stored `token`, and empty configuration remain compatible.
 
-## Authentication
+Credentials, authorization headers and provider error bodies are omitted from failure messages. Requests have a 30-second timeout and do not follow redirects. HTTP failures retain their status; a returned `Retry-After` header is exposed as retry guidance. Writes are not retried automatically. Folk enforces quotas per user across that user's keys, including a burst quota. Respect the provider's current rate headers rather than relying on a fixed allowance.
 
-Folk uses **API key** authentication. There is no OAuth2 flow.
+## Tool coverage
 
-To authenticate:
+| Workflow | Tools | API |
+| --- | --- | --- |
+| Authenticated user | `get_current_user` | `GET /users/me` |
+| People | `create_person`, `get_person`, `update_person`, `delete_person`, `list_people` | `/people`, `/people/{id}` |
+| Companies | `create_company`, `get_company`, `update_company`, `delete_company`, `list_companies` | `/companies`, `/companies/{id}` |
+| Group-scoped deals/custom objects | `create_deal`, `get_deal`, `update_deal`, `delete_deal`, `list_deals` | `/groups/{groupId}/{objectType}` and `/{id}` |
+| Discovery | `list_groups`, `list_custom_fields` | `/groups`, `/groups/{groupId}/custom-fields/{entityType}` |
+| Notes | `create_note`, `update_note`, `delete_note`, `list_notes` | `/notes`, `/notes/{id}` |
+| Existing reminders | `create_reminder`, `delete_reminder`, `list_reminders` | `/reminders`, `/reminders/{id}` |
+| Tasks | `list_tasks`, `manage_task` | `/tasks`, `/tasks/{id}`, `/mark-as-done`, `/mark-as-to-do` |
 
-1. Go to your Folk workspace **Settings > API** section and create a new API key.
-2. Copy and securely store the generated key.
-3. Include the API key in the `Authorization` header of every request using the Bearer token scheme: `Authorization: Bearer YOUR_API_KEY`.
+There are 27 tools: all 24 original keys plus authenticated identity and two task tools. Historical input/output fields retain their types and requiredness. Search filters, note query/date bounds and selected create idempotency keys are optional additions. Existing company numeric response values are converted to their historical string representation; missing required response data is treated as a provider failure rather than invented.
 
-The API base URL is `https://api.folk.app/v1`.
+Group administration, custom-field definition administration, outreach, enrichment, imports, bulk changes and webhook registration are outside this tool set. No notification trigger is registered. Notes support external links; the API does not document direct note attachment upload, and these tools do not generate downloadable files.
 
-There are no scopes or additional credentials (such as tenant IDs) required. The API key is tied to a specific workspace and grants access to all resources within that workspace.
+## Pagination and filtering
 
-## Features
+List tools return one page and a nullable `nextCursor`. Missing `pagination.nextLink` means the final page. Pass `nextCursor` as the next request's `cursor` and keep the same filters, group, object type and entity. Page size must be an integer from 1 to 100; cursors are bounded to the provider's documented maximum. Pagination links must refer to the exact requested resource on `api.folk.app`.
 
-### People Management
+People, company, deal and task lists accept `filter`, keyed first by field and then by documented operator, plus an optional `and`/`or` combinator. For example, `{"fullName":{"eq":"Example Person"}}` finds a person by name, while `{"groups":{"in":[{"id":"grp_..."}]}}` selects group references. Repeated reference values are encoded as repeated query parameters. Text fields support `eq`/`like`; use only operators supported for the selected field. Task entity filtering uses `{"entity":{"in":"per_..."}}`.
 
-A person is the most basic unit of data in Folk. You can create, read, update, and delete people in your workspace. Each person has native fields including first name, last name, description, birthday, job title, emails, phones, addresses, URLs, and company associations. People can belong to multiple groups and have group-specific custom field values.
+Notes and reminders use the provider's `entity.id` query parameter. Notes additionally support full-text `query`, `createdAfter` and `createdBefore` timestamps. Group custom-field discovery accepts `person`, `company`, or the exact custom object name.
 
-### Company Management
+## Contact and deal writes
 
-A company is a business entity that can include one or more people. You can create, read, update, and delete companies. Companies share a similar structure to people with native fields, group memberships, and custom field values.
+Person creation performs duplicate matching and can merge into existing data in the background. Use unique synthetic names and reserved email addresses for tests. Company names are unique; creating a company with an existing name returns that company. A company association requires exactly one existing company ID or company name; using a name can create a company. Funding amounts retain the established string input and output representation, with finite numeric strings converted to numeric USD amounts for provider requests; null clears funding during update.
 
-### Deal Management
+Omitted update fields are preserved. Supplied arrays replace their entire lists; an empty array clears an array. Birthday accepts null during update. Company nullable funding, year and classification fields retain null values when supplied. Group custom values use `{groupId: {fieldName: value}}`; include the target group in `groupIds` when setting them. Null or an empty array clears an individual custom field according to its type. Removing a group also deletes that group's custom values.
 
-A deal is an object you use to track opportunities, projects, or any other outcome-driven item in Folk. Deals have a name and can reference people and companies. Deals are created inside a group and can only reference people and companies that belong to the same group. Deals also support custom fields defined within their group.
+Discover the exact deal `objectType` from the group's object fields. It need not be named `Deals`. A deal's related people and companies must belong to that same group. Delete actions require a matching provider acknowledgement and permanently remove the specified record.
 
-### Groups
+People, company, deal and note creation accept an optional `idempotencyKey`. Reuse a key only for the same body after an uncertain response; completed keys are retained for 24 hours, and an in-progress request can return 409. A fresh logical creation needs a fresh key.
 
-Folk uses groups to map out workflows. A group is a database made up of contacts (people and companies) that work as categories to organize different types of contacts for different workflows. You can list groups in a workspace and manage group memberships for people and companies.
+## Notes, reminders and tasks
 
-### Custom Fields
+Notes can be private or public. Markdown mentions of workspace users may notify them; creation and update require deliberate notification intent when mentions are present.
 
-In each group you can define custom fields, which are custom attributes that can be added to people and companies. Custom fields allow you to tailor data to your specific business needs on a per-group basis.
+Reminders remain available for existing IDs and schedules, but all three reminder tools are marked deprecated. Folk's changelog gives February 13, 2027 as their sunset, while its migration guide gives February 11, 2027. The integration documents this discrepancy and recommends tasks for new workflows. Reminder recurrence uses iCalendar `DTSTART` with an IANA time zone and `RRULE`; public reminders require 1–50 assignees. Omit assignedUsers for private reminders; the API key owner is automatically notified.
 
-### Notes
+`manage_task` uses an action field in a single object:
 
-You can create, read, update, and delete notes attached to people or companies. Notes can have visibility settings (e.g., private or shared).
+- `create`: requires `entityId`, `title` and a `YYYY-MM-DD` `dueAt`; optional time is `HH:mm`. Omitted assignment defaults to the API key's associated user, and visibility defaults to public. Set `isPublic: false` for a private task. Up to 50 assignees can be supplied, each with exactly one user ID or email.
+- `get`, `update`, `delete`: require `taskId`. Update accepts only task fields; null clears description, due time or recurrence. Assignment replaces the assignee list. Deletion is permanent.
+- `mark_done`: requires `taskId` and an ISO 8601 `completedAt` timestamp. Only this action changes an existing task to completed.
+- `mark_to_do`: requires `taskId` and reopens the task with null completion. Due-date changes alone never complete a task.
 
-### Reminders
+Completion can optionally be supplied when creating a task; ordinary update cannot change it. Content fields are rejected on read, deletion and reopen actions. Task responses expose provider state and identifiers, and remain open to future provider string enum values. Reminder IDs and task IDs are distinct.
 
-You can create, read, update, and delete reminders associated with contacts. Reminders can be assigned to specific users, have a scheduled time, and support recurring triggers.
+## Official references
 
-### Interaction Metadata
-
-Folk tracks interaction metadata at the workspace level for contacts, including approximate interaction count, last interaction time, and which users last interacted.
-
-## Events
-
-Folk supports webhooks that follow the [Standard Webhooks specification](https://www.standardwebhooks.com/). Webhooks let you subscribe to events happening in Folk and automatically receive data to your server whenever those events occur. Webhooks can be created via the API or the workspace settings UI. You specify a target URL and subscribe to specific event types. Deliveries include signature headers (`webhook-signature`) for verification.
-
-Webhook events support **filtering** to narrow down notifications — for example, only triggering when a person is added to a specific group or when a deal moves to a specific pipeline status.
-
-### Person Events
-
-- **person.created** — A new person is created in the workspace.
-- **person.updated** — A person's native attributes or custom fields are changed. The payload includes the specific changes made.
-- **person.deleted** — A person is removed from the workspace. The payload includes basic details (name, emails) since the resource is no longer fetchable.
-- **person.groups_updated** — A person is added to or removed from groups.
-- **person.workspace_interaction_metadata_updated** — A person's workspace-level interaction metadata changes (e.g., interaction count, last interaction time).
-
-### Company Events
-
-- **company.created** — A new company is created in the workspace.
-- **company.updated** — A company's native attributes or custom fields are changed.
-- **company.deleted** — A company is removed from the workspace.
-- **company.groups_updated** — A company is added to or removed from groups.
-
-### Deal Events
-
-- **object.created** — A new deal is created in a group.
-- **object.updated** — A deal's name, custom fields, or other attributes are changed.
-- **object.deleted** — A deal is removed from the workspace.
-
-### Note Events
-
-- **note.created** — A new note is created.
-- **note.updated** — A note's visibility or content is changed. Note content itself is never included in the payload.
-- **note.deleted** — A note is removed.
-
-### Reminder Events
-
-- **reminder.created** — A new reminder is created.
-- **reminder.updated** — A reminder's name, visibility, or assigned users are changed.
-- **reminder.deleted** — A reminder is removed.
-- **reminder.triggered** — A reminder fires at its scheduled time. The payload includes the last and next trigger times.
+- [Authentication](https://developer.folk.app/api-reference/authentication), [versioning](https://developer.folk.app/api-reference/versioning), [current user](https://developer.folk.app/api-reference/users/get-the-current-user), [rate limits](https://developer.folk.app/api-reference/rate-limits).
+- [Pagination](https://developer.folk.app/api-reference/pagination), [filtering](https://developer.folk.app/api-reference/filtering), [group custom fields](https://developer.folk.app/api-reference/group-custom-fields/list-group-custom-fields).
+- [People](https://developer.folk.app/api-reference/people/create-a-person), [company updates](https://developer.folk.app/api-reference/companies/update-a-company), [deal relationships](https://developer.folk.app/core-concepts/deals), [notes](https://developer.folk.app/api-reference/notes/create-a-note).
+- [Tasks](https://developer.folk.app/api-reference/tasks/create-a-task), [task completion](https://developer.folk.app/api-reference/tasks/mark-a-task-as-done), [migration guide](https://developer.folk.app/migrations/reminders-to-tasks), [changelog](https://developer.folk.app/changelog).

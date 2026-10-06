@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -101,7 +101,7 @@ export let createCheck = SlateTool.create(spec, {
       accountEmail: ctx.auth.accountEmail
     });
 
-    let data: Record<string, any> = {
+    let data: Record<string, unknown> = {
       name: ctx.input.name,
       host: ctx.input.hostname,
       type: ctx.input.type
@@ -109,7 +109,8 @@ export let createCheck = SlateTool.create(spec, {
 
     if (ctx.input.resolution !== undefined) data.resolution = ctx.input.resolution;
     if (ctx.input.paused !== undefined) data.paused = ctx.input.paused;
-    if (ctx.input.tags) data.tags = ctx.input.tags;
+    if (ctx.input.tags !== undefined)
+      data.tags = ctx.input.tags ? ctx.input.tags.split(',').map(tag => tag.trim()) : [];
     if (ctx.input.ipv6 !== undefined) data.ipv6 = ctx.input.ipv6;
     if (ctx.input.responseTimeThreshold !== undefined)
       data.responsetime_threshold = ctx.input.responseTimeThreshold;
@@ -120,23 +121,34 @@ export let createCheck = SlateTool.create(spec, {
     if (ctx.input.notifyWhenBackup !== undefined)
       data.notifywhenbackup = ctx.input.notifyWhenBackup;
     if (ctx.input.customMessage) data.custom_message = ctx.input.customMessage;
-    if (ctx.input.integrationIds?.length)
-      data.integrationids = ctx.input.integrationIds.join(',');
-    if (ctx.input.userIds?.length) data.userids = ctx.input.userIds.join(',');
-    if (ctx.input.teamIds?.length) data.teamids = ctx.input.teamIds.join(',');
-    if (ctx.input.probeFilters) data.probe_filters = ctx.input.probeFilters;
+    if (ctx.input.integrationIds !== undefined) data.integrationids = ctx.input.integrationIds;
+    if (ctx.input.userIds !== undefined) data.userids = ctx.input.userIds.join(',');
+    if (ctx.input.teamIds !== undefined) data.teamids = ctx.input.teamIds.join(',');
+    if (ctx.input.probeFilters !== undefined)
+      data.probe_filters = ctx.input.probeFilters
+        ? ctx.input.probeFilters.split(',').map(filter => filter.trim())
+        : [];
     if (ctx.input.url) data.url = ctx.input.url;
     if (ctx.input.encryption !== undefined) data.encryption = ctx.input.encryption;
     if (ctx.input.port !== undefined) data.port = ctx.input.port;
-    if (ctx.input.username) data.auth = ctx.input.username;
-    if (ctx.input.password) data.pass = ctx.input.password;
+    if (ctx.input.username !== undefined || ctx.input.password !== undefined) {
+      if (ctx.input.username === undefined || ctx.input.password === undefined)
+        throw createApiServiceError(
+          'Provide both username and password to set target authentication; use empty strings to clear it.'
+        );
+      data.auth = `${ctx.input.username}:${ctx.input.password}`;
+    }
     if (ctx.input.shouldContain) data.shouldcontain = ctx.input.shouldContain;
     if (ctx.input.shouldNotContain) data.shouldnotcontain = ctx.input.shouldNotContain;
     if (ctx.input.postData) data.postdata = ctx.input.postData;
     if (ctx.input.requestHeaders) {
-      for (let [key, value] of Object.entries(ctx.input.requestHeaders)) {
-        data[`requestheader${key}`] = value;
-      }
+      data.requestheaders = Object.entries(ctx.input.requestHeaders).map(([key, value]) => {
+        if (!key.trim() || /[\r\n:]/.test(key) || /[\r\n]/.test(value))
+          throw createApiServiceError(
+            'Use valid HTTP header names and values without line breaks.'
+          );
+        return `${key}:${value}`;
+      });
     }
     if (ctx.input.verifyCertificate !== undefined)
       data.verify_certificate = ctx.input.verifyCertificate;
@@ -148,7 +160,7 @@ export let createCheck = SlateTool.create(spec, {
     if (ctx.input.nameServer) data.nameserver = ctx.input.nameServer;
 
     let result = await client.createCheck(data);
-    let check = result.check || result;
+    let check = result.check;
 
     return {
       output: {

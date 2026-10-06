@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let sendRealtimeNotificationTool = SlateTool.create(spec, {
   name: 'Send Realtime Notification',
   key: 'send_realtime_notification',
-  description: `Notify IFTTT's Realtime API that new trigger events are available. This causes IFTTT to immediately poll your trigger endpoints for the specified users or trigger identities, enabling near-instant Applet runs instead of waiting for the normal ~1 hour polling cycle.`,
+  description: `Notify IFTTT's Realtime API that new trigger events are available for the specified users or trigger identities. This prompts polling; request acceptance does not confirm polling time, Applet completion, or downstream effects.`,
   instructions: [
     'Each notification must include either a userId or a triggerIdentity (or both).',
     'Up to 1000 notifications can be sent in a single request.',
@@ -40,7 +40,7 @@ export let sendRealtimeNotificationTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ConnectClient(ctx.auth.token);
+    let client = new ConnectClient(ctx.auth);
     let result = await client.sendRealtimeNotification(ctx.input.notifications);
 
     return {
@@ -48,7 +48,7 @@ export let sendRealtimeNotificationTool = SlateTool.create(spec, {
         notificationCount: ctx.input.notifications.length,
         result
       },
-      message: `Sent **${ctx.input.notifications.length}** realtime notification(s) to IFTTT.`
+      message: `IFTTT accepted **${ctx.input.notifications.length}** realtime notification target(s). Polling and Applet completion are not confirmed.`
     };
   })
   .build();

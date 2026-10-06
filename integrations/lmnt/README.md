@@ -1,6 +1,16 @@
-# <img src="logo.jpeg" height="20"> Lmnt
+# <img src="logo.jpeg" height="20"> LMNT (Retired)
 
-Generate lifelike speech from text using AI-powered text-to-speech synthesis. Clone custom voices from audio samples with as little as 30 seconds of audio. Stream synthesized audio in real-time via WebSocket for low-latency conversational applications. Manage a library of voices including listing, updating, starring, and deleting voices. Supports multiple output formats (aac, mp3, mulaw, raw, wav), 12+ languages, configurable speech parameters (temperature, speed, top-p), and models like "aurora" and "blizzard". Retrieve account details and usage information.
+LMNT has shut down its speech generation service. The
+[official website](https://www.lmnt.com/) and
+[API documentation](https://docs.lmnt.com/) show its shutdown notice.
+
+This integration keeps the six existing speech, voice-management, and account
+tool contracts for compatibility. They are deprecated and return a clear
+provider-shutdown error without making requests. New connections and profile
+lookups return the same error. Choose another speech provider.
+
+There are no triggers. See [the specification](docs/SPEC.md) for the preserved
+tool keys and historical API references.
 
 ## License
 

@@ -7,10 +7,6 @@ export let config = SlateConfig.create(
       .string()
       .default('https://api.machines.dev')
       .describe('Base URL for the Fly.io Machines API'),
-    appName: z
-      .string()
-      .optional()
-      .describe('Default Fly App name to use for triggers and actions when not specified'),
     orgSlug: z.string().optional().describe('Default organization slug')
   })
 );

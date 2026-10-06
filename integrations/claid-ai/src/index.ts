@@ -9,8 +9,6 @@ import {
   getJobStatus,
   manageStorage
 } from './tools';
-import { asyncJobCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     manageStorage,
     getJobStatus
   ],
-  triggers: [asyncJobCompleted]
+  triggers: []
 });

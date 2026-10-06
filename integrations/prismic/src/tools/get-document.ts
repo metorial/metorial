@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ContentApiClient } from '../lib/client';
+import { invalid, protect } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getDocument = SlateTool.create(spec, {
@@ -53,22 +54,34 @@ export let getDocument = SlateTool.create(spec, {
         .array(
           z.object({
             documentId: z.string(),
-            uid: z.string(),
+            uid: z.string().nullable(),
             type: z.string(),
             lang: z.string()
           })
         )
         .describe('Alternate language versions'),
-      data: z.record(z.string(), z.any()).describe('Document field data')
+      data: z.record(z.string(), z.unknown()).describe('Document field data')
     })
   )
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     let client = new ContentApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       accessToken: ctx.auth.token
     });
 
-    let doc: any;
+    let doc: Awaited<ReturnType<ContentApiClient['getDocumentById']>>;
+    if (
+      ctx.input.documentId !== undefined &&
+      (ctx.input.uid !== undefined || ctx.input.documentType !== undefined)
+    )
+      invalid('Provide documentId or UID with documentType, not both lookup modes.');
     if (ctx.input.documentId) {
       doc = await client.getDocumentById(ctx.input.documentId, {
         ref: ctx.input.ref,
@@ -84,11 +97,11 @@ export let getDocument = SlateTool.create(spec, {
         graphQuery: ctx.input.graphQuery
       });
     } else {
-      throw new Error('Provide either "documentId" or both "uid" and "documentType".');
+      invalid('Provide either "documentId" or both "uid" and "documentType".');
     }
 
     if (!doc) {
-      throw new Error('Document not found.');
+      invalid('Document not found.');
     }
 
     let output = {
@@ -102,7 +115,7 @@ export let getDocument = SlateTool.create(spec, {
       url: doc.url,
       href: doc.href,
       slugs: doc.slugs,
-      alternateLanguages: doc.alternate_languages.map((al: any) => ({
+      alternateLanguages: doc.alternate_languages.map(al => ({
         documentId: al.id,
         uid: al.uid,
         type: al.type,

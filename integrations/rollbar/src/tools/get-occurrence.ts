@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, mapOccurrence } from '../lib/client';
 import { spec } from '../spec';
 
 export let getOccurrence = SlateTool.create(spec, {
@@ -13,12 +13,20 @@ export let getOccurrence = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: z
+        .number()
+        .optional()
+        .describe('Project ID from manage_project; required with an account token.'),
       occurrenceId: z.string().describe('Unique occurrence ID')
     })
   )
   .output(
     z.object({
       occurrenceId: z.string().describe('Unique occurrence ID'),
+      occurrenceUuid: z
+        .string()
+        .optional()
+        .describe('UUID associated with the reported occurrence'),
       itemId: z.number().optional().describe('Parent item ID'),
       timestamp: z.number().optional().describe('Unix timestamp of the occurrence'),
       level: z.string().optional().describe('Severity level'),
@@ -35,28 +43,13 @@ export let getOccurrence = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let result = await client.getOccurrence(ctx.input.occurrenceId);
     let occ = result?.result;
 
     return {
-      output: {
-        occurrenceId: occ.id,
-        itemId: occ.item_id,
-        timestamp: occ.timestamp,
-        level: occ.data?.level_string || occ.data?.level,
-        environment: occ.data?.environment,
-        framework: occ.data?.framework,
-        platform: occ.data?.platform,
-        language: occ.data?.language,
-        server: occ.data?.server,
-        request: occ.data?.request,
-        person: occ.data?.person,
-        body: occ.data?.body,
-        custom: occ.data?.custom,
-        codeVersion: occ.data?.code_version
-      },
+      output: mapOccurrence(occ),
       message: `Retrieved occurrence **${occ.id}** (${occ.data?.level_string || 'unknown level'}) from environment "${occ.data?.environment || 'unknown'}".`
     };
   })

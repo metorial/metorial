@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { destinationOutputSchema } from '../lib/models';
 import { spec } from '../spec';
 
 let transformationSchema = z.object({
@@ -11,13 +12,16 @@ let transformationSchema = z.object({
   language: z.string().describe('Programming language used'),
   codeVersion: z.string().nullable().describe('Code version number'),
   createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp')
+  updatedAt: z.string().describe('Last update timestamp'),
+  destinations: destinationOutputSchema.describe(
+    'Current destination associations when reported by the provider.'
+  )
 });
 
 export let listTransformations = SlateTool.create(spec, {
   name: 'List Transformations',
   key: 'list_transformations',
-  description: `List all transformations in the workspace. Returns each transformation's metadata including name, language, version, and timestamps. Does not include the full code — use **Get Transformation** to retrieve the code for a specific transformation.`,
+  description: `List published transformations in the workspace. Draft revisions may not appear. Returns each transformation's metadata including name, language, version, and timestamps. Does not include the full code — use **Get Transformation** to retrieve the code for a specific transformation.`,
   tags: {
     readOnly: true,
     destructive: false
@@ -38,8 +42,7 @@ export let listTransformations = SlateTool.create(spec, {
     });
 
     let result = await client.listTransformations();
-    let transformations = result.transformations ?? result ?? [];
-    let items = (Array.isArray(transformations) ? transformations : []).map((t: any) => ({
+    let items = result.map(t => ({
       transformationId: t.id,
       versionId: t.versionId,
       name: t.name,
@@ -47,7 +50,8 @@ export let listTransformations = SlateTool.create(spec, {
       language: t.language,
       codeVersion: t.codeVersion ?? null,
       createdAt: t.createdAt,
-      updatedAt: t.updatedAt
+      updatedAt: t.updatedAt,
+      destinations: t.destinations
     }));
 
     return {

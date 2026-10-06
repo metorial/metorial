@@ -51,16 +51,16 @@ export let createAccount = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let accountData: Record<string, any> = {
+    let accountData: Record<string, unknown> = {
       name: ctx.input.name
     };
 
     if (ctx.input.urls) accountData.url = ctx.input.urls;
     if (ctx.input.phones) accountData.phone = ctx.input.phones;
     if (ctx.input.address) accountData.address = ctx.input.address;
-    if (ctx.input.industryId) accountData.industryId = ctx.input.industryId;
-    if (ctx.input.description) accountData.description = ctx.input.description;
-    if (ctx.input.ownerUserId)
+    if (ctx.input.industryId !== undefined) accountData.industryId = ctx.input.industryId;
+    if (ctx.input.description !== undefined) accountData.description = ctx.input.description;
+    if (ctx.input.ownerUserId !== undefined)
       accountData.owner = { entityType: 'Users', id: ctx.input.ownerUserId };
     if (ctx.input.customFields) accountData.customFields = ctx.input.customFields;
 

@@ -82,8 +82,6 @@ import {
   updateWebhook,
   verifyDomain
 } from './tools';
-import { contactEvents, domainEvents, emailEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -168,5 +166,5 @@ export let provider = Slate.create({
     listReceivedEmails,
     getReceivedEmail
   ],
-  triggers: [emailEvents, contactEvents, domainEvents]
+  triggers: []
 });

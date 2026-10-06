@@ -1,71 +1,84 @@
-import crypto from 'crypto';
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { ImgixClient } from '../lib/client';
+import { containsCredential } from '../lib/errors';
+import {
+  expiry,
+  renderParams,
+  renderUrl,
+  sourceDomain,
+  sourceSigningToken
+} from '../lib/render';
+import { sourceId } from '../lib/schemas';
 import { spec } from '../spec';
-
-export let generateSignedUrl = SlateTool.create(spec, {
+export const generateSignedUrl = SlateTool.create(spec, {
   name: 'Generate Signed URL',
   key: 'generate_signed_url',
-  description: `Generate a signed/secure Imgix URL for an image. Signed URLs prevent unauthorized modifications to URL parameters and can include an expiration timestamp. Requires the source's secure URL token (available from the source configuration). Useful for protecting premium content or time-limited access.`,
-  instructions: [
-    'You can retrieve the secure URL token from the source details (Get Source tool).',
-    'The image path should not include the domain, just the path (e.g., "/images/photo.jpg").',
-    'Any rendering parameters (width, height, format, etc.) should be included in the params field.'
-  ],
-  tags: {
-    readOnly: true
-  }
+  description:
+    'Build a correctly signed HTTPS imgix URL without requesting the image. Prefer sourceId from list_sources to use its current signing token internally. Existing manual secureUrlToken calls remain supported. Serving the URL may incur rendering and delivery charges.',
+  tags: { readOnly: true, destructive: false }
 })
   .input(
     z.object({
       domain: z
         .string()
-        .describe('Imgix source domain (e.g., "example.imgix.net" or custom domain)'),
-      path: z.string().describe('Image path within the source (e.g., "/images/photo.jpg")'),
-      secureUrlToken: z.string().describe('Source-specific secure URL token for signing'),
-      params: z
-        .record(z.string(), z.string())
         .optional()
         .describe(
-          'Rendering parameters to include in the URL (e.g., {"w": "400", "h": "300", "fit": "crop"})'
+          'Source domain. Required for legacy manual signing; with sourceId it must be currently assigned to that source.'
         ),
-      expiresAt: z.number().optional().describe('Unix timestamp for URL expiration')
+      path: z.string().min(1),
+      secureUrlToken: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy manual source signing token. Omit when using sourceId; tokens are never returned by source tools.'
+        ),
+      sourceId: sourceId.optional(),
+      params: renderParams.optional(),
+      expiresAt: expiry
     })
   )
-  .output(
-    z.object({
-      signedUrl: z.string().describe('The fully signed Imgix URL'),
-      expiresAt: z.number().optional().describe('Unix timestamp when the URL expires, if set')
-    })
-  )
+  .output(z.object({ signedUrl: z.string(), expiresAt: z.number().optional() }))
   .handleInvocation(async ctx => {
-    let path = ctx.input.path.startsWith('/') ? ctx.input.path : `/${ctx.input.path}`;
-
-    let queryParts: string[] = [];
-
-    if (ctx.input.params) {
-      for (let [key, value] of Object.entries(ctx.input.params)) {
-        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
-      }
+    let domain = ctx.input.domain,
+      token = ctx.input.secureUrlToken;
+    if (ctx.input.sourceId !== undefined) {
+      if (token !== undefined)
+        throw createApiServiceError('Use sourceId or a manual secureUrlToken, not both.', {
+          parent: {}
+        });
+      const source = (await new ImgixClient(ctx.auth.token).getSource(ctx.input.sourceId))
+        .data;
+      domain = sourceDomain(source, domain);
+      token = sourceSigningToken(source);
     }
-
-    if (ctx.input.expiresAt !== undefined) {
-      queryParts.push(`expires=${ctx.input.expiresAt}`);
-    }
-
-    let queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
-    let signatureBase = ctx.input.secureUrlToken + path + queryString;
-    let signature = crypto.createHash('md5').update(signatureBase).digest('base64url');
-
-    let separator = queryString ? '&' : '?';
-    let signedUrl = `https://${ctx.input.domain}${path}${queryString}${separator}s=${signature}`;
-
+    if (!domain || !token)
+      throw createApiServiceError(
+        'Use an authorized secured sourceId, or provide domain and its manual secureUrlToken.',
+        { parent: {} }
+      );
+    const url = renderUrl(
+      domain,
+      ctx.input.path,
+      ctx.input.params,
+      token,
+      ctx.input.expiresAt
+    );
+    if (containsCredential(url, ctx.auth.token) || containsCredential(url, token))
+      throw createApiServiceError(
+        'The URL reflects a credential. Remove it from the path or parameters.',
+        { parent: {} }
+      );
     return {
       output: {
-        signedUrl,
-        expiresAt: ctx.input.expiresAt
+        signedUrl: url,
+        expiresAt:
+          ctx.input.expiresAt ??
+          (ctx.input.params?.expires === undefined
+            ? undefined
+            : Number(ctx.input.params.expires))
       },
-      message: `Generated signed URL for **${path}**${ctx.input.expiresAt ? ` (expires at ${ctx.input.expiresAt})` : ''}.`
+      message: 'Built the signed URL locally; no image request was made.'
     };
   })
   .build();

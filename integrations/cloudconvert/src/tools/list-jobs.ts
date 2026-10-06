@@ -1,81 +1,65 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { pageInput, perPageInput, tagInput } from '../lib/schemas';
 import { spec } from '../spec';
-
-export let listJobs = SlateTool.create(spec, {
+export const listJobs = SlateTool.create(spec, {
   name: 'List Jobs',
   key: 'list_jobs',
-  description: `List CloudConvert jobs with optional filtering by status and tag.
-
-Use this to monitor recent jobs, find specific jobs by tag, or review processing history.`,
-  tags: {
-    destructive: false,
-    readOnly: true
-  }
+  description:
+    'List recent jobs with tasks, status, and an optional exact tag filter. Follow nextPage until absent; jobs normally expire 24 hours after ending, so this is not a complete billing history.',
+  tags: { destructive: false, readOnly: true }
 })
   .input(
     z.object({
       status: z
         .enum(['waiting', 'processing', 'finished', 'error'])
         .optional()
-        .describe('Filter by job status'),
-      tag: z.string().optional().describe('Filter by job tag'),
-      perPage: z
-        .number()
-        .optional()
-        .default(25)
-        .describe('Number of results per page (max 100)'),
-      page: z.number().optional().default(1).describe('Page number for pagination')
+        .describe(
+          'processing, finished, or error. The retained waiting value is unsupported by job-list filtering; omit status to inspect waiting jobs.'
+        ),
+      tag: tagInput,
+      perPage: perPageInput.describe('Results per page, from 1 to 1000.'),
+      page: pageInput.describe('Positive page number.')
     })
   )
   .output(
     z.object({
-      jobs: z
-        .array(
-          z.object({
-            jobId: z.string().describe('ID of the job'),
-            status: z.string().describe('Job status'),
-            tag: z.string().optional().describe('Job tag'),
-            taskCount: z.number().describe('Number of tasks in the job'),
-            createdAt: z.string().optional().describe('Job creation timestamp'),
-            endedAt: z.string().optional().describe('Job completion timestamp')
-          })
-        )
-        .describe('List of jobs'),
-      totalCount: z.number().optional().describe('Total number of matching jobs'),
-      currentPage: z.number().optional().describe('Current page number')
+      jobs: z.array(
+        z.object({
+          jobId: z.string(),
+          status: z.string(),
+          tag: z.string().optional(),
+          taskCount: z.number(),
+          createdAt: z.string().optional(),
+          endedAt: z.string().optional()
+        })
+      ),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Present only when supplied by the provider.'),
+      currentPage: z.number().optional(),
+      nextPage: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let result = await client.listJobs({
-      status: ctx.input.status,
-      tag: ctx.input.tag,
-      perPage: ctx.input.perPage,
-      page: ctx.input.page
-    });
-
-    let jobs = (result.data ?? []).map((j: any) => ({
-      jobId: j.id,
-      status: j.status,
-      tag: j.tag,
-      taskCount: j.tasks?.length ?? 0,
-      createdAt: j.created_at,
-      endedAt: j.ended_at
-    }));
-
+    const result = await clientFor(ctx).listJobs(ctx.input);
     return {
       output: {
-        jobs,
-        totalCount: result.meta?.total,
-        currentPage: result.meta?.current_page
+        jobs: result.data.map(job => ({
+          jobId: job.id,
+          status: job.status,
+          tag: job.tag,
+          taskCount: job.tasks.length,
+          createdAt: job.created_at,
+          endedAt: job.ended_at
+        })),
+        totalCount: result.meta.total,
+        currentPage: result.meta.current_page,
+        nextPage: result.links.next === null ? undefined : result.meta.current_page + 1
       },
-      message: `Found ${jobs.length} job(s)${ctx.input.status ? ` with status "${ctx.input.status}"` : ''}.`
+      message: `Found ${result.data.length} job(s) on page ${result.meta.current_page}.`
     };
   })
   .build();

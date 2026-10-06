@@ -2,6 +2,8 @@ export * from './check-queue-status';
 export * from './generate-image';
 export * from './generate-speech';
 export * from './generate-video';
+export * from './get-account';
+export * from './get-model-pricing';
 export * from './run-model';
 export * from './search-models';
 export * from './submit-queue-request';

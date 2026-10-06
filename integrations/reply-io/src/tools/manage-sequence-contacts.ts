@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -63,11 +63,12 @@ export let manageSequenceContacts = SlateTool.create(spec, {
         .optional()
         .describe('Added or affected contact details'),
       contacts: z.array(z.record(z.string(), z.any())).optional().describe('Listed contacts'),
+      hasMore: z.boolean().optional(),
       removed: z.boolean().optional().describe('Whether a contact was removed')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let {
       action,
       sequenceId,
@@ -80,36 +81,58 @@ export let manageSequenceContacts = SlateTool.create(spec, {
       skip
     } = ctx.input;
 
+    if (contactId !== undefined && contactData !== undefined)
+      throw createApiServiceError('Choose contactId or contactData, not both.');
     if (action === 'add') {
-      let data: Record<string, any> = {};
-      if (contactId) {
-        data.contactId = contactId;
-      } else if (contactData) {
-        data.contact = contactData;
-      } else {
-        throw new Error(
-          'Either contactId or contactData is required to add a contact to a sequence'
-        );
+      if (contactId === undefined && !contactData)
+        throw createApiServiceError('Supply contactId or contactData.');
+      // Validate the target and step before a separately committed inline contact creation.
+      await client.getSequence(sequenceId);
+      if (startStepId !== undefined) {
+        const steps = await client.listSequenceSteps(sequenceId);
+        if (!steps.some(step => step.id === startStepId))
+          throw createApiServiceError('startStepId does not belong to this sequence.');
       }
-      if (forcePush) data.forcePush = forcePush;
-      if (startStepId) data.startStepId = startStepId;
-
-      let result = await client.addContactToSequence(sequenceId, data);
-      return {
-        output: { contact: result },
-        message: `Added contact to sequence **${sequenceId}**.`
-      };
+      const created = contactData ? await client.createContact(contactData) : undefined;
+      const id = contactId ?? created!.id;
+      try {
+        const result = await client.addContactToSequence(sequenceId, {
+          contactId: id,
+          forcePush,
+          startStepId
+        });
+        return {
+          output: { contact: { ...created, ...result } },
+          message: `Enrolled contact ${id} in sequence ${sequenceId}; processing follows the sequence settings.`
+        };
+      } catch (error) {
+        if (created)
+          throw createApiServiceError(
+            `Contact ${created.id} was created, but enrollment in sequence ${sequenceId} was not confirmed. Inspect membership before retrying; the contact is retained.`,
+            { parent: {} }
+          );
+        throw error;
+      }
     }
-
     if (action === 'remove') {
-      let data: Record<string, any> = {};
-      if (contactId) data.contactId = contactId;
-      if (email) data.email = email;
-
-      await client.removeContactFromSequence(sequenceId, data);
+      let id = contactId;
+      if (id === undefined) {
+        if (!email) throw createApiServiceError('Supply contactId or email.');
+        const matches = await client.searchContacts(email);
+        if (matches.length !== 1)
+          throw createApiServiceError(
+            'Email removal requires exactly one matching contact; use contactId instead.'
+          );
+        id = matches[0]!.id;
+      } else if (email !== undefined) {
+        const contact = await client.getContact(id);
+        if (contact.email?.toLowerCase() !== email.toLowerCase())
+          throw createApiServiceError('contactId and email identify different contacts.');
+      }
+      await client.removeContactFromSequence(sequenceId, id);
       return {
         output: { removed: true },
-        message: `Removed contact from sequence **${sequenceId}**.`
+        message: `Removed contact ${id} from sequence ${sequenceId}.`
       };
     }
 
@@ -119,10 +142,10 @@ export let manageSequenceContacts = SlateTool.create(spec, {
       skip,
       additionalColumns: 'CurrentStep,LastStepCompletedAt,Status'
     });
-    let contacts = Array.isArray(result) ? result : (result?.items ?? []);
+    let contacts = result.items;
 
     return {
-      output: { contacts },
+      output: { contacts, hasMore: result.hasMore },
       message: `Found **${contacts.length}** contact(s) in sequence **${sequenceId}**.`
     };
   })

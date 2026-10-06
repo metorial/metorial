@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/acuity-scheduling.png" height="20"> Acuity Scheduling
 
-Create, retrieve, update, cancel, and reschedule appointments. Manage availability by querying open dates and time slots for appointment types and calendars. Block time slots to prevent bookings. Manage client records including creation, retrieval, updates, and deletion. List appointment types, add-ons, calendars, and intake forms. Create and validate gift certificates, packages, and coupons. Retrieve orders and product listings. Subscribe to webhooks for appointment and order events.
+Create, retrieve, update, cancel, and reschedule appointments. Manage availability by querying open dates and time slots for appointment types and calendars. Block time slots to prevent bookings. Manage client records including creation, retrieval, updates, and deletion. List appointment types, add-ons, calendars, and intake forms. Create and validate gift certificates, packages, and coupons. Retrieve orders and product listings.
 
 ## Tools
 

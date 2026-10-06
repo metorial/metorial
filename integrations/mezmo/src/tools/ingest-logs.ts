@@ -11,21 +11,27 @@ Requires an ingestion key to be configured in authentication.`,
   instructions: [
     'The hostname query parameter is required and identifies the source of the logs.',
     'Each log line must include the "line" field with the log message text.',
-    'Custom metadata can be attached via the "meta" field on each line. Use consistent value types for metadata fields.'
+    'Custom metadata can be attached via the "meta" field on each line. Use consistent value types for metadata fields.',
+    'Sending logs may trigger existing account alerts, routing, and storage charges. Use only sources you are authorized to write.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
-      hostname: z.string().describe('Source hostname for the log lines'),
+      hostname: z.string().min(1).describe('Source hostname for the log lines'),
       lines: z
         .array(
           z.object({
             line: z.string().describe('The log message content'),
-            timestamp: z.number().optional().describe('Unix timestamp in milliseconds'),
+            timestamp: z
+              .number()
+              .multipleOf(1)
+              .nonnegative()
+              .optional()
+              .describe('Unix timestamp in milliseconds'),
             app: z.string().optional().describe('Application name'),
             level: z
               .string()
@@ -49,7 +55,7 @@ Requires an ingestion key to be configured in authentication.`,
   )
   .output(
     z.object({
-      ingested: z.boolean().describe('Whether the logs were successfully ingested')
+      ingested: z.boolean().describe('Whether the logs were accepted for ingestion')
     })
   )
   .handleInvocation(async ctx => {
@@ -66,7 +72,7 @@ Requires an ingestion key to be configured in authentication.`,
 
     return {
       output: { ingested: true },
-      message: `Successfully ingested **${ctx.input.lines.length}** log line(s) from host **${ctx.input.hostname}**.`
+      message: `Submitted **${ctx.input.lines.length}** log line(s) from host **${ctx.input.hostname}**.`
     };
   })
   .build();

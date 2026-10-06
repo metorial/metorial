@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import { publicEventTarget } from '../lib/event-target';
+import type { EventDestination, EventSubscription } from '../lib/models';
 import { spec } from '../spec';
 
 let refSchema = z.object({
@@ -24,14 +26,14 @@ let subscriptionOutputSchema = z.object({
   destinations: z.array(refSchema).describe('Destinations where events are sent')
 });
 
-let mapSubscription = (s: any) => ({
+let mapSubscription = (s: EventSubscription) => ({
   subscriptionId: s.id,
   uri: s.uri || '',
   createdAt: s.created_at || '',
   description: s.description || '',
   metadata: s.metadata || '',
-  sources: (s.sources || []).map((src: any) => ({ type: src.type })),
-  destinations: (s.destinations || []).map((d: any) => ({ id: d.id, uri: d.uri }))
+  sources: (s.sources || []).map(src => ({ type: src.type })),
+  destinations: (s.destinations || []).map(d => ({ id: d.id, uri: d.uri }))
 });
 
 let destinationOutputSchema = z.object({
@@ -40,22 +42,22 @@ let destinationOutputSchema = z.object({
   createdAt: z.string().describe('Creation timestamp'),
   description: z.string().describe('Description'),
   metadata: z.string().describe('Metadata'),
-  format: z.string().describe('Event format (e.g., "json")'),
+  format: z.string().describe('Event format (JSON)'),
   target: z
     .any()
     .describe(
-      'Target configuration (kinesis, firehose, cloudwatch_logs, datadog, or azure_logs_ingestion)'
+      'Target configuration (kinesis, firehose, cloudwatch_logs, datadog, or azure_logs_ingestion); stored credentials are redacted'
     )
 });
 
-let mapDestination = (d: any) => ({
+let mapDestination = (d: EventDestination) => ({
   destinationId: d.id,
   uri: d.uri || '',
   createdAt: d.created_at || '',
   description: d.description || '',
   metadata: d.metadata || '',
-  format: d.format || 'json',
-  target: d.target || null
+  format: d.format ?? '',
+  target: publicEventTarget(d.target)
 });
 
 export let listEventSubscriptions = SlateTool.create(spec, {
@@ -66,8 +68,17 @@ export let listEventSubscriptions = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -79,6 +90,7 @@ export let listEventSubscriptions = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listEventSubscriptions({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -155,7 +167,7 @@ export let updateEventSubscription = SlateTool.create(spec, {
   name: 'Update Event Subscription',
   key: 'update_event_subscription',
   description: `Update an event subscription's sources, destinations, description, or metadata.`,
-  tags: { destructive: false }
+  tags: { destructive: true }
 })
   .input(
     z.object({
@@ -223,8 +235,17 @@ export let listEventDestinations = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -236,6 +257,7 @@ export let listEventDestinations = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listEventDestinations({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -265,7 +287,7 @@ export let createEventDestination = SlateTool.create(spec, {
       target: z
         .any()
         .describe('Target configuration object with exactly one destination type'),
-      format: z.string().optional().describe('Event format (default "json")'),
+      format: z.string().optional().describe('Event format (default "JSON")'),
       description: z.string().optional().describe('Description (max 255 bytes)'),
       metadata: z.string().optional().describe('Metadata (max 4096 bytes)')
     })

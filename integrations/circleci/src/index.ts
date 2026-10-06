@@ -19,8 +19,6 @@ import {
   triggerPipeline,
   triggerPipelineRun
 } from './tools';
-import { buildEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     manageWebhooks,
     getUser
   ],
-  triggers: [buildEvent]
+  triggers: []
 });

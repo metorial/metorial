@@ -2,7 +2,9 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   deleteUserTool,
+  getProjectTool,
   getSurveyStatisticsTool,
+  getSurveyTool,
   getUnsubscribesTool,
   insertResponseTool,
   listResponsesTool,
@@ -12,11 +14,11 @@ import {
   updateUnsubscribesTool,
   upsertUserTool
 } from './tools';
-import { surveyResponseTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getProjectTool,
+    getSurveyTool,
     listSurveysTool,
     listResponsesTool,
     getSurveyStatisticsTool,
@@ -28,5 +30,5 @@ export let provider = Slate.create({
     getUnsubscribesTool,
     updateUnsubscribesTool
   ],
-  triggers: [surveyResponseTrigger]
+  triggers: []
 });

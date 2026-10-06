@@ -20,8 +20,6 @@ import {
   managePage,
   syncContent
 } from './tools';
-import { contentChanged } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     listUsers,
     getLocales
   ],
-  triggers: [contentChanged]
+  triggers: []
 });

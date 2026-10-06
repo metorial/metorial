@@ -32,7 +32,7 @@ export let listSequences = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.listSequences({
       name: ctx.input.name,
@@ -41,8 +41,8 @@ export let listSequences = SlateTool.create(spec, {
       skip: ctx.input.skip
     });
 
-    let sequences = result?.items ?? result ?? [];
-    let hasMore = result?.info?.hasMore ?? false;
+    let sequences = result.items;
+    let hasMore = result.hasMore;
 
     return {
       output: {

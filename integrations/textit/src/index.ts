@@ -23,8 +23,6 @@ import {
   sendMessage,
   startFlow
 } from './tools';
-import { newFlowRun, newMessage, resthookEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     getWorkspace,
     listChannels
   ],
-  triggers: [resthookEvent, newMessage, newFlowRun]
+  triggers: []
 });

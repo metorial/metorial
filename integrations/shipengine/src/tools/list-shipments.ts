@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listShipments = SlateTool.create(spec, {
@@ -34,8 +34,20 @@ export let listShipments = SlateTool.create(spec, {
         .optional()
         .describe('Filter by modification date end (ISO 8601)'),
       salesOrderId: z.string().optional().describe('Filter by sales order ID'),
-      page: z.number().optional().describe('Page number (default 1)'),
-      pageSize: z.number().optional().describe('Results per page (default 25, max 500)'),
+      page: z
+        .number()
+        .int()
+        .positive()
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Page number (default 1)'),
+      pageSize: z
+        .number()
+        .int()
+        .positive()
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Results per page (default 25)'),
       sortBy: z
         .enum(['ship_date', 'created_at', 'modified_at'])
         .optional()
@@ -51,8 +63,8 @@ export let listShipments = SlateTool.create(spec, {
       shipments: z.array(
         z.object({
           shipmentId: z.string().describe('Shipment ID'),
-          carrierId: z.string().describe('Carrier ID'),
-          serviceCode: z.string().describe('Service code'),
+          carrierId: z.string().optional().describe('Carrier ID'),
+          serviceCode: z.string().optional().describe('Service code'),
           externalShipmentId: z.string().optional().describe('External reference ID'),
           shipDate: z.string().describe('Ship date'),
           createdAt: z.string().describe('Creation timestamp'),
@@ -63,10 +75,7 @@ export let listShipments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
     let result = await client.listShipments({
       shipment_status: ctx.input.shipmentStatus,
@@ -83,15 +92,15 @@ export let listShipments = SlateTool.create(spec, {
       sort_dir: ctx.input.sortDir
     });
 
-    let shipments = (result.shipments || []).map((s: any) => ({
+    let shipments = result.shipments.map(s => ({
       shipmentId: s.shipment_id,
-      carrierId: s.carrier_id ?? '',
-      serviceCode: s.service_code ?? '',
+      carrierId: s.carrier_id,
+      serviceCode: s.service_code,
       externalShipmentId: s.external_shipment_id,
       shipDate: s.ship_date,
       createdAt: s.created_at,
       shipmentStatus: s.shipment_status,
-      tags: (s.tags || []).map((t: any) => t.name)
+      tags: s.tags.map(t => t.name)
     }));
 
     return {

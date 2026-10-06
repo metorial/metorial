@@ -43,6 +43,7 @@ import {
   getIpPolicy,
   getTlsCertificate,
   getTunnel,
+  getTunnelSession,
   listAddresses,
   listApiKeys,
   listBotUsers,
@@ -76,13 +77,6 @@ import {
   uploadTlsCertificate
 } from './tools';
 
-import {
-  activeTunnelsTrigger,
-  domainChangesTrigger,
-  endpointChangesTrigger,
-  inboundWebhook
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -98,6 +92,7 @@ export let provider = Slate.create({
     deleteEndpoint,
     listTunnels,
     getTunnel,
+    getTunnelSession,
     listTunnelSessions,
     restartTunnelSession,
     stopTunnelSession,
@@ -159,10 +154,5 @@ export let provider = Slate.create({
     createSshCertificateAuthority,
     deleteSshCertificateAuthority
   ],
-  triggers: [
-    inboundWebhook,
-    activeTunnelsTrigger,
-    domainChangesTrigger,
-    endpointChangesTrigger
-  ]
+  triggers: []
 });

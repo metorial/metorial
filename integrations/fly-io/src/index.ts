@@ -31,8 +31,6 @@ import {
   updateMachine,
   waitForMachine
 } from './tools';
-import { appMachinesChanged, inboundWebhook, machineStateChanged } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -66,5 +64,5 @@ export let provider = Slate.create({
     manageCertificates,
     requestOidcToken
   ],
-  triggers: [inboundWebhook, machineStateChanged, appMachinesChanged]
+  triggers: []
 });

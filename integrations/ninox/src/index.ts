@@ -16,8 +16,6 @@ import {
   listViews,
   updateRecord
 } from './tools';
-import { databaseChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     deleteFile,
     listViews
   ],
-  triggers: [inboundWebhook, databaseChanges]
+  triggers: []
 });

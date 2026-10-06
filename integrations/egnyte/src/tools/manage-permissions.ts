@@ -33,10 +33,7 @@ export let getPermissionsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.getPermissions(ctx.input.folderPath)) as Record<
       string,
@@ -62,7 +59,7 @@ export let setPermissionsTool = SlateTool.create(spec, {
   key: 'set_permissions',
   description: `Set or update folder permissions in Egnyte for specific users and/or groups. This is a delta operation — only the specified permissions are changed; existing permissions for other users/groups remain unaffected. Set a permission to "None" to revoke access.`,
   instructions: [
-    'Valid permission levels are: Owner, Full, Editor, Viewer, None',
+    'Valid permission levels are: Owner, Full, Editor, Viewer, Viewer Only, None',
     'Setting "None" removes the permission for that user or group'
   ]
 })
@@ -70,11 +67,17 @@ export let setPermissionsTool = SlateTool.create(spec, {
     z.object({
       folderPath: z.string().describe('Path to the folder'),
       userPermissions: z
-        .record(z.string(), z.enum(['Owner', 'Full', 'Editor', 'Viewer', 'None']))
+        .record(
+          z.string(),
+          z.enum(['Owner', 'Full', 'Editor', 'Viewer', 'Viewer Only', 'None'])
+        )
         .optional()
         .describe('Map of username to permission level'),
       groupPermissions: z
-        .record(z.string(), z.enum(['Owner', 'Full', 'Editor', 'Viewer', 'None']))
+        .record(
+          z.string(),
+          z.enum(['Owner', 'Full', 'Editor', 'Viewer', 'Viewer Only', 'None'])
+        )
         .optional()
         .describe('Map of group name to permission level'),
       inheritsPermissions: z
@@ -94,10 +97,7 @@ export let setPermissionsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     await client.setPermissions(ctx.input.folderPath, {
       userPerms: ctx.input.userPermissions,

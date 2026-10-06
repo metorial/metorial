@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { responseFiles } from '../lib/files';
+import { invalid, publicPages } from '../lib/response';
 import { spec } from '../spec';
 
 export let getResponses = SlateTool.create(spec, {
@@ -14,8 +16,20 @@ export let getResponses = SlateTool.create(spec, {
   .input(
     z.object({
       surveyId: z.string().describe('ID of the survey'),
-      page: z.number().optional().describe('Page number (default: 1)'),
-      perPage: z.number().optional().describe('Results per page (max 100)'),
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .max(Number.MAX_SAFE_INTEGER)
+        .optional()
+        .describe('Page number (default: 1)'),
+      perPage: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page (max 100)'),
       status: z
         .enum(['completed', 'partial', 'overquota', 'disqualified'])
         .optional()
@@ -60,7 +74,10 @@ export let getResponses = SlateTool.create(spec, {
         })
       ),
       page: z.number(),
-      total: z.number()
+      total: z.number(),
+      perPage: z.number(),
+      hasMore: z.boolean(),
+      nextPage: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -83,7 +100,7 @@ export let getResponses = SlateTool.create(spec, {
       collectorIds: ctx.input.collectorIds
     });
 
-    let responses = (result.data || []).map((r: any) => ({
+    let responses = result.data.map(r => ({
       responseId: r.id,
       status: r.response_status,
       dateCreated: r.date_created,
@@ -91,16 +108,19 @@ export let getResponses = SlateTool.create(spec, {
       collectorId: r.collector_id,
       totalTime: r.total_time,
       ipAddress: r.ip_address,
-      pages: r.pages
+      pages: publicPages(r.pages)
     }));
 
     return {
       output: {
         responses,
-        page: result.page || 1,
-        total: result.total || responses.length
+        page: result.page,
+        total: result.total,
+        perPage: result.per_page,
+        hasMore: result.nextPage !== undefined,
+        nextPage: result.nextPage
       },
-      message: `Retrieved **${responses.length}** responses (${result.total || responses.length} total) for survey \`${ctx.input.surveyId}\`.`
+      message: `Retrieved **${responses.length}** responses (${result.total} total) for survey \`${ctx.input.surveyId}\`.`
     };
   })
   .build();
@@ -116,7 +136,13 @@ export let getResponse = SlateTool.create(spec, {
   .input(
     z.object({
       surveyId: z.string().describe('ID of the survey'),
-      responseId: z.string().describe('ID of the specific response to retrieve')
+      responseId: z.string().describe('ID of the specific response to retrieve'),
+      includeFiles: z
+        .boolean()
+        .optional()
+        .describe(
+          'Prepare up to 20 uploaded response files for download. Expiring URLs are renewed only while the same file remains authorized.'
+        )
     })
   )
   .output(
@@ -131,7 +157,18 @@ export let getResponse = SlateTool.create(spec, {
       editUrl: z.string().optional(),
       analyzeUrl: z.string().optional(),
       customVariables: z.record(z.string(), z.string()).optional(),
-      pages: z.array(z.any()).optional()
+      pages: z.array(z.any()).optional(),
+      files: z
+        .array(
+          z.object({
+            pageId: z.string(),
+            questionId: z.string(),
+            fileIndex: z.number(),
+            filename: z.string(),
+            mimeType: z.string()
+          })
+        )
+        .optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -141,6 +178,35 @@ export let getResponse = SlateTool.create(spec, {
     });
 
     let r = await client.getResponse(ctx.input.surveyId, ctx.input.responseId);
+    let files = ctx.input.includeFiles ? responseFiles(r) : undefined;
+    if (files) {
+      if (r.survey_id !== ctx.input.surveyId)
+        throw invalid(
+          'The response does not prove its survey association. No files were prepared.'
+        );
+      let user = await client.getCurrentUser();
+      for (let file of files)
+        await ctx.addAttachment({
+          type: 'url',
+          url: file.url,
+          mimeType: file.mimeType,
+          filename: file.filename,
+          refreshAt: file.expiresAt,
+          refreshReference: {
+            surveyId: ctx.input.surveyId,
+            responseId: r.id,
+            pageId: file.pageId,
+            questionId: file.questionId,
+            answerIndex: file.answerIndex,
+            userId: user.id,
+            apiOrigin: client.origin,
+            fileOrigin: file.origin,
+            filePath: file.path,
+            identity: file.identity,
+            mimeType: file.mimeType
+          }
+        });
+    }
 
     return {
       output: {
@@ -154,9 +220,16 @@ export let getResponse = SlateTool.create(spec, {
         editUrl: r.edit_url,
         analyzeUrl: r.analyze_url,
         customVariables: r.custom_variables,
-        pages: r.pages
+        pages: publicPages(r.pages),
+        files: files?.map(file => ({
+          pageId: file.pageId,
+          questionId: file.questionId,
+          fileIndex: file.answerIndex,
+          filename: file.filename,
+          mimeType: file.mimeType
+        }))
       },
-      message: `Retrieved response \`${r.id}\` — status: **${r.response_status}**, total time: ${r.total_time || 0}s.`
+      message: `Retrieved response \`${r.id}\`${r.response_status ? ` — ${r.response_status}` : ''}.`
     };
   })
   .build();

@@ -1,7 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  registrationFailures: z
+    .array(z.any())
+    .optional()
+    .describe(
+      'Registrations that failed after the connection was created; creation is not rolled back.'
+    ),
+  connectionId: z.string().describe('ID of the newly created connection'),
+  name: z.string().optional().describe('Name of the created connection'),
+  type: z.string().optional().describe('Type of the created connection'),
+  rawConnection: z.any().describe('Credential-filtered native connection object')
+});
 
 export let createConnection = SlateTool.create(spec, {
   name: 'Create Connection',
@@ -21,30 +35,14 @@ export let createConnection = SlateTool.create(spec, {
         )
     })
   )
-  .output(
-    z.object({
-      connectionId: z.string().describe('ID of the newly created connection'),
-      name: z.string().optional().describe('Name of the created connection'),
-      type: z.string().optional().describe('Type of the created connection'),
-      rawConnection: z.any().describe('Full connection object returned by the API')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let connection = await client.createConnection(ctx.input.connectionData);
-
-    return {
-      output: {
-        connectionId: connection._id,
-        name: connection.name,
-        type: connection.type,
-        rawConnection: connection
-      },
-      message: `Created connection **${connection.name || connection._id}** (type: ${connection.type}).`
-    };
+    const result = await invoke('create_connection', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

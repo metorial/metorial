@@ -1,73 +1,13 @@
-# <img src="https://provider-logos.metorial-cdn.com/dialpad.png" height="20"> Dialpad
+# Dialpad
 
-Manage business communications including voice calls, SMS messaging, video meetings, and contact center operations. Initiate and control calls, send SMS messages, manage users and contacts, configure call centers with agent duty status and skill levels, set up call routing with IVR menus, retrieve AI-generated call transcripts and recaps, send faxes, manage phone number assignments, subscribe to real-time webhook events for calls and messages, run analytics reports, and administer company settings including access control policies and blocked numbers.
+Read company and current-user identity, discover users, contacts, offices, completed calls, call centers and number assignments, and read exact resources and native operator collections. The integration retains the fifteen original tool keys and adds `get_resource` and `list_resources`.
 
-## Tools
+Production and sandbox API keys and OAuth connections are supported. New OAuth requests use PKCE and only the documented `calls:list` and `offline_access` scopes needed here. Existing unmarked authorization callbacks remain compatible with the provider's optional PKCE flow; tokens cannot be moved between environments. Company administration and license prerequisites still apply to administrative actions.
 
-### Get Company Info
+User, contact and call-center changes return native receipts with exact readback. Contact upsert can modify an existing shared contact. User email updates replace the email list; timezone is readable but cannot be set through this API. Update Do Not Disturb separately from other fields. Provisioning and operator membership can affect licenses and billing.
 
-Retrieve information about your Dialpad company, including name, settings, and plan details.
+Call initiation returns the selected device acknowledgment without inventing a call ID or claiming connection. SMS preserves pending, failed and success states; acceptance does not establish delivery. Hangup returns request acceptance, and transfers preserve the requested and returned call IDs separately. The legacy warm/cold transfer selector has no current native equivalent and must be omitted. The legacy recording action is refused because the current user-active-call endpoint cannot bind the supplied call ID.
 
-### Get User
+Number unassignment returns the exact number to the company pool without releasing it. Optional assignment preconditions are checked before the request, but concurrent changes are not atomically protected. List target filters apply to the current native page only; follow the returned cursor even when the filtered page is empty. API-managed block IDs are exact E.164 phone numbers; blocks created outside the API are excluded.
 
-Retrieve detailed information about a specific Dialpad user by their ID. Returns profile, status, contact info, and settings.
-
-### Initiate Call
-
-Initiate an outbound call from a Dialpad user's application. The target user must have at least one active autocallable device (web or desktop Dialpad app, or CTI).
-
-### List Call Centers
-
-List call centers for a specific office in your Dialpad account. Returns call center details including name, state, and metadata.
-
-### List Calls
-
-List calls in your Dialpad account. Filter by time range and target (user, call center, department, or office). Requires the **calls:list** scope.
-
-### List Contacts
-
-List shared and local contacts in your Dialpad account with cursor-based pagination.
-
-### List Offices
-
-List all offices accessible with your API key. Returns office details including name, location, and associated departments and call centers.
-
-### List Users
-
-List users in your Dialpad company. Supports filtering by email or state and cursor-based pagination.
-
-### Manage Blocked Number
-
-List, add, or remove blocked phone numbers at the company level. Blocked numbers are prevented from calling into your Dialpad organization.
-
-### Manage Call Center
-
-Create, update, or delete a Dialpad call center. Also supports managing operators — adding or removing agents from a call center.
-
-### Manage Call
-
-Perform actions on an active Dialpad call: hang up, transfer to another number or user, or toggle call recording.
-
-### Manage Contact
-
-Create, update, upsert, or delete a Dialpad contact. The **upsert** action uses an external unique identifier to create-or-update, which is useful for syncing contacts from external systems.
-
-### Manage Phone Number
-
-List, assign, or unassign Dialpad phone numbers. Numbers can be assigned to users, offices, rooms, or call routers.
-
-### Manage User
-
-Create, update, or delete a Dialpad user. Use this to provision new users, modify user settings (name, DND, office), or remove users from the company.
-
-### Send SMS
-
-Send an SMS message to one or more phone numbers through Dialpad. Optionally specify a sender user or group.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+No recording-file delivery is offered: the documented recording-share pages do not establish an authenticated native file-download contract. No triggers are registered. Calls, messages, licenses and deleted resources may retain historical effects that require manual reconciliation.

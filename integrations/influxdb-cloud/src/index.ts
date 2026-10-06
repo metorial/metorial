@@ -44,8 +44,6 @@ import {
   upsertSecrets,
   writeData
 } from './tools';
-import { bucketChangesTrigger, inboundWebhook, taskRunsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -92,5 +90,5 @@ export let provider = Slate.create({
     createDBRP,
     deleteDBRP
   ],
-  triggers: [inboundWebhook, taskRunsTrigger, bucketChangesTrigger]
+  triggers: []
 });

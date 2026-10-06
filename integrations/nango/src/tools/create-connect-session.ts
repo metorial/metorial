@@ -1,15 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { NangoClient } from '../lib/client';
+import { invalid } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createConnectSession = SlateTool.create(spec, {
   name: 'Create Connect Session',
   key: 'create_connect_session',
-  description: `Create a short-lived connect session token for the frontend SDK. The session lasts 30 minutes and enables end users to initiate OAuth flows or provide API credentials through a pre-built UI. Sessions can be scoped to specific integrations and carry end-user metadata.`,
+  description:
+    'Connect session creation is unavailable through public tools because the native result grants connection-creation access. Use the Nango Connect UI through a trusted backend for secure end-user authorization. This retained key does not mint a session or send a request.',
   instructions: [
-    'The returned session token should be passed to the Nango frontend SDK.',
-    'End user ID is required; email and display name are recommended for better UX in the Nango UI.'
+    'Use a trusted Nango backend to create and securely deliver a short-lived Connect session.'
   ]
 })
   .input(
@@ -42,35 +42,9 @@ export let createConnectSession = SlateTool.create(spec, {
       expiresAt: z.string().describe('ISO 8601 expiration timestamp')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new NangoClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let result = await client.createConnectSession({
-      end_user: {
-        id: ctx.input.endUserId,
-        email: ctx.input.endUserEmail,
-        display_name: ctx.input.endUserDisplayName,
-        tags: ctx.input.endUserTags
-      },
-      organization: ctx.input.organizationId
-        ? {
-            id: ctx.input.organizationId,
-            display_name: ctx.input.organizationDisplayName
-          }
-        : undefined,
-      allowed_integrations: ctx.input.allowedIntegrations,
-      integrations_config_defaults: ctx.input.integrationsConfigDefaults
-    });
-
-    return {
-      output: {
-        sessionToken: result.data.token,
-        expiresAt: result.data.expires_at
-      },
-      message: `Created connect session for user **${ctx.input.endUserId}**. Expires at ${result.data.expires_at}.`
-    };
+  .handleInvocation(async () => {
+    throw invalid(
+      'Connect session creation is unavailable here because the native token and link authorize connection creation. Use Nango Connect UI through a trusted backend to create and securely deliver the session. No session was created.'
+    );
   })
   .build();

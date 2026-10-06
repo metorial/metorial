@@ -1,8 +1,10 @@
+export * from './get-resource';
 export { getSystem } from './get-system';
 export { getUser } from './get-user';
 export { listApplications } from './list-applications';
 export { listCommandResults } from './list-command-results';
 export { listGroups } from './list-groups';
+export * from './list-organizations';
 export { listSystems } from './list-systems';
 export { listUsers } from './list-users';
 export { manageAssociations } from './manage-associations';

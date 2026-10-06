@@ -21,7 +21,7 @@ describe('youtube-analytics provider contract', () => {
         'list_report_types',
         'download_bulk_report'
       ],
-      triggerIds: ['inbound_webhook', 'new_bulk_reports'],
+      triggerIds: [],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'query_analytics', readOnly: true, destructive: false },
@@ -32,13 +32,10 @@ describe('youtube-analytics provider contract', () => {
         { id: 'list_report_types', readOnly: true, destructive: false },
         { id: 'download_bulk_report', readOnly: true, destructive: false }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'new_bulk_reports', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(9);
+    expect(contract.actions).toHaveLength(7);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -48,9 +45,7 @@ describe('youtube-analytics provider contract', () => {
       manage_reporting_jobs: youtubeAnalyticsActionScopes.manageReportingJobs,
       list_bulk_reports: youtubeAnalyticsActionScopes.listBulkReports,
       list_report_types: youtubeAnalyticsActionScopes.listReportTypes,
-      download_bulk_report: youtubeAnalyticsActionScopes.downloadBulkReport,
-      new_bulk_reports: youtubeAnalyticsActionScopes.newBulkReports,
-      inbound_webhook: youtubeAnalyticsActionScopes.inboundWebhook
+      download_bulk_report: youtubeAnalyticsActionScopes.downloadBulkReport
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

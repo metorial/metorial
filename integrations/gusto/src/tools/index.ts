@@ -1,4 +1,5 @@
 export { getCompany } from './get-company';
+export * from './get-current-context';
 export { getPayroll } from './get-payroll';
 export { listContractors } from './list-contractors';
 export { listEmployees } from './list-employees';

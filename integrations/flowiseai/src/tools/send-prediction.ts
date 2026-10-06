@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FlowiseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -17,7 +17,20 @@ export let sendPrediction = SlateTool.create(spec, {
       chatflowId: z
         .string()
         .describe('ID of the chatflow, assistant, or agentflow to send the message to'),
-      question: z.string().describe('The message or question to send'),
+      question: z
+        .string()
+        .optional()
+        .describe(
+          'The message or question to send. Alternatively provide form or humanInput.'
+        ),
+      form: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Form values for an Agentflow V2 form-input flow'),
+      humanInput: z
+        .object({ type: z.enum(['proceed', 'reject']), feedback: z.string().optional() })
+        .optional()
+        .describe('Human feedback to resume a stopped checkpoint'),
       sessionId: z.string().optional().describe('Session ID for conversation continuity'),
       overrideConfig: z
         .record(z.string(), z.any())
@@ -36,7 +49,9 @@ export let sendPrediction = SlateTool.create(spec, {
         .array(
           z.object({
             data: z.string().describe('Base64-encoded data or URL of the file'),
-            type: z.enum(['file', 'url', 'audio']).describe('Type of upload'),
+            type: z
+              .enum(['file', 'url', 'audio', 'file:rag', 'file:full'])
+              .describe('Type of upload'),
             name: z.string().optional().describe('Filename'),
             mime: z.string().optional().describe('MIME type of the file')
           })
@@ -64,6 +79,11 @@ export let sendPrediction = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.question?.trim() && !ctx.input.form && !ctx.input.humanInput) {
+      throw createApiServiceError(
+        'Provide question, form, or humanInput to run a prediction.'
+      );
+    }
     let client = new FlowiseClient({
       baseUrl: ctx.config.baseUrl,
       token: ctx.auth.token
@@ -79,6 +99,9 @@ export let sendPrediction = SlateTool.create(spec, {
 
     let result = await client.sendPrediction(ctx.input.chatflowId, {
       question: ctx.input.question,
+      form: ctx.input.form,
+      humanInput: ctx.input.humanInput,
+      streaming: false,
       overrideConfig,
       history: ctx.input.history,
       uploads: ctx.input.uploads
@@ -92,8 +115,8 @@ export let sendPrediction = SlateTool.create(spec, {
         chatId: result.chatId,
         chatMessageId: result.chatMessageId,
         sessionId: result.sessionId,
-        sourceDocuments: result.sourceDocuments,
-        usedTools: result.usedTools
+        sourceDocuments: result.sourceDocuments ?? undefined,
+        usedTools: result.usedTools ?? undefined
       },
       message: `Sent message to chatflow \`${ctx.input.chatflowId}\`. Response: ${result.text ? result.text.substring(0, 200) + (result.text.length > 200 ? '...' : '') : 'No text response'}`
     };

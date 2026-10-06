@@ -15,7 +15,7 @@ export let getIncident = SlateTool.create(spec, {
     z.object({
       incidentId: z
         .string()
-        .describe('The incident ID (UUID) or numeric reference (e.g. "123" for INC-123)')
+        .describe('The incident ID or numeric reference (e.g. "123" for INC-123)')
     })
   )
   .output(

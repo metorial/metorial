@@ -1,208 +1,179 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SanityClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { documentId, invalid, malformed, opaqueId, record, scopes } from '../lib/schemas';
 import { spec } from '../spec';
 
-let _patchOperationsSchema = z
-  .object({
-    set: z
-      .record(z.string(), z.any())
-      .optional()
-      .describe('Set field values. Overwrites existing values.'),
-    setIfMissing: z
-      .record(z.string(), z.any())
-      .optional()
-      .describe('Set field values only if they do not already exist.'),
-    unset: z.array(z.string()).optional().describe('Remove fields by their paths.'),
-    inc: z
-      .record(z.string(), z.number())
-      .optional()
-      .describe('Increment numeric fields by the given amounts.'),
-    dec: z
-      .record(z.string(), z.number())
-      .optional()
-      .describe('Decrement numeric fields by the given amounts.'),
-    insert: z
-      .object({
-        before: z.string().optional().describe('Insert before this path.'),
-        after: z.string().optional().describe('Insert after this path.'),
-        replace: z.string().optional().describe('Replace items at this path.'),
-        items: z.array(z.any()).describe('Items to insert.')
-      })
-      .optional()
-      .describe('Insert items into arrays.'),
-    ifRevisionID: z
-      .string()
-      .optional()
-      .describe(
-        'Only apply patch if the document is at this revision. Enables optimistic locking.'
-      )
-  })
-  .describe('Patch operations to apply to the document.');
-
-let mutationSchema = z.object({
-  create: z
-    .object({
-      _id: z.string().optional().describe('Document ID. Auto-generated if omitted.'),
-      _type: z.string().describe('Document type.')
-    })
-    .passthrough()
-    .optional()
-    .describe('Create a new document. Fails if a document with the same ID already exists.'),
-
-  createOrReplace: z
-    .object({
-      _id: z.string().describe('Document ID. Required for createOrReplace.'),
-      _type: z.string().describe('Document type.')
-    })
-    .passthrough()
-    .optional()
-    .describe('Create a new document or fully replace an existing one.'),
-
-  createIfNotExists: z
-    .object({
-      _id: z.string().describe('Document ID. Required for createIfNotExists.'),
-      _type: z.string().describe('Document type.')
-    })
-    .passthrough()
-    .optional()
-    .describe('Create a document only if it does not already exist.'),
-
-  delete: z
-    .object({
-      documentId: z.string().optional().describe('ID of the document to delete.'),
-      query: z.string().optional().describe('GROQ query to match documents for deletion.'),
-      params: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe('Parameters for the GROQ deletion query.')
-    })
-    .optional()
-    .describe('Delete a document by ID or by GROQ query.'),
-
+const create = z
+  .object({ _id: documentId.optional(), _type: z.string().min(1) })
+  .passthrough();
+const fixed = create.extend({ _id: documentId });
+const selection = {
+  documentId: documentId.optional(),
+  query: z.string().min(1).optional(),
+  params: record.optional(),
+  ifRevisionID: opaqueId.optional()
+};
+const insert = z.object({
+  before: z.string().optional(),
+  after: z.string().optional(),
+  replace: z.string().optional(),
+  items: z.array(z.unknown())
+});
+export const mutationSchema = z.object({
+  create: create.optional(),
+  createOrReplace: fixed.optional(),
+  createIfNotExists: fixed.optional(),
+  delete: z.object(selection).optional(),
   patch: z
     .object({
-      documentId: z.string().optional().describe('ID of the document to patch.'),
-      query: z.string().optional().describe('GROQ query to match documents for patching.'),
-      params: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe('Parameters for the GROQ patch query.'),
-      set: z.record(z.string(), z.any()).optional().describe('Set field values.'),
-      setIfMissing: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe('Set field values only if they do not already exist.'),
-      unset: z.array(z.string()).optional().describe('Remove fields by their paths.'),
-      inc: z.record(z.string(), z.number()).optional().describe('Increment numeric fields.'),
-      dec: z.record(z.string(), z.number()).optional().describe('Decrement numeric fields.'),
-      ifRevisionID: z
-        .string()
-        .optional()
-        .describe('Only apply patch if the document is at this revision.')
+      ...selection,
+      set: record.optional(),
+      setIfMissing: record.optional(),
+      unset: z.array(z.string()).optional(),
+      inc: z.record(z.string(), z.number()).optional(),
+      dec: z.record(z.string(), z.number()).optional(),
+      insert: insert.optional()
     })
     .optional()
-    .describe('Patch an existing document with targeted updates.')
 });
-
-export let mutateDocuments = SlateTool.create(spec, {
+export const mutateDocuments = SlateTool.create(spec, {
   name: 'Mutate Documents',
   key: 'mutate_documents',
-  description: `Create, update, patch, or delete documents in a Sanity dataset. Supports multiple mutations in a single atomic transaction. Each mutation in the array can be a create, createOrReplace, createIfNotExists, delete, or patch operation.`,
+  description:
+    'Submit document mutations in one native transaction. Discover project/dataset first. Native receipts distinguish accepted operations and dry-run validation; deletion does not promise to erase transaction history, caches, backups, webhooks, or external effects.',
   instructions: [
-    'Each item in the mutations array should have exactly one operation key: create, createOrReplace, createIfNotExists, delete, or patch.',
-    'All mutations in a single call are executed as an atomic transaction — either all succeed or none are applied.',
-    'For patch operations, you can target a single document by documentId or multiple documents by GROQ query.',
-    'For delete operations, the API expects an "id" field — the tool maps "documentId" to "id" automatically.'
+    'Exactly one operation per mutation. Use documentId or query for patch/delete, never both.',
+    'Use ifRevisionID for optimistic locking, including exact-ID deletion. createOrReplace fully replaces content. createIfNotExists can leave an existing document unchanged.',
+    'GROQ delete queries have the documented 10,000-document limit; paginate by ordered _id for larger workloads.',
+    'For reads immediately after writes use visibility sync. async/deferred may not yet be query-visible. No automatic retry of ambiguous writes.'
   ],
-  constraints: ['Delete queries are limited to 10,000 documents maximum.'],
-  tags: {
-    destructive: true
-  }
+  tags: { destructive: true }
 })
   .input(
     z.object({
-      mutations: z
-        .array(mutationSchema)
-        .describe('Array of mutation operations to execute as a single transaction.'),
-      returnDocuments: z
-        .boolean()
-        .optional()
-        .describe('If true, returns the full content of changed documents in the response.'),
-      dryRun: z
-        .boolean()
-        .optional()
-        .describe('If true, validates the mutations without actually executing them.'),
-      autoGenerateArrayKeys: z
-        .boolean()
-        .optional()
-        .describe('If true, automatically adds _key attributes to array items.')
+      ...scopes,
+      mutations: z.array(mutationSchema).min(1),
+      returnDocuments: z.boolean().optional(),
+      dryRun: z.boolean().optional(),
+      autoGenerateArrayKeys: z.boolean().optional(),
+      visibility: z.enum(['sync', 'async', 'deferred']).optional(),
+      transactionId: opaqueId.optional()
     })
   )
   .output(
     z.object({
-      transactionId: z.string().describe('ID of the completed transaction.'),
-      results: z
-        .array(
-          z.object({
-            operation: z.string().describe('The mutation operation that was performed.'),
-            documentId: z.string().optional().describe('ID of the affected document.'),
-            document: z
-              .any()
-              .optional()
-              .describe('Full document content (only if returnDocuments was true).')
+      transactionId: z.string(),
+      results: z.array(
+        z
+          .object({
+            operation: z.string(),
+            documentId: z.string().optional(),
+            document: z.unknown().optional()
           })
-        )
-        .describe('Results for each mutation in the transaction.')
+          .passthrough()
+      ),
+      dryRun: z.boolean().optional(),
+      visibility: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SanityClient({
-      token: ctx.auth.token,
-      projectId: ctx.config.projectId,
-      dataset: ctx.config.dataset,
-      apiVersion: ctx.config.apiVersion
-    });
-
-    // Map user-friendly field names to API field names
-    let apiMutations = ctx.input.mutations.map(m => {
-      let mapped: Record<string, any> = {};
-      if (m.create) mapped.create = m.create;
-      if (m.createOrReplace) mapped.createOrReplace = m.createOrReplace;
-      if (m.createIfNotExists) mapped.createIfNotExists = m.createIfNotExists;
+    const i = ctx.input;
+    const mutations = i.mutations.map(m => {
+      if (Object.values(m).filter(value => value !== undefined).length !== 1)
+        throw invalid('Each mutation must contain exactly one operation.');
+      for (const selected of [m.delete, m.patch])
+        if (selected) {
+          if ((selected.documentId !== undefined) === (selected.query !== undefined))
+            throw invalid('Patch/delete require exactly one documentId or query.');
+          if (selected.params !== undefined && !selected.query)
+            throw invalid('Mutation params require a query.');
+        }
+      if (m.patch) {
+        if (
+          !['set', 'setIfMissing', 'unset', 'inc', 'dec', 'insert'].some(key =>
+            Object.hasOwn(m.patch!, key)
+          )
+        )
+          throw invalid('Provide at least one patch operation.');
+        if (
+          m.patch.insert &&
+          [m.patch.insert.before, m.patch.insert.after, m.patch.insert.replace].filter(
+            value => value !== undefined
+          ).length !== 1
+        )
+          throw invalid('Insert requires exactly one before, after, or replace selector.');
+      }
       if (m.delete) {
-        mapped.delete = {
-          ...(m.delete.documentId ? { id: m.delete.documentId } : {}),
-          ...(m.delete.query ? { query: m.delete.query } : {}),
-          ...(m.delete.params ? { params: m.delete.params } : {})
-        };
+        const { documentId, ...rest } = m.delete;
+        return { delete: { ...rest, ...(documentId ? { id: documentId } : {}) } };
       }
       if (m.patch) {
-        let { documentId, ...rest } = m.patch;
-        mapped.patch = {
-          ...(documentId ? { id: documentId } : {}),
-          ...rest
-        };
+        const { documentId, ...rest } = m.patch;
+        return { patch: { ...rest, ...(documentId ? { id: documentId } : {}) } };
       }
-      return mapped;
+      return m;
     });
-
-    let response = await client.mutate(apiMutations, {
-      returnIds: true,
-      returnDocuments: ctx.input.returnDocuments,
-      dryRun: ctx.input.dryRun,
-      autoGenerateArrayKeys: ctx.input.autoGenerateArrayKeys
+    const response = await clientFor(ctx).mutate(mutations, {
+      returnDocuments: i.returnDocuments,
+      dryRun: i.dryRun,
+      autoGenerateArrayKeys: i.autoGenerateArrayKeys,
+      visibility: i.visibility,
+      transactionId: i.transactionId
     });
-
-    let mutationCount = ctx.input.mutations.length;
-    let dryRunLabel = ctx.input.dryRun ? ' (dry run)' : '';
-
+    const results = response.results.map(result => ({
+      ...result,
+      documentId: result.documentId ?? result.id
+    }));
+    if (results.some(result => result.document && result.document._id !== result.documentId))
+      throw malformed();
+    const expected = new Set(
+      i.mutations.flatMap(m => {
+        const fixedId =
+          m.delete?.documentId ??
+          m.patch?.documentId ??
+          m.create?._id ??
+          m.createOrReplace?._id ??
+          m.createIfNotExists?._id;
+        return fixedId && !fixedId.endsWith('.') ? [fixedId] : [];
+      })
+    );
+    const prefixes = i.mutations.flatMap(m =>
+      m.create?._id?.endsWith('.') ? [m.create._id] : []
+    );
+    const matchesPrefix = (id: string | undefined, prefix: string) =>
+      typeof id === 'string' && id.startsWith(prefix) && id.length > prefix.length;
+    const flexibleIds = i.mutations.some(
+      m => m.delete?.query || m.patch?.query || (m.create && !m.create._id)
+    );
+    if (
+      !flexibleIds &&
+      results.some(
+        result =>
+          !result.documentId ||
+          (!expected.has(result.documentId) &&
+            !prefixes.some(prefix => matchesPrefix(result.documentId, prefix)))
+      )
+    )
+      throw malformed();
+    if (
+      !i.dryRun &&
+      ([...expected].some(id => !results.some(result => result.documentId === id)) ||
+        prefixes.some(
+          prefix => !results.some(result => matchesPrefix(result.documentId, prefix))
+        ))
+    )
+      throw malformed();
     return {
       output: {
         transactionId: response.transactionId,
-        results: response.results || []
+        results,
+        dryRun: i.dryRun,
+        visibility: i.visibility
       },
-      message: `Executed ${mutationCount} mutation(s)${dryRunLabel}. Transaction ID: \`${response.transactionId}\`.`
+      message: i.dryRun
+        ? 'Native mutation validation completed; no mutation execution was requested.'
+        : 'Native transaction accepted. Returned receipts describe its operations; downstream history, cache, notification, and automation effects may remain.'
     };
   })
   .build();

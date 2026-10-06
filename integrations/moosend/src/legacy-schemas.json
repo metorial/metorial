@@ -1,0 +1,1218 @@
+{
+  "create_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the campaign"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Email subject line"
+        },
+        "senderEmail": {
+          "type": "string",
+          "description": "Verified sender email address"
+        },
+        "replyToEmail": {
+          "type": "string",
+          "description": "Reply-to email address"
+        },
+        "mailingLists": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "mailingListId": {
+                "type": "string",
+                "description": "ID of the mailing list to send to"
+              },
+              "segmentId": {
+                "description": "Optional segment ID to filter recipients within the list",
+                "type": "string"
+              }
+            },
+            "required": ["mailingListId"],
+            "additionalProperties": false
+          },
+          "description": "Mailing lists to send the campaign to"
+        },
+        "webLocation": {
+          "description": "URL to hosted HTML email content",
+          "type": "string"
+        },
+        "confirmationToEmail": {
+          "description": "Email to receive campaign send confirmation",
+          "type": "string"
+        },
+        "isAB": {
+          "default": false,
+          "description": "Whether this is an A/B test campaign",
+          "type": "boolean"
+        },
+        "abCampaignType": {
+          "description": "Type of A/B test variation",
+          "type": "string",
+          "enum": ["Subject", "Content", "Sender"]
+        },
+        "subjectB": {
+          "description": "Subject line for A/B variant B",
+          "type": "string"
+        },
+        "webLocationB": {
+          "description": "Content URL for A/B variant B",
+          "type": "string"
+        },
+        "senderEmailB": {
+          "description": "Sender email for A/B variant B",
+          "type": "string"
+        },
+        "hoursToTest": {
+          "description": "Hours to run the A/B test (1-24)",
+          "type": "number"
+        },
+        "listPercentage": {
+          "description": "Percentage of list to use for A/B test",
+          "type": "number"
+        },
+        "abWinnerSelectionType": {
+          "description": "How to determine the A/B test winner",
+          "type": "string",
+          "enum": ["OpenRate", "TotalUniqueClicks"]
+        },
+        "trackInGoogleAnalytics": {
+          "description": "Enable Google Analytics tracking",
+          "type": "boolean"
+        },
+        "dontTrackLinkClicks": {
+          "description": "Disable link click tracking",
+          "type": "boolean"
+        }
+      },
+      "required": ["name", "subject", "senderEmail", "replyToEmail", "mailingLists", "isAB"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "ID of the created campaign"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the campaign"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Subject line of the campaign"
+        },
+        "status": {
+          "description": "Campaign status code",
+          "type": "number"
+        },
+        "isTransactional": {
+          "description": "Whether the campaign is transactional",
+          "type": "boolean"
+        },
+        "createdOn": {
+          "description": "Creation timestamp",
+          "type": "string"
+        }
+      },
+      "required": ["campaignId", "name", "subject"],
+      "additionalProperties": false
+    }
+  },
+  "get_campaigns": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "description": "Specific campaign ID to retrieve. If omitted, returns a paginated list of all campaigns.",
+          "type": "string"
+        },
+        "page": {
+          "default": 1,
+          "description": "Page number for pagination (starts at 1)",
+          "type": "number"
+        },
+        "pageSize": {
+          "default": 50,
+          "description": "Number of campaigns per page",
+          "type": "number"
+        }
+      },
+      "required": ["page", "pageSize"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaigns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "campaignId": {
+                "type": "string",
+                "description": "Campaign ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Campaign name"
+              },
+              "subject": {
+                "type": "string",
+                "description": "Campaign subject line"
+              },
+              "status": {
+                "description": "Campaign status code",
+                "type": "number"
+              },
+              "isTransactional": {
+                "description": "Whether the campaign is transactional",
+                "type": "boolean"
+              },
+              "createdOn": {
+                "description": "Creation timestamp",
+                "type": "string"
+              },
+              "deliveredOn": {
+                "description": "Delivery timestamp",
+                "type": "string"
+              },
+              "scheduledFor": {
+                "description": "Scheduled send timestamp",
+                "type": "string"
+              },
+              "scheduledForTimezone": {
+                "description": "Timezone of scheduled send",
+                "type": "string"
+              },
+              "totalSent": {
+                "description": "Total emails sent",
+                "type": "number"
+              },
+              "uniqueOpens": {
+                "description": "Unique opens count",
+                "type": "number"
+              },
+              "uniqueLinkClicks": {
+                "description": "Unique link clicks count",
+                "type": "number"
+              },
+              "recipientsCount": {
+                "description": "Number of recipients",
+                "type": "number"
+              },
+              "totalBounces": {
+                "description": "Total bounces",
+                "type": "number"
+              },
+              "totalComplaints": {
+                "description": "Total complaints",
+                "type": "number"
+              },
+              "totalUnsubscribes": {
+                "description": "Total unsubscribes",
+                "type": "number"
+              }
+            },
+            "required": ["campaignId", "name", "subject"],
+            "additionalProperties": false
+          },
+          "description": "List of campaigns"
+        },
+        "totalCount": {
+          "description": "Total number of campaigns (when listing)",
+          "type": "number"
+        },
+        "currentPage": {
+          "description": "Current page number",
+          "type": "number"
+        }
+      },
+      "required": ["campaigns"],
+      "additionalProperties": false
+    }
+  },
+  "send_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "ID of the campaign"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["send", "schedule", "unschedule", "send_test"],
+          "description": "Action to perform on the campaign"
+        },
+        "scheduleDateTime": {
+          "description": "Date and time to schedule the campaign (e.g. \"2024-06-15T10:00:00\"). Required when action is \"schedule\".",
+          "type": "string"
+        },
+        "scheduleTimezone": {
+          "description": "Timezone for the scheduled send (e.g. \"Eastern Standard Time\"). Defaults to account timezone.",
+          "type": "string"
+        },
+        "testEmails": {
+          "description": "Email addresses for test send (max 5). Required when action is \"send_test\".",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["campaignId", "action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "ID of the campaign"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action that was performed"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action completed successfully"
+        }
+      },
+      "required": ["campaignId", "action", "success"],
+      "additionalProperties": false
+    }
+  },
+  "update_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "ID of the campaign to update"
+        },
+        "name": {
+          "description": "New campaign name",
+          "type": "string"
+        },
+        "subject": {
+          "description": "New email subject line",
+          "type": "string"
+        },
+        "senderEmail": {
+          "description": "New sender email address",
+          "type": "string"
+        },
+        "replyToEmail": {
+          "description": "New reply-to email address",
+          "type": "string"
+        },
+        "webLocation": {
+          "description": "New URL for HTML email content",
+          "type": "string"
+        },
+        "confirmationToEmail": {
+          "description": "Email to receive send confirmation",
+          "type": "string"
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "ID of the updated campaign"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the update was successful"
+        }
+      },
+      "required": ["campaignId", "success"],
+      "additionalProperties": false
+    }
+  },
+  "delete_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "ID of the campaign"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["delete", "clone"],
+          "description": "Action to perform: \"delete\" permanently removes the campaign, \"clone\" creates a draft copy"
+        }
+      },
+      "required": ["campaignId", "action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "The campaign ID (original for delete, new for clone)"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action that was performed"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action completed successfully"
+        }
+      },
+      "required": ["campaignId", "action", "success"],
+      "additionalProperties": false
+    }
+  },
+  "campaign_analytics": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "ID of the campaign to analyze"
+        },
+        "reportType": {
+          "type": "string",
+          "enum": ["summary", "ab_summary", "stats", "links", "locations"],
+          "description": "Type of analytics report to retrieve"
+        },
+        "statsType": {
+          "description": "Specific stat type (required when reportType is \"stats\")",
+          "type": "string",
+          "enum": [
+            "Sent",
+            "Opened",
+            "LinkClicked",
+            "Forward",
+            "Unsubscribed",
+            "Bounced",
+            "Complained"
+          ]
+        },
+        "page": {
+          "default": 1,
+          "description": "Page number for paginated stats",
+          "type": "number"
+        },
+        "pageSize": {
+          "default": 50,
+          "description": "Items per page for paginated stats",
+          "type": "number"
+        },
+        "fromDate": {
+          "description": "Start date filter for stats (e.g. \"2024-01-01\")",
+          "type": "string"
+        },
+        "toDate": {
+          "description": "End date filter for stats (e.g. \"2024-12-31\")",
+          "type": "string"
+        }
+      },
+      "required": ["campaignId", "reportType", "page", "pageSize"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "Campaign ID"
+        },
+        "reportType": {
+          "type": "string",
+          "description": "Type of report returned"
+        },
+        "analytics": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Analytics data returned by the API"
+        }
+      },
+      "required": ["campaignId", "reportType", "analytics"],
+      "additionalProperties": false
+    }
+  },
+  "manage_mailing_list": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete", "get", "list"],
+          "description": "Action to perform"
+        },
+        "mailingListId": {
+          "description": "Mailing list ID (required for update, delete, get)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Mailing list name (required for create, optional for update)",
+          "type": "string"
+        },
+        "confirmationPage": {
+          "description": "URL displayed after subscription",
+          "type": "string"
+        },
+        "redirectAfterUnsubscribePage": {
+          "description": "URL to redirect after unsubscribe",
+          "type": "string"
+        },
+        "withStatistics": {
+          "default": false,
+          "description": "Include subscriber statistics in results (for get/list)",
+          "type": "boolean"
+        },
+        "page": {
+          "default": 1,
+          "description": "Page number for listing",
+          "type": "number"
+        },
+        "pageSize": {
+          "default": 100,
+          "description": "Items per page for listing",
+          "type": "number"
+        }
+      },
+      "required": ["action", "withStatistics", "page", "pageSize"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mailingLists": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "mailingListId": {
+                "type": "string",
+                "description": "Mailing list ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Mailing list name"
+              },
+              "createdOn": {
+                "description": "Creation timestamp",
+                "type": "string"
+              },
+              "updatedOn": {
+                "description": "Last update timestamp",
+                "type": "string"
+              },
+              "status": {
+                "description": "Mailing list status code",
+                "type": "number"
+              },
+              "activeMemberCount": {
+                "description": "Number of active subscribers",
+                "type": "number"
+              },
+              "bouncedMemberCount": {
+                "description": "Number of bounced subscribers",
+                "type": "number"
+              },
+              "removedMemberCount": {
+                "description": "Number of removed subscribers",
+                "type": "number"
+              },
+              "unsubscribedMemberCount": {
+                "description": "Number of unsubscribed members",
+                "type": "number"
+              }
+            },
+            "required": ["mailingListId", "name"],
+            "additionalProperties": false
+          },
+          "description": "Mailing list(s) returned"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action performed"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action completed successfully"
+        }
+      },
+      "required": ["mailingLists", "action", "success"],
+      "additionalProperties": false
+    }
+  },
+  "manage_subscriber": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "add",
+            "add_many",
+            "update",
+            "unsubscribe",
+            "remove",
+            "remove_many",
+            "get_by_email",
+            "get_by_id"
+          ],
+          "description": "Action to perform"
+        },
+        "mailingListId": {
+          "type": "string",
+          "description": "ID of the mailing list"
+        },
+        "email": {
+          "description": "Subscriber email (for add, unsubscribe, remove, get_by_email)",
+          "type": "string"
+        },
+        "subscriberId": {
+          "description": "Subscriber ID (for update, get_by_id)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Subscriber name (for add/update)",
+          "type": "string"
+        },
+        "customFields": {
+          "description": "Custom fields as \"fieldName=value\" pairs (for add/update)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags": {
+          "description": "Tags to assign to the subscriber (for add)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "campaignId": {
+          "description": "Campaign ID (for unsubscribing from a specific campaign)",
+          "type": "string"
+        },
+        "subscribers": {
+          "description": "Multiple subscribers (for add_many)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "Subscriber email"
+              },
+              "name": {
+                "description": "Subscriber name",
+                "type": "string"
+              },
+              "customFields": {
+                "description": "Custom fields as \"fieldName=value\" pairs",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["email"],
+            "additionalProperties": false
+          }
+        },
+        "emails": {
+          "description": "List of emails to remove (for remove_many)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["action", "mailingListId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "subscribers": {
+          "description": "Subscriber data returned",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "subscriberId": {
+                "type": "string",
+                "description": "Subscriber ID"
+              },
+              "email": {
+                "type": "string",
+                "description": "Subscriber email address"
+              },
+              "name": {
+                "description": "Subscriber name",
+                "type": "string"
+              },
+              "createdOn": {
+                "description": "Subscription date",
+                "type": "string"
+              },
+              "updatedOn": {
+                "description": "Last update date",
+                "type": "string"
+              },
+              "unsubscribedOn": {
+                "description": "Unsubscription date",
+                "type": "string"
+              },
+              "customFields": {
+                "description": "Custom field values for this subscriber",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "customFieldId": {
+                      "description": "Custom field ID",
+                      "type": "string"
+                    },
+                    "fieldName": {
+                      "description": "Custom field name",
+                      "type": "string"
+                    },
+                    "fieldValue": {
+                      "description": "Custom field value",
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["subscriberId", "email"],
+            "additionalProperties": false
+          }
+        },
+        "emailsProcessed": {
+          "description": "Number of emails processed (for bulk operations)",
+          "type": "number"
+        },
+        "emailsIgnored": {
+          "description": "Number of emails ignored (for bulk operations)",
+          "type": "number"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action that was performed"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action completed successfully"
+        }
+      },
+      "required": ["action", "success"],
+      "additionalProperties": false
+    }
+  },
+  "list_subscribers": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mailingListId": {
+          "type": "string",
+          "description": "ID of the mailing list"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Subscribed", "Unsubscribed", "Bounced", "Removed"],
+          "description": "Filter subscribers by status"
+        },
+        "page": {
+          "default": 1,
+          "description": "Page number (starts at 1)",
+          "type": "number"
+        },
+        "pageSize": {
+          "default": 100,
+          "description": "Number of subscribers per page",
+          "type": "number"
+        },
+        "since": {
+          "description": "Only return subscribers added/changed since this date (e.g. \"2024-01-01\")",
+          "type": "string"
+        }
+      },
+      "required": ["mailingListId", "status", "page", "pageSize"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "subscribers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "subscriberId": {
+                "type": "string",
+                "description": "Subscriber ID"
+              },
+              "email": {
+                "type": "string",
+                "description": "Subscriber email"
+              },
+              "name": {
+                "description": "Subscriber name",
+                "type": "string"
+              },
+              "createdOn": {
+                "description": "Subscription date",
+                "type": "string"
+              },
+              "updatedOn": {
+                "description": "Last update date",
+                "type": "string"
+              }
+            },
+            "required": ["subscriberId", "email"],
+            "additionalProperties": false
+          },
+          "description": "List of subscribers matching the status filter"
+        },
+        "totalCount": {
+          "description": "Total matching subscribers",
+          "type": "number"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page number"
+        }
+      },
+      "required": ["subscribers", "currentPage"],
+      "additionalProperties": false
+    }
+  },
+  "manage_custom_field": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "mailingListId": {
+          "type": "string",
+          "description": "ID of the mailing list"
+        },
+        "customFieldId": {
+          "description": "Custom field ID (required for update and delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Custom field name (required for create)",
+          "type": "string"
+        },
+        "fieldType": {
+          "description": "Data type of the custom field",
+          "type": "string",
+          "enum": [
+            "Text",
+            "Decimal",
+            "DateTime",
+            "SingleSelectDropdown",
+            "Integer",
+            "CheckBox"
+          ]
+        },
+        "options": {
+          "description": "Comma-separated values for dropdown fields",
+          "type": "string"
+        },
+        "isRequired": {
+          "description": "Whether the field is required for subscribers",
+          "type": "boolean"
+        }
+      },
+      "required": ["action", "mailingListId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "customFieldId": {
+          "description": "ID of the custom field",
+          "type": "string"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action that was performed"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action completed successfully"
+        }
+      },
+      "required": ["action", "success"],
+      "additionalProperties": false
+    }
+  },
+  "manage_segment": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "create",
+            "update",
+            "delete",
+            "get",
+            "list",
+            "add_criteria",
+            "update_criteria",
+            "get_subscribers"
+          ],
+          "description": "Action to perform"
+        },
+        "mailingListId": {
+          "type": "string",
+          "description": "ID of the mailing list"
+        },
+        "segmentId": {
+          "description": "Segment ID (required for update, delete, get, add_criteria, update_criteria, get_subscribers)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Segment name (required for create)",
+          "type": "string"
+        },
+        "matchType": {
+          "description": "How criteria match together: \"All\" (AND) or \"Any\" (OR)",
+          "type": "string",
+          "enum": ["All", "Any"]
+        },
+        "criteria": {
+          "description": "Criteria to add or update",
+          "type": "object",
+          "properties": {
+            "field": {
+              "type": "string",
+              "description": "Field to filter on (e.g. \"DateAdded\", \"CampaignOpens\", or a custom field name)"
+            },
+            "comparer": {
+              "description": "Comparison operator",
+              "type": "string",
+              "enum": [
+                "Is",
+                "IsNot",
+                "Contains",
+                "DoesNotContain",
+                "StartsWith",
+                "EndsWith",
+                "IsGreaterThan",
+                "IsLessThan",
+                "IsBefore",
+                "IsAfter"
+              ]
+            },
+            "value": {
+              "type": "string",
+              "description": "Value to compare against"
+            },
+            "dateFrom": {
+              "description": "Start date for date range criteria",
+              "type": "string"
+            },
+            "dateTo": {
+              "description": "End date for date range criteria",
+              "type": "string"
+            }
+          },
+          "required": ["field", "value"],
+          "additionalProperties": false
+        },
+        "criteriaId": {
+          "description": "Criteria ID (required for update_criteria)",
+          "type": "string"
+        },
+        "page": {
+          "default": 1,
+          "description": "Page number for get_subscribers",
+          "type": "number"
+        },
+        "pageSize": {
+          "default": 100,
+          "description": "Items per page for get_subscribers",
+          "type": "number"
+        }
+      },
+      "required": ["action", "mailingListId", "page", "pageSize"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "segments": {
+          "description": "Segment(s) returned",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "segmentId": {
+                "type": "string",
+                "description": "Segment ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Segment name"
+              },
+              "matchType": {
+                "description": "How criteria match together (0 = All, 1 = Any)",
+                "type": "number"
+              },
+              "createdOn": {
+                "description": "Creation timestamp",
+                "type": "string"
+              },
+              "updatedOn": {
+                "description": "Last update timestamp",
+                "type": "string"
+              },
+              "criteria": {
+                "description": "Segment criteria/rules",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "criteriaId": {
+                      "description": "Criteria ID",
+                      "type": "string"
+                    },
+                    "field": {
+                      "description": "Field name",
+                      "type": "string"
+                    },
+                    "comparer": {
+                      "description": "Comparison operator",
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "Comparison value",
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["segmentId", "name"],
+            "additionalProperties": false
+          }
+        },
+        "subscribers": {
+          "description": "Subscribers matching segment criteria (for get_subscribers)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "subscriberId": {
+                "type": "string",
+                "description": "Subscriber ID"
+              },
+              "email": {
+                "type": "string",
+                "description": "Subscriber email"
+              },
+              "name": {
+                "description": "Subscriber name",
+                "type": "string"
+              }
+            },
+            "required": ["subscriberId", "email"],
+            "additionalProperties": false
+          }
+        },
+        "action": {
+          "type": "string",
+          "description": "Action performed"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action completed successfully"
+        }
+      },
+      "required": ["action", "success"],
+      "additionalProperties": false
+    }
+  },
+  "send_transactional_email": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fromEmail": {
+          "type": "string",
+          "description": "Sender email address"
+        },
+        "fromName": {
+          "description": "Sender display name",
+          "type": "string"
+        },
+        "replyToEmail": {
+          "description": "Reply-to email address",
+          "type": "string"
+        },
+        "replyToName": {
+          "description": "Reply-to display name",
+          "type": "string"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Email subject line"
+        },
+        "templateId": {
+          "description": "ID of an existing transactional campaign template to use",
+          "type": "string"
+        },
+        "templateName": {
+          "description": "Template name to match an existing campaign or create a new one",
+          "type": "string"
+        },
+        "htmlContent": {
+          "description": "Inline HTML email content",
+          "type": "string"
+        },
+        "webLocation": {
+          "description": "URL to retrieve HTML content from",
+          "type": "string"
+        },
+        "personalizations": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "to": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string",
+                      "description": "Recipient email address"
+                    },
+                    "name": {
+                      "description": "Recipient name",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["email"],
+                  "additionalProperties": false
+                },
+                "description": "Recipients for this personalization"
+              },
+              "substitutions": {
+                "description": "Key-value pairs for template variable substitution",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["to"],
+            "additionalProperties": false
+          },
+          "description": "Array of personalizations, each with recipients and optional variable substitutions"
+        },
+        "attachments": {
+          "description": "File attachments (base64-encoded)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "MIME type of the attachment (e.g. \"application/pdf\")"
+              },
+              "fileName": {
+                "type": "string",
+                "description": "Filename for the attachment"
+              },
+              "content": {
+                "type": "string",
+                "description": "Base64-encoded file content"
+              }
+            },
+            "required": ["type", "fileName", "content"],
+            "additionalProperties": false
+          }
+        },
+        "bypassUnsubscribeManagement": {
+          "default": false,
+          "description": "Bypass unsubscribe management for this send",
+          "type": "boolean"
+        }
+      },
+      "required": ["fromEmail", "subject", "personalizations", "bypassUnsubscribeManagement"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the emails were sent successfully"
+        },
+        "recipientCount": {
+          "type": "number",
+          "description": "Total number of recipients across all personalizations"
+        }
+      },
+      "required": ["success", "recipientCount"],
+      "additionalProperties": false
+    }
+  }
+}

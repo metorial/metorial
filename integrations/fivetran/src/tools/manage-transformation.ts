@@ -1,13 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FivetranClient } from '../lib/client';
+import { transformationId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let transformationOutputSchema = z.object({
-  transformationId: z.string().describe('Unique identifier of the transformation'),
+  transformationId: transformationId,
   status: z.string().optional().describe('Current status of the transformation'),
+  type: z.string().optional().describe('DBT_CORE or QUICKSTART'),
+  paused: z.boolean().optional().describe('Whether execution is paused'),
+  name: z.string().optional().describe('Transformation name'),
+  projectId: z.string().optional().describe('dbt Core project identifier'),
+  outputModelNames: z.array(z.string()).optional().describe('All output model names'),
   schedule: z.record(z.string(), z.any()).optional().describe('Schedule configuration'),
-  config: z.record(z.string(), z.any()).optional().describe('Transformation configuration'),
+  config: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Stored configuration is omitted to protect commands and credential values'),
   createdAt: z.string().optional().describe('Timestamp when the transformation was created'),
   outputModelName: z.string().optional().describe('Name of the output model'),
   connectionIds: z
@@ -20,16 +29,23 @@ let mapTransformation = (t: any) => ({
   transformationId: t.id,
   status: t.status,
   schedule: t.schedule,
-  config: t.config,
   createdAt: t.created_at,
-  outputModelName: t.output_model_name,
-  connectionIds: t.connection_ids
+  outputModelName: t.output_model_names?.[0],
+  outputModelNames: t.output_model_names,
+  type: t.type,
+  paused: t.paused,
+  name: t.transformation_config?.name,
+  projectId: t.transformation_config?.project_id,
+  connectionIds:
+    t.type === 'QUICKSTART'
+      ? t.transformation_config?.connection_ids
+      : t.schedule.connection_ids
 });
 
 export let listTransformations = SlateTool.create(spec, {
   name: 'List Transformations',
   key: 'list_transformations',
-  description: `List all transformations in the Fivetran account. Transformations reshape synced data using dbt Core, dbt Cloud, or Coalesce.`,
+  description: `List all transformations in the Fivetran account. Transformations reshape synced data using dbt Core or Quickstart packages.`,
   tags: {
     readOnly: true
   }
@@ -56,14 +72,14 @@ export let listTransformations = SlateTool.create(spec, {
 export let getTransformation = SlateTool.create(spec, {
   name: 'Get Transformation',
   key: 'get_transformation',
-  description: `Retrieve full details of a specific transformation including its configuration, schedule, and status.`,
+  description: `Read a transformation's safe metadata, dependencies, schedule and status. Commands and stored configuration values are omitted.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      transformationId: z.string().describe('ID of the transformation to retrieve')
+      transformationId: transformationId
     })
   )
   .output(transformationOutputSchema)
@@ -89,15 +105,21 @@ export let createTransformation = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      type: z
+        .enum(['DBT_CORE', 'QUICKSTART'])
+        .optional()
+        .describe('Transformation type; inferred from config when unambiguous'),
       config: z
         .record(z.string(), z.any())
         .describe(
-          'Transformation configuration (varies by type: dbt Core, dbt Cloud, Coalesce)'
+          'Transformation configuration (dbt Core: project_id, name, steps; Quickstart: package_name and connection_ids)'
         ),
       schedule: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Schedule configuration with schedule_type and related fields'),
+        .describe(
+          'Schedule configuration with schedule_type INTEGRATED, INTERVAL, CRON or TIME_OF_DAY and related fields'
+        ),
       connectionIds: z
         .array(z.string())
         .optional()
@@ -113,10 +135,11 @@ export let createTransformation = SlateTool.create(spec, {
     let client = new FivetranClient(ctx.auth.token);
 
     let body: Record<string, any> = {
-      config: ctx.input.config
+      config: ctx.input.config,
+      type: ctx.input.type
     };
-    if (ctx.input.schedule) body.schedule = ctx.input.schedule;
-    if (ctx.input.connectionIds) body.connection_ids = ctx.input.connectionIds;
+    if (ctx.input.schedule !== undefined) body.schedule = ctx.input.schedule;
+    if (ctx.input.connectionIds !== undefined) body.connection_ids = ctx.input.connectionIds;
     if (ctx.input.paused !== undefined) body.paused = ctx.input.paused;
 
     let t = await client.createTransformation(body);
@@ -135,7 +158,7 @@ export let updateTransformation = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      transformationId: z.string().describe('ID of the transformation to update'),
+      transformationId: transformationId,
       config: z
         .record(z.string(), z.any())
         .optional()
@@ -156,9 +179,9 @@ export let updateTransformation = SlateTool.create(spec, {
     let client = new FivetranClient(ctx.auth.token);
 
     let body: Record<string, any> = {};
-    if (ctx.input.config) body.config = ctx.input.config;
-    if (ctx.input.schedule) body.schedule = ctx.input.schedule;
-    if (ctx.input.connectionIds) body.connection_ids = ctx.input.connectionIds;
+    if (ctx.input.config !== undefined) body.config = ctx.input.config;
+    if (ctx.input.schedule !== undefined) body.schedule = ctx.input.schedule;
+    if (ctx.input.connectionIds !== undefined) body.connection_ids = ctx.input.connectionIds;
     if (ctx.input.paused !== undefined) body.paused = ctx.input.paused;
 
     let t = await client.updateTransformation(ctx.input.transformationId, body);
@@ -180,7 +203,7 @@ export let deleteTransformation = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      transformationId: z.string().describe('ID of the transformation to delete')
+      transformationId: transformationId
     })
   )
   .output(
@@ -206,7 +229,7 @@ export let runTransformation = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      transformationId: z.string().describe('ID of the transformation to run')
+      transformationId: transformationId
     })
   )
   .output(
@@ -216,10 +239,10 @@ export let runTransformation = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new FivetranClient(ctx.auth.token);
-    let result = await client.runTransformation(ctx.input.transformationId);
+    await client.runTransformation(ctx.input.transformationId);
 
     return {
-      output: { message: result?.message || 'Transformation run triggered.' },
+      output: { message: 'Transformation run request accepted.' },
       message: `Triggered run for transformation ${ctx.input.transformationId}.`
     };
   })

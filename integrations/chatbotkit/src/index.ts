@@ -14,8 +14,6 @@ import {
   manageSpaceTool,
   sendMessageTool
 } from './tools';
-import { chatbotkitEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     listMessagesTool,
     conversationFeedbackTool
   ],
-  triggers: [chatbotkitEventsTrigger]
+  triggers: []
 });

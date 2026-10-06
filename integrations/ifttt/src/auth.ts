@@ -1,60 +1,53 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { ConnectClient } from './lib/client';
+import { credential, webhookKey } from './lib/contracts';
 
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string().describe('IFTTT Service Key for Connect API authentication'),
-      webhooksKey: z
-        .string()
-        .optional()
-        .describe(
-          'Webhooks key for the Maker Webhooks service (found at ifttt.com/maker_webhooks/settings)'
-        )
-    })
-  )
+const authOutput = z.object({
+  token: z.string().describe('Platform Service Key; empty for a Webhooks-only connection'),
+  webhooksKey: z.string().optional().describe('Maker Webhooks key'),
+  serviceId: z
+    .string()
+    .optional()
+    .describe('Service ID observed from the authenticated Connect API')
+});
+export const auth = SlateAuth.create()
+  .output(authOutput)
   .addTokenAuth({
     type: 'auth.token',
     name: 'Service Key',
     key: 'service_key',
     inputSchema: z.object({
-      serviceKey: z
-        .string()
-        .describe(
-          'Your IFTTT Service Key, found in the API tab of the IFTTT Platform under the Service Key heading'
-        ),
+      serviceKey: z.string().describe('Platform Service Key from your service API settings'),
       webhooksKey: z
         .string()
         .optional()
-        .describe(
-          'Your Webhooks key for the Maker Webhooks service (found at ifttt.com/maker_webhooks/settings). Required for triggering webhooks.'
-        )
+        .describe('Optional Maker Webhooks key; webhook execution is currently unavailable')
     }),
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.serviceKey,
-          webhooksKey: ctx.input.webhooksKey
-        }
-      };
+      const token = credential(ctx.input.serviceKey, 'Platform Service Key');
+      const key =
+        ctx.input.webhooksKey === undefined ? undefined : webhookKey(ctx.input.webhooksKey);
+      const info = await new ConnectClient({ token, webhooksKey: key }).getServiceInfo();
+      return { output: { token, webhooksKey: key, serviceId: info.service_id } };
     },
-    getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://connect.ifttt.com'
-      });
-
-      let response = await http.get('/v2/me', {
-        headers: {
-          'IFTTT-Service-Key': ctx.output.token
-        }
-      });
-
-      let data = response.data?.data;
-      return {
-        profile: {
-          id: data?.user_login || data?.service_id,
-          name: data?.user_login || data?.service_id
-        }
-      };
+    getProfile: async (ctx: { output: z.infer<typeof authOutput> }) => {
+      const info = await new ConnectClient(ctx.output).getServiceInfo();
+      return { profile: { id: info.service_id, name: info.service_id } };
     }
+  })
+  .addTokenAuth({
+    type: 'auth.token',
+    name: 'Webhooks Key (execution unavailable)',
+    key: 'webhooks_key',
+    inputSchema: z.object({
+      webhooksKey: z
+        .string()
+        .describe(
+          'Maker Webhooks key copied from the Webhooks Documentation page; no Platform key is needed. This method currently provides no executable webhook action or authenticated identity check.'
+        )
+    }),
+    getOutput: async ctx => ({
+      output: { token: '', webhooksKey: webhookKey(ctx.input.webhooksKey) }
+    })
   });

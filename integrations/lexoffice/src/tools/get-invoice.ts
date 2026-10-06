@@ -11,7 +11,7 @@ let addressOutputSchema = z
     street: z.string().optional().describe('Street and house number'),
     zip: z.string().optional().describe('Postal code'),
     city: z.string().optional().describe('City name'),
-    countryCode: z.string().optional().describe('ISO 3166-1 alpha-2 country code')
+    countryCode: z.string().optional().describe('Provider country or tax-region code')
   })
   .optional()
   .describe('Address of the invoice recipient');
@@ -136,7 +136,7 @@ export let getInvoice = SlateTool.create(spec, {
         updatedDate: invoice.updatedDate,
         version: invoice.version
       },
-      message: `Retrieved invoice **${invoice.voucherNumber || invoice.id}** — Status: **${invoice.voucherStatus}**${invoice.totalPrice?.totalGrossAmount !== undefined ? `, Total: **${invoice.totalPrice.totalGrossAmount} ${invoice.totalPrice.currency || 'EUR'}**` : ''}`
+      message: `Retrieved invoice **${invoice.voucherNumber || invoice.id}** — Status: **${invoice.voucherStatus}**${invoice.totalPrice?.totalGrossAmount !== undefined ? `, Total: **${invoice.totalPrice.totalGrossAmount} ${invoice.totalPrice.currency ?? ''}**` : ''}`
     };
   })
   .build();

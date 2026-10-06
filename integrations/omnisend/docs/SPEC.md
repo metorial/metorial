@@ -1,81 +1,32 @@
-Let me get more details on the API v5 reference to understand the full feature set.Now let me check the OAuth details and authentication page more carefully.Now I have enough information to write the specification.
+# Omnisend
 
-# Slates Specification for Omnisend
+The integration provides 16 tools for brand identity, contact discovery and updates, product and category catalogs, campaign and automation discovery, and customer events. It does not expose campaign sending, analytics exports, store connection, contact deletion or event-history deletion.
 
-## Overview
+## API selection and authentication
 
-Omnisend is an ecommerce marketing automation platform that provides email, SMS, and push notification campaigns. It offers a REST API for managing contacts, products, orders, events, campaigns, and automations, primarily used to connect custom ecommerce platforms or extend existing integrations.
+`apiVersion` defaults to `v5` to preserve existing behavior. Explicitly select `2026-03-15` to use the current `/api/` base and required `Omnisend-Version` header. API keys use `X-API-KEY` in v5 and `Authorization: Omnisend-API-Key` in the current API. OAuth uses Bearer authorization in either version. These mappings follow the [migration guide](https://api-docs.omnisend.com/docs/migrate-from-v5-to-v2026-03-15) and [authentication reference](https://api-docs.omnisend.com/reference/authentication).
 
-## Authentication
+Authentication verifies brand identity through the documented current `GET /api/brands/current`, independently of tool API selection. Brand-read permission is required. `get_brand` itself requires the current API; it does not invent a v5 GET from the archived store-connection POST. Archived v5 documentation establishes the contract, not guaranteed ongoing service availability. A rejected or retired version fails explicitly without silently changing API versions. See [current brand discovery](https://api-docs.omnisend.com/reference/get_brands-current).
 
-Omnisend supports two authentication methods:
+OAuth preserves returned refresh tokens and expiry metadata and supports the documented token endpoint. The provider OAuth guide describes long-lived access tokens despite showing expiry and refresh fields; actual token lifetime and refresh acceptance must be verified for the application. See [OAuth](https://api-docs.omnisend.com/reference/oauth).
 
-### 1. API Key
+## Tools and behavior
 
-The primary authentication method is an API key, provided via the `X-API-KEY` header with every request.
+| Capability | Tools | Behavior |
+| --- | --- | --- |
+| Brand identity | `get_brand` | Current API only; returns provider brand identity. |
+| Contacts | `create_contact`, `get_contact`, `list_contacts`, `update_contact` | Email-based creation/upsert and ID-based read/update. Shorthand identifiers map to the supported identifier DTO. Current tags replace the whole array; v5 tags append. Omitted tags stay unchanged. Welcome email is suppressed unless explicitly requested; other configured automations may still run. |
+| Products | `create_product`, `get_product`, `list_products`, `delete_product`, `replace_product` | Complete variant-backed records. Replacement is full PUT, including variants. Create/replacement is followed by a provider read. Prices remain currency units. |
+| Categories | `create_category`, `list_categories`, `delete_category` | Documented `product-categories` routes and category identifiers; continuation uses provider offsets. Review associations before deletion. |
+| Campaigns and automations | `list_campaigns`, `list_automations` | Read-only discovery; page-size/cursor inputs require the current API. Scheduling time is separate from actual start time. |
+| Customer events | `send_event` | HTTP 202 means asynchronous acceptance. Events can create/update contacts, trigger messaging and retain history. No automatic retry or erasure is promised. The HTTP contract supports contact ID, email or phone; contact-ID inputs map to the documented `contact.id` field. |
 
-- Generate an API key by going to Store Settings → API keys → click Create API key.
-- Permissions can be configured per key to control which resources (Contacts, Campaigns, Orders, Products, etc.) the key can access.
-- The key cannot be viewed again after creation; if lost, a new one must be generated.
-- Base URL: `https://api.omnisend.com/v5/`
+Contact cursor pagination preserves provider cursors and rejects invalid continuation origins. Products and categories retain the resource-specific offset API. All original tool keys, input field types and output field types remain available; optional current paging fields and category continuation were added.
 
-Example:
+Event UUID/time deduplication applies to historical ingestion rather than real-time idempotency. Checkout recovery and courier URLs use documented property names. Currency amounts are never divided by 100. See [events](https://api-docs.omnisend.com/reference/post_events), [REST event identifiers](https://api-docs.omnisend.com/docs/how-to-send-events-rest-api), [checkout events](https://api-docs.omnisend.com/reference/started-checkout), [products](https://api-docs.omnisend.com/reference/get_products), and [full product replacement](https://api-docs.omnisend.com/reference/put_products-productid).
 
-```
-GET https://api.omnisend.com/v5/contacts
-X-API-KEY: your-api-key
-```
+## Errors and operational limits
 
-### 2. OAuth 2.0 (Authorization Code Grant)
+Validation and upstream failures return safe service errors with numeric status information where available. Credential-bearing transport state and provider error bodies are concealed. Unknown write completion is reported conservatively. There are no retries for event ingestion or uncertain creates. Provider rate limits, permissions, subscription behavior and automation effects apply to every write.
 
-Omnisend supports the OAuth Authorization Code Grant flow in v5 endpoints. To use it, you must fill in an application form and Omnisend will provide OAuth credentials (Client ID and Client Secret).
-
-**Flow:**
-
-1. **Authorization Request:** Redirect the user to `https://app.omnisend.com/oauth2/authorize` with `client_id`, `redirect_uri`, `response_type=code`, `scope` (space-separated resource names), and a random `state` value.
-2. **Callback:** After user consent, Omnisend redirects to your callback URL with a `code` parameter.
-3. **Token Exchange:** POST to `https://app.omnisend.com/oauth2/token` with `code`, `grant_type=authorization_code`, `client_id`, `client_secret`, and `redirect_uri`. The response includes `access_token`, `refresh_token`, and `scope`.
-
-API requests use the access token as a Bearer token in the `Authorization` header. Scopes are defined per endpoint in the API documentation and control which resources the app can access.
-
-## Features
-
-### Contact Management
-
-Sync subscriber lists, add custom properties, and update contact details. Contacts can be listed, created, updated, and retrieved by ID. Contacts can have email and SMS subscription statuses managed independently.
-
-### Product Catalog
-
-Manage a product catalog within Omnisend by creating, updating, deleting, and listing products and product categories. This enables the Product Picker in Omnisend's Email Builder and automation workflows.
-
-### Ecommerce Event Tracking
-
-Omnisend provides an events endpoint that allows you to send events to Omnisend, used to track customer behavior and trigger automations. Predefined events include:
-
-- **Cart events:** added product to cart, started checkout
-- **Order events:** placed order, paid for order, order fulfilled, order refunded, order canceled
-- **Browsing events:** viewed product
-
-Custom events can also be sent (e.g., "trial started," "subscription renewed") to trigger automation workflows.
-
-### Automation Workflows
-
-Pass cart data to trigger abandoned cart emails/SMS. Pass order data to trigger order confirmation and shipping confirmation transactional emails. Track product views and cart additions to enable product abandonment and browse abandonment workflows. Automations can be listed via the API.
-
-### Campaigns
-
-List and view campaigns. Campaigns cover email newsletters and other marketing messages managed within Omnisend.
-
-### Brand Management
-
-Retrieve and configure brand information, including connecting a brand/store to Omnisend.
-
-### Analytics & Reporting
-
-Export analytics data with the Statistics API — query campaign and workflow performance, engagement metrics, revenue attribution, deliverability, and audience growth data. This feature is currently in beta.
-
-## Events
-
-Omnisend does not offer traditional API-based webhook subscriptions that can be programmatically registered or managed. The Omnisend API allows you to send events to their platform, but does not offer traditional webhooks for subscribing to notifications. The focus is on sending customer behavior data to Omnisend rather than receiving real-time updates from Omnisend.
-
-Omnisend does support webhooks as an action within automation workflows — these are HTTP callbacks that send real-time data from Omnisend to other services when specific automation events occur, allowing you to notify third-party systems, send messages through platforms like WhatsApp, or trigger custom workflows. However, these are configured manually within the Omnisend UI as part of automation flows, not through a programmable webhook subscription API.
+There are no trigger registrations or file-producing tools in this package.

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteUpdateTool = SlateTool.create(spec, {
   name: 'Delete Update',
   key: 'delete_update',
-  description: `Permanently delete an existing status update from the queue.`,
+  description: `Delete an existing unpublished update from Buffer. This does not delete a post already published on a social network.`,
   tags: {
     destructive: true
   }
@@ -22,7 +22,7 @@ export let deleteUpdateTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.deleteUpdate(ctx.input.updateId);
 
     return {

@@ -1,25 +1,36 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, mapItem } from '../lib/client';
 import { spec } from '../spec';
 
 export let getItem = SlateTool.create(spec, {
   name: 'Get Item',
   key: 'get_item',
-  description: `Retrieve detailed information about a specific Rollbar item (grouped error/message). Look up an item by its unique ID or project-specific counter number.`,
+  description: `Retrieve detailed information about a specific Rollbar item (grouped error/message). Look up an item by its unique ID, project-specific counter number, or ingestion UUID.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      projectId: z
+        .number()
+        .optional()
+        .describe('Project ID from manage_project; required with an account token.'),
       itemId: z.number().optional().describe('Unique item ID'),
-      counter: z.number().optional().describe('Project-specific item counter number')
+      counter: z.number().optional().describe('Project-specific item counter number'),
+      occurrenceUuid: z
+        .string()
+        .optional()
+        .describe(
+          '32-character ingestion UUID from create_occurrence; indexed asynchronously.'
+        )
     })
   )
   .output(
     z.object({
       itemId: z.number().describe('Unique item ID'),
+      projectId: z.number().optional().describe('Project containing the item'),
       counter: z.number().describe('Project-specific item counter'),
       title: z.string().describe('Item title/message'),
       status: z.string().describe('Current item status'),
@@ -39,6 +50,7 @@ export let getItem = SlateTool.create(spec, {
       platform: z.string().optional().describe('Platform of the item'),
       hash: z.string().optional().describe('Item hash/fingerprint'),
       assignedUser: z.any().optional().describe('Assigned user details'),
+      assignedUserId: z.number().optional().describe('Assigned user ID when present'),
       lastActivatedTimestamp: z
         .number()
         .optional()
@@ -50,41 +62,27 @@ export let getItem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
-    if (!ctx.input.itemId && !ctx.input.counter) {
-      throw new Error('Either itemId or counter must be provided');
-    }
-
-    let result: any;
-    if (ctx.input.itemId) {
-      result = await client.getItem(ctx.input.itemId);
-    } else {
-      result = await client.getItemByCounter(ctx.input.counter!);
-    }
-
-    let item = result?.result;
+    if (
+      ctx.input.itemId === undefined &&
+      ctx.input.counter === undefined &&
+      !ctx.input.occurrenceUuid
+    )
+      throw createApiServiceError(
+        'Provide itemId, counter, or occurrenceUuid from create_occurrence.'
+      );
+    const result =
+      ctx.input.itemId !== undefined
+        ? await client.getItem(ctx.input.itemId)
+        : ctx.input.counter !== undefined
+          ? await client.getItemByCounter(ctx.input.counter)
+          : await client.getItemByUuid(ctx.input.occurrenceUuid!);
+    const item = result.result;
 
     return {
-      output: {
-        itemId: item.id,
-        counter: item.counter,
-        title: item.title,
-        status: item.status,
-        level: item.level_string || item.level,
-        environment: item.environment,
-        framework: item.framework,
-        totalOccurrences: item.total_occurrences,
-        lastOccurrenceTimestamp: item.last_occurrence_timestamp,
-        firstOccurrenceTimestamp: item.first_occurrence_timestamp,
-        uniqueOccurrences: item.unique_occurrences,
-        platform: item.platform,
-        hash: item.hash,
-        assignedUser: item.assigned_user,
-        lastActivatedTimestamp: item.last_activated_timestamp,
-        integrationsData: item.integrations_data
-      },
-      message: `Retrieved item **#${item.counter}**: "${item.title}" (${item.status}, ${item.level_string || item.level}, ${item.total_occurrences} occurrences).`
+      output: mapItem(item),
+      message: `Retrieved item **#${item.counter}**: "${item.title}" (${item.status}, ${mapItem(item).level}, ${item.total_occurrences} occurrences).`
     };
   })
   .build();

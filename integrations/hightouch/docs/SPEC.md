@@ -1,72 +1,22 @@
-Now let me look at the actual API reference to understand the full set of features:Now I have a good understanding of Hightouch's API. Let me check if there are any webhook/event listening capabilities:I now have enough information to write the specification. Note that:
+# Hightouch API contract
 
-- Hightouch's docs.hightouch.ai is a different product (a chatbot platform), not the same as hightouch.com
-- Hightouch (hightouch.com) is a data activation / reverse ETL platform
-- The REST API uses Bearer token auth with API keys
-- The API base URL is `https://api.hightouch.com/api/v1`
-- No outgoing webhooks/event subscriptions from Hightouch's management API (alerting is via Slack/email/SMS/PagerDuty but not API webhooks)
+Version 0.3.1 exposes 22 tools: 20 preserved keys and two lifecycle additions, delete_model and delete_sync. No event triggers are registered. Personalization, Events SDK, warehouse row exports and sequence configuration are separate capabilities and are not exposed here.
 
-# Slates Specification for Hightouch
+## Official evidence
 
-## Overview
+Checked 2026-10-05 against the [current API overview](https://hightouch.com/docs/developer-tools/api-guide) and [API reference](https://hightouch.com/docs/api-reference). The reference page directly loads [Hightouch's official OpenAPI JSON](https://api.hightouch.io/api/swagger.json), whose server is https://api.hightouch.com/api/v1. The retrieved document has 36 paths, API version 1.0.0 and SHA-256 f5525483cd8ddf4830097f3b0977d0b0676b5ccd99f44128bf86d315a817d72a.
 
-Hightouch is a data activation (reverse ETL) platform that syncs data from data warehouses and databases to 200+ SaaS destinations such as CRMs, ad platforms, and marketing tools. It provides a REST API for programmatically managing workspace resources including sources, destinations, models, and syncs.
+## Contracts
 
-## Authentication
+- API keys belong to one workspace and inherit selected group permissions; they do not necessarily grant administrator access. Group/creator access changes can revoke permission. No suitable identity or workspace discovery route exists in the current management specification.
+- Sources and destinations support GET collections/details, POST creation and PATCH updates. They have no documented DELETE route. Returned provider id maps to the preserved sourceId/destinationId fields.
+- Models support GET, POST, PATCH and DELETE. Provider id maps to modelId. Existing dbt/visual string reference IDs convert to numeric upstream IDs; visual.filter is a JSON object encoded in the legacy string field, and label maps to primaryLabel. Model creation optionally uses the documented skipColumnQuery query parameter; it is not sent in the request body. Only the selected query definition is accepted. Model/sync deletion reports success only for documented HTTP 200/204 responses after rejecting API-error envelopes.
+- Syncs support GET, POST, PATCH and DELETE. Provider id maps to syncId. Creation always sends the required schedule attribute, with null for manual scheduling when omitted. Disabled defaults remain compatible. clearSchedule provides an additive way to remove a schedule without changing the legacy schedule field type. The documented match_booster schedule has no inner payload, so its optional schedule payload is omitted.
+- Lists validate integer pagination and IDs. Sources/destinations/models specifications omit hasMore from their required schema but include it in examples: returned booleans are respected; when absent, a separate one-row lookahead after the actual returned rows determines whether another page exists. Optional nextOffset identifies the next page, including a provider-capped page. No invented default false is used.
+- Triggering requires exactly one sync ID or slug. Both documented trigger routes retain their correct identifiers, fullResync and resetCDC spellings. Sequence path IDs are encoded. Trigger results report submission, not completion. Disabled syncs can still run through manual/API/sequence triggers; disabling is not an execution lock. Runs map id to the preserved runId number, and trigger IDs remain strings. Sequence results are selected typed fields rather than arbitrary response metadata.
+- All source/destination/sync configuration values are omitted from outputs to prevent disclosure of opaque credentials. Safe resource metadata, identifiers, model definitions and run counts remain. Run error text is replaced with a debugger reference because upstream diagnostics may include secrets or row data.
+- HTTP requests use shared authenticated HTTP/error helpers, 30-second timeouts and no automatic redirects. Validation and provider failures are ServiceError values with sanitized status/remediation and no raw request/response parent. Documented API errors returned with HTTP 200 are rejected as errors.
 
-Hightouch uses **API key-based authentication** via Bearer tokens.
+## Operational references
 
-- **Method:** HTTP Bearer Token
-- **Header:** `Authorization: Bearer <API_KEY>`
-- **Base URL:** `https://api.hightouch.com/api/v1`
-
-To obtain an API key:
-
-1. Log in to Hightouch as an Admin user of your workspace.
-2. From the API keys tab on the Settings page, select "Add API key."
-3. Copy your API key and store it in a safe location. The key will only be displayed once.
-
-To use Hightouch programmatically through the API, you must use an API key created by an Admin user of your Hightouch workspace. Your API key provides read/write access to sensitive Hightouch resources and should be kept secure.
-
-There are no OAuth flows or scopes for the management API. The API key grants full workspace-level access.
-
-## Features
-
-### Source Management
-
-Create, retrieve, list, and update data sources connected to your Hightouch workspace. Sources are where your organization's data lives — these define the data warehouses, databases, or other systems from which Hightouch pulls data.
-
-### Destination Management
-
-Create, retrieve, list, and update destinations in your workspace. A destination is any tool or service you want to send source data to, such as CRM systems, ad platforms, marketing automations, and support tools. Hightouch integrates with 200+ destinations.
-
-### Model Management
-
-Create, retrieve, list, and update models that define which data to pull from sources. Models define the data you want to pull from a source. You can also use Hightouch's no-code Customer Studio feature to define cohorts before syncing data to a destination. Models require a unique primary key for change data capture.
-
-### Sync Management
-
-Create, retrieve, list, and update syncs that move data from models to destinations. Syncs declare how you want query results from a model to appear in your destination. Syncs can be configured with various modes (upsert, insert, update, mirror) and field mappings between source columns and destination fields.
-
-### Sync Triggering
-
-Programmatically trigger syncs to run on demand, either by sync ID or slug. You can also trigger sync sequences (ordered groups of syncs). This is useful for integrating Hightouch into existing data pipelines and orchestration workflows. You can also trigger syncs using Airflow, Dagster, Prefect, Mage, or the REST API.
-
-- Supports triggering individual syncs or sync sequences.
-- Can optionally perform a full resync instead of incremental.
-
-### Sync Run Monitoring
-
-List and inspect sync run history for a given sync, including status (completed, failed, aborted), row counts for added/changed/removed records, and error details. Also supports checking the status of sync sequence runs.
-
-### Personalization API
-
-Hightouch Personalization API is a fully managed service that combines the analytical power of the data warehouse with the real-time performance of a low-latency API. You can serve any data model — customers, products, transactions, recommendations, etc. — to any internal app, web experience, or email marketing platform.
-
-- Records are queried by collection name and index key/value.
-- You can specify your API key via a bearer token in an HTTP Authorization header.
-- Available only to Business Tier customers.
-
-## Events
-
-The provider does not support webhooks or event subscription mechanisms through its API. Hightouch offers alerting for sync monitoring through SMS, Slack, email, and PagerDuty, but these are notification channels configured in the UI, not programmable webhook subscriptions available via the API.
+[Sync creation](https://hightouch.com/docs/syncs/create-your-first-sync), [sync scheduling](https://hightouch.com/docs/syncs/schedule-sync-ui), [resync/reset CDC](https://hightouch.com/docs/syncs/resync-reset-clear), [sync sequences](https://hightouch.com/docs/syncs/schedule-sync-with-sequences) and [warehouse compute](https://hightouch.com/docs/sources/warehouse-compute) describe external changes, query costs and execution prerequisites. Deleting configuration does not reverse destination data writes.

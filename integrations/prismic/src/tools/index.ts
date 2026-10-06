@@ -5,3 +5,4 @@ export * from './manage-custom-types';
 export * from './manage-shared-slices';
 export * from './migrate-document';
 export * from './query-documents';
+export * from './read-resources';

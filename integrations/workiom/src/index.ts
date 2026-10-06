@@ -11,8 +11,6 @@ import {
   queryRecords,
   updateRecord
 } from './tools';
-import { recordEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     createWebhookSubscription,
     deleteWebhookSubscription
   ],
-  triggers: [recordEvent]
+  triggers: []
 });

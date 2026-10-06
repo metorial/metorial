@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, optionalNumber, type Row, text } from '../lib/client';
 import { spec } from '../spec';
 
 export let listTags = SlateTool.create(spec, {
@@ -40,21 +40,21 @@ export let listTags = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let params: Record<string, any> = {
+    let params: Row = {
       limit: ctx.input.limit,
       offset: ctx.input.offset
     };
     if (ctx.input.search) params.q = JSON.stringify({ search: ctx.input.search });
 
     let tags = await client.listTags(params);
-    let list = Array.isArray(tags) ? tags : [];
+    let list = tags;
 
-    let mapped = list.map((t: any) => ({
+    let mapped = list.map(t => ({
       tagId: t.id,
-      name: t.name,
-      accountCount: t.account_count,
-      contactCount: t.person_count,
-      opportunityCount: t.opportunity_count
+      name: text(t.name, 'tag name'),
+      accountCount: optionalNumber(t.account_count, 'account count'),
+      contactCount: optionalNumber(t.person_count, 'contact count'),
+      opportunityCount: optionalNumber(t.opportunity_count, 'opportunity count')
     }));
 
     return {

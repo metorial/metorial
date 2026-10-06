@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FlowiseClient } from '../lib/client';
+import { FlowiseClient, flowiseJsonString, parseFlowiseList } from '../lib/client';
 import { spec } from '../spec';
 
 export let getUpsertHistory = SlateTool.create(spec, {
@@ -51,15 +51,15 @@ export let getUpsertHistory = SlateTool.create(spec, {
 
     let { chatflowId, ...params } = ctx.input;
     let result = await client.getUpsertHistory(chatflowId, params);
-    let records = Array.isArray(result) ? result : [];
+    let { items: records } = parseFlowiseList(result);
 
     return {
       output: {
         records: records.map((r: any) => ({
           recordId: r.id,
           chatflowId: r.chatflowid,
-          result: r.result,
-          flowData: r.flowData,
+          result: flowiseJsonString(r.result),
+          flowData: flowiseJsonString(r.flowData),
           date: r.date
         }))
       },

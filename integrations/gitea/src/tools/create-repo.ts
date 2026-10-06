@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import type { GiteaRepository } from '../lib/types';
 import { spec } from '../spec';
 
 export let createRepo = SlateTool.create(spec, {
@@ -20,7 +21,10 @@ export let createRepo = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Initialize repository with a README (default: false)'),
-      defaultBranch: z.string().optional().describe('Default branch name (default: main)'),
+      defaultBranch: z
+        .string()
+        .optional()
+        .describe('Default branch name; defaults to the instance setting'),
       gitignores: z
         .string()
         .optional()
@@ -50,16 +54,18 @@ export let createRepo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
 
-    let r: any;
+    let r: GiteaRepository;
     if (ctx.input.organization) {
       r = await client.createOrgRepo(ctx.input.organization, {
         name: ctx.input.name,
         description: ctx.input.description,
         private: ctx.input.isPrivate,
         autoInit: ctx.input.autoInit,
-        defaultBranch: ctx.input.defaultBranch
+        defaultBranch: ctx.input.defaultBranch,
+        gitignores: ctx.input.gitignores,
+        license: ctx.input.license
       });
     } else {
       r = await client.createRepo({

@@ -1,10 +1,13 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { SerpApiClient } from './lib/client';
+import { apiKey } from './lib/contracts';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      accountId: z.string().optional()
     })
   )
   .addTokenAuth({
@@ -19,25 +22,24 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      const token = apiKey(ctx.input.apiKey);
+      const account = await new SerpApiClient({ apiKey: token }).getAccount();
       return {
         output: {
-          token: ctx.input.apiKey
+          token,
+          accountId: account.account_id
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axiosInstance = createAxios({
-        baseURL: 'https://serpapi.com'
-      });
-
-      let response = await axiosInstance.get('/account.json', {
-        params: {
-          api_key: ctx.output.token
-        }
-      });
-
-      let account = response.data;
+    getProfile: async (ctx: {
+      output: { token: string; accountId?: string };
+      input: { apiKey: string };
+    }) => {
+      const account = await new SerpApiClient({
+        apiKey: ctx.output.token,
+        accountId: ctx.output.accountId
+      }).getAccount();
 
       return {
         profile: {

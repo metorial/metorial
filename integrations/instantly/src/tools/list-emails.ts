@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, emailAddresses } from '../lib/client';
 import { spec } from '../spec';
 
 export let listEmails = SlateTool.create(spec, {
@@ -55,6 +55,10 @@ export let listEmails = SlateTool.create(spec, {
             isUnread: z.boolean().optional().describe('Whether the email is unread'),
             isAutoReply: z.boolean().optional().describe('Whether this is an auto-reply'),
             step: z.number().optional().describe('Campaign step number'),
+            stepId: z
+              .string()
+              .optional()
+              .describe('Provider step identifier when it is not a numeric step number.'),
             timestampEmail: z.string().optional().describe('Email timestamp from mail server'),
             timestampCreated: z.string().optional().describe('Database creation timestamp')
           })
@@ -80,16 +84,22 @@ export let listEmails = SlateTool.create(spec, {
     let emails = result.items.map((e: any) => ({
       emailId: e.id,
       subject: e.subject,
-      fromAddress: e.from_address_email,
-      toAddresses: e.to_address_email_list,
+      fromAddress: e.from_address_email ?? undefined,
+      toAddresses: emailAddresses(e.to_address_email_list),
       body: e.body,
-      campaignId: e.campaign_id,
-      leadEmail: e.lead,
+      campaignId: e.campaign_id ?? undefined,
+      leadEmail: e.lead ?? undefined,
       sendingAccount: e.eaccount,
-      threadId: e.thread_id,
-      isUnread: e.is_unread,
-      isAutoReply: e.is_auto_reply === 1,
-      step: e.step,
+      threadId: e.thread_id ?? undefined,
+      isUnread: e.is_unread === 1 ? true : e.is_unread === 0 ? false : undefined,
+      isAutoReply: e.is_auto_reply === 1 ? true : e.is_auto_reply === 0 ? false : undefined,
+      step:
+        typeof e.step === 'number'
+          ? e.step
+          : typeof e.step === 'string' && /^\d+$/.test(e.step)
+            ? Number(e.step)
+            : undefined,
+      stepId: typeof e.step === 'string' ? e.step : undefined,
       timestampEmail: e.timestamp_email,
       timestampCreated: e.timestamp_created
     }));

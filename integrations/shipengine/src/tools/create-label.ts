@@ -1,13 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, type LabelResponse } from '../lib/client';
+import { addDocument, type DocumentFormat } from '../lib/files';
 import { spec } from '../spec';
 
 let addressSchema = z.object({
   name: z.string().optional().describe('Name of the person'),
   companyName: z.string().optional().describe('Company name'),
   phone: z.string().optional().describe('Phone number'),
-  addressLine1: z.string().describe('Street address line 1'),
+  addressLine1: z.string().min(1).describe('Street address line 1'),
   addressLine2: z.string().optional().describe('Street address line 2'),
   cityLocality: z.string().optional().describe('City or locality'),
   stateProvince: z.string().optional().describe('State or province'),
@@ -17,14 +18,14 @@ let addressSchema = z.object({
 
 let packageSchema = z.object({
   weight: z.object({
-    value: z.number().describe('Weight value'),
+    value: z.number().finite().nonnegative().describe('Weight value in the selected unit'),
     unit: z.enum(['pound', 'ounce', 'gram', 'kilogram']).describe('Weight unit')
   }),
   dimensions: z
     .object({
-      length: z.number().describe('Length'),
-      width: z.number().describe('Width'),
-      height: z.number().describe('Height'),
+      length: z.number().finite().nonnegative().describe('Length'),
+      width: z.number().finite().nonnegative().describe('Width'),
+      height: z.number().finite().nonnegative().describe('Height'),
       unit: z.enum(['inch', 'centimeter']).describe('Dimension unit')
     })
     .optional(),
@@ -34,9 +35,9 @@ let packageSchema = z.object({
 
 let customsItemSchema = z.object({
   description: z.string().describe('Item description'),
-  quantity: z.number().describe('Quantity'),
+  quantity: z.number().int().positive().describe('Quantity'),
   value: z.object({
-    amount: z.number().describe('Item value'),
+    amount: z.number().finite().nonnegative().describe('Item value'),
     currency: z.string().describe('Currency code')
   }),
   harmonizedTariffCode: z.string().optional().describe('Harmonized tariff code'),
@@ -47,35 +48,39 @@ let customsItemSchema = z.object({
 let labelOutputSchema = z.object({
   labelId: z.string().describe('Label ID'),
   shipmentId: z.string().describe('Shipment ID'),
-  trackingNumber: z.string().describe('Tracking number'),
+  trackingNumber: z.string().optional().describe('Tracking number'),
   status: z.string().describe('Label status'),
-  carrierId: z.string().describe('Carrier ID'),
-  carrierCode: z.string().describe('Carrier code'),
-  serviceCode: z.string().describe('Service code'),
-  shipDate: z.string().describe('Ship date'),
-  createdAt: z.string().describe('Creation timestamp'),
-  shippingCost: z.number().describe('Shipping cost amount'),
-  insuranceCost: z.number().describe('Insurance cost amount'),
-  currency: z.string().describe('Currency code'),
-  trackable: z.boolean().describe('Whether the shipment is trackable'),
-  voided: z.boolean().describe('Whether the label has been voided'),
-  isReturnLabel: z.boolean().describe('Whether this is a return label'),
-  isInternational: z.boolean().describe('Whether this is an international shipment'),
-  labelFormat: z.string().describe('Label format (pdf, png, zpl)'),
-  labelDownloadUrl: z.string().describe('URL to download the label')
+  carrierId: z.string().optional().describe('Carrier ID'),
+  carrierCode: z.string().optional().describe('Carrier code'),
+  serviceCode: z.string().optional().describe('Service code'),
+  shipDate: z.string().optional().describe('Ship date'),
+  createdAt: z.string().optional().describe('Creation timestamp'),
+  shippingCost: z.number().optional().describe('Shipping cost amount'),
+  insuranceCost: z.number().optional().describe('Insurance cost amount'),
+  insuranceCurrency: z.string().optional().describe('Currency of insuranceCost'),
+  currency: z.string().optional().describe('Currency code'),
+  trackable: z.boolean().optional().describe('Whether the shipment is trackable'),
+  voided: z.boolean().optional().describe('Whether the label has been voided'),
+  isReturnLabel: z.boolean().optional().describe('Whether this is a return label'),
+  isInternational: z
+    .boolean()
+    .optional()
+    .describe('Whether this is an international shipment'),
+  labelFormat: z.string().optional().describe('Label format (pdf, png, zpl)'),
+  labelDownloadUrl: z.string().optional().describe('URL to download the label')
 });
 
 export let createLabel = SlateTool.create(spec, {
   name: 'Create Shipping Label',
   key: 'create_label',
-  description: `Create a shipping label. Provide either full shipment details (addresses, packages, carrier/service) to create a label directly, or a **rateId** from a previous rate lookup, or a **shipmentId** from an existing shipment. The label can be downloaded as PDF, PNG, or ZPL.`,
+  description: `Purchase a shipping label; production requests can charge your account. Provide either full shipment details (addresses, packages, carrier/service) to create a label directly, or a **rateId** from a previous rate lookup, or a **shipmentId** from an existing shipment. The label can be downloaded as PDF, PNG, or ZPL.`,
   instructions: [
     'Provide rateId to create from a previously quoted rate, or shipmentId to create from an existing shipment, or full shipment details for a new label.',
     'When using rateId, shipment details are not required.'
   ],
   tags: {
     readOnly: false,
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -92,7 +97,7 @@ export let createLabel = SlateTool.create(spec, {
         .describe('Service code (required for direct label creation)'),
       shipFrom: addressSchema.optional().describe('Origin address'),
       shipTo: addressSchema.optional().describe('Destination address'),
-      packages: z.array(packageSchema).optional().describe('Packages in the shipment'),
+      packages: z.array(packageSchema).min(1).optional().describe('Packages in the shipment'),
       labelFormat: z.enum(['pdf', 'png', 'zpl']).optional().describe('Label format'),
       labelLayout: z.enum(['4x6', 'letter']).optional().describe('Label layout size'),
       externalShipmentId: z
@@ -120,12 +125,32 @@ export let createLabel = SlateTool.create(spec, {
   )
   .output(labelOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    const sourceCount =
+      Number(ctx.input.rateId !== undefined) + Number(ctx.input.shipmentId !== undefined);
+    const directFields = [
+      ctx.input.carrierId,
+      ctx.input.serviceCode,
+      ctx.input.shipFrom,
+      ctx.input.shipTo,
+      ctx.input.packages,
+      ctx.input.externalShipmentId,
+      ctx.input.warehouseId,
+      ctx.input.confirmation,
+      ctx.input.customs
+    ];
+    if (sourceCount > 1 || (sourceCount && directFields.some(value => value !== undefined)))
+      throw createApiServiceError(
+        'Choose exactly one source: rateId, shipmentId, or direct shipment details.'
+      );
+    if (
+      ctx.input.labelLayout === 'letter' &&
+      ctx.input.labelFormat &&
+      ctx.input.labelFormat !== 'pdf'
+    )
+      throw createApiServiceError('Letter layout requires PDF format.');
+    let client = createClient(ctx);
 
-    let label: any;
+    let label: LabelResponse;
 
     if (ctx.input.rateId) {
       label = await client.createLabelFromRate(ctx.input.rateId, {
@@ -145,7 +170,7 @@ export let createLabel = SlateTool.create(spec, {
         !ctx.input.shipTo ||
         !ctx.input.packages
       ) {
-        throw new Error(
+        throw createApiServiceError(
           'When creating a label directly, carrierId, serviceCode, shipFrom, shipTo, and packages are required.'
         );
       }
@@ -186,15 +211,45 @@ export let createLabel = SlateTool.create(spec, {
     }
 
     let output = mapLabelOutput(label);
+    const format = label.label_format ?? ctx.input.labelFormat ?? 'pdf';
+    if (!['pdf', 'png', 'zpl'].includes(format))
+      throw createApiServiceError(
+        'The label format is unsupported. Check the purchased label before retrying.'
+      );
+    const files = new Set(
+      [
+        label.label_download?.href,
+        ...(label.packages ?? []).map(p => p.label_download?.href)
+      ].filter((url): url is string => Boolean(url))
+    );
+    try {
+      for (const [index, url] of [...files].entries())
+        await addDocument(
+          ctx,
+          url,
+          `${label.label_id}-${index + 1}`,
+          format as DocumentFormat
+        );
+    } catch {
+      const error = createApiServiceError(
+        `Label ${label.label_id} was created, but its document could not be prepared. Retrieve that label before retrying; do not purchase another label.`
+      );
+      Object.assign(error.data, {
+        writeMayHaveOccurred: true,
+        labelId: label.label_id,
+        shipmentId: label.shipment_id
+      });
+      throw error;
+    }
 
     return {
       output,
-      message: `Created label **${label.label_id}** via **${label.carrier_code}** (${label.service_code}). Tracking: **${label.tracking_number}**. Cost: **${label.shipment_cost.currency} ${label.shipment_cost.amount.toFixed(2)}**.`
+      message: `Label **${label.label_id}** has status **${label.status}**. Check its status before attempting another purchase.`
     };
   })
   .build();
 
-let mapAddressToApi = (addr: any) => ({
+let mapAddressToApi = (addr: z.infer<typeof addressSchema>) => ({
   name: addr.name,
   company_name: addr.companyName,
   phone: addr.phone,
@@ -206,7 +261,7 @@ let mapAddressToApi = (addr: any) => ({
   country_code: addr.countryCode
 });
 
-let mapLabelOutput = (label: any) => ({
+let mapLabelOutput = (label: LabelResponse) => ({
   labelId: label.label_id,
   shipmentId: label.shipment_id,
   trackingNumber: label.tracking_number,
@@ -216,13 +271,14 @@ let mapLabelOutput = (label: any) => ({
   serviceCode: label.service_code,
   shipDate: label.ship_date,
   createdAt: label.created_at,
-  shippingCost: label.shipment_cost?.amount ?? 0,
-  insuranceCost: label.insurance_cost?.amount ?? 0,
-  currency: label.shipment_cost?.currency ?? 'usd',
+  shippingCost: label.shipment_cost?.amount,
+  insuranceCost: label.insurance_cost?.amount,
+  insuranceCurrency: label.insurance_cost?.currency,
+  currency: label.shipment_cost?.currency,
   trackable: label.trackable,
   voided: label.voided,
   isReturnLabel: label.is_return_label,
   isInternational: label.is_international,
   labelFormat: label.label_format,
-  labelDownloadUrl: label.label_download?.href ?? ''
+  labelDownloadUrl: label.label_download?.href
 });

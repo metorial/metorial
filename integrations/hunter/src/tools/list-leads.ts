@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, optionalNumber, row, rows } from '../lib/client';
+import { mapLead } from '../lib/lead';
 import { spec } from '../spec';
 
 export let listLeads = SlateTool.create(spec, {
@@ -21,13 +22,28 @@ export let listLeads = SlateTool.create(spec, {
         .describe('Number of leads to return (1-1000, default 20)'),
       offset: z.number().optional().describe('Offset for pagination (max 100000)'),
       leadListId: z.number().optional().describe('Filter leads by a specific list ID'),
-      email: z.string().optional().describe('Filter by email address'),
+      email: z
+        .string()
+        .optional()
+        .describe(
+          'Filter by email substring; * matches any value and ~ matches an empty value'
+        ),
       firstName: z.string().optional().describe('Filter by first name'),
       lastName: z.string().optional().describe('Filter by last name'),
       company: z.string().optional().describe('Filter by company name'),
       industry: z.string().optional().describe('Filter by industry'),
-      verificationStatus: z.string().optional().describe('Filter by verification status'),
-      sendingStatus: z.string().optional().describe('Filter by sending status')
+      verificationStatus: z
+        .string()
+        .optional()
+        .describe(
+          'Verification status or comma-separated statuses, sent as a provider array filter'
+        ),
+      sendingStatus: z
+        .string()
+        .optional()
+        .describe(
+          'Sending status or comma-separated statuses; ~ selects leads without a sending status'
+        )
     })
   )
   .output(
@@ -49,13 +65,15 @@ export let listLeads = SlateTool.create(spec, {
           })
         )
         .describe('List of leads'),
-      total: z.number().describe('Total number of leads matching filters')
+      total: z
+        .number()
+        .optional()
+        .describe('Provider-reported total matching leads, when supplied'),
+      returnedCount: z.number().describe('Number of leads returned in this page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.listLeads({
+    const result = await new Client({ token: ctx.auth.token }).listLeads({
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       leadListId: ctx.input.leadListId,
@@ -67,26 +85,9 @@ export let listLeads = SlateTool.create(spec, {
       verificationStatus: ctx.input.verificationStatus,
       sendingStatus: ctx.input.sendingStatus
     });
-
-    let leads = (result.data?.leads || []).map((lead: any) => ({
-      leadId: lead.id,
-      email: lead.email ?? null,
-      firstName: lead.first_name ?? null,
-      lastName: lead.last_name ?? null,
-      position: lead.position ?? null,
-      company: lead.company ?? null,
-      companyIndustry: lead.company_industry ?? null,
-      website: lead.website ?? null,
-      countryCode: lead.country_code ?? null,
-      linkedinUrl: lead.linkedin_url ?? null,
-      verificationStatus: lead.verification?.status ?? null
-    }));
-
+    const leads = rows(row(result.data).leads).map(mapLead);
     return {
-      output: {
-        leads,
-        total: result.meta?.total ?? leads.length
-      },
+      output: { leads, total: optionalNumber(result.meta.total), returnedCount: leads.length },
       message: `Retrieved **${leads.length}** leads.`
     };
   })

@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let queryKnowledgeBase = SlateTool.create(spec, {
   name: 'Query Knowledge Base',
   key: 'query_knowledge_base',
-  description: `Query or search a Griptape Cloud Knowledge Base using natural language. Knowledge Bases are collections of Data Sources that your LLM-powered applications can retrieve information from using RAG (Retrieval-Augmented Generation). Use "query" for LLM-processed answers or "search" for raw document retrieval.`,
+  description: `Query or search a Griptape Cloud Knowledge Base using natural language. Knowledge Bases are collections of Data Sources that your LLM-powered applications can retrieve information from using RAG (Retrieval-Augmented Generation). Use query to retrieve relevant entries or search to return the provider search result.`,
   instructions: [
-    'Use action "query" to get an LLM-processed response using the knowledge base content.',
-    'Use action "search" for raw vector search results without LLM processing.'
+    'Use action "query" to retrieve relevant entries with optional query arguments.',
+    'Use action "search" to return the knowledge base search result.'
   ],
   tags: {
     destructive: false,
@@ -20,13 +20,15 @@ export let queryKnowledgeBase = SlateTool.create(spec, {
     z.object({
       action: z
         .enum(['query', 'search'])
-        .describe('Whether to query (LLM-processed) or search (raw results)'),
+        .describe(
+          'Whether to retrieve entries with query or use the provider search operation'
+        ),
       knowledgeBaseId: z.string().describe('ID of the knowledge base to query'),
       query: z.string().describe('Natural language query string'),
       queryArgs: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Additional query arguments (for query action)')
+        .describe('Additional query arguments for query or search')
     })
   )
   .output(
@@ -45,7 +47,11 @@ export let queryKnowledgeBase = SlateTool.create(spec, {
         ctx.input.queryArgs
       );
     } else {
-      results = await client.searchKnowledgeBase(ctx.input.knowledgeBaseId, ctx.input.query);
+      results = await client.searchKnowledgeBase(
+        ctx.input.knowledgeBaseId,
+        ctx.input.query,
+        ctx.input.queryArgs
+      );
     }
 
     return {

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { page, pagination, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listPostingsTool = SlateTool.create(spec, {
@@ -11,6 +12,10 @@ export let listPostingsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      distributionChannels: z
+        .array(z.enum(['public', 'internal']))
+        .optional()
+        .describe('Published posting audiences; use both to include every published posting'),
       state: z
         .enum(['published', 'internal', 'closed', 'draft', 'pending', 'rejected'])
         .optional()
@@ -31,26 +36,15 @@ export let listPostingsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, environment: ctx.auth.environment });
-
-    let params: Record<string, any> = {};
-    if (ctx.input.state) params.state = ctx.input.state;
-    if (ctx.input.team) params.team = ctx.input.team;
-    if (ctx.input.department) params.department = ctx.input.department;
-    if (ctx.input.location) params.location = ctx.input.location;
-    if (ctx.input.commitment) params.commitment = ctx.input.commitment;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.offset) params.offset = ctx.input.offset;
-
-    let result = await client.listPostings(params);
-
+    const params = pagination(ctx.input);
+    for (const key of ['state', 'team', 'department', 'location', 'commitment'] as const)
+      if (ctx.input[key] !== undefined) params[key] = text(ctx.input[key], key);
+    if (ctx.input.distributionChannels !== undefined)
+      params.distributionChannel = ctx.input.distributionChannels.join(',');
+    const result = page(await new Client(ctx.auth).listPostings(params));
     return {
-      output: {
-        postings: result.data || [],
-        hasNext: result.hasNext || false,
-        next: result.next || undefined
-      },
-      message: `Found ${(result.data || []).length} job postings.${result.hasNext ? ' More results available.' : ''}`
+      output: { postings: result.data, hasNext: result.hasNext, next: result.next },
+      message: `Retrieved ${result.data.length} postings${result.hasNext ? '; more pages available' : ''}.`
     };
   })
   .build();

@@ -1,363 +1,287 @@
 import { createAxios } from 'slates';
-
+import {
+  apiFailure,
+  date,
+  invalid,
+  object,
+  type Row,
+  records,
+  required,
+  resource,
+  routeId,
+  safeResponse,
+  stringValue
+} from './validation';
+export const apiVersion = '20241028';
+export type Environment = 'production' | 'sandbox';
 export interface ClientConfig {
   token: string;
-  accountName: string;
+  accountName?: string;
   authMethod?: 'oauth' | 'api_key';
+  environment?: Environment;
 }
-
+export const domain = (environment: Environment) =>
+  environment === 'sandbox' ? 'sandbox-quadernoapp.com' : 'quadernoapp.com';
+export function accountName(value: string): string {
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(value))
+    throw invalid(
+      'Account name must be the lowercase Quaderno subdomain, without a URL or dots.'
+    );
+  return value;
+}
+export function endpoint(environment: Environment, account?: string) {
+  return `https://${account ? `${accountName(account)}.` : ''}${domain(environment)}/api/`;
+}
+export function authorizationEndpoint(href: string, environment: Environment) {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    throw invalid('Quaderno returned an invalid account endpoint.');
+  }
+  const suffix = `.${domain(environment)}`;
+  if (
+    url.protocol !== 'https:' ||
+    !url.hostname.endsWith(suffix) ||
+    url.username ||
+    url.password ||
+    url.port ||
+    url.pathname !== '/api/' ||
+    url.search ||
+    url.hash
+  )
+    throw invalid('Quaderno returned an unexpected account endpoint. Check the environment.');
+  const account = accountName(url.hostname.slice(0, -suffix.length));
+  return { accountName: account, apiEndpoint: endpoint(environment, account) };
+}
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
-
+  private http: ReturnType<typeof createAxios>;
+  private token: string;
+  readonly environment: Environment;
+  readonly accountName?: string;
+  readonly baseURL: string;
+  pagination: { hasMore?: boolean; nextPage?: string; nextCursor?: string } = {};
   constructor(config: ClientConfig) {
-    let baseURL = `https://${config.accountName}.quadernoapp.com/api/`;
-
-    if (config.authMethod === 'oauth') {
-      this.axios = createAxios({
-        baseURL,
-        headers: {
-          Authorization: `Bearer ${config.token}`,
-          'Content-Type': 'application/json'
-        }
+    this.token = required(config.token, 'Access token or API key');
+    this.environment = config.environment ?? 'production';
+    if (this.environment !== 'production' && this.environment !== 'sandbox')
+      throw invalid('Select production or sandbox.');
+    if (
+      config.authMethod !== undefined &&
+      config.authMethod !== 'oauth' &&
+      config.authMethod !== 'api_key'
+    )
+      throw invalid('Reconnect using a supported authentication method.');
+    this.accountName =
+      config.accountName === undefined ? undefined : accountName(config.accountName);
+    this.baseURL = endpoint(this.environment, this.accountName);
+    this.http = createAxios({
+      baseURL: this.baseURL,
+      timeout: 30000,
+      maxRedirects: 0,
+      ...(config.authMethod === 'oauth'
+        ? {
+            headers: {
+              Authorization: `Bearer ${this.token}`,
+              'Content-Type': 'application/json',
+              Accept: `application/json; api_version: ${apiVersion}`
+            }
+          }
+        : {
+            auth: { username: this.token, password: '' },
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: `application/json; api_version: ${apiVersion}`
+            }
+          })
+    });
+  }
+  async request(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    path: string,
+    body?: Row,
+    params?: Row,
+    compatibility = false
+  ): Promise<unknown> {
+    if (path !== 'authorization' && !this.accountName)
+      throw invalid(
+        'Set the accountName from get_current_account before using account tools.'
+      );
+    if (!/^[a-zA-Z0-9_/-]+(?:\.json)?$/.test(path) || path.includes('..'))
+      throw invalid('Invalid resource path.');
+    let response: { data: unknown; headers: Record<string, unknown> };
+    try {
+      response = await this.http.request<unknown>({
+        method,
+        url: path,
+        data: body,
+        params,
+        ...(compatibility ? { headers: { Accept: 'application/json' } } : {})
       });
-    } else {
-      this.axios = createAxios({
-        baseURL,
-        auth: {
-          username: config.token,
-          password: 'x'
-        },
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+    } catch (error) {
+      apiFailure(error, method !== 'GET' || path.endsWith('/deliver'));
     }
+    const secrets = [this.token, Buffer.from(`${this.token}:`).toString('base64')];
+    const result = safeResponse(response.data, secrets);
+    this.pagination = {};
+    if (Array.isArray(result)) {
+      const hasMore = response.headers['x-pages-hasmore'];
+      if (hasMore !== undefined) {
+        if (![true, false, 'true', 'false'].includes(hasMore as boolean | string))
+          throw invalid('Quaderno returned an invalid pagination header.');
+        this.pagination.hasMore = hasMore === true || hasMore === 'true';
+      }
+      const next = response.headers['x-pages-nextpage'];
+      if (typeof next === 'string' && next) {
+        const parsed = this.cursor(next, path);
+        this.pagination.nextPage = parsed.toString();
+        this.pagination.nextCursor = parsed.searchParams.get('created_before') ?? undefined;
+      }
+      if (this.pagination.hasMore === true && !this.pagination.nextPage) {
+        const last = result.at(-1);
+        if (last) this.pagination.nextCursor = String(resource(last).id);
+        if (!this.pagination.nextCursor)
+          throw invalid('Quaderno omitted a continuation cursor.');
+      }
+    }
+    return result;
   }
-
-  // ---- Contacts ----
-
-  async listContacts(params?: { page?: number; q?: string }) {
-    let response = await this.axios.get('contacts.json', { params });
-    return response.data;
+  private cursor(value: string, path: string) {
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw invalid('Use the next-page URL from the same list tool.');
+    }
+    if (
+      url.origin !== new URL(this.baseURL).origin ||
+      ![`/api/${path}`, `/api/${path}.json`].includes(url.pathname) ||
+      url.username ||
+      url.password ||
+      url.hash
+    )
+      throw invalid(
+        'The pagination URL must use the same account, environment and list route.'
+      );
+    const allowed = new Set([
+      'created_before',
+      'limit',
+      'q',
+      'date',
+      'state',
+      'contact',
+      'processor_id',
+      'country',
+      'region'
+    ]);
+    for (const [key, item] of url.searchParams) {
+      if (!allowed.has(key) || !item || url.searchParams.getAll(key).length !== 1)
+        throw invalid('The pagination URL contains unsupported parameters.');
+      if (
+        [this.token, Buffer.from(`${this.token}:`).toString('base64')].some(secret =>
+          item.includes(secret)
+        )
+      )
+        throw invalid('The pagination URL contains an authentication secret.');
+    }
+    const before = url.searchParams.get('created_before');
+    if (!before || !/^[a-zA-Z0-9_-]{1,128}$/.test(before))
+      throw invalid('The pagination URL must contain a valid created_before cursor.');
+    const limit = url.searchParams.get('limit');
+    if (limit && (!/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 100))
+      throw invalid('The pagination limit must be between 1 and 100.');
+    if (
+      [this.token, Buffer.from(`${this.token}:`).toString('base64')].some(secret =>
+        url.toString().includes(secret)
+      )
+    )
+      throw invalid('The pagination URL contains an authentication secret.');
+    return url;
   }
-
-  async getContact(contactId: string) {
-    let response = await this.axios.get(`contacts/${contactId}.json`);
-    return response.data;
+  async list(path: string, input: Row = {}, filters: Row = {}) {
+    if (input.page !== undefined && input.page !== 1)
+      throw invalid(
+        'Quaderno uses cursor pagination. Use page 1, then createdBefore or nextPage from the previous result.'
+      );
+    if (
+      input.limit !== undefined &&
+      (!Number.isInteger(input.limit) || Number(input.limit) < 1 || Number(input.limit) > 100)
+    )
+      throw invalid('The list limit must be between 1 and 100.');
+    if (input.createdBefore !== undefined) routeId(required(input.createdBefore, 'Cursor'));
+    let params: Row = { ...filters, created_before: input.createdBefore, limit: input.limit };
+    if (input.nextPage !== undefined) {
+      if (
+        Object.entries(input).some(
+          ([key, value]) => key !== 'nextPage' && value !== undefined
+        ) ||
+        Object.values(filters).some(v => v !== undefined)
+      )
+        throw invalid('Use nextPage alone; its URL already contains the cursor and filters.');
+      params = Object.fromEntries(
+        this.cursor(required(input.nextPage, 'Next page'), path).searchParams
+      );
+    }
+    if (params.date !== undefined) {
+      const dates = required(params.date, 'Date range').replaceAll('/', '-').split(',');
+      if (dates.length === 1) params.date = `${date(dates[0]!)},${date(dates[0]!)}`;
+      else if (dates.length === 2 && date(dates[0]!) <= date(dates[1]!))
+        params.date = dates.join(',');
+      else throw invalid('Use a date or ordered start,end date range.');
+    }
+    return records(await this.request('GET', path, undefined, params)).map(resource);
   }
-
-  async createContact(data: Record<string, any>) {
-    let response = await this.axios.post('contacts.json', data);
-    return response.data;
+  async get(path: string, id: string) {
+    const result = resource(await this.request('GET', `${path}/${routeId(id)}`));
+    if (String(result.id) !== id.trim())
+      throw invalid('Quaderno returned a different resource than requested.');
+    return result;
   }
-
-  async updateContact(contactId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`contacts/${contactId}.json`, data);
-    return response.data;
+  async create(path: string, body: Row, compatibility = false) {
+    return resource(await this.request('POST', path, body, undefined, compatibility));
   }
-
-  async deleteContact(contactId: string) {
-    await this.axios.delete(`contacts/${contactId}.json`);
+  async update(path: string, id: string, body: Row) {
+    await this.get(path, id);
+    const result = resource(await this.request('PUT', `${path}/${routeId(id)}`, body));
+    if (String(result.id) !== id.trim())
+      throw invalid(
+        'Quaderno returned a different resource after the update. Independently verify the requested record before retrying.'
+      );
+    return result;
   }
-
-  // ---- Products (Items) ----
-
-  async listProducts(params?: { page?: number; q?: string }) {
-    let response = await this.axios.get('items.json', { params });
-    return response.data;
+  async remove(path: string, id: string, compatibility = false) {
+    await this.request(
+      'DELETE',
+      `${path}/${routeId(id)}${compatibility ? '.json' : ''}`,
+      undefined,
+      undefined,
+      compatibility
+    );
   }
-
-  async getProduct(productId: string) {
-    let response = await this.axios.get(`items/${productId}.json`);
-    return response.data;
+  async deliver(path: string, id: string) {
+    await this.get(path, id);
+    await this.request('GET', `${path}/${routeId(id)}/deliver`);
   }
-
-  async createProduct(data: Record<string, any>) {
-    let response = await this.axios.post('items.json', data);
-    return response.data;
-  }
-
-  async updateProduct(productId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`items/${productId}.json`, data);
-    return response.data;
-  }
-
-  async deleteProduct(productId: string) {
-    await this.axios.delete(`items/${productId}.json`);
-  }
-
-  // ---- Invoices ----
-
-  async listInvoices(params?: { page?: number; q?: string; date?: string; state?: string }) {
-    let response = await this.axios.get('invoices.json', { params });
-    return response.data;
-  }
-
-  async getInvoice(invoiceId: string) {
-    let response = await this.axios.get(`invoices/${invoiceId}.json`);
-    return response.data;
-  }
-
-  async createInvoice(data: Record<string, any>) {
-    let response = await this.axios.post('invoices.json', data);
-    return response.data;
-  }
-
-  async updateInvoice(invoiceId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`invoices/${invoiceId}.json`, data);
-    return response.data;
-  }
-
-  async deliverInvoice(invoiceId: string) {
-    let response = await this.axios.get(`invoices/${invoiceId}/deliver.json`);
-    return response.data;
-  }
-
-  // ---- Credit Notes ----
-
-  async listCreditNotes(params?: { page?: number; q?: string; date?: string }) {
-    let response = await this.axios.get('credits.json', { params });
-    return response.data;
-  }
-
-  async getCreditNote(creditNoteId: string) {
-    let response = await this.axios.get(`credits/${creditNoteId}.json`);
-    return response.data;
-  }
-
-  async createCreditNote(data: Record<string, any>) {
-    let response = await this.axios.post('credits.json', data);
-    return response.data;
-  }
-
-  async updateCreditNote(creditNoteId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`credits/${creditNoteId}.json`, data);
-    return response.data;
-  }
-
-  async deliverCreditNote(creditNoteId: string) {
-    let response = await this.axios.get(`credits/${creditNoteId}/deliver.json`);
-    return response.data;
-  }
-
-  // ---- Expenses ----
-
-  async listExpenses(params?: { page?: number; q?: string; date?: string }) {
-    let response = await this.axios.get('expenses.json', { params });
-    return response.data;
-  }
-
-  async getExpense(expenseId: string) {
-    let response = await this.axios.get(`expenses/${expenseId}.json`);
-    return response.data;
-  }
-
-  async createExpense(data: Record<string, any>) {
-    let response = await this.axios.post('expenses.json', data);
-    return response.data;
-  }
-
-  async updateExpense(expenseId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`expenses/${expenseId}.json`, data);
-    return response.data;
-  }
-
-  async deleteExpense(expenseId: string) {
-    await this.axios.delete(`expenses/${expenseId}.json`);
-  }
-
-  // ---- Estimates ----
-
-  async listEstimates(params?: { page?: number; q?: string }) {
-    let response = await this.axios.get('estimates.json', { params });
-    return response.data;
-  }
-
-  async getEstimate(estimateId: string) {
-    let response = await this.axios.get(`estimates/${estimateId}.json`);
-    return response.data;
-  }
-
-  async createEstimate(data: Record<string, any>) {
-    let response = await this.axios.post('estimates.json', data);
-    return response.data;
-  }
-
-  async updateEstimate(estimateId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`estimates/${estimateId}.json`, data);
-    return response.data;
-  }
-
-  async deleteEstimate(estimateId: string) {
-    await this.axios.delete(`estimates/${estimateId}.json`);
-  }
-
-  async deliverEstimate(estimateId: string) {
-    let response = await this.axios.get(`estimates/${estimateId}/deliver.json`);
-    return response.data;
-  }
-
-  // ---- Recurring Documents ----
-
-  async listRecurring(params?: { page?: number }) {
-    let response = await this.axios.get('recurring.json', { params });
-    return response.data;
-  }
-
-  async getRecurring(recurringId: string) {
-    let response = await this.axios.get(`recurring/${recurringId}.json`);
-    return response.data;
-  }
-
-  async createRecurring(data: Record<string, any>) {
-    let response = await this.axios.post('recurring.json', data);
-    return response.data;
-  }
-
-  async updateRecurring(recurringId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`recurring/${recurringId}.json`, data);
-    return response.data;
-  }
-
-  async deleteRecurring(recurringId: string) {
-    await this.axios.delete(`recurring/${recurringId}.json`);
-  }
-
-  // ---- Tax Calculations ----
-
-  async calculateTax(params: {
-    to_country: string;
-    to_postal_code?: string;
-    to_city?: string;
-    from_country?: string;
-    tax_code?: string;
-    amount?: number;
-    tax_id?: string;
-  }) {
-    let response = await this.axios.get('tax_rates/calculate.json', { params });
-    return response.data;
-  }
-
-  // ---- Tax ID Validation ----
-
-  async validateTaxId(params: { country: string; tax_id: string }) {
-    let response = await this.axios.get('tax_ids/validate.json', { params });
-    return response.data;
-  }
-
-  // ---- Tax Jurisdictions ----
-
-  async listJurisdictions(params?: { page?: number }) {
-    let response = await this.axios.get('jurisdictions.json', { params });
-    return response.data;
-  }
-
-  async getJurisdiction(jurisdictionId: string) {
-    let response = await this.axios.get(`jurisdictions/${jurisdictionId}.json`);
-    return response.data;
-  }
-
-  async createJurisdiction(data: Record<string, any>) {
-    let response = await this.axios.post('jurisdictions.json', data);
-    return response.data;
-  }
-
-  async updateJurisdiction(jurisdictionId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`jurisdictions/${jurisdictionId}.json`, data);
-    return response.data;
-  }
-
-  async deleteJurisdiction(jurisdictionId: string) {
-    await this.axios.delete(`jurisdictions/${jurisdictionId}.json`);
-  }
-
-  // ---- Transactions ----
-
-  async createTransaction(data: Record<string, any>) {
-    let response = await this.axios.post('transactions.json', data);
-    return response.data;
-  }
-
-  // ---- Checkout Sessions ----
-
-  async listCheckoutSessions(params?: { page?: number }) {
-    let response = await this.axios.get('checkout/sessions.json', { params });
-    return response.data;
-  }
-
-  async getCheckoutSession(sessionId: string) {
-    let response = await this.axios.get(`checkout/sessions/${sessionId}.json`);
-    return response.data;
-  }
-
-  async createCheckoutSession(data: Record<string, any>) {
-    let response = await this.axios.post('checkout/sessions.json', data);
-    return response.data;
-  }
-
-  // ---- Payments ----
-
-  async listPayments(documentType: string, documentId: string) {
-    let response = await this.axios.get(`${documentType}/${documentId}/payments.json`);
-    return response.data;
-  }
-
-  async createPayment(documentType: string, documentId: string, data: Record<string, any>) {
-    let response = await this.axios.post(`${documentType}/${documentId}/payments.json`, data);
-    return response.data;
-  }
-
-  async deletePayment(documentType: string, documentId: string, paymentId: string) {
-    await this.axios.delete(`${documentType}/${documentId}/payments/${paymentId}.json`);
-  }
-
-  // ---- Reporting ----
-
-  async createReportRequest(data: Record<string, any>) {
-    let response = await this.axios.post('reporting/requests.json', data);
-    return response.data;
-  }
-
-  async getReportRequest(requestId: string) {
-    let response = await this.axios.get(`reporting/requests/${requestId}.json`);
-    return response.data;
-  }
-
-  async listReportRequests(params?: { page?: number }) {
-    let response = await this.axios.get('reporting/requests.json', { params });
-    return response.data;
-  }
-
-  // ---- Webhooks ----
-
-  async listWebhooks(params?: { page?: number }) {
-    let response = await this.axios.get('webhooks.json', { params });
-    return response.data;
-  }
-
-  async getWebhook(webhookId: string) {
-    let response = await this.axios.get(`webhooks/${webhookId}.json`);
-    return response.data;
-  }
-
-  async createWebhook(data: { url: string; events_types: string[] }) {
-    let response = await this.axios.post('webhooks.json', data);
-    return response.data;
-  }
-
-  async updateWebhook(webhookId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`webhooks/${webhookId}.json`, data);
-    return response.data;
-  }
-
-  async deleteWebhook(webhookId: string) {
-    await this.axios.delete(`webhooks/${webhookId}.json`);
-  }
-
-  // ---- Events ----
-
-  async listEvents(params?: { page?: number }) {
-    let response = await this.axios.get('events.json', { params });
-    return response.data;
+  async authorization() {
+    const identity = object(object(await this.request('GET', 'authorization')).identity);
+    const id =
+      typeof identity.id === 'string'
+        ? required(identity.id, 'Identity ID')
+        : String(resource(identity).id);
+    const discovered = authorizationEndpoint(
+      required(identity.href, 'Account endpoint'),
+      this.environment
+    );
+    if (this.accountName && discovered.accountName !== this.accountName)
+      throw invalid(
+        'The connection belongs to a different Quaderno account. Correct accountName.'
+      );
+    return {
+      identityId: id,
+      name: stringValue(identity.name),
+      email: stringValue(identity.email),
+      ...discovered,
+      environment: this.environment
+    };
   }
 }

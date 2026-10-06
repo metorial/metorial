@@ -11,8 +11,6 @@ import {
   updateEntityTool,
   uploadFileTool
 } from './tools';
-import { entityChangesTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     uploadFileTool,
     batchCreateOrUpdateTool
   ],
-  triggers: [entityChangesTrigger]
+  triggers: []
 });

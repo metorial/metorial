@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTags = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let manageTags = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       action: z
         .enum(['apply', 'remove', 'list'])
         .describe(
@@ -47,7 +49,7 @@ export let manageTags = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 
@@ -61,21 +63,21 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (!ctx.input.email || !ctx.input.tag) {
-      throw new Error('Both email and tag are required for apply/remove actions.');
+      throw createApiServiceError('Both email and tag are required for apply/remove actions.');
     }
 
     if (ctx.input.action === 'apply') {
       await client.applyTagToSubscriber(ctx.input.email, ctx.input.tag);
       return {
         output: { applied: true },
-        message: `Tag **${ctx.input.tag}** applied to **${ctx.input.email}**.`
+        message: 'The tag has been applied to the selected subscriber.'
       };
     }
 
     await client.removeTagFromSubscriber(ctx.input.email, ctx.input.tag);
     return {
       output: { removed: true },
-      message: `Tag **${ctx.input.tag}** removed from **${ctx.input.email}**.`
+      message: 'The tag has been removed from the selected subscriber.'
     };
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TinifyClient } from '../lib/client';
+import { type StoreOptions, TinifyClient } from '../lib/client';
+import { validateOptions } from '../lib/validation';
 import { spec } from '../spec';
 
 let s3ConfigSchema = z.object({
@@ -9,7 +10,10 @@ let s3ConfigSchema = z.object({
   awsSecretAccessKey: z.string().describe('AWS secret access key'),
   region: z.string().describe('AWS region, e.g. "us-west-1"'),
   path: z.string().describe('Target path in format "bucket-name/path/filename.ext"'),
-  acl: z.string().optional().describe('S3 ACL, e.g. "public-read", "private"')
+  acl: z
+    .string()
+    .optional()
+    .describe('S3 object canned ACL or "no-acl"; omitted follows Tinify defaults')
 });
 
 let gcsConfigSchema = z.object({
@@ -30,7 +34,7 @@ let resizeSchema = z
 export let saveToCloud = SlateTool.create(spec, {
   name: 'Save to Cloud Storage',
   key: 'save_to_cloud',
-  description: `Compress an image and save it directly to Amazon S3 or Google Cloud Storage. Combines compression with cloud upload in a single operation. Optionally resize, convert format, and preserve metadata before uploading. Supports custom Cache-Control and Expires headers for CDN configuration.`,
+  description: `Compress an image and save it directly to Amazon S3 or Google Cloud Storage. Combines compression with cloud upload in a single operation. Optionally resize, convert format, and preserve metadata before uploading. Supports the documented Cache-Control storage header. Existing target objects can be overwritten; usage and cloud effects are retained.`,
   instructions: [
     'The path should include the bucket name followed by the object key, e.g. "my-bucket/images/photo.jpg".',
     'For S3, provide AWS credentials with appropriate write permissions to the target bucket.',
@@ -41,7 +45,7 @@ export let saveToCloud = SlateTool.create(spec, {
     'Resize and format conversion each count as additional compressions.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -76,24 +80,22 @@ export let saveToCloud = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      inputSize: z.number().describe('Original image size in bytes'),
-      inputType: z.string().describe('Original image MIME type'),
-      storageUrl: z.string().optional().describe('Public URL of the stored image'),
-      compressionCount: z.number().describe('Total compressions used this month')
+      inputSize: z.number().optional().describe('Original image size in bytes'),
+      inputType: z.string().optional().describe('Original image MIME type'),
+      storageUrl: z
+        .string()
+        .optional()
+        .describe('Provider storage receipt URL; accessibility depends on the bucket and ACL'),
+      compressionCount: z.number().optional().describe('Total compressions used this month')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TinifyClient(ctx.auth.token);
-
-    ctx.info('Compressing image...');
-    let compressResult = await client.compressFromUrl(ctx.input.sourceUrl);
-
     let storageHeaders: Record<string, string> = {};
-    if (ctx.input.cacheControl) {
+    if (ctx.input.cacheControl !== undefined) {
       storageHeaders['Cache-Control'] = ctx.input.cacheControl;
     }
 
-    let storeOptions: any;
+    let storeOptions: StoreOptions;
     if (ctx.input.storage.service === 's3') {
       storeOptions = {
         service: 's3' as const,
@@ -113,12 +115,27 @@ export let saveToCloud = SlateTool.create(spec, {
       };
     }
 
-    let convertOptions = ctx.input.convertTo
-      ? {
-          type: ctx.input.convertTo,
-          background: ctx.input.background
-        }
-      : undefined;
+    let convertOptions =
+      ctx.input.convertTo !== undefined
+        ? {
+            type: ctx.input.convertTo,
+            background: ctx.input.background
+          }
+        : undefined;
+
+    validateOptions({
+      store: storeOptions,
+      resize: ctx.input.resize,
+      convert: convertOptions,
+      background: ctx.input.background,
+      preserve: ctx.input.preserve
+    });
+    const cloudSecrets =
+      storeOptions.service === 's3'
+        ? [storeOptions.awsAccessKeyId, storeOptions.awsSecretAccessKey]
+        : [storeOptions.gcpAccessToken];
+    let client = new TinifyClient(ctx.auth.token, cloudSecrets);
+    let compressResult = await client.compressFromUrl(ctx.input.sourceUrl);
 
     ctx.info(
       `Uploading to ${ctx.input.storage.service === 's3' ? 'Amazon S3' : 'Google Cloud Storage'}...`
@@ -145,7 +162,7 @@ export let saveToCloud = SlateTool.create(spec, {
         storageUrl: storeResult.storageUrl,
         compressionCount: storeResult.compressionCount
       },
-      message: `Compressed and uploaded image to **${serviceName}** at \`${ctx.input.storage.path}\`. Monthly compressions used: **${storeResult.compressionCount}**.`
+      message: `Compressed and uploaded image to **${serviceName}** at the requested target. Usage and cloud storage effects remain in effect.`
     };
   })
   .build();

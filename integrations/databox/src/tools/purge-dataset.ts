@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdInput, idempotencyInput } from '../lib/models';
 import { spec } from '../spec';
 
 export let purgeDataset = SlateTool.create(spec, {
@@ -14,7 +15,13 @@ export let purgeDataset = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      datasetId: z.string().describe('UUID of the dataset to purge')
+      accountId: accountIdInput,
+      idempotencyKey: idempotencyInput,
+      datasetId: z
+        .string()
+        .describe(
+          'Identifier of the dataset (v1 UUID or v2 decimal ID encoded as text) to purge'
+        )
     })
   )
   .output(
@@ -24,8 +31,11 @@ export let purgeDataset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.purgeDataset(ctx.input.datasetId);
+    let client = new Client({ token: ctx.auth.token, apiVersion: ctx.config.apiVersion });
+    let result = await client.purgeDataset(ctx.input.datasetId, {
+      accountId: ctx.input.accountId,
+      idempotencyKey: ctx.input.idempotencyKey
+    });
 
     return {
       output: {

@@ -14,8 +14,6 @@ import {
   updateDocumentRecipients,
   updateTemplate
 } from './tools';
-import { documentEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     updateTemplate,
     deleteTemplate
   ],
-  triggers: [documentEvents]
+  triggers: []
 });

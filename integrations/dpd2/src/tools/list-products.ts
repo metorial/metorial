@@ -1,23 +1,28 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listProducts = SlateTool.create(spec, {
   name: 'List Products',
   key: 'list_products',
-  description: `Retrieve a list of all products in your DPD account. Optionally filter by storefront. Returns product IDs and names.`,
+  description: `Retrieve one page of products in your DPD account. Optionally filter by storefront. Returns product IDs and names.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      page: z
+        .number()
+        .optional()
+        .describe('1-based page; omitted means page 1. Continue until endOfResults is true.'),
       storefrontId: z
         .number()
         .optional()
         .describe(
-          'Filter products by storefront ID. Omit to return products from all storefronts.'
+          'Filter products by storefront ID. Omit to query products across storefronts.'
         )
     })
   )
@@ -26,9 +31,10 @@ export let listProducts = SlateTool.create(spec, {
       products: z.array(
         z.object({
           productId: z.number().describe('Unique product ID'),
-          name: z.string().describe('Product name')
+          name: z.string().optional().describe('Product name when supplied')
         })
-      )
+      ),
+      ...pageSchema
     })
   )
   .handleInvocation(async ctx => {
@@ -37,11 +43,16 @@ export let listProducts = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let products = await client.listProducts(ctx.input.storefrontId);
+    let result = await client.listProducts(ctx.input.storefrontId, ctx.input.page);
 
     return {
-      output: { products },
-      message: `Found **${products.length}** product(s)${ctx.input.storefrontId ? ` in storefront ${ctx.input.storefrontId}` : ''}.`
+      output: {
+        products: result.items,
+        page: result.page,
+        nextPage: result.nextPage,
+        endOfResults: result.endOfResults
+      },
+      message: `Retrieved ${result.items.length} products on page ${result.page}${result.endOfResults ? '; end of results confirmed' : ''}.`
     };
   })
   .build();

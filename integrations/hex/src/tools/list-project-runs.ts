@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listProjectRuns = SlateTool.create(spec, {
   name: 'List Project Runs',
   key: 'list_project_runs',
-  description: `List API-triggered runs of a Hex project. Can filter by run status (PENDING, RUNNING, ERRORED, COMPLETED, KILLED). Returns run details including status, timestamps, and notifications.`,
+  description: `List one page of API-triggered Hex project runs, optionally filtered by status. Returns run IDs, state and nullable timing metadata. Notification recipient details are excluded.`,
   tags: {
     readOnly: true
   }
@@ -45,13 +45,20 @@ export let listProjectRuns = SlateTool.create(spec, {
           startTime: z.string().nullable(),
           endTime: z.string().nullable(),
           elapsedTime: z.number().nullable(),
-          traceId: z.string().nullable()
+          traceId: z.string().nullable(),
+          projectVersion: z.string().optional()
         })
-      )
+      ),
+      nextPage: z.string().optional(),
+      previousPage: z.string().optional(),
+      returnedCount: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
 
     let runs = await client.getProjectRuns(ctx.input.projectId, {
       limit: ctx.input.limit,
@@ -59,11 +66,9 @@ export let listProjectRuns = SlateTool.create(spec, {
       statusFilter: ctx.input.statusFilter
     });
 
-    let runsList = Array.isArray(runs) ? runs : ((runs as any).values ?? []);
-
     return {
-      output: { runs: runsList },
-      message: `Found **${runsList.length}** run(s) for project ${ctx.input.projectId}.`
+      output: { ...runs, returnedCount: runs.runs.length },
+      message: `Returned **${runs.runs.length}** run(s) for project ${ctx.input.projectId}.${runs.nextPage ? ' More results are available.' : ''}`
     };
   })
   .build();

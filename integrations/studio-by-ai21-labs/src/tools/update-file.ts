@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapFile } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateFile = SlateTool.create(spec, {
@@ -14,7 +15,10 @@ export let updateFile = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      fileId: z.string().describe('ID of the file to update'),
+      fileId: z
+        .string()
+        .min(1)
+        .describe('ID of the file to update; use list_files to discover files'),
       labels: z.array(z.string()).optional().describe('New labels for the file'),
       publicUrl: z.string().optional().describe('New public URL for the file')
     })
@@ -28,6 +32,8 @@ export let updateFile = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.labels === undefined && ctx.input.publicUrl === undefined)
+      throw createApiServiceError('Provide labels or publicUrl to update.');
     let client = new Client({ token: ctx.auth.token });
 
     await client.updateFile(ctx.input.fileId, {
@@ -35,13 +41,13 @@ export let updateFile = SlateTool.create(spec, {
       publicUrl: ctx.input.publicUrl
     });
 
-    let f = await client.getFile(ctx.input.fileId);
+    let f = mapFile(await client.getFile(ctx.input.fileId));
 
     let output = {
-      fileId: f.fileId ?? f.file_id ?? f.id ?? ctx.input.fileId,
-      name: f.name ?? f.fileName,
+      fileId: f.fileId,
+      name: f.name,
       labels: f.labels,
-      publicUrl: f.publicUrl ?? f.public_url
+      publicUrl: f.publicUrl
     };
 
     return {

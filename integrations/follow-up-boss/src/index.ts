@@ -17,16 +17,6 @@ import {
   sendEvent,
   sendTextMessage
 } from './tools';
-import {
-  appointmentEvents,
-  communicationEvents,
-  dealEvents,
-  emailMarketingEvents,
-  noteEvents,
-  peopleEvents,
-  taskEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,13 +36,5 @@ export let provider = Slate.create({
     enrollActionPlan,
     listPipelines
   ],
-  triggers: [
-    peopleEvents,
-    communicationEvents,
-    taskEvents,
-    dealEvents,
-    appointmentEvents,
-    noteEvents,
-    emailMarketingEvents
-  ]
+  triggers: []
 });

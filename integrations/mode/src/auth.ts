@@ -1,60 +1,41 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { ModeClient } from './lib/client';
 
-let outputSchema = z.object({
-  token: z.string().describe('Mode API token (public component)'),
-  secret: z.string().describe('Mode API secret (private component)')
+const outputSchema = z.object({
+  token: z.string().describe('Mode API token'),
+  secret: z.string().describe('Mode API secret'),
+  workspaceName: z.string().optional().describe('Authorized Mode workspace slug')
 });
-
-let inputSchema = z.object({
-  token: z.string().describe('Mode API token (public component of the credential)'),
-  secret: z.string().describe('Mode API secret (private component of the credential)'),
-  workspaceName: z.string().describe('Workspace name for profile verification')
+const inputSchema = z.object({
+  token: z
+    .string()
+    .describe('Mode API token; workspace tokens have administrator permissions'),
+  secret: z.string().describe('Mode API secret'),
+  workspaceName: z.string().describe('Workspace slug from your Mode URL')
 });
-
-type OutputType = z.infer<typeof outputSchema>;
-type InputType = z.infer<typeof inputSchema>;
-
-export let auth = SlateAuth.create()
+export const auth = SlateAuth.create()
   .output(outputSchema)
   .addCustomAuth({
     type: 'auth.custom',
     name: 'API Token',
     key: 'api_token',
-
     inputSchema,
-
-    getOutput: async (ctx: { input: InputType }) => {
-      return {
-        output: {
-          token: ctx.input.token,
-          secret: ctx.input.secret
-        }
-      };
+    getOutput: async (ctx: { input: z.infer<typeof inputSchema> }) => {
+      const client = new ModeClient(ctx.input);
+      await client.getCurrentAccount();
+      return { output: ctx.input };
     },
-
-    getProfile: async (ctx: { output: OutputType; input: InputType }) => {
-      let basicAuth = btoa(`${ctx.output.token}:${ctx.output.secret}`);
-      let http = createAxios({
-        baseURL: 'https://app.mode.com/api',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/hal+json',
-          Authorization: `Basic ${basicAuth}`
-        }
-      });
-
-      try {
-        await http.get(`/${ctx.input.workspaceName}/memberships`);
-      } catch {
-        // If auth fails, we'll still return the workspace name
-      }
-
+    getProfile: async (ctx: {
+      output: z.infer<typeof outputSchema>;
+      input: z.infer<typeof inputSchema>;
+    }) => {
+      const account = await new ModeClient({
+        ...ctx.output,
+        workspaceName: ctx.output.workspaceName ?? ctx.input.workspaceName
+      }).getCurrentAccount();
       return {
-        profile: {
-          name: ctx.input.workspaceName,
-          id: ctx.input.workspaceName
-        }
+        profile: { name: account.name || account.accountName, id: account.accountToken }
       };
     }
   });

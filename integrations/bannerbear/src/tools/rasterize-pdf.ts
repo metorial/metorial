@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { nativeState, nullableText, stateMessage, uid } from '../lib/contracts';
+import { deliverGeneratedFiles } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let rasterizePdf = SlateTool.create(spec, {
@@ -14,6 +17,7 @@ export let rasterizePdf = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       pdfUrl: z.string().describe('URL of the PDF file to rasterize'),
       dpi: z.number().optional().describe('Resolution in DPI (max 300, default varies)'),
       webhookUrl: z
@@ -31,22 +35,22 @@ export let rasterizePdf = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.rasterizePdf({
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const result = await client.rasterizePdf({
       url: ctx.input.pdfUrl,
       dpi: ctx.input.dpi,
       webhook_url: ctx.input.webhookUrl
     });
-
+    const output = {
+      rasterizeUid: uid(result.uid),
+      status: nativeState(result.status),
+      imageUrlPng: nullableText(result.image_url_png),
+      imageUrlJpg: nullableText(result.image_url_jpg)
+    };
+    await deliverGeneratedFiles(ctx, 'rasterized_pdf', result);
     return {
-      output: {
-        rasterizeUid: result.uid,
-        status: result.status,
-        imageUrlPng: result.image_url_png || null,
-        imageUrlJpg: result.image_url_jpg || null
-      },
-      message: `PDF rasterization ${result.status === 'completed' ? 'completed' : 'initiated'} (UID: ${result.uid}). ${result.image_url_png ? `[View PNG](${result.image_url_png})` : 'Still processing.'}`
+      output,
+      message: `PDF rasterization ${stateMessage(result.status)} (UID: ${output.rasterizeUid}). Read its status with get_resource.`
     };
   })
   .build();

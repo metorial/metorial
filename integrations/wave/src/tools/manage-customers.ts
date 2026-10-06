@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaveClient } from '../lib/client';
+import type { Customer } from '../lib/contracts';
 import { spec } from '../spec';
 
 let addressSchema = z
@@ -63,7 +64,7 @@ let customerOutputSchema = z.object({
   modifiedAt: z.string().optional().describe('Last modification timestamp')
 });
 
-let mapCustomer = (c: any) => ({
+let mapCustomer = (c: Customer) => ({
   customerId: c.id,
   name: c.name,
   firstName: c.firstName,
@@ -92,9 +93,14 @@ export let listCustomers = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('customer:read'))
   .input(
     z.object({
-      businessId: z.string().describe('ID of the business to list customers for'),
+      businessId: z
+        .string()
+        .describe(
+          'ID of the business to list customers for. Call list_businesses to discover a permitted business ID.'
+        ),
       page: z.number().optional().describe('Page number (starts at 1, default: 1)'),
       pageSize: z
         .number()
@@ -114,8 +120,8 @@ export let listCustomers = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.listCustomers(
       ctx.input.businessId,
-      ctx.input.page || 1,
-      ctx.input.pageSize || 20
+      ctx.input.page ?? 1,
+      ctx.input.pageSize ?? 20
     );
 
     return {
@@ -135,14 +141,17 @@ export let listCustomers = SlateTool.create(spec, {
 export let createCustomer = SlateTool.create(spec, {
   name: 'Create Customer',
   key: 'create_customer',
-  description: `Create a new customer record for a Wave business. At minimum a business ID and customer name are required. Optionally include contact details, address, shipping info, and currency preference.`,
-  tags: {
-    destructive: false
-  }
+  tags: { readOnly: false },
+  description: `Create a new customer record for a Wave business. At minimum a business ID and customer name are required. Optionally include contact details, address, shipping info, and currency preference.`
 })
+  .scopes(anyOf('customer:write'))
   .input(
     z.object({
-      businessId: z.string().describe('ID of the business to create the customer for'),
+      businessId: z
+        .string()
+        .describe(
+          'ID of the business to create the customer for. Call list_businesses to discover a permitted business ID.'
+        ),
       name: z.string().describe('Customer or company name'),
       firstName: z.string().optional().describe('First name of primary contact'),
       lastName: z.string().optional().describe('Last name of primary contact'),
@@ -167,12 +176,6 @@ export let createCustomer = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.createCustomer(ctx.input);
 
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to create customer: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
-
     return {
       output: mapCustomer(result.data),
       message: `Created customer **${result.data.name}** (${result.data.id}).`
@@ -185,11 +188,10 @@ export let createCustomer = SlateTool.create(spec, {
 export let updateCustomer = SlateTool.create(spec, {
   name: 'Update Customer',
   key: 'update_customer',
-  description: `Update an existing customer's details. Only the fields you provide will be updated; omitted fields remain unchanged.`,
-  tags: {
-    destructive: false
-  }
+  tags: { readOnly: false },
+  description: `Update an existing customer's details. Only the fields you provide will be updated; omitted fields remain unchanged.`
 })
+  .scopes(anyOf('customer:write'))
   .input(
     z.object({
       customerId: z.string().describe('ID of the customer to update'),
@@ -215,12 +217,6 @@ export let updateCustomer = SlateTool.create(spec, {
     let { customerId, ...rest } = ctx.input;
     let result = await client.patchCustomer({ id: customerId, ...rest });
 
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to update customer: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
-
     return {
       output: mapCustomer(result.data),
       message: `Updated customer **${result.data.name}** (${result.data.id}).`
@@ -233,11 +229,10 @@ export let updateCustomer = SlateTool.create(spec, {
 export let deleteCustomer = SlateTool.create(spec, {
   name: 'Delete Customer',
   key: 'delete_customer',
-  description: `Permanently delete a customer from a Wave business. This action cannot be undone.`,
-  tags: {
-    destructive: true
-  }
+  tags: { readOnly: false, destructive: true },
+  description: `Permanently delete a customer from a Wave business. This action cannot be undone.`
 })
+  .scopes(anyOf('customer:write'))
   .input(
     z.object({
       customerId: z.string().describe('ID of the customer to delete')
@@ -250,13 +245,7 @@ export let deleteCustomer = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new WaveClient(ctx.auth.token);
-    let result = await client.deleteCustomer(ctx.input.customerId);
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to delete customer: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
+    await client.deleteCustomer(ctx.input.customerId);
 
     return {
       output: { success: true },

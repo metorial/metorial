@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 let commentThreadSchema = z.object({
@@ -69,9 +70,11 @@ export let createComment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
 
-    if (ctx.input.threadId) {
+    if (ctx.input.threadId !== undefined) {
+      if (ctx.input.assigneeId !== undefined)
+        fail('Assignment is supported only for a new thread; omit assigneeId when replying.');
       let reply = await client.createReply(ctx.input.designId, ctx.input.threadId, {
         messagePlaintext: ctx.input.message
       });
@@ -95,7 +98,7 @@ export let createComment = SlateTool.create(spec, {
 export let getCommentThread = SlateTool.create(spec, {
   name: 'Get Comment Thread',
   key: 'get_comment_thread',
-  description: `Retrieve a comment thread and its replies on a design. Returns the thread details and optionally lists all replies.`,
+  description: `Retrieve a comment thread and its replies on a design. Returns the thread details and optionally lists one page of replies.`,
   tags: {
     readOnly: true
   }
@@ -107,7 +110,13 @@ export let getCommentThread = SlateTool.create(spec, {
       includeReplies: z
         .boolean()
         .optional()
-        .describe('Whether to also fetch replies for this thread'),
+        .describe('Whether to also fetch one page of replies for this thread'),
+      repliesContinuation: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque token from the preceding replies page; requires includeReplies true'
+        ),
       repliesLimit: z
         .number()
         .min(1)
@@ -127,13 +136,19 @@ export let getCommentThread = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
+    if (
+      (ctx.input.repliesContinuation !== undefined || ctx.input.repliesLimit !== undefined) &&
+      ctx.input.includeReplies !== true
+    )
+      fail('Set includeReplies true to request reply paging options.');
     let thread = await client.getCommentThread(ctx.input.designId, ctx.input.threadId);
 
     let replies: Awaited<ReturnType<typeof client.listReplies>> | undefined;
     if (ctx.input.includeReplies) {
       replies = await client.listReplies(ctx.input.designId, ctx.input.threadId, {
-        limit: ctx.input.repliesLimit
+        limit: ctx.input.repliesLimit,
+        continuation: ctx.input.repliesContinuation
       });
     }
 

@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'vonage',
   name: 'Vonage',
   description:
-    'Cloud communications platform providing APIs for messaging (SMS, MMS, WhatsApp, Messenger, Viber, RCS), voice calling, video conferencing, user verification, and phone number intelligence.',
+    'Send multichannel messages, create and control phone calls, start and check verifications, inspect phone numbers, manage virtual numbers and applications, and read account balance or manage subaccounts and transfers.',
   metadata: {},
   config,
   auth

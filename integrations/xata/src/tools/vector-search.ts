@@ -6,12 +6,14 @@ import { spec } from '../spec';
 export let vectorSearch = SlateTool.create(spec, {
   name: 'Vector Search',
   key: 'vector_search',
-  description: `Perform vector-based similarity search on a table column that contains vector embeddings. Use this for semantic search, recommendation systems, or any nearest-neighbor lookup. Requires a column of type "vector" with a fixed dimension.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Perform vector-based similarity search on a table column that contains vector embeddings. Use this for semantic search, recommendation systems, or any nearest-neighbor lookup. Requires a column of type "vector" with a fixed dimension.`,
   instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.',
     'The queryVector must match the dimension of the target vector column.',
     'Supported similarity functions: "cosineSimilarity" (default), "l1", "l2".'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

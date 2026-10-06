@@ -8,6 +8,9 @@ import {
   browseTags,
   browseTiers,
   browseUsers,
+  exportContent,
+  getCurrentContext,
+  getResource,
   getSite,
   manageMember,
   manageNewsletter,
@@ -17,11 +20,13 @@ import {
   manageTag,
   manageWebhook
 } from './tools';
-import { memberEvents, pageEvents, postEvents, siteChanged, tagEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
+  triggers: [],
   tools: [
+    getCurrentContext,
+    getResource,
+    exportContent,
     browsePosts,
     managePost,
     browsePages,
@@ -37,6 +42,5 @@ export let provider = Slate.create({
     browseUsers,
     getSite,
     manageWebhook
-  ],
-  triggers: [postEvents, pageEvents, tagEvents, memberEvents, siteChanged]
+  ]
 });

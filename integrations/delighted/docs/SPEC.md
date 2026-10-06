@@ -1,87 +1,40 @@
-Let me get more details on the full API features.# Slates Specification for Delighted
+# Delighted legacy API contracts
 
-## Overview
+Delighted is discontinued. The [official sunset FAQ](https://help.delighted.com/article/840-delighted-sunset-faq), updated June 29, 2026, states that the product ended June 30, 2026 and customer access terminated July 1, 2026, with no extensions. The [current product page](https://www.qualtrics.com/delighted/) confirms it is no longer available. Historical API documentation is not evidence of a working service.
 
-Delighted is a customer experience (CX) platform that enables businesses to collect and analyze customer feedback through various survey types including NPS, CSAT, CES, and others. It provides a REST API for programmatically sending surveys, managing people, retrieving responses, and accessing metrics across multiple CX projects.
+This package preserves all 12 existing action keys, names, input/output fields, enum values and original effect tags, with an added deprecated tag and unavailable guidance. Each handler, token setup and profile lookup returns an actionable unavailable error before reading credentials or making a request. The retained client constructor rejects access without creating a transport. Do not retry or reconnect; select another supported provider. No automatic migration, Qualtrics routing, data recovery, identity discovery, exports, triggers or replacement tools are exposed.
 
-## Authentication
+## Historical coverage
 
-All API requests must be made over HTTPS and are authenticated via HTTP Basic Auth. Use your API key as the username and leave the password blank.
+The following table records the former contract only. None of these operations can run through this package.
 
-To use the Delighted API, you'll need a private API key that is linked to your account. Each CX project has its own API key, so ensure you've selected the correct project.
+| Retained tool | Former documented workflow |
+| --- | --- |
+| `send_survey` | Create/update a person and optionally schedule email/SMS; `send=false` suppressed scheduling |
+| `list_survey_responses` | Response pages, scores/comments, additional answers, date/person/trend filters |
+| `add_survey_response` | Import a person-linked score/comment |
+| `get_metrics` | Core NPS response breakdown |
+| `list_people` | People, unsubscribed people, or bounced people |
+| `delete_person` | Person deletion request |
+| `unsubscribe_person` | Email unsubscribe without deleting previous responses |
+| `cancel_pending_surveys` | Cancel pending survey requests |
+| `get_autopilot_config` | Email/SMS recurring survey settings |
+| `add_to_autopilot` | Enroll/update a person; membership properties replaced previous properties |
+| `list_autopilot_members` | Email/SMS memberships and next scheduled request |
+| `remove_from_autopilot` | Remove recurring membership |
 
-- **Method:** HTTP Basic Authentication
-- **Base URL:** `https://api.delighted.com/v1/`
-- **Username:** Your Delighted API key
-- **Password:** Leave blank
-- The API key can be found under Integrations > API in your Delighted account. Limited users cannot view the API key, and each project has its own key.
+The former API used project-specific Basic credentials (API key as username, blank password) over HTTPS at `https://api.delighted.com/v1/`. No OAuth, token refresh or genuine account/self endpoint was documented in the reviewed API index. Config remains an empty object, and the legacy auth method key/token fields remain unchanged for stored contract compatibility. New setup is unavailable.
 
-Example:
+People and Autopilot memberships formerly used opaque `Link` header cursors; survey responses used numbered pages. The old client discarded people/membership continuation, used truthiness for zero/empty values, mapped unrestricted native data, and emitted unsupported unconditional deletion/scheduling success claims. Those dormant request/mapping paths were removed rather than promoted as repaired live functionality after the shutdown. Legacy schema looseness and output shapes remain solely for saved contract compatibility. There were no file-download/export tools, and none were added.
 
-```
-curl https://api.delighted.com/v1/metrics.json \
-  -u YOUR_DELIGHTED_API_KEY:
-```
+## Official references
 
-## Features
+- [Historical API/auth index](https://app.delighted.com/docs/api)
+- [Sending to people](https://app.delighted.com/docs/api/sending-to-people)
+- [Listing responses](https://app.delighted.com/docs/api/listing-survey-responses) and [adding responses](https://app.delighted.com/docs/api/adding-survey-responses)
+- [Metrics](https://app.delighted.com/docs/api/getting-metrics)
+- [People and cursor pagination](https://app.delighted.com/docs/api/listing-people)
+- [Unsubscribe semantics](https://app.delighted.com/docs/api/unsubscribing-people)
+- [Autopilot configuration](https://app.delighted.com/docs/api/getting-autopilot-configuration), [adding/updating members](https://app.delighted.com/docs/api/adding-people-to-autopilot), and [membership cursor pagination](https://app.delighted.com/docs/api/listing-people-in-autopilot)
 
-### Survey Distribution
-
-Send surveys to people via the API by creating person records with an email address or phone number. You can add custom properties (metadata) to each survey request for filtering responses on the dashboard, such as location, product purchased, or customer type. Surveys can be sent via email or SMS. You can create a person without scheduling a survey email by passing `send=false`, useful if you wish to handle surveying the person yourself and add your own survey response data via the API.
-
-- Supports configurable delay before sending surveys.
-- Supports locale settings for multilingual surveys.
-- Depending on the survey throttling interval set on your account, a person added via the API may not be sent a survey if they have been sent one recently.
-
-### Survey Response Management
-
-List and retrieve survey responses, including scores, comments, tags, notes, and additional question answers. You can also programmatically add survey responses (e.g., for responses collected outside of Delighted).
-
-- Responses include metadata such as person properties, timestamps, and permalinks.
-- Supports filtering by date range and other parameters.
-
-### Metrics Retrieval
-
-Retrieve aggregated survey metrics such as NPS score, promoter/passive/detractor counts and percentages, and total response count. Useful for dashboard reporting and analytics.
-
-### People Management
-
-Manage survey recipients including listing all people, deleting people and their associated data, listing unsubscribed people, and listing bounced emails. People can be deleted by ID or email address. You can also programmatically unsubscribe people from future surveys.
-
-### Autopilot Management
-
-Autopilot is Delighted's recurring survey automation feature. The API allows you to:
-
-- Retrieve the Autopilot configuration for email or SMS platforms (active status, frequency).
-- Add people to Autopilot by providing their email address (for Email Autopilot) or phone number (for SMS Autopilot).
-- List people currently enrolled in Autopilot.
-- Remove people from Autopilot, which cancels their scheduled surveys.
-
-### Pending Survey Request Management
-
-Delete pending (not yet sent) survey requests for specific people, useful for cancelling surveys that are scheduled but have not been dispatched.
-
-### Web Snippet
-
-Delighted provides a web snippet for embedding in-app surveys, with presets configurable in the Delighted dashboard without needing to modify code. Configuration set in Delighted provides defaults that can be customized in the JavaScript call. Supports throttling, adaptive sampling, and multi-project setups.
-
-## Events
-
-Delighted supports webhooks to trigger requests to your own application when feedback and unsubscribe events occur. Webhooks are always sent as an HTTP POST request to the webhook URLs configured via the Webhooks integration.
-
-Every webhook includes an `X-Delighted-Webhook-Signature` header that can be used to verify the request authenticity. The signature is an HMAC SHA-256 digest generated using your private API key over the request body.
-
-### Survey Response Events
-
-The response webhook is triggered when a response is received or updated. This means the response webhook fires when a score is selected, when a comment is added, and when any Additional Questions are answered in a Delighted CX survey.
-
-- Event type: `survey_response.updated`
-- Payload includes person details, survey type, score, comment, tags, notes, person properties, and additional question answers.
-- Webhook rules can be configured to filter by conditions (e.g., "promoters only").
-
-### Unsubscribe Events
-
-The unsubscribe webhook is triggered when someone clicks on the unsubscribe button within the survey email.
-
-- Event type: `survey_response.unsubscribed`
-- Payload includes details about the person who unsubscribed.
+The sunset notices determine current availability. Some direct historical-document fetches returned 502 during this audit, while official search-index copies remained readable. No API endpoint was probed and no provider credentials or resources were used.

@@ -19,9 +19,17 @@ export let getLifecycleEvents = SlateTool.create(spec, {
         .describe(
           'Filter events for a specific sandbox. Omit to get events for all team sandboxes.'
         ),
-      offset: z.number().optional().describe('Number of events to skip (default 0).'),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Number of events to skip (default 0).'),
       limit: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
         .describe('Number of events to return (default 10, max 100).'),
       orderAsc: z
@@ -42,7 +50,7 @@ export let getLifecycleEvents = SlateTool.create(spec, {
               .describe(
                 'Event type (e.g., sandbox.lifecycle.created, sandbox.lifecycle.killed).'
               ),
-            eventData: z.any().optional().describe('Event-specific metadata.'),
+            eventData: z.unknown().optional().describe('Event-specific metadata.'),
             sandboxId: z.string().describe('ID of the sandbox.'),
             sandboxBuildId: z.string().describe('Build ID of the sandbox.'),
             sandboxExecutionId: z.string().describe('Execution ID of the sandbox.'),

@@ -7,6 +7,7 @@ import {
   createGroupToken,
   deleteDatabase,
   deleteGroup,
+  getCurrentUser,
   getDatabase,
   getGroup,
   getOrganization,
@@ -16,6 +17,7 @@ import {
   listDatabases,
   listGroups,
   listLocations,
+  listOrganizations,
   manageApiTokens,
   manageGroupLocations,
   manageMembers,
@@ -23,11 +25,11 @@ import {
   unarchiveGroup,
   updateDatabaseConfiguration
 } from './tools';
-import { auditLogActivity, databaseChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    listOrganizations,
     listDatabases,
     createDatabase,
     getDatabase,
@@ -50,5 +52,5 @@ export let provider = Slate.create({
     manageApiTokens,
     listAuditLogs
   ],
-  triggers: [inboundWebhook, auditLogActivity, databaseChanges]
+  triggers: []
 });

@@ -19,7 +19,7 @@ export let getFieldValues = SlateTool.create(spec, {
   description: `Retrieve field values (custom data) for entities in Affinity. Filter by person, organization, opportunity, list entry, or specific field. Returns all custom field data associated with the entity.`,
   instructions: [
     'Use "Get Fields" first to discover field IDs and their types.',
-    'At least one filter parameter should be provided.'
+    'Provide exactly one of personId, organizationId, opportunityId or listEntryId. fieldId optionally filters that entity’s returned values.'
   ],
   tags: {
     readOnly: true
@@ -53,7 +53,7 @@ export let getFieldValues = SlateTool.create(spec, {
       fieldId: ctx.input.fieldId
     });
 
-    let fieldValues = (Array.isArray(result) ? result : []).map((fv: any) => ({
+    let fieldValues = (Array.isArray(result) ? result : []).map(fv => ({
       fieldValueId: fv.id,
       fieldId: fv.field_id,
       entityId: fv.entity_id,
@@ -78,9 +78,10 @@ export let setFieldValue = SlateTool.create(spec, {
 **Value formats by field type:**
 - **Text/Number**: String or number
 - **Date**: ISO 8601 date string
-- **Dropdown**: The dropdown option ID
+- **Text/managed dropdown (type 2)**: A string value
+- **Ranked dropdown (type 7)**: The dropdown option ID from get_fields
 - **Person/Organization**: The entity ID
-- **Location**: Object with street, city, state, country, etc.`,
+- **Location**: Object with street_address, city, state and country.`,
   instructions: [
     'Use "Get Fields" to discover available field IDs and their types.',
     'For list-specific fields, also provide the listEntryId.'

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { salesPayload } from '../lib/payloads';
 import { spec } from '../spec';
 
 let addressSchema = z
@@ -22,7 +23,9 @@ let addressSchema = z
     countryCode: z
       .string()
       .optional()
-      .describe('ISO 3166-1 alpha-2 country code (e.g. DE, AT, CH)')
+      .describe(
+        'Provider country or tax-region code (e.g. DE, ES_CN); discover choices with list_reference_data'
+      )
   })
   .describe(
     'Address of the order confirmation recipient. Provide either contactId or inline address fields.'
@@ -98,7 +101,7 @@ let paymentConditionsSchema = z
     paymentTermLabelTemplate: z
       .string()
       .optional()
-      .describe('Template for payment term label with placeholders'),
+      .describe('Legacy read-only field; use paymentTermLabel for writes'),
     paymentTermDuration: z.number().optional().describe('Payment term duration in days')
   })
   .describe('Payment conditions');
@@ -180,37 +183,15 @@ export let createOrderConfirmation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let orderData: Record<string, any> = {
-      address: ctx.input.address,
-      lineItems: ctx.input.lineItems,
-      taxConditions: ctx.input.taxConditions
-    };
-
-    if (ctx.input.totalPrice) orderData.totalPrice = ctx.input.totalPrice;
-    if (ctx.input.paymentConditions) orderData.paymentConditions = ctx.input.paymentConditions;
-    if (ctx.input.shippingConditions)
-      orderData.shippingConditions = ctx.input.shippingConditions;
-    if (ctx.input.title) orderData.title = ctx.input.title;
-    if (ctx.input.introduction) orderData.introduction = ctx.input.introduction;
-    if (ctx.input.remark) orderData.remark = ctx.input.remark;
-    if (ctx.input.voucherDate) orderData.voucherDate = ctx.input.voucherDate;
-
-    let result = await client.createOrderConfirmation(orderData, {
+    const client = new Client({ token: ctx.auth.token });
+    const data = salesPayload(ctx.input, 'order_confirmation');
+    const result = await client.createOrderConfirmation(data, {
       finalize: ctx.input.finalize,
       precedingSalesVoucherId: ctx.input.precedingSalesVoucherId
     });
-
     return {
-      output: {
-        id: result.id,
-        resourceUri: result.resourceUri,
-        createdDate: result.createdDate,
-        updatedDate: result.updatedDate,
-        version: result.version
-      },
-      message: `Created order confirmation **${result.id}**${ctx.input.finalize ? ' (finalized)' : ' (draft)'}${ctx.input.precedingSalesVoucherId ? ` linked to voucher ${ctx.input.precedingSalesVoucherId}` : ''}`
+      output: result,
+      message: `Created order confirmation **${result.id}**${ctx.input.finalize ? '; immediate finalization was requested' : '; created as a draft'}.`
     };
   })
   .build();

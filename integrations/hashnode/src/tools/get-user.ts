@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -67,14 +67,14 @@ export let getUser = SlateTool.create(spec, {
       publicationHost: ctx.config.publicationHost
     });
 
-    let user: any;
+    let user: Awaited<ReturnType<Client['getMe']>>;
     if (ctx.input.username) {
       user = await client.getUser(ctx.input.username);
     } else {
       user = await client.getMe();
     }
 
-    if (!user) throw new Error('User not found');
+    if (!user) throw createApiServiceError('User not found');
 
     return {
       output: {

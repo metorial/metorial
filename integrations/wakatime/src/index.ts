@@ -20,8 +20,6 @@ import {
   listProjects,
   manageDataExports
 } from './tools';
-import { codingActivityTrigger, goalProgressTrigger, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     getMachines,
     manageDataExports
   ],
-  triggers: [inboundWebhook, codingActivityTrigger, goalProgressTrigger]
+  triggers: []
 });

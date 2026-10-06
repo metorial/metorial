@@ -1,13 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectUnavailableDelighted, unavailableMessage } from '../lib/unavailable';
 import { spec } from '../spec';
 
 export let listPeople = SlateTool.create(spec, {
   name: 'List People',
   key: 'list_people',
-  description: `List survey recipients. Can filter by date range, email, or phone number. Also supports listing unsubscribed people and bounced emails by setting the \`listType\` parameter.`,
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: true
   }
@@ -37,39 +40,5 @@ export let listPeople = SlateTool.create(spec, {
       people: z.array(z.any()).describe('List of people records')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let listType = ctx.input.listType || 'all';
-
-    let people: any[];
-
-    if (listType === 'unsubscribed') {
-      people = await client.listUnsubscribes({
-        perPage: ctx.input.perPage,
-        page: ctx.input.page,
-        since: ctx.input.since,
-        until: ctx.input.until
-      });
-    } else if (listType === 'bounced') {
-      people = await client.listBounces({
-        perPage: ctx.input.perPage,
-        page: ctx.input.page,
-        since: ctx.input.since,
-        until: ctx.input.until
-      });
-    } else {
-      people = await client.listPeople({
-        perPage: ctx.input.perPage,
-        since: ctx.input.since,
-        until: ctx.input.until,
-        email: ctx.input.email,
-        phoneNumber: ctx.input.phoneNumber
-      });
-    }
-
-    return {
-      output: { people },
-      message: `Retrieved **${people.length}** ${listType === 'unsubscribed' ? 'unsubscribed' : listType === 'bounced' ? 'bounced' : ''} people.`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();

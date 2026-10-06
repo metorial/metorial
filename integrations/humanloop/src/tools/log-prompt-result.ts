@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectHumanloopOperation } from '../lib/retirement';
 import { spec } from '../spec';
 
 export let logPromptResult = SlateTool.create(spec, {
   name: 'Log Prompt Result',
   key: 'log_prompt_result',
-  description: `Log an LLM call result to Humanloop. Use this when calling model providers directly (not through Humanloop's proxy) and you want to record the result for observability, evaluation, or feedback. Captures inputs, outputs, token usage, latency, and optional metadata.`,
+  description:
+    'DEPRECATED — Humanloop shut down on September 8, 2025. This operation is unavailable; the tool is retained only for compatibility.',
   instructions: [
-    'Provide either a promptId/path to associate the log with a prompt, or a versionId for a specific version.',
-    'Use traceParentId to link logs in a parent-child trace relationship for multi-step pipelines.'
+    'Humanloop is retired. Do not use this tool for new workflows; use data exported before September 8, 2025 with your chosen replacement platform.'
   ],
   tags: {
     destructive: false,
-    readOnly: false
+    readOnly: false,
+    deprecated: true
   }
 })
   .input(
@@ -62,51 +63,5 @@ export let logPromptResult = SlateTool.create(spec, {
       raw: z.any().optional().describe('Full response from the API')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let body: Record<string, any> = {};
-    if (ctx.input.promptId) body.id = ctx.input.promptId;
-    if (ctx.input.path) body.path = ctx.input.path;
-    if (ctx.input.versionId) body.version_id = ctx.input.versionId;
-    if (ctx.input.inputs) body.inputs = ctx.input.inputs;
-    if (ctx.input.output) body.output = ctx.input.output;
-    if (ctx.input.outputMessage) {
-      body.output_message = {
-        role: ctx.input.outputMessage.role,
-        content: ctx.input.outputMessage.content,
-        tool_calls: ctx.input.outputMessage.toolCalls
-      };
-    }
-    if (ctx.input.messages) body.messages = ctx.input.messages;
-    if (ctx.input.error) body.error = ctx.input.error;
-    if (ctx.input.traceParentId) body.trace_parent_id = ctx.input.traceParentId;
-    if (ctx.input.metadata) body.metadata = ctx.input.metadata;
-
-    if (ctx.input.promptTokens !== undefined || ctx.input.outputTokens !== undefined) {
-      body.usage = {};
-      if (ctx.input.promptTokens !== undefined)
-        body.usage.prompt_tokens = ctx.input.promptTokens;
-      if (ctx.input.outputTokens !== undefined)
-        body.usage.completion_tokens = ctx.input.outputTokens;
-    }
-
-    if (ctx.input.promptCost !== undefined || ctx.input.outputCost !== undefined) {
-      body.cost = {};
-      if (ctx.input.promptCost !== undefined) body.cost.prompt = ctx.input.promptCost;
-      if (ctx.input.outputCost !== undefined) body.cost.completion = ctx.input.outputCost;
-    }
-
-    if (ctx.input.latency !== undefined) body.provider_latency = ctx.input.latency;
-
-    let result = await client.logPrompt(body);
-
-    return {
-      output: {
-        logId: result.id,
-        raw: result
-      },
-      message: `Logged prompt result (log ID: **${result.id}**).`
-    };
-  })
+  .handleInvocation(async () => rejectHumanloopOperation())
   .build();

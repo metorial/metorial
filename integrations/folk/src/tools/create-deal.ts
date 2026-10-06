@@ -8,7 +8,7 @@ export let createDeal = SlateTool.create(spec, {
   key: 'create_deal',
   description: `Creates a new deal within a specific group in your Folk workspace. Deals track opportunities, projects, or other outcome-driven items. You can associate people and companies that belong to the same group.`,
   instructions: [
-    'The groupId and objectType are required. Use "Deals" as the objectType unless you have a custom deal type.',
+    'The groupId and objectType are required. Call list_groups and list_custom_fields to discover the exact group and object type name.',
     'People and companies referenced must already belong to the same group.'
   ],
   tags: {
@@ -18,8 +18,16 @@ export let createDeal = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe(
+          'Optional unique retry key. Reuse the same key and identical input after an uncertain response; Folk retains completed keys for 24 hours.'
+        ),
       groupId: z.string().describe('ID of the group to create the deal in'),
-      objectType: z.string().describe('Deal object type name (e.g. "Deals")'),
+      objectType: z
+        .string()
+        .describe('Exact deal object type name discovered with list_custom_fields'),
       name: z.string().optional().describe('Deal name'),
       companyIds: z.array(z.string()).optional().describe('IDs of companies to associate'),
       personIds: z.array(z.string()).optional().describe('IDs of people to associate'),
@@ -57,7 +65,7 @@ export let createDeal = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let input: Record<string, unknown> = {};
-    if (ctx.input.name) input.name = ctx.input.name;
+    if (ctx.input.name !== undefined) input.name = ctx.input.name;
     if (ctx.input.customFieldValues) input.customFieldValues = ctx.input.customFieldValues;
     if (ctx.input.companyIds) {
       input.companies = ctx.input.companyIds.map(id => ({ id }));
@@ -66,7 +74,12 @@ export let createDeal = SlateTool.create(spec, {
       input.people = ctx.input.personIds.map(id => ({ id }));
     }
 
-    let deal = await client.createDeal(ctx.input.groupId, ctx.input.objectType, input);
+    let deal = await client.createDeal(
+      ctx.input.groupId,
+      ctx.input.objectType,
+      input,
+      ctx.input.idempotencyKey
+    );
 
     return {
       output: {

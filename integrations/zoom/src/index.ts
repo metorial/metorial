@@ -26,14 +26,6 @@ import {
   updateMeeting,
   updateWebinar
 } from './tools';
-import {
-  chatMessageEvents,
-  meetingEvents,
-  recordingEvents,
-  userEvents,
-  webinarEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,5 +54,5 @@ export let provider = Slate.create({
     deleteRecording,
     getMeetingReport
   ],
-  triggers: [meetingEvents, webinarEvents, recordingEvents, userEvents, chatMessageEvents]
+  triggers: []
 });

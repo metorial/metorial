@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listOrgMembers = SlateTool.create(spec, {
@@ -13,10 +14,11 @@ export let listOrgMembers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organization: z
+      organization: organizationInput,
+      continuationToken: z
         .string()
         .optional()
-        .describe('Organization name (uses default from config if not set)')
+        .describe('Request one page from this token; omit to retrieve all pages.')
     })
   )
   .output(
@@ -30,32 +32,36 @@ export let listOrgMembers = SlateTool.create(spec, {
           role: z.string().optional(),
           knownToPulumi: z.boolean().optional()
         })
-      )
+      ),
+      continuationToken: z.string().optional(),
+      returnedCount: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
 
-    let result = await client.listOrgMembers(org);
+    let result = await client.listOrgMembers(org, ctx.input.continuationToken);
 
-    let members = (result.members || []).map((m: any) => ({
+    let members = result.members.map(m => ({
       userName: m.user?.name,
       userLogin: m.user?.githubLogin,
-      email: m.user?.email,
+      email: m.user?.email ?? undefined,
       avatarUrl: m.user?.avatarUrl,
       role: m.role,
       knownToPulumi: m.knownToPulumi
     }));
 
     return {
-      output: { members },
+      output: {
+        members,
+        continuationToken: result.continuationToken,
+        returnedCount: members.length
+      },
       message: `Found **${members.length}** member(s) in organization **${org}**`
     };
   })

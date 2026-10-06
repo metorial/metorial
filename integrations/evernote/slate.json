@@ -1,6 +1,6 @@
 {
   "name": "@metorial/evernote",
-  "description": "Create, read, update, copy, search, and trash notes in Evernote. Organize notes with notebooks and tags, attach resources when creating notes, download resource file contents through Slate attachments, list saved searches, and receive note-change notifications through webhooks or polling.",
+  "description": "Create, read, update, copy, search, and trash notes in Evernote. Organize notes with notebooks and tags, attach resources when creating notes, download resource file contents through Slate attachments, list saved searches.",
   "categories": [
     "apis-and-http-requests",
     "note-taking-and-knowledge-bases",
@@ -14,7 +14,6 @@
     "attach resources to new notes",
     "download note resources",
     "list saved searches",
-    "receive change notifications",
     "sync account metadata"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/evernote.png"

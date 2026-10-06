@@ -10,10 +10,7 @@ let exclusionRuleOutputSchema = z.object({
   apps: z.array(z.string()).optional().describe('Apps the rule applies to'),
   hosts: z.array(z.string()).optional().describe('Hosts the rule applies to'),
   query: z.string().optional().describe('Query string that matches logs to exclude'),
-  indexOnly: z
-    .boolean()
-    .optional()
-    .describe('If true, logs are preserved for search but not stored long-term')
+  indexOnly: z.boolean().optional().describe('Provider index-only exclusion setting')
 });
 
 export let listExclusionRules = SlateTool.create(spec, {
@@ -29,14 +26,18 @@ export let listExclusionRules = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let rules = await client.listExclusionRules();
-    let ruleList = Array.isArray(rules) ? rules : [];
+    let ruleList = rules;
 
     return {
       output: {
-        rules: ruleList.map((r: any) => ({
-          ruleId: r.id || r.ID || '',
+        rules: ruleList.map(r => ({
+          ruleId: r.id,
           title: r.title,
           active: r.active,
           apps: r.apps,
@@ -50,11 +51,48 @@ export let listExclusionRules = SlateTool.create(spec, {
   })
   .build();
 
+export let getExclusionRule = SlateTool.create(spec, {
+  name: 'Get Exclusion Rule',
+  key: 'get_exclusion_rule',
+  description:
+    'Read one ingestion exclusion rule by ID. Call list_exclusion_rules to discover rules and their active state.',
+  tags: { destructive: false, readOnly: true }
+})
+  .input(
+    z.object({
+      ruleId: z
+        .string()
+        .describe('Exclusion rule ID. Call list_exclusion_rules to discover IDs.')
+    })
+  )
+  .output(exclusionRuleOutputSchema)
+  .handleInvocation(async ctx => {
+    const client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
+    const rule = await client.getExclusionRule(ctx.input.ruleId);
+    return {
+      output: {
+        ruleId: rule.id,
+        title: rule.title,
+        active: rule.active,
+        apps: rule.apps,
+        hosts: rule.hosts,
+        query: rule.query,
+        indexOnly: rule.indexonly
+      },
+      message: `Retrieved exclusion rule **${rule.title ?? rule.id}**.`
+    };
+  })
+  .build();
+
 export let createExclusionRule = SlateTool.create(spec, {
   name: 'Create Exclusion Rule',
   key: 'create_exclusion_rule',
-  description: `Create a new exclusion rule to prevent certain logs from being stored. Filter by apps, hosts, or query patterns. Optionally use "indexOnly" to keep logs searchable without long-term storage.`,
-  tags: { destructive: false, readOnly: false }
+  description: `Create a new exclusion rule to prevent certain logs from being stored. Filter by apps, hosts, or query patterns. Use "indexOnly" to select the provider exclusion mode.`,
+  tags: { destructive: true, readOnly: false }
 })
   .input(
     z.object({
@@ -62,22 +100,23 @@ export let createExclusionRule = SlateTool.create(spec, {
       active: z
         .boolean()
         .optional()
-        .describe('Whether the rule should be active immediately (defaults to true)'),
+        .describe('Whether the rule should be active immediately (provider default is false)'),
       apps: z.array(z.string()).optional().describe('App names whose logs should be excluded'),
       hosts: z
         .array(z.string())
         .optional()
         .describe('Hostnames whose logs should be excluded'),
       query: z.string().optional().describe('Query string to match logs for exclusion'),
-      indexOnly: z
-        .boolean()
-        .optional()
-        .describe('If true, logs are searchable but not stored long-term')
+      indexOnly: z.boolean().optional().describe('Provider index-only exclusion setting')
     })
   )
   .output(exclusionRuleOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let r = await client.createExclusionRule({
       title: ctx.input.title,
       active: ctx.input.active,
@@ -89,7 +128,7 @@ export let createExclusionRule = SlateTool.create(spec, {
 
     return {
       output: {
-        ruleId: r.id || r.ID || '',
+        ruleId: r.id,
         title: r.title,
         active: r.active,
         apps: r.apps,
@@ -106,7 +145,7 @@ export let updateExclusionRule = SlateTool.create(spec, {
   name: 'Update Exclusion Rule',
   key: 'update_exclusion_rule',
   description: `Update an existing exclusion rule's title, filters, or active state.`,
-  tags: { destructive: false, readOnly: false }
+  tags: { destructive: true, readOnly: false }
 })
   .input(
     z.object({
@@ -121,8 +160,12 @@ export let updateExclusionRule = SlateTool.create(spec, {
   )
   .output(exclusionRuleOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
-    let updates: any = {};
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
+    let updates: Partial<import('../lib/types').ExclusionRuleRequest> = {};
     if (ctx.input.title !== undefined) updates.title = ctx.input.title;
     if (ctx.input.active !== undefined) updates.active = ctx.input.active;
     if (ctx.input.apps !== undefined) updates.apps = ctx.input.apps;
@@ -134,7 +177,7 @@ export let updateExclusionRule = SlateTool.create(spec, {
 
     return {
       output: {
-        ruleId: r.id || r.ID || ctx.input.ruleId,
+        ruleId: r.id,
         title: r.title,
         active: r.active,
         apps: r.apps,
@@ -164,7 +207,11 @@ export let deleteExclusionRule = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     await client.deleteExclusionRule(ctx.input.ruleId);
 
     return {

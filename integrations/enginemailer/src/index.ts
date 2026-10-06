@@ -16,8 +16,6 @@ import {
   tagSubscriber,
   untagSubscriber
 } from './tools';
-import { emailEvent, subscriberChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     listSubcategories,
     listCustomFields
   ],
-  triggers: [emailEvent, subscriberChange]
+  triggers: []
 });

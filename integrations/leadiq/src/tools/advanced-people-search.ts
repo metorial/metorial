@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapCompanyFilter, mapContactFilter } from '../lib/filters';
 import { spec } from '../spec';
 
 let locationFilterSchema = z
@@ -26,11 +27,33 @@ let rangeFilterSchema = z.object({
 });
 
 let fundingInfoFilterSchema = z.object({
-  fundingRoundsMin: z.number().optional().describe('Minimum number of funding rounds'),
-  fundingRoundsMax: z.number().optional().describe('Maximum number of funding rounds'),
+  fundingRoundsMin: z
+    .number()
+    .optional()
+    .describe(
+      'Legacy round-count filter; unavailable in the documented current funding input.'
+    ),
+  fundingRoundsMax: z
+    .number()
+    .optional()
+    .describe(
+      'Legacy round-count filter; unavailable in the documented current funding input.'
+    ),
   fundingTotalUsdMin: z.number().optional().describe('Minimum total funding in USD'),
   fundingTotalUsdMax: z.number().optional().describe('Maximum total funding in USD'),
-  lastFundingTypes: z.array(z.string()).optional().describe('Filter by last funding type')
+  lastFundingTypes: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Legacy funding-type filter; the current provider schema does not document it. Use supported funding ranges instead.'
+    ),
+  lastFundingRange: rangeFilterSchema
+    .optional()
+    .describe('Most recent funding amount range in USD'),
+  lastFundingDateRange: z
+    .object({ start: z.string().optional(), end: z.string().optional() })
+    .optional()
+    .describe('Most recent funding date range as ISO dates, converted to Unix milliseconds')
 });
 
 let contactFilterSchema = z
@@ -90,7 +113,9 @@ let companyFilterSchema = z
     descriptions: z
       .array(z.string())
       .optional()
-      .describe('Filter by keywords in company description'),
+      .describe(
+        'Legacy description filter; not documented in the current CompanyFilter. Use supported filters instead.'
+      ),
     technologies: z.array(z.string()).optional().describe('Filter by technologies used'),
     technologyCategories: z
       .array(z.string())
@@ -184,13 +209,15 @@ Includes powerful contact and company filters with exclusion support.`,
   instructions: [
     'Use resultFormat "flat" for a simple list of people, or "grouped" for results organized by company.',
     'Combine contactFilter and companyFilter for targeted prospecting.',
+    'For deep pagination, pass the returned after cursor unchanged with identical filters and sorting; omit skip. Offset skip + limit cannot exceed 10,000.',
+    'Advanced search returns professional profiles and company data, not emails or phones. Use search_contact with a returned personId to request contact information.',
     'Use exclusion filters to omit specific companies or contacts from results.',
     'Sorting options for contacts: RoleAsc, RoleDesc, NameAsc, NameDesc, SeniorityAsc, SeniorityDesc, TitleAsc, TitleDesc, UpdatedAtAsc, UpdatedAtDesc.',
     'Sorting options for companies (grouped mode only): IdDesc, IdAsc, SizeDesc, SizeAsc, NameAsc, NameDesc, IndustryAsc, IndustryDesc.'
   ],
   constraints: [
     'Each search call consumes API credits.',
-    'Rate limits: 10 requests/minute (free), 60 requests/minute (paid).'
+    'Standard rate limit is 60 requests per minute; selected fields and account-specific API rates determine charges.'
   ],
   tags: {
     readOnly: true
@@ -206,6 +233,12 @@ Includes powerful contact and company filters with exclusion support.`,
       contactExcludedFilter: contactFilterSchema.describe('Exclusion filters for people'),
       companyFilter: companyFilterSchema.describe('Filters for companies'),
       companyExcludedFilter: companyFilterSchema.describe('Exclusion filters for companies'),
+      after: z
+        .array(z.object({ key: z.string(), value: z.string() }))
+        .optional()
+        .describe(
+          'Opaque cursor returned by the previous page. Keep filters and sorting identical and omit skip.'
+        ),
       skip: z.number().optional().describe('Number of results to skip (pagination offset)'),
       limit: z.number().optional().describe('Maximum number of results to return'),
       limitPerCompany: z
@@ -224,6 +257,11 @@ Includes powerful contact and company filters with exclusion support.`,
   )
   .output(
     z.object({
+      after: z
+        .array(z.object({ key: z.string(), value: z.string() }))
+        .nullable()
+        .optional()
+        .describe('Opaque continuation cursor; null means no next page.'),
       totalPeople: z.number().optional().describe('Total matching people (flat mode)'),
       people: z.array(personSchema).optional().describe('Matching people (flat mode)'),
       totalCompanies: z
@@ -237,67 +275,130 @@ Includes powerful contact and company filters with exclusion support.`,
     })
   )
   .handleInvocation(async ctx => {
+    for (let [name, value] of [
+      ['skip', ctx.input.skip],
+      ['limit', ctx.input.limit],
+      ['limitPerCompany', ctx.input.limitPerCompany]
+    ] as const)
+      if (
+        value !== undefined &&
+        (!Number.isSafeInteger(value) ||
+          value > 2147483647 ||
+          value < (name === 'skip' ? 0 : 1))
+      )
+        throw createApiServiceError(
+          `${name} must be a ${name === 'skip' ? 'non-negative' : 'positive'} safe integer.`,
+          { reason: 'invalid_input' }
+        );
+    if (ctx.input.after?.length === 0)
+      throw createApiServiceError(
+        'Omit after for the first page; a continuation cursor must be non-empty.',
+        { reason: 'invalid_input' }
+      );
+    if (ctx.input.after && ctx.input.skip !== undefined && ctx.input.skip !== 0)
+      throw createApiServiceError(
+        'Cursor pagination cannot be combined with a non-zero skip. Keep the filters and sorting unchanged.',
+        { reason: 'invalid_input' }
+      );
+    if (!ctx.input.after && (ctx.input.skip ?? 0) + (ctx.input.limit ?? 0) > 10000)
+      throw createApiServiceError(
+        'Offset skip + limit cannot exceed 10,000. Use the returned after cursor for deeper pagination.',
+        { reason: 'invalid_input' }
+      );
+    if (
+      ctx.input.resultFormat === 'flat' &&
+      (ctx.input.limitPerCompany !== undefined || ctx.input.sortCompaniesBy !== undefined)
+    )
+      throw createApiServiceError(
+        'limitPerCompany and sortCompaniesBy apply only to grouped results.',
+        { reason: 'invalid_input' }
+      );
+    let contactSorts = new Set([
+      'RoleAsc',
+      'NameDesc',
+      'SeniorityAsc',
+      'IdAsc',
+      'NameAsc',
+      'TitleAsc',
+      'SeniorityDesc',
+      'RoleDesc',
+      'TitleDesc',
+      'IdDesc',
+      'MobilePhoneAsc',
+      'MobilePhoneDesc',
+      'UpdatedAtAsc',
+      'UpdatedAtDesc',
+      'JobChangeStartedAtAsc',
+      'JobChangeStartedAtDesc'
+    ]);
+    let companySorts = new Set([
+      'IdDesc',
+      'IdAsc',
+      'SizeDesc',
+      'NameAsc',
+      'SizeAsc',
+      'IndustryAsc',
+      'NameDesc',
+      'IndustryDesc'
+    ]);
+    if (
+      ctx.input.sortContactsBy?.some(value => !contactSorts.has(value)) ||
+      ctx.input.sortCompaniesBy?.some(value => !companySorts.has(value))
+    )
+      throw createApiServiceError('Use a documented contact or company sorting option.', {
+        reason: 'invalid_input'
+      });
     let client = new Client({ token: ctx.auth.token });
-
-    let mapPerson = (p: any) => ({
-      ...p,
-      personId: p.id,
-      company: p.company ? { ...p.company, companyId: p.company.id } : undefined
+    let input = pickDefined({
+      contactFilter: mapContactFilter(ctx.input.contactFilter),
+      contactExcludedFilter: mapContactFilter(ctx.input.contactExcludedFilter),
+      companyFilter: mapCompanyFilter(ctx.input.companyFilter),
+      companyExcludedFilter: mapCompanyFilter(ctx.input.companyExcludedFilter),
+      skip: ctx.input.skip,
+      limit: ctx.input.limit,
+      after: ctx.input.after,
+      sortContactsBy: ctx.input.sortContactsBy
     });
-
+    let mapPerson = (person: any) => ({
+      ...person,
+      personId: person.id,
+      company: person.company ? { ...person.company, companyId: person.company.id } : undefined
+    });
     if (ctx.input.resultFormat === 'grouped') {
-      let input: Record<string, any> = {};
-      if (ctx.input.contactFilter) input.contactFilter = ctx.input.contactFilter;
-      if (ctx.input.contactExcludedFilter)
-        input.contactExcludedFilter = ctx.input.contactExcludedFilter;
-      if (ctx.input.companyFilter) input.companyFilter = ctx.input.companyFilter;
-      if (ctx.input.companyExcludedFilter)
-        input.companyExcludedFilter = ctx.input.companyExcludedFilter;
-      if (ctx.input.skip !== undefined) input.skip = ctx.input.skip;
-      if (ctx.input.limit !== undefined) input.limit = ctx.input.limit;
-      if (ctx.input.limitPerCompany !== undefined)
-        input.limitPerCompany = ctx.input.limitPerCompany;
-      if (ctx.input.sortContactsBy) input.sortContactsBy = ctx.input.sortContactsBy;
-      if (ctx.input.sortCompaniesBy) input.sortCompaniesBy = ctx.input.sortCompaniesBy;
-
-      let result = await client.groupedAdvancedSearch(input);
-
-      let companies = (result.companies ?? []).map((c: any) => ({
-        totalContactsInCompany: c.totalContactsInCompany,
-        company: c.company ? { ...c.company, companyId: c.company.id } : undefined,
-        people: (c.people ?? []).map(mapPerson)
+      let result = await client.groupedAdvancedSearch(
+        pickDefined({
+          ...input,
+          limitPerCompany: ctx.input.limitPerCompany,
+          sortCompaniesBy: ctx.input.sortCompaniesBy
+        })
+      );
+      if (!Array.isArray(result?.companies) || typeof result.totalCompanies !== 'number')
+        throw createApiServiceError('LeadIQ returned an invalid grouped search page.', {
+          reason: 'invalid_api_response'
+        });
+      let companies = result.companies.map((company: any) => ({
+        ...company,
+        company: { ...company.company, companyId: company.company.id },
+        people: company.people.map(mapPerson)
       }));
-
       return {
         output: {
-          totalCompanies: result.totalCompanies ?? 0,
-          companies
+          totalCompanies: result.totalCompanies,
+          companies,
+          after: result.after ?? null
         },
-        message: `Found people across **${result.totalCompanies ?? 0}** companies.`
-      };
-    } else {
-      let input: Record<string, any> = {};
-      if (ctx.input.contactFilter) input.contactFilter = ctx.input.contactFilter;
-      if (ctx.input.contactExcludedFilter)
-        input.contactExcludedFilter = ctx.input.contactExcludedFilter;
-      if (ctx.input.companyFilter) input.companyFilter = ctx.input.companyFilter;
-      if (ctx.input.companyExcludedFilter)
-        input.companyExcludedFilter = ctx.input.companyExcludedFilter;
-      if (ctx.input.skip !== undefined) input.skip = ctx.input.skip;
-      if (ctx.input.limit !== undefined) input.limit = ctx.input.limit;
-      if (ctx.input.sortContactsBy) input.sortContactsBy = ctx.input.sortContactsBy;
-
-      let result = await client.flatAdvancedSearch(input);
-
-      let people = (result.people ?? []).map(mapPerson);
-
-      return {
-        output: {
-          totalPeople: result.totalPeople ?? 0,
-          people
-        },
-        message: `Found **${result.totalPeople ?? 0}** matching people.`
+        message: `Returned ${companies.length} company groups; estimated total ${result.totalCompanies}.`
       };
     }
+    let result = await client.flatAdvancedSearch(input);
+    if (!Array.isArray(result?.people) || typeof result.totalPeople !== 'number')
+      throw createApiServiceError('LeadIQ returned an invalid flat search page.', {
+        reason: 'invalid_api_response'
+      });
+    let people = result.people.map(mapPerson);
+    return {
+      output: { totalPeople: result.totalPeople, people, after: result.after ?? null },
+      message: `Returned ${people.length} professional profiles; estimated total ${result.totalPeople}.`
+    };
   })
   .build();

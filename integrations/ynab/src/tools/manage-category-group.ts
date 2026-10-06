@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { budgetInput, idInput, invalid, rejectFields, required } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageCategoryGroup = SlateTool.create(spec, {
@@ -13,16 +14,10 @@ export let manageCategoryGroup = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      budgetId: z
-        .string()
-        .optional()
-        .describe('Budget ID. Defaults to the configured budget.'),
+      budgetId: budgetInput,
       action: z.enum(['create', 'update']).describe('Action to perform'),
-      categoryGroupId: z
-        .string()
-        .optional()
-        .describe('Category group ID (required for update)'),
-      name: z.string().describe('Category group name')
+      categoryGroupId: idInput.optional().describe('Category group ID (required for update)'),
+      name: z.string().trim().min(1).max(50).describe('Category group name')
     })
   )
   .output(
@@ -32,27 +27,33 @@ export let manageCategoryGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let budgetId = ctx.input.budgetId ?? ctx.config.budgetId;
-
-    let group: any;
+    const client = new Client({ token: ctx.auth.token });
+    const budget = ctx.input.budgetId ?? ctx.config.budgetId;
+    const name = required(ctx.input.name, 'Category group name');
+    let group: Awaited<ReturnType<Client['createCategoryGroup']>>;
     if (ctx.input.action === 'create') {
-      group = await client.createCategoryGroup(budgetId, { name: ctx.input.name });
+      rejectFields(ctx.input, ['categoryGroupId'], 'create');
+      group = await client.createCategoryGroup(budget, { name });
     } else {
-      if (!ctx.input.categoryGroupId) {
-        throw new Error('categoryGroupId is required for update action');
-      }
-      group = await client.updateCategoryGroup(budgetId, ctx.input.categoryGroupId, {
-        name: ctx.input.name
-      });
+      const id = required(ctx.input.categoryGroupId, 'Category group ID');
+      const current = (await client.getCategories(budget)).categoryGroups.find(
+        g => g.id === id
+      );
+      if (!current || current.deleted || current.internal)
+        throw invalid('Only an active, user-created category group can be renamed.');
+      group = await client.updateCategoryGroup(budget, id, { name });
     }
-
+    if (
+      group.deleted ||
+      (ctx.input.action === 'update' && group.id !== ctx.input.categoryGroupId) ||
+      group.name !== name
+    )
+      throw createApiServiceError('YNAB did not confirm the requested category group.', {
+        reason: 'ynab_response'
+      });
     return {
-      output: {
-        categoryGroupId: group.id,
-        name: group.name
-      },
-      message: `${ctx.input.action === 'create' ? 'Created' : 'Updated'} category group **${group.name}**`
+      output: { categoryGroupId: group.id, name: group.name },
+      message: `${ctx.input.action === 'create' ? 'Created' : 'Updated'} category group ${group.id}.`
     };
   })
   .build();

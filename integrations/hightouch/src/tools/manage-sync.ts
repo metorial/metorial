@@ -1,34 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { syncSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let scheduleSchema = z
-  .object({
-    type: z.string().describe('Schedule type (e.g. interval, cron, visual_cron, dbt_cloud)'),
-    schedule: z.record(z.string(), z.any()).describe('Schedule configuration (varies by type)')
-  })
-  .optional()
-  .nullable();
-
-let syncSchema = z.object({
-  syncId: z.number().describe('Unique ID of the sync'),
-  slug: z.string().describe('URL-friendly slug for the sync'),
-  destinationId: z.number().describe('ID of the destination'),
-  modelId: z.number().describe('ID of the model'),
-  configuration: z
-    .record(z.string(), z.any())
-    .describe('Sync configuration including field mappings'),
-  disabled: z.boolean().describe('Whether the sync is disabled'),
-  status: z.string().describe('Current sync status'),
-  primaryKey: z.string().describe('Primary key used for identifying source data'),
-  referencedColumns: z.array(z.string()).describe('Source columns the sync depends on'),
-  schedule: scheduleSchema.describe('Sync schedule configuration'),
-  lastRunAt: z.string().nullable().optional().describe('ISO timestamp of the last sync run'),
-  workspaceId: z.number().describe('ID of the workspace'),
-  createdAt: z.string().describe('ISO timestamp when the sync was created'),
-  updatedAt: z.string().describe('ISO timestamp when the sync was last updated')
-});
 
 export let listSyncs = SlateTool.create(spec, {
   name: 'List Syncs',
@@ -55,7 +29,8 @@ export let listSyncs = SlateTool.create(spec, {
   .output(
     z.object({
       syncs: z.array(syncSchema).describe('List of syncs'),
-      hasMore: z.boolean().describe('Whether more results are available')
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextOffset: z.number().optional().describe('Offset for the next page, when available')
     })
   )
   .handleInvocation(async ctx => {
@@ -65,7 +40,8 @@ export let listSyncs = SlateTool.create(spec, {
     return {
       output: {
         syncs: result.data,
-        hasMore: result.hasMore
+        hasMore: result.hasMore,
+        nextOffset: result.nextOffset
       },
       message: `Found **${result.data.length}** sync(s).${result.hasMore ? ' More results available.' : ''}`
     };
@@ -75,7 +51,7 @@ export let listSyncs = SlateTool.create(spec, {
 export let getSync = SlateTool.create(spec, {
   name: 'Get Sync',
   key: 'get_sync',
-  description: `Retrieve details of a specific sync by its ID, including field mappings, schedule, status, and associated model and destination.`,
+  description: `Retrieve details of a specific sync by its ID, including schedule, status, and associated model and destination. Opaque configuration is omitted to protect credentials.`,
   tags: {
     readOnly: true
   }
@@ -100,13 +76,14 @@ export let getSync = SlateTool.create(spec, {
 export let createSync = SlateTool.create(spec, {
   name: 'Create Sync',
   key: 'create_sync',
-  description: `Create a new sync that moves data from a model to a destination. Configure field mappings, sync mode (upsert, insert, update, mirror), and scheduling.`,
+  description: `Create a new sync that moves data from a model to a destination. Configure field mappings, sync mode, and scheduling. Enabled scheduled syncs can query the source, incur charges and modify destination data; use disabled=true for setup without scheduled execution.`,
   instructions: [
     'The configuration field specifies how source columns map to destination fields. Its schema varies by destination type.',
+    'Omitting schedule creates a manual schedule.',
     'Schedule types include "interval" (with quantity and unit), "cron" (with expression), "visual_cron", and "dbt_cloud".'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -115,7 +92,7 @@ export let createSync = SlateTool.create(spec, {
       destinationId: z.number().describe('ID of the destination to sync data to'),
       modelId: z.number().describe('ID of the model to sync data from'),
       configuration: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .describe('Sync configuration including field mappings (varies by destination type)'),
       disabled: z
         .boolean()
@@ -125,7 +102,10 @@ export let createSync = SlateTool.create(spec, {
       schedule: z
         .object({
           type: z.string().describe('Schedule type (interval, cron, visual_cron, dbt_cloud)'),
-          schedule: z.record(z.string(), z.any()).describe('Schedule configuration')
+          schedule: z
+            .record(z.string(), z.unknown())
+            .optional()
+            .describe('Schedule configuration; omitted for match_booster')
         })
         .optional()
         .describe('Optional schedule configuration')
@@ -151,21 +131,30 @@ export let updateSync = SlateTool.create(spec, {
   key: 'update_sync',
   description: `Update an existing sync's configuration, schedule, or enabled/disabled state.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
       syncId: z.number().describe('ID of the sync to update'),
+      clearSchedule: z
+        .boolean()
+        .optional()
+        .describe(
+          'Remove the schedule and use manual triggering. Cannot be combined with schedule.'
+        ),
       configuration: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Updated sync configuration'),
       disabled: z.boolean().optional().describe('Enable or disable the sync'),
       schedule: z
         .object({
           type: z.string().describe('Schedule type'),
-          schedule: z.record(z.string(), z.any()).describe('Schedule configuration')
+          schedule: z
+            .record(z.string(), z.unknown())
+            .optional()
+            .describe('Schedule configuration; omitted for match_booster')
         })
         .optional()
         .describe('Updated schedule configuration')

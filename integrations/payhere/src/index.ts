@@ -14,8 +14,6 @@ import {
   updateCompany,
   updatePlan
 } from './tools';
-import { paymentEvents, subscriptionEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     getCompany,
     updateCompany
   ],
-  triggers: [paymentEvents, subscriptionEvents]
+  triggers: []
 });

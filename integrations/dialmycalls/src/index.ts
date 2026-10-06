@@ -23,8 +23,6 @@ import {
   manageGroup,
   manageRecording
 } from './tools';
-import { inboundWebhook, newContact, newIncomingText } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     listAccessAccounts,
     getAccount
   ],
-  triggers: [inboundWebhook, newIncomingText, newContact]
+  triggers: []
 });

@@ -36,8 +36,6 @@ import {
   updateTeamMember,
   updateVehicle
 } from './tools';
-import { activityPolling, activityWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -76,5 +74,5 @@ export let provider = Slate.create({
     getTrackingHistory,
     setGpsPosition
   ],
-  triggers: [activityWebhook, activityPolling]
+  triggers: []
 });

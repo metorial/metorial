@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deliverFiles } from '../lib/files';
 import { spec } from '../spec';
 
 let convertedFileSchema = z.object({
@@ -36,7 +37,7 @@ Returns the current job status: **processing** (still running), **completed** (r
       conversionTime: z
         .number()
         .nullable()
-        .describe('Conversion duration in seconds (when completed)'),
+        .describe('Provider-reported legacy duration, when present (when completed)'),
       files: z
         .array(convertedFileSchema)
         .nullable()
@@ -46,20 +47,22 @@ Returns the current job status: **processing** (still running), **completed** (r
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
+      masterToken: ctx.auth.masterToken,
       region: ctx.config.region
     });
 
     let jobResult = await client.getAsyncJobResult(ctx.input.jobId);
 
     if (jobResult.status === 'completed' && jobResult.result) {
+      const result = await deliverFiles(ctx, jobResult.result);
       return {
         output: {
           status: 'completed',
-          conversionCost: jobResult.result.conversionCost,
-          conversionTime: jobResult.result.conversionTime,
-          files: jobResult.result.files
+          conversionCost: result.conversionCost,
+          conversionTime: result.conversionTime ?? null,
+          files: result.files
         },
-        message: `Job \`${ctx.input.jobId}\` **completed** in ${jobResult.result.conversionTime}s. ${jobResult.result.files.length} file(s) ready.`
+        message: `Job \`${ctx.input.jobId}\` **completed**. ${result.files.length} file(s) ready.`
       };
     }
 

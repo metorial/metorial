@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { BugsnagClient } from '../lib/client';
+import { BugsnagClient, filtersSchema } from '../lib/client';
+import { pageInput, pageOutput } from '../lib/schemas';
+import type { Filters } from '../lib/types';
 import { spec } from '../spec';
 
 let errorSchema = z.object({
@@ -48,6 +50,12 @@ export let listErrors = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...pageInput,
+      filters: filtersSchema
+        .optional()
+        .describe(
+          'Additional event-field filters. Discover keys with List Event Fields; each key maps to comparisons with type and value.'
+        ),
       projectId: z.string().describe('Project ID to list errors for'),
       perPage: z
         .number()
@@ -68,7 +76,7 @@ export let listErrors = SlateTool.create(spec, {
         .optional()
         .describe('Filter by release stage (e.g., production, staging)'),
       errorClass: z.string().optional().describe('Filter by error class name'),
-      search: z.string().optional().describe('Search term to filter errors'),
+      search: z.string().optional().describe('Substring to match in event messages'),
       since: z
         .string()
         .optional()
@@ -81,15 +89,16 @@ export let listErrors = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pageOutput,
       errors: z.array(errorSchema).describe('List of errors matching the filters')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
+    let client = new BugsnagClient(ctx.auth);
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('Project ID is required.');
+    if (!projectId) throw createApiServiceError('Project ID is required.');
 
-    let filters: Record<string, any> = {};
+    let filters: Filters = { ...ctx.input.filters };
     if (ctx.input.status) filters['error.status'] = [{ type: 'eq', value: ctx.input.status }];
     if (ctx.input.severity)
       filters['event.severity'] = [{ type: 'eq', value: ctx.input.severity }];
@@ -97,37 +106,38 @@ export let listErrors = SlateTool.create(spec, {
       filters['app.release_stage'] = [{ type: 'eq', value: ctx.input.releaseStage }];
     if (ctx.input.errorClass)
       filters['event.class'] = [{ type: 'eq', value: ctx.input.errorClass }];
-    if (ctx.input.search) filters.search = [{ type: 'eq', value: ctx.input.search }];
+    if (ctx.input.search) filters['event.message'] = [{ type: 'eq', value: ctx.input.search }];
     if (ctx.input.since) filters['event.since'] = [{ type: 'eq', value: ctx.input.since }];
     if (ctx.input.before) filters['event.before'] = [{ type: 'eq', value: ctx.input.before }];
 
     let errors = await client.listErrors(projectId, {
       perPage: ctx.input.perPage,
+      pageUrl: ctx.input.pageUrl,
       sort: ctx.input.sort,
       direction: ctx.input.direction,
       filters: Object.keys(filters).length > 0 ? filters : undefined
     });
 
-    let mapped = errors.map((e: any) => ({
-      errorId: e.id,
-      errorClass: e.error_class,
-      message: e.message,
-      context: e.context,
-      severity: e.severity,
-      status: e.status,
-      unhandled: e.unhandled,
-      eventsCount: e.events,
-      usersCount: e.users,
-      firstSeen: e.first_seen,
-      lastSeen: e.last_seen,
-      releaseStages: e.release_stages,
-      assignedCollaboratorId: e.assigned_collaborator_id,
-      url: e.url,
-      projectUrl: e.project_url
+    let mapped = errors.map(e => ({
+      errorId: e.id ?? undefined,
+      errorClass: e.error_class ?? undefined,
+      message: e.message ?? undefined,
+      context: e.context ?? undefined,
+      severity: e.overridden_severity ?? e.severity ?? undefined,
+      status: e.status ?? undefined,
+      unhandled: e.unhandled ?? undefined,
+      eventsCount: e.events ?? undefined,
+      usersCount: e.users ?? undefined,
+      firstSeen: e.first_seen ?? undefined,
+      lastSeen: e.last_seen ?? undefined,
+      releaseStages: e.release_stages ?? undefined,
+      assignedCollaboratorId: e.assigned_collaborator_id ?? undefined,
+      url: e.url ?? undefined,
+      projectUrl: e.project_url ?? undefined
     }));
 
     return {
-      output: { errors: mapped },
+      output: { errors: mapped, ...client.pageInfo },
       message: `Found **${mapped.length}** error(s) in the project.`
     };
   })

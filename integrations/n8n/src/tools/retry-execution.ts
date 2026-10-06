@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let retryExecution = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let retryExecution = SlateTool.create(spec, {
   key: 'retry_execution',
   description: `Retry a failed workflow execution. By default, retries using the original workflow version from the failed execution. Set **useCurrentWorkflow** to true to retry with the latest workflow definition instead.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -32,10 +32,7 @@ export let retryExecution = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
     let result = await client.retryExecution(
       ctx.input.executionId,
@@ -47,7 +44,7 @@ export let retryExecution = SlateTool.create(spec, {
         retried: true,
         newExecutionId: result?.id ? String(result.id) : undefined
       },
-      message: `Retried execution **${ctx.input.executionId}**${ctx.input.useCurrentWorkflow ? ' using the latest workflow version' : ' using the original workflow version'}.`
+      message: `Started a retry for execution **${ctx.input.executionId}**${ctx.input.useCurrentWorkflow ? ' using the latest workflow version' : ' using the original workflow version'}.`
     };
   })
   .build();

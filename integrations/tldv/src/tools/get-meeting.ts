@@ -39,7 +39,15 @@ export let getMeeting = SlateTool.create(spec, {
         )
         .describe('List of meeting invitees.'),
       templateName: z.string().optional().describe('Name of the applied note template.'),
-      conferenceId: z.string().optional().describe('Conference platform meeting ID.')
+      conferenceId: z.string().optional().describe('Conference platform meeting ID.'),
+      phoneNumber: z
+        .string()
+        .optional()
+        .describe('Phone number associated with the recording.'),
+      metadata: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .optional()
+        .describe('Custom correlation identifiers stored on the meeting.')
     })
   )
   .handleInvocation(async ctx => {
@@ -61,8 +69,10 @@ export let getMeeting = SlateTool.create(spec, {
           name: i.name,
           email: i.email
         })),
-        templateName: meeting.template?.name,
-        conferenceId: meeting.conferenceId
+        templateName: meeting.template,
+        conferenceId: meeting.extraProperties?.conferenceId,
+        phoneNumber: meeting.phoneNumber ?? undefined,
+        metadata: meeting.metadata ?? undefined
       },
       message: `Retrieved meeting **${meeting.name}** (${meeting.happenedAt}).`
     };

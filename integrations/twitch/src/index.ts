@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  downloadClip,
   getChannelInfo,
   getFollowersSubscribers,
   getStreams,
@@ -20,8 +21,6 @@ import {
   startCommercial,
   updateChannel
 } from './tools';
-import { channelUpdate, inboundWebhook, newFollower, streamStatus } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,7 +41,8 @@ export let provider = Slate.create({
     manageRoles,
     startCommercial,
     sendShoutout,
-    getVideos
+    getVideos,
+    downloadClip
   ],
-  triggers: [inboundWebhook, streamStatus, newFollower, channelUpdate]
+  triggers: []
 });

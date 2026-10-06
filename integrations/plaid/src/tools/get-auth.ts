@@ -64,34 +64,34 @@ export let getAuthTool = SlateTool.create(spec, {
     });
 
     let result = await client.getAuth(ctx.input.accessToken, ctx.input.accountIds);
-    let numbers = result.numbers || {};
+    let numbers = result.numbers;
 
     return {
       output: {
-        ach: (numbers.ach || []).map((n: any) => ({
+        ach: numbers.ach.map(n => ({
           accountId: n.account_id,
           account: n.account,
           routing: n.routing,
           wireRouting: n.wire_routing ?? null
         })),
-        eft: (numbers.eft || []).map((n: any) => ({
+        eft: numbers.eft.map(n => ({
           accountId: n.account_id,
           account: n.account,
           institution: n.institution,
           branch: n.branch
         })),
-        bacs: (numbers.bacs || []).map((n: any) => ({
+        bacs: numbers.bacs.map(n => ({
           accountId: n.account_id,
           account: n.account,
           sortCode: n.sort_code
         })),
-        international: (numbers.international || []).map((n: any) => ({
+        international: numbers.international.map(n => ({
           accountId: n.account_id,
           iban: n.iban,
           bic: n.bic
         }))
       },
-      message: `Retrieved auth numbers: **${(numbers.ach || []).length}** ACH, **${(numbers.eft || []).length}** EFT, **${(numbers.bacs || []).length}** BACS, **${(numbers.international || []).length}** international.`
+      message: `Retrieved auth numbers: **${numbers.ach.length}** ACH, **${numbers.eft.length}** EFT, **${numbers.bacs.length}** BACS, **${numbers.international.length}** international.`
     };
   })
   .build();

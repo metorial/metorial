@@ -8,6 +8,8 @@ import {
   discoverPoints,
   getCollection,
   getPoints,
+  listAccounts,
+  listCloudOptions,
   listCollections,
   manageAliases,
   manageClusters,
@@ -17,17 +19,18 @@ import {
   recommendPoints,
   scrollPoints,
   searchPoints,
+  updateCollection,
   upsertPoints
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
+  triggers: [],
   tools: [
     listCollections,
     getCollection,
     createCollection,
+    updateCollection,
     deleteCollection,
     manageAliases,
     upsertPoints,
@@ -41,7 +44,8 @@ export let provider = Slate.create({
     managePayload,
     managePayloadIndex,
     manageSnapshots,
-    manageClusters
-  ],
-  triggers: [inboundWebhook]
+    manageClusters,
+    listAccounts,
+    listCloudOptions
+  ]
 });

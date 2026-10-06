@@ -20,15 +20,6 @@ import {
   manageUsers,
   manageWorkbook
 } from './tools';
-import {
-  datasourceEvents,
-  labelEvents,
-  siteEvents,
-  userEvents,
-  viewEvents,
-  workbookEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -51,5 +42,5 @@ export let provider = Slate.create({
     manageAlerts,
     getSiteInfo
   ],
-  triggers: [datasourceEvents, workbookEvents, userEvents, labelEvents, siteEvents, viewEvents]
+  triggers: []
 });

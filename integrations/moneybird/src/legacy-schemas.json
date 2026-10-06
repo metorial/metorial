@@ -1,0 +1,3847 @@
+{
+  "create_contact": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "companyName": {
+          "description": "Company name",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "First name (required if no company name)",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Last name (required if no company name)",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address",
+          "type": "string"
+        },
+        "phone": {
+          "description": "Phone number",
+          "type": "string"
+        },
+        "address1": {
+          "description": "Address line 1",
+          "type": "string"
+        },
+        "address2": {
+          "description": "Address line 2",
+          "type": "string"
+        },
+        "zipcode": {
+          "description": "Zip/postal code",
+          "type": "string"
+        },
+        "city": {
+          "description": "City",
+          "type": "string"
+        },
+        "country": {
+          "description": "2-letter country code (default: NL)",
+          "type": "string"
+        },
+        "taxNumber": {
+          "description": "Tax/VAT number",
+          "type": "string"
+        },
+        "chamberOfCommerce": {
+          "description": "Chamber of Commerce number",
+          "type": "string"
+        },
+        "deliveryMethod": {
+          "description": "Invoice delivery method",
+          "type": "string",
+          "enum": ["Email", "Post", "Manual", "Simplerinvoicing", "Peppol"]
+        },
+        "sendInvoicesToEmail": {
+          "description": "Email for invoice delivery",
+          "type": "string"
+        },
+        "sendEstimatesToEmail": {
+          "description": "Email for estimate delivery",
+          "type": "string"
+        },
+        "sepaActive": {
+          "description": "Enable SEPA direct debit",
+          "type": "boolean"
+        },
+        "sepaIban": {
+          "description": "SEPA IBAN number",
+          "type": "string"
+        },
+        "sepaIbanAccountName": {
+          "description": "SEPA account holder name",
+          "type": "string"
+        },
+        "sepaBic": {
+          "description": "SEPA BIC code",
+          "type": "string"
+        },
+        "sepaMandateId": {
+          "description": "SEPA mandate ID",
+          "type": "string"
+        },
+        "sepaMandateDate": {
+          "description": "SEPA mandate date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "sepaSequenceType": {
+          "description": "SEPA sequence type",
+          "type": "string",
+          "enum": ["RCUR", "FRST", "OOFF", "FNAL"]
+        },
+        "customFields": {
+          "description": "Custom field values",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "customFieldId": {
+                "type": "string",
+                "description": "Custom field ID"
+              },
+              "value": {
+                "type": "string",
+                "description": "Custom field value"
+              }
+            },
+            "required": ["customFieldId", "value"]
+          }
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "description": "Created contact ID"
+        },
+        "customerId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Auto-assigned customer ID"
+        },
+        "companyName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["contactId", "customerId", "companyName", "firstName", "lastName", "email"],
+      "additionalProperties": false
+    }
+  },
+  "manage_products": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "get", "create", "update", "delete"],
+          "description": "Operation to perform"
+        },
+        "productId": {
+          "description": "Product ID (for get, update, delete)",
+          "type": "string"
+        },
+        "identifier": {
+          "description": "Product identifier/SKU (for get by identifier)",
+          "type": "string"
+        },
+        "query": {
+          "description": "Search query (for list)",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Filter by currency (for list)",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number (for list)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (for list)",
+          "type": "number"
+        },
+        "description": {
+          "description": "Product description (for create/update)",
+          "type": "string"
+        },
+        "title": {
+          "description": "Product title (for create/update)",
+          "type": "string"
+        },
+        "price": {
+          "description": "Product price (for create/update)",
+          "type": "string"
+        },
+        "taxRateId": {
+          "description": "Tax rate ID (for create/update)",
+          "type": "string"
+        },
+        "ledgerAccountId": {
+          "description": "Ledger account ID (for create/update)",
+          "type": "string"
+        },
+        "frequencyType": {
+          "description": "Recurrence frequency type (for create/update)",
+          "type": "string",
+          "enum": ["day", "week", "month", "quarter", "year"]
+        },
+        "frequency": {
+          "description": "Recurrence frequency count (for create/update)",
+          "type": "number"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "product": {
+          "type": "object",
+          "properties": {
+            "productId": {
+              "type": "string"
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "identifier": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "price": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "currency": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "taxRateId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ledgerAccountId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frequency": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frequencyType": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "updatedAt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "productId",
+            "description",
+            "title",
+            "identifier",
+            "price",
+            "currency",
+            "taxRateId",
+            "ledgerAccountId",
+            "frequency",
+            "frequencyType",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        },
+        "products": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": {
+                "type": "string"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "identifier": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "price": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "taxRateId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "ledgerAccountId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "frequency": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "frequencyType": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "productId",
+              "description",
+              "title",
+              "identifier",
+              "price",
+              "currency",
+              "taxRateId",
+              "ledgerAccountId",
+              "frequency",
+              "frequencyType",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "update_contact": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "description": "Moneybird contact ID to update"
+        },
+        "companyName": {
+          "description": "Company name",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "First name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Last name",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address",
+          "type": "string"
+        },
+        "phone": {
+          "description": "Phone number",
+          "type": "string"
+        },
+        "address1": {
+          "description": "Address line 1",
+          "type": "string"
+        },
+        "address2": {
+          "description": "Address line 2",
+          "type": "string"
+        },
+        "zipcode": {
+          "description": "Zip/postal code",
+          "type": "string"
+        },
+        "city": {
+          "description": "City",
+          "type": "string"
+        },
+        "country": {
+          "description": "2-letter country code",
+          "type": "string"
+        },
+        "taxNumber": {
+          "description": "Tax/VAT number",
+          "type": "string"
+        },
+        "deliveryMethod": {
+          "description": "Invoice delivery method",
+          "type": "string",
+          "enum": ["Email", "Post", "Manual", "Simplerinvoicing", "Peppol"]
+        },
+        "archive": {
+          "description": "Set to true to archive the contact",
+          "type": "boolean"
+        },
+        "remove": {
+          "description": "Set to true to permanently delete the contact",
+          "type": "boolean"
+        }
+      },
+      "required": ["contactId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "description": "Updated contact ID"
+        },
+        "companyName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the contact was deleted"
+        }
+      },
+      "required": [
+        "contactId",
+        "companyName",
+        "firstName",
+        "lastName",
+        "email",
+        "archived",
+        "deleted"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "list_estimates": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "state": {
+          "description": "Filter by estimate state",
+          "type": "string",
+          "enum": [
+            "all",
+            "draft",
+            "open",
+            "late",
+            "accepted",
+            "rejected",
+            "billed",
+            "archived"
+          ]
+        },
+        "period": {
+          "description": "Filter by period: \"this_month\", \"prev_month\", \"this_year\", \"prev_year\", or custom \"YYYYMMDD..YYYYMMDD\"",
+          "type": "string"
+        },
+        "contactId": {
+          "description": "Filter by contact ID",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number (starts at 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (1-100)",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "estimates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "estimateId": {
+                "type": "string"
+              },
+              "estimateNumber": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "contactId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "contactName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "state": {
+                "type": "string"
+              },
+              "estimateDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dueDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "totalPriceInclTax": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "estimateId",
+              "estimateNumber",
+              "reference",
+              "contactId",
+              "contactName",
+              "state",
+              "estimateDate",
+              "dueDate",
+              "currency",
+              "totalPriceInclTax"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["estimates"],
+      "additionalProperties": false
+    }
+  },
+  "manage_time_entries": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "get", "create", "update", "delete"],
+          "description": "Operation to perform"
+        },
+        "timeEntryId": {
+          "description": "Time entry ID (for get, update, delete)",
+          "type": "string"
+        },
+        "filter": {
+          "description": "Filter string for list (e.g., \"state:open,period:this_month\")",
+          "type": "string"
+        },
+        "query": {
+          "description": "Search by description (for list)",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number (for list)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (for list)",
+          "type": "number"
+        },
+        "startedAt": {
+          "description": "Start time ISO 8601 (for create/update)",
+          "type": "string"
+        },
+        "endedAt": {
+          "description": "End time ISO 8601 (for create/update)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Work description (for create/update)",
+          "type": "string"
+        },
+        "contactId": {
+          "description": "Contact ID (for create/update)",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "Project ID (for create/update)",
+          "type": "string"
+        },
+        "billable": {
+          "description": "Whether the time entry is billable (for create/update)",
+          "type": "boolean"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timeEntry": {
+          "type": "object",
+          "properties": {
+            "timeEntryId": {
+              "type": "string"
+            },
+            "contactId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "projectId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "userId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "salesInvoiceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "startedAt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "endedAt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "pausedDuration": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "billable": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "updatedAt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "timeEntryId",
+            "contactId",
+            "projectId",
+            "userId",
+            "salesInvoiceId",
+            "startedAt",
+            "endedAt",
+            "description",
+            "pausedDuration",
+            "billable",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        },
+        "timeEntries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timeEntryId": {
+                "type": "string"
+              },
+              "contactId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "projectId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "userId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "salesInvoiceId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "startedAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "endedAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "pausedDuration": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "billable": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "timeEntryId",
+              "contactId",
+              "projectId",
+              "userId",
+              "salesInvoiceId",
+              "startedAt",
+              "endedAt",
+              "description",
+              "pausedDuration",
+              "billable",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_contacts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Search query to filter contacts by name, email, phone, customer ID, etc.",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number for pagination (starts at 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Number of results per page (1-100)",
+          "type": "number"
+        },
+        "includeArchived": {
+          "description": "Include archived contacts in results",
+          "type": "boolean"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string",
+                "description": "Unique contact ID"
+              },
+              "companyName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Company name"
+              },
+              "firstName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "First name"
+              },
+              "lastName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Last name"
+              },
+              "customerId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Customer ID"
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Email address"
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Phone number"
+              },
+              "city": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "City"
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Country code"
+              },
+              "deliveryMethod": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Invoice delivery method"
+              },
+              "taxNumber": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tax/VAT number"
+              },
+              "archived": {
+                "type": "boolean",
+                "description": "Whether the contact is archived"
+              }
+            },
+            "required": [
+              "contactId",
+              "companyName",
+              "firstName",
+              "lastName",
+              "customerId",
+              "email",
+              "phone",
+              "city",
+              "country",
+              "deliveryMethod",
+              "taxNumber",
+              "archived"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["contacts"],
+      "additionalProperties": false
+    }
+  },
+  "list_tax_rates": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {}
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "taxRates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taxRateId": {
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "percentage": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "taxRateType": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "taxRateId",
+              "name",
+              "percentage",
+              "taxRateType",
+              "active",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["taxRates"],
+      "additionalProperties": false
+    }
+  },
+  "list_financial_mutations": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "period": {
+          "description": "Filter period: \"this_month\", \"prev_month\", \"this_quarter\", \"this_year\", \"prev_year\", or custom \"YYYYMMDD..YYYYMMDD\"",
+          "type": "string"
+        },
+        "state": {
+          "description": "Filter by processing state",
+          "type": "string",
+          "enum": ["all", "unprocessed", "processed"]
+        },
+        "mutationType": {
+          "description": "Filter by mutation type",
+          "type": "string",
+          "enum": ["all", "debit", "credit"]
+        },
+        "financialAccountId": {
+          "description": "Filter by financial account ID",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (1-100)",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mutations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "mutationId": {
+                "type": "string"
+              },
+              "amount": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "code": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "message": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "contraAccountName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "contraAccountNumber": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "amountOpen": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "financialAccountId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "batchReference": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "mutationId",
+              "amount",
+              "code",
+              "date",
+              "message",
+              "contraAccountName",
+              "contraAccountNumber",
+              "state",
+              "currency",
+              "amountOpen",
+              "financialAccountId",
+              "batchReference"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["mutations"],
+      "additionalProperties": false
+    }
+  },
+  "manage_sales_invoice": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "salesInvoiceId": {
+          "type": "string",
+          "description": "Sales invoice ID"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "update",
+            "send",
+            "registerPayment",
+            "createCredit",
+            "pause",
+            "resume",
+            "delete"
+          ],
+          "description": "Action to perform"
+        },
+        "updateFields": {
+          "description": "Fields to update (for \"update\" action)",
+          "type": "object",
+          "properties": {
+            "reference": {
+              "type": "string"
+            },
+            "dueDate": {
+              "type": "string"
+            },
+            "discount": {
+              "type": "string"
+            }
+          }
+        },
+        "sendMethod": {
+          "description": "Delivery method (for \"send\" action)",
+          "type": "string",
+          "enum": ["Email", "Post", "Manual", "Simplerinvoicing", "Peppol"]
+        },
+        "emailAddress": {
+          "description": "Override email address (for \"send\" action)",
+          "type": "string"
+        },
+        "paymentAmount": {
+          "description": "Payment amount (for \"registerPayment\" action)",
+          "type": "string"
+        },
+        "paymentDate": {
+          "description": "Payment date YYYY-MM-DD (for \"registerPayment\" action)",
+          "type": "string"
+        }
+      },
+      "required": ["salesInvoiceId", "action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "salesInvoiceId": {
+          "type": "string"
+        },
+        "invoiceNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "actionPerformed": {
+          "type": "string"
+        },
+        "creditInvoiceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "ID of the created credit invoice (for createCredit action)"
+        }
+      },
+      "required": [
+        "salesInvoiceId",
+        "invoiceNumber",
+        "state",
+        "actionPerformed",
+        "creditInvoiceId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "get_contact": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "description": "Moneybird internal contact ID",
+          "type": "string"
+        },
+        "customerId": {
+          "description": "Customer ID (the human-readable identifier)",
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "description": "Unique contact ID"
+        },
+        "companyName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Company name"
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First name"
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last name"
+        },
+        "customerId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Customer ID"
+        },
+        "attention": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Attention / c/o"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Primary email"
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Phone number"
+        },
+        "address1": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Address line 1"
+        },
+        "address2": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Address line 2"
+        },
+        "zipcode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Zip/postal code"
+        },
+        "city": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "City"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Country code"
+        },
+        "taxNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Tax/VAT number"
+        },
+        "chamberOfCommerce": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Chamber of Commerce number"
+        },
+        "deliveryMethod": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Invoice delivery method"
+        },
+        "invoiceWorkflowId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default invoice workflow ID"
+        },
+        "estimateWorkflowId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Default estimate workflow ID"
+        },
+        "sepaActive": {
+          "type": "boolean",
+          "description": "Whether SEPA direct debit is active"
+        },
+        "sepaIban": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "SEPA IBAN"
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "Whether the contact is archived"
+        },
+        "createdAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last update timestamp"
+        },
+        "contactPeople": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contactPersonId": {
+                "type": "string"
+              },
+              "firstName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "department": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "contactPersonId",
+              "firstName",
+              "lastName",
+              "email",
+              "phone",
+              "department"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Contact persons"
+        }
+      },
+      "required": [
+        "contactId",
+        "companyName",
+        "firstName",
+        "lastName",
+        "customerId",
+        "attention",
+        "email",
+        "phone",
+        "address1",
+        "address2",
+        "zipcode",
+        "city",
+        "country",
+        "taxNumber",
+        "chamberOfCommerce",
+        "deliveryMethod",
+        "invoiceWorkflowId",
+        "estimateWorkflowId",
+        "sepaActive",
+        "sepaIban",
+        "archived",
+        "createdAt",
+        "updatedAt",
+        "contactPeople"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "manage_projects": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "get", "create", "update", "delete"],
+          "description": "Operation to perform"
+        },
+        "projectId": {
+          "description": "Project ID (for get, update, delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Project name (for create/update)",
+          "type": "string"
+        },
+        "budget": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Budget amount (for create/update)"
+        },
+        "filter": {
+          "description": "Filter for list (e.g., \"state:active\")",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number (for list)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (for list)",
+          "type": "number"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "state": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "budget": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": ["projectId", "name", "state", "budget"],
+          "additionalProperties": false
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "projectId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "budget": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["projectId", "name", "state", "budget"],
+            "additionalProperties": false
+          }
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_estimate": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "estimateId": {
+          "type": "string",
+          "description": "Estimate ID"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["send", "changeState", "bill", "delete"],
+          "description": "Action to perform"
+        },
+        "newState": {
+          "description": "New state (for \"changeState\" action)",
+          "type": "string",
+          "enum": ["open", "accepted", "rejected", "billed", "late", "archived"]
+        },
+        "sendMethod": {
+          "description": "Delivery method (for \"send\" action)",
+          "type": "string",
+          "enum": ["Email", "Post", "Manual"]
+        },
+        "emailAddress": {
+          "description": "Override email address (for \"send\" action)",
+          "type": "string"
+        }
+      },
+      "required": ["estimateId", "action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "estimateId": {
+          "type": "string"
+        },
+        "estimateNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "actionPerformed": {
+          "type": "string"
+        },
+        "billedInvoiceId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "ID of the invoice created from billing the estimate"
+        }
+      },
+      "required": [
+        "estimateId",
+        "estimateNumber",
+        "state",
+        "actionPerformed",
+        "billedInvoiceId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "list_sales_invoices": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "state": {
+          "description": "Filter by invoice state",
+          "type": "string",
+          "enum": [
+            "all",
+            "draft",
+            "open",
+            "scheduled",
+            "pending_payment",
+            "late",
+            "reminded",
+            "paid",
+            "uncollectible"
+          ]
+        },
+        "period": {
+          "description": "Filter by period: \"this_month\", \"prev_month\", \"this_quarter\", \"this_year\", \"prev_year\", or custom range \"YYYYMMDD..YYYYMMDD\"",
+          "type": "string"
+        },
+        "contactId": {
+          "description": "Filter by contact ID",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number (starts at 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (1-100)",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "invoices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "invoiceId": {
+                "type": "string",
+                "description": "Moneybird internal ID"
+              },
+              "invoiceNumber": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Human-readable invoice number"
+              },
+              "reference": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Custom reference"
+              },
+              "contactId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact ID"
+              },
+              "contactName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact company or person name"
+              },
+              "state": {
+                "type": "string",
+                "description": "Invoice state (draft, open, paid, late, etc.)"
+              },
+              "invoiceDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Invoice date"
+              },
+              "dueDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Due date"
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Currency code"
+              },
+              "totalPriceInclTax": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total including tax"
+              },
+              "totalUnpaid": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Total unpaid amount"
+              },
+              "paused": {
+                "type": "boolean",
+                "description": "Whether the invoice workflow is paused"
+              }
+            },
+            "required": [
+              "invoiceId",
+              "invoiceNumber",
+              "reference",
+              "contactId",
+              "contactName",
+              "state",
+              "invoiceDate",
+              "dueDate",
+              "currency",
+              "totalPriceInclTax",
+              "totalUnpaid",
+              "paused"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["invoices"],
+      "additionalProperties": false
+    }
+  },
+  "link_booking": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mutationId": {
+          "type": "string",
+          "description": "Financial mutation ID"
+        },
+        "unlink": {
+          "description": "Set to true to unlink instead of link",
+          "type": "boolean"
+        },
+        "bookingType": {
+          "type": "string",
+          "enum": [
+            "SalesInvoice",
+            "Document",
+            "LedgerAccount",
+            "ExternalSalesInvoice",
+            "Payment",
+            "LedgerAccountBooking"
+          ],
+          "description": "Type of entity to link/unlink"
+        },
+        "bookingId": {
+          "type": "string",
+          "description": "ID of the entity to link/unlink"
+        },
+        "price": {
+          "description": "Amount to book (if partial)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Booking description (for LedgerAccount linking)",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "Project ID to associate",
+          "type": "string"
+        }
+      },
+      "required": ["mutationId", "bookingType", "bookingId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mutationId": {
+          "type": "string"
+        },
+        "linked": {
+          "type": "boolean"
+        }
+      },
+      "required": ["mutationId", "linked"],
+      "additionalProperties": false
+    }
+  },
+  "create_estimate": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "description": "Contact ID to send the estimate to"
+        },
+        "estimateDate": {
+          "description": "Estimate date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "dueDate": {
+          "description": "Expiry/due date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "reference": {
+          "description": "Custom reference",
+          "type": "string"
+        },
+        "currency": {
+          "description": "ISO currency code",
+          "type": "string"
+        },
+        "language": {
+          "description": "Language code (nl, en)",
+          "type": "string"
+        },
+        "discount": {
+          "description": "Discount percentage",
+          "type": "string"
+        },
+        "pricesAreInclTax": {
+          "description": "Whether prices include tax",
+          "type": "boolean"
+        },
+        "workflowId": {
+          "description": "Workflow ID",
+          "type": "string"
+        },
+        "documentStyleId": {
+          "description": "Document style ID",
+          "type": "string"
+        },
+        "preText": {
+          "description": "Text above the line items",
+          "type": "string"
+        },
+        "postText": {
+          "description": "Text below the line items",
+          "type": "string"
+        },
+        "lineItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "description": "Line item description",
+                "type": "string"
+              },
+              "amount": {
+                "description": "Quantity",
+                "type": "string"
+              },
+              "price": {
+                "description": "Unit price",
+                "type": "string"
+              },
+              "taxRateId": {
+                "description": "Tax rate ID",
+                "type": "string"
+              },
+              "ledgerAccountId": {
+                "description": "Ledger account ID",
+                "type": "string"
+              },
+              "productId": {
+                "description": "Product ID",
+                "type": "string"
+              }
+            }
+          },
+          "description": "Estimate line items"
+        }
+      },
+      "required": ["contactId", "lineItems"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "estimateId": {
+          "type": "string"
+        },
+        "estimateNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "type": "string"
+        },
+        "totalPriceInclTax": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalPriceExclTax": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "estimateId",
+        "estimateNumber",
+        "state",
+        "totalPriceInclTax",
+        "totalPriceExclTax",
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "manage_recurring_invoices": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "get", "create", "update", "delete"],
+          "description": "Operation to perform"
+        },
+        "recurringInvoiceId": {
+          "description": "Recurring invoice ID (for get, update, delete)",
+          "type": "string"
+        },
+        "contactId": {
+          "description": "Contact ID (for create)",
+          "type": "string"
+        },
+        "invoiceDate": {
+          "description": "Next invoice date YYYY-MM-DD (for create/update)",
+          "type": "string"
+        },
+        "frequencyType": {
+          "description": "Recurrence interval type (for create/update)",
+          "type": "string",
+          "enum": ["day", "week", "month", "quarter", "year"]
+        },
+        "frequency": {
+          "description": "Recurrence frequency count (for create/update)",
+          "type": "number"
+        },
+        "autoSend": {
+          "description": "Auto-send generated invoices (for create/update)",
+          "type": "boolean"
+        },
+        "currency": {
+          "description": "ISO currency code (for create)",
+          "type": "string"
+        },
+        "reference": {
+          "description": "Custom reference (for create/update)",
+          "type": "string"
+        },
+        "hasDesiredCount": {
+          "description": "Whether to limit the number of invoices generated",
+          "type": "boolean"
+        },
+        "desiredCount": {
+          "description": "Number of invoices to generate before deactivating",
+          "type": "number"
+        },
+        "workflowId": {
+          "description": "Workflow ID (for create/update)",
+          "type": "string"
+        },
+        "lineItems": {
+          "description": "Line items (for create/update)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "string"
+              },
+              "price": {
+                "type": "string"
+              },
+              "taxRateId": {
+                "type": "string"
+              },
+              "ledgerAccountId": {
+                "type": "string"
+              },
+              "productId": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "filter": {
+          "description": "Filter for list",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number (for list)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (for list)",
+          "type": "number"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recurringInvoice": {
+          "type": "object",
+          "properties": {
+            "recurringInvoiceId": {
+              "type": "string"
+            },
+            "contactId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "active": {
+              "type": "boolean"
+            },
+            "frequency": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frequencyType": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "startDate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "invoiceDate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lastDate": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "autoSend": {
+              "type": "boolean"
+            },
+            "currency": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "totalPriceInclTax": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "totalPriceExclTax": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reference": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "updatedAt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "recurringInvoiceId",
+            "contactId",
+            "active",
+            "frequency",
+            "frequencyType",
+            "startDate",
+            "invoiceDate",
+            "lastDate",
+            "autoSend",
+            "currency",
+            "totalPriceInclTax",
+            "totalPriceExclTax",
+            "reference",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        },
+        "recurringInvoices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "recurringInvoiceId": {
+                "type": "string"
+              },
+              "contactId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "frequency": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "frequencyType": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "startDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "invoiceDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "autoSend": {
+                "type": "boolean"
+              },
+              "currency": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "totalPriceInclTax": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "totalPriceExclTax": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "recurringInvoiceId",
+              "contactId",
+              "active",
+              "frequency",
+              "frequencyType",
+              "startDate",
+              "invoiceDate",
+              "lastDate",
+              "autoSend",
+              "currency",
+              "totalPriceInclTax",
+              "totalPriceExclTax",
+              "reference",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_sales_invoice": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "salesInvoiceId": {
+          "description": "Moneybird internal invoice ID",
+          "type": "string"
+        },
+        "invoiceNumber": {
+          "description": "Human-readable invoice number (e.g., \"2024-001\")",
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "salesInvoiceId": {
+          "type": "string"
+        },
+        "invoiceNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "type": "string"
+        },
+        "contactId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contactName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "invoiceDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dueDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pricesAreInclTax": {
+          "type": "boolean"
+        },
+        "totalPriceExclTax": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalPriceInclTax": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalPaid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalUnpaid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paidAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sentAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paused": {
+          "type": "boolean"
+        },
+        "paymentUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lineItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "lineItemId": {
+                "type": "string"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "amount": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "price": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "taxRateId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "ledgerAccountId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "productId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "period": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rowOrder": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "totalPriceExclTax": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "totalPriceInclTax": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "lineItemId",
+              "description",
+              "amount",
+              "price",
+              "taxRateId",
+              "ledgerAccountId",
+              "productId",
+              "period",
+              "rowOrder",
+              "totalPriceExclTax",
+              "totalPriceInclTax"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "payments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "paymentId": {
+                "type": "string"
+              },
+              "paymentDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "price": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "financialMutationId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["paymentId", "paymentDate", "price", "financialMutationId"],
+            "additionalProperties": false
+          }
+        },
+        "createdAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "salesInvoiceId",
+        "invoiceNumber",
+        "reference",
+        "state",
+        "contactId",
+        "contactName",
+        "invoiceDate",
+        "dueDate",
+        "currency",
+        "language",
+        "pricesAreInclTax",
+        "totalPriceExclTax",
+        "totalPriceInclTax",
+        "totalPaid",
+        "totalUnpaid",
+        "paidAt",
+        "sentAt",
+        "paused",
+        "paymentUrl",
+        "url",
+        "lineItems",
+        "payments",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "create_sales_invoice": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "description": "Contact ID to invoice"
+        },
+        "invoiceDate": {
+          "description": "Invoice date (YYYY-MM-DD). Defaults to today.",
+          "type": "string"
+        },
+        "dueDate": {
+          "description": "Payment due date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "currency": {
+          "description": "ISO currency code (e.g., EUR, USD)",
+          "type": "string"
+        },
+        "language": {
+          "description": "Language code (nl, en)",
+          "type": "string"
+        },
+        "reference": {
+          "description": "Custom reference",
+          "type": "string"
+        },
+        "discount": {
+          "description": "Discount percentage (e.g., \"10\")",
+          "type": "string"
+        },
+        "pricesAreInclTax": {
+          "description": "Whether prices include tax (default: true)",
+          "type": "boolean"
+        },
+        "workflowId": {
+          "description": "Workflow ID for sending configuration",
+          "type": "string"
+        },
+        "documentStyleId": {
+          "description": "Document style/template ID",
+          "type": "string"
+        },
+        "lineItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "description": "Line item description",
+                "type": "string"
+              },
+              "amount": {
+                "description": "Quantity (e.g., \"1\", \"2.5\")",
+                "type": "string"
+              },
+              "price": {
+                "description": "Unit price",
+                "type": "string"
+              },
+              "taxRateId": {
+                "description": "Tax rate ID",
+                "type": "string"
+              },
+              "ledgerAccountId": {
+                "description": "Ledger account ID",
+                "type": "string"
+              },
+              "productId": {
+                "description": "Product ID (auto-fills description, price, tax rate)",
+                "type": "string"
+              },
+              "period": {
+                "description": "Period for the line item (e.g., \"20240101..20240131\")",
+                "type": "string"
+              }
+            }
+          },
+          "description": "Invoice line items"
+        }
+      },
+      "required": ["contactId", "lineItems"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "salesInvoiceId": {
+          "type": "string"
+        },
+        "invoiceNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "type": "string"
+        },
+        "totalPriceInclTax": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalPriceExclTax": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "salesInvoiceId",
+        "invoiceNumber",
+        "state",
+        "totalPriceInclTax",
+        "totalPriceExclTax",
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "manage_ledger_accounts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "get", "create", "update", "delete"],
+          "description": "Operation to perform"
+        },
+        "ledgerAccountId": {
+          "description": "Ledger account ID (for get, update, delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Account name (for create/update)",
+          "type": "string"
+        },
+        "accountType": {
+          "description": "Account type (for create)",
+          "type": "string",
+          "enum": [
+            "non_current_assets",
+            "current_assets",
+            "equity",
+            "provisions",
+            "non_current_liabilities",
+            "current_liabilities",
+            "revenue",
+            "direct_costs",
+            "expenses",
+            "other_income_expenses"
+          ]
+        },
+        "accountId": {
+          "description": "Account number/ID (for create/update)",
+          "type": "string"
+        },
+        "parentId": {
+          "description": "Parent ledger account ID (for create/update)",
+          "type": "string"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "ledgerAccount": {
+          "type": "object",
+          "properties": {
+            "ledgerAccountId": {
+              "type": "string"
+            },
+            "name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "accountType": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "accountId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "parentId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "active": {
+              "type": "boolean"
+            },
+            "createdAt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "updatedAt": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "ledgerAccountId",
+            "name",
+            "accountType",
+            "accountId",
+            "parentId",
+            "active",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        },
+        "ledgerAccounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ledgerAccountId": {
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "accountType": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "accountId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "parentId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "active": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "ledgerAccountId",
+              "name",
+              "accountType",
+              "accountId",
+              "parentId",
+              "active",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,10 +1,15 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 let BASE_URL = 'https://api.writer.com/v1';
 
 export type ChatMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+  content: string | null;
   name?: string;
   tool_call_id?: string;
   tool_calls?: Array<{
@@ -15,23 +20,63 @@ export type ChatMessage = {
 };
 
 export type ToolDefinition = {
-  type: 'function' | 'graph' | 'llm' | 'translation' | 'vision' | 'web_search';
-  function?: {
-    name: string;
-    description?: string;
-    parameters?: Record<string, unknown>;
-  };
-  graph_ids?: string[];
-  subqueries?: boolean;
-  query_config?: Record<string, unknown>;
-  description?: string;
-  model?: string;
-  include_domains?: string[];
-  exclude_domains?: string[];
-  formality?: string;
-  length_control?: string;
-  mask_profanity?: boolean;
+  type: 'function' | 'graph' | 'web_search';
+  function: Record<string, unknown>;
 };
+
+export type PaginationRequest = {
+  before?: string;
+  after?: string;
+  limit?: number;
+  order?: 'asc' | 'desc';
+  offset?: number;
+};
+
+export type Page<T> = {
+  data: T[];
+  hasMore: boolean;
+  firstId?: string;
+  lastId?: string;
+};
+
+type ApiPage<T> = {
+  data: T[];
+  has_more: boolean;
+  first_id?: string | null;
+  last_id?: string | null;
+};
+
+type ApiGraph = {
+  id: string;
+  created_at: string;
+  name: string;
+  description?: string | null;
+  file_status?: { in_progress: number; completed: number; failed: number; total: number };
+};
+type ApiFile = {
+  id: string;
+  name: string;
+  created_at: string;
+  graph_ids?: string[];
+  graph_id?: string[];
+  status?: string;
+};
+
+let mapGraph = (data: ApiGraph): GraphResponse => ({
+  graphId: data.id,
+  createdAt: data.created_at,
+  name: data.name,
+  description: data.description ?? '',
+  fileStatus: data.file_status
+});
+
+let mapFile = (data: ApiFile): FileResponse => ({
+  fileId: data.id,
+  name: data.name,
+  createdAt: data.created_at,
+  graphIds: data.graph_ids ?? data.graph_id ?? [],
+  status: data.status ?? 'unknown'
+});
 
 export type ChatCompletionRequest = {
   model: string;
@@ -61,6 +106,7 @@ export type ChatChoice = {
     }>;
     graphData?: Record<string, unknown>;
     webSearchData?: Record<string, unknown>;
+    refusal?: string | null;
   };
 };
 
@@ -103,6 +149,7 @@ export type GraphResponse = {
   createdAt: string;
   name: string;
   description: string;
+  fileStatus?: { in_progress: number; completed: number; failed: number; total: number };
 };
 
 export type GraphQuestionRequest = {
@@ -128,6 +175,7 @@ export type GraphQuestionResponse = {
     fileId: string;
     snippets: string[];
   }>;
+  references?: Record<string, unknown>;
   subqueries?: Array<{
     question: string;
     answer: string;
@@ -157,8 +205,20 @@ export class WriterClient {
   private axios;
 
   constructor(private token: string) {
-    this.axios = createAxios({
-      baseURL: BASE_URL
+    if (!token?.trim())
+      throw createApiServiceError(
+        'A Writer API key is required. Reconnect with a valid API key.'
+      );
+    this.axios = createAuthenticatedAxios({
+      baseURL: BASE_URL,
+      authHeader: { value: `Bearer ${token}` },
+      timeout: 120_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Writer',
+          reason: 'writer_api_error'
+        })
     });
   }
 
@@ -182,23 +242,7 @@ export class WriterClient {
     if (request.stop !== undefined) body.stop = request.stop;
     if (request.stream !== undefined) body.stream = request.stream;
     if (request.logprobs !== undefined) body.logprobs = request.logprobs;
-    if (request.tools !== undefined) {
-      body.tools = request.tools.map(t => {
-        let tool: Record<string, unknown> = { type: t.type };
-        if (t.function) tool.function = t.function;
-        if (t.graph_ids) tool.graph_ids = t.graph_ids;
-        if (t.subqueries !== undefined) tool.subqueries = t.subqueries;
-        if (t.query_config) tool.query_config = t.query_config;
-        if (t.description) tool.description = t.description;
-        if (t.model) tool.model = t.model;
-        if (t.include_domains) tool.include_domains = t.include_domains;
-        if (t.exclude_domains) tool.exclude_domains = t.exclude_domains;
-        if (t.formality) tool.formality = t.formality;
-        if (t.length_control) tool.length_control = t.length_control;
-        if (t.mask_profanity !== undefined) tool.mask_profanity = t.mask_profanity;
-        return tool;
-      });
-    }
+    if (request.tools !== undefined) body.tools = request.tools;
     if (request.toolChoice !== undefined) body.tool_choice = request.toolChoice;
     if (request.responseFormat !== undefined) body.response_format = request.responseFormat;
 
@@ -206,23 +250,42 @@ export class WriterClient {
       headers: this.headers
     });
 
-    let data = response.data;
+    let data: {
+      id: string;
+      object: string;
+      created: number;
+      model: string;
+      choices: Array<{
+        index: number;
+        finish_reason: string;
+        message: {
+          role: string;
+          content: string | null;
+          tool_calls?: ChatMessage['tool_calls'] | null;
+          graph_data?: Record<string, unknown> | null;
+          web_search_data?: Record<string, unknown> | null;
+          refusal?: string | null;
+        };
+      }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+    } = response.data;
     return {
       completionId: data.id,
       object: data.object,
-      choices: (data.choices || []).map((c: any) => ({
+      choices: (data.choices || []).map(c => ({
         index: c.index,
         finishReason: c.finish_reason,
         message: {
           role: c.message?.role,
           content: c.message?.content,
-          toolCalls: c.message?.tool_calls?.map((tc: any) => ({
+          toolCalls: c.message?.tool_calls?.map(tc => ({
             id: tc.id,
             type: tc.type,
             function: { name: tc.function.name, arguments: tc.function.arguments }
           })),
-          graphData: c.message?.graph_data,
-          webSearchData: c.message?.web_search_data
+          graphData: c.message?.graph_data ?? undefined,
+          webSearchData: c.message?.web_search_data ?? undefined,
+          refusal: c.message?.refusal
         }
       })),
       created: data.created,
@@ -253,10 +316,10 @@ export class WriterClient {
       headers: this.headers
     });
 
-    let data = response.data;
+    let data: { choices: Array<{ text: string }>; model?: string } = response.data;
     return {
-      choices: (data.choices || []).map((c: any) => ({ text: c.text })),
-      model: data.model
+      choices: (data.choices || []).map(c => ({ text: c.text })),
+      model: data.model ?? request.model
     };
   }
 
@@ -266,9 +329,9 @@ export class WriterClient {
       headers: this.headers
     });
 
-    let data = response.data;
-    let models = data.data || data.models || data || [];
-    return (Array.isArray(models) ? models : []).map((m: any) => ({
+    let data: { models: Array<{ id: string; name?: string; type?: string }> } = response.data;
+    let models = data.models;
+    return (Array.isArray(models) ? models : []).map(m => ({
       modelId: m.id,
       name: m.name || m.id,
       type: m.type || 'unknown'
@@ -278,95 +341,74 @@ export class WriterClient {
   // Knowledge Graphs
   async createGraph(name: string, description?: string): Promise<GraphResponse> {
     let body: Record<string, unknown> = { name };
-    if (description) body.description = description;
+    if (description !== undefined) body.description = description;
 
     let response = await this.axios.post('/graphs', body, {
       headers: this.headers
     });
 
-    let data = response.data;
-    return {
-      graphId: data.id,
-      createdAt: data.created_at,
-      name: data.name,
-      description: data.description || ''
-    };
+    return mapGraph(response.data);
   }
 
-  async listGraphs(): Promise<GraphResponse[]> {
-    let response = await this.axios.get('/graphs', {
-      headers: this.headers
-    });
-
-    let items = response.data.data || response.data || [];
-    return (Array.isArray(items) ? items : []).map((g: any) => ({
-      graphId: g.id,
-      createdAt: g.created_at,
-      name: g.name,
-      description: g.description || ''
-    }));
+  async listGraphs(
+    params: PaginationRequest & { teamIds?: number[] } = {}
+  ): Promise<Page<GraphResponse>> {
+    let page = await this.listPage<ApiGraph>('/graphs', params, { team_ids: params.teamIds });
+    return { ...page, data: page.data.map(mapGraph) };
   }
 
   async getGraph(graphId: string): Promise<GraphResponse> {
-    let response = await this.axios.get(`/graphs/${graphId}`, {
+    let response = await this.axios.get(`/graphs/${encodeURIComponent(graphId)}`, {
       headers: this.headers
     });
 
-    let data = response.data;
-    return {
-      graphId: data.id,
-      createdAt: data.created_at,
-      name: data.name,
-      description: data.description || ''
-    };
+    return mapGraph(response.data);
   }
 
   async updateGraph(
     graphId: string,
     updates: { name?: string; description?: string }
   ): Promise<GraphResponse> {
-    let response = await this.axios.put(`/graphs/${graphId}`, updates, {
+    let response = await this.axios.put(`/graphs/${encodeURIComponent(graphId)}`, updates, {
       headers: this.headers
     });
 
-    let data = response.data;
-    return {
-      graphId: data.id,
-      createdAt: data.created_at,
-      name: data.name,
-      description: data.description || ''
-    };
+    return mapGraph(response.data);
   }
 
   async deleteGraph(graphId: string): Promise<void> {
-    await this.axios.delete(`/graphs/${graphId}`, {
+    let response = await this.axios.delete(`/graphs/${encodeURIComponent(graphId)}`, {
       headers: this.headers
     });
+    if (response.data.deleted !== true)
+      throw createApiServiceError(
+        'Writer did not confirm that the Knowledge Graph was deleted. Retrieve the graph to check its status.'
+      );
   }
 
   async addFileToGraph(graphId: string, fileId: string): Promise<FileResponse> {
     let response = await this.axios.post(
-      `/graphs/${graphId}/file`,
+      `/graphs/${encodeURIComponent(graphId)}/file`,
       { file_id: fileId },
       {
         headers: this.headers
       }
     );
 
-    let data = response.data;
-    return {
-      fileId: data.id,
-      name: data.name,
-      createdAt: data.created_at,
-      graphIds: data.graph_ids || [],
-      status: data.status || 'unknown'
-    };
+    return mapFile(response.data);
   }
 
   async removeFileFromGraph(graphId: string, fileId: string): Promise<void> {
-    await this.axios.delete(`/graphs/${graphId}/file/${fileId}`, {
-      headers: this.headers
-    });
+    let response = await this.axios.delete(
+      `/graphs/${encodeURIComponent(graphId)}/file/${encodeURIComponent(fileId)}`,
+      {
+        headers: this.headers
+      }
+    );
+    if (response.data.deleted !== true)
+      throw createApiServiceError(
+        'Writer did not confirm that the file was removed from the Knowledge Graph. Retrieve the file to check its graph associations.'
+      );
   }
 
   async queryGraph(request: GraphQuestionRequest): Promise<GraphQuestionResponse> {
@@ -400,99 +442,95 @@ export class WriterClient {
       headers: this.headers
     });
 
-    let data = response.data;
+    let data: {
+      question: string;
+      answer: string;
+      sources: Array<{ file_id: string; snippet?: string; snippets?: string[] } | null>;
+      subqueries?: Array<{ query: string; question?: string; answer: string } | null> | null;
+      references?: Record<string, unknown> | null;
+    } = response.data;
     return {
       question: data.question,
       answer: data.answer,
-      sources: (data.sources || []).map((s: any) => ({
-        fileId: s.file_id,
-        snippets: s.snippets || []
-      })),
-      subqueries: data.subqueries?.map((sq: any) => ({
-        question: sq.question,
-        answer: sq.answer
-      }))
+      sources: (data.sources || [])
+        .filter(s => s !== null)
+        .map(s => ({
+          fileId: s.file_id,
+          snippets: s.snippet !== undefined ? [s.snippet] : (s.snippets ?? [])
+        })),
+      references: data.references ?? undefined,
+      subqueries: data.subqueries
+        ?.filter(sq => sq !== null)
+        .map(sq => ({
+          question: sq.query ?? sq.question ?? '',
+          answer: sq.answer
+        }))
     };
   }
 
   // Files
   async uploadFile(
     fileName: string,
-    content: string,
+    content: Uint8Array,
     contentType: string,
     graphId?: string
   ): Promise<FileResponse> {
     let url = '/files';
-    if (graphId) url += `?graphId=${graphId}`;
 
     let response = await this.axios.post(url, content, {
       headers: {
         Authorization: `Bearer ${this.token}`,
         'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename=${fileName}`
-      }
+        'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Content-Length': String(content.byteLength)
+      },
+      params: pickDefined({ graphId })
     });
 
-    let data = response.data;
-    return {
-      fileId: data.id,
-      name: data.name,
-      createdAt: data.created_at,
-      graphIds: data.graph_ids || [],
-      status: data.status || 'unknown'
-    };
+    return mapFile(response.data);
   }
 
-  async listFiles(params?: {
-    orderBy?: string;
-    order?: string;
-    offset?: number;
-    limit?: number;
-  }): Promise<FileResponse[]> {
-    let queryParams: Record<string, string> = {};
-    if (params?.orderBy) queryParams.order_by = params.orderBy;
-    if (params?.order) queryParams.order = params.order;
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-
-    let response = await this.axios.get('/files', {
-      headers: this.headers,
-      params: queryParams
+  async listFiles(
+    params: PaginationRequest & {
+      orderBy?: string;
+      graphId?: string;
+      status?: string;
+      fileTypes?: string;
+    } = {}
+  ): Promise<Page<FileResponse>> {
+    if (params.orderBy === 'name') {
+      throw createApiServiceError(
+        'Writer files are ordered by creation time. Omit orderBy or use created_at.'
+      );
+    }
+    let page = await this.listPage<ApiFile>('/files', params, {
+      graph_id: params.graphId,
+      status: params.status,
+      file_types: params.fileTypes
     });
-
-    let items = response.data.data || response.data || [];
-    return (Array.isArray(items) ? items : []).map((f: any) => ({
-      fileId: f.id,
-      name: f.name,
-      createdAt: f.created_at,
-      graphIds: f.graph_ids || [],
-      status: f.status || 'unknown'
-    }));
+    return { ...page, data: page.data.map(mapFile) };
   }
 
   async getFile(fileId: string): Promise<FileResponse> {
-    let response = await this.axios.get(`/files/${fileId}`, {
+    let response = await this.axios.get(`/files/${encodeURIComponent(fileId)}`, {
       headers: this.headers
     });
 
-    let data = response.data;
-    return {
-      fileId: data.id,
-      name: data.name,
-      createdAt: data.created_at,
-      graphIds: data.graph_ids || [],
-      status: data.status || 'unknown'
-    };
+    return mapFile(response.data);
   }
 
   async deleteFile(fileId: string): Promise<void> {
-    await this.axios.delete(`/files/${fileId}`, {
+    let response = await this.axios.delete(`/files/${encodeURIComponent(fileId)}`, {
       headers: this.headers
     });
+    if (response.data.deleted !== true)
+      throw createApiServiceError(
+        'Writer did not confirm that the file was deleted. Retrieve the file to check its status.'
+      );
   }
 
   async downloadFile(fileId: string): Promise<string> {
-    let response = await this.axios.get(`/files/${fileId}/download`, {
+    let response = await this.axios.get(`/files/${encodeURIComponent(fileId)}/download`, {
       headers: {
         Authorization: `Bearer ${this.token}`
       },
@@ -504,7 +542,7 @@ export class WriterClient {
 
   // Applications (No-Code Agents)
   async getApplication(applicationId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/applications/${applicationId}`, {
+    let response = await this.axios.get(`/applications/${encodeURIComponent(applicationId)}`, {
       headers: this.headers
     });
 
@@ -516,7 +554,7 @@ export class WriterClient {
     inputs: Array<{ id: string; value: string[] }>
   ): Promise<ApplicationResponse[]> {
     let response = await this.axios.post(
-      `/applications/${applicationId}`,
+      `/applications/${encodeURIComponent(applicationId)}`,
       {
         inputs
       },
@@ -527,25 +565,71 @@ export class WriterClient {
 
     let data = response.data;
     if (Array.isArray(data)) {
-      return data.map((r: any) => ({ title: r.title, suggestion: r.suggestion }));
+      return data.map((r: ApplicationResponse) => ({
+        title: r.title ?? '',
+        suggestion: r.suggestion
+      }));
     }
     return [{ title: data.title || '', suggestion: data.suggestion || '' }];
   }
 
-  async listApplications(params?: {
-    offset?: number;
-    limit?: number;
-  }): Promise<Record<string, unknown>[]> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
+  async listApplications(
+    params: PaginationRequest = {}
+  ): Promise<Page<Record<string, unknown>>> {
+    return this.listPage('/applications', params);
+  }
 
-    let response = await this.axios.get('/applications', {
-      headers: this.headers,
-      params: queryParams
+  private async listPage<T extends { id?: unknown }>(
+    path: string,
+    params: PaginationRequest,
+    filters: Record<string, unknown> = {}
+  ): Promise<Page<T>> {
+    if (params.before && params.after) {
+      throw createApiServiceError('Specify either before or after, not both.');
+    }
+    if (params.offset && (params.before || params.after)) {
+      throw createApiServiceError('Use offset or cursor pagination, not both.');
+    }
+    let remaining = params.offset ?? 0;
+    let after = params.after;
+    // Preserve legacy offset calls by walking the provider's cursor pages.
+    while (remaining > 0) {
+      let response = await this.axios.get<ApiPage<T>>(path, {
+        params: pickDefined({
+          ...filters,
+          order: params.order,
+          after,
+          limit: Math.min(remaining, 100)
+        }),
+        paramsSerializer: { indexes: null }
+      });
+      let page = response.data;
+      remaining -= page.data.length;
+      if (!page.has_more || !page.data.length) return { data: [], hasMore: false };
+      let next = page.last_id ?? page.data.at(-1)?.id;
+      if (typeof next !== 'string' || next === after) {
+        throw createApiServiceError(
+          'Writer returned an invalid pagination cursor. Retry the list operation.'
+        );
+      }
+      after = next;
+    }
+    let response = await this.axios.get<ApiPage<T>>(path, {
+      params: pickDefined({
+        ...filters,
+        order: params.order,
+        before: params.before,
+        after,
+        limit: params.limit
+      }),
+      paramsSerializer: { indexes: null }
     });
-
-    let items = response.data.data || response.data || [];
-    return Array.isArray(items) ? items : [];
+    let page = response.data;
+    return {
+      data: page.data,
+      hasMore: page.has_more,
+      firstId: page.first_id ?? undefined,
+      lastId: page.last_id ?? undefined
+    };
   }
 }

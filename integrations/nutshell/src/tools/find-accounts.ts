@@ -55,11 +55,11 @@ export let findAccounts = SlateTool.create(spec, {
       stubResponses: ctx.input.stubResponses
     });
 
-    let accounts = results.map((a: any) => ({
+    let accounts = results.map(a => ({
       accountId: a.id,
       name: a.name,
-      urls: a.url || a.urls,
-      phones: a.phone || a.phones,
+      urls: a.url,
+      phones: a.phone,
       entityType: a.entityType
     }));
 

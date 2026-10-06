@@ -1,56 +1,23 @@
-I see that "Later" (later.com) is a social media scheduling platform, and the search results are getting mixed with "Late" (getlate.dev) which is a different product. Let me focus specifically on Later (later.com) and its API capabilities.Let me get more details on the Later Influence API integrations and check the Swagger documentation.Based on my research, I can now see that Later (later.com) is primarily a social media management and influencer marketing platform. The main API it exposes is the **Later Influence Reporting API** (formerly Mavrck). Later's core social media scheduling product does not have a public API for third-party developers. Let me confirm this and check for any additional API details.Now I have a comprehensive picture. Later (later.com) is a social media management and influencer marketing platform. Its core social media scheduling product (Later Social) does not offer a public API. The only API available to developers is the **Later Influence Reporting API** (formerly under the Mavrck brand), which is focused on retrieving influencer campaign analytics data. The API is hosted at `api.mavrck.co` and uses JWT-based authentication.
+# Reporting API contract
 
-# Slates Specification for Later
+The current Later Influence Reporting API is hosted at `https://reporting.api.later.com`. Its dedicated reference describes v2.0.0 using OpenAPI 3.1.1. The older Help Center migration article contains conflicting token-lifetime, numbered-pagination and date-basis examples; current implementation follows the dedicated reference and token `exp`, without assuming a fixed lifetime.
 
-## Overview
+| Tool | Documented operation |
+| --- | --- |
+| list_instances | GET /v2/instances |
+| list_campaigns_v2 | GET /v2/campaigns |
+| get_analytics | GET /v2/instances/performance, /instances/performance-over-time, /campaigns/performance, /creators/performance, /platforms/performance, /platforms/return-on-investment or /posts/performance |
+| get_instance | GET /v1/reporting-api/instance on api.mavrck.co |
+| list_campaigns | GET /v1/reporting-api/campaign on api.mavrck.co |
+| list_reporting_groups | GET /v1/reporting-api/reporting-group on api.mavrck.co |
+| get_performance_report | GET /v1/reporting-api/report on api.mavrck.co |
 
-Later is a social media management and influencer marketing platform comprising Later Social (scheduling and publishing to Instagram, Facebook, TikTok, LinkedIn, Twitter/X, and Pinterest) and Later Influence (influencer campaign management, formerly Mavrck). The only developer-facing API available is the Later Influence Reporting API, which provides programmatic access to influencer campaign performance data for integration with external reporting and analytics tools.
+Both credential methods exchange JSON `clientId` and `clientSecret` at their own host's POST /oauth/token. V2 requires the documented `jwt` field and a usable future JWT expiry. Legacy token aliases remain accepted. JWT decoding schedules renewal only; provider responses establish access and scope. Existing unmarked auth output stays v1. There is no suitable documented current-user endpoint: accessible instance IDs are discovery data, not human identity.
 
-## Authentication
+Current response envelopes contain `data` and nullable `nextCursor`; no totals are fabricated. Arrays use repeated query keys. The campaign roster accepts only pagination. Performance dates are required; metrics are required except for ROI. Summary rejects pagination; time series alone accepts granularity; only campaign, creator, platform and post accept sorting. Metric names and sorting fields are checked per route; additional platform/format restrictions remain authoritative provider validation. ROI's fixed numeric fields are returned within the common `metrics` object. Known identifiers and metric values are projected; unrequested creator profiles, image URLs and arbitrary response properties are omitted.
 
-Authentication is handled by JWT (JSON Web Tokens), where clients must exchange their `clientId` and `clientSecret` for a token.
+Legacy output field types and requiredness remain unchanged. Provider responses missing those fields fail explicitly rather than inventing empty identifiers or zeros. The migration article confirms legacy routes, but does not supply a current complete v1 response specification or definitive retirement date. V1 compatibility remains subject to real account verification; reporting groups have no inferred current replacement.
 
-Contact your Account Manager to get your `clientId` and `clientSecret`. These credentials are not self-service and must be provisioned by Later.
+Upstream errors expose only validated HTTP status and recognized ANL code with fixed remediation text. Transport details, credentials, provider body text and original parent/cause objects are discarded. API redirects are disabled. Reporting rate limits are not automatically retried.
 
-**Steps:**
-
-1. Obtain your `clientId` and `clientSecret` from your Later Account Manager.
-2. Use the `/oauth/token` route to retrieve a JWT based on the `clientId` and `clientSecret`. The token endpoint is `POST https://api.mavrck.co/oauth/token` with a JSON body containing `clientId` and `clientSecret`.
-3. Use the returned JWT as a Bearer token in the `Authorization` header for all subsequent API requests.
-
-**Base URL:** `https://api.mavrck.co`
-
-All routes require the `v1/reporting-api` prefix.
-
-## Features
-
-### Instance Information
-
-Retrieve metadata about the Later Influence community (instance) associated with your credentials. This allows you to confirm which program your credentials are linked to before pulling campaign data.
-
-### Campaign Listing
-
-Retrieve campaigns associated with the community linked to the supplied credentials, with the ability to filter results by campaign ID. Returns campaign details including ID, status, start/end dates, title, and description.
-
-### Reporting Group Management
-
-Retrieve information about reporting groups, allowing filtering by reporting group ID and campaign ID. Reporting groups allow you to aggregate data across related campaigns.
-
-### Campaign Performance Reporting
-
-Programmatically retrieve detailed analytics and performance data, including metrics on campaign performance, influencer performance, and reporting data aggregation.
-
-- Report on either a campaign or a reporting group by setting the campaign ID or reporting group ID. The API returns all metrics, including content totals, impressions, and engagements by network type.
-- Filter by date range using start and end dates. Data can be grouped by year, quarter, month, week (starting Monday), week (starting Sunday), or day using the `groupBy` field.
-- The report includes additional affiliate data such as clicks, conversions, and conversion value.
-- Metrics are broken down by social network (Facebook, Instagram, TikTok, Pinterest) and content type (posts, stories, reels, lives).
-- Designed for integration with third-party reporting dashboards and analytical tools like Looker, Microsoft BI, Oracle Analytics Cloud, SAP Analytics Cloud, and Tableau.
-
-**Limitations:**
-
-- There is no public API for Later's core social media scheduling product (Later Social). The API is limited to the Later Influence (campaign reporting) product.
-- API access requires an enterprise Later Influence subscription and credentials must be provisioned by an Account Manager.
-
-## Events
-
-The provider does not support events. The Later Influence Reporting API is a read-only reporting interface with no webhook or event subscription capabilities.
+References: [API reference](https://docs.reporting.api.later.com/api-reference), [authentication](https://docs.reporting.api.later.com/authentication), [querying](https://docs.reporting.api.later.com/querying), [error contract](https://docs.reporting.api.later.com/errors), [migration](https://help-influence.later.com/hc/en-us/articles/20462385592087-Implement-the-Reporting-API-for-Later-Influence).

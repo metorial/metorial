@@ -29,8 +29,6 @@ import {
   updateForm,
   updateProduct
 } from './tools';
-import { formSubmissionTrigger, papersignEventTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,5 +60,5 @@ export let provider = Slate.create({
     listPapersignFolders,
     createPapersignFolder
   ],
-  triggers: [formSubmissionTrigger, papersignEventTrigger]
+  triggers: []
 });

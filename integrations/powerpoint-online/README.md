@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/powerpoint-online.png" height="20"> Powerpoint Online
 
-Manage PowerPoint presentations stored in OneDrive and SharePoint via Microsoft Graph API. Upload, download, copy, move, and delete .pptx files. Convert presentations to PDF format. Share files by creating sharing links or granting direct permissions with configurable roles. Retrieve and update file metadata, access version history, restore previous versions, and generate slide thumbnails and embeddable previews. Search for presentations across OneDrive and SharePoint. Subscribe to webhook notifications for file creation, update, and deletion events within monitored folders. Note: does not support direct manipulation of individual slides, shapes, or text content within presentations.
+Manage PowerPoint presentations stored in OneDrive and SharePoint via Microsoft Graph API. Upload, download, copy, move, and delete .pptx files. Convert presentations to PDF format. Share files by creating sharing links or granting direct permissions with configurable roles. Retrieve and update file metadata, access version history, restore previous versions, and generate slide thumbnails and embeddable previews. Search for presentations across OneDrive and SharePoint. Note: does not support direct manipulation of individual slides, shapes, or text content within presentations.
 
 ## Tools
 

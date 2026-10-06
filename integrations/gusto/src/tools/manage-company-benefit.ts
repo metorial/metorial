@@ -1,8 +1,38 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { getBaseUrl } from '../lib/helpers';
+import { invokeGusto } from '../lib/actions';
+import { companyIdSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  pagination: paginationSchema.optional(),
+  benefits: z
+    .array(
+      z.object({
+        companyBenefitId: z.string().describe('UUID of the company benefit'),
+        version: z.string().nullable().optional(),
+        companyId: z.string().nullable().optional(),
+        benefitType: z.number().nullable().optional().describe('Benefit type ID'),
+        description: z.string().nullable().optional().describe('Description'),
+        active: z.boolean().nullable().optional().describe('Whether active'),
+        name: z.string().nullable().optional().describe('Benefit name')
+      })
+    )
+    .optional()
+    .describe('List of company benefits (for list action)'),
+  benefit: z
+    .object({
+      companyBenefitId: z.string().describe('UUID of the company benefit'),
+      companyId: z.string().nullable().optional(),
+      benefitType: z.number().nullable().optional().describe('Benefit type ID'),
+      description: z.string().nullable().optional().describe('Description'),
+      active: z.boolean().nullable().optional().describe('Whether active'),
+      name: z.string().nullable().optional().describe('Benefit name'),
+      version: z.string().nullable().optional().describe('Current resource version')
+    })
+    .optional()
+    .describe('Single benefit (for get/create/update)')
+});
 
 export let manageCompanyBenefit = SlateTool.create(spec, {
   name: 'Manage Company Benefit',
@@ -16,7 +46,7 @@ export let manageCompanyBenefit = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['list', 'get', 'create', 'update']).describe('The action to perform'),
-      companyId: z.string().optional().describe('Company UUID (required for list/create)'),
+      companyId: companyIdSchema.optional(),
       companyBenefitId: z
         .string()
         .optional()
@@ -38,117 +68,8 @@ export let manageCompanyBenefit = SlateTool.create(spec, {
         .describe('Whether responsible for employee W-2')
     })
   )
-  .output(
-    z.object({
-      benefits: z
-        .array(
-          z.object({
-            companyBenefitId: z.string().describe('UUID of the company benefit'),
-            benefitType: z.number().optional().describe('Benefit type ID'),
-            description: z.string().optional().describe('Description'),
-            active: z.boolean().optional().describe('Whether active'),
-            name: z.string().optional().describe('Benefit name')
-          })
-        )
-        .optional()
-        .describe('List of company benefits (for list action)'),
-      benefit: z
-        .object({
-          companyBenefitId: z.string().describe('UUID of the company benefit'),
-          benefitType: z.number().optional().describe('Benefit type ID'),
-          description: z.string().optional().describe('Description'),
-          active: z.boolean().optional().describe('Whether active'),
-          name: z.string().optional().describe('Benefit name'),
-          version: z.string().optional().describe('Current resource version')
-        })
-        .optional()
-        .describe('Single benefit (for get/create/update)')
-    })
+  .output(outputSchema)
+  .handleInvocation(ctx =>
+    invokeGusto('manage_company_benefit', ctx.input, ctx.auth, outputSchema)
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: getBaseUrl(ctx.auth.environment)
-    });
-
-    switch (ctx.input.action) {
-      case 'list': {
-        if (!ctx.input.companyId) throw new Error('companyId is required');
-        let result = await client.listCompanyBenefits(ctx.input.companyId);
-        let benefits = Array.isArray(result) ? result : result.company_benefits || result;
-        let mapped = benefits.map((b: any) => ({
-          companyBenefitId: b.uuid || b.id?.toString(),
-          benefitType: b.benefit_type,
-          description: b.description,
-          active: b.active,
-          name: b.name
-        }));
-        return {
-          output: { benefits: mapped },
-          message: `Found **${mapped.length}** company benefit(s).`
-        };
-      }
-      case 'get': {
-        if (!ctx.input.companyBenefitId) throw new Error('companyBenefitId is required');
-        let result = await client.getCompanyBenefit(ctx.input.companyBenefitId);
-        return {
-          output: {
-            benefit: {
-              companyBenefitId: result.uuid || result.id?.toString(),
-              benefitType: result.benefit_type,
-              description: result.description,
-              active: result.active,
-              name: result.name,
-              version: result.version
-            }
-          },
-          message: `Retrieved benefit **${result.name || result.description}**.`
-        };
-      }
-      case 'create': {
-        if (!ctx.input.companyId) throw new Error('companyId is required');
-        let result = await client.createCompanyBenefit(ctx.input.companyId, {
-          benefit_type: ctx.input.benefitType,
-          description: ctx.input.description,
-          active: ctx.input.active,
-          responsible_for_employer_taxes: ctx.input.responsibleForEmployerTaxes,
-          responsible_for_employee_w2: ctx.input.responsibleForEmployeeW2
-        });
-        return {
-          output: {
-            benefit: {
-              companyBenefitId: result.uuid || result.id?.toString(),
-              benefitType: result.benefit_type,
-              description: result.description,
-              active: result.active,
-              name: result.name,
-              version: result.version
-            }
-          },
-          message: `Created company benefit **${result.name || ctx.input.description}**.`
-        };
-      }
-      case 'update': {
-        if (!ctx.input.companyBenefitId) throw new Error('companyBenefitId is required');
-        let data: Record<string, any> = {};
-        if (ctx.input.version) data.version = ctx.input.version;
-        if (ctx.input.description !== undefined) data.description = ctx.input.description;
-        if (ctx.input.active !== undefined) data.active = ctx.input.active;
-        let result = await client.updateCompanyBenefit(ctx.input.companyBenefitId, data);
-        return {
-          output: {
-            benefit: {
-              companyBenefitId: result.uuid || result.id?.toString(),
-              benefitType: result.benefit_type,
-              description: result.description,
-              active: result.active,
-              name: result.name,
-              version: result.version
-            }
-          },
-          message: `Updated company benefit ${ctx.input.companyBenefitId}.`
-        };
-      }
-    }
-  })
   .build();

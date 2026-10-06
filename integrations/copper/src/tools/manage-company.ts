@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageContinuation, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 let companyOutputSchema = z.object({
@@ -109,15 +110,16 @@ export let createCompany = SlateTool.create(spec, {
   )
   .output(companyOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'create_company');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = { name: ctx.input.name };
-    if (ctx.input.emailDomain) body.email_domain = ctx.input.emailDomain;
-    if (ctx.input.assigneeId) body.assignee_id = ctx.input.assigneeId;
-    if (ctx.input.contactTypeId) body.contact_type_id = ctx.input.contactTypeId;
-    if (ctx.input.details) body.details = ctx.input.details;
-    if (ctx.input.phoneNumbers) body.phone_numbers = ctx.input.phoneNumbers;
-    if (ctx.input.address) {
+    if (ctx.input.emailDomain !== undefined) body.email_domain = ctx.input.emailDomain;
+    if (ctx.input.assigneeId !== undefined) body.assignee_id = ctx.input.assigneeId;
+    if (ctx.input.contactTypeId !== undefined) body.contact_type_id = ctx.input.contactTypeId;
+    if (ctx.input.details !== undefined) body.details = ctx.input.details;
+    if (ctx.input.phoneNumbers !== undefined) body.phone_numbers = ctx.input.phoneNumbers;
+    if (ctx.input.address !== undefined) {
       body.address = {
         street: ctx.input.address.street,
         city: ctx.input.address.city,
@@ -126,10 +128,10 @@ export let createCompany = SlateTool.create(spec, {
         country: ctx.input.address.country
       };
     }
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.socials) body.socials = ctx.input.socials;
-    if (ctx.input.websites) body.websites = ctx.input.websites;
-    if (ctx.input.customFields) {
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.socials !== undefined) body.socials = ctx.input.socials;
+    if (ctx.input.websites !== undefined) body.websites = ctx.input.websites;
+    if (ctx.input.customFields !== undefined) {
       body.custom_fields = ctx.input.customFields.map(cf => ({
         custom_field_definition_id: cf.customFieldDefinitionId,
         value: cf.value
@@ -158,6 +160,7 @@ export let getCompany = SlateTool.create(spec, {
   )
   .output(companyOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'get_company');
     let client = new Client(ctx.auth);
     let company = await client.getCompany(ctx.input.companyId);
 
@@ -215,6 +218,7 @@ export let updateCompany = SlateTool.create(spec, {
   )
   .output(companyOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'update_company');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {};
@@ -268,6 +272,7 @@ export let deleteCompany = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'delete_company');
     let client = new Client(ctx.auth);
     await client.deleteCompany(ctx.input.companyId);
 
@@ -307,33 +312,45 @@ export let searchCompanies = SlateTool.create(spec, {
   .output(
     z.object({
       companies: z.array(companyOutputSchema).describe('Matching company records'),
-      count: z.number().describe('Number of results returned')
+      count: z.number().describe('Number of results returned'),
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('A full page suggests another page may be available'),
+      nextPageNumber: z.number().optional().describe('Next page to request when available'),
+      atSearchLimit: z
+        .boolean()
+        .optional()
+        .describe('Narrow filters when the 100,000-result window is reached')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'search_companies');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {
       page_number: ctx.input.pageNumber,
       page_size: ctx.input.pageSize
     };
-    if (ctx.input.sortBy) body.sort_by = ctx.input.sortBy;
-    if (ctx.input.sortDirection) body.sort_direction = ctx.input.sortDirection;
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.emailDomain) body.email_domain = ctx.input.emailDomain;
-    if (ctx.input.assigneeIds) body.assignee_ids = ctx.input.assigneeIds;
-    if (ctx.input.contactTypeIds) body.contact_type_ids = ctx.input.contactTypeIds;
-    if (ctx.input.city) body.city = ctx.input.city;
-    if (ctx.input.state) body.state = ctx.input.state;
-    if (ctx.input.country) body.country = ctx.input.country;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
+    if (ctx.input.sortBy !== undefined) body.sort_by = ctx.input.sortBy;
+    if (ctx.input.sortDirection !== undefined) body.sort_direction = ctx.input.sortDirection;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.emailDomain !== undefined) body.email_domain = ctx.input.emailDomain;
+    if (ctx.input.assigneeIds !== undefined) body.assignee_ids = ctx.input.assigneeIds;
+    if (ctx.input.contactTypeIds !== undefined)
+      body.contact_type_ids = ctx.input.contactTypeIds;
+    if (ctx.input.city !== undefined) body.city = ctx.input.city;
+    if (ctx.input.state !== undefined) body.state = ctx.input.state;
+    if (ctx.input.country !== undefined) body.country = ctx.input.country;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
 
     let companies = await client.searchCompanies(body);
 
     return {
       output: {
         companies: companies.map(mapCompany),
-        count: companies.length
+        count: companies.length,
+        ...pageContinuation(ctx.input, companies.length)
       },
       message: `Found **${companies.length}** companies matching the search criteria.`
     };

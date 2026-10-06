@@ -7,10 +7,8 @@ import {
   sendNotification
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [sendNotification, sendGroupNotification, inviteTeamMember, removeTeamMember],
-  triggers: [inboundWebhook]
+  triggers: []
 });

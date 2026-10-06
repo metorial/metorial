@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,11 +9,11 @@ export let manageBatch = SlateTool.create(spec, {
   description: `Create, schedule, stop, or delete a batch calling campaign. Batches automate outbound calls to large contact lists. Use **action** to specify the operation.`,
   instructions: [
     'To create a batch, provide csvContent with contact_number as the header and phone numbers in E.164 format.',
-    'To schedule, provide batchId and scheduledAt in ISO 8601 format.',
+    'To schedule, provide batchId and scheduledAt in ISO 8601 format with a numeric UTC offset (for example +00:00), within 30 days.',
     'To stop or delete, provide the batchId only.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -49,8 +49,8 @@ export let manageBatch = SlateTool.create(spec, {
       retryConfig: z
         .object({
           enabled: z.boolean().optional(),
-          maxRetries: z.number().optional(),
-          retryIntervalsMinutes: z.array(z.number()).optional()
+          maxRetries: z.number().int().min(1).max(3).optional(),
+          retryIntervalsMinutes: z.array(z.number().positive()).optional()
         })
         .optional()
         .describe('Retry configuration for unanswered calls')
@@ -67,8 +67,9 @@ export let manageBatch = SlateTool.create(spec, {
     let input = ctx.input;
 
     if (input.action === 'create') {
-      if (!input.agentId) throw new Error('agentId is required to create a batch');
-      if (!input.csvContent) throw new Error('csvContent is required to create a batch');
+      if (!input.agentId) throw createApiServiceError('agentId is required to create a batch');
+      if (!input.csvContent)
+        throw createApiServiceError('csvContent is required to create a batch');
 
       let retryConfig: Record<string, any> | undefined;
       if (input.retryConfig) {
@@ -101,12 +102,27 @@ export let manageBatch = SlateTool.create(spec, {
     }
 
     if (input.action === 'schedule') {
-      if (!input.batchId) throw new Error('batchId is required to schedule a batch');
-      if (!input.scheduledAt) throw new Error('scheduledAt is required to schedule a batch');
+      if (!input.batchId)
+        throw createApiServiceError('batchId is required to schedule a batch');
+      if (!input.scheduledAt)
+        throw createApiServiceError('scheduledAt is required to schedule a batch');
+
+      let scheduledAt = input.scheduledAt.replace(/Z$/, '+00:00');
+      let scheduledTime = Date.parse(scheduledAt);
+      if (
+        !Number.isFinite(scheduledTime) ||
+        !/[+-]\d{2}:\d{2}$/.test(scheduledAt) ||
+        scheduledTime <= Date.now() ||
+        scheduledTime > Date.now() + 30 * 86400000
+      ) {
+        throw createApiServiceError(
+          'scheduledAt must be a future ISO 8601 datetime with a numeric UTC offset, within 30 days.'
+        );
+      }
 
       let result = await client.scheduleBatch(
         input.batchId,
-        input.scheduledAt,
+        scheduledAt,
         input.bypassCallGuardrails
       );
 
@@ -120,7 +136,7 @@ export let manageBatch = SlateTool.create(spec, {
     }
 
     if (input.action === 'stop') {
-      if (!input.batchId) throw new Error('batchId is required to stop a batch');
+      if (!input.batchId) throw createApiServiceError('batchId is required to stop a batch');
 
       let result = await client.stopBatch(input.batchId);
 
@@ -134,7 +150,7 @@ export let manageBatch = SlateTool.create(spec, {
     }
 
     if (input.action === 'delete') {
-      if (!input.batchId) throw new Error('batchId is required to delete a batch');
+      if (!input.batchId) throw createApiServiceError('batchId is required to delete a batch');
 
       let result = await client.deleteBatch(input.batchId);
 
@@ -147,6 +163,6 @@ export let manageBatch = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

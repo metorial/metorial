@@ -24,17 +24,6 @@ import {
   searchJobsTool,
   uploadJobFileTool
 } from './tools';
-import {
-  contactEventsTrigger,
-  jobAppointmentEventsTrigger,
-  jobClassificationEventsTrigger,
-  jobContactEventsTrigger,
-  jobFinancialEventsTrigger,
-  jobLifecycleEventsTrigger,
-  jobMilestoneEventsTrigger,
-  jobRepresentativeEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -61,14 +50,5 @@ export let provider = Slate.create({
     getCompanySettingsTool,
     getLeadHistoryTool
   ],
-  triggers: [
-    contactEventsTrigger,
-    jobLifecycleEventsTrigger,
-    jobMilestoneEventsTrigger,
-    jobFinancialEventsTrigger,
-    jobClassificationEventsTrigger,
-    jobContactEventsTrigger,
-    jobAppointmentEventsTrigger,
-    jobRepresentativeEventsTrigger
-  ]
+  triggers: []
 });

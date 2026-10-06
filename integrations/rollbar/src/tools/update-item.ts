@@ -1,29 +1,46 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, mapItem } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateItem = SlateTool.create(spec, {
   name: 'Update Item',
   key: 'update_item',
-  description: `Update properties of a Rollbar item, such as its status (resolve, mute, archive, reactivate), severity level, title, or assigned user.`,
-  tags: {
-    destructive: false
-  }
+  description:
+    'Update an item’s status, severity, title or assigned user. Use assignedUserId from list_users to assign or null to unassign. Legacy assignedUser resolves a username with an account read token. Archived status is retained for compatibility; current API documentation only guarantees active, resolved and muted.',
+  tags: { destructive: false }
 })
   .input(
     z.object({
       itemId: z.number().describe('Unique item ID to update'),
+      projectId: z
+        .number()
+        .optional()
+        .describe('Project ID from manage_project; required with an account token.'),
       status: z
         .enum(['active', 'resolved', 'muted', 'archived'])
         .optional()
-        .describe('New status for the item'),
+        .describe('New item status'),
       level: z
         .enum(['debug', 'info', 'warning', 'error', 'critical'])
         .optional()
         .describe('New severity level'),
-      title: z.string().optional().describe('New title for the item'),
-      assignedUser: z.string().optional().describe('Username to assign the item to')
+      title: z.string().optional().describe('New item title, 1–255 characters'),
+      assignedUser: z
+        .string()
+        .optional()
+        .describe('Legacy username assignment; requires account read access to list_users'),
+      assignedUserId: z
+        .number()
+        .nullable()
+        .optional()
+        .describe(
+          'User ID from list_users; null removes the assignment. Do not combine with assignedUser.'
+        ),
+      resolvedInVersion: z
+        .string()
+        .optional()
+        .describe('Code version, at most 40 characters; requires status resolved')
     })
   )
   .output(
@@ -36,26 +53,31 @@ export let updateItem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let updateData: any = {};
-    if (ctx.input.status) updateData.status = ctx.input.status;
-    if (ctx.input.level) updateData.level = ctx.input.level;
-    if (ctx.input.title) updateData.title = ctx.input.title;
-    if (ctx.input.assignedUser) updateData.assigned_user = ctx.input.assignedUser;
-
-    let result = await client.updateItem(ctx.input.itemId, updateData);
-    let item = result?.result;
-
+    const client = createClient(ctx);
+    if (ctx.input.assignedUser !== undefined && ctx.input.assignedUserId !== undefined)
+      throw createApiServiceError('Provide assignedUserId or assignedUser, not both.');
+    let assignedUserId = ctx.input.assignedUserId;
+    if (ctx.input.assignedUser !== undefined) {
+      const users = (await client.listUsers()).result.users;
+      const user = users.find(user => user.username === ctx.input.assignedUser);
+      if (!user)
+        throw createApiServiceError(
+          'No account user matches assignedUser. Use a user ID from list_users.'
+        );
+      assignedUserId = user.id;
+    }
+    const item = (
+      await client.updateItem(ctx.input.itemId, {
+        status: ctx.input.status,
+        level: ctx.input.level,
+        title: ctx.input.title,
+        assigned_user_id: assignedUserId,
+        resolved_in_version: ctx.input.resolvedInVersion
+      })
+    ).result;
     return {
-      output: {
-        itemId: item.id,
-        counter: item.counter,
-        title: item.title,
-        status: item.status,
-        level: item.level_string || item.level
-      },
-      message: `Updated item **#${item.counter}**: "${item.title}" — status: ${item.status}, level: ${item.level_string || item.level}.`
+      output: mapItem(item),
+      message: `Updated item #${item.counter}: ${item.title} (${item.status}).`
     };
   })
   .build();

@@ -1,16 +1,58 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { getBaseUrl } from '../lib/helpers';
+import { invokeGusto } from '../lib/actions';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  pagination: paginationSchema.optional(),
+  garnishments: z
+    .array(
+      z.object({
+        garnishmentId: z.string().describe('UUID of the garnishment'),
+        version: z.string().nullable().optional(),
+        amountExact: z.string().nullable().optional(),
+        employeeId: z.string().nullable().optional(),
+        recurring: z.boolean().nullable().optional(),
+        times: z.number().nullable().optional(),
+        description: z.string().nullable().optional().describe('Description'),
+        active: z.boolean().nullable().optional().describe('Whether active'),
+        amount: z.number().nullable().optional().describe('Amount per pay period'),
+        courtOrdered: z.boolean().nullable().optional().describe('Whether court-ordered')
+      })
+    )
+    .optional()
+    .describe('List of garnishments (for list action)'),
+  garnishment: z
+    .object({
+      garnishmentId: z.string().describe('UUID of the garnishment'),
+      amountExact: z.string().nullable().optional(),
+      employeeId: z.string().nullable().optional(),
+      recurring: z.boolean().nullable().optional(),
+      times: z.number().nullable().optional(),
+      description: z.string().nullable().optional().describe('Description'),
+      active: z.boolean().nullable().optional().describe('Whether active'),
+      amount: z.number().nullable().optional().describe('Amount per pay period'),
+      courtOrdered: z.boolean().nullable().optional().describe('Whether court-ordered'),
+      version: z.string().nullable().optional().describe('Current resource version')
+    })
+    .optional()
+    .describe('Single garnishment (for create/update)')
+});
 
 export let manageGarnishment = SlateTool.create(spec, {
   name: 'Manage Garnishment',
   key: 'manage_garnishment',
-  description: `List, create, or update wage garnishments for an employee. Supports child support and other garnishment types with configurable amounts and schedules.`
+  description: `List, create, or update wage garnishments for an employee. Supports ordinary garnishments with exact amounts and schedules; specialized child-support setup must be completed in Gusto.`
 })
   .input(
     z.object({
+      page: z.number().optional().describe('Page number for list, starting at 1.'),
+      per: z.number().optional().describe('Results per list page, 1 to 100.'),
+      recurring: z
+        .boolean()
+        .optional()
+        .describe('Whether an ordinary garnishment recurs indefinitely.'),
       action: z.enum(['list', 'create', 'update']).describe('The action to perform'),
       employeeId: z.string().optional().describe('Employee UUID (required for list/create)'),
       garnishmentId: z.string().optional().describe('Garnishment UUID (required for update)'),
@@ -22,123 +64,23 @@ export let manageGarnishment = SlateTool.create(spec, {
       active: z.boolean().optional().describe('Whether the garnishment is active'),
       amount: z.number().optional().describe('Garnishment amount per pay period'),
       courtOrdered: z.boolean().optional().describe('Whether court-ordered'),
-      times: z.number().optional().describe('Number of times to deduct (null for ongoing)'),
+      times: z
+        .number()
+        .optional()
+        .describe('Positive number of deductions; use recurring for an ongoing deduction.'),
       recurringChildSupport: z
         .boolean()
         .optional()
-        .describe('Whether this is recurring child support'),
+        .describe(
+          'Legacy unsupported field. Specialized child-support setup must be completed in Gusto; use recurring for ordinary deductions.'
+        ),
       annualMaximum: z.number().optional().describe('Annual maximum deduction'),
       payPeriodMaximum: z.number().optional().describe('Maximum deduction per pay period'),
       deductAsPercentage: z.boolean().optional().describe('Whether to deduct as a percentage')
     })
   )
-  .output(
-    z.object({
-      garnishments: z
-        .array(
-          z.object({
-            garnishmentId: z.string().describe('UUID of the garnishment'),
-            description: z.string().optional().describe('Description'),
-            active: z.boolean().optional().describe('Whether active'),
-            amount: z.number().optional().describe('Amount per pay period'),
-            courtOrdered: z.boolean().optional().describe('Whether court-ordered')
-          })
-        )
-        .optional()
-        .describe('List of garnishments (for list action)'),
-      garnishment: z
-        .object({
-          garnishmentId: z.string().describe('UUID of the garnishment'),
-          description: z.string().optional().describe('Description'),
-          active: z.boolean().optional().describe('Whether active'),
-          amount: z.number().optional().describe('Amount per pay period'),
-          courtOrdered: z.boolean().optional().describe('Whether court-ordered'),
-          version: z.string().optional().describe('Current resource version')
-        })
-        .optional()
-        .describe('Single garnishment (for create/update)')
-    })
+  .output(outputSchema)
+  .handleInvocation(ctx =>
+    invokeGusto('manage_garnishment', ctx.input, ctx.auth, outputSchema)
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: getBaseUrl(ctx.auth.environment)
-    });
-
-    switch (ctx.input.action) {
-      case 'list': {
-        if (!ctx.input.employeeId) throw new Error('employeeId is required');
-        let result = await client.listGarnishments(ctx.input.employeeId);
-        let garnishments = Array.isArray(result) ? result : result.garnishments || result;
-        let mapped = garnishments.map((g: any) => ({
-          garnishmentId: g.uuid || g.id?.toString(),
-          description: g.description,
-          active: g.active,
-          amount: g.amount,
-          courtOrdered: g.court_ordered
-        }));
-        return {
-          output: { garnishments: mapped },
-          message: `Found **${mapped.length}** garnishment(s).`
-        };
-      }
-      case 'create': {
-        if (!ctx.input.employeeId) throw new Error('employeeId is required');
-        let result = await client.createGarnishment(ctx.input.employeeId, {
-          description: ctx.input.description,
-          active: ctx.input.active,
-          amount: ctx.input.amount,
-          court_ordered: ctx.input.courtOrdered,
-          times: ctx.input.times,
-          recurring_child_support: ctx.input.recurringChildSupport,
-          annual_maximum: ctx.input.annualMaximum,
-          pay_period_maximum: ctx.input.payPeriodMaximum,
-          deduct_as_percentage: ctx.input.deductAsPercentage
-        });
-        return {
-          output: {
-            garnishment: {
-              garnishmentId: result.uuid || result.id?.toString(),
-              description: result.description,
-              active: result.active,
-              amount: result.amount,
-              courtOrdered: result.court_ordered,
-              version: result.version
-            }
-          },
-          message: `Created garnishment "${ctx.input.description}" for employee ${ctx.input.employeeId}.`
-        };
-      }
-      case 'update': {
-        if (!ctx.input.garnishmentId) throw new Error('garnishmentId is required');
-        let data: Record<string, any> = {};
-        if (ctx.input.version) data.version = ctx.input.version;
-        if (ctx.input.description !== undefined) data.description = ctx.input.description;
-        if (ctx.input.active !== undefined) data.active = ctx.input.active;
-        if (ctx.input.amount !== undefined) data.amount = ctx.input.amount;
-        if (ctx.input.courtOrdered !== undefined) data.court_ordered = ctx.input.courtOrdered;
-        if (ctx.input.times !== undefined) data.times = ctx.input.times;
-        if (ctx.input.annualMaximum !== undefined)
-          data.annual_maximum = ctx.input.annualMaximum;
-        if (ctx.input.payPeriodMaximum !== undefined)
-          data.pay_period_maximum = ctx.input.payPeriodMaximum;
-        if (ctx.input.deductAsPercentage !== undefined)
-          data.deduct_as_percentage = ctx.input.deductAsPercentage;
-        let result = await client.updateGarnishment(ctx.input.garnishmentId, data);
-        return {
-          output: {
-            garnishment: {
-              garnishmentId: result.uuid || result.id?.toString(),
-              description: result.description,
-              active: result.active,
-              amount: result.amount,
-              courtOrdered: result.court_ordered,
-              version: result.version
-            }
-          },
-          message: `Updated garnishment ${ctx.input.garnishmentId}.`
-        };
-      }
-    }
-  })
   .build();

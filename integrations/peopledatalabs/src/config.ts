@@ -6,6 +6,8 @@ export let config = SlateConfig.create(
     sandbox: z
       .boolean()
       .default(false)
-      .describe('Enable sandbox mode to use fictitious data without consuming credits')
+      .describe(
+        'Use artificial person/company data without credits on documented sandbox endpoints. Other operations fail without switching to production.'
+      )
   })
 );

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,6 +7,7 @@ export let manageCollection = SlateTool.create(spec, {
   name: 'Manage Collection',
   key: 'manage_collection',
   description: `Create a new collection or update an existing collection's name and description. Collections serve as organizational containers for Hex projects.`,
+  tags: { destructive: true },
   instructions: [
     'To create a collection, provide "name" without "collectionId".',
     'To update a collection, provide "collectionId" with "name" and/or "description".'
@@ -28,15 +29,18 @@ export let manageCollection = SlateTool.create(spec, {
     z.object({
       collectionId: z.string(),
       name: z.string(),
-      description: z.string().nullable(),
-      createdAt: z.string(),
-      updatedAt: z.string()
+      description: z.string().nullable().optional(),
+      createdAt: z.string().optional(),
+      updatedAt: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
 
-    if (ctx.input.collectionId) {
+    if (ctx.input.collectionId !== undefined) {
       let collection = await client.editCollection(ctx.input.collectionId, {
         name: ctx.input.name,
         description: ctx.input.description
@@ -53,7 +57,7 @@ export let manageCollection = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.name) {
-        throw new Error('Name is required when creating a new collection.');
+        throw createApiServiceError('Name is required when creating a new collection.');
       }
       let collection = await client.createCollection(ctx.input.name, ctx.input.description);
       return {

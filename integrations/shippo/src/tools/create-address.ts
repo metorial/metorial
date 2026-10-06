@@ -56,9 +56,9 @@ export let createAddress = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
-    let result = (await client.createAddress({
+    let result = await client.createAddress({
       name: ctx.input.name,
       company: ctx.input.company,
       street1: ctx.input.street1,
@@ -73,7 +73,7 @@ export let createAddress = SlateTool.create(spec, {
       is_residential: ctx.input.isResidential,
       validate: ctx.input.validate,
       metadata: ctx.input.metadata
-    })) as Record<string, any>;
+    });
 
     return {
       output: {

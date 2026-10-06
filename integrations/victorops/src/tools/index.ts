@@ -1,5 +1,6 @@
 export * from './create-incident';
 export * from './create-on-call-override';
+export * from './discovery';
 export * from './get-on-call';
 export * from './get-shift-log';
 export * from './get-team-rotations';

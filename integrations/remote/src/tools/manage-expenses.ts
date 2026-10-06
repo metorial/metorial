@@ -1,146 +1,208 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { spec } from '../spec';
-
-export let manageExpenses = SlateTool.create(spec, {
-  name: 'Manage Expenses',
-  key: 'manage_expenses',
-  description: `Create, update, list, or retrieve expense records. Also supports listing available expense categories. Expenses include amount, currency, category, and receipt information.`,
-  instructions: [
-    'Use action "create" to submit a new expense.',
-    'Use action "update" to modify an existing expense by providing expenseId.',
-    'Use action "get" to retrieve a single expense.',
-    'Use action "list" to browse expenses with optional filters.',
-    'Use action "list_categories" to view available expense categories.'
-  ],
-  tags: {
-    destructive: false
-  }
-})
-  .input(
-    z.object({
-      action: z
-        .enum(['create', 'update', 'get', 'list', 'list_categories'])
-        .describe('Action to perform'),
-      expenseId: z.string().optional().describe('Expense ID (required for get, update)'),
-      employmentId: z
-        .string()
-        .optional()
-        .describe('Employment ID (used for create, list, list_categories)'),
-      title: z.string().optional().describe('Expense title for create'),
-      amount: z.number().optional().describe('Expense amount for create/update'),
-      currency: z
-        .string()
-        .optional()
-        .describe('Currency code (e.g., USD, EUR) for create/update'),
-      category: z.string().optional().describe('Expense category for create/update'),
-      expenseDate: z
-        .string()
-        .optional()
-        .describe('Date of the expense (YYYY-MM-DD) for create'),
-      receiptBase64: z.string().optional().describe('Base64-encoded receipt file for create'),
-      receiptFileName: z.string().optional().describe('Receipt file name for create'),
-      taxAmount: z.number().optional().describe('Tax amount for create/update'),
-      reviewedAt: z.string().optional().describe('Review timestamp for update'),
-      status: z.string().optional().describe('Filter by status when listing'),
-      page: z.number().optional().describe('Page number for list'),
-      pageSize: z.number().optional().describe('Page size for list')
-    })
-  )
-  .output(
-    z.object({
-      expense: z.record(z.string(), z.any()).optional().describe('Single expense record'),
-      expenses: z
-        .array(z.record(z.string(), z.any()))
-        .optional()
-        .describe('List of expense records'),
-      categories: z
-        .array(z.record(z.string(), z.any()))
-        .optional()
-        .describe('Available expense categories'),
-      totalCount: z.number().optional().describe('Total count for list')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment ?? 'production'
-    });
-
-    if (ctx.input.action === 'create') {
-      let data: Record<string, any> = {
-        employment_id: ctx.input.employmentId,
-        title: ctx.input.title,
-        amount: ctx.input.amount,
-        currency: ctx.input.currency,
-        category: ctx.input.category,
-        expense_date: ctx.input.expenseDate
-      };
-      if (ctx.input.receiptBase64) {
-        data.receipt = {
-          content: ctx.input.receiptBase64,
-          name: ctx.input.receiptFileName
-        };
-      }
-      if (ctx.input.taxAmount !== undefined) data.tax_amount = ctx.input.taxAmount;
-
-      let result = await client.createExpense(data);
-      let expense = result?.data ?? result?.expense ?? result;
+import { collection, pageOutput, pageParams, single } from '../lib/client';
+import { remoteTool } from '../lib/tool';
+import {
+  country,
+  currency,
+  date,
+  fail,
+  id,
+  integer,
+  pageSchema,
+  pageSizeSchema,
+  paginationOutput,
+  recordSchema,
+  rejectFields,
+  required,
+  timestamp
+} from '../lib/validation';
+export let manageExpenses = remoteTool(
+  {
+    name: 'Manage Expenses',
+    key: 'manage_expenses',
+    description:
+      'Read expenses and categories, create an already-approved expense, or approve/decline a pending expense. Current update changes review status only; it does not edit expense amounts or reimburse funds directly.',
+    tags: { destructive: true }
+  },
+  z.object({
+    action: z.enum(['create', 'update', 'get', 'list', 'list_categories']),
+    expenseId: z.string().optional(),
+    employmentId: z.string().optional(),
+    title: z.string().optional(),
+    amount: z
+      .number()
+      .optional()
+      .describe(
+        'Integer hundredths of the expense currency (10000 means 100.00). Creation only.'
+      ),
+    currency: z.string().optional(),
+    category: z.string().optional(),
+    expenseDate: z.string().optional(),
+    receiptBase64: z.string().optional(),
+    receiptFileName: z.string().optional(),
+    taxAmount: z
+      .number()
+      .optional()
+      .describe('Integer hundredths, without conversion. Creation only.'),
+    reviewedAt: z
+      .string()
+      .optional()
+      .describe(
+        'Optional ISO review timestamp for creation; current update accepts review status only.'
+      ),
+    status: z
+      .string()
+      .optional()
+      .describe('Legacy list filter; the current list endpoint does not document it.'),
+    page: pageSchema,
+    pageSize: pageSizeSchema,
+    expenseCategorySlug: z.string().optional(),
+    countryCode: z.string().optional(),
+    includeParents: z.boolean().optional(),
+    timezone: z.string().optional(),
+    reviewerId: z.string().optional(),
+    reviewStatus: z.enum(['approved', 'declined']).optional(),
+    reviewReason: z.string().optional(),
+    receipts: z
+      .array(z.object({ name: z.string(), content: z.string() }))
+      .optional()
+      .describe(
+        'Up to five Base64 receipts for creation; use this or the legacy single receipt fields.'
+      )
+  }),
+  z.object({
+    expense: recordSchema.optional(),
+    expenses: z.array(recordSchema).optional(),
+    categories: z.array(recordSchema).optional(),
+    ...paginationOutput
+  }),
+  async (client, input) => {
+    if (input.action === 'list') {
+      rejectFields(
+        input,
+        ['employmentId', 'status'],
+        'The current expense list does not document employmentId or status filters. Omit them and inspect the returned page; these filters must not be silently ignored.'
+      );
+      let value = await client.get('/expenses', pageParams(input));
       return {
-        output: { expense },
-        message: `Created expense **${ctx.input.title ?? 'untitled'}** for ${ctx.input.amount} ${ctx.input.currency}.`
+        output: { expenses: collection(value, 'expenses'), ...pageOutput(value) },
+        message: 'Retrieved an expense page.'
       };
     }
-
-    if (ctx.input.action === 'update') {
-      let data: Record<string, any> = {};
-      if (ctx.input.title) data.title = ctx.input.title;
-      if (ctx.input.amount !== undefined) data.amount = ctx.input.amount;
-      if (ctx.input.currency) data.currency = ctx.input.currency;
-      if (ctx.input.category) data.category = ctx.input.category;
-      if (ctx.input.taxAmount !== undefined) data.tax_amount = ctx.input.taxAmount;
-
-      let result = await client.updateExpense(ctx.input.expenseId!, data);
-      let expense = result?.data ?? result?.expense ?? result;
+    if (input.action === 'get')
       return {
-        output: { expense },
-        message: `Updated expense **${ctx.input.expenseId}**.`
+        output: { expense: await client.entity('/expenses', 'expense', input.expenseId) },
+        message: 'Retrieved the current expense.'
       };
-    }
-
-    if (ctx.input.action === 'get') {
-      let result = await client.getExpense(ctx.input.expenseId!);
-      let expense = result?.data ?? result?.expense ?? result;
-      return {
-        output: { expense },
-        message: `Retrieved expense **${ctx.input.expenseId}**.`
-      };
-    }
-
-    if (ctx.input.action === 'list_categories') {
-      let result = await client.listExpenseCategories({
-        employmentId: ctx.input.employmentId,
-        expenseId: ctx.input.expenseId
+    if (input.action === 'list_categories') {
+      if (!input.employmentId && !input.expenseId && !input.countryCode)
+        fail('Category discovery requires employmentId, expenseId, or countryCode.');
+      let value = await client.get('/expenses/categories', {
+        employment_id: input.employmentId === undefined ? undefined : id(input.employmentId),
+        expense_id: input.expenseId === undefined ? undefined : id(input.expenseId),
+        country_code: input.countryCode === undefined ? undefined : country(input.countryCode),
+        include_parents: input.includeParents
       });
-      let categories = result?.data ?? result?.expense_categories ?? [];
       return {
-        output: { categories },
-        message: `Found **${categories.length}** expense categories.`
+        output: { categories: collection(value, 'expense_categories') },
+        message: 'Retrieved effective expense categories.'
       };
     }
-
-    // list
-    let result = await client.listExpenses({
-      employmentId: ctx.input.employmentId,
-      status: ctx.input.status,
-      page: ctx.input.page,
-      pageSize: ctx.input.pageSize
+    if (input.action === 'update') {
+      rejectFields(
+        input,
+        [
+          'title',
+          'amount',
+          'currency',
+          'category',
+          'taxAmount',
+          'reviewedAt',
+          'expenseDate',
+          'receiptBase64',
+          'receiptFileName',
+          'receipts',
+          'expenseCategorySlug',
+          'status'
+        ],
+        'Current expense updates only approve or decline pending expenses. Use reviewStatus and reviewReason; amounts, receipts, and categories cannot be edited by this endpoint.'
+      );
+      let expenseId = id(input.expenseId, 'Expense ID');
+      if (!input.reviewStatus)
+        fail('Expense update requires reviewStatus: approved or declined.');
+      let current = await client.entity('/expenses', 'expense', expenseId);
+      if (current.status !== 'pending')
+        fail(
+          'Only pending expenses can be approved or declined. Read the current expense before retrying.'
+        );
+      let value = await client.patch(`/expenses/${expenseId}`, {
+        status: input.reviewStatus,
+        reason:
+          input.reviewStatus === 'declined'
+            ? required(input.reviewReason, 'Decline reason')
+            : undefined
+      });
+      return {
+        output: { expense: single(value, 'expense', expenseId) },
+        message: 'Remote accepted the expense review. This is not a fund-transfer receipt.'
+      };
+    }
+    let employmentId = id(input.employmentId, 'Employment ID');
+    await client.employment(employmentId);
+    let purchaseDate = date(input.expenseDate, 'Expense date');
+    if (purchaseDate > new Date().toISOString().slice(0, 10))
+      fail('Expense date must not be in the future.');
+    if (
+      input.receipts &&
+      (input.receiptBase64 !== undefined || input.receiptFileName !== undefined)
+    )
+      fail('Use receipts or the legacy single receipt fields, not both.');
+    let receipts =
+      input.receipts ??
+      (input.receiptBase64 === undefined
+        ? undefined
+        : [
+            {
+              content: input.receiptBase64,
+              name: required(input.receiptFileName, 'Receipt file name')
+            }
+          ]);
+    if (receipts && (!receipts.length || receipts.length > 5))
+      fail('Provide between one and five receipts.');
+    if (input.receiptFileName !== undefined && input.receiptBase64 === undefined)
+      fail('receiptFileName requires receiptBase64.');
+    for (let receipt of receipts ?? []) {
+      required(receipt.name, 'Receipt name');
+      if (
+        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+          required(receipt.content, 'Receipt Base64')
+        ) ||
+        Buffer.from(receipt.content, 'base64').toString('base64') !== receipt.content
+      )
+        fail('Receipt content must be canonical Base64.');
+    }
+    let value = await client.post('/expenses', {
+      employment_id: employmentId,
+      title: required(input.title, 'Expense title'),
+      amount: integer(input.amount, 'Expense amount'),
+      currency: currency(input.currency),
+      category: input.category,
+      expense_category_slug: input.expenseCategorySlug,
+      expense_date: purchaseDate,
+      tax_amount:
+        input.taxAmount === undefined ? undefined : integer(input.taxAmount, 'Tax amount'),
+      reviewed_at:
+        input.reviewedAt === undefined
+          ? undefined
+          : timestamp(input.reviewedAt, 'Review timestamp'),
+      reviewer_id: input.reviewerId === undefined ? undefined : id(input.reviewerId),
+      timezone: input.timezone,
+      receipts
     });
-    let expenses = result?.data ?? result?.expenses ?? [];
-    let totalCount = result?.total_count ?? expenses.length;
     return {
-      output: { expenses, totalCount },
-      message: `Found **${totalCount}** expense(s).`
+      output: { expense: single(value, 'expense') },
+      message:
+        'Remote created an already-approved expense. The expense may enter reimbursement processing; no transfer completion is asserted.'
     };
-  });
+  }
+);

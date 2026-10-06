@@ -16,7 +16,7 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      apiKey: z.string().describe('Weaviate API key for authentication')
+      apiKey: z.string().min(1).describe('Weaviate API key for authentication')
     }),
     getOutput: async (ctx: { input: ApiKeyInput }) => {
       return {
@@ -38,7 +38,12 @@ export let auth = SlateAuth.create()
     name: 'OIDC Bearer Token',
     key: 'oidc_bearer',
     inputSchema: z.object({
-      accessToken: z.string().describe('OIDC access token for authentication')
+      accessToken: z
+        .string()
+        .min(1)
+        .describe(
+          'OIDC access token for authentication. Reconnect with a new token when it expires; automatic refresh is not configured.'
+        )
     }),
     getOutput: async (ctx: { input: OidcInput }) => {
       return {

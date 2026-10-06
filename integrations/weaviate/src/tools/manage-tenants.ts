@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let manageTenants = SlateTool.create(spec, {
 
 Tenant statuses: **ACTIVE** (available), **INACTIVE** (stored locally but not loaded), **OFFLOADED** (moved to cold storage).`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -26,7 +26,9 @@ Tenant statuses: **ACTIVE** (available), **INACTIVE** (stored locally but not lo
             activityStatus: z
               .enum(['ACTIVE', 'INACTIVE', 'OFFLOADED'])
               .optional()
-              .describe('Tenant activity status (for add/update)')
+              .describe(
+                'Tenant activity status for add/update; defaults to ACTIVE when omitted'
+              )
           })
         )
         .optional()
@@ -64,8 +66,13 @@ Tenant statuses: **ACTIVE** (available), **INACTIVE** (stored locally but not lo
         };
       }
       case 'add': {
+        if (tenants?.some(tenant => tenant.activityStatus === 'OFFLOADED')) {
+          throw createApiServiceError(
+            'New tenants must be ACTIVE or INACTIVE. Use update to offload an existing tenant.'
+          );
+        }
         if (!tenants || tenants.length === 0)
-          throw new Error('Tenants array is required for add action');
+          throw createApiServiceError('Tenants array is required for add action');
         let payload = tenants.map(t => ({
           name: t.name,
           activityStatus: t.activityStatus || 'ACTIVE'
@@ -81,7 +88,7 @@ Tenant statuses: **ACTIVE** (available), **INACTIVE** (stored locally but not lo
       }
       case 'update': {
         if (!tenants || tenants.length === 0)
-          throw new Error('Tenants array is required for update action');
+          throw createApiServiceError('Tenants array is required for update action');
         let payload = tenants.map(t => ({
           name: t.name,
           activityStatus: t.activityStatus || 'ACTIVE'
@@ -97,7 +104,7 @@ Tenant statuses: **ACTIVE** (available), **INACTIVE** (stored locally but not lo
       }
       case 'remove': {
         if (!tenants || tenants.length === 0)
-          throw new Error('Tenants array is required for remove action');
+          throw createApiServiceError('Tenants array is required for remove action');
         let tenantNames = tenants.map(t => t.name);
         await client.deleteTenants(collectionName, tenantNames);
         return {

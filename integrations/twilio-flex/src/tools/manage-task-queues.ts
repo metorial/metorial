@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TaskRouterClient } from '../lib/taskrouter-client';
+import { fail, validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let taskQueueSchema = z.object({
@@ -19,16 +20,24 @@ export let manageTaskQueuesTool = SlateTool.create(spec, {
   key: 'manage_task_queues',
   description: `Create, read, update, delete, or list task queues in a TaskRouter workspace. Task queues hold tasks waiting to be assigned to workers. Each queue has a target worker expression that determines which workers are eligible to receive tasks from it.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque continuation from nextPageToken; retain the same resource and filters.'
+        ),
       action: z
         .enum(['create', 'get', 'update', 'delete', 'list'])
         .describe('Action to perform'),
-      workspaceSid: z.string().describe('Workspace SID'),
+      workspaceSid: z
+        .string()
+        .describe('Workspace SID. Call list_workspaces to discover authorized workspaces.'),
       taskQueueSid: z
         .string()
         .optional()
@@ -55,11 +64,21 @@ export let manageTaskQueuesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Native continuation; omitted when this page is exhausted.'),
+      hasMore: z.boolean().optional().describe('Whether a next page is available.'),
       taskQueues: z.array(taskQueueSchema).describe('Task queue records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TaskRouterClient(ctx.auth.token, ctx.auth.accountSid);
+    validateInput('manage_task_queues', ctx.input);
+    let client = new TaskRouterClient(
+      ctx.auth.token,
+      ctx.auth.accountSid,
+      ctx.input.pageToken
+    );
 
     if (ctx.input.action === 'list') {
       let result = await client.listTaskQueues(ctx.input.workspaceSid, ctx.input.pageSize);
@@ -74,13 +93,13 @@ export let manageTaskQueuesTool = SlateTool.create(spec, {
         dateUpdated: q.date_updated
       }));
       return {
-        output: { taskQueues },
+        output: { taskQueues, nextPageToken: result.nextPageToken, hasMore: result.hasMore },
         message: `Found **${taskQueues.length}** task queues.`
       };
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.taskQueueSid) throw new Error('taskQueueSid is required');
+      if (!ctx.input.taskQueueSid) throw fail('taskQueueSid is required');
       let q = await client.getTaskQueue(ctx.input.workspaceSid, ctx.input.taskQueueSid);
       return {
         output: {
@@ -102,7 +121,7 @@ export let manageTaskQueuesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.friendlyName) throw new Error('friendlyName is required');
+      if (!ctx.input.friendlyName) throw fail('friendlyName is required');
       let params: Record<string, string | undefined> = {
         FriendlyName: ctx.input.friendlyName,
         TargetWorkers: ctx.input.targetWorkers,
@@ -131,7 +150,7 @@ export let manageTaskQueuesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.taskQueueSid) throw new Error('taskQueueSid is required');
+      if (!ctx.input.taskQueueSid) throw fail('taskQueueSid is required');
       let params: Record<string, string | undefined> = {
         FriendlyName: ctx.input.friendlyName,
         TargetWorkers: ctx.input.targetWorkers,
@@ -164,7 +183,7 @@ export let manageTaskQueuesTool = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.taskQueueSid) throw new Error('taskQueueSid is required');
+    if (!ctx.input.taskQueueSid) throw fail('taskQueueSid is required');
     await client.deleteTaskQueue(ctx.input.workspaceSid, ctx.input.taskQueueSid);
     return {
       output: {

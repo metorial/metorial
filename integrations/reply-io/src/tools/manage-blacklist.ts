@@ -31,12 +31,16 @@ export let manageBlacklist = SlateTool.create(spec, {
         .record(z.string(), z.any())
         .optional()
         .describe('Current blacklist entries'),
+      rules: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Confirmed newly created blacklist rules with identifiers.'),
       added: z.boolean().optional().describe('Whether items were added'),
       removed: z.boolean().optional().describe('Whether items were removed')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let { action, filterType, domains, emails } = ctx.input;
 
     if (action === 'list') {
@@ -51,9 +55,9 @@ export let manageBlacklist = SlateTool.create(spec, {
       let data: { domains?: string[]; emails?: string[] } = {};
       if (domains) data.domains = domains;
       if (emails) data.emails = emails;
-      await client.addToBlacklist(data);
+      const result = await client.addToBlacklist(data);
       return {
-        output: { added: true },
+        output: { added: true, rules: result.rules },
         message: `Added **${(domains?.length ?? 0) + (emails?.length ?? 0)}** item(s) to the blacklist.`
       };
     }

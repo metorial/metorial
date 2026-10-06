@@ -6,7 +6,9 @@ import { spec } from '../spec';
 let logEventSchema = z.object({
   eventId: z.string().describe('Unique Papertrail event ID'),
   generatedAt: z.string().describe('ISO 8601 timestamp when the log event was generated'),
-  receivedAt: z.string().describe('ISO 8601 timestamp when Papertrail received the event'),
+  receivedAt: z
+    .string()
+    .describe('Timestamp when Papertrail received the event in the API token owner time zone'),
   displayReceivedAt: z.string().describe('Human-readable received timestamp'),
   sourceId: z.number().describe('ID of the system that generated the event'),
   sourceName: z.string().describe('Name of the system that generated the event'),
@@ -24,7 +26,8 @@ export let searchEvents = SlateTool.create(spec, {
   description: `Search for log events across systems and groups. Supports Papertrail's full query syntax including Boolean operators (AND, OR), negation, quoted phrases, and attribute filters like \`sender:\` and \`program:\`. Results can be filtered by system, group, and time range.`,
   instructions: [
     'Use Unix timestamps (seconds since epoch) for minTime and maxTime parameters.',
-    'For pagination, use the minId or maxId from the previous response to fetch the next set of results.',
+    'For forward pagination, send the previous maxId as minId. For backward pagination, send the previous minId as maxId. Continue until reachedEnd or reachedBeginning, including after an empty partial page.',
+    'When paging a time window backward with both minTime and maxId, discard the overlapping boundary event if it was already returned.',
     'Query syntax supports: AND, OR, quoted phrases, negation with -, and attribute filters like sender:hostname or program:nginx.'
   ],
   constraints: [
@@ -42,6 +45,12 @@ export let searchEvents = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Search query string using Papertrail search syntax'),
+      systemName: z
+        .string()
+        .optional()
+        .describe(
+          'Unique sender name containing only letters, numbers and underscores; use instead of systemId'
+        ),
       systemId: z.number().optional().describe('Limit results to a specific system by ID'),
       groupId: z.number().optional().describe('Limit results to a specific group by ID'),
       minTime: z
@@ -76,11 +85,27 @@ export let searchEvents = SlateTool.create(spec, {
       minId: z
         .string()
         .optional()
-        .describe('Smallest event ID in the result set, for backward pagination'),
+        .describe(
+          'Lowest event ID examined, including on empty pages; use for backward pagination'
+        ),
       maxId: z
         .string()
         .optional()
-        .describe('Largest event ID in the result set, for forward pagination'),
+        .describe(
+          'Highest event ID examined, including on empty pages; use for forward pagination'
+        ),
+      reachedBeginning: z
+        .boolean()
+        .optional()
+        .describe('Whether backward search reached the beginning of retained logs'),
+      reachedEnd: z
+        .boolean()
+        .optional()
+        .describe('Whether forward search reached the newest logs'),
+      reachedRecordLimit: z
+        .boolean()
+        .optional()
+        .describe('Whether the event limit truncated this page'),
       reachedTimeLimit: z
         .boolean()
         .optional()
@@ -100,6 +125,7 @@ export let searchEvents = SlateTool.create(spec, {
     let result = await client.searchEvents({
       query: ctx.input.query,
       systemId: ctx.input.systemId,
+      systemName: ctx.input.systemName,
       groupId: ctx.input.groupId,
       minTime: ctx.input.minTime,
       maxTime: ctx.input.maxTime,
@@ -109,27 +135,30 @@ export let searchEvents = SlateTool.create(spec, {
       tail: ctx.input.tail
     });
 
-    let events = (result.events || []).map((e: any) => ({
+    let events = result.events.map(e => ({
       eventId: String(e.id),
-      generatedAt: e.generated_at || '',
-      receivedAt: e.received_at || '',
-      displayReceivedAt: e.display_received_at || '',
+      generatedAt: e.generated_at ?? '',
+      receivedAt: e.received_at,
+      displayReceivedAt: e.display_received_at,
       sourceId: e.source_id,
-      sourceName: e.source_name || '',
-      sourceIp: e.source_ip || '',
-      facility: e.facility || '',
-      severity: e.severity || '',
-      hostname: e.hostname || '',
-      program: e.program || '',
-      message: e.message || ''
+      sourceName: e.source_name,
+      sourceIp: e.source_ip,
+      facility: e.facility,
+      severity: e.severity,
+      hostname: e.hostname,
+      program: e.program ?? '',
+      message: e.message
     }));
 
     return {
       output: {
         events,
-        minId: result.min_id ? String(result.min_id) : undefined,
-        maxId: result.max_id ? String(result.max_id) : undefined,
+        minId: result.min_id !== undefined ? String(result.min_id) : undefined,
+        maxId: result.max_id !== undefined ? String(result.max_id) : undefined,
         reachedTimeLimit: result.reached_time_limit,
+        reachedBeginning: result.reached_beginning,
+        reachedEnd: result.reached_end,
+        reachedRecordLimit: result.reached_record_limit,
         minTimeAt: result.min_time_at,
         maxTimeAt: result.max_time_at
       },

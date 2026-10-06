@@ -1,23 +1,28 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RedditAdsClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { accountInput, pagingInput, pagingOutput, resourceOutput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listAdGroups = SlateTool.create(spec, {
   name: 'List Ad Groups',
   key: 'list_ad_groups',
-  description: `Retrieve ad groups for the configured Reddit Ads account. Optionally filter by campaign ID to see ad groups within a specific campaign. Returns targeting, bidding, and placement details.`,
+  description:
+    'Retrieve one page of ad groups for a selected ad account, optionally filtered by campaign. Returns current configured state, relationships and provider values. Follow nextUrl with the same selectors to continue.',
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      accountId: accountInput,
+      ...pagingInput,
       campaignId: z.string().optional().describe('Filter ad groups by campaign ID')
     })
   )
   .output(
     z.object({
+      ...pagingOutput,
       adGroups: z.array(
         z.object({
           adGroupId: z.string().optional(),
@@ -26,6 +31,7 @@ export let listAdGroups = SlateTool.create(spec, {
           status: z.string().optional(),
           bidCents: z.number().optional(),
           bidStrategy: z.string().optional(),
+          optimizationStrategy: z.string().optional(),
           startDate: z.string().optional(),
           endDate: z.string().optional(),
           raw: z.any().optional()
@@ -34,30 +40,14 @@ export let listAdGroups = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RedditAdsClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
-    });
-
-    let adGroups = await client.listAdGroups({
-      campaignId: ctx.input.campaignId
-    });
-
-    let mapped = (Array.isArray(adGroups) ? adGroups : []).map((ag: any) => ({
-      adGroupId: ag.id || ag.ad_group_id,
-      campaignId: ag.campaign_id,
-      name: ag.name,
-      status: ag.status || ag.effective_status,
-      bidCents: ag.bid_cents || ag.bid,
-      bidStrategy: ag.bid_strategy,
-      startDate: ag.start_date,
-      endDate: ag.end_date,
-      raw: ag
-    }));
-
+    const page = await createClient(ctx).list('adGroup', ctx.input);
     return {
-      output: { adGroups: mapped },
-      message: `Found **${mapped.length}** ad group(s).`
+      output: {
+        adGroups: page.items.map(value => resourceOutput('adGroup', value)),
+        nextUrl: page.nextUrl,
+        hasMore: page.hasMore
+      },
+      message: `Retrieved ${page.items.length} adGroups in this page${page.hasMore ? '; more pages are available' : ''}.`
     };
   })
   .build();

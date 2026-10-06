@@ -1,18 +1,17 @@
 {
   "name": "@metorial/canva",
-  "description": "Create, manage, and export graphic designs programmatically. Upload and manage assets (images), organize designs and assets into folders, and retrieve design metadata. Import external files as Canva designs and export designs in various formats (PDF, PNG, JPG). Autofill brand templates with dynamic data to generate designs at scale. Read and create comments and replies on designs. Resize designs to different dimensions. Manage folder permissions and retrieve user profile information. Receive webhook notifications for comments, design sharing, approval requests, access requests, and suggestions.",
+  "description": "Create, read and export Canva designs; manage assets and folders, import public files, read and create comments, and autofill eligible brand templates. Poll native upload, import, export and autofill jobs and retrieve the authenticated user/team profile. URL asset upload uses a preview API.",
   "categories": ["document-processing"],
   "skills": [
-    "create and manage designs",
+    "create and read designs",
     "upload and manage assets",
-    "export designs to PDF/PNG/JPG",
+    "export designs as downloadable files",
     "autofill brand templates",
-    "import external files as designs",
-    "manage folders and permissions",
+    "import files from public URLs",
+    "organize folders",
     "read and create comments",
-    "resize designs",
-    "retrieve user profile",
-    "receive design event webhooks"
+    "poll native async jobs",
+    "retrieve user and team profile"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/canva.jpeg"
 }

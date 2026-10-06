@@ -10,6 +10,7 @@ import {
   deleteWebhook,
   getLifecycleEvents,
   getSandbox,
+  getWebhook,
   killSandbox,
   listSandboxes,
   listSnapshots,
@@ -21,10 +22,10 @@ import {
   setSandboxTimeout,
   updateWebhook
 } from './tools';
-import { sandboxLifecycleTrigger } from './triggers';
 
 export let provider = Slate.create({
   spec,
+  triggers: [],
   tools: [
     createSandbox,
     listSandboxes,
@@ -39,12 +40,12 @@ export let provider = Slate.create({
     deleteTemplate,
     getLifecycleEvents,
     listWebhooks,
+    getWebhook,
     createWebhook,
     updateWebhook,
     deleteWebhook,
     listVolumes,
     createVolume,
     deleteVolume
-  ],
-  triggers: [sandboxLifecycleTrigger]
+  ]
 });

@@ -1,25 +1,35 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RedditAdsClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { accountInput, pagingInput, pagingOutput, resourceOutput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listCustomAudiences = SlateTool.create(spec, {
   name: 'List Custom Audiences',
   key: 'list_custom_audiences',
-  description: `Retrieve all custom audiences for the configured Reddit Ads account. Returns audience names, types, sizes, and statuses. Useful for reviewing available targeting audiences before creating campaigns.`,
+  description:
+    'Retrieve one page of audiences for a selected ad account. Returns current provider state, size ranges and relationships. Follow nextUrl with the same account to continue.',
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      accountId: accountInput,
+      ...pagingInput
+    })
+  )
   .output(
     z.object({
+      ...pagingOutput,
       audiences: z.array(
         z.object({
           audienceId: z.string().optional(),
           name: z.string().optional(),
           audienceType: z.string().optional(),
           approximateSize: z.number().optional(),
+          sizeRangeLower: z.number().optional(),
+          sizeRangeUpper: z.number().optional(),
           status: z.string().optional(),
           raw: z.any().optional()
         })
@@ -27,25 +37,14 @@ export let listCustomAudiences = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RedditAdsClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
-    });
-
-    let audiences = await client.listCustomAudiences();
-
-    let mapped = (Array.isArray(audiences) ? audiences : []).map((a: any) => ({
-      audienceId: a.id || a.audience_id,
-      name: a.name,
-      audienceType: a.type,
-      approximateSize: a.approximate_size || a.size,
-      status: a.status,
-      raw: a
-    }));
-
+    const page = await createClient(ctx).list('audience', ctx.input);
     return {
-      output: { audiences: mapped },
-      message: `Found **${mapped.length}** custom audience(s).`
+      output: {
+        audiences: page.items.map(value => resourceOutput('audience', value)),
+        nextUrl: page.nextUrl,
+        hasMore: page.hasMore
+      },
+      message: `Retrieved ${page.items.length} audiences in this page${page.hasMore ? '; more pages are available' : ''}.`
     };
   })
   .build();

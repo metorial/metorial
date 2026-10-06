@@ -47,17 +47,17 @@ export let getCampaign = SlateTool.create(spec, {
         campaignId: c.id,
         name: c.name,
         status: c.status,
-        isEvergreen: c.is_evergreen,
-        dailyLimit: c.daily_limit,
-        stopOnReply: c.stop_on_reply,
-        stopOnAutoReply: c.stop_on_auto_reply,
-        linkTracking: c.link_tracking,
+        isEvergreen: c.is_evergreen ?? undefined,
+        dailyLimit: c.daily_limit ?? undefined,
+        stopOnReply: c.stop_on_reply ?? undefined,
+        stopOnAutoReply: c.stop_on_auto_reply ?? undefined,
+        linkTracking: c.link_tracking ?? undefined,
         openTracking: c.open_tracking,
-        textOnly: c.text_only,
+        textOnly: c.text_only ?? undefined,
         campaignSchedule: c.campaign_schedule,
         sequences: c.sequences,
         timestampCreated: c.timestamp_created,
-        timestampUpdated: c.timestamp_updated
+        timestampUpdated: c.timestamp_updated ?? undefined
       },
       message: `Retrieved campaign **${c.name}** (status: ${c.status}).`
     };

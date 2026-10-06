@@ -1,7 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  flowId: z.string().describe('Unique flow identifier'),
+  name: z.string().optional().describe('Flow name'),
+  disabled: z.boolean().optional().describe('Whether the flow is disabled'),
+  integrationId: z.string().optional().describe('Parent integration ID'),
+  lastModified: z.string().optional().describe('Last modification timestamp'),
+  scheduleDetails: z.any().optional(),
+  schedule: z.string().optional().describe('Cron schedule expression'),
+  pageGenerators: z.array(z.any()).optional().describe('Export components of the flow'),
+  pageProcessors: z.array(z.any()).optional().describe('Import/lookup components of the flow'),
+  dependencies: z.any().optional().describe('Flow dependencies, if requested'),
+  rawFlow: z.any().describe('Credential-filtered native flow object')
+});
 
 export let getFlow = SlateTool.create(spec, {
   name: 'Get Flow',
@@ -21,54 +36,14 @@ export let getFlow = SlateTool.create(spec, {
         .describe('If true, also fetch the flow dependencies')
     })
   )
-  .output(
-    z.object({
-      flowId: z.string().describe('Unique flow identifier'),
-      name: z.string().optional().describe('Flow name'),
-      disabled: z.boolean().optional().describe('Whether the flow is disabled'),
-      integrationId: z.string().optional().describe('Parent integration ID'),
-      lastModified: z.string().optional().describe('Last modification timestamp'),
-      schedule: z.string().optional().describe('Cron schedule expression'),
-      pageGenerators: z.array(z.any()).optional().describe('Export components of the flow'),
-      pageProcessors: z
-        .array(z.any())
-        .optional()
-        .describe('Import/lookup components of the flow'),
-      dependencies: z.any().optional().describe('Flow dependencies, if requested'),
-      rawFlow: z.any().describe('Full flow object from the API')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let flow = await client.getFlow(ctx.input.flowId);
-
-    let dependencies: any;
-    if (ctx.input.includeDependencies) {
-      try {
-        dependencies = await client.getFlowDependencies(ctx.input.flowId);
-      } catch (err: any) {
-        dependencies = { error: err.message || 'Failed to fetch dependencies' };
-      }
-    }
-
-    return {
-      output: {
-        flowId: flow._id,
-        name: flow.name,
-        disabled: flow.disabled,
-        integrationId: flow._integrationId,
-        lastModified: flow.lastModified,
-        schedule: flow.schedule,
-        pageGenerators: flow.pageGenerators,
-        pageProcessors: flow.pageProcessors,
-        dependencies,
-        rawFlow: flow
-      },
-      message: `Retrieved flow **${flow.name || flow._id}** (${flow.disabled ? 'disabled' : 'enabled'}).`
-    };
+    const result = await invoke('get_flow', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

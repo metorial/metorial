@@ -1,9 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
-let constraintSchema = z.object({
+export const constraintSchema = z.object({
   key: z.string().describe('Field name to apply the constraint on.'),
   constraintType: z
     .string()
@@ -24,8 +24,8 @@ export let searchRecords = SlateTool.create(spec, {
   description: `Search and filter records in a Bubble data type. Supports powerful constraint-based filtering, sorting, and pagination. Use this to find records matching specific criteria or to list all records of a given type.`,
   instructions: [
     'Constraint types include: "equals", "not equal", "is_empty", "is_not_empty", "text contains", "not text contains", "greater than", "less than", "in", "not in", "contains", "not contains", "geographic_search".',
-    'For geographic searches, use constraint_type "geographic_search" with a value of { range: <meters>, origin_address: "<address>" }.',
-    'The maximum number of records returned per request is 100. Use cursor-based pagination to retrieve more.'
+    'For geographic_search, follow the address/range structure defined by the app and Bubble Data API documentation.',
+    'The maximum number of records returned per request is 100. Use nextCursor to continue the same query.'
   ],
   constraints: ['Maximum 100 records per request. Use cursor for pagination.'],
   tags: {
@@ -50,7 +50,7 @@ export let searchRecords = SlateTool.create(spec, {
         .number()
         .optional()
         .describe(
-          'Pagination cursor. Use the cursor value from a previous response to get the next page.'
+          'Pagination cursor. Use nextCursor from the previous response; cursor identifies that page’s first record.'
         )
     })
   )
@@ -58,26 +58,25 @@ export let searchRecords = SlateTool.create(spec, {
     z.object({
       records: z
         .array(z.record(z.string(), z.any()))
-        .describe('Array of matching records with all field values.'),
-      count: z.number().describe('Total number of records matching the query.'),
+        .describe('Visible matching records; privacy rules can hide fields.'),
+      count: z.number().describe('Number of records in this page.'),
       remaining: z.number().describe('Number of records remaining after the current page.'),
       cursor: z
         .number()
-        .describe(
-          'Cursor position for pagination. Pass this as the cursor input to get the next page.'
-        )
+        .describe('Native starting cursor for this page; use nextCursor to continue.'),
+      nextCursor: z
+        .number()
+        .optional()
+        .describe('Next native offset, computed as cursor + count when records remain.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.appBaseUrl,
-      token: ctx.auth?.token
-    });
+    const client = clientFor(ctx);
 
     let bubbleConstraints = ctx.input.constraints?.map(c => ({
       key: c.key,
       constraint_type: c.constraintType,
-      value: c.value
+      ...(c.value === undefined ? {} : { value: c.value })
     }));
 
     let result = await client.searchRecords(ctx.input.dataType, {
@@ -93,7 +92,8 @@ export let searchRecords = SlateTool.create(spec, {
         records: result.results,
         count: result.count,
         remaining: result.remaining,
-        cursor: result.cursor
+        cursor: result.cursor,
+        nextCursor: result.nextCursor
       },
       message: `Found **${result.count}** ${ctx.input.dataType} record(s). Returned ${result.results.length} record(s), ${result.remaining} remaining.`
     };

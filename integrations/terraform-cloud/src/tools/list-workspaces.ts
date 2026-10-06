@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { organizationNameSchema } from '../lib/contracts';
 import { createClient } from '../lib/helpers';
 import { mapPagination, mapWorkspace } from '../lib/mappers';
 import { spec } from '../spec';
@@ -7,13 +8,14 @@ import { spec } from '../spec';
 export let listWorkspacesTool = SlateTool.create(spec, {
   name: 'List Workspaces',
   key: 'list_workspaces',
-  description: `List workspaces in the organization. Supports searching by name and filtering by project. Returns workspace configuration including execution mode, Terraform version, lock status, and VCS connection.`,
+  description: `Call list_organizations to select an organization or use the optional configured default. List workspaces in the organization. Supports searching by name and filtering by project. Returns workspace configuration including execution mode, Terraform version, lock status, and VCS connection.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       search: z.string().optional().describe('Search workspaces by name (partial match)'),
       projectId: z.string().optional().describe('Filter workspaces by project ID'),
       pageNumber: z.number().optional().describe('Page number for pagination (default: 1)'),

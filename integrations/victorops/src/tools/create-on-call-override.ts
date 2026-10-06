@@ -8,7 +8,7 @@ export let createOnCallOverride = SlateTool.create(spec, {
   key: 'create_on_call_override',
   description: `Take on-call from another user within an escalation policy. This creates an immediate on-call override, temporarily replacing the currently on-call user.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -37,7 +37,7 @@ export let createOnCallOverride = SlateTool.create(spec, {
 
     return {
       output: { result },
-      message: `On-call override created: **${ctx.input.toUser}** is now on-call in place of **${ctx.input.fromUser}** for policy **${ctx.input.policySlug}**.`
+      message: `Requested on-call takeover from **${ctx.input.fromUser}** to **${ctx.input.toUser}** for policy **${ctx.input.policySlug}**. Read the current roster to confirm coverage.`
     };
   })
   .build();

@@ -17,7 +17,7 @@ let pollOptionSchema = z.object({
 let pollSchema = z.object({
   pollId: z.string().describe('Poll ID'),
   question: z.string().optional().describe('Poll question'),
-  livePoll: z.boolean().optional().describe('Whether the poll is live (accepting responses)'),
+  livePoll: z.boolean().optional().describe('Whether recipients can view poll results'),
   options: z.array(pollOptionSchema).optional().describe('Poll options with vote data'),
   createdAt: z.string().optional().describe('When the poll was created')
 });
@@ -51,9 +51,9 @@ export let listPolls = SlateTool.create(spec, {
       next: ctx.input.cursor
     });
 
-    let results = data.results || data || [];
-    let polls = results.map((p: any) => ({
-      pollId: p._id || p.id,
+    let results = data.results;
+    let polls = results.map(p => ({
+      pollId: p._id,
       question: p.question,
       livePoll: p.livePoll,
       options: p.options,
@@ -92,7 +92,7 @@ export let getPoll = SlateTool.create(spec, {
 
     return {
       output: {
-        pollId: p._id || p.id,
+        pollId: p._id,
         question: p.question,
         livePoll: p.livePoll,
         options: p.options,

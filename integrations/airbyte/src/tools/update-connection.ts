@@ -5,12 +5,27 @@ import { spec } from '../spec';
 
 let streamConfigSchema = z.object({
   name: z.string().describe('Name of the stream to sync.'),
+  namespace: z
+    .string()
+    .optional()
+    .describe(
+      'Source stream namespace from get_stream_properties; distinguishes streams with the same name.'
+    ),
+  selectedFields: z
+    .array(z.object({ fieldPath: z.array(z.string()) }))
+    .optional()
+    .describe('Optional explicit field paths to sync. Omit to include all fields.'),
   syncMode: z
     .enum([
       'full_refresh_overwrite',
       'full_refresh_append',
+      'full_refresh_overwrite_deduped',
+      'full_refresh_update',
+      'full_refresh_soft_delete',
       'incremental_append',
-      'incremental_deduped_history'
+      'incremental_deduped_history',
+      'incremental_update',
+      'incremental_soft_delete'
     ])
     .optional()
     .describe('Sync mode for this stream.'),
@@ -31,6 +46,7 @@ export let updateConnectionTool = SlateTool.create(spec, {
   instructions: [
     'Stream configurations are a **full overwrite** — you must include all desired streams, not just the ones you want to change. Omitted streams will be removed.'
   ],
+  tags: { destructive: true },
   constraints: [
     'Stream configurations submitted through this tool overwrite existing stream configuration entirely.'
   ]
@@ -58,7 +74,9 @@ export let updateConnectionTool = SlateTool.create(spec, {
       dataResidency: z
         .enum(['auto', 'us', 'eu'])
         .optional()
-        .describe('Data processing region.'),
+        .describe(
+          'Legacy provider option. Current connections inherit their workspace data residency; changing it per connection is deprecated.'
+        ),
       namespaceDefinition: z
         .enum(['source', 'destination', 'custom_format'])
         .optional()
@@ -91,7 +109,7 @@ export let updateConnectionTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.status !== undefined) body.status = ctx.input.status;
     if (ctx.input.schedule !== undefined) body.schedule = ctx.input.schedule;

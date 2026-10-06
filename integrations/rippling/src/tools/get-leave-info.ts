@@ -39,14 +39,17 @@ export let listLeaveTypes = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
     let leaveTypes = await client.listLeaveTypes({
       managedBy: ctx.input.managedBy
     });
 
-    let items = (Array.isArray(leaveTypes) ? leaveTypes : []).map((lt: any) => ({
-      leaveTypeId: lt.id || '',
-      key: lt.key,
+    const items = leaveTypes.map(lt => ({
+      leaveTypeId: lt.id,
+      key: lt.leaveType ?? lt.key,
       name: lt.name,
       description: lt.description,
       isUnpaid: lt.isUnpaid
@@ -102,17 +105,18 @@ export let getLeaveBalances = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
     let data = await client.getLeaveBalances(ctx.input.roleId);
 
-    let balances = (Array.isArray(data?.balances || data) ? data.balances || data : []).map(
-      (b: any) => ({
-        companyLeaveTypeId: b.companyLeaveTypeId || b.companyLeaveType,
-        isUnlimited: b.isUnlimited,
-        remainingBalanceMinutes: b.remainingBalanceMinutes,
-        remainingBalanceMinutesWithFuture: b.remainingBalanceMinutesWithFuture
-      })
-    );
+    const balances = data.balances.map(b => ({
+      companyLeaveTypeId: b.companyLeaveType,
+      isUnlimited: b.isBalanceUnlimited,
+      remainingBalanceMinutes: b.balanceWithoutFutureRequests,
+      remainingBalanceMinutesWithFuture: b.balanceWithFutureRequests
+    }));
 
     return {
       output: {

@@ -1,7 +1,9 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HoneybadgerClient } from '../lib/client';
 import { HoneybadgerReportingClient } from '../lib/reporting-client';
+import type { Deploy } from '../lib/types';
+import { nextUrlSchema, projectIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 let deploySchema = z.object({
@@ -16,7 +18,7 @@ let deploySchema = z.object({
 export let manageDeployments = SlateTool.create(spec, {
   name: 'Manage Deployments',
   key: 'manage_deployments',
-  description: `List, record, or delete deployments for a Honeybadger project. Recording a new deployment uses the Reporting API and requires a project API key. Listing and deleting use the Data API.`,
+  description: `List, record, or delete deployments for a Honeybadger project. Recording a new deployment uses the Reporting API and requires the selected project’s primary API key. Listing and deleting use the Data API. Reporting targets the configured primary project key and may resolve errors or send notifications according to project settings.`,
   instructions: [
     'To record a deployment, provide the action "create" and ensure a project API key is configured in authentication.'
   ],
@@ -27,8 +29,9 @@ export let manageDeployments = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextUrl: nextUrlSchema,
       action: z.enum(['list', 'create', 'delete']).describe('Action to perform'),
-      projectId: z.string().describe('Project ID'),
+      projectId: projectIdSchema,
       deployId: z.string().optional().describe('Deployment ID (required for delete)'),
       environment: z
         .string()
@@ -40,17 +43,29 @@ export let manageDeployments = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Username of who deployed (for list filter or create)'),
+      createdAfter: z
+        .number()
+        .optional()
+        .describe('List deployments created after this Unix timestamp'),
+      createdBefore: z
+        .number()
+        .optional()
+        .describe('List deployments created before this Unix timestamp'),
       limit: z.number().optional().describe('Max results for list (max 25)')
     })
   )
   .output(
     z.object({
+      nextUrl: z
+        .string()
+        .optional()
+        .describe('Next-page URL, when another page may be available'),
       deployments: z.array(deploySchema).optional().describe('List of deployments'),
       success: z.boolean().describe('Whether the operation succeeded')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HoneybadgerClient({ token: ctx.auth.token });
+    let client = new HoneybadgerClient(ctx.auth);
     let {
       action,
       projectId,
@@ -67,30 +82,35 @@ export let manageDeployments = SlateTool.create(spec, {
         let data = await client.listDeploys(projectId, {
           environment,
           localUsername,
+          nextUrl: ctx.input.nextUrl,
+          createdAfter: ctx.input.createdAfter,
+          createdBefore: ctx.input.createdBefore,
           limit
         });
-        let deployments = (data.results || []).map((d: any) => ({
-          deployId: d.id,
-          environment: d.environment,
-          revision: d.revision,
-          repository: d.repository,
-          localUsername: d.local_username,
-          createdAt: d.created_at
+        let deployments = (data.results || []).map((d: Deploy) => ({
+          deployId: d.id ?? undefined,
+          environment: d.environment ?? undefined,
+          revision: d.revision ?? undefined,
+          repository: d.repository ?? undefined,
+          localUsername: d.local_username ?? undefined,
+          createdAt: d.created_at ?? undefined
         }));
         return {
-          output: { deployments, success: true },
+          output: { deployments, nextUrl: data.links?.next ?? undefined, success: true },
           message: `Found **${deployments.length}** deployment(s).`
         };
       }
 
       case 'create': {
         if (!ctx.auth.projectToken) {
-          throw new Error(
+          throw createApiServiceError(
             'A project API key is required to record deployments. Configure it in your authentication settings.'
           );
         }
+        await client.verifyReportingProject(projectId, ctx.auth.projectToken);
         let reportingClient = new HoneybadgerReportingClient({
-          projectToken: ctx.auth.projectToken
+          projectToken: ctx.auth.projectToken,
+          region: ctx.auth.region
         });
         await reportingClient.reportDeploy({
           environment,
@@ -100,12 +120,12 @@ export let manageDeployments = SlateTool.create(spec, {
         });
         return {
           output: { success: true },
-          message: `Recorded deployment${environment ? ` to **${environment}**` : ''}${revision ? ` (rev: ${revision})` : ''}.`
+          message: `Accepted deployment report${environment ? ` to **${environment}**` : ''}${revision ? ` (rev: ${revision})` : ''}.`
         };
       }
 
       case 'delete': {
-        if (!deployId) throw new Error('deployId is required for delete action');
+        if (!deployId) throw createApiServiceError('deployId is required for delete action');
         await client.deleteDeploy(projectId, deployId);
         return {
           output: { success: true },
@@ -114,7 +134,7 @@ export let manageDeployments = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw createApiServiceError(`Unknown action: ${action}`);
     }
   })
   .build();

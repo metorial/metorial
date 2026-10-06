@@ -1,10 +1,12 @@
 export { getCompanyTool } from './get-company';
+export { getResourceTool } from './get-resource';
 export { getUserTool } from './get-user';
 export { initiateCallTool } from './initiate-call';
 export { listCallCentersTool } from './list-call-centers';
 export { listCallsTool } from './list-calls';
 export { listContactsTool } from './list-contacts';
 export { listOfficesTool } from './list-offices';
+export { listResourcesTool } from './list-resources';
 export { listUsersTool } from './list-users';
 export { manageBlockedNumberTool } from './manage-blocked-number';
 export { manageCallTool } from './manage-call';

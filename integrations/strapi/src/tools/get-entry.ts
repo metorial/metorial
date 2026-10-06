@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getEntry = SlateTool.create(spec, {
   name: 'Get Entry',
   key: 'get_entry',
-  description: `Retrieve a single entry from any Strapi content type by its document ID. Supports field selection, relation population, locale, and draft/published status.`,
+  description: `Retrieve a single entry from an authorized Strapi content type by its document ID. Supports field selection, relation population, locale, and draft/published status.`,
   tags: {
     readOnly: true
   }
@@ -16,12 +16,18 @@ export let getEntry = SlateTool.create(spec, {
       contentType: z
         .string()
         .describe('Plural API ID of the content type (e.g., "articles", "products")'),
-      documentId: z.string().describe('Document ID of the entry to retrieve'),
+      documentId: z
+        .string()
+        .describe(
+          'Strapi 5 documentId, or Strapi 4 numeric ID as a string, of the entry to retrieve'
+        ),
       fields: z.array(z.string()).optional().describe('Specific fields to return'),
       populate: z
         .union([z.string(), z.record(z.string(), z.any())])
         .optional()
-        .describe('Relations to populate. Use "*" for all, or an object for granular control'),
+        .describe(
+          'Relations to populate. Use "*" for permitted first-level fields, or an object for granular control'
+        ),
       status: z
         .enum(['draft', 'published'])
         .optional()
@@ -35,10 +41,7 @@ export let getEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.getEntry(ctx.input.contentType, ctx.input.documentId, {
       fields: ctx.input.fields,

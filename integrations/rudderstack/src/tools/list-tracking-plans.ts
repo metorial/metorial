@@ -23,37 +23,25 @@ export let listTrackingPlans = SlateTool.create(spec, {
   .output(
     z.object({
       trackingPlans: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .optional()
         .describe('List of tracking plans'),
       trackingPlan: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Details of the specific tracking plan')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ControlPlaneClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
+    let client = new ControlPlaneClient({ token: ctx.auth.token, region: ctx.config.region });
     if (ctx.input.trackingPlanId) {
-      let result = await client.getTrackingPlan(ctx.input.trackingPlanId);
-      let plan = result.trackingPlan || result;
-
-      return {
-        output: { trackingPlan: plan },
-        message: `Retrieved tracking plan \`${ctx.input.trackingPlanId}\`.`
-      };
+      let plan = await client.getTrackingPlan(ctx.input.trackingPlanId);
+      return { output: { trackingPlan: plan }, message: 'Retrieved the tracking plan.' };
     }
-
-    let result = await client.listTrackingPlans();
-    let list = result.trackingPlans || result;
-
+    let plans = await client.listTrackingPlans();
     return {
-      output: { trackingPlans: Array.isArray(list) ? list : [] },
-      message: `Found **${Array.isArray(list) ? list.length : 0}** tracking plan(s).`
+      output: { trackingPlans: plans },
+      message: `Retrieved ${plans.length} tracking plan(s).`
     };
   })
   .build();

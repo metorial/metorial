@@ -2,6 +2,7 @@ export * from './create-record';
 export * from './delete-record';
 export * from './get-record';
 export * from './get-record-metadata';
+export * from './list-record-types';
 export * from './list-records';
 export * from './query-suiteql';
 export * from './transform-record';

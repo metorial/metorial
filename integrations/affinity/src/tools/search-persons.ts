@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AffinityClient } from '../lib/client';
+import { interactionDatesOutput, mapInteractionDates } from '../lib/interaction-dates';
 import { spec } from '../spec';
 
 let personSchema = z.object({
@@ -9,7 +10,8 @@ let personSchema = z.object({
   lastName: z.string().nullable().describe('Last name'),
   primaryEmail: z.string().nullable().describe('Primary email address'),
   emails: z.array(z.string()).describe('All email addresses'),
-  organizationIds: z.array(z.number()).describe('IDs of associated organizations')
+  organizationIds: z.array(z.number()).describe('IDs of associated organizations'),
+  interactionDates: interactionDatesOutput.optional()
 });
 
 export let searchPersons = SlateTool.create(spec, {
@@ -30,7 +32,12 @@ export let searchPersons = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Include first and last interaction dates in results'),
-      pageSize: z.number().optional().describe('Number of results per page (default 100)'),
+      pageSize: z
+        .number()
+        .optional()
+        .describe(
+          'Number of results per page (1–500; provider default 500). Association details may require an additional read for each result.'
+        ),
       pageToken: z.string().optional().describe('Token for fetching the next page of results')
     })
   )
@@ -53,13 +60,16 @@ export let searchPersons = SlateTool.create(spec, {
       pageToken: ctx.input.pageToken
     });
 
-    let persons = (result.persons ?? result ?? []).map((p: any) => ({
+    let persons = (result.persons ?? result ?? []).map(p => ({
       personId: p.id,
       firstName: p.first_name ?? null,
       lastName: p.last_name ?? null,
       primaryEmail: p.primary_email ?? null,
       emails: p.emails ?? [],
-      organizationIds: p.organization_ids ?? []
+      organizationIds: p.organization_ids ?? [],
+      interactionDates: ctx.input.withInteractionDates
+        ? mapInteractionDates(p.interaction_dates)
+        : undefined
     }));
 
     return {

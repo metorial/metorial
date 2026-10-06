@@ -1,15 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RedditAdsClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { accountInput, pagingInput, pagingOutput } from '../lib/contracts';
+import { reportPayload } from '../lib/mappers';
 import { spec } from '../spec';
 
 export let getPerformanceReport = SlateTool.create(spec, {
   name: 'Get Performance Report',
   key: 'get_performance_report',
-  description: `Retrieve advertising performance data at the account, campaign, ad group, or ad level. Query impressions, clicks, CTR, CPC, spend, conversions, and other metrics over a date range. Supports optional breakdowns for detailed analysis.`,
+  description:
+    'Retrieve one page of campaign performance data with documented metrics and dimensions. YYYY-MM-DD dates become UTC midnight boundaries without extending endDate. Monetary metrics retain their provider units.',
   instructions: [
     'Dates should be in YYYY-MM-DD format.',
-    'Reporting data is in UTC and accurate up to 3 hours ago.'
+    'UTC is the default. Data can change with attribution and provider refreshes; no fixed freshness guarantee is made.'
   ],
   constraints: ['Rate limit: 1 request per second.'],
   tags: {
@@ -18,6 +21,14 @@ export let getPerformanceReport = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountInput,
+      ...pagingInput,
+      timeZoneId: z
+        .string()
+        .optional()
+        .describe(
+          'Optional provider time zone identifier; applies with date breakdowns. UTC is the default.'
+        ),
       startDate: z.string().describe('Report start date in YYYY-MM-DD format'),
       endDate: z.string().describe('Report end date in YYYY-MM-DD format'),
       level: z.enum(['account', 'campaign', 'adGroup', 'ad']).describe('Reporting level'),
@@ -25,7 +36,7 @@ export let getPerformanceReport = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe(
-          'Metrics to include (e.g., impressions, clicks, spend, ctr, cpc, ecpm, conversions, video_viewable_impressions)'
+          'Metrics to include (e.g., impressions, clicks, spend, ctr, cpc, ecpm, KEY_CONVERSION_TOTAL_COUNT, video_viewable_impressions)'
         ),
       breakdowns: z
         .array(z.string())
@@ -44,36 +55,16 @@ export let getPerformanceReport = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pagingOutput,
       report: z.any().describe('Report data containing the requested metrics and breakdowns')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RedditAdsClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
-    });
-
-    let levelMap: Record<string, string> = {
-      account: 'account',
-      campaign: 'campaign',
-      adGroup: 'ad_group',
-      ad: 'ad'
-    };
-
-    let report = await client.getReport({
-      start_date: ctx.input.startDate,
-      end_date: ctx.input.endDate,
-      level: levelMap[ctx.input.level] || ctx.input.level,
-      metrics: ctx.input.metrics,
-      breakdowns: ctx.input.breakdowns,
-      campaign_ids: ctx.input.campaignIds,
-      ad_group_ids: ctx.input.adGroupIds,
-      ad_ids: ctx.input.adIds
-    });
-
+    const result = await createClient(ctx).report(ctx.input, reportPayload(ctx.input));
     return {
-      output: { report },
-      message: `Performance report generated for **${ctx.input.startDate}** to **${ctx.input.endDate}** at **${ctx.input.level}** level.`
+      output: result,
+      message:
+        'Retrieved one page of performance metrics in provider units. Multiple entity-ID filters use OR; follow nextUrl with identical report inputs.'
     };
   })
   .build();

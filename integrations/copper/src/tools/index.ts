@@ -1,3 +1,4 @@
+export * from './get-profile';
 export * from './list-metadata';
 export * from './list-pipelines';
 export * from './manage-activity';

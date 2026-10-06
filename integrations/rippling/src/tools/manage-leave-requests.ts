@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RipplingClient } from '../lib/client';
+import { mapLeave } from '../lib/models';
 import { spec } from '../spec';
 
 let leaveRequestSchema = z.object({
@@ -45,6 +46,9 @@ export let listLeaveRequests = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter leave requests ending on or before this date (YYYY-MM-DD)'),
+      limit: z.number().optional().describe('Page size from 1 to 100'),
+      offset: z.number().optional().describe('Nonnegative page offset'),
+      roleId: z.string().optional().describe('Filter by employee role ID'),
       status: z
         .string()
         .optional()
@@ -58,34 +62,28 @@ export let listLeaveRequests = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
 
     let requests = await client.listLeaveRequests({
       startDate: ctx.input.startDate,
       endDate: ctx.input.endDate,
-      status: ctx.input.status
+      status: ctx.input.status,
+      limit: ctx.input.limit,
+      offset: ctx.input.offset,
+      role: ctx.input.roleId
     });
 
-    let items = (Array.isArray(requests) ? requests : []).map((req: any) => ({
-      leaveRequestId: req.id || '',
-      role: req.role,
-      requestedBy: req.requestedBy,
-      status: req.status,
-      startDate: req.startDate,
-      endDate: req.endDate,
-      companyLeaveType: req.companyLeaveType,
-      leavePolicy: req.leavePolicy,
-      reasonForLeave: req.reasonForLeave,
-      managedBy: req.managedBy,
-      isPaid: req.isPaid
-    }));
+    const items = requests.map(mapLeave);
 
     return {
       output: {
         leaveRequests: items,
         count: items.length
       },
-      message: `Retrieved **${items.length}** leave request(s)${ctx.input.status ? ` with status "${ctx.input.status}"` : ''}.`
+      message: `Retrieved **${items.length}** leave request(s).`
     };
   })
   .build();
@@ -95,7 +93,7 @@ export let processLeaveRequest = SlateTool.create(spec, {
   key: 'process_leave_request',
   description: `Approve or decline a pending leave request. Returns the updated leave request details after processing.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -108,23 +106,14 @@ export let processLeaveRequest = SlateTool.create(spec, {
   )
   .output(leaveRequestSchema)
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
     let result = await client.processLeaveRequest(ctx.input.leaveRequestId, ctx.input.action);
 
     return {
-      output: {
-        leaveRequestId: result.id || ctx.input.leaveRequestId,
-        role: result.role,
-        requestedBy: result.requestedBy,
-        status: result.status,
-        startDate: result.startDate,
-        endDate: result.endDate,
-        companyLeaveType: result.companyLeaveType,
-        leavePolicy: result.leavePolicy,
-        reasonForLeave: result.reasonForLeave,
-        managedBy: result.managedBy,
-        isPaid: result.isPaid
-      },
+      output: mapLeave(result),
       message: `Leave request **${ctx.input.leaveRequestId}** has been **${ctx.input.action === 'APPROVE' ? 'approved' : 'declined'}**.`
     };
   })

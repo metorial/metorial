@@ -14,6 +14,8 @@ export * from './get-opportunity';
 export * from './list-accounts';
 export * from './list-contacts';
 export * from './list-currencies';
+export * from './list-custom-fields';
+export * from './list-notes';
 export * from './list-opportunities';
 export * from './list-pipelines';
 export * from './list-tasks';

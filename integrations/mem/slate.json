@@ -1,15 +1,14 @@
 {
   "name": "@metorial/mem",
-  "description": "Create, read, search, and delete notes in an AI-powered personal knowledge base. Organize notes into collections, search across notes with filters (by collection, tasks, images, attachments), and use the AI-powered \"Mem It\" feature to process raw content (web pages, emails, transcripts, articles) into structured knowledge base entries with custom instructions and context. Manage collections by creating, listing, searching, and deleting them.",
+  "description": "Create, read, update, search and organize Mem.ai notes and collections. Update notes using exact current versions, manage collection membership, and submit content for asynchronous Mem It processing.",
   "categories": ["apis-and-http-requests", "note-taking-and-knowledge-bases"],
   "skills": [
     "create and manage notes",
-    "search notes with filters",
+    "update notes with exact versions",
+    "search notes with filters and snapshots",
     "organize notes into collections",
-    "AI-powered content processing",
-    "create and manage collections",
-    "search collections by query",
-    "process raw content into notes",
-    "markdown-formatted note creation"
+    "manage collection membership",
+    "create and update collections",
+    "asynchronous content processing"
   ]
 }

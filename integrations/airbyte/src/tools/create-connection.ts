@@ -5,12 +5,27 @@ import { spec } from '../spec';
 
 let streamConfigSchema = z.object({
   name: z.string().describe('Name of the stream to sync.'),
+  namespace: z
+    .string()
+    .optional()
+    .describe(
+      'Source stream namespace from get_stream_properties; distinguishes streams with the same name.'
+    ),
+  selectedFields: z
+    .array(z.object({ fieldPath: z.array(z.string()) }))
+    .optional()
+    .describe('Optional explicit field paths to sync. Omit to include all fields.'),
   syncMode: z
     .enum([
       'full_refresh_overwrite',
       'full_refresh_append',
+      'full_refresh_overwrite_deduped',
+      'full_refresh_update',
+      'full_refresh_soft_delete',
       'incremental_append',
-      'incremental_deduped_history'
+      'incremental_deduped_history',
+      'incremental_update',
+      'incremental_soft_delete'
     ])
     .optional()
     .describe('Sync mode for this stream.'),
@@ -30,7 +45,7 @@ export let createConnectionTool = SlateTool.create(spec, {
   description: `Create a new connection linking a source to a destination in Airbyte. Define which streams to sync, the sync mode, and the sync schedule. Defaults to manual schedule with full_refresh_overwrite for all streams if not specified.`,
   instructions: [
     'Use the "Get Stream Properties" tool to discover available streams and their sync modes before creating a connection.',
-    'Cron expressions must follow UTC timezone. Minimum sync frequency is hourly.'
+    'Cron expressions use the UTC timezone.'
   ]
 })
   .input(
@@ -77,7 +92,9 @@ export let createConnectionTool = SlateTool.create(spec, {
       dataResidency: z
         .enum(['auto', 'us', 'eu'])
         .optional()
-        .describe('Data processing region.'),
+        .describe(
+          'Legacy provider option. Current connections inherit their workspace data residency; changing it per connection is deprecated.'
+        ),
       streams: z
         .array(streamConfigSchema)
         .optional()

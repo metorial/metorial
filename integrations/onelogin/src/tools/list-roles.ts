@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OneLoginClient } from '../lib/client';
+import { publicPagination } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listRoles = SlateTool.create(spec, {
@@ -13,6 +14,15 @@ export let listRoles = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      afterCursor: z
+        .string()
+        .optional()
+        .describe('Opaque next cursor; repeat the same filters. Do not combine with page.'),
+      page: z
+        .number()
+        .optional()
+        .describe('Positive page number; do not combine with afterCursor.'),
+      limit: z.number().optional().describe('Page size, maximum 650'),
       name: z.string().optional().describe('Filter by role name'),
       appId: z.number().optional().describe('Filter roles containing this app ID'),
       appName: z.string().optional().describe('Filter roles containing this app name'),
@@ -24,6 +34,11 @@ export let listRoles = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      afterCursor: z
+        .string()
+        .nullable()
+        .describe('Native next cursor, or null when none is supplied'),
+      pagination: publicPagination,
       roles: z
         .array(
           z.object({
@@ -38,23 +53,24 @@ export let listRoles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
-    let params: Record<string, string | number | undefined> = {};
-    if (ctx.input.name) params.name = ctx.input.name;
-    if (ctx.input.appId) params.app_id = ctx.input.appId;
-    if (ctx.input.appName) params.app_name = ctx.input.appName;
+    let params: Record<string, string | number | undefined> = {
+      cursor: ctx.input.afterCursor,
+      page: ctx.input.page,
+      limit: ctx.input.limit
+    };
+    if (ctx.input.name !== undefined) params.name = ctx.input.name;
+    if (ctx.input.appId !== undefined) params.app_id = ctx.input.appId;
+    if (ctx.input.appName !== undefined) params.app_name = ctx.input.appName;
     if (ctx.input.includeFields && ctx.input.includeFields.length > 0) {
       params.fields = ctx.input.includeFields.join(',');
     }
 
     let data = await client.listRoles(params);
-    let roles = Array.isArray(data) ? data : data.data || [];
+    let roles = data.data;
 
-    let mapped = roles.map((r: any) => ({
+    let mapped = roles.map(r => ({
       roleId: r.id,
       name: r.name,
       apps: r.apps,
@@ -63,7 +79,11 @@ export let listRoles = SlateTool.create(spec, {
     }));
 
     return {
-      output: { roles: mapped },
-      message: `Found **${mapped.length}** role(s).`
+      output: {
+        roles: mapped,
+        afterCursor: data.pagination.afterCursor,
+        pagination: data.pagination
+      },
+      message: `Found **${mapped.length}** on this page; role(s).`
     };
   });

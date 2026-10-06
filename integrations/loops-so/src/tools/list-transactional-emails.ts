@@ -6,7 +6,10 @@ import { spec } from '../spec';
 export let listTransactionalEmails = SlateTool.create(spec, {
   name: 'List Transactional Emails',
   key: 'list_transactional_emails',
-  description: `Retrieve all published transactional email templates in your Loops account. Returns template IDs, names, and required data variables. Useful for discovering which templates are available for sending transactional emails.`,
+  description: `Retrieve one page of published transactional email templates in your Loops account. Returns template IDs, names, and data variable names. Use the returned nextCursor to continue.`,
+  constraints: [
+    "Uses the provider's supported legacy published-template listing. Draft templates and content-authoring features are outside this listing."
+  ],
   tags: {
     destructive: false,
     readOnly: true

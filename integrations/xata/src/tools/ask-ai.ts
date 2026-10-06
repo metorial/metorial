@@ -6,12 +6,14 @@ import { spec } from '../spec';
 export let askAi = SlateTool.create(spec, {
   name: 'Ask AI',
   key: 'ask_ai',
-  description: `Ask a natural language question about data in a Xata table and get an AI-generated answer. The AI searches relevant records and synthesizes a response. Supports follow-up questions using session IDs for conversational context.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Ask a natural language question about data in a Xata table and get an AI-generated answer. The AI searches relevant records and synthesizes a response. Supports follow-up questions using session IDs for conversational context.`,
   instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.',
     'Use rules to guide the AI response, e.g. ["Answer in bullet points", "Be concise"].',
     'Provide a sessionId to continue a previous conversation.'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

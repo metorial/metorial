@@ -1,6 +1,6 @@
 {
   "name": "@metorial/hightouch",
-  "description": "Manage reverse ETL pipelines that sync data from warehouses to 200+ SaaS destinations. Create and configure sources, destinations, models, and syncs. Trigger syncs and sync sequences on demand, monitor sync run history with status and error details, and serve low-latency personalization data via collection queries. Supports field mappings, sync modes (upsert, insert, update, mirror), and integration with orchestration tools.",
+  "description": "Manage Hightouch sources, destinations, models and syncs in the workspace authorized by an API key. Configure pipelines, delete models and syncs, submit on-demand sync or sequence runs, and inspect run history. Connection credentials and opaque configuration are omitted from returned resources.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "manage data sources",
@@ -10,8 +10,7 @@
     "monitor sync run history",
     "configure field mappings",
     "trigger sync sequences",
-    "query personalization data",
-    "list sync run errors"
+    "delete models and syncs"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/hightouch.png"
 }

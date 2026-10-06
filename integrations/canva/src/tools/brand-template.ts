@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listBrandTemplates = SlateTool.create(spec, {
   name: 'List Brand Templates',
   key: 'list_brand_templates',
-  description: `List brand templates available to the user. Supports searching by query, filtering by ownership, and pagination. Requires the user to be a member of a Canva Enterprise organization.`,
+  description: `List brand templates available to the user. Supports searching by query, filtering by ownership, and pagination. Requires a Canva plan with brand template access.`,
   tags: {
     readOnly: true
   }
@@ -60,7 +60,7 @@ export let listBrandTemplates = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let result = await client.listBrandTemplates({
       query: ctx.input.query,
       ownership: ctx.input.ownership,
@@ -80,7 +80,7 @@ export let listBrandTemplates = SlateTool.create(spec, {
 export let getBrandTemplate = SlateTool.create(spec, {
   name: 'Get Brand Template',
   key: 'get_brand_template',
-  description: `Retrieve metadata and autofill dataset for a brand template. Returns template details and the list of data fields that can be populated via autofill. Requires Canva Enterprise.`,
+  description: `Retrieve metadata and autofill dataset for a brand template. Returns template details and the list of data fields that can be populated via autofill. Requires a Canva plan with brand template access.`,
   tags: {
     readOnly: true
   }
@@ -115,7 +115,7 @@ export let getBrandTemplate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let template = await client.getBrandTemplate(ctx.input.brandTemplateId);
 
     let dataset: Record<string, { type: string }> | undefined;
@@ -133,7 +133,7 @@ export let getBrandTemplate = SlateTool.create(spec, {
 export let autofillBrandTemplate = SlateTool.create(spec, {
   name: 'Autofill Brand Template',
   key: 'autofill_brand_template',
-  description: `Create a design by populating a brand template with dynamic data. Provide key-value pairs matching the template's dataset fields. This starts an asynchronous autofill job. Requires Canva Enterprise.`,
+  description: `Create a design by populating a brand template with dynamic data. Provide key-value pairs matching the template's dataset fields. This starts an asynchronous autofill job. Requires Canva Pro (including Education and Nonprofits), Teams, or Enterprise and an accessible template dataset.`,
   instructions: [
     'Use "Get Brand Template" with includeDataset=true to discover available fields and their types.',
     'For text fields, use: { "type": "text", "text": "your value" }',
@@ -176,7 +176,7 @@ export let autofillBrandTemplate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let job = await client.createAutofillJob({
       brandTemplateId: ctx.input.brandTemplateId,
       data: ctx.input.fields,
@@ -194,5 +194,19 @@ export let autofillBrandTemplate = SlateTool.create(spec, {
       output: job,
       message: statusMsg
     };
+  })
+  .build();
+
+export const getAutofillJob = SlateTool.create(spec, {
+  name: 'Get Autofill Job',
+  key: 'get_autofill_job',
+  description: 'Check an autofill job and return its exact resulting design when complete.',
+  tags: { readOnly: true }
+})
+  .input(z.object({ jobId: z.string().describe('Exact autofill job ID') }))
+  .output(autofillBrandTemplate.outputSchema)
+  .handleInvocation(async ctx => {
+    const job = await Client.fromContext(ctx).getAutofillJob(ctx.input.jobId);
+    return { output: job, message: `Autofill job ${job.jobId}: ${job.status}.` };
   })
   .build();

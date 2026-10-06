@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/azure-blob-storage.png" height="20"> Azure Blob Storage
 
-Upload, download, copy, and delete blobs (block, append, page) in Azure cloud storage. Create and manage containers, set blob metadata and properties, and configure access tiers (Hot, Cool, Cold, Archive). Manage blob snapshots and versioning for point-in-time recovery. Apply lifecycle management policies to automatically transition blobs between tiers or expire data. Acquire and manage leases for concurrency control. Configure immutable storage with WORM policies for compliance. Subscribe to blob events (created, deleted, tier changed, renamed) via Azure Event Grid webhooks for event-driven workflows.
+Upload, download, copy, and delete blobs (block, append, page) in Azure cloud storage. Create and manage containers, set blob metadata and properties, and configure access tiers (Hot, Cool, Cold, Archive). Manage blob snapshots and versioning for point-in-time recovery. Apply lifecycle management policies to automatically transition blobs between tiers or expire data. Acquire and manage leases for concurrency control. Configure immutable storage with WORM policies for compliance.
 
 ## Tools
 

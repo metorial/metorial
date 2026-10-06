@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { clientConfig } from '../lib/validation';
 import { spec } from '../spec';
 
 export let useTemplateTool = SlateTool.create(spec, {
@@ -9,7 +10,9 @@ export let useTemplateTool = SlateTool.create(spec, {
   description: `Generate a new document from an existing template. Override recipient details and prefill field values to customize each instance. The resulting document can then be distributed for signing.`,
   instructions: [
     'The templateId must reference an envelope of type TEMPLATE.',
-    'recipientId in recipientOverrides refers to the placeholder recipient ID from the template.'
+    'recipientId and fieldId refer to existing template resources from get_envelope. Empty placeholder emails must be replaced.',
+    'Prefill accepts TEXT, NUMBER, DATE, RADIO, CHECKBOX, and DROPDOWN. A CHECKBOX string selects one option; DROPDOWN retains its native string selection. Signatures and recipient identity cannot be prefilled.',
+    'Creation explicitly keeps distribution disabled; sending requires a separate distribute_envelope call.'
   ]
 })
   .input(
@@ -44,17 +47,14 @@ export let useTemplateTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = new Client(clientConfig(ctx));
 
     let result = await client.useTemplate(ctx.input.templateId, {
       recipients: ctx.input.recipientOverrides,
       prefillFields: ctx.input.prefillFields
     });
 
-    let envelopeId = String(result.id ?? result.envelopeId ?? '');
+    let envelopeId = result.id;
 
     return {
       output: { envelopeId },

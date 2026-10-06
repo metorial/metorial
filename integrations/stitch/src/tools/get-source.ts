@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { StitchConnectClient } from '../lib/client';
+import { resolveRegion, StitchConnectClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSource = SlateTool.create(spec, {
@@ -27,15 +27,15 @@ export let getSource = SlateTool.create(spec, {
       type: z.string().describe('Source type'),
       name: z.string().nullable().describe('Display name'),
       properties: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Configuration properties'),
       createdAt: z.string().nullable().describe('ISO 8601 creation timestamp'),
       updatedAt: z.string().nullable().describe('ISO 8601 last updated timestamp'),
       pausedAt: z.string().nullable().describe('ISO 8601 timestamp if paused'),
-      reportCard: z.any().optional().describe('Configuration status report card'),
+      reportCard: z.unknown().optional().describe('Configuration status report card'),
       lastConnectionCheck: z
-        .any()
+        .unknown()
         .optional()
         .describe('Last connection check result, if requested')
     })
@@ -43,19 +43,15 @@ export let getSource = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let source = await client.getSource(ctx.input.sourceId);
-    let lastConnectionCheck: any;
+    let lastConnectionCheck: unknown;
 
     if (ctx.input.includeConnectionCheck) {
-      try {
-        lastConnectionCheck = await client.getLastConnectionCheck(ctx.input.sourceId);
-      } catch (_e) {
-        ctx.warn('Could not fetch last connection check');
-      }
+      lastConnectionCheck = await client.getLastConnectionCheck(ctx.input.sourceId);
     }
 
     return {

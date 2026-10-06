@@ -10,8 +10,7 @@
     "manage file attachments",
     "discover module metadata",
     "manage users",
-    "organize records with tags",
-    "subscribe to record notifications"
+    "organize records with tags"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/zoho-crm.svg",
   "version": "0.1.2"

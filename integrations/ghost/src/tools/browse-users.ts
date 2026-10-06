@@ -1,35 +1,39 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GhostAdminClient } from '../lib/client';
+import { getClient } from '../lib/client';
+import { pagination } from '../lib/schemas';
 import { spec } from '../spec';
 
-let userSchema = z.object({
-  userId: z.string().describe('Unique user ID'),
-  name: z.string().describe('User display name'),
-  slug: z.string().describe('URL-friendly slug'),
-  email: z.string().describe('User email address'),
-  profileImage: z.string().nullable().describe('Profile image URL'),
-  coverImage: z.string().nullable().describe('Cover image URL'),
-  bio: z.string().nullable().describe('User biography'),
-  website: z.string().nullable().describe('User website URL'),
-  location: z.string().nullable().describe('User location'),
-  accessibility: z.string().nullable().describe('Accessibility settings'),
-  status: z.string().describe('User status (active, inactive, locked)'),
-  lastSeen: z.string().nullable().describe('Last seen timestamp'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp'),
-  url: z.string().describe('User profile URL'),
-  roles: z
-    .array(
-      z.object({
-        roleId: z.string(),
-        name: z.string(),
-        description: z.string()
-      })
-    )
-    .optional()
-    .describe('User roles')
-});
+let userSchema = z
+  .object({
+    userId: z.string().describe('Unique user ID'),
+    name: z.string().optional().describe('User display name'),
+    slug: z.string().optional().describe('URL-friendly slug'),
+    email: z.string().optional().describe('User email address'),
+    profileImage: z.string().nullable().optional().describe('Profile image URL'),
+    coverImage: z.string().nullable().optional().describe('Cover image URL'),
+    bio: z.string().nullable().optional().describe('User biography'),
+    website: z.string().nullable().optional().describe('User website URL'),
+    location: z.string().nullable().optional().describe('User location'),
+    accessibility: z.string().nullable().optional().describe('Accessibility settings'),
+    status: z.string().optional().describe('User status (active, inactive, locked)'),
+    lastSeen: z.string().nullable().optional().describe('Last seen timestamp'),
+    createdAt: z.string().optional().describe('Creation timestamp'),
+    updatedAt: z.string().optional().describe('Last update timestamp'),
+    url: z.string().optional().describe('User profile URL'),
+    roles: z
+      .array(
+        z.object({
+          roleId: z.string(),
+          name: z.string(),
+          description: z.string()
+        })
+      )
+      .optional()
+      .describe('User roles')
+  })
+  .partial()
+  .required({ userId: true });
 
 let paginationSchema = z.object({
   page: z.number(),
@@ -69,10 +73,7 @@ export let browseUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GhostAdminClient({
-      domain: ctx.config.adminDomain,
-      apiKey: ctx.auth.token
-    });
+    let client = getClient(ctx);
 
     let result = await client.browseUsers({
       include: ctx.input.include ?? 'roles',
@@ -87,14 +88,14 @@ export let browseUsers = SlateTool.create(spec, {
       name: u.name,
       slug: u.slug,
       email: u.email,
-      profileImage: u.profile_image ?? null,
-      coverImage: u.cover_image ?? null,
-      bio: u.bio ?? null,
-      website: u.website ?? null,
-      location: u.location ?? null,
-      accessibility: u.accessibility ?? null,
+      profileImage: u.profile_image,
+      coverImage: u.cover_image,
+      bio: u.bio,
+      website: u.website,
+      location: u.location,
+      accessibility: u.accessibility,
       status: u.status,
-      lastSeen: u.last_seen ?? null,
+      lastSeen: u.last_seen,
       createdAt: u.created_at,
       updatedAt: u.updated_at,
       url: u.url,
@@ -105,18 +106,11 @@ export let browseUsers = SlateTool.create(spec, {
       }))
     }));
 
-    let pagination = result.meta?.pagination ?? {
-      page: 1,
-      limit: 15,
-      pages: 1,
-      total: users.length,
-      next: null,
-      prev: null
-    };
+    let pageInfo = pagination(result, users.length);
 
     return {
-      output: { users, pagination },
-      message: `Found **${pagination.total}** staff users.`
+      output: { users, pagination: pageInfo },
+      message: `Found **${pageInfo.total}** staff users.`
     };
   })
   .build();

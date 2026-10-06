@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let createUser = SlateTool.create(spec, {
@@ -35,14 +36,17 @@ export let createUser = SlateTool.create(spec, {
       username: z.string(),
       email: z.string().optional(),
       status: z.string(),
-      enrollmentSent: z.boolean().optional()
+      enrollmentSent: z.boolean().optional(),
+      enrollmentState: z.enum(['not_requested', 'confirmed', 'unconfirmed']).optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('create_user', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.createUser({
@@ -65,8 +69,8 @@ export let createUser = SlateTool.create(spec, {
           email: ctx.input.email
         });
         enrollmentSent = true;
-      } catch (_e) {
-        ctx.warn('Failed to send enrollment email');
+      } catch {
+        // User creation already succeeded; preserve its ID for reconciliation.
       }
     }
 
@@ -76,9 +80,14 @@ export let createUser = SlateTool.create(spec, {
         username: user.username,
         email: user.email || undefined,
         status: user.status,
-        enrollmentSent
+        enrollmentSent,
+        enrollmentState: ctx.input.sendEnrollment
+          ? enrollmentSent
+            ? 'confirmed'
+            : 'unconfirmed'
+          : 'not_requested'
       },
-      message: `Created user **${user.username}**${enrollmentSent ? ' and sent enrollment email' : ''}.`
+      message: `Created user **${user.username}** (${user.user_id}).${ctx.input.sendEnrollment ? (enrollmentSent ? ' Duo confirmed sending the enrollment email.' : ' Enrollment sending is unconfirmed; reconcile the existing user and email state before retrying. The user was not rolled back.') : ''}`
     };
   })
   .build();

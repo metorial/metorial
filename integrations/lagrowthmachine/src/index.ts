@@ -15,14 +15,6 @@ import {
   sendLinkedInMessage,
   updateLeadCampaignStatus
 } from './tools';
-import {
-  campaignEvents,
-  emailEvents,
-  leadLifecycleEvents,
-  linkedinEvents,
-  twitterEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +32,5 @@ export let provider = Slate.create({
     listInboxWebhooks,
     deleteInboxWebhook
   ],
-  triggers: [emailEvents, linkedinEvents, twitterEvents, leadLifecycleEvents, campaignEvents]
+  triggers: []
 });

@@ -1,18 +1,89 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientForContext } from '../lib/client';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  databaseName: z.string().describe('Name of the database'),
+  databaseId: z.string().describe('Unique identifier of the database'),
+  hostname: z.string().describe('Hostname for connecting to the database'),
+  regions: z.array(z.string()).optional().describe('Regions where the database is replicated'),
+  primaryRegion: z.string().optional().describe('Primary region of the database'),
+  group: z.string().optional().describe('Group the database belongs to'),
+  type: z.string().optional().describe('Type of the database'),
+  isSchema: z.boolean().optional().describe('Whether the database is a schema database'),
+  schema: z.string().optional().describe('Parent schema database name, if applicable'),
+  sleeping: z.boolean().optional().describe('Whether the database is currently sleeping'),
+  blockReads: z.boolean().optional().describe('Whether reads are blocked'),
+  blockWrites: z.boolean().optional().describe('Whether writes are blocked'),
+  allowAttach: z.boolean().optional().describe('Whether ATTACH is allowed'),
+  version: z.string().optional().describe('Database version'),
+  configuration: z
+    .object({
+      sizeLimit: z.string().optional(),
+      allowAttach: z.boolean().optional(),
+      blockReads: z.boolean().optional(),
+      blockWrites: z.boolean().optional(),
+      deleteProtection: z.boolean().optional(),
+      allowedIps: z.array(z.string()).optional(),
+      allowedAwsVpcIds: z.array(z.string()).optional()
+    })
+    .optional()
+    .describe('Database configuration'),
+  usage: z
+    .object({
+      uuid: z.string(),
+      instances: z.array(
+        z.object({
+          uuid: z.string(),
+          rowsRead: z.number(),
+          rowsWritten: z.number(),
+          storageBytes: z.number()
+        })
+      )
+    })
+    .optional()
+    .describe('Usage statistics'),
+  topQueries: z
+    .array(
+      z.object({
+        query: z.string(),
+        rowsRead: z.number(),
+        rowsWritten: z.number()
+      })
+    )
+    .optional()
+    .describe('Top queries by usage'),
+  instances: z
+    .array(
+      z.object({
+        instanceUuid: z.string(),
+        instanceName: z.string(),
+        type: z.string(),
+        region: z.string(),
+        hostname: z.string()
+      })
+    )
+    .optional()
+    .describe('Database instances')
+});
 
 export let getDatabase = SlateTool.create(spec, {
   name: 'Get Database',
   key: 'get_database',
-  description: `Retrieve detailed information about a specific database, including its configuration, instances, usage statistics, and top queries.`,
+  description: `Choose an organization with list_organizations. Retrieve detailed information about a specific database, including its configuration, instances, usage statistics, and top queries.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      organizationSlug: z
+        .string()
+        .optional()
+        .describe(
+          'Organization slug. Call list_organizations to discover authorized organizations; older connections may use their saved organization.'
+        ),
       databaseName: z.string().describe('Name of the database to retrieve'),
       includeUsage: z.boolean().optional().describe('Whether to include usage statistics'),
       includeStats: z.boolean().optional().describe('Whether to include top query statistics'),
@@ -23,79 +94,14 @@ export let getDatabase = SlateTool.create(spec, {
         .describe('Whether to include database configuration')
     })
   )
-  .output(
-    z.object({
-      databaseName: z.string().describe('Name of the database'),
-      databaseId: z.string().describe('Unique identifier of the database'),
-      hostname: z.string().describe('Hostname for connecting to the database'),
-      regions: z.array(z.string()).describe('Regions where the database is replicated'),
-      primaryRegion: z.string().describe('Primary region of the database'),
-      group: z.string().describe('Group the database belongs to'),
-      type: z.string().describe('Type of the database'),
-      isSchema: z.boolean().describe('Whether the database is a schema database'),
-      schema: z.string().optional().describe('Parent schema database name, if applicable'),
-      sleeping: z.boolean().describe('Whether the database is currently sleeping'),
-      blockReads: z.boolean().describe('Whether reads are blocked'),
-      blockWrites: z.boolean().describe('Whether writes are blocked'),
-      allowAttach: z.boolean().describe('Whether ATTACH is allowed'),
-      version: z.string().describe('Database version'),
-      configuration: z
-        .object({
-          sizeLimit: z.string().optional(),
-          allowAttach: z.boolean().optional(),
-          blockReads: z.boolean().optional(),
-          blockWrites: z.boolean().optional()
-        })
-        .optional()
-        .describe('Database configuration'),
-      usage: z
-        .object({
-          uuid: z.string(),
-          instances: z.array(
-            z.object({
-              uuid: z.string(),
-              rowsRead: z.number(),
-              rowsWritten: z.number(),
-              storageBytes: z.number()
-            })
-          )
-        })
-        .optional()
-        .describe('Usage statistics'),
-      topQueries: z
-        .array(
-          z.object({
-            query: z.string(),
-            rowsRead: z.number(),
-            rowsWritten: z.number()
-          })
-        )
-        .optional()
-        .describe('Top queries by usage'),
-      instances: z
-        .array(
-          z.object({
-            instanceUuid: z.string(),
-            instanceName: z.string(),
-            type: z.string(),
-            region: z.string(),
-            hostname: z.string()
-          })
-        )
-        .optional()
-        .describe('Database instances')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    const client = clientForContext(ctx);
 
     let result = await client.getDatabase(ctx.input.databaseName);
     let db = result.database;
 
-    let output: Record<string, unknown> = {
+    let output: z.infer<typeof outputSchema> = {
       databaseName: db.Name,
       databaseId: db.DbId,
       hostname: db.Hostname,
@@ -118,7 +124,10 @@ export let getDatabase = SlateTool.create(spec, {
         sizeLimit: config.size_limit,
         allowAttach: config.allow_attach,
         blockReads: config.block_reads,
-        blockWrites: config.block_writes
+        blockWrites: config.block_writes,
+        deleteProtection: config.delete_protection,
+        allowedIps: config.allowed_ips,
+        allowedAwsVpcIds: config.allowed_aws_vpc_ids
       };
     }
 
@@ -157,8 +166,8 @@ export let getDatabase = SlateTool.create(spec, {
     }
 
     return {
-      output: output as any,
-      message: `Retrieved database **${db.Name}** in group **${db.group}** (primary: ${db.primaryRegion}, regions: ${db.regions.join(', ')}).`
+      output,
+      message: `Retrieved database **${db.Name}**.${db.group ? ` Group: **${db.group}**.` : ''}${db.primaryRegion ? ` Primary region: **${db.primaryRegion}**.` : ''}`
     };
   })
   .build();

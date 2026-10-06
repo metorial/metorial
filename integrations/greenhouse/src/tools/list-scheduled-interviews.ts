@@ -1,18 +1,29 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GreenhouseClient } from '../lib/client';
-import { mapScheduledInterview } from '../lib/mappers';
+import { interviewOutputSchema, mapScheduledInterview } from '../lib/mappers';
 import { spec } from '../spec';
-
-export let listScheduledInterviewsTool = SlateTool.create(spec, {
-  name: 'List Scheduled Interviews',
+export const listScheduledInterviewsTool = SlateTool.create(spec, {
   key: 'list_scheduled_interviews',
-  description: `List scheduled interviews in Greenhouse. Filter by application or date ranges. Returns interview details including time, location, interviewers, and scorecard status.`,
-  tags: { readOnly: true }
+  name: 'List Scheduled Interviews',
+  description:
+    'List interviews by application or one date range. Returns timing, status and job interview IDs; expanded v1 interviewer data is unavailable.',
+  tags: { readOnly: true, destructive: false }
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (starts at 1)'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque nextCursor from the preceding response. Pass cursor alone for subsequent pages.'
+        ),
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy first-page selector. Only page 1 is supported; use cursor for subsequent pages.'
+        ),
       perPage: z
         .number()
         .optional()
@@ -41,59 +52,22 @@ export let listScheduledInterviewsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      interviews: z.array(
-        z.object({
-          interviewId: z.string(),
-          applicationId: z.string(),
-          externalEventId: z.string().nullable(),
-          startAt: z.string().nullable(),
-          endAt: z.string().nullable(),
-          location: z.string().nullable(),
-          status: z.string().nullable(),
-          interviewName: z.string().nullable(),
-          interviewers: z.array(
-            z.object({
-              userId: z.string(),
-              name: z.string(),
-              email: z.string().nullable(),
-              scorecardId: z.string().nullable()
-            })
-          ),
-          organizer: z.object({ userId: z.string(), name: z.string() }).nullable(),
-          createdAt: z.string().nullable(),
-          updatedAt: z.string().nullable()
-        })
-      ),
-      hasMore: z.boolean()
+      interviews: z.array(interviewOutputSchema),
+      hasMore: z.boolean(),
+      nextCursor: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GreenhouseClient({
-      token: ctx.auth.token,
-      onBehalfOf: ctx.config.onBehalfOf
-    });
-    let perPage = ctx.input.perPage || 50;
-
-    let results = await client.listScheduledInterviews({
-      page: ctx.input.page,
-      perPage,
-      applicationId: ctx.input.applicationId
-        ? Number.parseInt(ctx.input.applicationId, 10)
-        : undefined,
-      createdAfter: ctx.input.createdAfter,
-      createdBefore: ctx.input.createdBefore,
-      updatedAfter: ctx.input.updatedAfter,
-      updatedBefore: ctx.input.updatedBefore
-    });
-
-    let interviews = results.map(mapScheduledInterview);
-
+    const page = await new GreenhouseClient(ctx.auth, ctx.config).listScheduledInterviews(
+      ctx.input
+    );
     return {
       output: {
-        interviews,
-        hasMore: results.length >= perPage
+        interviews: page.items.map(mapScheduledInterview),
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor
       },
-      message: `Found ${interviews.length} scheduled interview(s)${ctx.input.applicationId ? ` for application ${ctx.input.applicationId}` : ''}.`
+      message: `Retrieved ${page.items.length} result(s).`
     };
   })
   .build();

@@ -9,10 +9,8 @@ import {
   updateVoice
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [generateSpeech, listVoices, getVoice, updateVoice, deleteVoice, getAccount],
-  triggers: [inboundWebhook]
+  triggers: []
 });

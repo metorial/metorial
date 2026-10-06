@@ -1,12 +1,10 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { identifier, instanceUrl, requireValue } from './lib/validation';
 
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+export const auth = SlateAuth.create()
+  .output(z.object({ token: z.string(), baseUrl: z.string().optional() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Token',
@@ -14,38 +12,36 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Outline API token (starts with ol_api_). Found in Settings → API.')
+        .describe(
+          'Outline API token from Settings → API. Grant only the read/write permissions needed for your tools.'
+        ),
+      baseUrl: z
+        .string()
+        .default('https://app.getoutline.com')
+        .describe(
+          'Exact HTTPS Outline instance URL. Set your self-hosted domain here; omit the /api suffix.'
+        )
     }),
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({});
-      let response = await axios.post(
-        '/auth.info',
-        {},
-        {
-          baseURL: 'https://app.getoutline.com/api',
-          headers: {
-            Authorization: `Bearer ${ctx.output.token}`,
-            'Content-Type': 'application/json'
-          }
-        }
+    getOutput: async ctx => ({
+      output: {
+        token: identifier(ctx.input.token, 'API token'),
+        baseUrl: instanceUrl(ctx.input.baseUrl)
+      }
+    }),
+    getProfile: async (ctx: { output: { token: string; baseUrl?: string } }) => {
+      requireValue(
+        ctx.output.baseUrl,
+        'Reconnect API Token authentication with the exact Outline instance URL before looking up your profile.'
       );
-      let user = response.data?.data?.user;
-      let team = response.data?.data?.team;
+      const { user, team } = await new Client(ctx.output).getIdentity();
       return {
         profile: {
-          id: user?.id,
-          name: user?.name,
-          email: user?.email,
-          imageUrl: user?.avatarUrl,
-          teamName: team?.name,
-          teamId: team?.id
+          id: user.id,
+          name: user.name,
+          email: user.email ?? undefined,
+          imageUrl: user.avatarUrl ?? undefined,
+          teamName: team.name,
+          teamId: team.id
         }
       };
     }

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { EosGameServicesClient } from '../lib/client';
+import { gameClient } from '../lib/client';
+import { identifier, time } from '../lib/validation';
 import { spec } from '../spec';
 
 export let sendPlayerReport = SlateTool.create(spec, {
@@ -47,29 +48,32 @@ Reports feed into moderation workflows and can be queried via the **Find Player 
   )
   .output(
     z.object({
+      outcome: z
+        .literal('accepted')
+        .optional()
+        .describe('The provider accepted the request; downstream effects are not verified.'),
       submitted: z.boolean().describe('Whether the report was successfully submitted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EosGameServicesClient({
-      token: ctx.auth.token,
-      deploymentId: ctx.config.deploymentId
-    });
-
-    let reportTime = ctx.input.time ?? new Date().toISOString();
-
-    await client.sendPlayerReport({
-      reportingPlayerId: ctx.input.reportingPlayerId,
-      reportedPlayerId: ctx.input.reportedPlayerId,
-      time: reportTime,
-      reasonId: ctx.input.reasonId,
-      message: ctx.input.message,
-      context: ctx.input.context
-    });
-
+    identifier(ctx.input.reportingPlayerId, 'Reporting player');
+    identifier(ctx.input.reportedPlayerId, 'Reported player');
+    if (ctx.input.reportingPlayerId === ctx.input.reportedPlayerId)
+      throw createApiServiceError('A player cannot report themselves.');
+    const reportTime = ctx.input.time ?? new Date().toISOString();
+    time(reportTime, 'Report time');
+    if (ctx.input.context !== undefined) {
+      try {
+        JSON.parse(ctx.input.context);
+      } catch {
+        throw createApiServiceError('context must contain valid JSON text.');
+      }
+    }
+    await gameClient(ctx).sendPlayerReport({ ...ctx.input, time: reportTime });
     return {
-      output: { submitted: true },
-      message: `Player report submitted: \`${ctx.input.reportingPlayerId}\` reported \`${ctx.input.reportedPlayerId}\` for reason **${ctx.input.reasonId}**.`
+      output: { submitted: true, outcome: 'accepted' as const },
+      message:
+        'Epic accepted the player report. This retains moderation history and may trigger disciplinary workflows; no moderation completion or undo is claimed.'
     };
   })
   .build();

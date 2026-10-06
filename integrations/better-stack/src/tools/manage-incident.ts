@@ -1,12 +1,20 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import {
+  type ApiResource,
+  notificationBody,
+  notificationsSchema,
+  requireFields,
+  teamNameSchema
+} from '../lib/api';
 import { UptimeClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageIncident = SlateTool.create(spec, {
   name: 'Manage Incident',
   key: 'manage_incident',
-  description: `Create, acknowledge, resolve, get details, or delete an incident. Create manual incidents, acknowledge ongoing incidents, resolve them, or retrieve full incident details including timeline.`,
+  description: `Create, acknowledge, resolve, get details, or delete an incident. Creating an incident can notify the on-call person and escalate to the team according to notification settings or an escalation policy. Retrieve full details and timeline before changing an existing incident.`,
+  tags: { readOnly: false, destructive: true },
   instructions: [
     'Use action "create" to manually create a new incident.',
     'Use action "acknowledge" to acknowledge an ongoing incident.',
@@ -17,6 +25,8 @@ export let manageIncident = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamName: teamNameSchema,
+      ...notificationsSchema.shape,
       action: z
         .enum(['create', 'acknowledge', 'resolve', 'get', 'delete'])
         .describe('Action to perform'),
@@ -25,10 +35,23 @@ export let manageIncident = SlateTool.create(spec, {
         .optional()
         .describe('Incident ID (required for acknowledge, resolve, get, delete)'),
       summary: z.string().optional().describe('Incident summary (for create)'),
+      name: z.string().optional().describe('Short incident name for creation'),
       description: z.string().optional().describe('Detailed description (for create)'),
       requesterEmail: z.string().optional().describe('Email of person creating the incident'),
-      callUrl: z.string().optional().describe('URL for the incident call'),
-      smsBody: z.string().optional().describe('Custom SMS body'),
+      callUrl: z
+        .string()
+        .optional()
+        .describe('Legacy field unsupported by the current creation API; omit'),
+      smsBody: z
+        .string()
+        .optional()
+        .describe('Legacy field unsupported by the current creation API; omit'),
+      policyId: z
+        .string()
+        .optional()
+        .describe(
+          'Escalation policy for incident creation; overrides simple notification settings'
+        ),
       acknowledgedBy: z
         .string()
         .optional()
@@ -51,7 +74,7 @@ export let manageIncident = SlateTool.create(spec, {
       acknowledgedAt: z.string().nullable().describe('When acknowledged'),
       deleted: z.boolean().optional().describe('Whether the incident was deleted'),
       timeline: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .optional()
         .describe('Timeline events (if requested)')
     })
@@ -59,13 +82,14 @@ export let manageIncident = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new UptimeClient({
       token: ctx.auth.token,
-      teamName: ctx.config.teamName
+      tokenType: ctx.auth.tokenType,
+      teamName: ctx.input.teamName ?? ctx.config.teamName
     });
 
     let { action, incidentId } = ctx.input;
 
     if (action === 'delete') {
-      if (!incidentId) throw new Error('incidentId is required for delete action');
+      if (!incidentId) throw createApiServiceError('incidentId is required for delete action');
       await client.deleteIncident(incidentId);
       return {
         output: {
@@ -83,9 +107,10 @@ export let manageIncident = SlateTool.create(spec, {
     }
 
     if (action === 'acknowledge') {
-      if (!incidentId) throw new Error('incidentId is required for acknowledge action');
+      if (!incidentId)
+        throw createApiServiceError('incidentId is required for acknowledge action');
       let result = await client.acknowledgeIncident(incidentId, ctx.input.acknowledgedBy);
-      let attrs = result.data?.attributes || result.data || {};
+      let attrs = result.data.attributes;
       return {
         output: {
           incidentId: String(result.data?.id || incidentId),
@@ -101,9 +126,10 @@ export let manageIncident = SlateTool.create(spec, {
     }
 
     if (action === 'resolve') {
-      if (!incidentId) throw new Error('incidentId is required for resolve action');
+      if (!incidentId)
+        throw createApiServiceError('incidentId is required for resolve action');
       let result = await client.resolveIncident(incidentId, ctx.input.resolvedBy);
-      let attrs = result.data?.attributes || result.data || {};
+      let attrs = result.data.attributes;
       return {
         output: {
           incidentId: String(result.data?.id || incidentId),
@@ -119,14 +145,14 @@ export let manageIncident = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!incidentId) throw new Error('incidentId is required for get action');
+      if (!incidentId) throw createApiServiceError('incidentId is required for get action');
       let result = await client.getIncident(incidentId);
-      let attrs = result.data?.attributes || result.data || {};
+      let attrs = result.data.attributes;
 
-      let timeline: Record<string, any>[] | undefined;
+      let timeline: Record<string, unknown>[] | undefined;
       if (ctx.input.includeTimeline) {
         let timelineResult = await client.getIncidentTimeline(incidentId);
-        timeline = (timelineResult.data || []).map((item: any) => ({
+        timeline = (timelineResult.data || []).map((item: ApiResource) => ({
           timelineId: String(item.id),
           ...(item.attributes || item)
         }));
@@ -148,15 +174,20 @@ export let manageIncident = SlateTool.create(spec, {
     }
 
     // Create
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = notificationBody(ctx.input);
     if (ctx.input.summary) body.summary = ctx.input.summary;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.description) body.description = ctx.input.description;
     if (ctx.input.requesterEmail) body.requester_email = ctx.input.requesterEmail;
-    if (ctx.input.callUrl) body.call_url = ctx.input.callUrl;
-    if (ctx.input.smsBody) body.sms_body = ctx.input.smsBody;
+    requireFields(ctx.input.summary, ctx.input.requesterEmail);
+    if (ctx.input.callUrl !== undefined || ctx.input.smsBody !== undefined)
+      throw createApiServiceError(
+        'The current incident creation API does not support callUrl or smsBody. Omit these legacy fields.'
+      );
+    if (ctx.input.policyId !== undefined) body.policy_id = ctx.input.policyId;
 
     let result = await client.createIncident(body);
-    let attrs = result.data?.attributes || result.data || {};
+    let attrs = result.data.attributes;
     return {
       output: {
         incidentId: String(result.data?.id || ''),

@@ -31,8 +31,6 @@ import {
   startInstance,
   stopInstance
 } from './tools';
-import { triggers } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -66,5 +64,5 @@ export let provider = Slate.create({
     listCommitmentReservations,
     getZoneOperation
   ],
-  triggers
+  triggers: []
 });

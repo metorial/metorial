@@ -1,9 +1,10 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { companyParams } from '../lib/params';
 import { spec } from '../spec';
 
-let companyOutputSchema = z.object({
+export let companyOutputSchema = z.object({
   companyId: z
     .string()
     .nullable()
@@ -53,6 +54,20 @@ let companyOutputSchema = z.object({
   topPreviousEmployers: z.any().nullable().optional()
 });
 
+export const companyEnrichmentInputSchema = z.object({
+  name: z.string().optional().describe('Company name (e.g. "Google")'),
+  website: z.string().optional().describe('Company website URL (e.g. "google.com")'),
+  linkedinUrl: z.string().optional().describe('Company LinkedIn profile URL'),
+  ticker: z.string().optional().describe('Stock ticker symbol (e.g. "GOOGL")'),
+  location: z.string().optional().describe('Company headquarters location'),
+  locality: z.string().optional().describe('City/locality of the company'),
+  region: z.string().optional().describe('State/region of the company'),
+  country: z.string().optional().describe('Country of the company'),
+  streetAddress: z.string().optional().describe('Street address of the company'),
+  postalCode: z.string().optional().describe('Postal/zip code of the company'),
+  titlecase: z.boolean().optional().describe('Titlecase the output fields')
+});
+
 export let enrichCompany = SlateTool.create(spec, {
   name: 'Enrich Company',
   key: 'enrich_company',
@@ -65,21 +80,7 @@ Returns comprehensive company information including size, industry, location, fu
     readOnly: true
   }
 })
-  .input(
-    z.object({
-      name: z.string().optional().describe('Company name (e.g. "Google")'),
-      website: z.string().optional().describe('Company website URL (e.g. "google.com")'),
-      linkedinUrl: z.string().optional().describe('Company LinkedIn profile URL'),
-      ticker: z.string().optional().describe('Stock ticker symbol (e.g. "GOOGL")'),
-      location: z.string().optional().describe('Company headquarters location'),
-      locality: z.string().optional().describe('City/locality of the company'),
-      region: z.string().optional().describe('State/region of the company'),
-      country: z.string().optional().describe('Country of the company'),
-      streetAddress: z.string().optional().describe('Street address of the company'),
-      postalCode: z.string().optional().describe('Postal/zip code of the company'),
-      titlecase: z.boolean().optional().describe('Titlecase the output fields')
-    })
-  )
+  .input(companyEnrichmentInputSchema)
   .output(companyOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({
@@ -87,18 +88,7 @@ Returns comprehensive company information including size, industry, location, fu
       sandbox: ctx.config.sandbox
     });
 
-    let params: Record<string, unknown> = {};
-    if (ctx.input.name) params.name = ctx.input.name;
-    if (ctx.input.website) params.website = ctx.input.website;
-    if (ctx.input.linkedinUrl) params.profile = ctx.input.linkedinUrl;
-    if (ctx.input.ticker) params.ticker = ctx.input.ticker;
-    if (ctx.input.location) params.location = ctx.input.location;
-    if (ctx.input.locality) params.locality = ctx.input.locality;
-    if (ctx.input.region) params.region = ctx.input.region;
-    if (ctx.input.country) params.country = ctx.input.country;
-    if (ctx.input.streetAddress) params.street_address = ctx.input.streetAddress;
-    if (ctx.input.postalCode) params.postal_code = ctx.input.postalCode;
-    if (ctx.input.titlecase !== undefined) params.titlecase = ctx.input.titlecase;
+    let params = companyParams(ctx.input);
 
     let result = await client.enrichCompany(params);
     let data = result;
@@ -153,7 +143,8 @@ export let mapCompanyData = (data: any) => {
     employeeGrowthRate: data.employee_growth_rate ?? null,
     grossAdditionsByMonth: data.gross_additions_by_month ?? null,
     grossDeparturesByMonth: data.gross_departures_by_month ?? null,
-    topNextEmployers: data.top_next_employers_by_role ?? null,
-    topPreviousEmployers: data.top_previous_employers_by_role ?? null
+    topNextEmployers: data.top_next_employers ?? data.top_next_employers_by_role ?? null,
+    topPreviousEmployers:
+      data.top_previous_employers ?? data.top_previous_employers_by_role ?? null
   };
 };

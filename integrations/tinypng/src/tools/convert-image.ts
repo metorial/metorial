@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TinifyClient } from '../lib/client';
+import { deliverContent } from '../lib/delivery';
+import { validateOptions } from '../lib/validation';
 import { spec } from '../spec';
 
 export let convertImage = SlateTool.create(spec, {
@@ -38,21 +40,30 @@ export let convertImage = SlateTool.create(spec, {
       preserve: z
         .array(z.enum(['copyright', 'creation', 'location']))
         .optional()
-        .describe('Metadata to preserve. "creation" and "location" are JPEG only.')
+        .describe(
+          'Metadata to preserve. "location" is JPEG only; "creation" also supports PNG.'
+        )
     })
   )
   .output(
     z.object({
-      inputSize: z.number().describe('Original image size in bytes'),
-      inputType: z.string().describe('Original image MIME type'),
-      outputUrl: z.string().describe('Temporary URL to download the converted image'),
+      inputSize: z.number().optional().describe('Original image size in bytes'),
+      inputType: z.string().optional().describe('Original image MIME type'),
+      outputUrl: z
+        .string()
+        .optional()
+        .describe('Not returned when the processed image is delivered as a downloadable file'),
       outputContentType: z.string().optional().describe('Output image MIME type'),
       outputWidth: z.number().optional().describe('Image width in pixels'),
       outputHeight: z.number().optional().describe('Image height in pixels'),
-      compressionCount: z.number().describe('Total compressions used this month')
+      compressionCount: z.number().optional().describe('Total compressions used this month')
     })
   )
   .handleInvocation(async ctx => {
+    validateOptions({
+      convert: { type: ctx.input.targetType, background: ctx.input.background },
+      preserve: ctx.input.preserve
+    });
     let client = new TinifyClient(ctx.auth.token);
 
     ctx.info('Compressing image...');
@@ -70,19 +81,20 @@ export let convertImage = SlateTool.create(spec, {
       }
     );
 
-    let outputUrl = convertResult.outputUrl || compressResult.outputUrl;
+    await deliverContent(ctx, convertResult);
 
     return {
       output: {
         inputSize: compressResult.inputSize,
         inputType: compressResult.inputType,
-        outputUrl,
+        outputUrl: undefined,
         outputContentType: convertResult.contentType,
         outputWidth: convertResult.width,
         outputHeight: convertResult.height,
         compressionCount: convertResult.compressionCount
       },
-      message: `Converted image from **${compressResult.inputType}** to **${convertResult.contentType || 'optimized format'}**. Monthly compressions used: **${convertResult.compressionCount}**.`
+      message:
+        'Prepared the processed image for download. Submitted operations retain compression usage.'
     };
   })
   .build();

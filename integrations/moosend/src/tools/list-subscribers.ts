@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoosendClient } from '../lib/client';
+import { mapSubscriber, optionalNumber, record, records } from '../lib/data';
 import { spec } from '../spec';
 
 export let listSubscribers = SlateTool.create(spec, {
   name: 'List Subscribers',
   key: 'list_subscribers',
-  description: `Retrieve subscribers from a mailing list filtered by their subscription status. Supports pagination and date filtering.`,
+  description: `Retrieve subscribers from a mailing list filtered by their subscription status. Supports pagination; compare returned timestamps after paging when needed.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -23,7 +24,9 @@ export let listSubscribers = SlateTool.create(spec, {
       since: z
         .string()
         .optional()
-        .describe('Only return subscribers added/changed since this date (e.g. "2024-01-01")')
+        .describe(
+          'Legacy field; current API does not document this filter, so supplied values receive explicit validation'
+        )
     })
   )
   .output(
@@ -40,7 +43,8 @@ export let listSubscribers = SlateTool.create(spec, {
         )
         .describe('List of subscribers matching the status filter'),
       totalCount: z.number().optional().describe('Total matching subscribers'),
-      currentPage: z.number().describe('Current page number')
+      currentPage: z.number().describe('Current page number'),
+      returnedCount: z.number().optional().describe('Number of subscribers in this page')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,22 +58,17 @@ export let listSubscribers = SlateTool.create(spec, {
       ctx.input.since
     );
 
-    let subscribersList = (result?.Subscribers as Record<string, unknown>[]) ?? [];
-    let paging = result?.Paging as Record<string, unknown> | undefined;
+    let subscribersList = records(result.Subscribers, 'subscribers');
+    let paging = result.Paging == null ? undefined : record(result.Paging, 'paging');
 
-    let subscribers = subscribersList.map(s => ({
-      subscriberId: String(s?.ID ?? ''),
-      email: String(s?.Email ?? ''),
-      name: s?.Name ? String(s.Name) : undefined,
-      createdOn: s?.CreatedOn ? String(s.CreatedOn) : undefined,
-      updatedOn: s?.UpdatedOn ? String(s.UpdatedOn) : undefined
-    }));
+    let subscribers = subscribersList.map(mapSubscriber);
 
     return {
       output: {
         subscribers,
-        totalCount: paging?.TotalResults as number | undefined,
-        currentPage: ctx.input.page
+        totalCount: optionalNumber(paging?.TotalResults),
+        currentPage: ctx.input.page,
+        returnedCount: subscribers.length
       },
       message: `Retrieved **${subscribers.length}** ${ctx.input.status.toLowerCase()} subscriber(s) from list ${ctx.input.mailingListId}.`
     };

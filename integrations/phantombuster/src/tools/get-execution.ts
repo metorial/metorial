@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, text } from '../lib/client';
+import { execution } from '../lib/responses';
 import { spec } from '../spec';
 
 export let getExecution = SlateTool.create(spec, {
@@ -45,41 +46,15 @@ export let getExecution = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let container = await client.fetchContainer(ctx.input.containerId);
 
-    let consoleOutput: string | undefined;
-    let resultObject: any;
-
-    if (ctx.input.includeOutput) {
-      try {
-        let outputData = await client.fetchContainerOutput(ctx.input.containerId);
-        consoleOutput = outputData?.output ?? undefined;
-      } catch (_e) {
-        ctx.warn('Could not fetch console output');
-      }
-    }
-
-    if (ctx.input.includeResultObject) {
-      try {
-        let resultData = await client.fetchContainerResultObject(ctx.input.containerId);
-        resultObject = resultData ?? undefined;
-      } catch (_e) {
-        ctx.warn('Could not fetch result object');
-      }
-    }
-
+    const consoleOutput = ctx.input.includeOutput
+      ? text((await client.fetchContainerOutput(ctx.input.containerId))?.output)
+      : undefined;
+    const resultObject = ctx.input.includeResultObject
+      ? await client.fetchContainerResultObject(ctx.input.containerId)
+      : undefined;
     return {
-      output: {
-        containerId: String(container.id),
-        phantomId: container.agentId ? String(container.agentId) : undefined,
-        status: container.status ?? container.lastEndStatus ?? undefined,
-        exitCode: container.exitCode ?? undefined,
-        exitMessage: container.exitMessage ?? container.lastEndMessage ?? undefined,
-        launchTimestamp: container.launchDate ?? undefined,
-        endTimestamp: container.endDate ?? undefined,
-        executionTime: container.executionTime ?? undefined,
-        consoleOutput,
-        resultObject
-      },
-      message: `Retrieved execution **${ctx.input.containerId}**. Status: ${container.status ?? container.lastEndStatus ?? 'unknown'}.`
+      output: { ...execution(container), consoleOutput, resultObject },
+      message: `Retrieved execution **${ctx.input.containerId}**.`
     };
   })
   .build();

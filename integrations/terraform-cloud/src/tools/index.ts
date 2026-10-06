@@ -3,6 +3,7 @@ export * from './create-variable';
 export * from './create-workspace';
 export * from './delete-variable';
 export * from './delete-workspace';
+export * from './discovery';
 export * from './get-organization';
 export * from './get-run';
 export * from './get-state';

@@ -1,17 +1,187 @@
-import { createAxios } from 'slates';
+import { getCurrentContext, pickDefined, requestAxios } from 'slates';
+import { z } from 'zod';
+import { adaptError, apiOrigin, authenticatedHttp, responsePrivacy } from './http';
+import {
+  bulkSchema,
+  collectorListSchema,
+  collectorSchema,
+  contactListSchema,
+  contactSchema,
+  id,
+  invalid,
+  malformed,
+  messageSchema,
+  nativeId,
+  pageSchema,
+  parse,
+  parseNativeJson,
+  preserveIds,
+  responseSchema,
+  surveySchema,
+  userSchema
+} from './response';
 
 export class Client {
   private http;
-
+  private checkPrivacy;
+  readonly origin: string;
   constructor(config: { token: string; accessUrl?: string }) {
-    let baseURL = config.accessUrl || 'https://api.surveymonkey.com';
-    this.http = createAxios({
-      baseURL,
-      headers: {
-        Authorization: `bearer ${config.token}`,
-        'Content-Type': 'application/json'
+    this.origin = apiOrigin(config.accessUrl);
+    this.http = authenticatedHttp(config.token, config.accessUrl);
+    this.checkPrivacy = responsePrivacy(config.token);
+  }
+
+  private async request<T extends z.ZodType>(
+    schema: T,
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    path: string,
+    data?: unknown,
+    params?: Record<string, string>,
+    onReceiptId?: (id: string) => void
+  ) {
+    let response = await requestAxios(
+      `${method} ${path}`,
+      () => this.http.request<unknown>({ method, url: path, data, params }),
+      (error, operation) => {
+        this.checkPrivacy(getCurrentContext().getHttpTraces());
+        return adaptError(error, operation);
       }
-    });
+    );
+    this.checkPrivacy(getCurrentContext().getHttpTraces());
+    if (method === 'DELETE') {
+      if (![200, 204].includes(response.status)) throw malformed();
+      return parse(schema, response.data);
+    }
+    let value: unknown = response.data;
+    if (typeof value === 'string') value = parseNativeJson(value);
+    if (
+      onReceiptId &&
+      response.status >= 200 &&
+      response.status < 300 &&
+      value !== null &&
+      typeof value === 'object' &&
+      'id' in value
+    ) {
+      let receiptId = nativeId.safeParse(value.id);
+      if (receiptId.success) {
+        this.checkPrivacy(receiptId.data);
+        onReceiptId(receiptId.data);
+      }
+    }
+    this.checkPrivacy(value);
+    if (![200, 201].includes(response.status)) throw malformed();
+    return parse(schema, preserveIds(value));
+  }
+
+  private resourceId(value: string) {
+    let result = id.safeParse(value);
+    if (!result.success) throw invalid('Provide an exact numeric resource ID as text.');
+    return result.data;
+  }
+  private query(params: Record<string, unknown> = {}) {
+    let query: Record<string, string> = {};
+    for (let [key, value] of Object.entries(params))
+      if (value !== undefined) {
+        if (
+          (key === 'page' || key === 'per_page') &&
+          (typeof value !== 'number' ||
+            !Number.isSafeInteger(value) ||
+            value < 1 ||
+            (key === 'per_page' && value > 1000))
+        )
+          throw invalid('Use positive integer pages and a page size from 1 to 1000.');
+        query[key] = String(value);
+      }
+    return query;
+  }
+  private async paged<T extends z.ZodType>(
+    schema: T,
+    path: string,
+    params: Record<string, string>
+  ) {
+    let result = await this.request(pageSchema(schema), 'GET', path, undefined, params);
+    let offset = (BigInt(result.page) - 1n) * BigInt(result.per_page);
+    let remaining = BigInt(result.total) - offset;
+    let expected =
+      remaining <= 0n
+        ? 0
+        : Number(remaining < BigInt(result.per_page) ? remaining : BigInt(result.per_page));
+    if (result.data.length !== expected) throw malformed();
+    let ids = new Set<string>();
+    for (let item of result.data) {
+      if (item !== null && typeof item === 'object' && 'id' in item) {
+        let itemId = nativeId.safeParse(item.id);
+        if (!itemId.success || ids.has(itemId.data)) throw malformed();
+        ids.add(itemId.data);
+      }
+    }
+    let nextPage: number | undefined;
+    if (result.links.next) {
+      if (offset + BigInt(result.per_page) >= BigInt(result.total)) throw malformed();
+      let url: URL;
+      try {
+        url = new URL(result.links.next);
+      } catch {
+        throw malformed();
+      }
+      if (
+        url.origin !== this.origin ||
+        url.pathname !== path ||
+        url.username ||
+        url.password ||
+        url.hash
+      )
+        throw malformed();
+      let page = url.searchParams.get('page');
+      if (!page || !/^\d+$/.test(page)) throw malformed();
+      nextPage = Number(page);
+      if (!Number.isSafeInteger(nextPage) || nextPage !== result.page + 1) throw malformed();
+      for (let [key, value] of Object.entries(params))
+        if (key !== 'page' && url.searchParams.has(key) && url.searchParams.get(key) !== value)
+          throw malformed();
+    } else if (offset + BigInt(result.per_page) < BigInt(result.total)) throw malformed();
+    if (params.page && Number(params.page) !== result.page) throw malformed();
+    return { ...result, nextPage };
+  }
+  private async exact<T extends z.ZodType<{ id: string }>>(
+    schema: T,
+    method: 'GET' | 'PATCH',
+    path: string,
+    expected: string,
+    body?: unknown
+  ) {
+    let result = await this.request(schema, method, path, body);
+    this.assertId(result.id, expected);
+    return result;
+  }
+  private assertId(actual: string, expected: string) {
+    if (actual !== expected) throw malformed();
+  }
+  private body(value: Record<string, unknown>) {
+    let result = pickDefined(value);
+    if (!Object.keys(result).length) throw invalid('Provide at least one field to update.');
+    return result;
+  }
+  private async remove(path: string) {
+    await this.request(z.unknown(), 'DELETE', path);
+    try {
+      await this.request(z.unknown(), 'GET', path);
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'data' in error &&
+        typeof error.data === 'object' &&
+        error.data !== null &&
+        'upstreamStatus' in error.data &&
+        error.data.upstreamStatus === 404
+      )
+        return;
+      throw error;
+    }
+    throw invalid(
+      'SurveyMonkey still exposes the resource after deletion. Its cleanup is unresolved; inspect it before retrying.'
+    );
   }
 
   // ── Surveys ──
@@ -27,29 +197,38 @@ export class Client {
     folderId?: string;
     include?: string;
   }) {
+    this.query({ page: params?.page, per_page: params?.perPage });
     let query: Record<string, string> = {};
-    if (params?.page) query.page = String(params.page);
-    if (params?.perPage) query.per_page = String(params.perPage);
-    if (params?.sortBy) query.sort_by = params.sortBy;
-    if (params?.sortOrder) query.sort_order = params.sortOrder;
-    if (params?.title) query.title = params.title;
-    if (params?.startModifiedAt) query.start_modified_at = params.startModifiedAt;
-    if (params?.endModifiedAt) query.end_modified_at = params.endModifiedAt;
-    if (params?.folderId) query.folder_id = params.folderId;
-    if (params?.include) query.include = params.include;
+    if (params?.page !== undefined) query.page = String(params.page);
+    if (params?.perPage !== undefined) query.per_page = String(params.perPage);
+    if (params?.sortBy !== undefined) query.sort_by = params.sortBy;
+    if (params?.sortOrder !== undefined) query.sort_order = params.sortOrder;
+    if (params?.title !== undefined) query.title = params.title;
+    if (params?.startModifiedAt !== undefined)
+      query.start_modified_at = params.startModifiedAt;
+    if (params?.endModifiedAt !== undefined) query.end_modified_at = params.endModifiedAt;
+    if (params?.folderId !== undefined) query.folder_id = params.folderId;
+    if (params?.include !== undefined) query.include = params.include;
 
-    let response = await this.http.get('/v3/surveys', { params: query });
-    return response.data;
+    return this.paged(surveySchema.extend({ href: z.string() }), '/v3/surveys', query);
   }
 
   async getSurvey(surveyId: string) {
-    let response = await this.http.get(`/v3/surveys/${surveyId}`);
-    return response.data;
+    return this.exact(
+      surveySchema,
+      'GET',
+      `/v3/surveys/${this.resourceId(surveyId)}`,
+      surveyId
+    );
   }
 
   async getSurveyDetails(surveyId: string) {
-    let response = await this.http.get(`/v3/surveys/${surveyId}/details`);
-    return response.data;
+    return this.exact(
+      surveySchema,
+      'GET',
+      `/v3/surveys/${this.resourceId(surveyId)}/details`,
+      surveyId
+    );
   }
 
   async createSurvey(data: {
@@ -60,16 +239,19 @@ export class Client {
     language?: string;
     folderId?: string;
   }) {
+    if (data.fromTemplateId && data.fromSurveyId)
+      throw invalid('Choose one copy source: fromTemplateId or fromSurveyId.');
+    for (let value of [data.fromTemplateId, data.fromSurveyId, data.folderId])
+      if (value !== undefined) this.resourceId(value);
     let body: Record<string, unknown> = {};
-    if (data.title) body.title = data.title;
-    if (data.fromTemplateId) body.from_template_id = data.fromTemplateId;
-    if (data.fromSurveyId) body.from_survey_id = data.fromSurveyId;
-    if (data.nickname) body.nickname = data.nickname;
-    if (data.language) body.language = data.language;
-    if (data.folderId) body.folder_id = data.folderId;
+    if (data.title !== undefined) body.title = data.title;
+    if (data.fromTemplateId !== undefined) body.from_template_id = data.fromTemplateId;
+    if (data.fromSurveyId !== undefined) body.from_survey_id = data.fromSurveyId;
+    if (data.nickname !== undefined) body.nickname = data.nickname;
+    if (data.language !== undefined) body.language = data.language;
+    if (data.folderId !== undefined) body.folder_id = data.folderId;
 
-    let response = await this.http.post('/v3/surveys', body);
-    return response.data;
+    return this.request(surveySchema, 'POST', '/v3/surveys', pickDefined(body));
   }
 
   async updateSurvey(
@@ -81,18 +263,24 @@ export class Client {
       folderId?: string;
     }
   ) {
+    if (data.folderId !== undefined) this.resourceId(data.folderId);
     let body: Record<string, unknown> = {};
     if (data.title !== undefined) body.title = data.title;
     if (data.nickname !== undefined) body.nickname = data.nickname;
     if (data.language !== undefined) body.language = data.language;
     if (data.folderId !== undefined) body.folder_id = data.folderId;
 
-    let response = await this.http.patch(`/v3/surveys/${surveyId}`, body);
-    return response.data;
+    return this.exact(
+      surveySchema,
+      'PATCH',
+      `/v3/surveys/${this.resourceId(surveyId)}`,
+      surveyId,
+      this.body(body)
+    );
   }
 
   async deleteSurvey(surveyId: string) {
-    await this.http.delete(`/v3/surveys/${surveyId}`);
+    await this.remove(`/v3/surveys/${this.resourceId(surveyId)}`);
   }
 
   // ── Collectors ──
@@ -107,22 +295,28 @@ export class Client {
       include?: string;
     }
   ) {
+    this.query({ page: params?.page, per_page: params?.perPage });
     let query: Record<string, string> = {};
-    if (params?.page) query.page = String(params.page);
-    if (params?.perPage) query.per_page = String(params.perPage);
-    if (params?.sortBy) query.sort_by = params.sortBy;
-    if (params?.sortOrder) query.sort_order = params.sortOrder;
-    if (params?.include) query.include = params.include;
+    if (params?.page !== undefined) query.page = String(params.page);
+    if (params?.perPage !== undefined) query.per_page = String(params.perPage);
+    if (params?.sortBy !== undefined) query.sort_by = params.sortBy;
+    if (params?.sortOrder !== undefined) query.sort_order = params.sortOrder;
+    if (params?.include !== undefined) query.include = params.include;
 
-    let response = await this.http.get(`/v3/surveys/${surveyId}/collectors`, {
-      params: query
-    });
-    return response.data;
+    return this.paged(
+      collectorListSchema,
+      `/v3/surveys/${this.resourceId(surveyId)}/collectors`,
+      query
+    );
   }
 
   async getCollector(collectorId: string) {
-    let response = await this.http.get(`/v3/collectors/${collectorId}`);
-    return response.data;
+    return this.exact(
+      collectorSchema,
+      'GET',
+      `/v3/collectors/${this.resourceId(collectorId)}`,
+      collectorId
+    );
   }
 
   async createCollector(
@@ -140,20 +334,28 @@ export class Client {
       senderEmail?: string;
     }
   ) {
+    if (!data.name?.trim())
+      throw invalid('Provide a collector name; the current API requires it.');
+    if (data.type === 'email' && data.allowMultipleResponses !== undefined)
+      throw invalid('allowMultipleResponses is unavailable for email collectors.');
     let body: Record<string, unknown> = { type: data.type };
-    if (data.name) body.name = data.name;
-    if (data.thankYouMessage) body.thank_you_message = data.thankYouMessage;
-    if (data.closeDate) body.close_date = data.closeDate;
-    if (data.redirectUrl) body.redirect_url = data.redirectUrl;
+    if (data.name !== undefined) body.name = data.name;
+    if (data.thankYouMessage !== undefined) body.thank_you_message = data.thankYouMessage;
+    if (data.closeDate !== undefined) body.close_date = data.closeDate;
+    if (data.redirectUrl !== undefined) body.redirect_url = data.redirectUrl;
     if (data.allowMultipleResponses !== undefined)
       body.allow_multiple_responses = data.allowMultipleResponses;
-    if (data.anonymous) body.anonymous_type = data.anonymous;
-    if (data.password) body.password = data.password;
-    if (data.responseLimit) body.response_limit = data.responseLimit;
-    if (data.senderEmail) body.sender_email = data.senderEmail;
+    if (data.anonymous !== undefined) body.anonymous_type = data.anonymous;
+    if (data.password !== undefined) body.password = data.password;
+    if (data.responseLimit !== undefined) body.response_limit = data.responseLimit;
+    if (data.senderEmail !== undefined) body.sender_email = data.senderEmail;
 
-    let response = await this.http.post(`/v3/surveys/${surveyId}/collectors`, body);
-    return response.data;
+    return this.request(
+      collectorSchema,
+      'POST',
+      `/v3/surveys/${this.resourceId(surveyId)}/collectors`,
+      this.body(body)
+    );
   }
 
   async updateCollector(
@@ -170,6 +372,10 @@ export class Client {
       status?: string;
     }
   ) {
+    let current = await this.getCollector(collectorId);
+    this.assertId(current.id, collectorId);
+    if (current.type === 'email' && data.allowMultipleResponses !== undefined)
+      throw invalid('allowMultipleResponses is unavailable for email collectors.');
     let body: Record<string, unknown> = {};
     if (data.name !== undefined) body.name = data.name;
     if (data.thankYouMessage !== undefined) body.thank_you_message = data.thankYouMessage;
@@ -182,12 +388,17 @@ export class Client {
     if (data.responseLimit !== undefined) body.response_limit = data.responseLimit;
     if (data.status !== undefined) body.status = data.status;
 
-    let response = await this.http.patch(`/v3/collectors/${collectorId}`, body);
-    return response.data;
+    return this.exact(
+      collectorSchema,
+      'PATCH',
+      `/v3/collectors/${this.resourceId(collectorId)}`,
+      collectorId,
+      this.body(body)
+    );
   }
 
   async deleteCollector(collectorId: string) {
-    await this.http.delete(`/v3/collectors/${collectorId}`);
+    await this.remove(`/v3/collectors/${this.resourceId(collectorId)}`);
   }
 
   // ── Responses ──
@@ -206,19 +417,24 @@ export class Client {
       sortOrder?: string;
     }
   ) {
+    this.query({ page: params?.page, per_page: params?.perPage });
     let query: Record<string, string> = {};
-    if (params?.page) query.page = String(params.page);
-    if (params?.perPage) query.per_page = String(params.perPage);
-    if (params?.startCreatedAt) query.start_created_at = params.startCreatedAt;
-    if (params?.endCreatedAt) query.end_created_at = params.endCreatedAt;
-    if (params?.startModifiedAt) query.start_modified_at = params.startModifiedAt;
-    if (params?.endModifiedAt) query.end_modified_at = params.endModifiedAt;
-    if (params?.status) query.status = params.status;
-    if (params?.sortBy) query.sort_by = params.sortBy;
-    if (params?.sortOrder) query.sort_order = params.sortOrder;
+    if (params?.page !== undefined) query.page = String(params.page);
+    if (params?.perPage !== undefined) query.per_page = String(params.perPage);
+    if (params?.startCreatedAt !== undefined) query.start_created_at = params.startCreatedAt;
+    if (params?.endCreatedAt !== undefined) query.end_created_at = params.endCreatedAt;
+    if (params?.startModifiedAt !== undefined)
+      query.start_modified_at = params.startModifiedAt;
+    if (params?.endModifiedAt !== undefined) query.end_modified_at = params.endModifiedAt;
+    if (params?.status !== undefined) query.status = params.status;
+    if (params?.sortBy !== undefined) query.sort_by = params.sortBy;
+    if (params?.sortOrder !== undefined) query.sort_order = params.sortOrder;
 
-    let response = await this.http.get(`/v3/surveys/${surveyId}/responses`, { params: query });
-    return response.data;
+    return this.paged(
+      responseSchema,
+      `/v3/surveys/${this.resourceId(surveyId)}/responses`,
+      query
+    );
   }
 
   async getResponsesBulk(
@@ -237,58 +453,84 @@ export class Client {
       collectorIds?: string[];
     }
   ) {
+    if (params?.perPage !== undefined && params.perPage > 100)
+      throw invalid('Full responses allow at most 100 results per page.');
+    params?.collectorIds?.forEach(value => this.resourceId(value));
+    this.query({ page: params?.page, per_page: params?.perPage });
     let query: Record<string, string> = {};
-    if (params?.page) query.page = String(params.page);
-    if (params?.perPage) query.per_page = String(params.perPage);
-    if (params?.startCreatedAt) query.start_created_at = params.startCreatedAt;
-    if (params?.endCreatedAt) query.end_created_at = params.endCreatedAt;
-    if (params?.startModifiedAt) query.start_modified_at = params.startModifiedAt;
-    if (params?.endModifiedAt) query.end_modified_at = params.endModifiedAt;
-    if (params?.status) query.status = params.status;
-    if (params?.sortBy) query.sort_by = params.sortBy;
-    if (params?.sortOrder) query.sort_order = params.sortOrder;
-    if (params?.simple) query.simple = 'true';
+    if (params?.page !== undefined) query.page = String(params.page);
+    if (params?.perPage !== undefined) query.per_page = String(params.perPage);
+    if (params?.startCreatedAt !== undefined) query.start_created_at = params.startCreatedAt;
+    if (params?.endCreatedAt !== undefined) query.end_created_at = params.endCreatedAt;
+    if (params?.startModifiedAt !== undefined)
+      query.start_modified_at = params.startModifiedAt;
+    if (params?.endModifiedAt !== undefined) query.end_modified_at = params.endModifiedAt;
+    if (params?.status !== undefined) query.status = params.status;
+    if (params?.sortBy !== undefined) query.sort_by = params.sortBy;
+    if (params?.sortOrder !== undefined) query.sort_order = params.sortOrder;
+    if (params?.simple !== undefined) query.simple = String(params.simple);
     if (params?.collectorIds?.length) query.collector_ids = params.collectorIds.join(',');
 
-    let response = await this.http.get(`/v3/surveys/${surveyId}/responses/bulk`, {
-      params: query
-    });
-    return response.data;
+    return this.paged(
+      responseSchema,
+      `/v3/surveys/${this.resourceId(surveyId)}/responses/bulk`,
+      query
+    );
   }
 
   async getResponse(surveyId: string, responseId: string) {
-    let response = await this.http.get(`/v3/surveys/${surveyId}/responses/${responseId}`);
-    return response.data;
+    let result = await this.exact(
+      responseSchema,
+      'GET',
+      `/v3/surveys/${this.resourceId(surveyId)}/responses/${this.resourceId(responseId)}/details`,
+      responseId
+    );
+    if (result.survey_id !== undefined && result.survey_id !== surveyId) throw malformed();
+    return result;
   }
 
   // ── Contacts ──
 
   async listContactLists(params?: { page?: number; perPage?: number }) {
+    this.query({ page: params?.page, per_page: params?.perPage });
     let query: Record<string, string> = {};
-    if (params?.page) query.page = String(params.page);
-    if (params?.perPage) query.per_page = String(params.perPage);
+    if (params?.page !== undefined) query.page = String(params.page);
+    if (params?.perPage !== undefined) query.per_page = String(params.perPage);
 
-    let response = await this.http.get('/v3/contact_lists', { params: query });
-    return response.data;
+    return this.paged(contactListSchema, '/v3/contact_lists', query);
   }
 
   async getContactList(contactListId: string) {
-    let response = await this.http.get(`/v3/contact_lists/${contactListId}`);
-    return response.data;
+    return this.exact(
+      contactListSchema,
+      'GET',
+      `/v3/contact_lists/${this.resourceId(contactListId)}`,
+      contactListId
+    );
   }
 
   async createContactList(name: string) {
-    let response = await this.http.post('/v3/contact_lists', { name });
-    return response.data;
+    let result = await this.request(z.unknown(), 'POST', '/v3/contact_lists', { name });
+    if (typeof result === 'object' && result !== null && 'data' in result) {
+      let page = parse(pageSchema(contactListSchema), result);
+      if (page.data.length !== 1) throw malformed();
+      return page.data[0]!;
+    }
+    return parse(contactListSchema, result);
   }
 
   async updateContactList(contactListId: string, name: string) {
-    let response = await this.http.patch(`/v3/contact_lists/${contactListId}`, { name });
-    return response.data;
+    return this.exact(
+      contactListSchema,
+      'PATCH',
+      `/v3/contact_lists/${this.resourceId(contactListId)}`,
+      contactListId,
+      { name }
+    );
   }
 
   async deleteContactList(contactListId: string) {
-    await this.http.delete(`/v3/contact_lists/${contactListId}`);
+    await this.remove(`/v3/contact_lists/${this.resourceId(contactListId)}`);
   }
 
   async listContacts(
@@ -303,54 +545,64 @@ export class Client {
       searchBy?: string;
     }
   ) {
+    this.query({ page: params?.page, per_page: params?.perPage });
     let query: Record<string, string> = {};
-    if (params?.page) query.page = String(params.page);
-    if (params?.perPage) query.per_page = String(params.perPage);
-    if (params?.status) query.status = params.status;
-    if (params?.sortBy) query.sort_by = params.sortBy;
-    if (params?.sortOrder) query.sort_order = params.sortOrder;
-    if (params?.search) query.search = params.search;
-    if (params?.searchBy) query.search_by = params.searchBy;
+    if (params?.page !== undefined) query.page = String(params.page);
+    if (params?.perPage !== undefined) query.per_page = String(params.perPage);
+    if (params?.status !== undefined) query.status = params.status;
+    if (params?.sortBy !== undefined) query.sort_by = params.sortBy;
+    if (params?.sortOrder !== undefined) query.sort_order = params.sortOrder;
+    if (params?.search !== undefined) query.search = params.search;
+    if (params?.searchBy !== undefined) query.search_by = params.searchBy;
 
-    let response = await this.http.get(`/v3/contact_lists/${contactListId}/contacts`, {
-      params: query
-    });
-    return response.data;
+    return this.paged(
+      contactSchema,
+      `/v3/contact_lists/${this.resourceId(contactListId)}/contacts/bulk`,
+      query
+    );
   }
 
   async createContact(
     contactListId: string,
     data: {
-      firstName: string;
-      lastName: string;
+      firstName?: string;
+      lastName?: string;
       email?: string;
       phoneNumber?: string;
       customFields?: Record<string, string>;
     }
   ) {
+    this.validateContact(data);
     let body: Record<string, unknown> = {
       first_name: data.firstName,
       last_name: data.lastName
     };
-    if (data.email) body.email = data.email;
-    if (data.phoneNumber) body.phone_number = data.phoneNumber;
-    if (data.customFields) body.custom_fields = data.customFields;
+    if (data.email !== undefined) body.email = data.email;
+    if (data.phoneNumber !== undefined) body.phone_number = data.phoneNumber;
+    if (data.customFields !== undefined) body.custom_fields = data.customFields;
 
-    let response = await this.http.post(`/v3/contact_lists/${contactListId}/contacts`, body);
-    return response.data;
+    return this.request(
+      contactSchema,
+      'POST',
+      `/v3/contact_lists/${this.resourceId(contactListId)}/contacts`,
+      this.body(body)
+    );
   }
 
   async createContactsBulk(
     contactListId: string,
     contacts: Array<{
-      firstName: string;
-      lastName: string;
+      firstName?: string;
+      lastName?: string;
       email?: string;
       phoneNumber?: string;
       customFields?: Record<string, string>;
     }>,
     updateExisting?: boolean
   ) {
+    if (!contacts.length || contacts.length > 1000)
+      throw invalid('Provide from 1 to 1000 contacts.');
+    contacts.forEach(contact => this.validateContact(contact));
     let body: Record<string, unknown> = {
       contacts: contacts.map(c => {
         let contact: Record<string, unknown> = {
@@ -365,11 +617,12 @@ export class Client {
     };
     if (updateExisting !== undefined) body.update_existing = updateExisting;
 
-    let response = await this.http.post(
-      `/v3/contact_lists/${contactListId}/contacts/bulk`,
-      body
+    return this.request(
+      bulkSchema,
+      'POST',
+      `/v3/contact_lists/${this.resourceId(contactListId)}/contacts/bulk`,
+      this.body(body)
     );
-    return response.data;
   }
 
   // ── Messages ──
@@ -383,26 +636,41 @@ export class Client {
       bodyText?: string;
       recipientStatus?: string;
       isBrandingEnabled?: boolean;
-    }
+    },
+    onCreated?: (messageId: string) => void
   ) {
     let body: Record<string, unknown> = { type: data.type };
-    if (data.subject) body.subject = data.subject;
-    if (data.bodyHtml) body.body_html = data.bodyHtml;
-    if (data.bodyText) body.body_text = data.bodyText;
-    if (data.recipientStatus) body.recipient_status = data.recipientStatus;
+    if (data.subject !== undefined) body.subject = data.subject;
+    if (data.bodyHtml !== undefined) body.body_html = data.bodyHtml;
+    if (data.bodyText !== undefined) body.body_text = data.bodyText;
+    if (data.recipientStatus !== undefined) body.recipient_status = data.recipientStatus;
     if (data.isBrandingEnabled !== undefined)
       body.is_branding_enabled = data.isBrandingEnabled;
 
-    let response = await this.http.post(`/v3/collectors/${collectorId}/messages`, body);
-    return response.data;
+    return this.request(
+      messageSchema,
+      'POST',
+      `/v3/collectors/${this.resourceId(collectorId)}/messages`,
+      this.body(body),
+      undefined,
+      onCreated
+    );
   }
 
   async sendMessage(collectorId: string, messageId: string) {
-    let response = await this.http.post(
-      `/v3/collectors/${collectorId}/messages/${messageId}/send`,
+    return this.request(
+      z
+        .object({
+          is_scheduled: z.boolean(),
+          scheduled_date: z.string().nullish(),
+          type: z.string(),
+          recipients: z.array(nativeId)
+        })
+        .passthrough(),
+      'POST',
+      `/v3/collectors/${this.resourceId(collectorId)}/messages/${this.resourceId(messageId)}/send`,
       {}
     );
-    return response.data;
   }
 
   async addMessageRecipients(
@@ -411,78 +679,18 @@ export class Client {
     contactListIds: string[]
   ) {
     let body = { contact_list_ids: contactListIds };
-    let response = await this.http.post(
-      `/v3/collectors/${collectorId}/messages/${messageId}/recipients/bulk`,
-      body
+    return this.request(
+      bulkSchema,
+      'POST',
+      `/v3/collectors/${this.resourceId(collectorId)}/messages/${this.resourceId(messageId)}/recipients/bulk`,
+      this.body(body)
     );
-    return response.data;
-  }
-
-  // ── Webhooks ──
-
-  async listWebhooks(params?: { page?: number; perPage?: number }) {
-    let query: Record<string, string> = {};
-    if (params?.page) query.page = String(params.page);
-    if (params?.perPage) query.per_page = String(params.perPage);
-
-    let response = await this.http.get('/v3/webhooks', { params: query });
-    return response.data;
-  }
-
-  async getWebhook(webhookId: string) {
-    let response = await this.http.get(`/v3/webhooks/${webhookId}`);
-    return response.data;
-  }
-
-  async createWebhook(data: {
-    name: string;
-    eventType: string;
-    objectType: string;
-    objectIds: string[];
-    subscriptionUrl: string;
-  }) {
-    let body = {
-      name: data.name,
-      event_type: data.eventType,
-      object_type: data.objectType,
-      object_ids: data.objectIds,
-      subscription_url: data.subscriptionUrl
-    };
-
-    let response = await this.http.post('/v3/webhooks', body);
-    return response.data;
-  }
-
-  async updateWebhook(
-    webhookId: string,
-    data: {
-      name?: string;
-      eventType?: string;
-      objectType?: string;
-      objectIds?: string[];
-      subscriptionUrl?: string;
-    }
-  ) {
-    let body: Record<string, unknown> = {};
-    if (data.name !== undefined) body.name = data.name;
-    if (data.eventType !== undefined) body.event_type = data.eventType;
-    if (data.objectType !== undefined) body.object_type = data.objectType;
-    if (data.objectIds !== undefined) body.object_ids = data.objectIds;
-    if (data.subscriptionUrl !== undefined) body.subscription_url = data.subscriptionUrl;
-
-    let response = await this.http.patch(`/v3/webhooks/${webhookId}`, body);
-    return response.data;
-  }
-
-  async deleteWebhook(webhookId: string) {
-    await this.http.delete(`/v3/webhooks/${webhookId}`);
   }
 
   // ── Users ──
 
   async getCurrentUser() {
-    let response = await this.http.get('/v3/users/me');
-    return response.data;
+    return this.request(userSchema, 'GET', '/v3/users/me');
   }
 
   // ── Survey Templates ──
@@ -493,25 +701,127 @@ export class Client {
     language?: string;
     category?: string;
   }) {
+    this.query({ page: params?.page, per_page: params?.perPage });
     let query: Record<string, string> = {};
-    if (params?.page) query.page = String(params.page);
-    if (params?.perPage) query.per_page = String(params.perPage);
-    if (params?.language) query.language = params.language;
-    if (params?.category) query.category = params.category;
+    if (params?.page !== undefined) query.page = String(params.page);
+    if (params?.perPage !== undefined) query.per_page = String(params.perPage);
+    if (params?.language !== undefined) query.language = params.language;
+    if (params?.category !== undefined) query.category = params.category;
 
-    let response = await this.http.get('/v3/survey_templates', { params: query });
-    return response.data;
+    return this.paged(z.object({ id: nativeId }).passthrough(), '/v3/survey_templates', query);
   }
 
   // ── Survey Categories ──
 
   async listSurveyCategories(params?: { page?: number; perPage?: number; language?: string }) {
+    this.query({ page: params?.page, per_page: params?.perPage });
     let query: Record<string, string> = {};
-    if (params?.page) query.page = String(params.page);
-    if (params?.perPage) query.per_page = String(params.perPage);
-    if (params?.language) query.language = params.language;
+    if (params?.page !== undefined) query.page = String(params.page);
+    if (params?.perPage !== undefined) query.per_page = String(params.perPage);
+    if (params?.language !== undefined) query.language = params.language;
 
-    let response = await this.http.get('/v3/survey_categories', { params: query });
-    return response.data;
+    return this.paged(
+      z.object({ id: nativeId }).passthrough(),
+      '/v3/survey_categories',
+      query
+    );
+  }
+  private validateContact(data: {
+    email?: string;
+    phoneNumber?: string;
+    customFields?: Record<string, string>;
+  }) {
+    if (!data.email?.trim() && !data.phoneNumber?.trim())
+      throw invalid('Provide an email address or phone number.');
+    if (
+      data.customFields &&
+      Object.keys(data.customFields).some(key => !/^([1-9]|[1-4][0-9]|50)$/.test(key))
+    )
+      throw invalid('Custom field keys must be the documented integers 1 through 50.');
+  }
+  async getContact(contactId: string) {
+    let result = await this.request(
+      contactSchema,
+      'GET',
+      `/v3/contacts/${this.resourceId(contactId)}`
+    );
+    this.assertId(result.id, contactId);
+    return result;
+  }
+  async updateContact(
+    contactId: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phoneNumber?: string;
+      customFields?: Record<string, string>;
+    }
+  ) {
+    if (
+      data.customFields &&
+      Object.keys(data.customFields).some(key => !/^([1-9]|[1-4][0-9]|50)$/.test(key))
+    )
+      throw invalid('Custom field keys must be 1 through 50.');
+    let body = this.body({
+      first_name: data.firstName,
+      last_name: data.lastName,
+      email: data.email,
+      phone_number: data.phoneNumber,
+      custom_fields: data.customFields
+    });
+    let result = await this.request(
+      contactSchema,
+      'PATCH',
+      `/v3/contacts/${this.resourceId(contactId)}`,
+      body
+    );
+    this.assertId(result.id, contactId);
+    return result;
+  }
+  async deleteContact(contactId: string) {
+    await this.remove(`/v3/contacts/${this.resourceId(contactId)}`);
+  }
+  async getMessage(collectorId: string, messageId: string) {
+    let result = await this.request(
+      messageSchema,
+      'GET',
+      `/v3/collectors/${this.resourceId(collectorId)}/messages/${this.resourceId(messageId)}`
+    );
+    this.assertId(result.id, messageId);
+    return result;
+  }
+  async deleteMessage(collectorId: string, messageId: string) {
+    await this.remove(
+      `/v3/collectors/${this.resourceId(collectorId)}/messages/${this.resourceId(messageId)}`
+    );
+  }
+  async listMessageRecipients(collectorId: string, messageId: string, page = 1) {
+    return this.paged(
+      z
+        .object({
+          id: nativeId,
+          email: z.string().optional(),
+          phone_number: z.string().optional()
+        })
+        .passthrough(),
+      `/v3/collectors/${this.resourceId(collectorId)}/messages/${this.resourceId(messageId)}/recipients`,
+      { page: String(page), per_page: '1000' }
+    );
+  }
+  async listReferenceData(
+    resource: 'survey_templates' | 'survey_categories' | 'survey_folders',
+    params: { page?: number; perPage?: number; language?: string; category?: string } = {}
+  ) {
+    return this.paged(
+      z.object({ id: nativeId }).passthrough(),
+      `/v3/${resource}`,
+      this.query({
+        page: params.page,
+        per_page: params.perPage,
+        language: params.language,
+        category: params.category
+      })
+    );
   }
 }

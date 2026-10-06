@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { customerIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let metadataTypeEnum = z.enum([
@@ -29,6 +30,7 @@ export let getMetadata = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      customerId: customerIdSchema,
       resourceType: metadataTypeEnum.describe('The type of metadata to retrieve.')
     })
   )
@@ -40,7 +42,7 @@ export let getMetadata = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      customerId: ctx.config.customerId
+      customerId: ctx.input.customerId ?? ctx.config.customerId
     });
 
     let result: any;
@@ -68,7 +70,7 @@ export let getMetadata = SlateTool.create(spec, {
         break;
     }
 
-    let resources = result?.data ?? [];
+    let resources = result.data;
 
     return {
       output: { resources },

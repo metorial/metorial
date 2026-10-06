@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TrayGraphqlClient } from '../lib/client';
+import { clientConfig, TrayGraphqlClient } from '../lib/client';
+import { failure as createApiServiceError, pageInput, pageOutput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listUsers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...pageInput,
       externalUserId: z
         .string()
         .optional()
@@ -21,6 +23,7 @@ export let listUsers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pageOutput,
       users: z.array(
         z.object({
           userId: z.string().describe('Tray.io internal user ID'),
@@ -31,25 +34,24 @@ export let listUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TrayGraphqlClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = new TrayGraphqlClient(clientConfig(ctx));
 
-    let criteria = ctx.input.externalUserId
-      ? { externalUserId: ctx.input.externalUserId }
-      : undefined;
-    let users = await client.listUsers(criteria);
+    let criteria =
+      ctx.input.externalUserId !== undefined
+        ? { externalUserId: ctx.input.externalUserId }
+        : undefined;
+    let users = await client.listUsers(criteria, ctx.input);
 
     return {
       output: {
-        users: users.map(u => ({
+        pageInfo: users.pageInfo,
+        users: users.items.map(u => ({
           userId: u.id,
           name: u.name,
           externalUserId: u.externalUserId
         }))
       },
-      message: `Found **${users.length}** user(s).`
+      message: `Found **${users.items.length}** user(s).`
     };
   })
   .build();
@@ -68,6 +70,12 @@ export let createUser = SlateTool.create(spec, {
       externalUserId: z
         .string()
         .describe("Your application's unique identifier for this user"),
+      isTestUser: z
+        .boolean()
+        .optional()
+        .describe(
+          'Create a native test user when true; requires the account’s test-user capability. Creation can affect billing.'
+        ),
       generateAccessToken: z
         .boolean()
         .optional()
@@ -85,20 +93,25 @@ export let createUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TrayGraphqlClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = new TrayGraphqlClient(clientConfig(ctx));
 
     let result = await client.createExternalUser({
       name: ctx.input.name,
-      externalUserId: ctx.input.externalUserId
+      externalUserId: ctx.input.externalUserId,
+      isTestUser: ctx.input.isTestUser
     });
 
     let accessToken: string | undefined;
     if (ctx.input.generateAccessToken) {
-      let authResult = await client.authorize(result.userId);
-      accessToken = authResult.accessToken;
+      try {
+        let authResult = await client.authorize(result.userId);
+        accessToken = authResult.accessToken;
+      } catch {
+        throw createApiServiceError(
+          'The user was created but token generation was not confirmed. Read or reuse this exact user; do not create it again. A token may already have been issued.',
+          { reason: 'user_token_unverified', userId: result.userId }
+        );
+      }
     }
 
     return {
@@ -114,7 +127,7 @@ export let createUser = SlateTool.create(spec, {
 export let deleteUser = SlateTool.create(spec, {
   name: 'Delete User',
   key: 'delete_user',
-  description: `Delete an external end user from Tray.io. This removes the user and all associated solution instances. Requires a master token.`,
+  description: `Delete an external end user from Tray.io. This can remove associated solution instances. Previously executed workflow, third-party, billing and audit effects are not undone. Requires a master token.`,
   tags: {
     destructive: true
   }
@@ -130,10 +143,7 @@ export let deleteUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TrayGraphqlClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = new TrayGraphqlClient(clientConfig(ctx));
 
     await client.deleteExternalUser(ctx.input.userId);
 
@@ -163,10 +173,7 @@ export let generateUserToken = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TrayGraphqlClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = new TrayGraphqlClient(clientConfig(ctx));
 
     let result = await client.authorize(ctx.input.userId);
 

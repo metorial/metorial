@@ -1,93 +1,25 @@
-Now let me get the OpenAPI spec to understand the full API surface:Now I have enough information to write the specification. Let me also check for the n8n Trigger node which seems to offer internal event listening:Now I have all the information needed. Let me compile the specification.
+# n8n Public API contract
 
-# Slates Specification for n8n
+Retains 23 existing public keys and input field types; adds only `discover_api` (GET `/discover`). Shared `X-N8N-API-KEY` client uses the credential-bound explicit `/api/v1` root, no redirects, 30-second timeout and 8 MiB request/response bounds. Native failures expose safe status/remediation without retaining raw transport parents. Successful response credentials, including encoded representations, are refused. This does not certify shared internal tracing.
 
-## Overview
+| Capability | Native routes and limits |
+| --- | --- |
+| Workflow list/get/create/update/delete | `/workflows`, `/workflows/{id}`; cursor pagination; current native record validation; complete replacement hydration; local optional version guard with no atomic CAS. |
+| Historical definition | `/workflows/{id}/versions/{versionId}`; documented deprecated `/workflows/{id}/{versionId}` read fallback only on 404. History availability and permissions apply. No fabricated active state. |
+| Publication | Existing `/workflows/{id}/activate` and `/deactivate`; documented current compatibility routes. Activation/version selection can put automation live. |
+| Workflow tags | GET/PUT `/workflows/{id}/tags`; complete replacement payload is an array of `{id}` records. |
+| Executions | `/executions`, `/executions/{id}`, `/retry`, `/stop`; positive integer IDs preserved as strings; nullable native timestamps omitted rather than invented. Retry starts a different execution; stopping reports native status. |
+| Credentials | `/credentials`, exact metadata `/credentials/{id}`, create/delete, `/credentials/schema/{type}`, transfer; metadata only, never credential data. Native schemas depend on installed node types. |
+| Users | `/users` or exact `/users/{id}`; native permission/scopes and nullable fields. No current-user inference. |
+| Tags / variables / projects | Native documented resource routes, cursor lists and project-member routes. Variable creation 201 and variable/project updates 204 may have empty bodies; accepted receipts do not invent IDs, values or timestamps. |
+| Transfers | PUT workflow/credential `/transfer`; native 204 acceptance, project permissions and feature availability apply. |
+| Source control / audit | POST `/source-control/pull` with verified force/autoPublish contract; per-resource/partial effects. Legacy variable override field is retained but explicitly refused before pulling. POST `/audit` with native categories and integer threshold. |
+| Capability discovery | Native scoped data from `/discover`, optional `include=schemas`/resource/operation. Not version, license, identity or complete authorization proof. |
 
-n8n is a workflow automation platform (available as self-hosted or cloud-hosted) that allows users to connect applications and build automated workflows using a visual node-based editor. It provides a public REST API for programmatic management of workflows, executions, credentials, users, and other instance resources. n8n supports both no-code visual workflow building and code-based extensibility.
+All list tools preserve native cursors and reject invalid page limits. Missing native envelopes never become successful empty lists. Dynamic workflow fields outside the verified replacement contract require direct deployment-specific API handling. Optional workflow JSON delivery uses bounded retrieved content, without an invented file URL or renewal endpoint. No legacy triggers existed and none were added.
 
-## Authentication
+Primary references: [authentication](https://docs.n8n.io/connect/n8n-api/authentication), [pagination](https://docs.n8n.io/connect/n8n-api/pagination), [workflows](https://docs.n8n.io/connect/n8n-api/workflow), [executions](https://docs.n8n.io/connect/n8n-api/executions), [credentials](https://docs.n8n.io/connect/n8n-api/credential), [projects](https://docs.n8n.io/connect/n8n-api/projects), [users](https://docs.n8n.io/connect/n8n-api/user), [tags](https://docs.n8n.io/connect/n8n-api/tags), [variables](https://docs.n8n.io/connect/n8n-api/variables), [source control](https://docs.n8n.io/connect/n8n-api/source-control), [audit](https://docs.n8n.io/connect/n8n-api/audit), [discovery](https://docs.n8n.io/connect/n8n-api/discover).
 
-n8n's public API uses **API Key authentication**.
+## Review safeguards
 
-**How to obtain an API key:**
-
-1. Log in to your n8n instance.
-2. Go to **Settings > n8n API**.
-3. Select **Create an API key**.
-4. Choose a label and set an expiration time for the key.
-5. On enterprise plans, you can optionally select **scopes** to restrict the key's access to specific resources and actions.
-6. Copy the generated API key.
-
-**How to use the API key:**
-
-Send the API key as a header named `X-N8N-API-KEY` with every request:
-
-```
-X-N8N-API-KEY: <your-api-key>
-```
-
-**Base URL:**
-
-- Self-hosted: `<N8N_HOST>:<N8N_PORT>/<N8N_PATH>/api/v1/`
-- n8n Cloud: `<your-instance>.app.n8n.cloud/api/v1/`
-
-**Scopes (Enterprise only):**
-
-Users of enterprise instances can limit which resources and actions a key can access with scopes. API key scopes allow you to specify the exact level of access a key needs for its intended purpose. Non-enterprise API keys have full access to all the account's resources and capabilities.
-
-**Availability:**
-
-The n8n API isn't available during the free trial. You need to upgrade to access this feature. The self-hosted version includes full API access at no additional cost, whereas n8n Cloud provides API access only in paid tiers.
-
-## Features
-
-### Workflow Management
-
-Create, retrieve, update, delete, activate, deactivate, and archive workflows programmatically. Workflows are defined as JSON objects containing nodes, connections, and settings. You can also activate a specific historical version of a workflow using an optional `versionId` parameter. Workflows can be filtered by active status and tags.
-
-- Enterprise plans support sharing features and project-based access control for workflows.
-
-### Execution Management
-
-List, retrieve, and delete workflow executions. Executions represent individual runs of a workflow (both manual and production). You can filter executions by workflow, status, and date range. Failed executions can be retried, with an option to use either the original workflow version or the current/latest version.
-
-### Credential Management
-
-Create, retrieve, delete, and list credentials used by workflows to authenticate with external services. The credential schema endpoint returns the JSON schema for a specific credential type, useful for understanding required fields before creating credentials. Credentials can be filtered by name and type.
-
-### User Management
-
-List and retrieve users on the n8n instance. User operations are only available to instance owners.
-
-### Tag Management
-
-Tags help organize workflows and credentials. You can create, retrieve, update, and delete tags via the API.
-
-### Variable Management
-
-Variables store fixed data accessible across workflows (Pro/Enterprise plans). You can create, retrieve, update, and delete variables.
-
-### Project Management
-
-Projects group workflows and credentials for access control (requires appropriate plan). You can create, retrieve, update, and delete projects.
-
-### Source Control
-
-Source control operations require the Source Control feature to be licensed and configured. Allows pulling and pushing workflow changes to and from a connected Git repository.
-
-### Security Audit
-
-Generate security audit reports for your n8n instance. You can select which risk categories to include and configure thresholds such as the number of days a workflow is considered abandoned.
-
-## Events
-
-The n8n public API does not provide webhook subscriptions or an event streaming mechanism for listening to instance-level events (such as workflow status changes or execution completions) from external systems.
-
-However, n8n does have internal trigger nodes that respond to certain instance events within workflows:
-
-- **n8n Trigger node**: Triggers when the workflow containing this node updates or gets published, or when the n8n instance starts or restarts. Events include: Published Workflow Updated, Instance Started, and Workflow Published. This node only responds to events in its own workflow; changes to other workflows won't trigger it.
-
-- **Error Trigger node**: Triggers when any workflow on the instance encounters an error, allowing you to build error-handling/notification workflows.
-
-These are internal workflow mechanisms, not externally subscribable webhooks. There is no external webhook or event subscription API for consuming n8n instance events from outside.
+Requests and native responses are screened before dispatch/projection for bounded raw, percent, Unicode and nested Base64 credential reflection, including hidden descriptor data and byte values. Lists reject results larger than an explicit limit and empty/nonadvancing cursors. Explicit historical publication requires the returned native published-version ID to match the requested version; incomplete receipts retain write uncertainty. These local checks do not imply universal trace privacy. Controlled private cleanup binds the original run/profile/credentials/fixtures and refuses incomplete native inventories or unbound published definitions. Credential destructive scenarios stay gated because visible workflow lists and metadata cannot prove complete credential associations; supported public create/delete routes remain available.

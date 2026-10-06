@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { EgnyteClient } from '../lib/client';
+import { invalid } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getFileInfoTool = SlateTool.create(spec, {
@@ -43,11 +44,14 @@ export let getFileInfoTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
+    if (
+      [ctx.input.path, ctx.input.fileGroupId, ctx.input.folderId].filter(
+        value => value !== undefined
+      ).length !== 1
+    )
+      throw invalid('Provide exactly one path, fileGroupId, or folderId.');
     let result: Record<string, unknown>;
 
     if (ctx.input.fileGroupId) {
@@ -57,10 +61,10 @@ export let getFileInfoTool = SlateTool.create(spec, {
     } else if (ctx.input.path) {
       result = (await client.getFileMetadata(ctx.input.path)) as Record<string, unknown>;
     } else {
-      throw new Error('Provide either a path, fileGroupId, or folderId');
+      throw invalid('Provide a path, fileGroupId, or folderId');
     }
 
-    let isFolder = result.is_folder === true || result.folder_id !== undefined;
+    let isFolder = result.is_folder === true;
 
     return {
       output: {
@@ -71,13 +75,17 @@ export let getFileInfoTool = SlateTool.create(spec, {
         entryId: result.entry_id ? String(result.entry_id) : undefined,
         folderId: result.folder_id ? String(result.folder_id) : undefined,
         size: typeof result.size === 'number' ? result.size : undefined,
-        lastModified: result.last_modified ? String(result.last_modified) : undefined,
+        lastModified: result.last_modified
+          ? String(result.last_modified)
+          : typeof result.lastModified === 'number'
+            ? new Date(result.lastModified).toISOString()
+            : undefined,
         uploadedBy: result.uploaded_by ? String(result.uploaded_by) : undefined,
         numVersions: typeof result.num_versions === 'number' ? result.num_versions : undefined,
         locked: typeof result.locked === 'boolean' ? result.locked : undefined,
         lockHolder: result.lock_holder ? String(result.lock_holder) : undefined,
         checksum: result.checksum ? String(result.checksum) : undefined,
-        customProperties: result.custom_properties
+        customProperties: result.custom_metadata ?? result.custom_properties
       },
       message: `Retrieved info for **${result.name}** at ${result.path || 'N/A'}${isFolder ? ' (folder)' : ` (${typeof result.size === 'number' ? formatBytes(result.size) : 'unknown size'})`}`
     };
@@ -87,6 +95,9 @@ export let getFileInfoTool = SlateTool.create(spec, {
 let formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B';
   let units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let i = Math.floor(Math.log(bytes) / Math.log(1024));
+  let i = Math.min(
+    units.length - 1,
+    Math.max(0, Math.floor(Math.log(bytes) / Math.log(1024)))
+  );
   return `${(bytes / 1024 ** i).toFixed(1)} ${units[i]}`;
 };

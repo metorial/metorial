@@ -1,21 +1,11 @@
-export let getGraphqlUrl = (region: string): string => {
-  switch (region) {
-    case 'eu':
-      return 'https://eu1.tray.io/graphql';
-    case 'apac':
-      return 'https://ap1.tray.io/graphql';
-    default:
-      return 'https://tray.io/graphql';
-  }
-};
+import { resolveRegion } from './validation';
 
-export let getRestBaseUrl = (region: string): string => {
-  switch (region) {
-    case 'eu':
-      return 'https://api.eu1.tray.io';
-    case 'apac':
-      return 'https://api.ap1.tray.io';
-    default:
-      return 'https://api.tray.io';
-  }
+const regions = {
+  us: { graphql: 'https://tray.io/graphql', rest: 'https://api.tray.io' },
+  eu: { graphql: 'https://eu1.tray.io/graphql', rest: 'https://api.eu1.tray.io' },
+  apac: { graphql: 'https://ap1.tray.io/graphql', rest: 'https://api.ap1.tray.io' }
 };
+export const getGraphqlUrl = (region: string): string =>
+  regions[resolveRegion(region) as keyof typeof regions].graphql;
+export const getRestBaseUrl = (region: string): string =>
+  regions[resolveRegion(region) as keyof typeof regions].rest;

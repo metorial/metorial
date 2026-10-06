@@ -1,22 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GhostAdminClient } from '../lib/client';
+import { getClient } from '../lib/client';
+import { invalid, resourceId } from '../lib/schemas';
 import { spec } from '../spec';
 
-let memberOutputSchema = z.object({
-  memberId: z.string().describe('Unique member ID'),
-  uuid: z.string().describe('Member UUID'),
-  email: z.string().describe('Member email address'),
-  name: z.string().nullable().describe('Member name'),
-  note: z.string().nullable().describe('Internal note'),
-  status: z.string().describe('Member status (free, paid, comped)'),
-  avatarImage: z.string().nullable().describe('Avatar image URL'),
-  emailCount: z.number().describe('Total emails sent'),
-  emailOpenedCount: z.number().describe('Number of emails opened'),
-  lastSeenAt: z.string().nullable().describe('Last activity timestamp'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp')
-});
+let memberOutputSchema = z
+  .object({
+    memberId: z.string().describe('Unique member ID'),
+    uuid: z.string().optional().describe('Member UUID'),
+    email: z.string().optional().describe('Member email address'),
+    name: z.string().nullable().optional().describe('Member name'),
+    note: z.string().nullable().optional().describe('Internal note'),
+    status: z.string().optional().describe('Member status (free, paid, comped)'),
+    avatarImage: z.string().nullable().optional().describe('Avatar image URL'),
+    emailCount: z.number().optional().describe('Total emails sent'),
+    emailOpenedCount: z.number().optional().describe('Number of emails opened'),
+    lastSeenAt: z.string().nullable().optional().describe('Last activity timestamp'),
+    createdAt: z.string().optional().describe('Creation timestamp'),
+    updatedAt: z.string().optional().describe('Last update timestamp')
+  })
+  .partial()
+  .required({ memberId: true });
 
 export let manageMember = SlateTool.create(spec, {
   name: 'Manage Member',
@@ -36,7 +40,7 @@ export let manageMember = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['create', 'read', 'update', 'delete']).describe('Operation to perform'),
-      memberId: z.string().optional().describe('Member ID (required for read/update/delete)'),
+      memberId: resourceId.optional().describe('Member ID (required for read/update/delete)'),
       email: z.string().optional().describe('Member email address'),
       name: z.string().optional().describe('Member name'),
       note: z.string().optional().describe('Internal note about the member'),
@@ -51,7 +55,7 @@ export let manageMember = SlateTool.create(spec, {
       newsletters: z
         .array(
           z.object({
-            newsletterId: z.string().describe('Newsletter ID to subscribe to')
+            newsletterId: resourceId.describe('Newsletter ID to subscribe to')
           })
         )
         .optional()
@@ -64,15 +68,12 @@ export let manageMember = SlateTool.create(spec, {
   )
   .output(memberOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GhostAdminClient({
-      domain: ctx.config.adminDomain,
-      apiKey: ctx.auth.token
-    });
+    let client = getClient(ctx);
 
     let { action } = ctx.input;
 
     if (action === 'read') {
-      if (!ctx.input.memberId) throw new Error('memberId is required for reading a member');
+      if (!ctx.input.memberId) throw invalid('memberId is required for reading a member');
       let result = await client.readMember(ctx.input.memberId, {
         include: 'newsletters,labels'
       });
@@ -84,7 +85,7 @@ export let manageMember = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.memberId) throw new Error('memberId is required for deleting a member');
+      if (!ctx.input.memberId) throw invalid('memberId is required for deleting a member');
       await client.deleteMember(ctx.input.memberId);
       return {
         output: {
@@ -116,20 +117,20 @@ export let manageMember = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.email) throw new Error('email is required for creating a member');
+      if (!ctx.input.email) throw invalid('email is required for creating a member');
       let result = await client.createMember(memberData);
       let m = result.members[0];
       return { output: mapMember(m), message: `Created member **${m.email}** (${m.status}).` };
     }
 
     if (action === 'update') {
-      if (!ctx.input.memberId) throw new Error('memberId is required for updating a member');
+      if (!ctx.input.memberId) throw invalid('memberId is required for updating a member');
       let result = await client.updateMember(ctx.input.memberId, memberData);
       let m = result.members[0];
       return { output: mapMember(m), message: `Updated member **${m.email}** (${m.status}).` };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw invalid(`Unknown action: ${action}`);
   })
   .build();
 
@@ -137,13 +138,13 @@ let mapMember = (m: any) => ({
   memberId: m.id,
   uuid: m.uuid,
   email: m.email,
-  name: m.name ?? null,
-  note: m.note ?? null,
+  name: m.name,
+  note: m.note,
   status: m.status,
-  avatarImage: m.avatar_image ?? null,
-  emailCount: m.email_count ?? 0,
-  emailOpenedCount: m.email_opened_count ?? 0,
-  lastSeenAt: m.last_seen_at ?? null,
+  avatarImage: m.avatar_image,
+  emailCount: m.email_count,
+  emailOpenedCount: m.email_opened_count,
+  lastSeenAt: m.last_seen_at,
   createdAt: m.created_at,
   updatedAt: m.updated_at
 });

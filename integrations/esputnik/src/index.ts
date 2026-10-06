@@ -19,8 +19,6 @@ import {
   updateSegmentMembership,
   upsertContact
 } from './tools';
-import { messageActivity } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     getAccountInfo,
     manageUnsubscribes
   ],
-  triggers: [messageActivity]
+  triggers: []
 });

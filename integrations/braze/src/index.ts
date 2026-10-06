@@ -32,8 +32,6 @@ import {
   triggerCanvas,
   updateSubscriptionStatus
 } from './tools';
-import { campaignActivity, emailBlocklistActivity, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -68,5 +66,5 @@ export let provider = Slate.create({
     getPurchaseAnalytics,
     scheduleMessage
   ],
-  triggers: [inboundWebhook, campaignActivity, emailBlocklistActivity]
+  triggers: []
 });

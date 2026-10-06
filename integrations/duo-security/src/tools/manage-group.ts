@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listGroups = SlateTool.create(spec, {
@@ -35,14 +36,17 @@ export let listGroups = SlateTool.create(spec, {
         })
       ),
       totalObjects: z.number().optional(),
-      hasMore: z.boolean()
+      hasMore: z.boolean(),
+      nextOffset: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('list_groups', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.listGroups({
@@ -62,13 +66,17 @@ export let listGroups = SlateTool.create(spec, {
     }));
 
     let totalObjects = result.metadata?.total_objects;
+    let nextOffset =
+      typeof result.metadata?.next_offset === 'number'
+        ? result.metadata.next_offset
+        : undefined;
     let hasMore =
-      totalObjects !== undefined
-        ? (ctx.input.offset ?? 0) + groups.length < totalObjects
-        : false;
+      nextOffset !== undefined ||
+      (totalObjects !== undefined &&
+        (ctx.input.offset ?? 0) + result.response.length < totalObjects);
 
     return {
-      output: { groups, totalObjects, hasMore },
+      output: { groups, totalObjects, hasMore, nextOffset },
       message: `Found **${groups.length}** group(s).`
     };
   })
@@ -95,10 +103,12 @@ export let createGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('create_group', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.createGroup({
@@ -139,10 +149,12 @@ export let deleteGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('delete_group', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     await client.deleteGroup(ctx.input.groupId);

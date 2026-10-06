@@ -1,6 +1,14 @@
 # <img src="logo.svg" height="20"> Ramp
 
-Manage corporate card spending, bill payments, reimbursements, and accounting automation. Create and manage virtual and physical cards with configurable spending limits, merchant restrictions, and spend programs. Track and retrieve transactions with filtering by date, merchant, status, and sync state. Create, approve, and pay bills for accounts payable workflows. Process employee reimbursements for out-of-pocket expenses and mileage. Manage users, departments, locations, and entities for organizational structure. Sync transactions, bills, reimbursements, and statements to external accounting systems with GL account and custom field management. Upload and manage receipts with OCR processing. Retrieve vendor and merchant data. Receive real-time webhook notifications for transaction, bill, reimbursement, and accounting sync events.
+Read transactions, reimbursements, vendors, entities, business information and balances. Manage users, departments, spend programs, approved bills, physical cards and funds. Use exact resource readbacks and deferred user-task status to confirm provider state.
+
+Authenticate with OAuth or an internal application's client credentials, selecting separate production or sandbox credentials. Current cards and funds use explicit selectors; the default legacy card and limit routes remain available for compatibility, with account availability unverified by the current public reference. Legacy limit IDs are never assumed to be fund IDs.
+
+New connections request current Funds permissions and do not request legacy Limits scopes. Use `resource=fund` for a new connection; legacy limit operations require an existing suitable grant and separately confirmed account support.
+
+Bill creation automatically approves the bill and can initiate payment. Archiving can cancel payments or terminate an attached one-time card. Fund and card termination is permanent. User invitations require accepted onboarding after the deferred task completes. Confirm the intended business, resource ownership and financial or notification effects before making changes.
+
+See the [implemented tool surface](docs/SPEC.md) and [Ramp API documentation](https://docs.ramp.com/developer-api/v1/).
 
 ## License
 

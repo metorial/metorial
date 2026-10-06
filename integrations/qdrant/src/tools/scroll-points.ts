@@ -18,7 +18,12 @@ export let scrollPoints = SlateTool.create(spec, {
   .input(
     z.object({
       collectionName: z.string().describe('Name of the collection'),
-      limit: z.number().optional().describe('Maximum number of points per page (default: 10)'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum number of points per page (default: 10)'),
       offset: z
         .union([z.string(), z.number()])
         .optional()
@@ -53,7 +58,7 @@ export let scrollPoints = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 

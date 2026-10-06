@@ -6,20 +6,22 @@ import {
   deleteForm,
   deleteSubmission,
   deleteWorkspace,
+  downloadSubmissionPdf,
   getForm,
   getSubmission,
   getUser,
+  getWorkspace,
   listForms,
   listQuestions,
   listSubmissions,
   listWorkspaces,
   updateForm
 } from './tools';
-import { formResponse } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getWorkspace,
+    downloadSubmissionPdf,
     listForms,
     getForm,
     createForm,
@@ -34,5 +36,5 @@ export let provider = Slate.create({
     createWorkspace,
     deleteWorkspace
   ],
-  triggers: [formResponse]
+  triggers: []
 });

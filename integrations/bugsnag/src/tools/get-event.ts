@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugsnagClient } from '../lib/client';
 import { spec } from '../spec';
@@ -109,71 +109,73 @@ export let getEvent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
+    let client = new BugsnagClient(ctx.auth);
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('Project ID is required.');
+    if (!projectId) throw createApiServiceError('Project ID is required.');
 
     let event = await client.getEvent(projectId, ctx.input.eventId);
 
     let output = {
-      eventId: event.id,
-      errorId: event.error_id,
-      receivedAt: event.received_at,
-      exceptions: event.exceptions?.map((ex: any) => ({
-        errorClass: ex.errorClass || ex.error_class,
-        message: ex.message,
-        stacktrace: ex.stacktrace?.map((frame: any) => ({
-          file: frame.file,
-          lineNumber: frame.lineNumber ?? frame.line_number,
-          columnNumber: frame.columnNumber ?? frame.column_number,
-          method: frame.method,
-          inProject: frame.inProject ?? frame.in_project
+      eventId: event.id ?? undefined,
+      errorId: event.error_id ?? undefined,
+      receivedAt: event.received_at ?? undefined,
+      exceptions: event.exceptions?.map(ex => ({
+        errorClass: ex.errorClass ?? undefined,
+        message: ex.message ?? undefined,
+        stacktrace: ex.stacktrace?.map(frame => ({
+          file: frame.file ?? undefined,
+          lineNumber: frame.lineNumber ?? undefined,
+          columnNumber: frame.columnNumber ?? undefined,
+          method: frame.method ?? undefined,
+          inProject: frame.inProject ?? undefined
         }))
       })),
-      severity: event.severity,
-      unhandled: event.unhandled,
-      context: event.context,
+      severity: event.severity ?? undefined,
+      unhandled: event.unhandled ?? undefined,
+      context: event.context ?? undefined,
       user: event.user
         ? {
-            userId: event.user.id,
-            email: event.user.email,
-            name: event.user.name
+            userId: event.user.id ?? undefined,
+            email: event.user.email ?? undefined,
+            name: event.user.name ?? undefined
           }
         : undefined,
       app: event.app
         ? {
-            version: event.app.version,
-            releaseStage: event.app.releaseStage ?? event.app.release_stage,
-            type: event.app.type
+            version: event.app.version ?? undefined,
+            releaseStage: event.app.releaseStage ?? undefined,
+            type: event.app.type ?? undefined
           }
         : undefined,
       device: event.device
         ? {
-            hostname: event.device.hostname,
-            osName: event.device.osName ?? event.device.os_name,
-            osVersion: event.device.osVersion ?? event.device.os_version,
-            browserName: event.device.browserName ?? event.device.browser_name,
-            browserVersion: event.device.browserVersion ?? event.device.browser_version,
-            manufacturer: event.device.manufacturer,
-            model: event.device.model
+            hostname: event.device.hostname ?? undefined,
+            osName: event.device.osName ?? undefined,
+            osVersion: event.device.osVersion ?? undefined,
+            browserName: event.device.browserName ?? undefined,
+            browserVersion: event.device.browserVersion ?? undefined,
+            manufacturer: event.device.manufacturer ?? undefined,
+            model: event.device.model ?? undefined
           }
         : undefined,
       request: event.request
         ? {
-            clientIp: event.request.clientIp ?? event.request.client_ip,
-            httpMethod: event.request.httpMethod ?? event.request.http_method,
-            url: event.request.url,
-            referer: event.request.referer
+            clientIp: event.request.clientIp ?? undefined,
+            httpMethod: event.request.httpMethod ?? undefined,
+            url: event.request.url ?? undefined,
+            referer: event.request.referer ?? undefined
           }
         : undefined,
-      breadcrumbs: event.breadcrumbs,
-      featureFlags: event.feature_flags ?? event.featureFlags,
-      metaData: event.metaData ?? event.meta_data,
-      groupingHash: event.groupingHash ?? event.grouping_hash
+      breadcrumbs: event.breadcrumbs ?? undefined,
+      featureFlags: event.feature_flags?.map(flag => ({
+        featureFlag: flag.feature_flag_name,
+        variant: flag.variant_name ?? undefined
+      })),
+      metaData: event.metaData ?? undefined,
+      groupingHash: undefined
     };
 
-    let exClass =
-      event.exceptions?.[0]?.errorClass || event.exceptions?.[0]?.error_class || 'Unknown';
+    let exClass = event.exceptions?.[0]?.errorClass || 'Unknown';
     let exMsg = event.exceptions?.[0]?.message || '';
 
     return {

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwitchClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let managePredictions = SlateTool.create(spec, {
@@ -29,7 +30,7 @@ export let managePredictions = SlateTool.create(spec, {
       predictionWindowSeconds: z
         .number()
         .optional()
-        .describe('How long viewers can make predictions in seconds (for create)'),
+        .describe('How long viewers can make predictions in seconds, 30-1800 (for create)'),
       predictionId: z.string().optional().describe('Prediction ID (for end/get)'),
       endStatus: z
         .enum(['RESOLVED', 'CANCELED', 'LOCKED'])
@@ -70,7 +71,19 @@ export let managePredictions = SlateTool.create(spec, {
             predictionId: z.string(),
             title: z.string(),
             status: z.string(),
-            createdAt: z.string()
+            createdAt: z.string(),
+            outcomes: z
+              .array(
+                z.object({
+                  outcomeId: z.string(),
+                  title: z.string(),
+                  users: z.number(),
+                  channelPoints: z.number(),
+                  color: z.string()
+                })
+              )
+              .optional(),
+            winningOutcomeId: z.string().optional()
           })
         )
         .optional(),
@@ -78,11 +91,12 @@ export let managePredictions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId);
+    validateInput('manage_predictions', ctx.input, [ctx.auth.token]);
+    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId, ctx.auth.userId);
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.title || !ctx.input.outcomes || !ctx.input.predictionWindowSeconds) {
-        throw new Error(
+        throw createApiServiceError(
           'title, outcomes, and predictionWindowSeconds are required to create a prediction'
         );
       }
@@ -117,10 +131,14 @@ export let managePredictions = SlateTool.create(spec, {
 
     if (ctx.input.action === 'end') {
       if (!ctx.input.predictionId || !ctx.input.endStatus) {
-        throw new Error('predictionId and endStatus are required to end a prediction');
+        throw createApiServiceError(
+          'predictionId and endStatus are required to end a prediction'
+        );
       }
       if (ctx.input.endStatus === 'RESOLVED' && !ctx.input.winningOutcomeId) {
-        throw new Error('winningOutcomeId is required when resolving a prediction');
+        throw createApiServiceError(
+          'winningOutcomeId is required when resolving a prediction'
+        );
       }
 
       let prediction = await client.endPrediction(
@@ -163,7 +181,15 @@ export let managePredictions = SlateTool.create(spec, {
       predictionId: p.id,
       title: p.title,
       status: p.status,
-      createdAt: p.created_at
+      createdAt: p.created_at,
+      outcomes: p.outcomes.map(o => ({
+        outcomeId: o.id,
+        title: o.title,
+        users: o.users,
+        channelPoints: o.channel_points,
+        color: o.color
+      })),
+      winningOutcomeId: p.winning_outcome_id ?? undefined
     }));
 
     return {

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, nextCursorFrom } from '../lib/client';
+import { combinatorSchema, filterSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listPeople = SlateTool.create(spec, {
@@ -19,7 +20,9 @@ export let listPeople = SlateTool.create(spec, {
         .max(100)
         .optional()
         .describe('Number of results per page (1-100, default 20)'),
-      cursor: z.string().optional().describe('Pagination cursor from a previous response')
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      filter: filterSchema,
+      combinator: combinatorSchema
     })
   )
   .output(
@@ -59,14 +62,12 @@ export let listPeople = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listPeople({
       limit: ctx.input.limit,
-      cursor: ctx.input.cursor
+      cursor: ctx.input.cursor,
+      filter: ctx.input.filter,
+      combinator: ctx.input.combinator
     });
 
-    let nextCursor: string | null = null;
-    if (result.pagination.nextLink) {
-      let url = new URL(result.pagination.nextLink);
-      nextCursor = url.searchParams.get('cursor');
-    }
+    const nextCursor = nextCursorFrom(result.pagination.nextLink);
 
     return {
       output: {

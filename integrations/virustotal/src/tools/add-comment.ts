@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 let resourceTypeMap: Record<string, string> = {
@@ -38,13 +39,14 @@ export let addComment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    let client = new Client(ctx.auth);
     let apiType = resourceTypeMap[ctx.input.resourceType] ?? ctx.input.resourceType;
     let result = await client.addComment(apiType, ctx.input.resourceId, ctx.input.text);
 
     return {
       output: {
-        commentId: result?.id ?? '',
+        commentId: result.id,
         text: result?.attributes?.text,
         date: result?.attributes?.date?.toString()
       },

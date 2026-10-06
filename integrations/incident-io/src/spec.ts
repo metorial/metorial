@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'incidentio',
   name: 'Incident.io',
   description:
-    'Incident management, on-call scheduling, alert routing, service catalog, and status pages platform.',
+    'Manage incidents, on-call overrides, alert events, catalog entries and status-page updates; read users and automation configuration.',
   metadata: {},
   config,
   auth

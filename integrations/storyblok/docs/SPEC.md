@@ -1,186 +1,38 @@
-Let me get the detailed webhook events list and more about the Management API features.Now let me get the Management API sidebar to understand all available resource types:Now I have comprehensive information to write the specification.
+# Storyblok integration
 
-# Slates Specification for Storyblok
+The integration uses the regional Management API, with account Personal Access Tokens or the retained single-space plugin OAuth flow. It does not use Content Delivery tokens, premium multiple-space scoped grants, or image/upload APIs.
 
-## Overview
+| Tools | Supported behavior |
+| --- | --- |
+| Get Current User, List Spaces | Native identity; regional PAT space discovery or the authorized plugin space |
+| Manage Story, List Stories, Get Story | Draft creation, partial updates, exact reads, native search/paging, publication/unpublication, verified active-resource deletion |
+| Manage Component, List Components | Schema creation/update, exact reads, native unpaged discovery, deletion |
+| Manage Asset, List Assets | Existing asset metadata, privacy/folder changes, native paging, exact reads and active-resource deletion; no upload or file download |
+| Manage Datasource, Manage Datasource Entry | Creation, partial updates, exact reads, parent association, paged discovery, deletion |
+| Manage Collaborator | Paged current inventory, explicit native role or discovered custom role, invitations and verified removal |
+| Manage Release | Native unpaged discovery, exact reads, creation/scheduling, deployment and deletion |
+| Get Space Info, List Activities | Exact space, available workflows/stages/roles, paged tags and activities; auxiliary 403 results are omitted with warnings |
 
-Storyblok is a headless content management system (CMS) that provides APIs for creating, managing, and delivering structured content across multiple channels. It offers a Content Delivery API for reading published content, a Management API for full CRUD operations on content and space configuration, a GraphQL API for querying content, and an Image Service API for on-the-fly image transformation.
+All 13 historical tool keys, names and input/output fields remain. Five manage tools add a read action; every space tool accepts an optional explicit numeric space ID. Saved legacy space settings remain a fallback, and newly authorized plugin credentials are restricted to their verified callback space. The two new read tools need no configured space. Historical triggers are removed.
 
-## Authentication
+New OAuth connections retain PKCE state, refresh tokens, expiry, callback redirect URI and the native authorized space. Regional token endpoints follow the current official plugin SDK. Older saved tokens retain raw authorization behavior; old OAuth credentials need reconnection for bearer mode and renewal. Both legacy OAuth scopes are requested, and management operations still depend on provider permissions and plan. The premium scoped-grant API is a separate flow.
 
-Storyblok supports multiple authentication methods depending on the API being accessed:
+Native resource envelopes and exact IDs are checked. Publication and deployment use independent native readback. Deletions require a prior exact read and a subsequent genuine 404 or documented deleted-asset state. HTTP 202 and unverified write outcomes require exact readback before retrying. Empty values, false flags and zero parent/folder IDs are preserved where supported. Asset metadata updates merge native metadata and verify requested values without replacing unrelated fields. Scheduled release dates use the provider's wall-clock format with an explicit IANA timezone.
 
-### Content Delivery API (read-only)
+Paged endpoints default to page 1 and 25 items, with a maximum of 1000 except collaborators (100). Totals come from native headers; the required story total is never fabricated. Components, releases and spaces are not assigned undocumented page parameters. Complete collaborator inventories have a finite verification bound and refuse unsafe removal when incomplete.
 
-API requests must be authenticated by providing an access token as a query parameter. Two types of space-level tokens are available:
+User-facing errors preserve safe status/remediation while discarding raw transport parents. Results omit credential fields and reject configured credential reflections, including encoded forms. This does not make a universal claim about inherited internal HTTP trace capture before local adaptation.
 
-- **Public token**: Allows access to published content only (`version=published`).
-- **Preview token**: Allows access to both draft and published content (`version=draft` and `version=published`).
+The active private suite covers all 15 keys. It discovers the exact space, registers cleanup before writes, uses unique ownership markers, reconciles uncertain creation through bounded current inventory, reads ownership before deletion, and deletes children before parents. Writes require explicit dedicated-space and retained-history consent; publication, releases, disposable asset deletion and controlled collaborator invitations have additional gates. Provider history, trash, content references, invitations, email/seat effects and downstream publication effects may remain. No historical erasure or refund is promised.
 
-Public and Preview tokens are read-only and do not allow you or others to write or delete entries in your space. These tokens are generated per space under **Settings → Access Tokens** in the Storyblok dashboard.
+Current authoritative references:
 
-### Management API (read-write)
-
-Use these tokens to perform CRUD (create, read, update, delete) operations via the Management API. Two token types are supported:
-
-1. **Personal Access Token**:
-   - A Personal Access Token is obtained from the Storyblok UI and grants access to all spaces associated with your account, including the Management API.
-   - This token is used without the Bearer keyword in the Authorization header.
-   - To manage existing tokens or generate new ones, open your Account settings: My account → Account settings → Personal access tokens.
-   - Passed as: `Authorization: <YOUR_PERSONAL_ACCESS_TOKEN>`
-
-2. **OAuth 2.0 Access Token**:
-   - OAuth 2.0 allows Storyblok plugins to securely access resources by obtaining a Content Management API access token, specifically using the Authorization Code Grant Flow.
-   - This token is tied to a single space. Obtain it via the OAuth2 authentication flow.
-   - Permissions (scopes) such as `read_content` and `write_content` are granted during the OAuth process. This token must be used with the Bearer keyword in the Authorization header.
-   - Authorization endpoint: `https://app.storyblok.com/oauth/authorize?client_id=<YOUR_CLIENT_ID>&response_type=code`
-   - OAuth2 requires a `client_id` and `client_secret`, configured in Storyblok's Partner Portal under the app's OAuth 2 settings.
-   - Passed as: `Authorization: Bearer <YOUR_OAUTH_TOKEN>`
-
-### Region-specific base URLs
-
-The Management API base URL depends on the space's server region:
-
-- EU: `https://mapi.storyblok.com/v1`
-- US: `https://api-us.storyblok.com/v1`
-- Canada: `https://api-ca.storyblok.com/v1`
-- Australia: `https://api-ap.storyblok.com/v1`
-- China: `https://app.storyblokchina.cn/v1`
-
-## Features
-
-### Story (Content) Management
-
-Create, read, update, delete, publish, unpublish, and duplicate stories (content entries). Stories hold structured content defined by components and can be organized in folders. Supports versioning with the ability to compare and restore previous versions, AI-powered translation, content scheduling for future publish dates, and import/export functionality. Stories can be filtered by slug, content type, publication status, and language.
-
-### Content Delivery
-
-Retrieve published or draft content for frontend consumption via REST or GraphQL. Supports filtering stories by custom field values using a rich set of filter operations (e.g., `is`, `in`, `like`, `gt_date`, `any_in_array`). Allows resolving relations between stories and retrieving content in specific languages for internationalized content.
-
-### Component Management
-
-Define and manage the content schema by creating, updating, and deleting components (content type definitions). Components define the fields and structure of stories. Supports component versioning and version restoration, and organizing components into folders.
-
-### Asset Management
-
-Upload, retrieve, update, replace, and delete media assets (images, documents, videos). Assets can be organized in folders, tagged with internal tags, and marked as private for restricted access. Supports bulk operations for moving and deleting assets. Asset metadata (including custom metadata fields) can be managed programmatically.
-
-### Image Transformation
-
-Transform and optimize images on the fly via URL-based parameters. Supports resizing, cropping, format conversion, quality adjustment, blur, brightness, grayscale, rotation, focal point, rounded corners, and fit-in operations.
-
-### Datasources
-
-Manage key-value data stores (datasources) and their entries. Useful for centralized option lists, configuration values, or structured data not tied to stories.
-
-### Collaborator and Role Management
-
-Add, remove, and manage collaborators (users) within a space. Create and configure custom space roles with granular permissions to control access to content and features.
-
-### Workflows
-
-Define and manage editorial workflows with custom stages. Move stories through workflow stages and track workflow stage changes. Supports approval processes for content review.
-
-### Releases
-
-Group content changes into releases that can be merged (published) together. Supports checking for conflicts within a release before merging.
-
-### Discussions and Comments
-
-Create discussions on stories for editorial collaboration. Add, update, and delete comments within discussions, and resolve discussions when issues are addressed.
-
-### Tags and Internal Tags
-
-Create and manage tags for organizing and categorizing stories. Internal tags can be used for assets and components for organizational purposes.
-
-### Spaces
-
-Create, retrieve, update, duplicate, delete, and back up spaces. A space is the top-level organizational container for all content and configuration.
-
-### Pipelines (Branching)
-
-Create and manage content pipeline branches for staging environments, allowing content to be developed and deployed across different stages.
-
-### Tasks
-
-Create automation tasks that can trigger webhooks when executed, with optional user input dialogs that pass custom values as payload.
-
-### Extensions and Field Plugins
-
-Manage custom extensions (apps/plugins) and field plugins that extend the Storyblok editing experience. Retrieve and update extension settings.
-
-### Activities
-
-Retrieve an audit log of activities (actions taken by users) within a space for tracking content changes and user actions.
-
-## Events
-
-In Storyblok, webhooks notify external services of events, such as when content is published or updated. This is useful for tasks like clearing caches or triggering build processes.
-
-Webhooks are configured per space under **Settings → Webhooks**. Each webhook requires a target URL and a selection of event types. The sender of the webhook can be verified by validating the signature sent along with the payload and generated with a shared secret key (webhook secret). Webhooks don't retry on failure.
-
-### Story Events
-
-Triggered when content stories change state.
-
-- **published**: A story is published.
-- **unpublished**: A story is unpublished.
-- **deleted**: A story is deleted.
-- **moved**: A story is moved.
-
-### Datasource Events
-
-Triggered when datasource entries are modified.
-
-- **entries_updated**: A datasource entry is saved or added.
-
-### Asset Events
-
-Triggered when media assets change.
-
-- **created**: An asset is uploaded.
-- **replaced**: An asset is replaced.
-- **deleted**: An asset is deleted.
-- **restored**: An asset is restored.
-
-### User Management Events
-
-Triggered when collaborator membership changes within a space.
-
-- **added**: A user is added to the space.
-- **removed**: A user is removed from the space.
-- **roles_updated**: A user's role is updated.
-
-### Workflow Events
-
-Triggered when a story moves through workflow stages.
-
-- **stage.changed**: The workflow stage of a story changed.
-
-### Discussion Events
-
-Triggered when editorial discussions or comments change.
-
-- **created**: A discussion is created.
-- **comment_created**: A comment is added.
-- **comment_updated**: A comment is updated.
-- **comment_deleted**: A comment is deleted.
-- **resolved**: A discussion is resolved.
-
-### Pipeline Events
-
-Triggered when pipeline stages are deployed. Requires the Pipelines App.
-
-- **deployed**: A pipeline stage is deployed.
-
-### Release Events
-
-Triggered when releases are merged. Requires the Releases App.
-
-- **merged**: A release is merged into the current released content.
-
-### Task Events
-
-Triggered manually via the Tasks App when a user clicks Execute on a task.
-
-- **task_execution**: A task webhook is triggered, optionally including user-provided `dialog_values` in the payload.
+- [Management API](https://www.storyblok.com/docs/api/management)
+- [Plugin OAuth authorization](https://www.storyblok.com/docs/plugins/oauth-authorization-flow)
+- [Current OAuth client implementation](https://github.com/storyblok/pluginsblok/blob/main/packages/app-extension-auth/src/storyblok-auth-api/handle-requests/openidClient.ts)
+- [Current regional hosts](https://github.com/storyblok/monoblok/blob/main/packages/region-helper/src/index.ts)
+- [OAuth user info](https://www.storyblok.com/docs/api/management/oauth/get-user-info) and [space info](https://www.storyblok.com/docs/api/management/oauth/get-space-info)
+- [Story search](https://www.storyblok.com/docs/api/management/stories/retrieve-multiple-stories), [creation](https://www.storyblok.com/docs/api/management/stories/create-a-story) and [publication](https://www.storyblok.com/docs/api/management/stories/publish-a-story)
+- [Asset object](https://www.storyblok.com/docs/api/management/assets/the-asset-object), [exact asset read](https://www.storyblok.com/docs/api/management/assets/retrieve-one-asset) and [official update client](https://github.com/storyblok/php-management-api-client/blob/main/src/Endpoints/AssetApi.php)
+- [Collaborator invitation](https://www.storyblok.com/docs/api/management/collaborators/add-a-collaborator) and [inventory](https://www.storyblok.com/docs/api/management/collaborators/retrieve-multiple-collaborators)
+- [Release update/deployment](https://www.storyblok.com/docs/api/management/releases/update-a-release) and [discovery](https://www.storyblok.com/docs/api/management/releases/retrieve-multiple-releases)

@@ -5,8 +5,9 @@ export let config = SlateConfig.create(
   z.object({
     accountId: z
       .string()
+      .optional()
       .describe(
-        'Your Drip account ID. Found in your Drip account settings under General Info.'
+        'Legacy saved account selection. Prefer calling list_accounts and passing accountId with each account operation.'
       )
   })
 );

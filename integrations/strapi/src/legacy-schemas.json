@@ -1,0 +1,631 @@
+{
+  "list_entries": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contentType": {
+          "type": "string",
+          "description": "Plural API ID of the content type (e.g., \"articles\", \"products\")"
+        },
+        "fields": {
+          "description": "Specific fields to return (e.g., [\"title\", \"description\"])",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "populate": {
+          "description": "Relations to populate. Use \"*\" for all, or an object for granular control",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          ]
+        },
+        "filters": {
+          "description": "Filter criteria using Strapi operators (e.g., {\"title\": {\"$contains\": \"hello\"}})",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "sort": {
+          "description": "Sort order (e.g., \"createdAt:desc\" or [\"title:asc\", \"createdAt:desc\"])",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "page": {
+          "description": "Page number for pagination (default: 1)",
+          "type": "number"
+        },
+        "pageSize": {
+          "description": "Number of entries per page (default: 25)",
+          "type": "number"
+        },
+        "status": {
+          "description": "Filter by publication status (requires Draft & Publish enabled)",
+          "type": "string",
+          "enum": ["draft", "published"]
+        },
+        "locale": {
+          "description": "Locale code for i18n content (e.g., \"en\", \"fr\")",
+          "type": "string"
+        }
+      },
+      "required": ["contentType"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of content entries"
+        },
+        "pagination": {
+          "description": "Pagination metadata",
+          "type": "object",
+          "properties": {
+            "page": {
+              "type": "number"
+            },
+            "pageSize": {
+              "type": "number"
+            },
+            "pageCount": {
+              "type": "number"
+            },
+            "total": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["entries"],
+      "additionalProperties": false
+    }
+  },
+  "get_entry": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contentType": {
+          "type": "string",
+          "description": "Plural API ID of the content type (e.g., \"articles\", \"products\")"
+        },
+        "documentId": {
+          "type": "string",
+          "description": "Document ID of the entry to retrieve"
+        },
+        "fields": {
+          "description": "Specific fields to return",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "populate": {
+          "description": "Relations to populate. Use \"*\" for all, or an object for granular control",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          ]
+        },
+        "status": {
+          "description": "Retrieve draft or published version",
+          "type": "string",
+          "enum": ["draft", "published"]
+        },
+        "locale": {
+          "description": "Locale code for i18n content",
+          "type": "string"
+        }
+      },
+      "required": ["contentType", "documentId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "entry": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The content entry"
+        }
+      },
+      "required": ["entry"],
+      "additionalProperties": false
+    }
+  },
+  "create_entry": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contentType": {
+          "type": "string",
+          "description": "Plural API ID of the content type (e.g., \"articles\", \"products\")"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Field values for the new entry (e.g., {\"title\": \"My Article\", \"content\": \"...\"})"
+        },
+        "status": {
+          "description": "Initial publication status",
+          "type": "string",
+          "enum": ["draft", "published"]
+        },
+        "locale": {
+          "description": "Locale for the entry (requires i18n enabled)",
+          "type": "string"
+        }
+      },
+      "required": ["contentType", "fields"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "entry": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The created entry"
+        }
+      },
+      "required": ["entry"],
+      "additionalProperties": false
+    }
+  },
+  "update_entry": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contentType": {
+          "type": "string",
+          "description": "Plural API ID of the content type (e.g., \"articles\", \"products\")"
+        },
+        "documentId": {
+          "type": "string",
+          "description": "Document ID of the entry to update"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Field values to update (e.g., {\"title\": \"Updated Title\"})"
+        },
+        "status": {
+          "description": "Publication status to set",
+          "type": "string",
+          "enum": ["draft", "published"]
+        },
+        "locale": {
+          "description": "Locale of the entry to update",
+          "type": "string"
+        }
+      },
+      "required": ["contentType", "documentId", "fields"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "entry": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The updated entry"
+        }
+      },
+      "required": ["entry"],
+      "additionalProperties": false
+    }
+  },
+  "delete_entry": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contentType": {
+          "type": "string",
+          "description": "Plural API ID of the content type (e.g., \"articles\", \"products\")"
+        },
+        "documentId": {
+          "type": "string",
+          "description": "Document ID of the entry to delete"
+        },
+        "locale": {
+          "description": "Specific locale to delete (omit to delete all locales)",
+          "type": "string"
+        }
+      },
+      "required": ["contentType", "documentId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deletedEntry": {
+          "description": "The deleted entry data, if returned by the API",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_single_type": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contentType": {
+          "type": "string",
+          "description": "Singular API ID of the single type (e.g., \"homepage\", \"global\")"
+        },
+        "fields": {
+          "description": "Specific fields to return",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "populate": {
+          "description": "Relations to populate. Use \"*\" for all, or an object for granular control",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          ]
+        },
+        "status": {
+          "description": "Retrieve draft or published version",
+          "type": "string",
+          "enum": ["draft", "published"]
+        },
+        "locale": {
+          "description": "Locale code for i18n content",
+          "type": "string"
+        }
+      },
+      "required": ["contentType"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "entry": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The single type entry"
+        }
+      },
+      "required": ["entry"],
+      "additionalProperties": false
+    }
+  },
+  "update_single_type": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contentType": {
+          "type": "string",
+          "description": "Singular API ID of the single type (e.g., \"homepage\", \"global\")"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Field values to update"
+        },
+        "status": {
+          "description": "Publication status to set",
+          "type": "string",
+          "enum": ["draft", "published"]
+        },
+        "locale": {
+          "description": "Locale of the content to update",
+          "type": "string"
+        }
+      },
+      "required": ["contentType", "fields"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "entry": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The updated single type entry"
+        }
+      },
+      "required": ["entry"],
+      "additionalProperties": false
+    }
+  },
+  "list_media": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number for pagination",
+          "type": "number"
+        },
+        "pageSize": {
+          "description": "Number of files per page",
+          "type": "number"
+        },
+        "sort": {
+          "description": "Sort order (e.g., \"createdAt:desc\")",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "filters": {
+          "description": "Filter criteria (e.g., {\"mime\": {\"$contains\": \"image\"}})",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of media files with metadata"
+        }
+      },
+      "required": ["files"],
+      "additionalProperties": false
+    }
+  },
+  "get_media": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "number",
+          "description": "Numeric ID of the media file"
+        }
+      },
+      "required": ["fileId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Media file details and metadata"
+        }
+      },
+      "required": ["file"],
+      "additionalProperties": false
+    }
+  },
+  "upload_media": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fileUrl": {
+          "type": "string",
+          "description": "Publicly accessible URL of the file to upload"
+        },
+        "fileName": {
+          "type": "string",
+          "description": "File name including extension (e.g., \"photo.jpg\")"
+        },
+        "name": {
+          "description": "Display name for the file in the media library",
+          "type": "string"
+        },
+        "alternativeText": {
+          "description": "Alternative text for accessibility",
+          "type": "string"
+        },
+        "caption": {
+          "description": "Caption for the file",
+          "type": "string"
+        }
+      },
+      "required": ["fileUrl", "fileName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Uploaded file(s) details"
+        }
+      },
+      "required": ["files"],
+      "additionalProperties": false
+    }
+  },
+  "update_media": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "number",
+          "description": "Numeric ID of the media file to update"
+        },
+        "name": {
+          "description": "New display name for the file",
+          "type": "string"
+        },
+        "alternativeText": {
+          "description": "New alternative text for accessibility",
+          "type": "string"
+        },
+        "caption": {
+          "description": "New caption for the file",
+          "type": "string"
+        }
+      },
+      "required": ["fileId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The updated file details"
+        }
+      },
+      "required": ["file"],
+      "additionalProperties": false
+    }
+  },
+  "delete_media": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "number",
+          "description": "Numeric ID of the media file to delete"
+        }
+      },
+      "required": ["fileId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deletedFile": {
+          "description": "The deleted file data",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

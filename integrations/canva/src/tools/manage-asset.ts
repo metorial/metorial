@@ -32,7 +32,7 @@ export let getAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let asset = await client.getAsset(ctx.input.assetId);
 
     return {
@@ -79,7 +79,7 @@ export let updateAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let asset = await client.updateAsset(ctx.input.assetId, {
       name: ctx.input.name,
       tags: ctx.input.tags
@@ -111,7 +111,7 @@ export let deleteAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     await client.deleteAsset(ctx.input.assetId);
 
     return {
@@ -124,10 +124,10 @@ export let deleteAsset = SlateTool.create(spec, {
 export let uploadAsset = SlateTool.create(spec, {
   name: 'Upload Asset',
   key: 'upload_asset',
-  description: `Upload an asset (image or video) to the user's Canva library from a URL. This starts an asynchronous upload job. Use the returned job ID to check the upload status.`,
+  description: `Upload from a public URL using Canva’s preview URL-upload API. Public apps using preview APIs cannot pass Canva app review. Upload an asset (image or video) to the user's Canva library from a URL. This starts an asynchronous upload job. Use the returned job ID to check the upload status.`,
   constraints: [
     'Images: max 50 MB (JPEG, PNG, HEIC, GIF, TIFF, WebP)',
-    'Videos: max 500 MB (M4V, MKV, MP4, MPEG, QuickTime, WebM)'
+    'Videos: max 100 MB (M4V, MKV, MP4, MPEG, QuickTime, WebM)'
   ]
 })
   .input(
@@ -159,7 +159,7 @@ export let uploadAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let job = await client.uploadAssetFromUrl({
       name: ctx.input.name,
       url: ctx.input.url
@@ -176,5 +176,24 @@ export let uploadAsset = SlateTool.create(spec, {
       output: job,
       message: statusMsg
     };
+  })
+  .build();
+
+export const getAssetUploadJob = SlateTool.create(spec, {
+  name: 'Get Asset Upload Job',
+  key: 'get_asset_upload_job',
+  description:
+    'Check a URL-upload job and return its exact uploaded asset when complete. This uses Canva’s preview URL-upload API.',
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      jobId: z.string().describe('Exact URL-upload job ID returned by Upload Asset')
+    })
+  )
+  .output(uploadAsset.outputSchema)
+  .handleInvocation(async ctx => {
+    const job = await Client.fromContext(ctx).getAssetUploadJob(ctx.input.jobId);
+    return { output: job, message: `URL upload job ${job.jobId}: ${job.status}.` };
   })
   .build();

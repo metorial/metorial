@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { FivetranClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -18,7 +19,15 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let encoded = btoa(`${ctx.input.apiKey}:${ctx.input.apiSecret}`);
+      for (const value of [ctx.input.apiKey, ctx.input.apiSecret]) {
+        if (!value.trim() || /[\s:]/.test(value))
+          throw createApiServiceError(
+            'Provide a valid API key and secret without whitespace or colons.'
+          );
+      }
+      let encoded = Buffer.from(`${ctx.input.apiKey}:${ctx.input.apiSecret}`, 'utf8').toString(
+        'base64'
+      );
       return {
         output: {
           token: encoded
@@ -26,23 +35,13 @@ export let auth = SlateAuth.create()
       };
     },
 
-    getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://api.fivetran.com/v1',
-        headers: {
-          Authorization: `Basic ${ctx.output.token}`
-        }
-      });
-
-      let response = await http.get('/users/me');
-      let user = response.data?.data;
+    getProfile: async (ctx: { output: { token: string } }) => {
+      const current = await new FivetranClient(ctx.output.token).getAccount();
 
       return {
         profile: {
-          id: user?.id,
-          email: user?.email,
-          name: [user?.given_name, user?.family_name].filter(Boolean).join(' ') || undefined,
-          imageUrl: user?.picture
+          id: current.account_id,
+          name: current.account_name ?? 'Fivetran account'
         }
       };
     }

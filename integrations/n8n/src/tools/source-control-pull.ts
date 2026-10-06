@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let sourceControlPull = SlateTool.create(spec, {
@@ -11,7 +11,7 @@ export let sourceControlPull = SlateTool.create(spec, {
     'Requires Source Control feature to be licensed and configured on the n8n instance.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -26,7 +26,9 @@ export let sourceControlPull = SlateTool.create(spec, {
       variables: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Variable overrides as key-value pairs')
+        .describe(
+          'Legacy compatibility field. The verified Public API does not support overrides here; use manage_variables separately. A supplied value is refused before any pull.'
+        )
     })
   )
   .output(
@@ -39,10 +41,7 @@ export let sourceControlPull = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
     let result = await client.sourceControlPull({
       force: ctx.input.force,
@@ -54,7 +53,7 @@ export let sourceControlPull = SlateTool.create(spec, {
       output: {
         pullResult: result
       },
-      message: `Successfully pulled changes from source control.`
+      message: `Source-control pull returned its native per-resource results. Inspect conflicts and publishing errors; partial imports or retained external effects may remain.`
     };
   })
   .build();

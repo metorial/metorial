@@ -2,7 +2,7 @@
 
 ## Overview
 
-ClickUp is a project management and productivity platform that organizes tasks within Workspaces, Spaces, Folders, and Lists. This integration exposes task management, comments, checklists, existing custom-field values, hierarchy management, Goals, Space tags, time tracking, Workspace members, and event triggers. One connection can access every Workspace authorized for its account.
+ClickUp is a project management and productivity platform that organizes tasks within Workspaces, Spaces, Folders, and Lists. This integration exposes task management, comments, checklists, existing custom-field values, hierarchy management, Goals, Space tags, time tracking, and Workspace members. One connection can access every Workspace authorized for its account.
 
 ## Authentication
 
@@ -42,8 +42,6 @@ OAuth access tokens currently do not expire. Each user gets an individualized to
 
 The connection is account-scoped rather than tied to one preset Workspace. `get_workspaces` discovers the Workspace IDs authorized for the connection. Tools that call Workspace-scoped ClickUp endpoints require an explicit `workspaceId`, allowing each request to select its target Workspace. This applies to Workspace members, Spaces, Goals, task search, time entries, and timers, including task searches narrowed by `listId`. Tools that operate on an existing resource ID continue to use that resource ID directly.
 
-Webhook triggers register once in every authorized Workspace. Registration retains the Workspace-to-webhook mapping so emitted task and Workspace events identify their source Workspace, and cleanup removes every registered webhook.
-
 ## Features
 
 ### Workspace & Hierarchy Management
@@ -82,9 +80,9 @@ Retrieve members of a selected Workspace, including available user IDs, names, e
 
 Query and filter tasks by status, assignee, tags, due dates, creation dates, update dates, Space, or List.
 
-## Events
+## Provider Event Reference
 
-The integration's task and Workspace event triggers create a webhook in every Workspace authorized for the connection. Emitted events include the source `workspaceId`, and removing a trigger cleans up every webhook registered for it.
+ClickUp supports these webhook event families for external receivers. This integration does not expose event triggers.
 
 ### Task Events
 

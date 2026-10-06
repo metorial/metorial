@@ -15,8 +15,6 @@ import {
   updateDriverParameters,
   updateDriverPositions
 } from './tools';
-import { inboundWebhook, mobileEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     getCompletionDetails,
     updateCompletionDetails
   ],
-  triggers: [inboundWebhook, mobileEvents]
+  triggers: []
 });

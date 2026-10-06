@@ -1,6 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AshbyClient } from '../lib/client';
+import {
+  invalid,
+  mapJob,
+  pageInput,
+  pageOutput,
+  pageSchema,
+  rows,
+  text,
+  warningsSchema
+} from '../lib/contracts';
 import { spec } from '../spec';
 
 let jobSchema = z.object({
@@ -13,20 +23,10 @@ let jobSchema = z.object({
   updatedAt: z.string().describe('Last updated timestamp')
 });
 
-let mapJob = (j: any) => ({
-  jobId: j.id,
-  title: j.title,
-  status: j.status,
-  locationId: j.locationId || undefined,
-  departmentId: j.departmentId || undefined,
-  createdAt: j.createdAt,
-  updatedAt: j.updatedAt
-});
-
 export let listJobsTool = SlateTool.create(spec, {
   name: 'List Jobs',
   key: 'list_jobs',
-  description: `Lists or searches jobs in Ashby. Can paginate through all jobs or search by term and status. When a search term or status filter is provided, the search endpoint is used instead of the list endpoint.`,
+  description: `Lists one native job page, reads an exact jobId, or performs bounded title search. Status-only filtering uses the list endpoint. Combined title/status filtering applies status to the bounded search results.`,
   instructions: [
     'To browse all jobs, call with no parameters or use cursor for pagination.',
     'To search by keyword or filter by status, provide searchTerm and/or status.'
@@ -37,10 +37,18 @@ export let listJobsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      jobId: z
+        .string()
+        .optional()
+        .describe('Exact job ID to retrieve; omit filters and pagination for this mode.'),
+      syncToken: z
+        .string()
+        .optional()
+        .describe('Incremental sync token for list mode; preserve it with the cursor.'),
       searchTerm: z
         .string()
         .optional()
-        .describe('Search term to filter jobs by title or other fields'),
+        .describe('Bounded title search; perPage is the maximum search result count'),
       status: z
         .enum(['Open', 'Closed', 'Archived', 'Draft'])
         .optional()
@@ -52,36 +60,65 @@ export let listJobsTool = SlateTool.create(spec, {
   .output(
     z.object({
       jobs: z.array(jobSchema).describe('List of jobs matching the query'),
-      nextCursor: z.string().optional().describe('Pagination cursor for the next page')
+      nextCursor: z.string().optional().describe('Pagination cursor for the next page'),
+      searchLimit: z.number().optional(),
+      searchLimitReached: z.boolean().optional(),
+      warnings: warningsSchema,
+      pageInfo: pageSchema.optional(),
+      completedActions: z.array(z.string()).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AshbyClient({ token: ctx.auth.token });
-    let { searchTerm, status, cursor, perPage } = ctx.input;
-
-    if (searchTerm !== undefined || status !== undefined) {
-      let searchParams: { term?: string; status?: string } = {};
-      if (searchTerm !== undefined) searchParams.term = searchTerm;
-      if (status !== undefined) searchParams.status = status;
-
-      let result = await client.searchJobs(searchParams);
-      let jobs = (result.results || []).map(mapJob);
-
+    const client = new AshbyClient(ctx.auth),
+      input = ctx.input;
+    pageInput(input);
+    if (input.jobId !== undefined) {
+      if (
+        input.searchTerm !== undefined ||
+        input.status !== undefined ||
+        input.cursor !== undefined ||
+        input.syncToken !== undefined
+      )
+        invalid('Use jobId alone for an exact job read.');
+      const job = mapJob((await client.getJob(input.jobId)).results);
       return {
-        output: { jobs },
-        message: `Found **${jobs.length}** jobs matching search criteria.`
+        output: { jobs: [job], warnings: client.warnings },
+        message: 'Retrieved the exact visible job.'
       };
     }
-
-    let result = await client.listJobs({ cursor, perPage });
-    let jobs = (result.results || []).map(mapJob);
-
+    if (input.searchTerm !== undefined) {
+      if (input.cursor !== undefined || input.syncToken !== undefined)
+        invalid(
+          'Job title search is bounded and does not accept pagination or sync tokens. Use list mode for a complete traversal.'
+        );
+      const limit = input.perPage ?? 50,
+        result = await client.post('/job.search', {
+          title: text(input.searchTerm, 'Job title search'),
+          limit
+        }),
+        matched = rows(result.results),
+        jobs = matched
+          .filter(job => input.status === undefined || job.status === input.status)
+          .map(mapJob);
+      return {
+        output: {
+          jobs,
+          searchLimit: limit,
+          searchLimitReached: matched.length === limit,
+          warnings: client.warnings
+        },
+        message:
+          'Retrieved bounded title-search results; an optional status filter applies to those results only. This is not a complete paginated job traversal.'
+      };
+    }
+    const result = await client.list('/job.list', input, { status: input.status });
     return {
       output: {
-        jobs,
-        nextCursor: result.moreDataAvailable ? result.nextCursor : undefined
+        jobs: rows(result.results).map(mapJob),
+        ...pageOutput(result),
+        warnings: client.warnings
       },
-      message: `Found **${jobs.length}** jobs${result.moreDataAvailable ? ' (more available)' : ''}.`
+      message: 'Retrieved one job page. Follow pageInfo until moreDataAvailable is false.'
     };
   })
   .build();

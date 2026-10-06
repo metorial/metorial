@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { contactPayload, validateContact } from '../lib/payloads';
+import { xRechnungSchema } from '../lib/schemas';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 let addressSchema = z
@@ -12,7 +15,9 @@ let addressSchema = z
     countryCode: z
       .string()
       .optional()
-      .describe('ISO 3166-1 alpha-2 country code (e.g. DE, AT, CH)')
+      .describe(
+        'Provider country or tax-region code (e.g. DE, ES_CN); discover choices with list_reference_data'
+      )
   })
   .describe('Postal address');
 
@@ -29,10 +34,7 @@ let contactPersonSchema = z
 
 let roleSchema = z
   .object({
-    number: z
-      .number()
-      .optional()
-      .describe('Customer or vendor number (auto-assigned if omitted)')
+    number: z.number().optional().describe('Legacy read-only number; assigned by Lexoffice')
   })
   .optional()
   .describe('Role configuration');
@@ -40,14 +42,14 @@ let roleSchema = z
 export let updateContact = SlateTool.create(spec, {
   name: 'Update Contact',
   key: 'update_contact',
-  description: `Updates an existing contact in Lexoffice. Requires the current version number for optimistic locking -- retrieve it first with get_contact. The full contact must be sent on update; any fields omitted will be cleared. A contact must remain either a company or a person, not both.`,
+  description: `Updates an existing contact in Lexoffice. Requires the current version number for optimistic locking -- retrieve it first with get_contact. The full contact must be sent on update; omitted fields are cleared except XRechnung settings, which are preserved when omitted. A contact must remain either a company or a person, not both.`,
   instructions: [
     'Always retrieve the contact first with get_contact to obtain the current version number.',
-    'The entire contact resource must be sent -- fields not included in the update will be removed.',
+    'Send the full contact representation. Omitted fields are removed; omitted XRechnung settings are preserved.',
     'The API allows a maximum of one billing address, one shipping address, and one contact person per call.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -106,6 +108,11 @@ export let updateContact = SlateTool.create(spec, {
         })
         .optional()
         .describe('Contact addresses'),
+      xRechnung: xRechnungSchema
+        .optional()
+        .describe(
+          'Replacement XRechnung settings; omit to preserve the current buyer reference and vendor number'
+        ),
       emailAddresses: z
         .object({
           business: z.array(z.string()).optional().describe('Business email addresses'),
@@ -138,71 +145,22 @@ export let updateContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let contactPayload: Record<string, any> = {
-      version: ctx.input.version,
-      roles: {}
-    };
-
-    if (ctx.input.roles.customer) {
-      contactPayload.roles.customer =
-        ctx.input.roles.customer.number !== undefined
-          ? { number: ctx.input.roles.customer.number }
-          : {};
-    }
-    if (ctx.input.roles.vendor) {
-      contactPayload.roles.vendor =
-        ctx.input.roles.vendor.number !== undefined
-          ? { number: ctx.input.roles.vendor.number }
-          : {};
-    }
-
-    if (ctx.input.company) {
-      contactPayload.company = {
-        name: ctx.input.company.name
-      };
-      if (ctx.input.company.taxNumber)
-        contactPayload.company.taxNumber = ctx.input.company.taxNumber;
-      if (ctx.input.company.vatRegistrationId)
-        contactPayload.company.vatRegistrationId = ctx.input.company.vatRegistrationId;
-      if (ctx.input.company.allowTaxFreeInvoices !== undefined)
-        contactPayload.company.allowTaxFreeInvoices = ctx.input.company.allowTaxFreeInvoices;
-      if (ctx.input.company.contactPersons)
-        contactPayload.company.contactPersons = ctx.input.company.contactPersons;
-    }
-
-    if (ctx.input.person) {
-      contactPayload.person = {
-        lastName: ctx.input.person.lastName
-      };
-      if (ctx.input.person.salutation)
-        contactPayload.person.salutation = ctx.input.person.salutation;
-      if (ctx.input.person.firstName)
-        contactPayload.person.firstName = ctx.input.person.firstName;
-    }
-
-    if (ctx.input.note !== undefined) contactPayload.note = ctx.input.note;
-    if (ctx.input.addresses) contactPayload.addresses = ctx.input.addresses;
-    if (ctx.input.emailAddresses) contactPayload.emailAddresses = ctx.input.emailAddresses;
-    if (ctx.input.phoneNumbers) contactPayload.phoneNumbers = ctx.input.phoneNumbers;
-
-    let result = await client.updateContact(ctx.input.contactId, contactPayload);
-
-    let contactName =
-      ctx.input.company?.name ??
-      [ctx.input.person?.firstName, ctx.input.person?.lastName].filter(Boolean).join(' ') ??
-      ctx.input.contactId;
-
-    return {
-      output: {
-        id: result.id,
-        resourceUri: result.resourceUri,
-        createdDate: result.createdDate,
-        updatedDate: result.updatedDate,
-        version: result.version
-      },
-      message: `Updated contact **${contactName}** (ID: ${result.id}, version: ${result.version}).`
-    };
+    const client = new Client({ token: ctx.auth.token });
+    const current = await client.getContact(ctx.input.contactId);
+    validateContact(current);
+    if (current.version !== ctx.input.version)
+      fail('The contact version changed; retrieve it again before updating.');
+    for (const role of ['customer', 'vendor'] as const)
+      if (
+        ctx.input.roles[role]?.number !== undefined &&
+        ctx.input.roles[role]?.number !== current.roles?.[role]?.number
+      )
+        fail('Customer and vendor numbers are read-only and cannot be changed.');
+    const { contactId, ...input } = ctx.input;
+    const result = await client.updateContact(
+      contactId,
+      contactPayload({ ...input, xRechnung: input.xRechnung ?? current.xRechnung })
+    );
+    return { output: result, message: `Updated contact **${result.id}**.` };
   })
   .build();

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, type TrackingInfo } from '../lib/client';
 import { spec } from '../spec';
 
 let trackingEventSchema = z.object({
@@ -59,22 +59,28 @@ export let trackPackage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    if (
+      ctx.input.labelId &&
+      (ctx.input.carrierCode !== undefined || ctx.input.trackingNumber !== undefined)
+    )
+      throw createApiServiceError(
+        'Choose labelId or carrierCode plus trackingNumber, not both.'
+      );
+    let client = createClient(ctx);
 
-    let tracking: any;
+    let tracking: TrackingInfo;
 
     if (ctx.input.labelId) {
       tracking = await client.getLabelTrackingInfo(ctx.input.labelId);
     } else if (ctx.input.carrierCode && ctx.input.trackingNumber) {
       tracking = await client.getTrackingInfo(ctx.input.carrierCode, ctx.input.trackingNumber);
     } else {
-      throw new Error('Provide either labelId, or both carrierCode and trackingNumber.');
+      throw createApiServiceError(
+        'Provide either labelId, or both carrierCode and trackingNumber.'
+      );
     }
 
-    let events = tracking.events.map((e: any) => ({
+    let events = tracking.events.map(e => ({
       occurredAt: e.occurred_at,
       description: e.description,
       cityLocality: e.city_locality,

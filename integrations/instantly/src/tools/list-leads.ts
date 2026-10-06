@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, leadVerificationStatus } from '../lib/client';
 import { spec } from '../spec';
 
 export let listLeads = SlateTool.create(spec, {
   name: 'List Leads',
   key: 'list_leads',
-  description: `List leads in a campaign or lead list. Supports filtering by interest status and cursor-based pagination.`,
+  description: `List leads in a campaign or lead list with cursor-based pagination. interestStatus filters each returned provider page locally; an empty filtered page may still have a cursor that must be followed.`,
   tags: {
     readOnly: true
   }
@@ -45,6 +45,10 @@ export let listLeads = SlateTool.create(spec, {
             emailReplyCount: z.number().optional().describe('Number of email replies'),
             emailClickCount: z.number().optional().describe('Number of link clicks'),
             verificationStatus: z.string().optional().describe('Email verification status'),
+            verificationStatusCode: z
+              .number()
+              .optional()
+              .describe('Provider verification status code, when available.'),
             customVariables: z
               .any()
               .optional()
@@ -72,17 +76,19 @@ export let listLeads = SlateTool.create(spec, {
 
     let leads = result.items.map((l: any) => ({
       leadId: l.id,
-      email: l.email,
-      firstName: l.first_name,
-      lastName: l.last_name,
-      companyName: l.company_name,
-      phone: l.phone,
-      website: l.website,
-      interestStatus: l.lt_interest_status,
+      email: l.email ?? undefined,
+      firstName: l.first_name ?? undefined,
+      lastName: l.last_name ?? undefined,
+      companyName: l.company_name ?? undefined,
+      phone: l.phone ?? undefined,
+      website: l.website ?? undefined,
+      interestStatus: l.lt_interest_status ?? undefined,
       emailOpenCount: l.email_open_count,
       emailReplyCount: l.email_reply_count,
       emailClickCount: l.email_click_count,
-      verificationStatus: l.verification_status,
+      verificationStatus: leadVerificationStatus(l.verification_status),
+      verificationStatusCode:
+        typeof l.verification_status === 'number' ? l.verification_status : undefined,
       customVariables: l.payload,
       timestampCreated: l.timestamp_created
     }));

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,24 +44,29 @@ export let manageCatalogEntry = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let input = ctx.input;
 
-    let transformedAttributes:
-      | Record<string, { value: { literal?: string; catalog_entry_id?: string } }>
-      | undefined;
-    if (input.attributeValues) {
-      transformedAttributes = {};
-      for (let [key, val] of Object.entries(input.attributeValues)) {
-        transformedAttributes[key] = {
-          value: {
-            literal: val.value.literal,
-            catalog_entry_id: val.value.catalogEntryId
-          }
-        };
+    const transformedAttributes: Record<string, { value: { literal: string } }> | undefined =
+      input.attributeValues ? {} : undefined;
+    if (input.attributeValues && transformedAttributes) {
+      for (const [key, attribute] of Object.entries(input.attributeValues)) {
+        const values = [attribute.value.literal, attribute.value.catalogEntryId].filter(
+          value => value !== undefined
+        );
+        if (values.length !== 1)
+          throw createApiServiceError(
+            'Provide exactly one of literal or catalogEntryId for each catalog attribute.'
+          );
+        const literal = values[0];
+        if (literal === undefined)
+          throw createApiServiceError('Provide a catalog attribute value.');
+        transformedAttributes[key] = { value: { literal } };
       }
     }
 
     if (input.action === 'create') {
       if (!input.catalogTypeId || !input.name) {
-        throw new Error('catalogTypeId and name are required for creating a catalog entry.');
+        throw createApiServiceError(
+          'catalogTypeId and name are required for creating a catalog entry.'
+        );
       }
       let result = await client.createCatalogEntry({
         catalogTypeId: input.catalogTypeId,
@@ -79,7 +84,9 @@ export let manageCatalogEntry = SlateTool.create(spec, {
 
     if (input.action === 'update') {
       if (!input.catalogEntryId) {
-        throw new Error('catalogEntryId is required for updating a catalog entry.');
+        throw createApiServiceError(
+          'catalogEntryId is required for updating a catalog entry.'
+        );
       }
       let result = await client.updateCatalogEntry(input.catalogEntryId, {
         name: input.name,
@@ -96,7 +103,9 @@ export let manageCatalogEntry = SlateTool.create(spec, {
 
     if (input.action === 'delete') {
       if (!input.catalogEntryId) {
-        throw new Error('catalogEntryId is required for deleting a catalog entry.');
+        throw createApiServiceError(
+          'catalogEntryId is required for deleting a catalog entry.'
+        );
       }
       await client.deleteCatalogEntry(input.catalogEntryId);
       return {
@@ -105,6 +114,6 @@ export let manageCatalogEntry = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

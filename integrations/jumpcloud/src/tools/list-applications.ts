@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listApplications = SlateTool.create(spec, {
   name: 'List Applications',
   key: 'list_applications',
-  description: `List SSO application connectors configured in JumpCloud. Returns application names, SSO URLs, and configuration details for SAML 2.0 and OIDC-based single sign-on integrations.`,
+  description: `List SSO application connectors configured in JumpCloud. Returns application names, SSO URLs, and basic status metadata; configuration and credentials are withheld for SAML 2.0 and OIDC-based single sign-on integrations.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       limit: z
         .number()
         .min(1)
@@ -46,34 +48,34 @@ export let listApplications = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      let result = await client.listApplications({
+        limit: ctx.input.limit,
+        skip: ctx.input.skip,
+        filter: ctx.input.filter,
+        sort: ctx.input.sort
+      });
 
-    let result = await client.listApplications({
-      limit: ctx.input.limit,
-      skip: ctx.input.skip,
-      filter: ctx.input.filter,
-      sort: ctx.input.sort
-    });
+      let apps = result.results.map(a => ({
+        applicationId: a._id,
+        name: a.name,
+        displayName: a.displayName,
+        displayLabel: a.displayLabel,
+        ssoUrl: a.ssoUrl,
+        active: a.active,
+        created: a.created
+      }));
 
-    let apps = result.results.map(a => ({
-      applicationId: a._id,
-      name: a.name,
-      displayName: a.displayName,
-      displayLabel: a.displayLabel,
-      ssoUrl: a.ssoUrl,
-      active: a.active,
-      created: a.created
-    }));
-
-    return {
-      output: {
-        applications: apps,
-        totalCount: result.totalCount
-      },
-      message: `Found **${result.totalCount}** applications. Returned **${apps.length}**.`
-    };
+      return {
+        output: {
+          applications: apps,
+          totalCount: result.totalCount
+        },
+        message: `Found **${result.totalCount}** applications. Returned **${apps.length}**.`
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
+    }
   })
   .build();

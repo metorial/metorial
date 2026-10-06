@@ -12,8 +12,6 @@ import {
   sendTemplateMessage,
   startChatbot
 } from './tools';
-import { accountEvent, messageReceived, messageStatus, templateLifecycle } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     listChannels,
     startChatbot
   ],
-  triggers: [messageReceived, messageStatus, templateLifecycle, accountEvent]
+  triggers: []
 });

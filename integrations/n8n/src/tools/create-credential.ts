@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let createCredential = SlateTool.create(spec, {
@@ -17,6 +17,18 @@ export let createCredential = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      credentialId: z
+        .string()
+        .optional()
+        .describe(
+          'Optional unused native credential ID (1–16 letters, digits, underscore or hyphen). Omit to use the server-generated ID.'
+        ),
+      projectId: z
+        .string()
+        .optional()
+        .describe(
+          'Optional project ID from manage_projects list, when this deployment supports scoped credential creation.'
+        ),
       name: z.string().describe('Display name for the credential'),
       type: z.string().describe('Credential type identifier (e.g. "slackApi", "githubApi")'),
       credentialData: z
@@ -33,12 +45,11 @@ export let createCredential = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
     let credential = await client.createCredential({
+      id: ctx.input.credentialId,
+      projectId: ctx.input.projectId,
       name: ctx.input.name,
       type: ctx.input.type,
       data: ctx.input.credentialData

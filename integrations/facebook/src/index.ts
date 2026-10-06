@@ -15,8 +15,6 @@ import {
   searchFacebook,
   sendPageMessage
 } from './tools';
-import { newLead, newPagePost, pageWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     getLeads,
     sendPageMessage
   ],
-  triggers: [pageWebhook, newPagePost, newLead]
+  triggers: []
 });

@@ -27,7 +27,12 @@ export let getSubmission = SlateTool.create(spec, {
   .output(
     z.object({
       submissionId: z.string().describe('Unique submission identifier'),
-      respondentId: z.string().describe('Unique respondent identifier'),
+      respondentId: z
+        .string()
+        .optional()
+        .describe(
+          'Respondent ID from the exact responses, when the submission has answered questions'
+        ),
       formId: z.string().describe('Form this submission belongs to'),
       formName: z.string().describe('Name of the form'),
       createdAt: z.string().describe('ISO 8601 submission timestamp'),

@@ -14,6 +14,7 @@ export let listCatalogTypes = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      returnedCount: z.number().int().nonnegative(),
       catalogTypes: z.array(
         z.object({
           catalogTypeId: z.string(),
@@ -21,6 +22,7 @@ export let listCatalogTypes = SlateTool.create(spec, {
           description: z.string().optional(),
           schema: z.any().optional(),
           estimatedCount: z.number().optional(),
+          isEditable: z.boolean(),
           createdAt: z.string().optional(),
           updatedAt: z.string().optional()
         })
@@ -32,18 +34,19 @@ export let listCatalogTypes = SlateTool.create(spec, {
 
     let result = await client.listCatalogTypes();
 
-    let catalogTypes = result.catalog_types.map((ct: any) => ({
+    let catalogTypes = result.catalog_types.map(ct => ({
       catalogTypeId: ct.id,
       name: ct.name,
       description: ct.description || undefined,
       schema: ct.schema || undefined,
       estimatedCount: ct.estimated_count ?? undefined,
+      isEditable: ct.is_editable,
       createdAt: ct.created_at || undefined,
       updatedAt: ct.updated_at || undefined
     }));
 
     return {
-      output: { catalogTypes },
+      output: { catalogTypes, returnedCount: catalogTypes.length },
       message: `Found **${catalogTypes.length}** catalog type(s).`
     };
   })

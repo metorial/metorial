@@ -11,8 +11,6 @@ import {
   searchNearby,
   updateLocation
 } from './tools';
-import { inboundWebhook, newLocation, newMap } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     addTravelBoundary,
     lookupTerritory
   ],
-  triggers: [inboundWebhook, newLocation, newMap]
+  triggers: []
 });

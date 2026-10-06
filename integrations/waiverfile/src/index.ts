@@ -13,8 +13,6 @@ import {
   searchWaivers,
   updateEvent
 } from './tools';
-import { eventTrigger, waiverTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     getWaiversForEvent,
     listWaiversByDate
   ],
-  triggers: [waiverTrigger, eventTrigger]
+  triggers: []
 });

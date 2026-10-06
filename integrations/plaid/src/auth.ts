@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { text } from './lib/validation';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,6 +20,8 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      text(ctx.input.clientId, 'Plaid client ID');
+      text(ctx.input.secret, 'Plaid secret');
       return {
         output: {
           clientId: ctx.input.clientId,

@@ -23,8 +23,6 @@ import {
   scheduleOrSendCampaign,
   updateCampaign
 } from './tools';
-import { campaignEvents, subscriberEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     listTimezones,
     listCampaignLanguages
   ],
-  triggers: [subscriberEvents, campaignEvents]
+  triggers: []
 });

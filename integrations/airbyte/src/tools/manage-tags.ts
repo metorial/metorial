@@ -55,7 +55,9 @@ export let createTagTool = SlateTool.create(spec, {
     z.object({
       name: z.string().describe('Display name for the tag.'),
       color: z.string().describe('Hexadecimal color value for the tag (e.g. "#FF5733").'),
-      workspaceId: z.string().describe('UUID of the workspace to create the tag in.')
+      workspaceId: z
+        .string()
+        .describe('Workspace ID. Call list_workspaces to discover authorized workspaces.')
     })
   )
   .output(
@@ -109,7 +111,7 @@ export let updateTagTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let updateData: Record<string, any> = {};
+    let updateData: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
     if (ctx.input.color !== undefined) updateData.color = ctx.input.color;
 

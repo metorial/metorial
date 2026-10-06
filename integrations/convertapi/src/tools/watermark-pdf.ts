@@ -1,23 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deliverFiles } from '../lib/files';
+import {
+  buildFileSource,
+  fileSourceSchema,
+  invalid,
+  stringInteger,
+  text
+} from '../lib/validation';
 import { spec } from '../spec';
-
-let fileSourceSchema = z
-  .object({
-    url: z.string().optional().describe('Public URL of the PDF file'),
-    fileId: z.string().optional().describe('ConvertAPI file ID of a previously uploaded PDF'),
-    base64Data: z.string().optional().describe('Base64-encoded PDF content'),
-    fileName: z.string().optional().describe('File name (required when using base64Data)')
-  })
-  .describe(
-    'PDF file source — provide exactly one of: url, fileId, or base64Data (with fileName)'
-  );
 
 export let watermarkPdf = SlateTool.create(spec, {
   name: 'Watermark PDF',
   key: 'watermark_pdf',
-  description: `Add a text or image watermark to a PDF document.
+  description: `Add a text watermark to a PDF document.
 Customize the watermark text, font size, color, opacity, and rotation angle.`,
   tags: {
     destructive: false,
@@ -57,7 +54,10 @@ Customize the watermark text, font size, color, opacity, and rotation angle.`,
   .output(
     z.object({
       conversionCost: z.number().describe('Number of conversion credits consumed'),
-      conversionTime: z.number().describe('Duration in seconds'),
+      conversionTime: z
+        .number()
+        .optional()
+        .describe('Provider-reported legacy duration, when present'),
       fileName: z.string().describe('Name of the watermarked PDF'),
       fileSize: z.number().describe('Size of the watermarked PDF in bytes'),
       fileId: z.string().nullable().describe('ConvertAPI file ID'),
@@ -67,35 +67,46 @@ Customize the watermark text, font size, color, opacity, and rotation angle.`,
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
+      masterToken: ctx.auth.masterToken,
       region: ctx.config.region
     });
 
     let fileSource = buildFileSource(ctx.input.file);
+    if (ctx.input.watermarkText === undefined)
+      throw invalid('Provide watermarkText for the text watermark operation.');
+    text(ctx.input.watermarkText, 'Watermark text');
+    if (ctx.input.watermarkFontSize !== undefined)
+      stringInteger(ctx.input.watermarkFontSize, 'watermarkFontSize', 1, 200);
+    if (ctx.input.watermarkOpacity !== undefined)
+      stringInteger(ctx.input.watermarkOpacity, 'watermarkOpacity', 0, 100);
+    if (ctx.input.watermarkRotation !== undefined)
+      stringInteger(ctx.input.watermarkRotation, 'watermarkRotation', 0, 360);
     let parameters: Record<string, string> = {};
 
     if (ctx.input.watermarkText) {
-      parameters.WatermarkText = ctx.input.watermarkText;
+      parameters.Text = ctx.input.watermarkText;
     }
     if (ctx.input.watermarkFontSize) {
-      parameters.WatermarkFontSize = ctx.input.watermarkFontSize;
+      parameters.FontSize = ctx.input.watermarkFontSize;
     }
     if (ctx.input.watermarkFontColor) {
-      parameters.WatermarkFontColor = ctx.input.watermarkFontColor;
+      parameters.FontColor = ctx.input.watermarkFontColor;
     }
     if (ctx.input.watermarkOpacity) {
-      parameters.WatermarkTransparency = ctx.input.watermarkOpacity;
+      parameters.Opacity = ctx.input.watermarkOpacity;
     }
     if (ctx.input.watermarkRotation) {
-      parameters.WatermarkRotation = ctx.input.watermarkRotation;
+      parameters.Rotate = ctx.input.watermarkRotation;
     }
 
-    let result = await client.convert({
+    let rawResult = await client.convert({
       sourceFormat: 'pdf',
-      destinationFormat: 'watermark',
+      destinationFormat: 'text-watermark',
       files: [fileSource],
       storeFile: ctx.input.storeFile,
       parameters
     });
+    let result = await deliverFiles(ctx, rawResult);
 
     let watermarked = result.files[0]!;
     return {
@@ -107,25 +118,7 @@ Customize the watermark text, font size, color, opacity, and rotation angle.`,
         fileId: watermarked.fileId,
         url: watermarked.url
       },
-      message: `Watermarked PDF as \`${watermarked.fileName}\` in ${result.conversionTime}s.`
+      message: `Watermarked PDF as \`${watermarked.fileName}\`.`
     };
   })
   .build();
-
-function buildFileSource(file: {
-  url?: string;
-  fileId?: string;
-  base64Data?: string;
-  fileName?: string;
-}) {
-  if (file.url) {
-    return { type: 'url' as const, url: file.url };
-  }
-  if (file.fileId) {
-    return { type: 'fileId' as const, fileId: file.fileId };
-  }
-  if (file.base64Data && file.fileName) {
-    return { type: 'base64' as const, fileName: file.fileName, data: file.base64Data };
-  }
-  throw new Error('Provide exactly one of: url, fileId, or base64Data (with fileName)');
-}

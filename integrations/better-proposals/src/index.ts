@@ -17,8 +17,6 @@ import {
   listQuotes,
   listTemplates
 } from './tools';
-import { inboundWebhook, proposalStatusTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     listCurrencies,
     getSettings
   ],
-  triggers: [inboundWebhook, proposalStatusTrigger]
+  triggers: []
 });

@@ -34,7 +34,7 @@ export let listProjectsTool = SlateTool.create(spec, {
     let client = new V0Client(ctx.auth.token);
     let result = await client.listProjects();
 
-    let projects = (result.data || []).map((p: any) => ({
+    let projects = (result.data || []).map(p => ({
       projectId: p.id,
       name: p.name,
       privacy: p.privacy,

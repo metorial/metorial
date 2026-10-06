@@ -33,13 +33,12 @@ export let deleteContact = SlateTool.create(spec, {
       userId: ctx.input.userId
     });
 
-    let identifier = ctx.input.email || ctx.input.userId || 'unknown';
     return {
       output: {
         success: result.success,
         statusMessage: result.message
       },
-      message: `Deleted contact **${identifier}**.`
+      message: 'Deleted the requested contact.'
     };
   })
   .build();

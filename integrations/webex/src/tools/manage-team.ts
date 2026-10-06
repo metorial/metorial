@@ -20,21 +20,31 @@ export let listTeams = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Native next-page URL returned by this tool. Use alone; do not add filters.'
+        ),
       max: z.number().optional().describe('Maximum number of teams to return (default 100)')
     })
   )
   .output(
     z.object({
+      nextPageUrl: z.string().optional().describe('URL for the next native page, if present'),
       teams: z.array(teamOutputSchema).describe('List of teams')
     })
   )
   .handleInvocation(async ctx => {
     let client = new WebexClient({ token: ctx.auth.token });
 
-    let result = await client.listTeams({ max: ctx.input.max });
+    let result = await client.listTeams({
+      max: ctx.input.max,
+      nextPageUrl: ctx.input.nextPageUrl
+    });
 
     let items = result.items || [];
-    let teams = items.map((t: any) => ({
+    let teams = items.map(t => ({
       teamId: t.id,
       name: t.name,
       creatorId: t.creatorId,
@@ -42,7 +52,7 @@ export let listTeams = SlateTool.create(spec, {
     }));
 
     return {
-      output: { teams },
+      output: { teams, nextPageUrl: result.nextPageUrl },
       message: `Found **${teams.length}** team(s).`
     };
   })

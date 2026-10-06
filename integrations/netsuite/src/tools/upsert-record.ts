@@ -1,18 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { connection } from '../lib/client';
 import { spec } from '../spec';
 
 export let upsertRecord = SlateTool.create(spec, {
   name: 'Upsert Record',
   key: 'upsert_record',
-  description: `Create or update a NetSuite record using an external ID. If a record with the given external ID exists, it will be updated; otherwise, a new record will be created.
+  description: `Create or update a NetSuite record using an external ID. Discover types with list_record_types and verify upsert support with get_record_metadata. If a record with the given external ID exists, it will be updated; otherwise, a new record will be created.
 This is useful for syncing data from external systems where you use your own identifier to match records.`,
   instructions: [
     'The externalId should be a value that uniquely identifies the record via an external ID field configured in NetSuite.',
-    'Pass the external ID in the format "eid:<externalIdFieldScriptId>:<value>" or use the record\'s externalId field.'
+    'Use a bare external ID value or eid:<value>. The native path does not accept a field-script-ID component.'
   ],
   tags: {
+    readOnly: false,
     destructive: false
   }
 })
@@ -21,11 +22,13 @@ This is useful for syncing data from external systems where you use your own ide
       recordType: z
         .string()
         .describe(
-          'NetSuite record type in camelCase (e.g., "customer", "salesOrder", "invoice")'
+          'Exact native record type from list_record_types; verify upsert support with get_record_metadata'
         ),
       externalId: z
         .string()
-        .describe('External ID value to match against (format varies by configuration)'),
+        .describe(
+          'Bare native external ID or eid:<value>, using letters, numbers, underscores or hyphens'
+        ),
       fieldValues: z
         .record(z.string(), z.any())
         .describe('Record field values as key-value pairs')
@@ -38,10 +41,7 @@ This is useful for syncing data from external systems where you use your own ide
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      ...ctx.auth,
-      accountId: ctx.config.accountId
-    });
+    const client = connection(ctx.auth, ctx.config);
 
     let result = await client.upsertRecord(
       ctx.input.recordType,
@@ -51,10 +51,10 @@ This is useful for syncing data from external systems where you use your own ide
 
     return {
       output: {
-        recordId: result.recordId || result.id || '',
+        recordId: result.recordId,
         location: result.location
       },
-      message: `Upserted **${ctx.input.recordType}** record with external ID \`${ctx.input.externalId}\` -> internal ID \`${result.recordId || result.id}\`.`
+      message: `Upserted **${ctx.input.recordType}** record with external ID \`${ctx.input.externalId}\` -> internal ID \`${result.recordId}\`.`
     };
   })
   .build();

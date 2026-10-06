@@ -6,8 +6,9 @@ import { spec } from '../spec';
 export let deleteMaintenanceWindow = SlateTool.create(spec, {
   name: 'Delete Maintenance Window',
   key: 'delete_maintenance_window',
-  description: `Permanently delete a maintenance window. Alerts will no longer be suppressed during the previously scheduled period.`,
+  description: `Use a Legacy API Key connection (API v2). Permanently delete a maintenance window. Alerts will no longer be suppressed during the previously scheduled period.`,
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
@@ -22,7 +23,7 @@ export let deleteMaintenanceWindow = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.deleteMWindow(ctx.input.windowId);
 

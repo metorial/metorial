@@ -12,7 +12,11 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      token: z.string().describe('Fal.ai API key in the format key_id:key_secret')
+      token: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Fal.ai API key in the format key_id:key_secret')
     }),
     getOutput: async ctx => {
       return {

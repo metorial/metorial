@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -7,11 +7,11 @@ export let updateCollection = SlateTool.create(spec, {
   name: 'Update Collection',
   key: 'update_collection',
   description: `Update an existing collection's settings or add new properties. You can update the description, inverted index config, replication config, and add new properties.
-Note: You **cannot change** the vectorizer, generative module, or existing properties after creation.`,
+The vectorizer cannot be changed and properties cannot be removed. Replication factor changes require replica movement.`,
   instructions: [
     'To add a new property, use the newProperties field.',
     'You cannot modify or remove existing properties.',
-    'Vectorizer and generative module cannot be changed.'
+    'The vectorizer cannot be changed. Generative configuration is mutable on supported server versions.'
   ],
   tags: {
     destructive: false
@@ -37,7 +37,11 @@ Note: You **cannot change** the vectorizer, generative module, or existing prope
             tokenization: z.string().optional().describe('Tokenization strategy'),
             indexFilterable: z.boolean().optional(),
             indexSearchable: z.boolean().optional(),
-            moduleConfig: z.any().optional()
+            moduleConfig: z.any().optional(),
+            nestedProperties: z
+              .array(z.any())
+              .optional()
+              .describe('Nested property definitions for object or object[] types')
           })
         )
         .optional()
@@ -57,17 +61,35 @@ Note: You **cannot change** the vectorizer, generative module, or existing prope
     let { collectionName, newProperties, ...updates } = ctx.input;
 
     // Update collection settings if any non-property changes
-    if (updates.description || updates.invertedIndexConfig || updates.replicationConfig) {
+    if (
+      updates.description !== undefined ||
+      updates.invertedIndexConfig ||
+      updates.replicationConfig
+    ) {
       let existing = await client.getCollection(collectionName);
+      if (
+        updates.replicationConfig?.factor !== undefined &&
+        updates.replicationConfig.factor !== existing.replicationConfig?.factor
+      ) {
+        throw createApiServiceError(
+          'Replication factor cannot be changed through collection schema updates. Use Weaviate replica movement.'
+        );
+      }
       let updatePayload: Record<string, any> = {
         class: collectionName,
         ...existing
       };
       if (updates.description !== undefined) updatePayload.description = updates.description;
       if (updates.invertedIndexConfig)
-        updatePayload.invertedIndexConfig = updates.invertedIndexConfig;
+        updatePayload.invertedIndexConfig = {
+          ...existing.invertedIndexConfig,
+          ...updates.invertedIndexConfig
+        };
       if (updates.replicationConfig)
-        updatePayload.replicationConfig = updates.replicationConfig;
+        updatePayload.replicationConfig = {
+          ...existing.replicationConfig,
+          ...updates.replicationConfig
+        };
       await client.updateCollection(collectionName, updatePayload);
     }
 

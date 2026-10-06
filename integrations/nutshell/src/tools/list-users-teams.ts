@@ -59,18 +59,18 @@ export let listUsersTeams = SlateTool.create(spec, {
     let includeUsers = ctx.input.includeUsers !== false;
     let includeTeams = ctx.input.includeTeams !== false;
 
-    let users: any[] = [];
-    let teams: any[] = [];
+    let users: { userId: number; name: string; emails?: unknown[]; entityType: string }[] = [];
+    let teams: { teamId: number; name: string; entityType: string }[] = [];
 
     if (includeUsers) {
       let userResults = await client.findUsers({
         limit: ctx.input.limit,
         page: ctx.input.page
       });
-      users = userResults.map((u: any) => ({
+      users = userResults.map(u => ({
         userId: u.id,
         name: u.name,
-        emails: u.email || u.emails,
+        emails: u.email,
         entityType: u.entityType
       }));
     }
@@ -80,7 +80,7 @@ export let listUsersTeams = SlateTool.create(spec, {
         limit: ctx.input.limit,
         page: ctx.input.page
       });
-      teams = teamResults.map((t: any) => ({
+      teams = teamResults.map(t => ({
         teamId: t.id,
         name: t.name,
         entityType: t.entityType

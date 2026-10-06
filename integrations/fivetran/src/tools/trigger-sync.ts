@@ -1,26 +1,27 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FivetranClient } from '../lib/client';
+import { connectionId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let triggerSync = SlateTool.create(spec, {
   name: 'Trigger Sync',
   key: 'trigger_sync',
-  description: `Trigger a manual data sync for a connection. Optionally force a full re-sync to reload all historical data. Use this when you need data synced immediately instead of waiting for the scheduled sync.`,
+  description: `Request an incremental sync or a historical re-sync for a connection. Forced incremental sync addresses rescheduling; historical re-sync reloads source data and can incur additional costs.`,
   instructions: [
     'A regular sync pulls only new/changed data since the last sync.',
-    'A force sync overrides any blocked or paused state.',
+    'A force sync overrides rescheduling; it does not bypass a paused connection.',
     'A historical re-sync reloads all data from the source; use with caution as it may take significant time.'
   ]
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the connection to sync'),
+      connectionId: connectionId,
       force: z
         .boolean()
         .optional()
         .default(false)
-        .describe('Force the sync even if the connection is paused or delayed'),
+        .describe('Force a sync when rescheduled; a paused connection must be resumed first'),
       historicalResync: z
         .boolean()
         .optional()
@@ -43,16 +44,16 @@ export let triggerSync = SlateTool.create(spec, {
     let client = new FivetranClient(ctx.auth.token);
 
     if (ctx.input.historicalResync) {
-      let result = await client.triggerResync(ctx.input.connectionId, ctx.input.resyncScope);
+      await client.triggerResync(ctx.input.connectionId, ctx.input.resyncScope);
       return {
-        output: { message: result?.message || 'Historical re-sync triggered.' },
+        output: { message: 'Historical re-sync request accepted.' },
         message: `Triggered historical re-sync for connection ${ctx.input.connectionId}.`
       };
     }
 
-    let result = await client.triggerSync(ctx.input.connectionId, ctx.input.force);
+    await client.triggerSync(ctx.input.connectionId, ctx.input.force);
     return {
-      output: { message: result?.message || 'Sync triggered.' },
+      output: { message: 'Sync request accepted.' },
       message: `Triggered sync for connection ${ctx.input.connectionId}${ctx.input.force ? ' (forced)' : ''}.`
     };
   })

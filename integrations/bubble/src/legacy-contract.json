@@ -1,0 +1,359 @@
+{
+  "create_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dataType": {
+          "type": "string",
+          "description": "Name of the Bubble data type (table) to create a record in, e.g. \"User\", \"Product\", \"Order\"."
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Key-value pairs of field names and their values for the new record. Field names must match the data type schema in your Bubble app."
+        }
+      },
+      "required": ["dataType", "fields"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "description": "Unique ID of the newly created record."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the creation operation."
+        }
+      },
+      "required": ["recordId", "status"],
+      "additionalProperties": false
+    }
+  },
+  "get_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dataType": {
+          "type": "string",
+          "description": "Name of the Bubble data type (table) to retrieve from."
+        },
+        "recordId": {
+          "type": "string",
+          "description": "Unique ID of the record to retrieve."
+        }
+      },
+      "required": ["dataType", "recordId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "record": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The full record with all field values, including _id, _type, Created Date, Modified Date, and all custom fields."
+        }
+      },
+      "required": ["record"],
+      "additionalProperties": false
+    }
+  },
+  "search_records": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dataType": {
+          "type": "string",
+          "description": "Name of the Bubble data type (table) to search in."
+        },
+        "constraints": {
+          "description": "Array of filter constraints. Omit to return all records.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Field name to apply the constraint on."
+              },
+              "constraintType": {
+                "type": "string",
+                "description": "Type of constraint. Common values: \"equals\", \"not equal\", \"is_empty\", \"is_not_empty\", \"text contains\", \"not text contains\", \"greater than\", \"less than\", \"in\", \"not in\", \"contains\", \"not contains\", \"empty\", \"not empty\", \"geographic_search\"."
+              },
+              "value": {
+                "description": "Value to compare against. Not needed for \"is_empty\" / \"is_not_empty\" constraints."
+              }
+            },
+            "required": ["key", "constraintType"],
+            "additionalProperties": false
+          }
+        },
+        "sortField": {
+          "description": "Field name to sort results by.",
+          "type": "string"
+        },
+        "descending": {
+          "description": "Sort in descending order. Defaults to false (ascending).",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Maximum number of records to return (max 100).",
+          "type": "number"
+        },
+        "cursor": {
+          "description": "Pagination cursor. Use the cursor value from a previous response to get the next page.",
+          "type": "number"
+        }
+      },
+      "required": ["dataType"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Array of matching records with all field values."
+        },
+        "count": {
+          "type": "number",
+          "description": "Total number of records matching the query."
+        },
+        "remaining": {
+          "type": "number",
+          "description": "Number of records remaining after the current page."
+        },
+        "cursor": {
+          "type": "number",
+          "description": "Cursor position for pagination. Pass this as the cursor input to get the next page."
+        }
+      },
+      "required": ["records", "count", "remaining", "cursor"],
+      "additionalProperties": false
+    }
+  },
+  "update_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dataType": {
+          "type": "string",
+          "description": "Name of the Bubble data type (table) containing the record."
+        },
+        "recordId": {
+          "type": "string",
+          "description": "Unique ID of the record to update."
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Key-value pairs of field names and their new values. Only specified fields will be updated."
+        }
+      },
+      "required": ["dataType", "recordId", "fields"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "updated": {
+          "type": "boolean",
+          "description": "Whether the update was successful."
+        }
+      },
+      "required": ["updated"],
+      "additionalProperties": false
+    }
+  },
+  "replace_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dataType": {
+          "type": "string",
+          "description": "Name of the Bubble data type (table) containing the record."
+        },
+        "recordId": {
+          "type": "string",
+          "description": "Unique ID of the record to replace."
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Complete set of field values for the record. Fields not included will be cleared."
+        }
+      },
+      "required": ["dataType", "recordId", "fields"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "replaced": {
+          "type": "boolean",
+          "description": "Whether the replacement was successful."
+        }
+      },
+      "required": ["replaced"],
+      "additionalProperties": false
+    }
+  },
+  "delete_record": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dataType": {
+          "type": "string",
+          "description": "Name of the Bubble data type (table) containing the record."
+        },
+        "recordId": {
+          "type": "string",
+          "description": "Unique ID of the record to delete."
+        }
+      },
+      "required": ["dataType", "recordId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful."
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "bulk_create_records": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "dataType": {
+          "type": "string",
+          "description": "Name of the Bubble data type (table) to create records in."
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Array of records to create. Each record is an object of field name to value pairs."
+        }
+      },
+      "required": ["dataType", "records"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "recordIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of unique IDs for the newly created records."
+        },
+        "totalCreated": {
+          "type": "number",
+          "description": "Total number of records created."
+        }
+      },
+      "required": ["recordIds", "totalCreated"],
+      "additionalProperties": false
+    }
+  },
+  "trigger_workflow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowName": {
+          "type": "string",
+          "description": "Name of the API workflow to trigger, as defined in the Bubble editor."
+        },
+        "parameters": {
+          "description": "Key-value pairs of parameters to pass to the workflow. Parameter names must match the workflow definition.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["workflowName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "response": {
+          "description": "Response data returned by the workflow, if the workflow is configured to return data. May be null if the workflow does not return data."
+        }
+      },
+      "required": ["response"],
+      "additionalProperties": false
+    }
+  },
+  "get_api_spec": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "specification": {
+          "description": "The OpenAPI/Swagger specification object describing all exposed data types and workflows."
+        }
+      },
+      "required": ["specification"],
+      "additionalProperties": false
+    }
+  }
+}

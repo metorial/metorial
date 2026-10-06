@@ -1,405 +1,327 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAuthenticatedAxios, isApiErrorRecord } from 'slates';
+import {
+  API_ORIGIN,
+  copperError,
+  entityTypes,
+  sanitize,
+  validateId,
+  validateRelationship
+} from './contracts';
 
 export interface CopperAuth {
   token: string;
   userEmail?: string;
   authMethod: 'api_key' | 'oauth';
 }
+export interface CopperRecord {
+  id: number;
+  [key: string]: any;
+}
+export const authHeaders = (auth: CopperAuth): Record<string, string> => {
+  if (
+    typeof auth.token !== 'string' ||
+    !auth.token.trim() ||
+    !['api_key', 'oauth'].includes(auth.authMethod)
+  )
+    throw createApiServiceError('Reconnect Copper with a valid API key or OAuth token.');
+  if (auth.authMethod === 'oauth') return { Authorization: `Bearer ${auth.token}` };
+  if (typeof auth.userEmail !== 'string' || !auth.userEmail.trim())
+    throw createApiServiceError(
+      'API key connections require the email address of the user who generated the key.'
+    );
+  return {
+    'X-PW-AccessToken': auth.token,
+    'X-PW-UserEmail': auth.userEmail,
+    'X-PW-Application': 'developer_api'
+  };
+};
+
+const record = (value: unknown, expectedId?: number): CopperRecord => {
+  if (!isApiErrorRecord(value))
+    throw createApiServiceError(
+      'Copper returned an invalid record. Read the record back before retrying any write.'
+    );
+  validateId(value.id, 'Returned record ID');
+  if (expectedId !== undefined && value.id !== expectedId)
+    throw createApiServiceError(
+      'Copper returned a different record ID. Verify the operation independently before retrying.'
+    );
+  return value as CopperRecord;
+};
+const records = (value: unknown): CopperRecord[] => {
+  if (!Array.isArray(value))
+    throw createApiServiceError(
+      'Copper returned an invalid collection; no complete results can be reported.'
+    );
+  return value.map(item => record(item));
+};
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
-
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  private nextRequestAt = 0;
   constructor(private auth: CopperAuth) {
-    this.axios = createAxios({
-      baseURL: 'https://api.copper.com/developer_api/v1'
+    this.axios = createAuthenticatedAxios({
+      baseURL: API_ORIGIN,
+      headers: authHeaders(auth),
+      timeout: 30000,
+      maxRedirects: 0,
+      errorAdapter: copperError
     });
   }
-
-  private getHeaders(): Record<string, string> {
-    if (this.auth.authMethod === 'oauth') {
-      return {
-        Authorization: `Bearer ${this.auth.token}`,
-        'Content-Type': 'application/json'
-      };
-    }
+  private async request(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    path: string,
+    data?: Record<string, any>
+  ): Promise<unknown> {
+    if (method === 'PUT' && (!data || Object.keys(data).length === 0))
+      throw createApiServiceError(
+        'Provide at least one field to update. Only supplied fields are changed.'
+      );
+    const wait = Math.max(0, this.nextRequestAt - Date.now());
+    this.nextRequestAt = Date.now() + wait + 400;
+    if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+    const response = await this.axios.request({ method, url: path, data });
+    return sanitize(response.data, this.auth.token);
+  }
+  private path(entity: string, id: number) {
+    return `/${entity}/${validateId(id)}`;
+  }
+  private async create(entity: string, data: Record<string, any>) {
+    return record(await this.request('POST', `/${entity}`, data));
+  }
+  private async get(entity: string, id: number) {
+    return record(await this.request('GET', this.path(entity, id)), id);
+  }
+  private async update(entity: string, id: number, data: Record<string, any>) {
+    return record(await this.request('PUT', this.path(entity, id), data), id);
+  }
+  private async remove(entity: string, id: number) {
+    const result = record(await this.request('DELETE', this.path(entity, id)), id);
+    if (result.is_deleted !== true)
+      throw createApiServiceError(
+        'Copper did not confirm deletion. Read the record back before retrying.'
+      );
+    return result;
+  }
+  private async search(entity: string, params: Record<string, any>) {
+    const result = records(await this.request('POST', `/${entity}/search`, params));
+    if (result.length > (params.page_size ?? 20))
+      throw createApiServiceError(
+        'Copper returned more records than the requested page size.'
+      );
+    return result;
+  }
+  async createPerson(data: Record<string, any>) {
+    return this.create('people', data);
+  }
+  async getPerson(id: number) {
+    return this.get('people', id);
+  }
+  async updatePerson(id: number, data: Record<string, any>) {
+    return this.update('people', id, data);
+  }
+  async deletePerson(id: number) {
+    return this.remove('people', id);
+  }
+  async searchPeople(params: Record<string, any>) {
+    return this.search('people', params);
+  }
+  async createCompany(data: Record<string, any>) {
+    return this.create('companies', data);
+  }
+  async getCompany(id: number) {
+    return this.get('companies', id);
+  }
+  async updateCompany(id: number, data: Record<string, any>) {
+    return this.update('companies', id, data);
+  }
+  async deleteCompany(id: number) {
+    return this.remove('companies', id);
+  }
+  async searchCompanies(params: Record<string, any>) {
+    return this.search('companies', params);
+  }
+  async createLead(data: Record<string, any>) {
+    return this.create('leads', data);
+  }
+  async getLead(id: number) {
+    return this.get('leads', id);
+  }
+  async updateLead(id: number, data: Record<string, any>) {
+    return this.update('leads', id, data);
+  }
+  async deleteLead(id: number) {
+    return this.remove('leads', id);
+  }
+  async searchLeads(params: Record<string, any>) {
+    return this.search('leads', params);
+  }
+  async createOpportunity(data: Record<string, any>) {
+    return this.create('opportunities', data);
+  }
+  async getOpportunity(id: number) {
+    return this.get('opportunities', id);
+  }
+  async updateOpportunity(id: number, data: Record<string, any>) {
+    return this.update('opportunities', id, data);
+  }
+  async deleteOpportunity(id: number) {
+    return this.remove('opportunities', id);
+  }
+  async searchOpportunities(params: Record<string, any>) {
+    return this.search('opportunities', params);
+  }
+  async createTask(data: Record<string, any>) {
+    return this.create('tasks', data);
+  }
+  async getTask(id: number) {
+    return this.get('tasks', id);
+  }
+  async updateTask(id: number, data: Record<string, any>) {
+    return this.update('tasks', id, data);
+  }
+  async deleteTask(id: number) {
+    return this.remove('tasks', id);
+  }
+  async searchTasks(params: Record<string, any>) {
+    return this.search('tasks', params);
+  }
+  async createProject(data: Record<string, any>) {
+    return this.create('projects', data);
+  }
+  async getProject(id: number) {
+    return this.get('projects', id);
+  }
+  async updateProject(id: number, data: Record<string, any>) {
+    return this.update('projects', id, data);
+  }
+  async deleteProject(id: number) {
+    return this.remove('projects', id);
+  }
+  async searchProjects(params: Record<string, any>) {
+    return this.search('projects', params);
+  }
+  async lookupPersonByEmail(email: string) {
+    if (!email.trim())
+      throw createApiServiceError('Provide a nonempty email address to find a person.');
+    return record(await this.request('POST', '/people/fetch_by_email', { email }));
+  }
+  async convertLead(id: number, details: Record<string, any>) {
+    const result = await this.request('POST', `${this.path('leads', id)}/convert`, {
+      details
+    });
+    if (!isApiErrorRecord(result))
+      throw createApiServiceError(
+        'Copper did not return the converted records. Verify conversion before retrying.'
+      );
+    const person = record(result.person);
     return {
-      'X-PW-AccessToken': this.auth.token,
-      'X-PW-UserEmail': this.auth.userEmail || '',
-      'X-PW-Application': 'developer_api',
-      'Content-Type': 'application/json'
+      person,
+      company: result.company == null ? null : record(result.company),
+      opportunity: result.opportunity == null ? null : record(result.opportunity)
     };
   }
-
-  // ========== People ==========
-
-  async createPerson(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/people', data, { headers: this.getHeaders() });
-    return response.data;
+  async createActivity(data: Record<string, any>) {
+    return this.create('activities', data);
   }
-
-  async getPerson(personId: number): Promise<any> {
-    let response = await this.axios.get(`/people/${personId}`, { headers: this.getHeaders() });
-    return response.data;
+  async searchActivities(params: Record<string, any>) {
+    return this.search('activities', params);
   }
-
-  async updatePerson(personId: number, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/people/${personId}`, data, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async deletePerson(personId: number): Promise<any> {
-    let response = await this.axios.delete(`/people/${personId}`, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async searchPeople(params: Record<string, any>): Promise<any[]> {
-    let response = await this.axios.post('/people/search', params, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async lookupPersonByEmail(email: string): Promise<any> {
-    let response = await this.axios.post(
-      '/people/fetch_by_email',
-      { email },
-      { headers: this.getHeaders() }
+  async listActivityTypes() {
+    const data = await this.request('GET', '/activity_types');
+    if (!isApiErrorRecord(data) || !Array.isArray(data.user) || !Array.isArray(data.system))
+      throw createApiServiceError('Copper returned invalid activity-type groups.');
+    return ['user', 'system'].flatMap(category =>
+      (data[category] as unknown[]).map(type => {
+        if (!isApiErrorRecord(type))
+          throw createApiServiceError('Copper returned an invalid activity type.');
+        validateId(type.id, 'Activity type ID', true);
+        return { ...type, category };
+      })
     );
-    return response.data;
   }
-
-  // ========== Companies ==========
-
-  async createCompany(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/companies', data, { headers: this.getHeaders() });
-    return response.data;
+  async listPipelines() {
+    return records(await this.request('GET', '/pipelines'));
   }
-
-  async getCompany(companyId: number): Promise<any> {
-    let response = await this.axios.get(`/companies/${companyId}`, {
-      headers: this.getHeaders()
-    });
-    return response.data;
+  async listPipelineStages(id: number) {
+    return records(await this.request('GET', `/pipeline_stages/pipeline/${validateId(id)}`));
   }
-
-  async updateCompany(companyId: number, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/companies/${companyId}`, data, {
-      headers: this.getHeaders()
-    });
-    return response.data;
+  async listCustomFieldDefinitions() {
+    return records(await this.request('GET', '/custom_field_definitions'));
   }
-
-  async deleteCompany(companyId: number): Promise<any> {
-    let response = await this.axios.delete(`/companies/${companyId}`, {
-      headers: this.getHeaders()
-    });
-    return response.data;
+  async listCustomerSources() {
+    return records(await this.request('GET', '/customer_sources'));
   }
-
-  async searchCompanies(params: Record<string, any>): Promise<any[]> {
-    let response = await this.axios.post('/companies/search', params, {
-      headers: this.getHeaders()
-    });
-    return response.data;
+  async listLossReasons() {
+    return records(await this.request('GET', '/loss_reasons'));
   }
-
-  // ========== Leads ==========
-
-  async createLead(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/leads', data, { headers: this.getHeaders() });
-    return response.data;
+  async listContactTypes() {
+    return records(await this.request('GET', '/contact_types'));
   }
-
-  async getLead(leadId: number): Promise<any> {
-    let response = await this.axios.get(`/leads/${leadId}`, { headers: this.getHeaders() });
-    return response.data;
+  async listLeadStatuses() {
+    return records(await this.request('GET', '/lead_statuses'));
   }
-
-  async updateLead(leadId: number, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/leads/${leadId}`, data, {
-      headers: this.getHeaders()
-    });
-    return response.data;
+  async getAccount() {
+    return record(await this.request('GET', '/account'));
   }
-
-  async deleteLead(leadId: number): Promise<any> {
-    let response = await this.axios.delete(`/leads/${leadId}`, { headers: this.getHeaders() });
-    return response.data;
+  async getApiUser() {
+    return record(await this.request('GET', '/users/me'));
   }
-
-  async searchLeads(params: Record<string, any>): Promise<any[]> {
-    let response = await this.axios.post('/leads/search', params, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async convertLead(leadId: number, details: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(
-      `/leads/${leadId}/convert`,
-      { details },
-      { headers: this.getHeaders() }
+  async listUsers() {
+    const result: CopperRecord[] = [];
+    const seen = new Set<number>();
+    for (let page = 1; page <= 500; page++) {
+      const batch = await this.search('users', { page_number: page, page_size: 200 });
+      for (const user of batch) {
+        if (seen.has(user.id))
+          throw createApiServiceError(
+            'User pagination repeated an ID; complete user discovery cannot be reported.'
+          );
+        seen.add(user.id);
+        result.push(user);
+      }
+      if (batch.length < 200) return result;
+    }
+    throw createApiServiceError(
+      'User discovery reached the 100,000-result search limit; complete results cannot be reported.'
     );
-    return response.data;
   }
-
-  // ========== Opportunities ==========
-
-  async createOpportunity(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/opportunities', data, {
-      headers: this.getHeaders()
-    });
-    return response.data;
+  async getRelatedItems(entity: string, id: number) {
+    if (
+      !['people', 'companies', 'leads', 'opportunities', 'projects', 'tasks'].includes(entity)
+    )
+      throw createApiServiceError('Choose a supported source entity type.');
+    const result = records(await this.request('GET', `${this.path(entity, id)}/related`));
+    for (const item of result)
+      if (!entityTypes.includes(item.type))
+        throw createApiServiceError('Copper returned an invalid related entity type.');
+    return result;
   }
-
-  async getOpportunity(opportunityId: number): Promise<any> {
-    let response = await this.axios.get(`/opportunities/${opportunityId}`, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async updateOpportunity(opportunityId: number, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/opportunities/${opportunityId}`, data, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async deleteOpportunity(opportunityId: number): Promise<any> {
-    let response = await this.axios.delete(`/opportunities/${opportunityId}`, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async searchOpportunities(params: Record<string, any>): Promise<any[]> {
-    let response = await this.axios.post('/opportunities/search', params, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  // ========== Tasks ==========
-
-  async createTask(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/tasks', data, { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  async getTask(taskId: number): Promise<any> {
-    let response = await this.axios.get(`/tasks/${taskId}`, { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  async updateTask(taskId: number, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/tasks/${taskId}`, data, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async deleteTask(taskId: number): Promise<any> {
-    let response = await this.axios.delete(`/tasks/${taskId}`, { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  async searchTasks(params: Record<string, any>): Promise<any[]> {
-    let response = await this.axios.post('/tasks/search', params, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  // ========== Projects ==========
-
-  async createProject(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/projects', data, { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  async getProject(projectId: number): Promise<any> {
-    let response = await this.axios.get(`/projects/${projectId}`, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async updateProject(projectId: number, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/projects/${projectId}`, data, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async deleteProject(projectId: number): Promise<any> {
-    let response = await this.axios.delete(`/projects/${projectId}`, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async searchProjects(params: Record<string, any>): Promise<any[]> {
-    let response = await this.axios.post('/projects/search', params, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  // ========== Activities ==========
-
-  async createActivity(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/activities', data, { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  async searchActivities(params: Record<string, any>): Promise<any[]> {
-    let response = await this.axios.post('/activities/search', params, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async listActivityTypes(): Promise<any[]> {
-    let response = await this.axios.get('/activity_types', { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  // ========== Pipelines ==========
-
-  async listPipelines(): Promise<any[]> {
-    let response = await this.axios.get('/pipelines', { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  async listPipelineStages(pipelineId: number): Promise<any[]> {
-    let response = await this.axios.get(`/pipeline_stages/pipeline/${pipelineId}`, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  // ========== Custom Fields ==========
-
-  async listCustomFieldDefinitions(): Promise<any[]> {
-    let response = await this.axios.get('/custom_field_definitions', {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  // ========== Tags ==========
-
-  async listTags(): Promise<any[]> {
-    let response = await this.axios.get('/tags', { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  // ========== Related Items ==========
-
-  async getRelatedItems(entityType: string, entityId: number): Promise<any> {
-    let response = await this.axios.get(`/${entityType}/${entityId}/related`, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async createRelatedItem(
-    entityType: string,
-    entityId: number,
+  private async relationship(
+    method: 'POST' | 'DELETE',
+    entity: string,
+    id: number,
     data: Record<string, any>
-  ): Promise<any> {
-    let response = await this.axios.post(`/${entityType}/${entityId}/related`, data, {
-      headers: this.getHeaders()
-    });
-    return response.data;
+  ) {
+    validateRelationship(entity, data.resource);
+    const result = await this.request(method, `${this.path(entity, id)}/related`, data);
+    const field = method === 'POST' ? 'added' : 'removed';
+    if (
+      !isApiErrorRecord(result) ||
+      result[field] !== true ||
+      !isApiErrorRecord(result.resource) ||
+      result.resource.id !== data.resource.id ||
+      result.resource.type !== data.resource.type
+    )
+      throw createApiServiceError(
+        'Copper did not confirm the exact relationship change. Read related items before retrying.'
+      );
+    return result;
   }
-
-  async deleteRelatedItem(
-    entityType: string,
-    entityId: number,
-    data: Record<string, any>
-  ): Promise<any> {
-    let response = await this.axios.delete(`/${entityType}/${entityId}/related`, {
-      headers: this.getHeaders(),
-      data
-    });
-    return response.data;
+  async createRelatedItem(entity: string, id: number, data: Record<string, any>) {
+    return this.relationship('POST', entity, id, data);
   }
-
-  // ========== Users ==========
-
-  async listUsers(): Promise<any[]> {
-    let response = await this.axios.post('/users/search', {}, { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  async getUser(userId: number): Promise<any> {
-    let response = await this.axios.get(`/users/${userId}`, { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  // ========== Account ==========
-
-  async getAccount(): Promise<any> {
-    let response = await this.axios.get('/account', { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  // ========== Customer Sources ==========
-
-  async listCustomerSources(): Promise<any[]> {
-    let response = await this.axios.get('/customer_sources', { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  // ========== Loss Reasons ==========
-
-  async listLossReasons(): Promise<any[]> {
-    let response = await this.axios.get('/loss_reasons', { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  // ========== Contact Types ==========
-
-  async listContactTypes(): Promise<any[]> {
-    let response = await this.axios.get('/contact_types', { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  // ========== Lead Statuses ==========
-
-  async listLeadStatuses(): Promise<any[]> {
-    let response = await this.axios.get('/lead_statuses', { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  // ========== Webhooks ==========
-
-  async createWebhook(data: {
-    target: string;
-    type: string;
-    event: string;
-    secret?: Record<string, string>;
-    headers?: Record<string, string>;
-  }): Promise<any> {
-    let response = await this.axios.post('/webhooks', data, { headers: this.getHeaders() });
-    return response.data;
-  }
-
-  async deleteWebhook(webhookId: number): Promise<any> {
-    let response = await this.axios.delete(`/webhooks/${webhookId}`, {
-      headers: this.getHeaders()
-    });
-    return response.data;
-  }
-
-  async listWebhooks(): Promise<any[]> {
-    let response = await this.axios.get('/webhooks', { headers: this.getHeaders() });
-    return response.data;
+  async deleteRelatedItem(entity: string, id: number, data: Record<string, any>) {
+    return this.relationship('DELETE', entity, id, data);
   }
 }

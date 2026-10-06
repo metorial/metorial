@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -16,11 +16,13 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Hightouch API key. Created from the API keys tab on the Settings page in Hightouch.'
+          'Hightouch workspace API key from Settings > API keys. The key inherits its selected user group permissions and requires its creator to retain workspace access.'
         )
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim() || /[\r\n]/.test(ctx.input.token))
+        throw createApiServiceError('Provide a valid Hightouch workspace API key.');
       return {
         output: {
           token: ctx.input.token

@@ -125,7 +125,7 @@ describe('bigquery provider contract', () => {
         'create_routine',
         'delete_routine'
       ],
-      triggerIds: ['inbound_webhook', 'job_completed', 'dataset_changed'],
+      triggerIds: [],
       authMethodIds: ['google_oauth', 'service_account'],
       tools: [
         {
@@ -134,14 +134,10 @@ describe('bigquery provider contract', () => {
           destructive: false
         }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'job_completed', invocationType: 'polling' },
-        { id: 'dataset_changed', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(32);
+    expect(contract.actions).toHaveLength(29);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([
       'projectId',
       'location'

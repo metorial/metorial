@@ -1,81 +1,23 @@
-# <img src="https://provider-logos.metorial-cdn.com/contentful-logo.png" height="20"> Contentful
+# Contentful
 
-Manage structured content in a headless CMS. Create, update, publish, unpublish, archive, and delete entries and assets. Define content types and content models with field validations. Retrieve published content via the Content Delivery API or preview unpublished content via the Content Preview API. Manage spaces, environments, and environment aliases. Configure locales for multilingual content. Apply image transformations including resizing, cropping, and format conversion. Sync content incrementally using sync tokens. Organize content with tags. Group and bulk-publish content using releases. Schedule future publish and unpublish actions. Manage users, organizations, teams, and space memberships. Configure webhooks for content change notifications on entries, assets, content types, releases, and scheduled actions.
+Twenty tools cover localized entries and assets, content types, tags, discovery, incremental sync, scheduling, and Release.v1 groups. Existing seventeen tool keys and their fields remain available.
 
-## Tools
+Use a CMA PAT or an externally obtained Contentful OAuth management token for writes, current-user identity, and space discovery. Delivery and Preview keys are separate read credentials; production Delivery keys also support sync. Preview credentials use the documented preview host, including EU data residency. Select the region when connecting. Legacy saved `region` remains a validated fallback; remove a conflicting saved region when reconnecting. Legacy token-only read connections can select their API explicitly, or reconnect to save the credential type. A known credential cannot be sent to a different API.
 
-### Create Asset
+Space and environment defaults are optional. Use `list_spaces` and `list_environments`, then pass the exact selection on each tool. Delivery/Preview users obtain their space ID from API-key settings. An environment alias whose returned binding differs must be replaced with its resolved environment ID.
 
-Create a new asset in Contentful. Provide file upload URL, title, and description per locale. Optionally process and publish the asset immediately.
+Contentful OAuth itself is available. Its documented flow returns a token in the redirect fragment. The current connection callback accepts authorization codes, so new OAuth authorization and guessed code/refresh exchanges are refused with token reconnection guidance. Existing stored CMA OAuth tokens remain usable. No new OAuth token endpoint is invented.
 
-### Create Entry
+Writes use native optimistic version headers without automatic retries. Entry updates replace the complete fields object and preserve current metadata. Asset processing is asynchronous: `processAndPublish` publishes only after all requested locales have processed URLs; a pending result preserves the existing asset ID. Later creation/update failures provide exact resource recovery information instead of hiding an already created object.
 
-Create a new entry for a given content type. Provide fields as a locale-keyed object. Optionally publish the entry immediately after creation.
+Lists expose native page metadata. Releases and scheduled actions use exact next-page URLs. Sync returns one page, a `nextPageToken` while incomplete, and a `nextSyncToken` only when that sync is complete. Do not discard locally stored content or start another initial sync merely because a page remains.
 
-### Get Asset
+Release publish/unpublish return an accepted asynchronous action with its ID and status; use `manage_release` with `action:get` and `releaseActionId` to inspect completion. Creation supports documented Release.v1 direct Entry/Asset links, at most 200 unique entities. The legacy `description` input is retained but refused before creation because current API and official SDK payloads do not support it. Release.v2 and locale-based release editing are outside this surface.
 
-Retrieve a single asset by ID. Returns full asset metadata including file URL, dimensions, and locale-specific fields.
+`download_asset` delivers the public original for the exact asset and locale from `get_asset`; it never chooses a fallback or fabricates a URL/signature. Secure/embargoed assets need a separately configured asset-key delivery workflow. Native public CDN URLs have no invented expiry or renewal. Metadata URLs are not evidence that private file delivery succeeded.
 
-### Get Entry
+Canceling a scheduled action retains its canceled record. Scheduling can send failure email and trigger automation. Deleting a release permanently removes its linked action records. Asset deletion removes the API object, but referenced CDN files can remain cached for up to 48 hours. History, audit, webhooks, external copies, and automation effects cannot be undone by cleanup.
 
-Retrieve a single entry by ID. Returns the full entry fields, metadata, and version information.
+The active private suite requires explicit isolated-resource and retained-effects consent for mutations. Source/schema/SDK checks do not establish live provider acceptance; no provider calls were performed during this refresh.
 
-### List Content Types
-
-List all content types in the current environment. Returns content type names, field definitions, and configuration details.
-
-### List Environments
-
-List all environments in the current space. Returns environment names, status, and metadata.
-
-### List Locales
-
-List all configured locales in the current environment. Returns locale codes, names, and fallback configuration.
-
-### Manage Asset Lifecycle
-
-Perform lifecycle actions on an asset: publish, unpublish, archive, unarchive, or delete. Fetches the current version automatically if not provided.
-
-### Manage Content Type
-
-Create, update, publish, unpublish, or delete a content type. When creating or updating, provide the full field definitions. Use the activate action to publish a content type so entries can be created from it.
-
-### Manage Entry Lifecycle
-
-Perform lifecycle actions on an entry: publish, unpublish, archive, unarchive, or delete. Fetches the current version automatically if not provided.
-
-### Manage Release
-
-Create, list, publish, unpublish, or delete releases. A release groups multiple entries and assets for bulk publishing.
-
-### Manage Tags
-
-List, create, update, or delete content tags in the current environment. Tags help organize and filter content.
-
-### Schedule Action
-
-Schedule a future publish or unpublish action for an entry. Also supports listing and cancelling scheduled actions.
-
-### Search Assets
-
-Search and filter assets in a Contentful space. Supports filtering by mime type, file name, and other query parameters. Returns asset metadata, file URLs, and dimensions.
-
-### Search Entries
-
-Search and filter entries in a Contentful space. Supports filtering by content type, field values, tags, creation/update dates, and full-text search. Returns paginated results with entry fields, metadata, and linked resources.
-
-### Sync Content
-
-Perform a content sync via the Content Delivery API. Use initial sync to fetch all content, or provide a sync token to retrieve incremental changes (deltas) since the last sync.
-
-### Update Entry
-
-Update an existing entry's fields. Fetches the current version automatically if not provided. Optionally publish the updated entry.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Sources: [CMA](https://www.contentful.com/developers/docs/references/content-management-api/overview/), [authentication](https://www.contentful.com/developers/docs/references/authentication/), [OAuth](https://www.contentful.com/developers/docs/extensibility/oauth/), [EU hosts](https://www.contentful.com/developers/docs/platform/eu-data-residency/), [releases](https://www.contentful.com/developers/docs/references/content-management-api/releases/), [sync](https://www.contentful.com/developers/docs/references/content-delivery-api/synchronization/).

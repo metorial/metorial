@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'flutterwave',
   name: 'Flutterwave',
   description:
-    'African payments technology platform for accepting payments, sending payouts, managing subscriptions, virtual accounts, bill payments, and identity verification across multiple African and global markets.',
+    'Inspect and manage payments, payouts, recurring billing, virtual accounts, bills, refunds and settlements through the supported Flutterwave API v3.',
   metadata: {},
   config,
   auth

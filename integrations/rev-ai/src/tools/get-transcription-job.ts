@@ -14,22 +14,44 @@ export let getTranscriptionJob = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      jobId: z.string().describe('ID of the transcription job to retrieve')
+      jobId: z.string().min(1).describe('ID of the transcription job to retrieve')
     })
   )
   .output(
     z.object({
-      jobId: z.string().describe('Unique identifier for the transcription job'),
+      jobId: z.string().min(1).describe('Unique identifier for the transcription job'),
       status: z.string().describe('Job status: "in_progress", "transcribed", "failed"'),
       createdOn: z.string().describe('ISO 8601 timestamp when the job was created'),
       completedOn: z.string().optional().describe('ISO 8601 timestamp when the job completed'),
       language: z.string().optional().describe('Language of the transcription'),
       durationSeconds: z.number().optional().describe('Duration of the media in seconds'),
       mediaUrl: z.string().optional().describe('URL of the submitted media'),
-      metadata: z.string().optional().describe('Metadata associated with the job'),
+      metadata: z.string().max(512).optional().describe('Metadata associated with the job'),
       failure: z.string().optional().describe('Failure reason if job failed'),
       failureDetail: z.string().optional().describe('Detailed failure information'),
-      transcriber: z.string().optional().describe('Transcriber used for the job')
+      transcriber: z.string().optional().describe('Transcriber used for the job'),
+      summarization: z
+        .object({
+          status: z.string(),
+          model: z.string().optional(),
+          type: z.string().optional(),
+          failure: z.string().optional()
+        })
+        .optional()
+        .describe('Summary processing status when requested'),
+      translation: z
+        .object({
+          targetLanguages: z.array(
+            z.object({
+              language: z.string(),
+              status: z.string(),
+              model: z.string().optional(),
+              failure: z.string().optional()
+            })
+          )
+        })
+        .optional()
+        .describe('Translation processing status for each requested language')
     })
   )
   .handleInvocation(async ctx => {
@@ -48,7 +70,9 @@ export let getTranscriptionJob = SlateTool.create(spec, {
         metadata: job.metadata,
         failure: job.failure,
         failureDetail: job.failureDetail,
-        transcriber: job.transcriber
+        transcriber: job.transcriber,
+        summarization: job.summarization,
+        translation: job.translation
       },
       message: `Transcription job **${job.jobId}** is **${job.status}**${job.durationSeconds ? ` (${job.durationSeconds}s duration)` : ''}.`
     };

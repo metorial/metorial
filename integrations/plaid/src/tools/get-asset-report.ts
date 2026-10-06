@@ -13,7 +13,13 @@ export let getAssetReportTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      assetReportToken: z.string().describe('Asset report token from the create call')
+      assetReportToken: z.string().describe('Asset report token from the create call'),
+      format: z
+        .enum(['json', 'pdf'])
+        .default('json')
+        .describe(
+          'Return structured data; optionally also download the existing report as a PDF'
+        )
     })
   )
   .output(
@@ -23,7 +29,10 @@ export let getAssetReportTool = SlateTool.create(spec, {
       daysRequested: z.number().describe('Number of days of history in the report'),
       report: z
         .any()
-        .describe('Full asset report data including accounts, balances, and transactions')
+        .describe('Full asset report data including accounts, balances, and transactions'),
+      fileName: z.string().optional().describe('PDF filename when requested'),
+      mimeType: z.string().optional().describe('PDF MIME type when requested'),
+      size: z.number().optional().describe('PDF size in bytes when requested')
     })
   )
   .handleInvocation(async ctx => {
@@ -35,15 +44,29 @@ export let getAssetReportTool = SlateTool.create(spec, {
 
     let result = await client.getAssetReport(ctx.input.assetReportToken);
     let report = result.report;
+    let file: { fileName: string; mimeType: string; size: number } | undefined;
+    if (ctx.input.format === 'pdf') {
+      const bytes = await client.getAssetReportPdf(ctx.input.assetReportToken);
+      const fileName = `asset-report-${report.asset_report_id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 100)}.pdf`;
+      const mimeType = 'application/pdf';
+      await ctx.addAttachment({
+        type: 'content',
+        filename: fileName,
+        mimeType,
+        content: new Response(Buffer.from(bytes), { headers: { 'content-type': mimeType } })
+      });
+      file = { fileName, mimeType, size: bytes.byteLength };
+    }
 
     return {
       output: {
-        assetReportId: report?.asset_report_id ?? '',
-        generatedAt: report?.date_generated ?? '',
-        daysRequested: report?.days_requested ?? 0,
-        report
+        assetReportId: report.asset_report_id,
+        generatedAt: report.date_generated,
+        daysRequested: report.days_requested,
+        report,
+        ...file
       },
-      message: `Retrieved asset report \`${report?.asset_report_id}\` generated at ${report?.date_generated}.`
+      message: `Retrieved asset report \`${report.asset_report_id}\` generated at ${report.date_generated}.`
     };
   })
   .build();

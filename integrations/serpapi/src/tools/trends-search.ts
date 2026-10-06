@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SerpApiClient } from '../lib/client';
+import { receiptMessage, receiptOutput, SerpApiClient } from '../lib/client';
+import { number, searchMetadataSchema, text } from '../lib/contracts';
+import { searchParams } from '../lib/params';
 import { spec } from '../spec';
 
 export let trendsSearchTool = SlateTool.create(spec, {
@@ -41,11 +43,37 @@ export let trendsSearchTool = SlateTool.create(spec, {
           'Time range (e.g., "today 12-m" for past 12 months, "today 5-y" for past 5 years, "2020-01-01 2023-12-31" for custom range)'
         ),
       language: z.string().optional().describe('Language code'),
+      hours: z
+        .number()
+        .optional()
+        .describe('Trending Now time window: 4, 24, 48 or 168 hours.'),
+      trendingCategoryId: z
+        .number()
+        .optional()
+        .describe('Native Trending Now category_id; distinct from Google Trends category.'),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Submit asynchronously and return the native search ID/status. Not compatible with noCache or Ludicrous Speed accounts.'
+        ),
       noCache: z.boolean().optional().describe('Force fresh results')
     })
   )
   .output(
     z.object({
+      isComplete: z
+        .boolean()
+        .describe(
+          'Whether native search status is Success; queued/processing receipts are incomplete.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Native pagination metadata; follow native offsets/tokens without inferring a total.'
+        ),
+      searchMetadata: searchMetadataSchema.optional(),
       interestOverTime: z
         .array(
           z.object({
@@ -55,6 +83,7 @@ export let trendsSearchTool = SlateTool.create(spec, {
                 z.object({
                   query: z.string().optional(),
                   value: z.number().optional(),
+                  displayValue: z.string().optional(),
                   extractedValue: z.number().optional()
                 })
               )
@@ -69,7 +98,16 @@ export let trendsSearchTool = SlateTool.create(spec, {
             location: z.string().optional(),
             value: z.number().optional(),
             extractedValue: z.number().optional(),
-            maxValueIndex: z.number().optional()
+            maxValueIndex: z.number().optional(),
+            values: z
+              .array(
+                z.object({
+                  query: z.string().optional(),
+                  displayValue: z.string().optional(),
+                  extractedValue: z.number().optional()
+                })
+              )
+              .optional()
           })
         )
         .optional()
@@ -97,6 +135,10 @@ export let trendsSearchTool = SlateTool.create(spec, {
         )
         .optional()
         .describe('Related topics'),
+      relatedGroups: z
+        .object({ queries: z.unknown().optional(), topics: z.unknown().optional() })
+        .optional()
+        .describe('Native rising and top groups, both preserved.'),
       trendingSearches: z
         .array(
           z.object({
@@ -109,23 +151,9 @@ export let trendsSearchTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SerpApiClient({ apiKey: ctx.auth.token });
+    let client = new SerpApiClient({ apiKey: ctx.auth.token, accountId: ctx.auth.accountId });
 
-    let params: Record<string, any> = {};
-
-    if (ctx.input.dataType === 'trending_now') {
-      params.engine = 'google_trends_trending_now';
-    } else {
-      params.engine = 'google_trends';
-      params.data_type = ctx.input.dataType.toUpperCase();
-      if (ctx.input.query) params.q = ctx.input.query;
-    }
-
-    if (ctx.input.geo) params.geo = ctx.input.geo;
-    if (ctx.input.category) params.cat = ctx.input.category;
-    if (ctx.input.timeRange) params.date = ctx.input.timeRange;
-    if (ctx.input.language) params.hl = ctx.input.language;
-    if (ctx.input.noCache) params.no_cache = ctx.input.noCache;
+    let params = searchParams('google_trends', ctx.input);
 
     let data = await client.search(params);
 
@@ -133,7 +161,8 @@ export let trendsSearchTool = SlateTool.create(spec, {
       date: d.date,
       values: d.values?.map((v: any) => ({
         query: v.query,
-        value: v.value,
+        value: number(v.value) ?? number(v.extracted_value),
+        displayValue: text(v.value),
         extractedValue: v.extracted_value
       }))
     }));
@@ -144,15 +173,20 @@ export let trendsSearchTool = SlateTool.create(spec, {
       []
     ).map((d: any) => ({
       location: d.location || d.geo,
-      value: d.value,
+      value: number(d.value),
       extractedValue: d.extracted_value,
-      maxValueIndex: d.max_value_index
+      maxValueIndex: d.max_value_index,
+      values: d.values?.map((v: any) => ({
+        query: v.query,
+        displayValue: text(v.value),
+        extractedValue: number(v.extracted_value)
+      }))
     }));
 
     let relatedQueries = (data.related_queries?.rising || data.related_queries?.top || []).map(
       (d: any) => ({
         query: d.query,
-        value: d.value,
+        value: text(d.value) ?? (number(d.value) !== undefined ? String(d.value) : undefined),
         extractedValue: d.extracted_value,
         link: d.link
       })
@@ -162,7 +196,7 @@ export let trendsSearchTool = SlateTool.create(spec, {
       (d: any) => ({
         title: d.topic?.title,
         type: d.topic?.type,
-        value: d.value,
+        value: text(d.value) ?? (number(d.value) !== undefined ? String(d.value) : undefined),
         extractedValue: d.extracted_value,
         link: d.link
       })
@@ -177,16 +211,20 @@ export let trendsSearchTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...receiptOutput(data),
+        relatedGroups: { queries: data.related_queries, topics: data.related_topics },
         interestOverTime: interestOverTime.length > 0 ? interestOverTime : undefined,
         interestByRegion: interestByRegion.length > 0 ? interestByRegion : undefined,
         relatedQueries: relatedQueries.length > 0 ? relatedQueries : undefined,
         relatedTopics: relatedTopics.length > 0 ? relatedTopics : undefined,
         trendingSearches: trendingSearches.length > 0 ? trendingSearches : undefined
       },
-      message:
+      message: receiptMessage(
+        data,
         ctx.input.dataType === 'trending_now'
           ? `Retrieved **${trendingSearches.length}** trending searches${ctx.input.geo ? ` in ${ctx.input.geo}` : ''}.`
           : `Google Trends data for "${ctx.input.query}" (${ctx.input.dataType}) retrieved successfully.`
+      )
     };
   })
   .build();

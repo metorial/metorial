@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   deployProjectTool,
   exportPackageTool,
+  getJobTool,
   getRecipeTool,
   getRecipeVersionsTool,
   getWorkspaceInfoTool,
@@ -21,13 +22,6 @@ import {
   manageRecipeTool,
   startStopRecipeTool
 } from './tools';
-import {
-  eventStreamMessagesTrigger,
-  inboundWebhook,
-  newJobTrigger,
-  recipeChangesTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -39,6 +33,7 @@ export let provider = Slate.create({
     listConnectionsTool.build(),
     manageConnectionTool.build(),
     listJobsTool.build(),
+    getJobTool.build(),
     listProjectsTool.build(),
     manageFolderTool.build(),
     deployProjectTool.build(),
@@ -51,10 +46,5 @@ export let provider = Slate.create({
     manageApiEndpointsTool.build(),
     getWorkspaceInfoTool.build()
   ],
-  triggers: [
-    inboundWebhook,
-    recipeChangesTrigger.build(),
-    newJobTrigger.build(),
-    eventStreamMessagesTrigger.build()
-  ]
+  triggers: []
 });

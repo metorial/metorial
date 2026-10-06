@@ -12,6 +12,7 @@ import {
   deletePerson,
   deleteReminder,
   getCompany,
+  getCurrentUser,
   getDeal,
   getPerson,
   listCompanies,
@@ -21,22 +22,19 @@ import {
   listNotes,
   listPeople,
   listReminders,
+  listTasks,
+  manageTask,
   updateCompany,
   updateDeal,
   updateNote,
   updatePerson
 } from './tools';
-import {
-  companyEvents,
-  dealEvents,
-  noteEvents,
-  personEvents,
-  reminderEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    listTasks,
+    manageTask,
     createPerson,
     updatePerson,
     getPerson,
@@ -62,5 +60,5 @@ export let provider = Slate.create({
     listGroups,
     listCustomFields
   ],
-  triggers: [personEvents, companyEvents, dealEvents, noteEvents, reminderEvents]
+  triggers: []
 });

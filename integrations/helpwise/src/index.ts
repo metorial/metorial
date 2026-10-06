@@ -18,8 +18,6 @@ import {
   searchContacts,
   sendEmail
 } from './tools';
-import { conversationEvents, messageEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     manageTemplate,
     manageWebhook
   ],
-  triggers: [conversationEvents, messageEvents]
+  triggers: []
 });

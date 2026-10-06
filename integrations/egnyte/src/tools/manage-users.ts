@@ -64,10 +64,7 @@ export let listUsersTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.listUsers({
       filter: ctx.input.filter,
@@ -110,10 +107,7 @@ export let getUserTool = SlateTool.create(spec, {
   )
   .output(userOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.getUser(ctx.input.userId)) as Record<string, unknown>;
 
@@ -143,10 +137,7 @@ export let createUserTool = SlateTool.create(spec, {
   )
   .output(userOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.createUser({
       userName: ctx.input.userName,
@@ -187,10 +178,7 @@ export let updateUserTool = SlateTool.create(spec, {
   )
   .output(userOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let body: Record<string, unknown> = {};
     if (ctx.input.email !== undefined) body.email = ctx.input.email;
@@ -233,10 +221,7 @@ export let deleteUserTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     await client.deleteUser(ctx.input.userId);
 

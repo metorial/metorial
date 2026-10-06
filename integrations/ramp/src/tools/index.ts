@@ -1,5 +1,7 @@
 export { getBusiness } from './get-business';
 export { getReimbursement } from './get-reimbursement';
+export { getResource } from './get-resource';
+export { getTaskStatus } from './get-task-status';
 export { getTransaction } from './get-transaction';
 export { listBills } from './list-bills';
 export { listCards } from './list-cards';

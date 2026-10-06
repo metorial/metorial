@@ -1,3 +1,4 @@
+export * from './export-logs';
 export * from './get-usage';
 export * from './ingest-logs';
 export * from './manage-alerts';

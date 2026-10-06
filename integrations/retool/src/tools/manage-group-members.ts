@@ -1,12 +1,18 @@
-import { SlateTool } from 'slates';
+import { ServiceError } from '@lowerdeck/error';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  assertNoCredentialReflection,
+  clientFor,
+  invalid,
+  validateMemberIds
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let manageGroupMembers = SlateTool.create(spec, {
   name: 'Manage Group Members',
   key: 'manage_group_members',
-  description: `Add or remove users from a permission group. Use "add" to add one or more users, or "remove" to remove a single user from the group.`
+  description: `Add or remove users from a permission group. Use "add" to add one or more users, or "remove" to remove the listed users. Removal is sequential; an error can follow a partial change.`
 })
   .input(
     z.object({
@@ -22,7 +28,7 @@ export let manageGroupMembers = SlateTool.create(spec, {
               .describe('Whether the user should be a group admin (only for "add" action)')
           })
         )
-        .describe('Users to add or remove. For "remove", only the first user is processed.')
+        .describe('Users to add or remove. Removal is sequential and can partially complete.')
     })
   )
   .output(
@@ -34,8 +40,14 @@ export let manageGroupMembers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
+    if (!ctx.input.members.length) throw invalid('Provide at least one member.');
+    validateMemberIds(
+      ctx.input.groupId,
+      ctx.input.members.map(m => m.userId)
+    );
+    assertNoCredentialReflection(ctx.input, ctx.auth.token);
     let affectedUserIds: string[] = [];
 
     if (ctx.input.action === 'add') {
@@ -45,8 +57,26 @@ export let manageGroupMembers = SlateTool.create(spec, {
       );
       affectedUserIds = ctx.input.members.map(m => m.userId);
     } else {
-      for (let member of ctx.input.members) {
-        await client.removeGroupMember(ctx.input.groupId, member.userId);
+      for (let [index, member] of ctx.input.members.entries()) {
+        try {
+          await client.removeGroupMember(ctx.input.groupId, member.userId);
+        } catch (error) {
+          let notAttemptedUserIds = ctx.input.members.slice(index + 1).map(m => m.userId);
+          let failure = createApiServiceError(
+            `Removal from group ${ctx.input.groupId} stopped. Native receipts confirmed removal of: ${affectedUserIds.join(', ') || 'none'}. Removal of ${member.userId} is uncertain. These users were not attempted: ${notAttemptedUserIds.join(', ') || 'none'}. Read the exact group before retrying; this operation is not atomic.`,
+            {
+              reason: 'retool_partial_group_removal',
+              upstreamStatus:
+                error instanceof ServiceError ? error.data.upstreamStatus : undefined,
+              upstreamCode: error instanceof ServiceError ? error.data.upstreamCode : undefined
+            }
+          );
+          failure.data.groupId = ctx.input.groupId;
+          failure.data.confirmedRemovedUserIds = [...affectedUserIds];
+          failure.data.uncertainUserId = member.userId;
+          failure.data.notAttemptedUserIds = notAttemptedUserIds;
+          throw failure;
+        }
         affectedUserIds.push(member.userId);
       }
     }

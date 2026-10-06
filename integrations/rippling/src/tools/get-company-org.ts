@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listDepartments = SlateTool.create(spec, {
   name: 'List Departments',
   key: 'list_departments',
-  description: `Retrieve all departments in the company. Supports pagination for companies with many departments.`,
+  description: `Retrieve a page of departments in the company. Supports pagination for companies with many departments.`,
   tags: {
     readOnly: true
   }
@@ -24,13 +24,16 @@ export let listDepartments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
     let departments = await client.listDepartments({
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
 
-    let items = Array.isArray(departments) ? departments : [];
+    let items = departments;
 
     return {
       output: {
@@ -45,7 +48,7 @@ export let listDepartments = SlateTool.create(spec, {
 export let listTeams = SlateTool.create(spec, {
   name: 'List Teams',
   key: 'list_teams',
-  description: `Retrieve all teams in the company. Supports pagination.`,
+  description: `Retrieve a page of teams in the company. Supports pagination.`,
   tags: {
     readOnly: true
   }
@@ -63,13 +66,16 @@ export let listTeams = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
     let teams = await client.listTeams({
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
 
-    let items = Array.isArray(teams) ? teams : [];
+    let items = teams;
 
     return {
       output: {
@@ -84,12 +90,17 @@ export let listTeams = SlateTool.create(spec, {
 export let listWorkLocations = SlateTool.create(spec, {
   name: 'List Work Locations',
   key: 'list_work_locations',
-  description: `Retrieve all work locations configured for the company.`,
+  description: `Retrieve a page of work locations configured for the company.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      limit: z.number().optional().describe('Page size from 1 to 100'),
+      offset: z.number().optional().describe('Nonnegative page offset')
+    })
+  )
   .output(
     z.object({
       workLocations: z.array(z.any()).describe('List of work location objects'),
@@ -97,10 +108,13 @@ export let listWorkLocations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
-    let locations = await client.listWorkLocations();
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
+    let locations = await client.listWorkLocations(ctx.input);
 
-    let items = Array.isArray(locations) ? locations : [];
+    let items = locations;
 
     return {
       output: {
@@ -115,12 +129,17 @@ export let listWorkLocations = SlateTool.create(spec, {
 export let listLevels = SlateTool.create(spec, {
   name: 'List Levels',
   key: 'list_levels',
-  description: `Retrieve all company levels/positions defined in Rippling.`,
+  description: `Retrieve a page of company levels/positions defined in Rippling.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      limit: z.number().optional().describe('Page size from 1 to 100'),
+      offset: z.number().optional().describe('Nonnegative page offset')
+    })
+  )
   .output(
     z.object({
       levels: z.array(z.any()).describe('List of level objects'),
@@ -128,10 +147,13 @@ export let listLevels = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
-    let levels = await client.listLevels();
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
+    let levels = await client.listLevels(ctx.input);
 
-    let items = Array.isArray(levels) ? levels : [];
+    let items = levels;
 
     return {
       output: {

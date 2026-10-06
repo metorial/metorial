@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HootsuiteClient } from '../lib/client';
 import { spec } from '../spec';
@@ -31,11 +31,25 @@ Can filter by social profile IDs and message state. Also supports fetching a sin
         .optional()
         .describe('Filter by social profile IDs'),
       state: z
-        .enum(['SCHEDULED', 'SENT', 'SEND_FAILED', 'PENDING_APPROVAL', 'REJECTED'])
+        .enum([
+          'SCHEDULED',
+          'SUBMITTED',
+          'SENT',
+          'SEND_FAILED',
+          'SEND_FAILED_PERMANENTLY',
+          'PENDING_APPROVAL',
+          'REJECTED'
+        ])
         .optional()
-        .describe('Filter by message state'),
-      limit: z.number().optional().describe('Maximum number of messages to return'),
-      cursor: z.string().optional().describe('Pagination cursor from a previous response')
+        .describe(
+          'Filter by message state; SEND_FAILED is accepted as SEND_FAILED_PERMANENTLY'
+        ),
+      limit: z.number().optional().describe('Page size from 1 to 100'),
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      includeUnscheduledReviewMessages: z
+        .boolean()
+        .optional()
+        .describe('Include unscheduled messages awaiting review')
     })
   )
   .output(
@@ -83,7 +97,9 @@ Can filter by social profile IDs and message state. Also supports fetching a sin
     }
 
     if (!ctx.input.startTime || !ctx.input.endTime) {
-      throw new Error('startTime and endTime are required when not fetching by messageId');
+      throw createApiServiceError(
+        'startTime and endTime are required when not fetching by messageId. Choose a UTC range of at most four weeks.'
+      );
     }
 
     let result = await client.getMessages({
@@ -92,10 +108,11 @@ Can filter by social profile IDs and message state. Also supports fetching a sin
       socialProfileIds: ctx.input.socialProfileIds,
       state: ctx.input.state,
       limit: ctx.input.limit,
-      cursor: ctx.input.cursor
+      cursor: ctx.input.cursor,
+      includeUnscheduledReviewMessages: ctx.input.includeUnscheduledReviewMessages
     });
 
-    let messages = result.messages.map((msg: any) => ({
+    let messages = result.messages.map(msg => ({
       messageId: String(msg.id),
       state: msg.state,
       text: msg.text,

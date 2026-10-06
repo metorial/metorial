@@ -1,13 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { prepareTranscriptionFiles, subtitleFileSchema } from '../lib/results';
+import type { TranscriptionRequestParams } from '../lib/types';
 import { spec } from '../spec';
 
 let customVocabularyEntrySchema = z.union([
   z.string().describe('A simple vocabulary term'),
   z.object({
     value: z.string().describe('The vocabulary term'),
-    intensity: z.number().optional().describe('Intensity of the term (0-1)'),
+    intensity: z.number().min(0).max(1).optional().describe('Intensity of the term (0-1)'),
     pronunciations: z
       .array(z.string())
       .optional()
@@ -19,14 +21,14 @@ let customVocabularyEntrySchema = z.union([
 export let transcribeAudio = SlateTool.create(spec, {
   name: 'Transcribe Audio',
   key: 'transcribe_audio',
-  description: `Submit an audio or video file URL for asynchronous transcription with optional audio intelligence features. Supports 100+ languages with automatic language detection, speaker diarization, translation, summarization, sentiment analysis, named entity recognition, chapterization, custom prompts, subtitles, and more. Returns the transcription ID and result URL for polling. Use **Get Transcription** to retrieve results.`,
+  description: `Submit an audio or video URL for asynchronous transcription, with language detection, speaker diarization, translation, summarization, sentiment analysis, entities, custom prompts, and subtitles. Returns a job ID for Get Transcription. Generated subtitles are available as downloadable files.`,
   instructions: [
     'Provide an audio URL — either a publicly accessible URL or one obtained from the Upload Audio tool.',
     'Enable audio intelligence features as needed by setting their respective flags to true.',
     'If you need the full result immediately, use the waitForCompletion option (up to 5 minutes).'
   ],
   constraints: [
-    'Only accepts audio/video URLs, not raw file uploads. Use Upload Audio first for local files.',
+    'Only accepts audio/video URLs. Upload Audio also requires a publicly accessible file URL.',
     'Processing time depends on audio duration and enabled features.'
   ],
   tags: {
@@ -36,7 +38,11 @@ export let transcribeAudio = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      audioUrl: z.string().describe('URL of the audio or video file to transcribe'),
+      audioUrl: z.string().url().describe('URL of the audio or video file to transcribe'),
+      model: z
+        .enum(['solaria-1', 'solaria-3', 'solaria-fusion'])
+        .optional()
+        .describe('Transcription model. Defaults to solaria-1.'),
       waitForCompletion: z
         .boolean()
         .optional()
@@ -59,9 +65,24 @@ export let transcribeAudio = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Enable speaker diarization to identify different speakers'),
-      numberOfSpeakers: z.number().optional().describe('Exact number of speakers (if known)'),
-      minSpeakers: z.number().optional().describe('Minimum number of expected speakers'),
-      maxSpeakers: z.number().optional().describe('Maximum number of expected speakers'),
+      numberOfSpeakers: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Exact number of speakers (if known)'),
+      minSpeakers: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Minimum number of expected speakers'),
+      maxSpeakers: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Maximum number of expected speakers'),
 
       translation: z.boolean().optional().describe('Enable translation of the transcript'),
       targetLanguages: z
@@ -69,7 +90,7 @@ export let transcribeAudio = SlateTool.create(spec, {
         .optional()
         .describe('ISO 639-1 target language codes for translation'),
       translationModel: z
-        .enum(['base', 'enhanced'])
+        .enum(['base', 'batch', 'enhanced'])
         .optional()
         .describe('Translation model quality'),
 
@@ -87,12 +108,22 @@ export let transcribeAudio = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Enable named entity recognition'),
-      chapterization: z.boolean().optional().describe('Enable automatic chapter segmentation'),
-      moderation: z.boolean().optional().describe('Enable content moderation'),
+      chapterization: z
+        .boolean()
+        .optional()
+        .describe('Discontinued by Gladia. Use audioToLlm with a chapter prompt.'),
+      moderation: z
+        .boolean()
+        .optional()
+        .describe(
+          'Legacy option, absent from the current documented request API. Use audioToLlm with a moderation prompt.'
+        ),
       nameConsistency: z
         .boolean()
         .optional()
-        .describe('Enable consistent name spelling throughout the transcript'),
+        .describe(
+          'Legacy option, absent from the current documented request API. Use customSpelling for known names.'
+        ),
 
       audioToLlm: z
         .boolean()
@@ -134,7 +165,9 @@ export let transcribeAudio = SlateTool.create(spec, {
       structuredDataExtraction: z
         .boolean()
         .optional()
-        .describe('Enable structured data extraction'),
+        .describe(
+          'Legacy option, absent from the current documented request API. Use audioToLlm with an extraction prompt.'
+        ),
       extractionClasses: z
         .array(z.string())
         .optional()
@@ -147,8 +180,11 @@ export let transcribeAudio = SlateTool.create(spec, {
 
       callbackUrl: z
         .string()
+        .url()
         .optional()
-        .describe('URL to receive results via webhook when transcription completes'),
+        .describe(
+          'URL to receive the result via a POST callback when transcription completes'
+        ),
       customMetadata: z
         .record(z.string(), z.any())
         .optional()
@@ -176,11 +212,15 @@ export let transcribeAudio = SlateTool.create(spec, {
             end: z.number(),
             confidence: z.number(),
             channel: z.number(),
-            speaker: z.number()
+            speaker: z.number().optional()
           })
         )
         .optional()
         .describe('Transcript utterances (if waitForCompletion was used and completed)'),
+      subtitleFiles: z
+        .array(subtitleFileSchema)
+        .optional()
+        .describe('Downloadable subtitle file metadata.'),
       result: z
         .any()
         .optional()
@@ -192,11 +232,73 @@ export let transcribeAudio = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let params: any = {
-      audio_url: ctx.input.audioUrl
+    let configuredFeatures = [
+      ['diarization', ['numberOfSpeakers', 'minSpeakers', 'maxSpeakers']],
+      ['translation', ['targetLanguages', 'translationModel']],
+      ['summarization', ['summarizationType']],
+      ['audioToLlm', ['audioToLlmPrompts']],
+      ['subtitles', ['subtitleFormats']],
+      ['customVocabulary', ['vocabularyTerms']],
+      ['customSpelling', ['spellingEntries']]
+    ] as const;
+    for (let [flag, fields] of configuredFeatures) {
+      if (!ctx.input[flag] && fields.some(field => ctx.input[field] !== undefined)) {
+        throw createApiServiceError(`Enable ${flag} to use its configuration fields.`);
+      }
+    }
+
+    for (let option of [
+      'chapterization',
+      'moderation',
+      'nameConsistency',
+      'structuredDataExtraction'
+    ] as const) {
+      if (ctx.input[option])
+        throw createApiServiceError(
+          `The current Gladia request API does not support ${option}. Use audioToLlmPrompts or customSpelling instead.`,
+          { reason: 'gladia_unsupported_option' }
+        );
+    }
+    if (ctx.input.extractionClasses !== undefined) {
+      throw createApiServiceError(
+        'extractionClasses is absent from the current Gladia API. Use audioToLlmPrompts for extraction.'
+      );
+    }
+    if (ctx.input.translation && !ctx.input.targetLanguages?.length) {
+      throw createApiServiceError(
+        'Provide at least one targetLanguages entry when translation is enabled.'
+      );
+    }
+    if (ctx.input.audioToLlm && !ctx.input.audioToLlmPrompts?.length) {
+      throw createApiServiceError('Provide audioToLlmPrompts when audioToLlm is enabled.');
+    }
+    if (ctx.input.customVocabulary && !ctx.input.vocabularyTerms?.length) {
+      throw createApiServiceError('Provide vocabularyTerms when customVocabulary is enabled.');
+    }
+    if (ctx.input.customSpelling && !ctx.input.spellingEntries?.length) {
+      throw createApiServiceError('Provide spellingEntries when customSpelling is enabled.');
+    }
+    if (
+      ctx.input.minSpeakers !== undefined &&
+      ctx.input.maxSpeakers !== undefined &&
+      ctx.input.minSpeakers > ctx.input.maxSpeakers
+    ) {
+      throw createApiServiceError('minSpeakers must not exceed maxSpeakers.');
+    }
+    if (
+      ctx.input.numberOfSpeakers !== undefined &&
+      (ctx.input.minSpeakers !== undefined || ctx.input.maxSpeakers !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Use numberOfSpeakers or minSpeakers/maxSpeakers, not both.'
+      );
+    }
+    let params: TranscriptionRequestParams = {
+      audio_url: ctx.input.audioUrl,
+      model: ctx.input.model
     };
 
-    if (ctx.input.languages || ctx.input.codeSwitching) {
+    if (ctx.input.languages !== undefined || ctx.input.codeSwitching !== undefined) {
       params.language_config = {
         languages: ctx.input.languages,
         code_switching: ctx.input.codeSwitching
@@ -205,7 +307,11 @@ export let transcribeAudio = SlateTool.create(spec, {
 
     if (ctx.input.diarization) {
       params.diarization = true;
-      if (ctx.input.numberOfSpeakers || ctx.input.minSpeakers || ctx.input.maxSpeakers) {
+      if (
+        ctx.input.numberOfSpeakers !== undefined ||
+        ctx.input.minSpeakers !== undefined ||
+        ctx.input.maxSpeakers !== undefined
+      ) {
         params.diarization_config = {
           number_of_speakers: ctx.input.numberOfSpeakers,
           min_speakers: ctx.input.minSpeakers,
@@ -233,9 +339,6 @@ export let transcribeAudio = SlateTool.create(spec, {
 
     if (ctx.input.sentimentAnalysis) params.sentiment_analysis = true;
     if (ctx.input.namedEntityRecognition) params.named_entity_recognition = true;
-    if (ctx.input.chapterization) params.chapterization = true;
-    if (ctx.input.moderation) params.moderation = true;
-    if (ctx.input.nameConsistency) params.name_consistency = true;
     if (ctx.input.sentences) params.sentences = true;
 
     if (ctx.input.audioToLlm) {
@@ -262,19 +365,17 @@ export let transcribeAudio = SlateTool.create(spec, {
     if (ctx.input.customSpelling) {
       params.custom_spelling = true;
       if (ctx.input.spellingEntries) {
-        params.custom_spelling_config = { spelling: ctx.input.spellingEntries };
-      }
-    }
-
-    if (ctx.input.structuredDataExtraction) {
-      params.structured_data_extraction = true;
-      if (ctx.input.extractionClasses) {
-        params.structured_data_extraction_config = { classes: ctx.input.extractionClasses };
+        params.custom_spelling_config = {
+          spelling_dictionary: Object.fromEntries(
+            ctx.input.spellingEntries.map(entry => [entry.value, entry.pronunciations])
+          )
+        };
       }
     }
 
     if (ctx.input.callbackUrl) {
-      params.callback_url = ctx.input.callbackUrl;
+      params.callback = true;
+      params.callback_config = { url: ctx.input.callbackUrl, method: 'POST' };
     }
 
     if (ctx.input.customMetadata) {
@@ -300,6 +401,7 @@ export let transcribeAudio = SlateTool.create(spec, {
         };
       }
 
+      let prepared = await prepareTranscriptionFiles(result, file => ctx.addAttachment(file));
       let utterances = result.result?.transcription?.utterances?.map(u => ({
         text: u.text,
         language: u.language,
@@ -317,7 +419,8 @@ export let transcribeAudio = SlateTool.create(spec, {
           status: result.status,
           fullTranscript: result.result?.transcription?.full_transcript,
           utterances,
-          result: result.result
+          result: prepared.result,
+          subtitleFiles: prepared.subtitleFiles
         },
         message: `Transcription **completed** successfully. Duration: ${result.result?.metadata?.audio_duration?.toFixed(1)}s. Transcript: "${result.result?.transcription?.full_transcript?.substring(0, 200)}${(result.result?.transcription?.full_transcript?.length ?? 0) > 200 ? '...' : ''}"`
       };

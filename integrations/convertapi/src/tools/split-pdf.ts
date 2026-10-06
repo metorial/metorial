@@ -1,18 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deliverFiles } from '../lib/files';
+import { buildFileSource, fileSourceSchema, invalid } from '../lib/validation';
 import { spec } from '../spec';
-
-let fileSourceSchema = z
-  .object({
-    url: z.string().optional().describe('Public URL of the PDF file'),
-    fileId: z.string().optional().describe('ConvertAPI file ID of a previously uploaded PDF'),
-    base64Data: z.string().optional().describe('Base64-encoded PDF content'),
-    fileName: z.string().optional().describe('File name (required when using base64Data)')
-  })
-  .describe(
-    'PDF file source — provide exactly one of: url, fileId, or base64Data (with fileName)'
-  );
 
 let splitFileSchema = z.object({
   fileName: z.string().describe('Name of the split PDF'),
@@ -51,29 +42,43 @@ By default, splits into one PDF per page. Use the splitByPage parameter to contr
   .output(
     z.object({
       conversionCost: z.number().describe('Number of conversion credits consumed'),
-      conversionTime: z.number().describe('Split duration in seconds'),
+      conversionTime: z
+        .number()
+        .optional()
+        .describe('Provider-reported legacy duration, when present'),
       files: z.array(splitFileSchema).describe('Split PDF files')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
+      masterToken: ctx.auth.masterToken,
       region: ctx.config.region
     });
 
     let fileSource = buildFileSource(ctx.input.file);
-    let parameters: Record<string, string> = {};
-    if (ctx.input.splitByPage) {
-      parameters.SplitByPage = ctx.input.splitByPage;
+    let parameters: Record<string, string> = { Mode: 'pagecount', Value: '1' };
+    if (ctx.input.splitByPage !== undefined) {
+      if (
+        !/^\d+(?:,\d+)*$/.test(ctx.input.splitByPage) ||
+        ctx.input.splitByPage
+          .split(',')
+          .some(v => !Number.isSafeInteger(Number(v)) || Number(v) < 1)
+      )
+        throw invalid(
+          'splitByPage must be a positive page count or a comma-separated sequence of positive counts.'
+        );
+      parameters.Value = ctx.input.splitByPage;
     }
 
-    let result = await client.convert({
+    let rawResult = await client.convert({
       sourceFormat: 'pdf',
       destinationFormat: 'split',
       files: [fileSource],
       storeFile: ctx.input.storeFile,
       parameters
     });
+    let result = await deliverFiles(ctx, rawResult);
 
     return {
       output: {
@@ -81,25 +86,7 @@ By default, splits into one PDF per page. Use the splitByPage parameter to contr
         conversionTime: result.conversionTime,
         files: result.files
       },
-      message: `Split PDF into **${result.files.length} file(s)** in ${result.conversionTime}s (cost: ${result.conversionCost} credit${result.conversionCost !== 1 ? 's' : ''}).`
+      message: `Split PDF into **${result.files.length} file(s)** (cost: ${result.conversionCost} credit${result.conversionCost !== 1 ? 's' : ''}).`
     };
   })
   .build();
-
-function buildFileSource(file: {
-  url?: string;
-  fileId?: string;
-  base64Data?: string;
-  fileName?: string;
-}) {
-  if (file.url) {
-    return { type: 'url' as const, url: file.url };
-  }
-  if (file.fileId) {
-    return { type: 'fileId' as const, fileId: file.fileId };
-  }
-  if (file.base64Data && file.fileName) {
-    return { type: 'base64' as const, fileName: file.fileName, data: file.base64Data };
-  }
-  throw new Error('Provide exactly one of: url, fileId, or base64Data (with fileName)');
-}

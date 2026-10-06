@@ -40,8 +40,6 @@ import {
   verifyInternationalAddress,
   verifyUSAddress
 } from './tools';
-import { mailEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -84,5 +82,5 @@ export let provider = Slate.create({
     sendCampaign,
     deleteCampaign
   ] as any,
-  triggers: [mailEvents] as any
+  triggers: []
 });

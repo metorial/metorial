@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -22,10 +22,17 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim() || /[\r\n]/.test(ctx.input.token))
+        throw createApiServiceError('A valid Mezmo IAM access token is required.');
+      if (
+        ctx.input.ingestionKey !== undefined &&
+        (!ctx.input.ingestionKey.trim() || /[\r\n]/.test(ctx.input.ingestionKey))
+      )
+        throw createApiServiceError('A valid Mezmo ingestion key is required when supplied.');
       return {
         output: {
-          token: ctx.input.token,
-          ingestionKey: ctx.input.ingestionKey
+          token: ctx.input.token.trim(),
+          ingestionKey: ctx.input.ingestionKey?.trim()
         }
       };
     }

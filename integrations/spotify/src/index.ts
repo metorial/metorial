@@ -13,8 +13,6 @@ import {
   managePlaylist,
   searchCatalog
 } from './tools';
-import { inboundWebhook, recentlyPlayedTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     manageFollowing.build(),
     getRecentlyPlayed.build()
   ],
-  triggers: [inboundWebhook, recentlyPlayedTrigger.build()]
+  triggers: []
 });

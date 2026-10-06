@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { anyOf, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { GMAIL_FULL, GMAIL_MODIFY } from '../auth';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -30,9 +31,11 @@ export let triageConversation = SlateTool.create(spec, {
     '**delete** permanently removes the thread (requires full mail scope); prefer **trash** for reversible triage.'
   ],
   tags: {
-    readOnly: false
+    readOnly: false,
+    destructive: true
   }
 })
+  .scopes(anyOf(GMAIL_FULL, GMAIL_MODIFY))
   .input(
     z.object({
       threadId: z.string().describe('Thread to triage.'),
@@ -62,7 +65,9 @@ export let triageConversation = SlateTool.create(spec, {
     if (action === 'apply_labels' || action === 'remove_labels') {
       let ids = ctx.input.labelIds;
       if (!ids || ids.length === 0) {
-        throw new Error('labelIds is required for apply_labels and remove_labels.');
+        throw createApiServiceError(
+          'labelIds is required for apply_labels and remove_labels.'
+        );
       }
     }
 
@@ -147,6 +152,10 @@ export let triageConversation = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
+      if (ctx.auth.grantedScopes && !ctx.auth.grantedScopes.includes(GMAIL_FULL))
+        throw createApiServiceError(
+          'Permanent deletion requires the Google OAuth Full Access connection. Use trash for reversible removal.'
+        );
       await client.deleteThread(threadId);
       return {
         output: { deleted: true },
@@ -154,5 +163,5 @@ export let triageConversation = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unsupported action: ${String(action)}`);
+    throw createApiServiceError(`Unsupported action: ${String(action)}`);
   });

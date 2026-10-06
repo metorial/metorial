@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { validateAgentSettings } from '../lib/agent-settings';
 import { RetellClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -19,6 +20,13 @@ export let createAgent = SlateTool.create(spec, {
         .any()
         .describe(
           'Response engine configuration object. Can be retell-llm, custom-llm, or conversation-flow type.'
+        ),
+      languages: z
+        .array(z.string().min(1))
+        .min(1)
+        .optional()
+        .describe(
+          'Explicit locale codes for a multilingual agent; omit language when using this field'
         ),
       language: z
         .string()
@@ -46,7 +54,7 @@ export let createAgent = SlateTool.create(spec, {
         .record(z.string(), z.any())
         .optional()
         .describe(
-          'Additional agent settings to pass through (voice_temperature, pii_config, guardrail_config, etc.)'
+          'Additional agent settings to pass through (voice_temperature, data_storage_setting, guardrail_config, etc.)'
         )
     })
   )
@@ -55,20 +63,21 @@ export let createAgent = SlateTool.create(spec, {
       agentId: z.string().describe('Unique identifier of the created agent'),
       agentName: z.string().nullable().optional().describe('Name of the agent'),
       version: z.number().describe('Version number'),
-      isPublished: z.boolean().describe('Whether the agent is published')
+      isPublished: z.boolean().optional().describe('Whether the agent is published')
     })
   )
   .handleInvocation(async ctx => {
     let client = new RetellClient(ctx.auth.token);
 
     let body: Record<string, any> = {
+      ...ctx.input.additionalSettings,
       voice_id: ctx.input.voiceId,
       response_engine: ctx.input.responseEngine
     };
 
-    if (ctx.input.agentName) body.agent_name = ctx.input.agentName;
-    if (ctx.input.language) body.language = ctx.input.language;
-    if (ctx.input.webhookUrl) body.webhook_url = ctx.input.webhookUrl;
+    if (ctx.input.agentName !== undefined) body.agent_name = ctx.input.agentName;
+    if (ctx.input.language !== undefined) body.language = ctx.input.language;
+    if (ctx.input.webhookUrl !== undefined) body.webhook_url = ctx.input.webhookUrl;
     if (ctx.input.voiceSpeed !== undefined) body.voice_speed = ctx.input.voiceSpeed;
     if (ctx.input.volume !== undefined) body.volume = ctx.input.volume;
     if (ctx.input.responsiveness !== undefined) body.responsiveness = ctx.input.responsiveness;
@@ -76,11 +85,13 @@ export let createAgent = SlateTool.create(spec, {
       body.interruption_sensitivity = ctx.input.interruptionSensitivity;
     if (ctx.input.enableBackchannel !== undefined)
       body.enable_backchannel = ctx.input.enableBackchannel;
-    if (ctx.input.ambientSound) body.ambient_sound = ctx.input.ambientSound;
+    if (ctx.input.ambientSound !== undefined) body.ambient_sound = ctx.input.ambientSound;
 
-    if (ctx.input.additionalSettings) {
-      Object.assign(body, ctx.input.additionalSettings);
+    if (ctx.input.language !== undefined && ctx.input.languages !== undefined) {
+      throw createApiServiceError('Provide language or languages, not both.');
     }
+    if (ctx.input.languages) body.language = ctx.input.languages;
+    validateAgentSettings(body);
 
     let agent = await client.createAgent(body);
 

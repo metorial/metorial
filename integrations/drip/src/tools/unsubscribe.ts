@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let unsubscribe = SlateTool.create(spec, {
@@ -13,12 +14,13 @@ export let unsubscribe = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       subscriberIdOrEmail: z.string().describe('The subscriber ID or email address.'),
       campaignId: z
         .string()
         .optional()
         .describe(
-          'If provided, removes the subscriber from this specific campaign only. Otherwise, unsubscribes from all mailings.'
+          'If provided, must be a nonempty campaign ID and removes the subscriber from that campaign only. Omit to unsubscribe from all mailings.'
         )
     })
   )
@@ -30,21 +32,21 @@ export let unsubscribe = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 
-    if (ctx.input.campaignId) {
+    if (ctx.input.campaignId !== undefined) {
       await client.removeFromCampaign(ctx.input.subscriberIdOrEmail, ctx.input.campaignId);
       return {
         output: { unsubscribed: true },
-        message: `Subscriber **${ctx.input.subscriberIdOrEmail}** removed from campaign **${ctx.input.campaignId}**.`
+        message: 'The selected subscriber has been removed from the selected campaign.'
       };
     } else {
       await client.unsubscribeFromAllMailings(ctx.input.subscriberIdOrEmail);
       return {
         output: { unsubscribed: true },
-        message: `Subscriber **${ctx.input.subscriberIdOrEmail}** unsubscribed from all mailings.`
+        message: 'The selected subscriber has been unsubscribed from all mailings.'
       };
     }
   })

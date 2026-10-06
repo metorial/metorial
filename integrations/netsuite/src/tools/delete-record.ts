@@ -1,13 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { connection } from '../lib/client';
 import { spec } from '../spec';
 
 export let deleteRecord = SlateTool.create(spec, {
   name: 'Delete Record',
   key: 'delete_record',
   description: `Permanently delete a NetSuite record by its type and internal ID. This action cannot be undone.
-Supports all standard and custom record types that allow deletion.`,
+Supports record types and operations exposed to your native role in list_record_types that allow deletion.`,
   instructions: [
     'Ensure the record is not referenced by other records before deleting — NetSuite will reject the deletion if there are dependencies.'
   ],
@@ -15,6 +15,7 @@ Supports all standard and custom record types that allow deletion.`,
     'Some record types do not support deletion (e.g., posted transactions). NetSuite will return an error in these cases.'
   ],
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
@@ -23,9 +24,11 @@ Supports all standard and custom record types that allow deletion.`,
       recordType: z
         .string()
         .describe(
-          'NetSuite record type in camelCase (e.g., "customer", "salesOrder", "invoice")'
+          'Exact native record type from list_record_types; verify deletion support with get_record_metadata'
         ),
-      recordId: z.string().describe('Internal ID of the record to delete')
+      recordId: z
+        .string()
+        .describe('Exact internal ID or eid:<externalId> of the record to delete')
     })
   )
   .output(
@@ -36,10 +39,7 @@ Supports all standard and custom record types that allow deletion.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      ...ctx.auth,
-      accountId: ctx.config.accountId
-    });
+    const client = connection(ctx.auth, ctx.config);
 
     await client.deleteRecord(ctx.input.recordType, ctx.input.recordId);
 

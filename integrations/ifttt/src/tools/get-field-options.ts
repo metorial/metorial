@@ -15,11 +15,14 @@ export let getFieldOptionsTool = SlateTool.create(spec, {
     z.object({
       connectionId: z.string().describe('The ID of the connection'),
       fieldType: z
-        .enum(['triggers', 'actions', 'queries'])
-        .describe('The type of field (triggers, actions, or queries)'),
+        .enum(['triggers', 'actions', 'queries', 'features'])
+        .describe('The field owner type: triggers, actions, queries, or features'),
       typeId: z.string().describe('The trigger, action, or query identifier'),
       fieldSlug: z.string().describe('The field slug to get options for'),
-      userId: z.string().optional().describe('The user ID for user-specific field options')
+      userId: z
+        .string()
+        .optional()
+        .describe('The connected user ID from your service; required by the native endpoint')
     })
   )
   .output(
@@ -32,7 +35,7 @@ export let getFieldOptionsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ConnectClient(ctx.auth.token);
+    let client = new ConnectClient(ctx.auth);
     let result = await client.getFieldOptions(
       ctx.input.connectionId,
       ctx.input.fieldType,

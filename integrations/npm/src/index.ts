@@ -11,8 +11,6 @@ import {
   searchPackages
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -25,5 +23,5 @@ export let provider = Slate.create({
     manageTrustedPublishers,
     getUserProfile
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Honeyhive
 
-Trace, monitor, and evaluate LLM applications and AI agents. Create and manage projects, log distributed traces of AI application execution including model calls, tool invocations, and chain events. Run offline experiments against curated datasets with custom evaluators. Create, version, and manage datasets and prompts. Post user feedback and custom metrics against sessions or events. Query and analyze production traces with aggregated cost, latency, token usage, and quality metrics. Manage annotation queues for human feedback collection. Configure prompt deployments across environments.
+Manage HoneyHive trace sessions and events, evaluation datasets and datapoints, prompt configurations, metrics, and experiment runs. Query traces, attach user feedback, and compare experiment results. Connect with a project-scoped data-plane API key. Legacy project-management and individual trace-delete tools report their provider limitations. See [the integration specification](docs/SPEC.md) for supported operations and migration details.
 
 ## License
 

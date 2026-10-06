@@ -14,6 +14,8 @@ export let accountInfoTool = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      accountStatus: z.string().optional(),
+      planRenewalDate: z.string().nullable().optional(),
       accountId: z.string().optional().describe('Account identifier'),
       accountEmail: z.string().optional().describe('Account email address'),
       planName: z.string().optional().describe('Current subscription plan name'),
@@ -28,12 +30,14 @@ export let accountInfoTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SerpApiClient({ apiKey: ctx.auth.token });
+    let client = new SerpApiClient({ apiKey: ctx.auth.token, accountId: ctx.auth.accountId });
 
     let data = await client.getAccount();
 
     return {
       output: {
+        accountStatus: data.account_status,
+        planRenewalDate: data.plan_renewal_date,
         accountId: data.account_id,
         accountEmail: data.account_email,
         planName: data.plan_name,
@@ -46,7 +50,7 @@ export let accountInfoTool = SlateTool.create(spec, {
         lastHourSearches: data.last_hour_searches,
         rateLimitPerHour: data.account_rate_limit_per_hour
       },
-      message: `Account **${data.account_email}** on the **${data.plan_name}** plan. **${data.total_searches_left}** searches remaining (${data.this_month_usage} used this month out of ${data.searches_per_month}).`
+      message: `Account ${data.account_id}${data.plan_name ? ` on ${data.plan_name}` : ''}.${data.total_searches_left !== undefined ? ` ${data.total_searches_left} searches remain.` : ' Remaining quota was not returned.'}`
     };
   })
   .build();

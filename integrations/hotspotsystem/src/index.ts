@@ -8,15 +8,6 @@ import {
   listVouchers,
   verifyCredentials
 } from './tools';
-import {
-  customerCreated,
-  macTransactionCreated,
-  paidTransactionCreated,
-  socialTransactionCreated,
-  subscriberCreated,
-  voucherTransactionCreated
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -27,12 +18,5 @@ export let provider = Slate.create({
     listTransactions,
     verifyCredentials
   ],
-  triggers: [
-    customerCreated,
-    subscriberCreated,
-    macTransactionCreated,
-    voucherTransactionCreated,
-    socialTransactionCreated,
-    paidTransactionCreated
-  ]
+  triggers: []
 });

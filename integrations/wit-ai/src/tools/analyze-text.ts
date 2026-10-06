@@ -9,18 +9,27 @@ let intentSchema = z.object({
   confidence: z.number().describe('Confidence score between 0 and 1')
 });
 
-let entityValueSchema = z.object({
-  id: z.string().optional().describe('Entity ID'),
-  name: z.string().optional().describe('Entity name'),
-  role: z.string().optional().describe('Role of the entity'),
-  start: z.number().optional().describe('Start character position in the text'),
-  end: z.number().optional().describe('End character position in the text'),
-  body: z.string().optional().describe('Matched text segment'),
-  confidence: z.number().optional().describe('Confidence score'),
-  value: z.string().optional().describe('Resolved value'),
-  type: z.string().optional().describe('Type of the entity value (e.g., "value", "interval")'),
-  entities: z.array(z.any()).optional().describe('Sub-entities')
-});
+let entityValueSchema = z
+  .object({
+    id: z.string().optional().describe('Entity ID'),
+    name: z.string().optional().describe('Entity name'),
+    role: z.string().optional().describe('Role of the entity'),
+    start: z.number().optional().describe('Start character position in the text'),
+    end: z.number().optional().describe('End character position in the text'),
+    body: z.string().optional().describe('Matched text segment'),
+    confidence: z.number().optional().describe('Confidence score'),
+    value: z.string().optional().describe('Resolved text value'),
+    resolvedValue: z
+      .unknown()
+      .optional()
+      .describe('Resolved provider value, including text, numbers, and objects'),
+    type: z
+      .string()
+      .optional()
+      .describe('Type of the entity value (e.g., "value", "interval")'),
+    entities: z.array(z.any()).optional().describe('Sub-entities')
+  })
+  .passthrough();
 
 let traitValueSchema = z.object({
   id: z.string().optional().describe('Trait ID'),
@@ -31,10 +40,10 @@ let traitValueSchema = z.object({
 export let analyzeText = SlateTool.create(spec, {
   name: 'Analyze Text',
   key: 'analyze_text',
-  description: `Extract meaning from text using Wit.ai's NLU engine. Returns detected **intents**, **entities**, and **traits** with confidence scores. Supports optional context (locale, timezone, reference time) for improved entity resolution. Use the \`n\` parameter to get multiple candidate intents (N-best).`,
+  description: `Extract meaning from text using Wit.ai's NLU engine. Returns detected **intents**, **entities**, and **traits** with confidence scores. Supports optional context (locale, timezone, reference time) for improved entity resolution. Use the \`maxResults\` parameter to get multiple candidate intents (N-best).`,
   instructions: [
     'Provide the text to analyze in the `text` field.',
-    'Use the `context` fields to improve entity resolution for datetime, location, etc.'
+    'Use `locale`, `timezone`, and `referenceTime` to improve entity resolution for datetime, location, etc.'
   ],
   tags: {
     readOnly: true
@@ -47,6 +56,8 @@ export let analyzeText = SlateTool.create(spec, {
         .describe('The text message to analyze for intents, entities, and traits'),
       maxResults: z
         .number()
+        .int()
+        .min(1)
         .optional()
         .describe('Maximum number of N-best intent/trait results to return'),
       locale: z
@@ -104,7 +115,16 @@ export let analyzeText = SlateTool.create(spec, {
       output: {
         text: result.text,
         intents: result.intents ?? [],
-        entities: result.entities ?? {},
+        entities: Object.fromEntries(
+          Object.entries(result.entities ?? {}).map(([key, values]) => [
+            key,
+            (values as Record<string, unknown>[]).map(value => ({
+              ...value,
+              value: typeof value.value === 'string' ? value.value : undefined,
+              resolvedValue: value.value
+            }))
+          ])
+        ),
         traits: result.traits ?? {}
       },
       message: `Analyzed text: "${ctx.input.text}". Found **${intentCount}** intent(s), **${entityCount}** entity type(s), and **${traitCount}** trait(s).`

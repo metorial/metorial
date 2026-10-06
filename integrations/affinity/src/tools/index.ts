@@ -4,6 +4,8 @@ export { createPerson } from './create-person';
 export { deleteOpportunity } from './delete-opportunity';
 export { deleteOrganization } from './delete-organization';
 export { deletePerson } from './delete-person';
+export { downloadEntityFile } from './download-entity-file';
+export { getCurrentUser } from './get-current-user';
 export { getEntityFiles } from './get-entity-files';
 export { getFieldValueChanges } from './get-field-value-changes';
 export { getFields } from './get-fields';

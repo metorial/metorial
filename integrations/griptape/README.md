@@ -1,6 +1,6 @@
 # Griptape
 
-Build, deploy, and operate AI-powered applications on Griptape Cloud. Create and run Assistants for chat applications, deploy custom Structures (agents, pipelines, workflows) from Python code, and manage Knowledge Bases for RAG retrieval. Ingest data from web pages, S3, Google Drive, Confluence, and Data Lakes. Query across Knowledge Bases with reranking via Retrievers. Configure Rules and Rulesets to steer LLM behavior. Manage conversation state through Threads. Run Griptape Tools as cloud-hosted endpoints for third-party integrations. Monitor performance and spending with observability traces and events.
+Build, deploy, and operate AI-powered applications on Griptape Cloud. Create and run Assistants for chat applications, run deployed Structures (agents, pipelines, workflows), and manage Knowledge Bases for RAG retrieval. Refresh existing data sources and ingest Data Lake documents into managed vector knowledge bases. Upload and download files in Data Lake buckets. Query across Knowledge Bases with reranking via Retrievers. Configure Rules and Rulesets to steer LLM behavior. Manage conversation state through Threads. Run Griptape Tools as cloud-hosted endpoints for third-party integrations. Read execution status and structure logs.
 
 ## License
 

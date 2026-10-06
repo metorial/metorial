@@ -15,10 +15,10 @@ let fileSchema = z.object({
   height: z.number().optional().nullable().describe('Height in pixels'),
   width: z.number().optional().nullable().describe('Width in pixels'),
   tags: z.array(z.string()).optional().nullable().describe('Tags'),
-  aiTags: z.array(z.any()).optional().nullable().describe('AI-generated tags'),
+  aiTags: z.array(z.unknown()).optional().nullable().describe('AI-generated tags'),
   isPrivateFile: z.boolean().optional().describe('Whether the file is private'),
   customMetadata: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .optional()
     .nullable()
     .describe('Custom metadata'),
@@ -62,7 +62,17 @@ export let listFiles = SlateTool.create(spec, {
   .output(
     z.object({
       files: z.array(fileSchema).describe('List of matching files'),
-      count: z.number().describe('Number of files returned')
+      count: z.number().describe('Number of files returned on this page'),
+      nextSkip: z
+        .number()
+        .optional()
+        .describe(
+          'Offset for another page when this page was full; more results are not guaranteed'
+        ),
+      omittedFolderCount: z
+        .number()
+        .optional()
+        .describe('Folder entries omitted from this file-only result')
     })
   )
   .handleInvocation(async ctx => {
@@ -78,12 +88,12 @@ export let listFiles = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let mappedFiles = (files as any[]).map((f: any) => ({
+    let mappedFiles = files.files.map(f => ({
       fileId: f.fileId,
       name: f.name,
       filePath: f.filePath,
       url: f.url,
-      thumbnailUrl: f.thumbnailUrl,
+      thumbnailUrl: f.thumbnail,
       fileType: f.fileType,
       mime: f.mime,
       size: f.size,
@@ -100,9 +110,11 @@ export let listFiles = SlateTool.create(spec, {
     return {
       output: {
         files: mappedFiles,
-        count: mappedFiles.length
+        count: mappedFiles.length,
+        nextSkip: files.nextSkip,
+        omittedFolderCount: files.omittedFolderCount
       },
-      message: `Found **${mappedFiles.length}** file(s)${ctx.input.searchQuery ? ` matching query \`${ctx.input.searchQuery}\`` : ''}${ctx.input.path ? ` in \`${ctx.input.path}\`` : ''}.`
+      message: `Returned **${mappedFiles.length}** file(s) on this page.`
     };
   })
   .build();

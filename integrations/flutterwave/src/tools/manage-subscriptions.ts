@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageFields, pageOutput } from '../lib/contracts';
 import { spec } from '../spec';
 
 let subscriptionSchema = z.object({
@@ -29,6 +30,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      page: z.number().optional().describe('Positive page number for listing'),
       action: z.enum(['list', 'cancel', 'activate']).describe('Action to perform'),
       subscriptionId: z
         .number()
@@ -44,22 +46,24 @@ export let manageSubscriptions = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pageFields,
       subscriptions: z.array(subscriptionSchema).describe('Subscription(s) returned')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
     let { action } = ctx.input;
 
     if (action === 'cancel') {
-      if (!ctx.input.subscriptionId) throw new Error('subscriptionId is required to cancel');
-      let _result = await client.cancelSubscription(ctx.input.subscriptionId);
+      if (!ctx.input.subscriptionId)
+        throw createApiServiceError('subscriptionId is required to cancel');
+      let result = await client.cancelSubscription(ctx.input.subscriptionId);
       return {
         output: {
           subscriptions: [
             {
-              subscriptionId: ctx.input.subscriptionId,
-              status: 'cancelled'
+              subscriptionId: result.data.id,
+              status: result.data.status
             }
           ]
         },
@@ -68,14 +72,15 @@ export let manageSubscriptions = SlateTool.create(spec, {
     }
 
     if (action === 'activate') {
-      if (!ctx.input.subscriptionId) throw new Error('subscriptionId is required to activate');
-      let _result = await client.activateSubscription(ctx.input.subscriptionId);
+      if (!ctx.input.subscriptionId)
+        throw createApiServiceError('subscriptionId is required to activate');
+      let result = await client.activateSubscription(ctx.input.subscriptionId);
       return {
         output: {
           subscriptions: [
             {
-              subscriptionId: ctx.input.subscriptionId,
-              status: 'active'
+              subscriptionId: result.data.id,
+              status: result.data.status
             }
           ]
         },
@@ -87,7 +92,8 @@ export let manageSubscriptions = SlateTool.create(spec, {
     let result = await client.listSubscriptions({
       email: ctx.input.email,
       plan: ctx.input.planId,
-      status: ctx.input.status
+      status: ctx.input.status,
+      page: ctx.input.page
     });
 
     let subscriptions = (result.data || []).map((s: any) => ({
@@ -101,7 +107,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
     }));
 
     return {
-      output: { subscriptions },
+      output: { subscriptions, ...pageOutput(result) },
       message: `Found **${subscriptions.length}** subscriptions.`
     };
   })

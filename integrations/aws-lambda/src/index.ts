@@ -21,8 +21,6 @@ import {
   publishVersion,
   updateFunction
 } from './tools/index';
-import { functionChanges, inboundWebhook } from './triggers/index';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     manageRuntimeManagement,
     manageRecursionConfig
   ],
-  triggers: [inboundWebhook, functionChanges]
+  triggers: []
 });

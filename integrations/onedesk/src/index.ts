@@ -11,8 +11,6 @@ import {
   searchProjects,
   updateItem
 } from './tools';
-import { inboundWebhook, itemEvents, projectEvents, userCreated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     createUser,
     getOrganization
   ],
-  triggers: [inboundWebhook, itemEvents, projectEvents, userCreated]
+  triggers: []
 });

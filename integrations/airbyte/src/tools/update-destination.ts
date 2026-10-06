@@ -6,6 +6,7 @@ import { spec } from '../spec';
 export let updateDestinationTool = SlateTool.create(spec, {
   name: 'Update Destination',
   key: 'update_destination',
+  tags: { destructive: true },
   description: `Update an existing Airbyte destination connector. Modify the destination name and/or its configuration. Only provided fields will be updated.`
 })
   .input(
@@ -13,7 +14,7 @@ export let updateDestinationTool = SlateTool.create(spec, {
       destinationId: z.string().describe('The UUID of the destination to update.'),
       name: z.string().optional().describe('New display name for the destination.'),
       configuration: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Updated destination-specific configuration.')
     })
@@ -24,13 +25,17 @@ export let updateDestinationTool = SlateTool.create(spec, {
       name: z.string(),
       destinationType: z.string(),
       workspaceId: z.string(),
-      configuration: z.record(z.string(), z.any())
+      configuration: z
+        .record(z.string(), z.unknown())
+        .describe(
+          'Configuration keys with all values redacted. Never reuse these values as connector input.'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
-    let updateData: Record<string, any> = {};
+    let updateData: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
     if (ctx.input.configuration !== undefined)
       updateData.configuration = ctx.input.configuration;

@@ -1,45 +1,15 @@
-# <img src="https://provider-logos.metorial-cdn.com/canva.jpeg" height="20"> Canva
+# Canva
 
-Create, manage, and export graphic designs programmatically. Upload and manage assets (images), organize designs and assets into folders, and retrieve design metadata. Import external files as Canva designs and export designs in various formats (PDF, PNG, JPG). Autofill brand templates with dynamic data to generate designs at scale. Read and create comments and replies on designs. Resize designs to different dimensions. Manage folder permissions and retrieve user profile information. Receive webhook notifications for comments, design sharing, approval requests, access requests, and suggestions.
+Read and create designs, manage assets and folders, import public files, export downloadable files, work with comments, and autofill eligible brand templates through Canva’s REST v1 API.
 
-## Tools
+The 25 tools retain all 23 original keys and add exact URL-upload and autofill job polling. Asset, design, folder, comment and template reads expose native IDs. List tools return opaque continuation tokens; reply paging is available through Get Comment Thread.
 
-### List Brand Templates
+OAuth uses PKCE and single-use rotating refresh tokens. New connections save their verified Canva user/team and original client binding. Existing access tokens remain usable; older connections without renewal binding require one reconnect for safe refresh. Only scopes used by these tools are requested.
 
-List brand templates available to the user. Supports searching by query, filtering by ownership, and pagination. Requires the user to be a member of a Canva Enterprise organization.
+Upload Asset uses Canva’s preview URL-upload API: URL video uploads are limited to 100MB, and public apps using preview APIs cannot pass Canva app review. Import Design creates URL-import jobs. Get Import Job defaults to that family; set `sourceType: "binary"` to inspect a previously created binary-upload import job.
 
-### Export Design
+Export Design and Get Export Job return downloadable files while preserving `downloadUrls`. Export pages are one-based. JPG quality and MP4 quality are required. Export URLs expire 24 hours after completion; polling cannot renew them. Request a new export explicitly after expiration. No bearer token is forwarded to the signed file URL.
 
-Export a Canva design to a downloadable file. Supports PDF, JPG, PNG, GIF, PPTX, and MP4 formats. This starts an asynchronous export job. If the job completes immediately, download URLs are returned; otherwise use the job ID to poll for completion.
+Brand template access and autofill depend on the user’s plan and template dataset. Autofill checks current dataset keys and types before creating a design. Design links, comment text and signed file URLs are intentional user outcomes. Deleting a folder moves owned contents to Trash and relocates other users’ contents; it does not prove permanent erasure.
 
-### Get User Profile
-
-Retrieve the authenticated user's profile information including user ID, team ID, and display name.
-
-### Import Design
-
-Import an external file as a new Canva design from a URL. Supports various file formats including PDF, Adobe Creative Suite files (.ai, .psd), Microsoft Office documents, Apple productivity apps, and OpenOffice formats. This starts an asynchronous import job.
-
-### Get Asset
-
-Retrieve metadata for an asset (image or video) in the user's Canva library, including name, tags, timestamps, and thumbnail info.
-
-### Create Comment
-
-Create a new comment thread on a design, or reply to an existing comment thread. To create a top-level comment, provide a designId and message. To reply, also provide a threadId.
-
-### List Designs
-
-List and search designs in the user's Canva account. Supports filtering by search query, ownership, and sorting. Returns paginated results.
-
-### Get Folder
-
-Retrieve metadata for a specific folder in the user's Canva projects.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+No triggers are registered. Native API calls, preview availability, plan entitlements, live file downloads and rotating-token renewal have not been exercised against a provider account in this refresh.

@@ -1,4 +1,5 @@
 export * from './delete-message';
+export * from './download-resource-file';
 export * from './edit-message';
 export * from './get-meeting';
 export * from './get-message';

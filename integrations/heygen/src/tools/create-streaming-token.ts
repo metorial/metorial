@@ -6,7 +6,10 @@ import { spec } from '../spec';
 export let createStreamingToken = SlateTool.create(spec, {
   name: 'Create Streaming Token',
   key: 'create_streaming_token',
-  description: `Create a session token for Interactive Avatar streaming. The token is used to establish a real-time streaming session where an avatar can respond to user input. Required before starting a streaming session in your application.`,
+  description: `Create a legacy Interactive Avatar streaming token for an account that still has streaming access. New streaming applications use the separate LiveAvatar API. The token is used to establish a real-time streaming session where an avatar can respond to user input. Required before starting a streaming session in your application.`,
+  constraints: [
+    'This legacy endpoint has no drop-in HeyGen v3 replacement. See developers.heygen.com/live-avatar for the current streaming product.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -19,7 +22,7 @@ export let createStreamingToken = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HeyGenClient({ token: ctx.auth.token });
+    let client = new HeyGenClient(ctx.auth);
 
     let result = await client.createStreamingToken();
 

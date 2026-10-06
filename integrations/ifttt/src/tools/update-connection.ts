@@ -12,7 +12,7 @@ export let updateConnectionTool = SlateTool.create(spec, {
     'The user must have the connection enabled for this to succeed.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -22,18 +22,20 @@ export let updateConnectionTool = SlateTool.create(spec, {
       configuration: z
         .record(z.string(), z.any())
         .describe(
-          'The full connection configuration object to set (replaces existing configuration)'
+          'Complete native user_features replacement object. Get current configuration first; omitted configurations are removed.'
         )
     })
   )
   .output(
     z.object({
       connectionId: z.string().describe('The connection ID that was updated'),
-      result: z.any().describe('The updated connection configuration')
+      result: z
+        .any()
+        .describe('Current native user_connection read back after request acceptance')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ConnectClient(ctx.auth.token);
+    let client = new ConnectClient(ctx.auth);
     let result = await client.updateUserConnection(
       ctx.input.connectionId,
       ctx.input.userId,
@@ -45,7 +47,7 @@ export let updateConnectionTool = SlateTool.create(spec, {
         connectionId: ctx.input.connectionId,
         result
       },
-      message: `Updated connection **${ctx.input.connectionId}** for user **${ctx.input.userId}**.`
+      message: `IFTTT accepted configuration replacement for **${ctx.input.connectionId}** for user **${ctx.input.userId}**; current configuration was read back. Existing automation effects may remain.`
     };
   })
   .build();

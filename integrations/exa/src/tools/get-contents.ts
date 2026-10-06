@@ -14,7 +14,17 @@ Useful when you already have specific URLs and need to extract their content.`,
 })
   .input(
     z.object({
-      urls: z.array(z.string()).min(1).describe('URLs to extract content from'),
+      urls: z
+        .array(z.string())
+        .min(1)
+        .optional()
+        .describe('URLs to extract; provide URLs or temporary document IDs'),
+      ids: z
+        .array(z.string())
+        .min(1)
+        .optional()
+        .describe('Temporary document IDs from search; provide IDs or URLs'),
+      maxAgeHours: z.number().optional().describe('Content freshness in hours (-1 to 720)'),
       text: z
         .union([
           z.boolean(),
@@ -51,10 +61,26 @@ Useful when you already have specific URLs and need to extract their content.`,
   .output(
     z.object({
       requestId: z.string().describe('Unique request identifier'),
+      costTotal: z.number().optional().describe('Reported cost in USD'),
+      statuses: z
+        .array(
+          z.object({
+            id: z.string(),
+            status: z.string(),
+            source: z.string().optional(),
+            error: z
+              .object({ tag: z.string(), httpStatusCode: z.number().nullish() })
+              .nullish()
+          })
+        )
+        .optional()
+        .describe(
+          'Per-document native retrieval status; a partial result is not success for every URL'
+        ),
       results: z
         .array(
           z.object({
-            title: z.string().describe('Page title'),
+            title: z.string().optional().describe('Page title'),
             url: z.string().describe('Page URL'),
             publishedDate: z.string().optional().describe('Publication date'),
             author: z.string().optional().describe('Content author'),
@@ -67,10 +93,12 @@ Useful when you already have specific URLs and need to extract their content.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
 
     let response = await client.getContents({
       urls: ctx.input.urls,
+      ids: ctx.input.ids,
+      maxAgeHours: ctx.input.maxAgeHours,
       text: ctx.input.text,
       highlights: ctx.input.highlights,
       summary: ctx.input.summary,
@@ -91,6 +119,8 @@ Useful when you already have specific URLs and need to extract their content.`,
     return {
       output: {
         requestId: response.requestId,
+        statuses: response.statuses,
+        costTotal: response.costDollars?.total,
         results
       },
       message: `Extracted content from **${results.length}** URL(s).`

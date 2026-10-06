@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, listeningValues, range } from '../lib/client';
+import { customerIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getListeningMessages = SlateTool.create(spec, {
@@ -10,13 +11,14 @@ export let getListeningMessages = SlateTool.create(spec, {
   instructions: [
     'Get topic IDs from the Get Metadata tool (resourceType: "topics").',
     'A created_time filter is required. Format: "created_time.in(YYYY-MM-DD..YYYY-MM-DDTHH:MM:SS)".',
-    'Network filter format: "network.eq(INSTAGRAM, FACEBOOK, REDDIT, YOUTUBE, TUMBLR, WEB)".',
+    'Network filter format: "network.eq(INSTAGRAM, FACEBOOK, YOUTUBE, TUMBLR, WWW, TIKTOK, BLUESKY)". WEB is accepted as an alias for WWW.',
     'Sentiment filter format: "sentiment.eq(POSITIVE, NEGATIVE, NEUTRAL)".',
     'Available fields include: "content_category", "created_time", "hashtags", "text", "from.name".',
     'Available metrics include: "likes", "replies", "shares_count".'
   ],
   constraints: [
     'Listening data from X (Twitter) is currently unavailable.',
+    'Reddit message-level Listening data is unavailable.',
     'Maximum 100 results per page.'
   ],
   tags: {
@@ -25,6 +27,7 @@ export let getListeningMessages = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      customerId: customerIdSchema,
       topicId: z.string().describe('Listening topic ID.'),
       startTime: z.string().describe('Start time in ISO 8601 or YYYY-MM-DD format.'),
       endTime: z.string().describe('End time in ISO 8601 or YYYY-MM-DD format.'),
@@ -32,7 +35,7 @@ export let getListeningMessages = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe(
-          'Networks to filter by (e.g., "INSTAGRAM", "FACEBOOK", "REDDIT", "YOUTUBE", "WEB").'
+          'Networks to filter by (e.g., "INSTAGRAM", "FACEBOOK", "YOUTUBE", "WWW", "BLUESKY").'
         ),
       sentiment: z
         .array(z.string())
@@ -41,7 +44,9 @@ export let getListeningMessages = SlateTool.create(spec, {
       fields: z
         .array(z.string())
         .optional()
-        .describe('Fields to return (e.g., "created_time", "text", "from.name", "hashtags").'),
+        .describe(
+          'Fields to return. Defaults to guid and created_time; an explicit list must contain at least one field.'
+        ),
       metrics: z
         .array(z.string())
         .optional()
@@ -65,17 +70,20 @@ export let getListeningMessages = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    range(ctx.input.startTime, ctx.input.endTime);
+    const networks = listeningValues(ctx.input.networks, 'network', true);
+    const sentiment = listeningValues(ctx.input.sentiment, 'sentiment');
     let client = new Client({
       token: ctx.auth.token,
-      customerId: ctx.config.customerId
+      customerId: ctx.input.customerId ?? ctx.config.customerId
     });
 
     let filters: string[] = [`created_time.in(${ctx.input.startTime}..${ctx.input.endTime})`];
-    if (ctx.input.networks?.length) {
-      filters.push(`network.eq(${ctx.input.networks.join(',')})`);
+    if (networks?.length) {
+      filters.push(`network.eq(${networks.join(',')})`);
     }
-    if (ctx.input.sentiment?.length) {
-      filters.push(`sentiment.eq(${ctx.input.sentiment.join(',')})`);
+    if (sentiment?.length) {
+      filters.push(`sentiment.eq(${sentiment.join(',')})`);
     }
 
     let result = await client.getListeningTopicMessages(ctx.input.topicId, {
@@ -88,7 +96,7 @@ export let getListeningMessages = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let messages = result?.data ?? [];
+    let messages = result.data;
     let paging = result?.paging
       ? {
           currentPage: result.paging.current_page,
@@ -98,6 +106,6 @@ export let getListeningMessages = SlateTool.create(spec, {
 
     return {
       output: { messages, paging },
-      message: `Retrieved **${messages.length}** listening messages from topic ${ctx.input.topicId}.`
+      message: `Retrieved **${messages.length}** Listening messages for the selected topic.`
     };
   });

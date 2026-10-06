@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapRun, runOutputSchema, validateTurns } from '../lib/schemas';
 import { spec } from '../spec';
 
 let requirementSchema = z.object({
@@ -12,13 +13,13 @@ let requirementSchema = z.object({
 export let maestroRun = SlateTool.create(spec, {
   name: 'Maestro Run',
   key: 'maestro_run',
-  description: `Create and execute a Maestro AI agent run. Maestro is an AI orchestration system that can search, reason, validate, and adapt in real time. Supports model selection (AI21 or third-party), compute budget control, requirements validation, and tool integration including file search and web search.`,
+  description: `Create a Maestro AI agent run with model selection, compute budget, validation requirements, and optional file or web search. Runs may be asynchronous; use the returned runId with get_maestro_run until the run completes.`,
   constraints: [
     'Up to 10 requirements per run',
     'Requirement descriptions limited to 128 words each'
   ],
   tags: {
-    readOnly: true,
+    readOnly: false,
     destructive: false
   }
 })
@@ -59,24 +60,49 @@ export let maestroRun = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Include requirements validation results in the response'),
-      responseLanguage: z.string().optional().describe('Desired output language')
+      responseLanguage: z.string().optional().describe('Desired output language'),
+      fileSearch: z
+        .object({
+          fileIds: z
+            .array(z.string())
+            .optional()
+            .describe('Library file IDs to search; upload_file creates library files'),
+          labels: z
+            .array(z.string())
+            .optional()
+            .describe('Search only matching document labels'),
+          retrievalStrategy: z.enum(['segments', 'add_neighbors', 'full_doc']).optional(),
+          maxNeighbors: z.number().int().min(0).optional()
+        })
+        .optional()
+        .describe('Enable file search over the document library'),
+      webSearch: z
+        .object({
+          urls: z
+            .array(z.string().min(1))
+            .optional()
+            .describe(
+              'Optional website prefixes to restrict the search, such as example.com or https://example.com/page'
+            )
+        })
+        .optional()
+        .describe('Enable web search')
     })
   )
-  .output(
-    z.object({
-      result: z.string().optional().describe('Generated output text'),
-      status: z.string().optional().describe('Run completion status'),
-      requirementsResult: z
-        .any()
-        .optional()
-        .describe('Per-requirement validation scores and overall score'),
-      dataSources: z
-        .array(z.any())
-        .optional()
-        .describe('Retrieved data sources used in the response')
-    })
-  )
+  .output(runOutputSchema)
   .handleInvocation(async ctx => {
+    if (typeof ctx.input.input === 'string') {
+      if (!ctx.input.input.trim())
+        throw createApiServiceError('Provide a non-empty Maestro input.');
+    } else validateTurns(ctx.input.input);
+    if (!ctx.input.systemPrompt.trim())
+      throw createApiServiceError('Provide a non-empty systemPrompt.');
+    if (
+      ctx.input.requirements?.some(item => item.description.trim().split(/\s+/).length > 128)
+    )
+      throw createApiServiceError(
+        'Each requirement description must contain no more than 128 words.'
+      );
     let client = new Client({ token: ctx.auth.token });
 
     let include: string[] = [];
@@ -90,15 +116,26 @@ export let maestroRun = SlateTool.create(spec, {
       models: ctx.input.models,
       budget: ctx.input.budget,
       include: include.length > 0 ? include : undefined,
-      responseLanguage: ctx.input.responseLanguage
+      responseLanguage: ctx.input.responseLanguage,
+      tools: [
+        ...(ctx.input.fileSearch
+          ? [
+              {
+                type: 'file_search',
+                file_ids: ctx.input.fileSearch.fileIds,
+                labels: ctx.input.fileSearch.labels,
+                retrieval_strategy: ctx.input.fileSearch.retrievalStrategy,
+                max_neighbors: ctx.input.fileSearch.maxNeighbors
+              }
+            ]
+          : []),
+        ...(ctx.input.webSearch
+          ? [{ type: 'web_search', urls: ctx.input.webSearch.urls }]
+          : [])
+      ]
     });
 
-    let output = {
-      result: result.result ?? result.output,
-      status: result.status,
-      requirementsResult: result.requirements_result,
-      dataSources: result.data_sources
-    };
+    let output = mapRun(result);
 
     let preview = output.result
       ? output.result.substring(0, 200) + (output.result.length > 200 ? '...' : '')
@@ -106,7 +143,7 @@ export let maestroRun = SlateTool.create(spec, {
 
     return {
       output,
-      message: `Maestro run completed with status **${output.status ?? 'unknown'}**.\n\n> ${preview}`
+      message: `Maestro run **${output.runId}** has status **${output.status}**.\n\n> ${preview}`
     };
   })
   .build();

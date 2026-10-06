@@ -25,11 +25,12 @@ export let listContacts = SlateTool.create(spec, {
   .output(
     z.object({
       contacts: z.array(z.record(z.string(), z.any())).describe('List of contacts'),
+      hasMore: z.boolean().optional().describe('Whether another page is available'),
       total: z.number().optional().describe('Total number of matching contacts')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.listContacts({
       email: ctx.input.email,
@@ -38,15 +39,14 @@ export let listContacts = SlateTool.create(spec, {
       skip: ctx.input.skip
     });
 
-    let contacts = result?.data ?? result?.items ?? (Array.isArray(result) ? result : []);
-    let total = result?.pagination?.total ?? result?.total;
+    let contacts = result.items;
 
     return {
       output: {
         contacts,
-        total
+        hasMore: result.hasMore
       },
-      message: `Found **${contacts.length}** contact(s).${total !== undefined ? ` Total: **${total}**.` : ''}`
+      message: `Found **${contacts.length}** contact(s).`
     };
   })
   .build();

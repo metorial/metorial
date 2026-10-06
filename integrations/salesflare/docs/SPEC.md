@@ -1,82 +1,15 @@
-The docs page seems to be a JavaScript-rendered page. Let me try searching for more details about the API features and webhooks.Let me get the Swagger/OpenAPI spec to understand the full API:Let me try fetching the Salesflare API docs JSON directly:Now I have enough information to compile the specification. Let me also look at the Knit developer page for more API details:Now I have comprehensive information to write the specification.
+# Salesflare API coverage
 
-# Slates Specification for Salesflare
+Current official reference: https://api.salesflare.com/openapi.json (Salesflare API 1.0.0, Swagger 2). Authentication is `Authorization: Bearer <API key>`, with HTTPS-only requests to api.salesflare.com. No token-refresh endpoint is documented.
 
-## Overview
+The 36 tools retain the original 34 keys and add internal note listing and custom-field discovery. Coverage includes account/contact/opportunity CRUD, task creation/listing/update/deletion, internal note creation/listing/update/deletion, tag CRUD, meeting/call logging, current user and team discovery, users, pipelines/stages, currencies and read-only workflows. Email campaigns, workflow mutation, data-source administration, merging existing contacts and broad custom-field administration are outside this surface.
 
-Salesflare is a CRM platform designed for small and medium-sized businesses selling B2B. It automates data entry by gathering information from emails, calendars, and social profiles, and provides features for managing contacts, accounts, sales pipelines, and email workflows. The API is a REST API available at `https://api.salesflare.com`.
+Contacts, tasks, meetings and calls are created using the documented single-item array request. Array query values are serialized as repeated parameters. Lists expose page counts, not invented totals. Internal note listing supports account/date bounds; tasks support exact ID filters through the list endpoint, since the public API provides no task detail GET.
 
-## Authentication
+Read outputs preserve provider metadata and required identifiers while omitting token/credential fields. Omitted pipeline default/recurring flags and stages remain absent; they do not imply false/empty state. Mutations reject invalid identifiers, empty changes and contradictory association lists before transport. Association readback reflects all completed account changes; failures warn that earlier changes can already have applied. No write is automatically retried.
 
-Salesflare uses bearer token authentication via API keys. You need to include the header `Authorization: Bearer APIKEY` with every request.
+Opportunity currency is selectable during creation. The legacy update currency input remains schema-compatible but produces explicit guidance because the current update route does not document that field. Opportunity tag-name filtering accepts one name per request, matching the documented scalar provider query while retaining the historical array input.
 
-To obtain an API key:
+Deleting an account can cascade to linked opportunities/tasks. Deleting a tag can remove assignments. Upserting an account can modify an existing domain match; contact force behavior affects duplicate handling. Task assignees/reminders and note mentions may notify users. Call logging creates permanent API activity without documented read/delete lifecycle; meeting deletion must not be presented as call cleanup.
 
-1. Navigate to **Settings > API keys** in your Salesflare account and click the orange "+" button to create a new API key.
-
-There is no OAuth2 flow. Salesflare uses API key-based authentication to secure its API. Each API key is tied to a user account and inherits that user's permissions.
-
-**Example header:**
-
-```
-Authorization: Bearer your_api_key_here
-```
-
-**Base URL:** `https://api.salesflare.com`
-
-## Features
-
-### Account Management
-
-Accounts represent companies or groups of contacts you sell to, and opportunities are sales opportunities with those accounts. You can create, read, update, and delete accounts, including details such as domain, website, description, addresses, email addresses, phone numbers, social profiles, tags, and custom fields. You can also manage which users and contacts are associated with an account.
-
-### Contact Management
-
-Contacts are the people who work in accounts. The API allows full CRUD operations on contacts with attributes such as name, email, phone numbers, addresses, roles, social profiles, tags, and custom fields. Contacts can be filtered by various criteria including modification date, making incremental syncing possible for contacts.
-
-- The contacts list method supports a `modification_after` query parameter, enabling incremental data loading.
-- However, the list methods for accounts and other objects don't support such parameters.
-
-### Opportunity & Pipeline Management
-
-The API allows retrieving and managing sales opportunities with filtering by stage, owner, account, value range, close date, creation date, and more. Opportunities include fields for value, currency, close date, probability, lost reason, lead source, recurring revenue, and custom fields. You can also list and manage pipelines and their stages.
-
-### Task Management
-
-Tasks can be created, updated, listed, and deleted. Tasks support assignees, reminder dates, descriptions, and can be linked to accounts. Different task types are supported (e.g., manual tasks, suggested tasks).
-
-### Internal Notes & Messages
-
-You can create, update, and delete internal notes on account timelines. Notes support mentions of team members and are linked to specific accounts.
-
-### Meeting & Call Logging
-
-The API supports creating, updating, and deleting meetings and calls. Meetings include date, participants, subject, description, and notes. Calls can be logged with similar fields.
-
-### Tag Management
-
-Tags can be assigned to accounts, contacts, and opportunities. The API allows creating, reading, updating, and deleting tags. You can also retrieve usage details for a tag across workflows, saved filters, and reports.
-
-### Custom Fields
-
-The API supports managing custom fields for accounts, contacts, and opportunities. You can create, update, delete, and list custom fields and their options. For opportunities, all custom fields are pipeline-specific.
-
-### Email Workflow Management
-
-The API allows listing, creating, updating, and managing email workflows. You can configure workflow filters, steps, scheduling, and manage workflow audience (re-enter or exit contacts from workflows). Merge fields for workflows can also be retrieved.
-
-### User & Team Management
-
-You can list users, retrieve user details, and manage user groups. The current authenticated user's details (including team, plan, and subscription info) can also be retrieved.
-
-### Email Data Sources
-
-You can list and update email data sources, including configuring email signatures and sending limits per day/hour.
-
-### Reference Data
-
-The API provides access to supported currencies, pipeline stages, filter fields for entities, and custom field types.
-
-## Events
-
-Salesflare does not have native endpoints for setting up real-time notifications or webhooks. The provider does not support events through a built-in webhook or event subscription mechanism in its own API.
+The API uses HTTP status errors, including 429. No numerical rate quota or automatic retry guarantee is inferred. Transport errors omit credentials, raw request/response bodies and authentication-bearing causes.

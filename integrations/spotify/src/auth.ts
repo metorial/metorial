@@ -1,6 +1,83 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { SpotifyClient } from './lib/client';
+import { protect, spotifyError } from './lib/validation';
 
+async function exchange(
+  clientId: string,
+  clientSecret: string,
+  fields: Record<string, string>,
+  previous?: string
+) {
+  if (!clientId || !clientSecret)
+    throw createApiServiceError(
+      'Configure the Spotify OAuth client and secret before connecting.'
+    );
+  const axios = createAuthenticatedAxios({
+    baseURL: 'https://accounts.spotify.com',
+    authHeader: {
+      value: `Basic ${Buffer.from(`${clientId}:${clientSecret}`, 'utf8').toString('base64')}`
+    },
+    contentType: 'application/x-www-form-urlencoded',
+    maxRedirects: 0,
+    timeout: 30000,
+    maxContentLength: 1024 * 1024,
+    errorMapping: {
+      extractResponseData: response => ({
+        error: { status: response.status, message: 'Spotify authorization was rejected.' }
+      })
+    },
+    errorAdapter: error => spotifyError(error)
+  });
+  try {
+    const response = await axios.post<unknown>(
+      '/api/token',
+      new URLSearchParams(fields).toString()
+    );
+    if (response.status !== 200)
+      throw createApiServiceError(
+        'Spotify returned an unexpected authorization status. Reconnect before retrying.'
+      );
+    const schema = z.object({
+      access_token: z.string().min(1),
+      refresh_token: z.string().min(1).optional(),
+      expires_in: z.number().int().positive().max(31536000),
+      token_type: z.string().regex(/^Bearer$/i)
+    });
+    const parsed = schema.safeParse(response.data);
+    if (!parsed.success)
+      throw createApiServiceError(
+        'Spotify returned incomplete authorization credentials or expiry. Reconnect the account.'
+      );
+    const raw = response.data as Record<string, unknown>;
+    const extras = Object.fromEntries(
+      Object.entries(raw).filter(([key]) => !['access_token', 'refresh_token'].includes(key))
+    );
+    protect(
+      { extras, headers: response.headers },
+      [
+        clientSecret,
+        fields.code ?? fields.refresh_token ?? '',
+        parsed.data.access_token,
+        parsed.data.refresh_token ?? '',
+        previous ?? ''
+      ].filter(v => v.length > 0)
+    );
+    return normalizeOAuthTokenResponse(parsed.data, {
+      providerLabel: 'Spotify',
+      previousRefreshToken: previous,
+      required: true,
+      expiresInType: 'number'
+    });
+  } catch (error) {
+    throw spotifyError(error);
+  }
+}
 export let auth = SlateAuth.create()
   .output(
     z.object({
@@ -13,13 +90,7 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'Spotify OAuth',
     key: 'spotify_oauth',
-
     scopes: [
-      {
-        title: 'Upload Images',
-        description: 'Upload custom cover images to playlists',
-        scope: 'ugc-image-upload'
-      },
       {
         title: 'Read Playback State',
         description: 'Read access to the current playback state and available devices',
@@ -34,16 +105,6 @@ export let auth = SlateAuth.create()
         title: 'Read Currently Playing',
         description: 'Read access to the currently playing track or episode',
         scope: 'user-read-currently-playing'
-      },
-      {
-        title: 'App Remote Control',
-        description: 'Remote control playback on Spotify clients',
-        scope: 'app-remote-control'
-      },
-      {
-        title: 'Streaming',
-        description: 'Stream music via the Spotify SDK',
-        scope: 'streaming'
       },
       {
         title: 'Read Private Playlists',
@@ -76,11 +137,6 @@ export let auth = SlateAuth.create()
         scope: 'user-follow-read'
       },
       {
-        title: 'Read Playback Position',
-        description: 'Read access to playback position for audiobooks and podcasts',
-        scope: 'user-read-playback-position'
-      },
-      {
         title: 'Read Top Items',
         description: "Read access to the user's top artists and tracks",
         scope: 'user-top-read'
@@ -111,126 +167,43 @@ export let auth = SlateAuth.create()
         scope: 'user-read-private'
       }
     ],
-
-    getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
-        client_id: ctx.clientId,
-        response_type: 'code',
-        redirect_uri: ctx.redirectUri,
-        state: ctx.state,
-        scope: ctx.scopes.join(' ')
-      });
-
-      return {
-        url: `https://accounts.spotify.com/authorize?${params.toString()}`
-      };
-    },
-
-    handleCallback: async ctx => {
-      let axios = createAxios({ baseURL: 'https://accounts.spotify.com' });
-
-      let response = await axios.post(
-        '/api/token',
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Authorization: `Basic ${btoa(`${ctx.clientId}:${ctx.clientSecret}`)}`
-          }
-        }
-      );
-
-      let data = response.data as {
-        access_token: string;
-        refresh_token: string;
-        expires_in: number;
-        token_type: string;
-      };
-
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      let axios = createAxios({ baseURL: 'https://accounts.spotify.com' });
-
-      let response = await axios.post(
-        '/api/token',
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Authorization: `Basic ${btoa(`${ctx.clientId}:${ctx.clientSecret}`)}`
-          }
-        }
-      );
-
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in: number;
-        token_type: string;
-      };
-
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
-        }
-      };
-    },
-
-    getProfile: async (ctx: {
+    getAuthorizationUrl: async ctx => ({
+      url: `https://accounts.spotify.com/authorize?${new URLSearchParams({ client_id: ctx.clientId, response_type: 'code', redirect_uri: ctx.redirectUri, state: ctx.state, scope: ctx.scopes.join(' ') })}`
+    }),
+    handleCallback: async ctx => ({
+      output: await exchange(ctx.clientId, ctx.clientSecret, {
+        grant_type: 'authorization_code',
+        code: ctx.code,
+        redirect_uri: ctx.redirectUri
+      })
+    }),
+    handleTokenRefresh: async (ctx: {
       output: { token: string; refreshToken?: string; expiresAt?: string };
-      input: {};
-      scopes: string[];
+      clientId: string;
+      clientSecret: string;
     }) => {
-      let axios = createAxios({ baseURL: 'https://api.spotify.com/v1' });
-
-      let response = await axios.get('/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let data = response.data as {
-        id: string;
-        email?: string;
-        display_name?: string;
-        images?: Array<{ url: string }>;
-        product?: string;
-        country?: string;
+      if (!ctx.output.refreshToken)
+        throw createApiServiceError('No refresh token is available. Reconnect Spotify.');
+      return {
+        output: await exchange(
+          ctx.clientId,
+          ctx.clientSecret,
+          { grant_type: 'refresh_token', refresh_token: ctx.output.refreshToken },
+          ctx.output.refreshToken
+        )
       };
-
+    },
+    getProfile: async (ctx: { output: { token: string; refreshToken?: string } }) => {
+      const data = await new SpotifyClient({
+        token: ctx.output.token,
+        refreshToken: ctx.output.refreshToken
+      }).getCurrentUser();
       return {
         profile: {
-          id: data.id,
+          id: data.account_id ?? data.id,
+          name: data.display_name ?? undefined,
           email: data.email,
-          name: data.display_name,
-          imageUrl: data.images?.[0]?.url,
-          product: data.product,
-          country: data.country
+          imageUrl: data.images?.[0]?.url
         }
       };
     }

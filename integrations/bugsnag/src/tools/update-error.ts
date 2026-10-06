@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugsnagClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let updateError = SlateTool.create(spec, {
   name: 'Update Error',
   key: 'update_error',
-  description: `Update the status or assignment of a Bugsnag error. Set the error status to open, fixed, snoozed, or ignored, assign it to a collaborator, or update its severity. Can also bulk-update multiple errors at once.`,
+  description: `Update the status or assignment of a Bugsnag error. Set the error status to open, fixed, snoozed, or ignored, assign it to a collaborator, or update its severity. Multiple explicitly identified errors and fields are applied as separate provider operations. Earlier changes remain if a later operation fails; results are read back before reporting success.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -40,44 +40,83 @@ export let updateError = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
-    let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('Project ID is required.');
-
-    let updateData: Record<string, any> = {};
-    if (ctx.input.status) updateData.status = ctx.input.status;
-    if (ctx.input.severity) updateData.severity = ctx.input.severity;
-    if (ctx.input.assignedCollaboratorId)
-      updateData.assigned_collaborator_id = ctx.input.assignedCollaboratorId;
-
-    if (ctx.input.errorIds && ctx.input.errorIds.length > 0) {
-      await client.bulkUpdateErrors(projectId, {
-        operation: 'update',
-        errorIds: ctx.input.errorIds,
-        ...updateData
+    const client = new BugsnagClient(ctx.auth);
+    const projectId = ctx.input.projectId || ctx.config.projectId;
+    if (!projectId) throw createApiServiceError('Project ID is required.');
+    if (ctx.input.errorId && ctx.input.errorIds?.length)
+      throw createApiServiceError('Supply errorId or errorIds, not both.');
+    const ids = [
+      ...new Set(
+        ctx.input.errorIds?.length
+          ? ctx.input.errorIds
+          : ctx.input.errorId
+            ? [ctx.input.errorId]
+            : []
+      )
+    ];
+    if (!ids.length || ids.some(id => !id.trim()))
+      throw createApiServiceError('Supply at least one non-blank error ID.');
+    if (ids.length > 100)
+      throw createApiServiceError(
+        'Update at most 100 explicitly identified errors per invocation.'
+      );
+    const operations: Record<string, unknown>[] = [];
+    if (ctx.input.severity !== undefined)
+      operations.push({ operation: 'override_severity', severity: ctx.input.severity });
+    if (ctx.input.assignedCollaboratorId !== undefined)
+      operations.push({
+        operation: 'assign',
+        assigned_collaborator_id: ctx.input.assignedCollaboratorId
       });
-
-      return {
-        output: {
-          updated: true,
-          errorCount: ctx.input.errorIds.length,
-          status: ctx.input.status
-        },
-        message: `Bulk updated **${ctx.input.errorIds.length}** errors.${ctx.input.status ? ` Status set to **${ctx.input.status}**.` : ''}`
-      };
+    if (ctx.input.status !== undefined)
+      operations.push({
+        operation: { open: 'open', fixed: 'fix', snoozed: 'snooze', ignored: 'ignore' }[
+          ctx.input.status
+        ]
+      });
+    if (!operations.length)
+      throw createApiServiceError(
+        'Supply status, severity, or assignedCollaboratorId to update.'
+      );
+    let completed = 0;
+    let status: string | undefined;
+    for (const id of ids) {
+      try {
+        for (const operation of operations) await client.updateError(projectId, id, operation);
+        const actual = await client.getError(projectId, id);
+        if (actual.id !== id)
+          throw createApiServiceError('Bugsnag returned a different error after updating.');
+        if (
+          ctx.input.severity !== undefined &&
+          (actual.overridden_severity ?? actual.severity) !== ctx.input.severity
+        )
+          throw createApiServiceError('Bugsnag did not apply the requested severity.');
+        if (
+          ctx.input.assignedCollaboratorId !== undefined &&
+          (actual.assigned_collaborator_id ?? '') !== ctx.input.assignedCollaboratorId
+        )
+          throw createApiServiceError(
+            'Bugsnag did not apply the requested assignee. Confirm the collaborator accepted their invitation and can access the project.'
+          );
+        if (ctx.input.status !== undefined && actual.status !== ctx.input.status)
+          throw createApiServiceError('Bugsnag did not apply the requested error status.');
+        status = actual.status ?? undefined;
+        completed++;
+      } catch (error) {
+        throw createApiServiceError(
+          `Error update stopped after ${completed} of ${ids.length} errors completed. Earlier changes remain; inspect the requested IDs before retrying. ${error instanceof Error ? error.message : 'Provider request failed.'}`,
+          { reason: 'partial_update', parent: error }
+        );
+      }
     }
-
-    if (!ctx.input.errorId) throw new Error('Either errorId or errorIds is required.');
-
-    let error = await client.updateError(projectId, ctx.input.errorId, updateData);
-
     return {
       output: {
         updated: true,
-        errorId: error.id,
-        status: error.status
+        errorId: ids.length === 1 ? ids[0] : undefined,
+        errorCount: completed,
+        status
       },
-      message: `Updated error \`${error.id}\`.${ctx.input.status ? ` Status: **${ctx.input.status}**.` : ''}${ctx.input.assignedCollaboratorId ? ` Assigned to \`${ctx.input.assignedCollaboratorId}\`.` : ''}`
+      message: `Updated and read back **${completed}** error(s).`
     };
   })
   .build();

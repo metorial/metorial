@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoneybirdClient } from '../lib/client';
+import { administrationIdSchema } from '../lib/schemas';
+import { checkedOutput, exactId, validateToolInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let contactSchema = z.object({
@@ -18,16 +20,23 @@ let contactSchema = z.object({
   archived: z.boolean().describe('Whether the contact is archived')
 });
 
+const outputSchema = z.object({
+  nextPage: z.number().int().positive().optional(),
+  previousPage: z.number().int().positive().optional(),
+  contacts: z.array(contactSchema)
+});
+
 export let listContacts = SlateTool.create(spec, {
   name: 'List Contacts',
   key: 'list_contacts',
-  description: `Search and list contacts (customers and suppliers) in Moneybird. Supports text search across company name, names, email, phone, customer ID, and other fields. Use pagination to browse large contact lists.`,
+  description: `Search and list contacts (customers and suppliers) in Moneybird. Supports text search across company name, names, email, phone, customer ID, and other fields. Use pagination to browse large contact lists. Call list_administrations to choose administrationId when no default is saved.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      administrationId: administrationIdSchema,
       query: z
         .string()
         .optional()
@@ -37,41 +46,44 @@ export let listContacts = SlateTool.create(spec, {
       includeArchived: z.boolean().optional().describe('Include archived contacts in results')
     })
   )
-  .output(
-    z.object({
-      contacts: z.array(contactSchema)
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new MoneybirdClient({
-      token: ctx.auth.token,
-      administrationId: ctx.config.administrationId
+    validateToolInput('list_contacts', ctx.input);
+    return checkedOutput(outputSchema, async () => {
+      let client = new MoneybirdClient({
+        token: ctx.auth.token,
+        administrationId: ctx.input.administrationId ?? ctx.config.administrationId
+      });
+
+      let contacts = await client.listContacts({
+        query: ctx.input.query,
+        page: ctx.input.page,
+        perPage: ctx.input.perPage,
+        includeArchived: ctx.input.includeArchived
+      });
+
+      let mapped = contacts.map((c: any) => ({
+        contactId: exactId(c.id),
+        companyName: c.company_name ?? null,
+        firstName: c.firstname ?? null,
+        lastName: c.lastname ?? null,
+        customerId: c.customer_id ?? null,
+        email: c.email ?? null,
+        phone: c.phone ?? null,
+        city: c.city ?? null,
+        country: c.country ?? null,
+        deliveryMethod: c.delivery_method ?? null,
+        taxNumber: c.tax_number ?? null,
+        archived: c.archived
+      }));
+
+      return {
+        output: {
+          contacts: mapped,
+          ...client.pagination
+        },
+        message: `Found ${mapped.length} contact(s).`
+      };
     });
-
-    let contacts = await client.listContacts({
-      query: ctx.input.query,
-      page: ctx.input.page,
-      perPage: ctx.input.perPage,
-      includeArchived: ctx.input.includeArchived
-    });
-
-    let mapped = contacts.map((c: any) => ({
-      contactId: String(c.id),
-      companyName: c.company_name || null,
-      firstName: c.firstname || null,
-      lastName: c.lastname || null,
-      customerId: c.customer_id || null,
-      email: c.email || null,
-      phone: c.phone || null,
-      city: c.city || null,
-      country: c.country || null,
-      deliveryMethod: c.delivery_method || null,
-      taxNumber: c.tax_number || null,
-      archived: c.archived || false
-    }));
-
-    return {
-      output: { contacts: mapped },
-      message: `Found ${mapped.length} contact(s)${ctx.input.query ? ` matching "${ctx.input.query}"` : ''}.`
-    };
-  });
+  })
+  .build();

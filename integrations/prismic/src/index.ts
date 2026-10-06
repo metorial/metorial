@@ -7,9 +7,11 @@ import {
   deleteAsset,
   deleteCustomType,
   deleteSharedSlice,
+  downloadAsset,
   getCustomType,
   getDocument,
   getRepositoryInfo,
+  getSharedSlice,
   listAssets,
   listCustomTypes,
   listSharedSlices,
@@ -20,11 +22,11 @@ import {
   updateSharedSlice,
   uploadAsset
 } from './tools';
-import { documentChanges, releaseChanges, tagChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getSharedSlice,
+    downloadAsset,
     queryDocuments,
     getDocument,
     getRepositoryInfo,
@@ -44,5 +46,5 @@ export let provider = Slate.create({
     createMigrationDocument,
     updateMigrationDocument
   ],
-  triggers: [documentChanges, releaseChanges, tagChanges]
+  triggers: []
 });

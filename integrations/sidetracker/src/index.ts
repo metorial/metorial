@@ -12,8 +12,6 @@ import {
   updateSalesStatus,
   updateSessionMetadata
 } from './tools';
-import { listRowCreated, listRowUpdated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     executeTrigger,
     addSessionNote
   ],
-  triggers: [listRowCreated, listRowUpdated]
+  triggers: []
 });

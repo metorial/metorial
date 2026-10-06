@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 let analysisStatsSchema = z
@@ -19,7 +20,10 @@ let analysisStatsSchema = z
 export let getFileReport = SlateTool.create(spec, {
   name: 'Get File Report',
   key: 'get_file_report',
-  description: `Retrieve the full analysis report for a file by its hash. Returns detection results from 70+ antivirus engines, file metadata, reputation scores, and community votes. Use SHA-256, SHA-1, or MD5 hash to look up the file.`,
+  description: `Retrieve the available summarized analysis report for a file by its hash. Returns the available detection results, file metadata, reputation scores, and community votes. Use SHA-256, SHA-1, or MD5 hash to look up the file.`,
+  constraints: [
+    'Use non-sensitive public indicators; submitted or queried indicators may be scanned and included in the community dataset.'
+  ],
   tags: {
     readOnly: true
   }
@@ -39,7 +43,11 @@ export let getFileReport = SlateTool.create(spec, {
       fileName: z.string().optional().describe('Meaningful name of the file'),
       fileSize: z.number().optional().describe('File size in bytes'),
       fileTypeTag: z.string().optional().describe('Detected file type tag'),
-      fileTypeMime: z.string().optional().describe('MIME type of the file'),
+      fileTypeMime: z
+        .string()
+        .optional()
+        .describe('Provider file type description; historical field name, not a MIME value'),
+      fileTypeDescription: z.string().optional().describe('Provider file type description'),
       reputation: z.number().optional().describe('Community reputation score'),
       totalVotes: z
         .object({
@@ -64,19 +72,14 @@ export let getFileReport = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    let client = new Client(ctx.auth);
     let result = await client.getFileReport(ctx.input.fileHash);
     let attrs = result?.attributes ?? {};
 
-    let malicious = attrs.last_analysis_stats?.malicious ?? 0;
-    let total = Object.values(attrs.last_analysis_stats ?? {}).reduce(
-      (sum: number, v) => sum + (typeof v === 'number' ? v : 0),
-      0
-    );
-
     return {
       output: {
-        fileId: result?.id ?? '',
+        fileId: result.id,
         fileType: result?.type,
         sha256: attrs.sha256,
         sha1: attrs.sha1,
@@ -85,6 +88,7 @@ export let getFileReport = SlateTool.create(spec, {
         fileSize: attrs.size,
         fileTypeTag: attrs.type_tag,
         fileTypeMime: attrs.type_description,
+        fileTypeDescription: attrs.type_description,
         reputation: attrs.reputation,
         totalVotes: attrs.total_votes
           ? {
@@ -109,7 +113,8 @@ export let getFileReport = SlateTool.create(spec, {
         firstSubmissionDate: attrs.first_submission_date?.toString(),
         timesSubmitted: attrs.times_submitted
       },
-      message: `**File report for** \`${ctx.input.fileHash}\`\n- **Name:** ${attrs.meaningful_name ?? 'Unknown'}\n- **Detection:** ${malicious}/${total} engines flagged as malicious\n- **Reputation:** ${attrs.reputation ?? 'N/A'}\n- **Size:** ${attrs.size ? `${attrs.size} bytes` : 'N/A'}`
+      message:
+        'Retrieved the available VirusTotal report. Missing analysis statistics are not a zero-detection result.'
     };
   })
   .build();

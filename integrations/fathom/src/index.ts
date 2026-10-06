@@ -7,10 +7,8 @@ import {
   listMeetings,
   listTeams
 } from './tools';
-import { meetingContentReady } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [listMeetings, getMeetingDetails, getTranscript, getSummary, listTeams],
-  triggers: [meetingContentReady]
+  triggers: []
 });

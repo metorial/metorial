@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'strapi',
   name: 'Strapi',
   description:
-    'Open-source headless CMS with custom content types, REST and GraphQL APIs, media management, internationalization, draft/publish workflows, and role-based access control.',
+    'Read and manage authorized content entries and media in a configured Strapi 4 or 5 instance using its Content REST API.',
   metadata: {},
   config,
   auth

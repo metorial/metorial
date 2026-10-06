@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { permissionsSchema } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let inviteMember = SlateTool.create(spec, {
   name: 'Invite Member',
   key: 'invite_member',
-  description: `Invite a new member to the Bitwarden organization by email. You can assign a role, grant access to all collections, or specify individual collection assignments.`,
+  description: `Invite a new member to the Bitwarden organization by email. You can assign a role, specify individual collection assignments and supported permission flags. The current Public API does not accept the legacy accessAll flag.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -18,17 +19,36 @@ export let inviteMember = SlateTool.create(spec, {
       type: z
         .number()
         .default(2)
-        .describe('Role to assign: 0=Owner, 1=Admin, 2=User, 3=Manager'),
+        .describe(
+          'Role to assign: 0=Owner, 1=Admin, 2=User, 4=Custom; legacy role 3 is unsupported'
+        ),
       accessAll: z
         .boolean()
         .default(false)
-        .describe('Whether to grant access to all collections'),
+        .describe(
+          'Legacy field: false only. Use explicit collection assignments; true is unsupported by the current Public API.'
+        ),
+      permissions: permissionsSchema
+        .optional()
+        .describe('Explicit complete Custom-role permissions; required when type is 4.'),
       externalId: z.string().optional().describe('External ID for directory sync'),
       collections: z
         .array(
           z.object({
             collectionId: z.string().describe('Collection ID to assign'),
-            readOnly: z.boolean().default(false).describe('Whether access is read-only')
+            readOnly: z.boolean().default(false).describe('Whether access is read-only'),
+            hidePasswords: z
+              .boolean()
+              .optional()
+              .describe(
+                'Hide passwords permission; omitted values preserve existing assignment settings on updates.'
+              ),
+            manage: z
+              .boolean()
+              .optional()
+              .describe(
+                'Manage collection permission; omitted values preserve existing assignment settings on updates.'
+              )
           })
         )
         .optional()
@@ -45,18 +65,20 @@ export let inviteMember = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.auth.serverUrl
+      ...ctx.auth
     });
 
     let result = await client.inviteMember({
+      permissions: ctx.input.permissions,
       email: ctx.input.email,
       type: ctx.input.type,
       accessAll: ctx.input.accessAll,
       externalId: ctx.input.externalId,
       collections: ctx.input.collections?.map(c => ({
         id: c.collectionId,
-        readOnly: c.readOnly
+        readOnly: c.readOnly,
+        hidePasswords: c.hidePasswords,
+        manage: c.manage
       }))
     });
 

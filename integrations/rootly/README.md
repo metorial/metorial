@@ -1,6 +1,12 @@
 # <img src="logo.jpeg" height="20"> Rootly
 
-Manage the full incident lifecycle including creating, updating, triaging, mitigating, and resolving incidents. Ingest and route alerts from monitoring tools, configure alert sources, and attach alerts to incidents. Manage on-call schedules, rotations, override shifts, and escalation policies with multi-level routing. Create automated workflows triggered by incident or alert events. Track post-incident retrospectives and action items. Maintain a service catalog with custom properties, functionalities, and environments. Configure status pages to communicate outage information. Define playbooks with ordered tasks for standardized incident response. Manage teams, users, notification rules, and role assignments. Create dashboards with panels for incident metrics. Monitor system health via heartbeats, configure live call routing to on-call responders, and manage outbound webhooks for real-time event notifications.
+Find, create, update and delete incidents and their follow-up action items. Inspect, ingest, acknowledge and resolve alerts. Create, inspect, update and delete heartbeat monitors, and read current on-call coverage, schedules, escalation policies, services, teams, users, workflows, severities and environments.
+
+Connect with a Rootly API key. The key's Global, Team or Personal scope and assigned roles determine which resources and operations are available. The current user is checked when connecting.
+
+List tools validate the provider's page metadata and related resources. On-call pagination applies to Rootly's complete current-coverage response. Alert search and sorting, and action-item search, apply within the fetched page. For a selected incident, action-item status filtering and sorting also apply within the fetched page; filtered totals are omitted. Action-item updates verify membership in the supplied incident. Incident updates preserve the existing kind and privacy setting unless a supported privacy change is requested.
+
+Creating incidents, ingesting alerts and enabling heartbeats can trigger notifications or configured automation. Verify the target before performing changes. Open alerts cannot be acknowledged. Incident, action-item and heartbeat deletion is permanent. Resolving an alert does not resolve its associated incidents. Heartbeat details omit the ping bearer secret; retrieve that secret from Rootly when configuring a ping sender.
 
 ## License
 

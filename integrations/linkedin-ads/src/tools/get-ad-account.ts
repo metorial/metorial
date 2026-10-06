@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdField } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getAdAccount = SlateTool.create(spec, {
@@ -12,13 +13,18 @@ export let getAdAccount = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('r_ads', 'rw_ads'))
   .input(
     z.object({
-      accountId: z.string().describe('Numeric ID of the ad account')
+      accountId: accountIdField
     })
   )
   .output(
     z.object({
+      test: z
+        .boolean()
+        .optional()
+        .describe('Provider test account flag; test ads are not served or billed'),
       accountId: z.number().describe('Numeric ID of the ad account'),
       name: z.string().describe('Name of the ad account'),
       status: z.string().describe('Account status'),
@@ -45,6 +51,7 @@ export let getAdAccount = SlateTool.create(spec, {
     return {
       output: {
         accountId: account.id,
+        test: account.test,
         name: account.name,
         status: account.status,
         type: account.type,

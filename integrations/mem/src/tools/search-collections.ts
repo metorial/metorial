@@ -7,6 +7,9 @@ export let searchCollections = SlateTool.create(spec, {
   name: 'Search Collections',
   key: 'search_collections',
   description: `Search across your Mem collections using a text query. Returns matching collections ranked by relevance.`,
+  instructions: [
+    'Results are a bounded general/relevance set and have no cursor. Use list_collections for chronological discovery with continuation. An omitted query is supported by the native collection search API.'
+  ],
   tags: {
     readOnly: true,
     destructive: false

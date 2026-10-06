@@ -18,8 +18,6 @@ import {
   updateActivity,
   updateAthlete
 } from './tools';
-import { activityEvent, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     listClubs,
     getGear
   ],
-  triggers: [inboundWebhook, activityEvent]
+  triggers: []
 });

@@ -6,19 +6,20 @@ import {
   createEditorSession,
   createSignedUrl,
   diagnoseImage,
+  downloadFile,
   generateAnimatedGif,
   generateCollection,
   generateImage,
   generateVideo,
   getAccount,
+  getResource,
   getTemplate,
   joinPdfs,
+  listResources,
   listTemplates,
   manageTemplate,
   rasterizePdf
 } from './tools';
-import { mediaEvent, templateEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,7 +37,10 @@ export let provider = Slate.create({
     joinPdfs,
     rasterizePdf,
     diagnoseImage,
-    getAccount
+    getAccount,
+    getResource,
+    listResources,
+    downloadFile
   ],
-  triggers: [templateEvent, mediaEvent]
+  triggers: []
 });

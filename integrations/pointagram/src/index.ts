@@ -12,8 +12,6 @@ import {
   manageTeamMembership,
   removePlayer
 } from './tools';
-import { inboundWebhook, newPlayer } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     listScoreHistory,
     listCompetitions
   ],
-  triggers: [inboundWebhook, newPlayer]
+  triggers: []
 });

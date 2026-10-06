@@ -21,8 +21,6 @@ import {
   textToSpeech,
   voiceChanger
 } from './tools';
-import { speechToTextCompletion, voiceAgentCall, voiceRemoval } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     getHistoryAudio,
     getAccount
   ],
-  triggers: [voiceAgentCall, speechToTextCompletion, voiceRemoval]
+  triggers: []
 });

@@ -50,15 +50,6 @@ import {
   updateProduct,
   updateTicket
 } from './tools';
-import {
-  appointmentEvents,
-  customerEvents,
-  invoiceEvents,
-  leadEvents,
-  paymentEvents,
-  ticketEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -111,12 +102,5 @@ export let provider = Slate.create({
     createClockEntry,
     updateClockEntry
   ],
-  triggers: [
-    ticketEvents,
-    customerEvents,
-    invoiceEvents,
-    paymentEvents,
-    leadEvents,
-    appointmentEvents
-  ]
+  triggers: []
 });

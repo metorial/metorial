@@ -3,31 +3,47 @@ import { spec } from './spec';
 import {
   createAgent,
   createBatchCall,
+  createKnowledgeBase,
+  createRetellLlm,
   createWebCall,
   deleteAgent,
   deleteCall,
   deleteKnowledgeBase,
   deletePhoneNumber,
+  deleteRetellLlm,
+  downloadCallRecording,
   getAgent,
   getCall,
   getConcurrency,
+  getFileUrl,
   getKnowledgeBase,
   getPhoneNumber,
+  getRetellLlm,
   listAgents,
   listCalls,
   listKnowledgeBases,
   listPhoneNumbers,
+  listRetellLlms,
   listVoices,
   makePhoneCall,
+  publishAgent,
   purchasePhoneNumber,
   updateAgent,
-  updatePhoneNumber
+  updatePhoneNumber,
+  updateRetellLlm
 } from './tools';
-import { callEvents, transferEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    createKnowledgeBase,
+    createRetellLlm,
+    getRetellLlm,
+    listRetellLlms,
+    updateRetellLlm,
+    deleteRetellLlm,
+    publishAgent,
+    downloadCallRecording,
+    getFileUrl,
     listAgents,
     getAgent,
     createAgent,
@@ -50,5 +66,5 @@ export let provider = Slate.create({
     listVoices,
     getConcurrency
   ],
-  triggers: [callEvents, transferEvents]
+  triggers: []
 });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getRepository = SlateTool.create(spec, {
@@ -38,7 +39,7 @@ Provide the full repository name (e.g., \`github.com/owner/repo\`).`,
           })
         )
         .optional()
-        .describe('Repository branches'),
+        .describe('First 100 repository branches; inspect branchesHasNextPage'),
       branchCount: z.number().optional().describe('Total number of branches'),
       tags: z
         .array(
@@ -48,29 +49,28 @@ Provide the full repository name (e.g., \`github.com/owner/repo\`).`,
           })
         )
         .optional()
-        .describe('Repository tags'),
-      tagCount: z.number().optional().describe('Total number of tags')
+        .describe('First 100 repository tags; inspect tagsHasNextPage'),
+      tagCount: z.number().optional().describe('Total number of tags'),
+      branchesHasNextPage: z.boolean().optional(),
+      tagsHasNextPage: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
     let data = await client.getRepository(ctx.input.repositoryName);
     let repo = data.repository;
 
     if (!repo) {
-      throw new Error(`Repository not found: ${ctx.input.repositoryName}`);
+      throw fail(`Repository not found: ${ctx.input.repositoryName}`);
     }
 
-    let branches = (repo.branches?.nodes || []).map((b: any) => ({
+    let branches = (repo.branches?.nodes || []).map(b => ({
       name: b.name,
       commitOid: b.target?.oid
     }));
 
-    let tags = (repo.tags?.nodes || []).map((t: any) => ({
+    let tags = (repo.tags?.nodes || []).map(t => ({
       name: t.name,
       commitOid: t.target?.oid
     }));
@@ -80,19 +80,21 @@ Provide the full repository name (e.g., \`github.com/owner/repo\`).`,
         repositoryId: repo.id,
         name: repo.name,
         url: repo.url,
-        description: repo.description || undefined,
-        createdAt: repo.createdAt || undefined,
+        description: repo.description ?? undefined,
+        createdAt: repo.createdAt ?? undefined,
         cloned: repo.mirrorInfo?.cloned,
         cloneInProgress: repo.mirrorInfo?.cloneInProgress,
-        lastCloneError: repo.mirrorInfo?.lastError || undefined,
-        serviceType: repo.externalRepository?.serviceType || undefined,
-        defaultBranch: repo.defaultBranch?.name || undefined,
+        lastCloneError: repo.mirrorInfo?.lastError ?? undefined,
+        serviceType: repo.externalRepository?.serviceType ?? undefined,
+        defaultBranch: repo.defaultBranch?.name ?? undefined,
         branches,
         branchCount: repo.branches?.totalCount,
         tags,
-        tagCount: repo.tags?.totalCount
+        tagCount: repo.tags?.totalCount,
+        branchesHasNextPage: repo.branches?.pageInfo.hasNextPage,
+        tagsHasNextPage: repo.tags?.pageInfo.hasNextPage
       },
-      message: `Repository **${repo.name}** — ${repo.mirrorInfo?.cloned ? 'cloned' : 'not cloned'}, default branch: ${repo.defaultBranch?.name || 'unknown'}, ${repo.branches?.totalCount || 0} branches, ${repo.tags?.totalCount || 0} tags.`
+      message: `Repository **${repo.name}** — ${repo.mirrorInfo?.cloned ? 'cloned' : 'not cloned'}, default branch: ${repo.defaultBranch?.name ?? 'unknown'}, ${repo.branches?.totalCount ?? 0} branches, ${repo.tags?.totalCount ?? 0} tags.`
     };
   })
   .build();

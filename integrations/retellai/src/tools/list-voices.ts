@@ -21,7 +21,8 @@ export let listVoices = SlateTool.create(spec, {
           'cartesia',
           'minimax',
           'fish_audio',
-          'platform'
+          'platform',
+          'inworld'
         ])
         .optional()
         .describe('Filter voices by provider'),

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/taxjar",
-  "description": "Calculate sales tax for US orders with jurisdiction-level breakdowns by state, county, city, and special district. Look up tax rates by ZIP code or address. Manage order and refund transactions for sales tax reporting and filing. Create and manage exempt customers (wholesale, government, etc.) with region-specific exemptions. List product tax categories and tax codes for product-level exemptions. Retrieve nexus regions where tax obligations exist. Validate and standardize US addresses with ZIP+4 precision.",
+  "description": "Calculate sales tax, inspect rates and tax categories, manage order and refund reporting records and customer exemptions, read configured nexus regions, and validate supported US addresses.",
   "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
   "skills": [
     "calculate sales tax",

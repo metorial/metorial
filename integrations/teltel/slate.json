@@ -9,7 +9,6 @@
     "verify phone numbers",
     "retrieve call data and recordings",
     "send bulk SMS campaigns",
-    "receive inbound SMS webhooks",
     "manage campaign contacts",
     "manage users and SIP devices",
     "configure call forwarding"

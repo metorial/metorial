@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { fetchOEmbed, findLoomUrls } from '../lib/client';
+import { fetchOEmbed, findLoomUrlMatches, invalid, MAX_RESULT_BYTES } from '../lib/client';
 import { spec } from '../spec';
 
 export let replaceLoomUrls = SlateTool.create(spec, {
@@ -8,8 +8,8 @@ export let replaceLoomUrls = SlateTool.create(spec, {
   key: 'replace_loom_urls',
   description: `Find all Loom video URLs in a block of text and replace them with embedded video player HTML. Scans for Loom share and embed URLs, fetches their oEmbed data, and substitutes each URL with the corresponding embed HTML. Useful for processing user-generated content, messages, or documents that contain Loom links.`,
   constraints: [
-    'Each unique Loom URL found triggers a separate oEmbed API request.',
-    'Invalid or inaccessible Loom URLs are left unchanged in the text.'
+    'Each unique valid Loom URL triggers one anonymous oEmbed request; local bounds are 1 MiB input, 20 unique URLs and 2 MiB result.',
+    'Invalid or unavailable URLs remain unchanged. Failed URLs are reported; urlsReplaced counts unique successful URLs, while occurrencesReplaced counts all replaced occurrences.'
   ],
   tags: {
     readOnly: true,
@@ -23,7 +23,19 @@ export let replaceLoomUrls = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      replacedText: z.string().describe('Text with Loom URLs replaced by embed HTML'),
+      replacedText: z
+        .string()
+        .describe(
+          'Text with confirmed Loom URLs replaced by native embed HTML; other text is preserved, not sanitized'
+        ),
+      occurrencesReplaced: z
+        .number()
+        .describe('Total replaced URL occurrences, including duplicates'),
+      failedUrls: z
+        .array(z.object({ originalUrl: z.string(), reason: z.string() }))
+        .describe(
+          'Valid URLs whose native metadata could not be confirmed and remain unchanged'
+        ),
       urlsFound: z.number().describe('Number of Loom URLs found in the text'),
       urlsReplaced: z.number().describe('Number of URLs successfully replaced with embeds'),
       replacedUrls: z
@@ -37,49 +49,55 @@ export let replaceLoomUrls = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let urls = findLoomUrls(ctx.input.text);
-
-    if (urls.length === 0) {
-      return {
-        output: {
-          replacedText: ctx.input.text,
-          urlsFound: 0,
-          urlsReplaced: 0,
-          replacedUrls: []
-        },
-        message: 'No Loom URLs found in the provided text.'
-      };
-    }
-
-    ctx.info(`Found ${urls.length} Loom URL(s) in the text.`);
-
-    let uniqueUrls = [...new Set(urls)];
-    let replacedText = ctx.input.text;
-    let replacedUrls: Array<{ originalUrl: string; videoTitle: string }> = [];
-    let urlsReplaced = 0;
-
-    for (let url of uniqueUrls) {
+    const matches = findLoomUrlMatches(ctx.input.text),
+      uniqueUrls = [...new Set(matches.map(v => v.url))];
+    const successes = new Map<string, { html: string; title: string }>();
+    const failedUrls: Array<{ originalUrl: string; reason: string }> = [];
+    for (const url of uniqueUrls) {
       try {
-        let metadata = await fetchOEmbed(url);
-        replacedText = replacedText.split(url).join(metadata.html);
-        replacedUrls.push({
+        const metadata = await fetchOEmbed(url);
+        successes.set(url, { html: metadata.html, title: metadata.title });
+      } catch {
+        failedUrls.push({
           originalUrl: url,
-          videoTitle: metadata.title
+          reason:
+            'Loom oEmbed metadata could not be confirmed. Check video visibility/availability and retry deliberately; the original URL remains unchanged.'
         });
-        urlsReplaced++;
-      } catch (_err) {
-        ctx.warn(`Failed to fetch oEmbed for URL: ${url}`);
       }
     }
-
+    let cursor = 0,
+      replacedText = '',
+      occurrencesReplaced = 0,
+      resultBytes = 0;
+    const append = (text: string) => {
+      resultBytes += Buffer.byteLength(text);
+      if (resultBytes > MAX_RESULT_BYTES)
+        throw invalid(
+          'Replacement output exceeds the local 2 MiB bound. Split the input; metadata reads may already have occurred.'
+        );
+      replacedText += text;
+    };
+    for (const match of matches) {
+      append(ctx.input.text.slice(cursor, match.index));
+      const replacement = successes.get(match.url);
+      append(replacement?.html ?? match.url);
+      if (replacement) occurrencesReplaced++;
+      cursor = match.index + match.url.length;
+    }
+    append(ctx.input.text.slice(cursor));
     return {
       output: {
         replacedText,
-        urlsFound: urls.length,
-        urlsReplaced,
-        replacedUrls
+        urlsFound: matches.length,
+        urlsReplaced: successes.size,
+        occurrencesReplaced,
+        failedUrls,
+        replacedUrls: [...successes].map(([originalUrl, value]) => ({
+          originalUrl,
+          videoTitle: value.title
+        }))
       },
-      message: `Replaced **${urlsReplaced}** of **${urls.length}** Loom URL(s) with embedded video players.`
+      message: `Replaced ${successes.size} unique Loom URL(s) across ${occurrencesReplaced} occurrence(s). ${failedUrls.length} URL(s) could not be confirmed and remain unchanged.`
     };
   })
   .build();

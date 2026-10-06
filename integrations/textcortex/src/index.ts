@@ -8,12 +8,13 @@ import {
   generateProductDescription,
   generateSocialMediaPost,
   generateText,
+  getBalance,
+  getModel,
+  listModels,
   rewriteText,
   summarizeText,
   translateText
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -27,7 +28,10 @@ export let provider = Slate.create({
     rewriteText,
     summarizeText,
     translateText,
-    generateCode
+    generateCode,
+    listModels,
+    getModel,
+    getBalance
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

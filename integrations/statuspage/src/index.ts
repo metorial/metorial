@@ -7,20 +7,22 @@ import {
   listComponents,
   listIncidents,
   listIncidentTemplates,
+  listPages,
   listSubscribers,
   manageComponent,
   manageComponentGroup,
+  manageMetric,
   managePostmortem,
   manageSubscriber,
   submitMetricData,
   updateIncident,
   updatePage
 } from './tools';
-import { componentStatusChanges, inboundWebhook, incidentUpdates } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    listPages,
+    manageMetric,
     getPage,
     updatePage,
     listComponents,
@@ -36,5 +38,5 @@ export let provider = Slate.create({
     submitMetricData,
     managePostmortem
   ],
-  triggers: [inboundWebhook, incidentUpdates, componentStatusChanges]
+  triggers: []
 });

@@ -14,8 +14,6 @@ import {
   triggerScrapingJob,
   unlockWebPage
 } from './tools';
-import { inboundWebhook, scrapingJobCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     getZoneDetails,
     manageZone
   ],
-  triggers: [inboundWebhook, scrapingJobCompleted]
+  triggers: []
 });

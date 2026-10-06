@@ -6,13 +6,24 @@ import { spec } from '../spec';
 let groupSchema = z.object({
   groupId: z.string().describe('Unique ID of the group'),
   name: z.string().describe('Name of the group'),
-  accessAll: z.boolean().describe('Whether the group has access to all collections'),
+  accessAll: z
+    .boolean()
+    .nullable()
+    .describe('Legacy accessAll response, null when not exposed by the current Public API'),
   externalId: z.string().nullable().describe('External ID for directory sync'),
+  collectionsAvailable: z
+    .boolean()
+    .optional()
+    .describe(
+      'Whether the provider exposed this association field; false means the array does not establish current assignments.'
+    ),
   collections: z
     .array(
       z.object({
         collectionId: z.string().describe('Collection ID'),
-        readOnly: z.boolean().describe('Whether access is read-only')
+        readOnly: z.boolean().describe('Whether access is read-only'),
+        hidePasswords: z.boolean().nullable().optional(),
+        manage: z.boolean().nullable().optional()
       })
     )
     .describe('Collections assigned to this group')
@@ -35,8 +46,7 @@ export let listGroups = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.auth.serverUrl
+      ...ctx.auth
     });
 
     let groups = await client.listGroups();
@@ -46,9 +56,12 @@ export let listGroups = SlateTool.create(spec, {
       name: g.name,
       accessAll: g.accessAll,
       externalId: g.externalId,
-      collections: g.collections.map(c => ({
+      collectionsAvailable: g.collections !== undefined,
+      collections: (g.collections ?? []).map(c => ({
         collectionId: c.id,
-        readOnly: c.readOnly
+        readOnly: c.readOnly,
+        hidePasswords: c.hidePasswords,
+        manage: c.manage
       }))
     }));
 

@@ -17,6 +17,7 @@ import {
   exportApp,
   getApp,
   getEntity,
+  getFileUrl,
   getIntent,
   getTrait,
   listApps,
@@ -28,12 +29,11 @@ import {
   listVoices,
   manageEntityKeywords,
   manageTraitValues,
+  synthesizeSpeech,
   trainUtterances,
   updateApp,
   updateEntity
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -67,7 +67,9 @@ export let provider = Slate.create({
     trainUtterances,
     deleteUtterances,
     exportApp,
-    listVoices
+    listVoices,
+    synthesizeSpeech,
+    getFileUrl
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

@@ -1,12 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { assetsSchema, metadataSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createUpdateTool = SlateTool.create(spec, {
   name: 'Create Update',
   key: 'create_update',
-  description: `Create a new social media update (post) and add it to the queue for one or more profiles. Supports scheduling, immediate sharing, media attachments, and queue positioning.`,
+  description: `Create a post for one or more profiles. By default it enters the publishing queue; saveToDraft creates an unpublished draft on the current API. now publishes immediately. Multi-profile creation is not atomic.`,
+  tags: { readOnly: false },
+  constraints: [
+    'Verify the target profiles before publishing. If one profile fails, earlier creations can remain; read them back before retrying.'
+  ],
   instructions: [
     'Provide at least one profile ID in profileIds. Use the Get Profiles tool first if you need to find profile IDs.',
     'Use `now: true` to share immediately, or `scheduledAt` for a specific time. By default the update is added to the queue.'
@@ -15,6 +20,14 @@ export let createUpdateTool = SlateTool.create(spec, {
   .input(
     z.object({
       text: z.string().describe('The text content of the update'),
+      saveToDraft: z
+        .boolean()
+        .optional()
+        .describe(
+          'Current API only: save an unpublished draft instead of queueing or publishing. Cannot be combined with now, top or scheduledAt.'
+        ),
+      assets: assetsSchema.optional(),
+      metadata: metadataSchema.optional(),
       profileIds: z
         .array(z.string())
         .min(1)
@@ -31,7 +44,9 @@ export let createUpdateTool = SlateTool.create(spec, {
       shorten: z
         .boolean()
         .optional()
-        .describe('Set to true to automatically shorten URLs in the text'),
+        .describe(
+          'Legacy REST only: shorten URLs in this post. Current connections use the channel setting; omit this field.'
+        ),
       media: z
         .object({
           link: z.string().optional().describe('URL of a link attachment'),
@@ -55,17 +70,26 @@ export let createUpdateTool = SlateTool.create(spec, {
             profileId: z.string().describe('Profile ID the update was created for'),
             status: z.string().describe('Status of the update (e.g. buffer, sent)'),
             text: z.string().describe('Text content of the update'),
-            dueAt: z.number().describe('Unix timestamp when the update is due'),
-            createdAt: z.number().describe('Unix timestamp when the update was created')
+            dueAt: z
+              .number()
+              .optional()
+              .describe('Unix seconds when scheduled; omitted for unscheduled drafts'),
+            createdAt: z
+              .number()
+              .optional()
+              .describe('Unix seconds when supplied by the provider')
           })
         )
         .describe('Created updates (one per profile)'),
-      bufferCount: z.number().describe('Total number of updates in the buffer after creation'),
-      bufferPercentage: z.number().describe('Percentage of buffer capacity used')
+      bufferCount: z.number().optional().describe('Legacy provider count, when supplied'),
+      bufferPercentage: z
+        .number()
+        .optional()
+        .describe('Legacy provider capacity percentage, when supplied')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.createUpdate({
       text: ctx.input.text,
@@ -74,10 +98,13 @@ export let createUpdateTool = SlateTool.create(spec, {
       now: ctx.input.now,
       top: ctx.input.top,
       shorten: ctx.input.shorten,
-      media: ctx.input.media
+      media: ctx.input.media,
+      saveToDraft: ctx.input.saveToDraft,
+      assets: ctx.input.assets,
+      metadata: ctx.input.metadata
     });
 
-    let updates = (result.updates || []).map(u => ({
+    let updates = result.updates.map(u => ({
       updateId: u.id,
       profileId: u.profileId,
       status: u.status,
@@ -86,11 +113,13 @@ export let createUpdateTool = SlateTool.create(spec, {
       createdAt: u.createdAt
     }));
 
-    let action = ctx.input.now
-      ? 'shared immediately'
-      : ctx.input.scheduledAt
-        ? 'scheduled'
-        : 'queued';
+    let action = ctx.input.saveToDraft
+      ? 'saved as drafts'
+      : ctx.input.now
+        ? 'created for immediate publication'
+        : ctx.input.scheduledAt
+          ? 'scheduled'
+          : 'queued';
 
     return {
       output: {
@@ -99,7 +128,7 @@ export let createUpdateTool = SlateTool.create(spec, {
         bufferCount: result.buffer_count,
         bufferPercentage: result.buffer_percentage
       },
-      message: `Successfully ${action} **${updates.length}** update(s) across profiles.`
+      message: `Successfully ${action} **${updates.length}** update(s) across profiles.${ctx.input.now ? ' Check the returned post statuses or Get Updates to verify delivery.' : ''}`
     };
   })
   .build();

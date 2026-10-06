@@ -18,14 +18,6 @@ import {
   manageWebhooks,
   startBuild
 } from './tools';
-import {
-  buildEvents,
-  distributionEvents,
-  enterpriseStoreEvents,
-  publishEvents,
-  signingIdentityEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,11 +38,5 @@ export let provider = Slate.create({
     listOrganizations,
     manageWebhooks
   ],
-  triggers: [
-    buildEvents,
-    distributionEvents,
-    signingIdentityEvents,
-    publishEvents,
-    enterpriseStoreEvents
-  ]
+  triggers: []
 });

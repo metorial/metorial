@@ -13,6 +13,12 @@ export let listMeetings = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Native next-page URL returned by this tool. Use alone; do not add filters.'
+        ),
       meetingNumber: z.string().optional().describe('Filter by meeting number'),
       state: z
         .string()
@@ -32,6 +38,7 @@ export let listMeetings = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: z.string().optional().describe('URL for the next native page, if present'),
       meetings: z
         .array(
           z.object({
@@ -62,11 +69,12 @@ export let listMeetings = SlateTool.create(spec, {
       from: ctx.input.from,
       to: ctx.input.to,
       hostEmail: ctx.input.hostEmail,
-      max: ctx.input.max
+      max: ctx.input.max,
+      nextPageUrl: ctx.input.nextPageUrl
     });
 
     let items = result.items || [];
-    let meetings = items.map((m: any) => ({
+    let meetings = items.map(m => ({
       meetingId: m.id,
       meetingNumber: m.meetingNumber,
       title: m.title,
@@ -82,7 +90,7 @@ export let listMeetings = SlateTool.create(spec, {
     }));
 
     return {
-      output: { meetings },
+      output: { meetings, nextPageUrl: result.nextPageUrl },
       message: `Found **${meetings.length}** meeting(s).`
     };
   })

@@ -1,15 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GreenhouseClient } from '../lib/client';
-import { mapCandidate } from '../lib/mappers';
+import { candidateOutputSchema, mapCandidate } from '../lib/mappers';
 import { spec } from '../spec';
-
-export let updateCandidateTool = SlateTool.create(spec, {
-  name: 'Update Candidate',
+export const updateCandidateTool = SlateTool.create(spec, {
   key: 'update_candidate',
-  description: `Update an existing candidate's information in Greenhouse. Only provided fields will be updated. Requires the **On-Behalf-Of** user ID in config.`,
-  constraints: ['Requires the onBehalfOf config value to be set for audit purposes.'],
-  tags: { readOnly: false }
+  name: 'Update Candidate',
+  description:
+    'Update only the supplied candidate fields. Contact arrays and tags replace their existing values. The authenticated v3 subject controls audit identity.',
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
@@ -39,40 +38,16 @@ export let updateCandidateTool = SlateTool.create(spec, {
       tags: z.array(z.string()).optional().describe('Updated tags (replaces existing)')
     })
   )
-  .output(
-    z.object({
-      candidateId: z.string(),
-      firstName: z.string(),
-      lastName: z.string(),
-      company: z.string().nullable(),
-      title: z.string().nullable(),
-      emailAddresses: z.array(z.object({ value: z.string(), type: z.string() })),
-      phoneNumbers: z.array(z.object({ value: z.string(), type: z.string() })),
-      tags: z.array(z.string()),
-      updatedAt: z.string().nullable()
-    })
-  )
+  .output(candidateOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GreenhouseClient({
-      token: ctx.auth.token,
-      onBehalfOf: ctx.config.onBehalfOf
-    });
-
-    let raw = await client.updateCandidate(Number.parseInt(ctx.input.candidateId, 10), {
-      firstName: ctx.input.firstName,
-      lastName: ctx.input.lastName,
-      company: ctx.input.company,
-      title: ctx.input.title,
-      emailAddresses: ctx.input.emailAddresses,
-      phoneNumbers: ctx.input.phoneNumbers,
-      tags: ctx.input.tags
-    });
-
-    let candidate = mapCandidate(raw);
-
     return {
-      output: candidate,
-      message: `Updated candidate **${candidate.firstName} ${candidate.lastName}** (ID: ${candidate.candidateId}).`
+      output: mapCandidate(
+        await new GreenhouseClient(ctx.auth, ctx.config).updateCandidate(
+          ctx.input.candidateId,
+          ctx.input
+        )
+      ),
+      message: 'Updated the requested candidate.'
     };
   })
   .build();

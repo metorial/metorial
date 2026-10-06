@@ -1,73 +1,20 @@
-Now let me get more details on the specific API endpoints.Now let me check if Mem supports webhooks or events.Now I have enough information to write the specification. Note that the webhook results are for Mem0 (a different product), not Mem.ai. The Mem.ai API does not appear to support webhooks.
+# Mem V2 API capability map
 
-# Slates Specification for Mem
+Provider: Mem.ai, distinct from Mem0. Origin: `https://api.mem.ai/v2`; authentication: `Authorization: Bearer <API key>`. No OAuth, configured workspace ID, or documented user identity endpoint is assumed.
 
-## Overview
+| Tools | Native contract |
+| --- | --- |
+| create_note / get_note / delete_note | POST /notes; GET or DELETE /notes/{UUID}. Bare 200 DTOs. Reads include current version, trash timestamp and native media associations. |
+| list_notes / search_notes | GET /notes with limit 1–100 and opaque cursor; POST /notes/search with query, limit 1–50, zero offset and optional snapshot UUID. Contains flags use OR; search snapshot capped at 100. |
+| update_note | PATCH /notes/{UUID}, full markdown body and exact current version. Local current-state preflight preserves native concurrency checks; no overwrite retry. |
+| create_collection / get_collection / delete_collection | POST /collections; GET or DELETE /collections/{UUID}. Create-only optional UUID; read includes note_count. |
+| list_collections / search_collections | GET /collections with cursor and limit 1–100; POST /collections/search with optional query and no cursor. |
+| update_collection | PATCH /collections/{UUID}; omitted title/description preserved, explicit null description clears. |
+| manage_collection_membership | PUT/DELETE /collections/{UUID}/notes/{UUID}; POST /collections/{source}/notes/{UUID}/move with target_collection_id. Receipt plus exact current note readback. |
+| mem_it | POST /mem-it, 200 request_id only. Processing/completion and generated resources cannot be inferred from that receipt. |
 
-Mem is an AI-powered note-taking and personal knowledge management application. It provides a REST API (v2) for programmatically creating, reading, searching, and organizing notes and collections, as well as an AI-powered "Mem It" feature for processing and saving raw content.
+Content bounds, UTC offsets, safe integers and exact UUID locators are validated locally. Create note content has both 200,000-character and UTF-8-byte bounds; collection title/description bounds are 1,000/10,000 characters and bytes. Native optional fields preserve omitted, false, empty string and explicit nullable distinctions. Empty collection search query remains supported; note search omission is retained in its historical schema with an actionable current-API refusal. Explicit empty note-search collection filters are refused locally to prevent accidental unfiltered access; omit the filter intentionally for full accessible search.
 
-## Authentication
+Current documentation: [authentication](https://docs.mem.ai/api-reference/overview/authentication), [changelog](https://docs.mem.ai/api-reference/overview/changelog), [note updates](https://docs.mem.ai/api-reference/notes/update-note), [note paging](https://docs.mem.ai/api-reference/notes/list-notes), [search snapshots](https://docs.mem.ai/api-reference/notes/search-notes), [collection move](https://docs.mem.ai/api-reference/collections/move-note), [Mem It](https://docs.mem.ai/api-reference/mem-it/mem-it), and [rate limits](https://docs.mem.ai/api-reference/overview/rate-limits).
 
-The Mem API uses API keys for authentication. To obtain a key, visit the API section in your Mem settings.
-
-To generate an API key:
-
-1. Log in to your Mem account, in the left sidebar, click on Flows, click on the API option, then the "+ Create API Key" button.
-2. Enter a label for the API key and click "Create API Key".
-3. Copy the API key value and store it securely — you will not be able to view it again.
-
-API keys are provided via HTTP Bearer authentication in the `Authorization` header:
-
-```
-Authorization: Bearer <YOUR_MEM_API_KEY>
-```
-
-The base URL for all API requests is `https://api.mem.ai/v2`.
-
-## Features
-
-### Note Management
-
-Create, read, list, and delete notes in your Mem knowledge base. Notes accept markdown-formatted content (up to ~200k characters), where the first line is automatically interpreted as the title. When creating a note, you can optionally:
-
-- Assign it to one or more collections by ID or by title (case-insensitive exact match).
-- Provide a custom UUID for the note.
-- Set custom `created_at` and `updated_at` timestamps.
-
-Mem automatically processes note content — for example, it may extract action items and key points from meeting notes.
-
-### Note Search
-
-Search across your notes using a text query. Results can be filtered by:
-
-- Collection IDs — only return notes belonging to specific collections.
-- Whether notes contain open tasks, any tasks, images, or file attachments.
-
-Search results include a snippet and relevance-ranked results.
-
-### Collection Management
-
-Collections are used to organize notes into groups. You can create, read, list, search, and delete collections. When creating a collection, you can provide:
-
-- A title (required, up to ~1k characters) and an optional description (up to ~10k characters).
-- A custom UUID, and custom `created_at`/`updated_at` timestamps.
-
-Collections can also be searched by text query.
-
-### Mem It (AI Content Processing)
-
-An AI-powered feature that accepts any raw content — web pages, emails, transcripts, articles, or simple text (up to ~1M characters) — and intelligently processes it into your knowledge base. You can provide:
-
-- **Instructions**: guidance on how the information should be processed (e.g., "Extract the key findings and save as a research note").
-- **Context**: background information to help Mem understand how the input relates to existing knowledge (e.g., "This is related to my Project Alpha research").
-- **Timestamp**: when the information was originally encountered.
-
-This is an asynchronous operation that returns a request ID.
-
-### MCP (Model Context Protocol)
-
-Mem supports the Model Context Protocol for connecting AI tools to Mem. Works with Claude, ChatGPT, Claude Code CLI, and Codex CLI.
-
-## Events
-
-The provider does not support events. The Mem API does not offer webhooks or any built-in event subscription mechanism.
+Historical 11 tool keys and their input/output fields remain compatible; three tools are additive. There are no triggers or file-output tools. Private live verification requires an independently pinned key and synthetic sentinel note, explicit record access, isolated synthetic writes, and positive ownership before cleanup. Offline fixtures prove wiring and refusal behavior, not provider acceptance, atomic isolation or quota reversal.

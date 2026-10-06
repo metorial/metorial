@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import * as map from '../lib/mappers';
+import { records } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getRecipeVersionsTool = SlateTool.create(spec, {
@@ -22,35 +24,22 @@ export let getRecipeVersionsTool = SlateTool.create(spec, {
     z.object({
       versions: z.array(
         z.object({
-          versionId: z.number().describe('Version ID'),
-          versionNo: z.number().describe('Version number'),
-          comment: z.string().nullable().describe('Version comment'),
-          authorName: z.string().nullable().describe('Author name'),
-          authorEmail: z.string().nullable().describe('Author email'),
-          createdAt: z.string().describe('Version creation timestamp')
+          versionId: z.number().optional().describe('Version ID'),
+          versionNo: z.number().optional().describe('Version number'),
+          comment: z.string().nullable().optional().describe('Version comment'),
+          authorName: z.string().nullable().optional().describe('Author name'),
+          authorEmail: z.string().nullable().optional().describe('Author email'),
+          createdAt: z.string().optional().describe('Version creation timestamp')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let result = await client.listRecipeVersions(ctx.input.recipeId, {
-      page: ctx.input.page,
-      perPage: ctx.input.perPage
-    });
-
-    let items = result.data ?? (Array.isArray(result) ? result : []);
-    let versions = items.map((v: any) => ({
-      versionId: v.id,
-      versionNo: v.version_no,
-      comment: v.comment ?? null,
-      authorName: v.author_name ?? null,
-      authorEmail: v.author_email ?? null,
-      createdAt: v.created_at
-    }));
-
+    const client = createClient(ctx);
+    const result = await client.listRecipeVersions(ctx.input.recipeId, ctx.input);
+    const versions = records(result.items).map(map.version);
     return {
       output: { versions },
-      message: `Found **${versions.length}** versions for recipe ${ctx.input.recipeId}.`
+      message: `Returned ${versions.length} versions from this page.`
     };
   });

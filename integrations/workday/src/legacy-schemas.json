@@ -1,0 +1,990 @@
+{
+  "list_workers": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "search": {
+          "description": "Search term to filter workers by name or other attributes",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of results to return (default: 20)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Number of results to skip for pagination (default: 0)",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workerId": {
+                "type": "string",
+                "description": "Unique worker ID"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Worker display name"
+              },
+              "href": {
+                "description": "API href for this worker",
+                "type": "string"
+              },
+              "primaryWorkEmail": {
+                "description": "Primary work email address",
+                "type": "string"
+              },
+              "businessTitle": {
+                "description": "Business title",
+                "type": "string"
+              },
+              "supervisoryOrganization": {
+                "description": "Primary supervisory organization",
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "description": "Workday ID of the referenced object",
+                    "type": "string"
+                  },
+                  "descriptor": {
+                    "description": "Display name of the referenced object",
+                    "type": "string"
+                  },
+                  "href": {
+                    "description": "API href for the referenced object",
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["workerId", "displayName"],
+            "additionalProperties": false
+          },
+          "description": "List of workers"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of matching workers"
+        }
+      },
+      "required": ["workers", "total"],
+      "additionalProperties": false
+    }
+  },
+  "get_worker": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workerId": {
+          "type": "string",
+          "description": "The Workday worker ID"
+        }
+      },
+      "required": ["workerId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workerId": {
+          "type": "string",
+          "description": "Unique worker ID"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Worker display name"
+        },
+        "href": {
+          "description": "API href for this worker",
+          "type": "string"
+        },
+        "primaryWorkEmail": {
+          "description": "Primary work email address",
+          "type": "string"
+        },
+        "businessTitle": {
+          "description": "Business title",
+          "type": "string"
+        },
+        "supervisoryOrganization": {
+          "description": "Primary supervisory organization",
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "Workday ID",
+              "type": "string"
+            },
+            "descriptor": {
+              "description": "Display name",
+              "type": "string"
+            },
+            "href": {
+              "description": "API href",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "primaryPosition": {
+          "description": "Primary position",
+          "type": "object",
+          "properties": {
+            "id": {
+              "description": "Workday ID",
+              "type": "string"
+            },
+            "descriptor": {
+              "description": "Display name",
+              "type": "string"
+            },
+            "href": {
+              "description": "API href",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "hireDate": {
+          "description": "Hire date in YYYY-MM-DD format",
+          "type": "string"
+        },
+        "isActive": {
+          "description": "Whether the worker is currently active",
+          "type": "boolean"
+        },
+        "isTerminated": {
+          "description": "Whether the worker has been terminated",
+          "type": "boolean"
+        },
+        "statusDate": {
+          "description": "Date of the current worker status",
+          "type": "string"
+        },
+        "additionalProperties": {
+          "description": "Additional worker properties returned by the API",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["workerId", "displayName"],
+      "additionalProperties": false
+    }
+  },
+  "get_time_off_entries": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workerId": {
+          "type": "string",
+          "description": "The Workday worker ID"
+        },
+        "fromDate": {
+          "description": "Start date filter in YYYY-MM-DD format",
+          "type": "string"
+        },
+        "toDate": {
+          "description": "End date filter in YYYY-MM-DD format",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of results (default: 20)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Pagination offset (default: 0)",
+          "type": "number"
+        }
+      },
+      "required": ["workerId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "entryId": {
+                "description": "Time-off entry ID",
+                "type": "string"
+              },
+              "date": {
+                "description": "Date of the time-off entry",
+                "type": "string"
+              },
+              "dailyQuantity": {
+                "description": "Number of hours for the day",
+                "type": "number"
+              },
+              "timeOffType": {
+                "description": "Type of time off",
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "description": "Workday ID",
+                    "type": "string"
+                  },
+                  "descriptor": {
+                    "description": "Display name",
+                    "type": "string"
+                  },
+                  "href": {
+                    "description": "API href",
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "worker": {
+                "description": "Worker reference",
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "description": "Workday ID",
+                    "type": "string"
+                  },
+                  "descriptor": {
+                    "description": "Display name",
+                    "type": "string"
+                  },
+                  "href": {
+                    "description": "API href",
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "status": {
+                "description": "Entry status",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "List of time-off entries"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of matching entries"
+        }
+      },
+      "required": ["entries", "total"],
+      "additionalProperties": false
+    }
+  },
+  "request_time_off": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workerId": {
+          "type": "string",
+          "description": "The Workday worker ID"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date of the time-off request in YYYY-MM-DD format"
+        },
+        "dailyQuantity": {
+          "type": "number",
+          "description": "Number of hours for the day (e.g., 8 for a full day)"
+        },
+        "timeOffTypeId": {
+          "type": "string",
+          "description": "Workday ID of the time-off type"
+        },
+        "comment": {
+          "description": "Optional comment for the time-off request",
+          "type": "string"
+        }
+      },
+      "required": ["workerId", "date", "dailyQuantity", "timeOffTypeId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "description": "ID of the created time-off request",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status of the request",
+          "type": "string"
+        },
+        "rawResponse": {
+          "description": "Full API response"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_time_blocks": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workerId": {
+          "type": "string",
+          "description": "The Workday worker ID"
+        },
+        "fromDate": {
+          "description": "Start date filter in YYYY-MM-DD format",
+          "type": "string"
+        },
+        "toDate": {
+          "description": "End date filter in YYYY-MM-DD format",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of results (default: 20)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Pagination offset (default: 0)",
+          "type": "number"
+        }
+      },
+      "required": ["workerId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timeBlocks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of time block entries"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of matching time blocks"
+        }
+      },
+      "required": ["timeBlocks", "total"],
+      "additionalProperties": false
+    }
+  },
+  "execute_wql": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "WQL query to execute (e.g., \"SELECT workdayID, fullName FROM allWorkers\")"
+        },
+        "limit": {
+          "description": "Maximum number of rows to return",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Number of rows to skip for pagination",
+          "type": "number"
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Query result rows"
+        },
+        "total": {
+          "description": "Total number of matching rows (if available)",
+          "type": "number"
+        }
+      },
+      "required": ["rows"],
+      "additionalProperties": false
+    }
+  },
+  "get_custom_report": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportOwner": {
+          "type": "string",
+          "description": "Workday username of the report owner"
+        },
+        "reportName": {
+          "type": "string",
+          "description": "Name of the custom report"
+        },
+        "format": {
+          "description": "Response format (default: json)",
+          "type": "string",
+          "enum": ["json", "csv"]
+        },
+        "prompts": {
+          "description": "Report prompt parameters as key-value pairs",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["reportOwner", "reportName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportData": {
+          "description": "Report data returned by Workday (structure depends on the report definition)"
+        }
+      },
+      "required": ["reportData"],
+      "additionalProperties": false
+    }
+  },
+  "get_inbox_tasks": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workerId": {
+          "type": "string",
+          "description": "The Workday worker ID whose inbox tasks to retrieve"
+        },
+        "limit": {
+          "description": "Maximum number of results (default: 20)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Pagination offset (default: 0)",
+          "type": "number"
+        }
+      },
+      "required": ["workerId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "description": "Inbox task ID"
+              },
+              "descriptor": {
+                "description": "Task description",
+                "type": "string"
+              },
+              "href": {
+                "description": "API href for the task",
+                "type": "string"
+              },
+              "status": {
+                "description": "Task status",
+                "type": "string"
+              },
+              "assigned": {
+                "description": "Worker the task is assigned to",
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "description": "Workday ID",
+                    "type": "string"
+                  },
+                  "descriptor": {
+                    "description": "Display name",
+                    "type": "string"
+                  },
+                  "href": {
+                    "description": "API href",
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "subject": {
+                "description": "Task subject line",
+                "type": "string"
+              },
+              "overallProcess": {
+                "description": "The overall business process this task belongs to",
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "description": "Workday ID",
+                    "type": "string"
+                  },
+                  "descriptor": {
+                    "description": "Display name",
+                    "type": "string"
+                  },
+                  "href": {
+                    "description": "API href",
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "stepType": {
+                "description": "The type of step in the business process",
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "description": "Workday ID",
+                    "type": "string"
+                  },
+                  "descriptor": {
+                    "description": "Display name",
+                    "type": "string"
+                  },
+                  "href": {
+                    "description": "API href",
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["taskId"],
+            "additionalProperties": false
+          },
+          "description": "List of inbox tasks"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of inbox tasks"
+        }
+      },
+      "required": ["tasks", "total"],
+      "additionalProperties": false
+    }
+  },
+  "action_inbox_task": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workerId": {
+          "type": "string",
+          "description": "The Workday worker ID who owns the inbox task"
+        },
+        "taskId": {
+          "type": "string",
+          "description": "The inbox task ID to act on"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["approve", "deny"],
+          "description": "Action to take on the task"
+        },
+        "comment": {
+          "description": "Optional comment explaining the action",
+          "type": "string"
+        }
+      },
+      "required": ["workerId", "taskId", "action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "The inbox task ID that was acted upon"
+        },
+        "action": {
+          "type": "string",
+          "description": "The action that was taken"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action was successful"
+        },
+        "rawResponse": {
+          "description": "Full API response"
+        }
+      },
+      "required": ["taskId", "action", "success"],
+      "additionalProperties": false
+    }
+  },
+  "list_organizations": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Maximum number of results (default: 20)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Pagination offset (default: 0)",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "organizationId": {
+                "type": "string",
+                "description": "Organization ID"
+              },
+              "descriptor": {
+                "description": "Organization name",
+                "type": "string"
+              },
+              "href": {
+                "description": "API href",
+                "type": "string"
+              }
+            },
+            "required": ["organizationId"],
+            "additionalProperties": false
+          },
+          "description": "List of supervisory organizations"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of organizations"
+        }
+      },
+      "required": ["organizations", "total"],
+      "additionalProperties": false
+    }
+  },
+  "get_organization_workers": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "description": "The supervisory organization ID"
+        },
+        "limit": {
+          "description": "Maximum number of results (default: 20)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Pagination offset (default: 0)",
+          "type": "number"
+        }
+      },
+      "required": ["organizationId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workerId": {
+                "type": "string",
+                "description": "Worker ID"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Worker display name"
+              },
+              "href": {
+                "description": "API href",
+                "type": "string"
+              },
+              "primaryWorkEmail": {
+                "description": "Primary work email",
+                "type": "string"
+              },
+              "businessTitle": {
+                "description": "Business title",
+                "type": "string"
+              },
+              "supervisoryOrganization": {
+                "description": "Supervisory organization reference",
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "description": "Workday ID",
+                    "type": "string"
+                  },
+                  "descriptor": {
+                    "description": "Display name",
+                    "type": "string"
+                  },
+                  "href": {
+                    "description": "API href",
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["workerId", "displayName"],
+            "additionalProperties": false
+          },
+          "description": "Workers in the organization"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of workers in the organization"
+        }
+      },
+      "required": ["workers", "total"],
+      "additionalProperties": false
+    }
+  },
+  "list_custom_objects": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "objectName": {
+          "type": "string",
+          "description": "Name of the custom object type"
+        },
+        "limit": {
+          "description": "Maximum number of results (default: 20)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Pagination offset (default: 0)",
+          "type": "number"
+        }
+      },
+      "required": ["objectName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "List of custom object records"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of records"
+        }
+      },
+      "required": ["records", "total"],
+      "additionalProperties": false
+    }
+  },
+  "get_custom_object": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "objectName": {
+          "type": "string",
+          "description": "Name of the custom object type"
+        },
+        "objectId": {
+          "type": "string",
+          "description": "ID of the custom object record"
+        }
+      },
+      "required": ["objectName", "objectId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "record": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The custom object record"
+        }
+      },
+      "required": ["record"],
+      "additionalProperties": false
+    }
+  },
+  "create_custom_object": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "objectName": {
+          "type": "string",
+          "description": "Name of the custom object type"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Field values for the new custom object record"
+        }
+      },
+      "required": ["objectName", "fields"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "record": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The created custom object record"
+        }
+      },
+      "required": ["record"],
+      "additionalProperties": false
+    }
+  },
+  "update_custom_object": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "objectName": {
+          "type": "string",
+          "description": "Name of the custom object type"
+        },
+        "objectId": {
+          "type": "string",
+          "description": "ID of the custom object record to update"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Field values to update on the custom object record"
+        }
+      },
+      "required": ["objectName", "objectId", "fields"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "record": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The updated custom object record"
+        }
+      },
+      "required": ["record"],
+      "additionalProperties": false
+    }
+  },
+  "delete_custom_object": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "objectName": {
+          "type": "string",
+          "description": "Name of the custom object type"
+        },
+        "objectId": {
+          "type": "string",
+          "description": "ID of the custom object record to delete"
+        }
+      },
+      "required": ["objectName", "objectId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "objectName": {
+          "type": "string",
+          "description": "Name of the deleted custom object type"
+        },
+        "objectId": {
+          "type": "string",
+          "description": "ID of the deleted record"
+        },
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["objectName", "objectId", "deleted"],
+      "additionalProperties": false
+    }
+  }
+}

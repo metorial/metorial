@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageBlockList = SlateTool.create(spec, {
@@ -68,14 +68,15 @@ export let manageBlockList = SlateTool.create(spec, {
 
       let entries = result.items.map((e: any) => ({
         entryId: e.id,
-        entry: e.entry,
-        entryType: e.entry_type
+        entry: e.bl_value,
+        entryType:
+          e.is_domain === true ? 'domain' : e.is_domain === false ? 'email' : undefined
       }));
 
       return {
         output: {
           entries,
-          nextStartingAfter: result.next_starting_after,
+          nextStartingAfter: result.next_starting_after ?? null,
           success: true
         },
         message: `Found **${entries.length}** block list entries.`
@@ -98,9 +99,6 @@ export let manageBlockList = SlateTool.create(spec, {
       };
     }
 
-    return {
-      output: { success: false },
-      message: 'Missing required parameters for the specified action.'
-    };
+    throw invalid('Provide the required fields for the selected action.');
   })
   .build();

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, nextCursorFrom } from '../lib/client';
 import { spec } from '../spec';
 
 export let listNotes = SlateTool.create(spec, {
@@ -20,7 +20,16 @@ export let listNotes = SlateTool.create(spec, {
         .max(100)
         .optional()
         .describe('Number of results per page (1-100, default 20)'),
-      cursor: z.string().optional().describe('Pagination cursor from a previous response')
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      query: z.string().optional().describe('Full-text search against note content.'),
+      createdAfter: z
+        .string()
+        .optional()
+        .describe('Only notes created after this ISO 8601 timestamp.'),
+      createdBefore: z
+        .string()
+        .optional()
+        .describe('Only notes created before this ISO 8601 timestamp.')
     })
   )
   .output(
@@ -45,14 +54,13 @@ export let listNotes = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listNotes(ctx.input.entityId, {
       limit: ctx.input.limit,
-      cursor: ctx.input.cursor
+      cursor: ctx.input.cursor,
+      query: ctx.input.query,
+      createdAfter: ctx.input.createdAfter,
+      createdBefore: ctx.input.createdBefore
     });
 
-    let nextCursor: string | null = null;
-    if (result.pagination.nextLink) {
-      let url = new URL(result.pagination.nextLink);
-      nextCursor = url.searchParams.get('cursor');
-    }
+    const nextCursor = nextCursorFrom(result.pagination.nextLink);
 
     return {
       output: {

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapNumber } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listNumbers = SlateTool.create(spec, {
@@ -26,43 +27,34 @@ export let listNumbers = SlateTool.create(spec, {
           digits: z.string().describe('Phone number in E.164 format'),
           country: z.string().nullable().describe('Country code'),
           timeZone: z.string().nullable().describe('Timezone'),
-          open: z.boolean().describe('Whether the number is currently open/active'),
-          liveRecordingActivated: z.boolean().describe('Whether live recording is enabled'),
-          createdAt: z.string().describe('Creation date as ISO string')
+          open: z.boolean().optional().describe('Whether the number is currently open/active'),
+          liveRecordingActivated: z
+            .boolean()
+            .optional()
+            .describe('Whether live recording is enabled'),
+          createdAt: z.string().optional().describe('Creation date as ISO string')
         })
       ),
+      perPage: z.number().optional(),
+      nextPageLink: z.string().nullable().optional(),
+      previousPageLink: z.string().nullable().optional(),
+      collectionLimit: z.number().optional(),
+      historyWindowMonths: z.number().optional(),
       totalCount: z.number().describe('Total number of phone numbers'),
       currentPage: z.number().describe('Current page number')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth);
-
-    let result = await client.listNumbers({
-      page: ctx.input.page,
-      perPage: ctx.input.perPage
-    });
-
-    let numbers = result.items.map((num: any) => ({
-      numberId: num.id,
-      name: num.name ?? null,
-      digits: num.digits,
-      country: num.country ?? null,
-      timeZone: num.time_zone ?? null,
-      open: num.open ?? false,
-      liveRecordingActivated: num.live_recording_activated ?? false,
-      createdAt: num.created_at
-        ? new Date(num.created_at * 1000).toISOString()
-        : new Date().toISOString()
-    }));
-
+    const result = await new Client(ctx.auth).listNumbers(ctx.input);
     return {
       output: {
-        numbers,
+        numbers: result.items.map(mapNumber),
         totalCount: result.meta.total,
-        currentPage: result.meta.currentPage
+        currentPage: result.meta.currentPage,
+        perPage: result.meta.perPage,
+        nextPageLink: result.meta.nextPageLink
       },
-      message: `Found **${result.meta.total}** phone numbers (showing page ${result.meta.currentPage}, ${numbers.length} results).`
+      message: `Retrieved ${result.items.length} numbers from native page ${result.meta.currentPage}.`
     };
   })
   .build();

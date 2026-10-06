@@ -1,98 +1,40 @@
-# Slates Specification for RudderStack
+# RudderStack integration
 
-## Overview
+## API and authentication
 
-RudderStack is a customer data platform (CDP) that collects, routes, and processes event data from websites, apps, and servers to over 200 downstream destinations including data warehouses, analytics tools, and marketing platforms. It is an open-source Customer Data Platform designed for developers, providing data pipelines for seamless collection and routing of customer data, supporting real-time data streaming to over 180 business tools and scheduled data loading to warehouses or data lakes. It also offers Reverse ETL capabilities to sync data from warehouses back to business tools.
+| Surface | Route | Credential |
+| --- | --- | --- |
+| Transformations and libraries | `/transformations`, `/libraries`, revisions and bulk publish | Workspace Service Access Token, Bearer |
+| Tracking plans and events | `/v2/catalog/tracking-plans` | Workspace Service Access Token, Bearer |
+| Reverse ETL syncs | `/v2/retl-connections/{connectionId}` | Workspace Service Access Token, Bearer |
+| Test stages | `/v0/testDestination/{id}`, `/v0/testSource/{id}` | Basic: empty username, workspace Service Access Token password |
+| Audit logs | `/v2/audit-logs` | Organization Admin Service Access Token, Bearer; Enterprise |
+| User suppression | `/v2/regulations` | Bearer; retained provider reference, account feature required |
+| Event Audit | `/v1/event-audit/event-models` | Retained legacy Basic transport; current detailed reference unavailable |
+| Event ingestion | Approved Data Plane URL, `/v1/{eventType}` and `/v1/batch` | Basic: Source Write Key username, empty password |
 
-## Authentication
+Control-plane hosts are `https://api.rudderstack.com` and `https://api.eu.rudderstack.com`. Credentials are never redirected. Token permissions and feature access are checked by RudderStack; an organization token is used only for audit logs.
 
-RudderStack uses two primary authentication mechanisms depending on the API being accessed:
+## Contracts
 
-### 1. Basic Authentication (HTTP API, Transformations API, Tracking Plan API, Test API)
+All 15 established tool keys and schemas remain; List Tracking Plan Events and Cancel Regulation complete readback and cancellation workflows. Inputs serialize as object schemas. No trigger implementation is registered.
 
-RudderStack uses Basic Authentication for authenticating all HTTP requests. There are two variations:
+Code publishing is a query parameter on create/update. Bulk publish resolves each resource's latest revision ID and sends `versionId` with optional transformation `testInput`. Python uses the provider's `pythonfaas` value. Library name and language remain immutable. Published-resource deletion does not erase revision history.
 
-- **For the Event/HTTP API (Data Plane):** Every request must be authenticated using Basic Authentication where the username is the source write key and the password should be an empty string. The base URL is your **Data Plane URL**, which varies by plan (provided in the dashboard for cloud plans, or self-hosted for open source).
+Catalog upserts run individually: POST creates an event with properties, PUT associates catalog IDs, and PATCH supports the retained rules form. A later failure does not undo earlier accepted events. Association removal keeps the catalog event. Readback must wait for queued processing.
 
-  Example header: `Authorization: Basic {Base64Encoded(<SOURCE_WRITE_KEY>:)}`
+Audit/regulation windows return `nextCursor`, `nextOffset`, and `hasMore`. Use the returned cursor as `afterCursor` and returned offset as `offset`, retaining filters. Audit end dates are applied locally. Reverse ETL uses page/per-page requests with offset continuation. Cancellation acknowledgement is not terminal confirmation.
 
-- **For Management APIs (Control Plane):** such as Transformations, Tracking Plans, Test API, and Data Catalog APIs. The API is authenticated via HTTP Basic Authentication with an empty string as the username and your Service Access Token (SAT) or Personal Access Token (PAT) as the password.
+Test stages use the provider's boolean stage object. Default destination transformation skips user code and delivery; user transformation can make external requests; router enables user code, destination transformation and delivery. Source tests fan out to every connected destination. Transport preview credentials and raw downstream responses are concealed; user transformation results, destination identifiers and stage status remain available.
 
-  Example header: `Authorization: Basic {Base64Encoded(:<SERVICE_ACCESS_TOKEN>)}`
+Ingestion supports six event types, identity validation, 32 KiB per event and 4 MiB per batch. Acknowledgement is distinct from collector readback. Suppression can affect all resources when IDs are omitted. Destination deletion and suppression cancellation never imply restored deleted data.
 
-  The base URL for these APIs is `https://api.rudderstack.com`.
+## Official references
 
-### 2. Bearer Authentication (Audit Logs API, User Suppression API, Data Governance API, Profiles API, Activation API)
-
-The Audit Logs API uses Bearer authentication. The User Suppression API uses Bearer Authentication in the format `Authorization: Bearer <SERVICE_ACCESS_TOKEN>`. The Profiles and Activation APIs also use Bearer authentication.
-
-Example header: `Authorization: Bearer <SERVICE_ACCESS_TOKEN>`
-
-### Token Types
-
-A Service Access Token (SAT) enables applications access to RudderStack APIs, providing a flexible, secure, and centralized way to programmatically interact with resources. Unlike Personal Access Tokens which are tied to individual users, SATs provide centralized access to resources within an Organization or Workspace, ensuring continuity when members are removed or their roles change.
-
-- **Service Access Tokens (SATs):** For production use cases that require shared access to the services and resources across the organization or workspace. Can be scoped to organization-level or workspace-level. Roles include Admin, Editor, or Viewer.
-- **Personal Access Tokens (PATs):** For testing a service/feature or personal use cases. Tied to an individual user account and inherit the user's role permissions.
-
-### Regional Base URLs
-
-RudderStack supports regional deployments (US and EU). The API base URL and Data Plane URL may differ depending on your region.
-
-## Features
-
-### Event Tracking (HTTP API)
-
-Send customer event data programmatically to RudderStack using standard call types: **identify** (associate users with traits), **track** (record user actions), **page** (record page views), **screen** (record screen views), **group** (associate users with groups), and **alias** (merge user identities). You can import historical data by adding the timestamp argument to API calls, though this only works for destinations that accept historical time-stamped data. Events can also be sent in batches.
-
-### Transformations Management
-
-RudderStack's Transformations API allows you to create, read, update and delete transformations and libraries programmatically. Transformations are custom JavaScript or Python functions that modify event payloads in-flight before they reach destinations. You can also create reusable **Libraries** of shared functions. Transformations support versioning and can be published or kept as unpublished drafts.
-
-### Tracking Plans
-
-Tracking plans let you proactively monitor and act on non-compliant event data coming into your RudderStack sources based on predefined plans, helping minimize the risk of improperly configured event data breaking downstream systems. They evaluate each incoming event for inconsistencies and automatically flag violations like unplanned events or erroneous key/value properties. Tracking plans can be managed programmatically via the API.
-
-### Data Governance (Event Audit API)
-
-RudderStack's Event Audit API allows you to diagnose inconsistencies in your event data programmatically, giving access to information on all events and their metadata, including event schema, event payload versions, data types, and more. Requires Org Admin role to enable.
-
-### User Suppression and Deletion
-
-The User Suppression API ensures the quality and integrity of data in a secure and compliant manner, allowing you to suppress incoming source data for users and delete collected user data in downstream destinations. Supports two regulation types: **suppress** (stop collecting data) and **suppress_with_delete** (stop collecting and delete existing data from specified destinations). Useful for GDPR/CCPA compliance.
-
-### Data Catalog Management
-
-Manage your tracking plans, events, and properties in your data catalog programmatically. This lets you maintain a centralized view of all event definitions across your organization.
-
-### Reverse ETL Sync Management
-
-Programmatically run syncs for a Reverse ETL connection. RudderStack's Reverse ETL feature lets you use the customer data residing in your data warehouse and route it to your entire data stack. Syncs can be scheduled, triggered via API, or orchestrated through tools like Airflow and Dagster.
-
-### Profiles and Activation API
-
-With RudderStack's Activation API, you can fetch enriched user traits stored in your Redis instance and use them for near real-time personalization. Run your Profiles project programmatically and check its run status. Requires a configured Redis destination and a successful Profiles run.
-
-- This feature is currently in Beta / Early Access.
-
-### Audit Logs
-
-The Audit Logs API lets you programmatically access audit logs for security audits, including accessing all existing logs, logs generated after the last access, and filtering based on workspaces, dates, etc. Tracks actions like CRUD operations on sources, destinations, connections, and transformations.
-
-- Available only in the Enterprise plan.
-
-### Event Testing
-
-The Test API offers endpoints to verify successful event transformation and delivery for a given source-destination setup, without having to refer to the Live Events tab. Allows testing individual destinations or full source pipelines with configurable stages (user transformation, destination transformation, and actual delivery).
-
-### Webhook Source and Destination
-
-RudderStack enables you to add any source that supports a webhook and use it to send events. It receives the data based on the settings made in the source, creates the payload, and routes it to the specified destination. You can also configure webhook destinations to forward processed event data to custom HTTP endpoints.
-
-## Events
-
-RudderStack does not natively provide a webhook or event subscription mechanism to push notifications about platform-level changes (e.g., source/destination updates, sync completions) to external systems.
-
-Webhooks in RudderStack serve as a mechanism to forward SDK-generated events to custom endpoints, and the Webhook Source allows ingesting data from external platforms. However, these are data routing features, not platform event subscription mechanisms.
-
-The provider does not support events in the traditional webhook/event subscription sense for platform-level notifications.
+- [Transformations API](https://www.rudderstack.com/docs/api/transformation-api/)
+- [Tracking plan Catalog API](https://www.rudderstack.com/docs/api/data-catalog-api/tracking-plans/)
+- [HTTP API](https://www.rudderstack.com/docs/api/http-api/)
+- [Test API](https://www.rudderstack.com/docs/api/test-api/)
+- [Reverse ETL Connections API](https://www.rudderstack.com/docs/api/retl-connections-api/)
+- [Audit Logs API](https://www.rudderstack.com/docs/api/audit-logs-api/)
+- [User Suppression API](https://www.rudderstack.com/docs/api/user-suppression-api/) and [Event Audit API](https://www.rudderstack.com/docs/api/event-audit-api/): current pages lack detailed endpoint/authentication bodies; retained routes require live confirmation.

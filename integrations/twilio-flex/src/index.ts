@@ -3,8 +3,10 @@ import { spec } from './spec';
 import {
   createInteractionTool,
   getFlexConfigurationTool,
+  getInteractionTool,
   getWorkspaceStatisticsTool,
   listConversationMessagesTool,
+  listWorkspacesTool,
   manageActivitiesTool,
   manageConversationParticipantsTool,
   manageConversationsTool,
@@ -18,16 +20,12 @@ import {
   manageWorkflowsTool,
   sendConversationMessageTool
 } from './tools';
-import {
-  interactionWebhookTrigger,
-  taskEventsTrigger,
-  taskRouterWebhookTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     createInteractionTool,
+    getInteractionTool,
+    listWorkspacesTool,
     manageInteractionChannelTool,
     manageInteractionParticipantsTool,
     manageWorkersTool,
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     manageStudioFlowsTool,
     getWorkspaceStatisticsTool
   ],
-  triggers: [taskEventsTrigger, taskRouterWebhookTrigger, interactionWebhookTrigger]
+  triggers: []
 });

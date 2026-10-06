@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageSubscriber = SlateTool.create(spec, {
   name: 'Manage Subscriber',
   key: 'manage_subscriber',
-  description: `Create, update, or fetch a subscriber (contact) in Drip. Use this to add new subscribers, update their profile information, manage tags, set custom fields, and configure GDPR consent. If the email already exists, the subscriber will be updated.`,
+  description: `Create or update a subscriber (contact) in Drip. Use this to add new subscribers, update their profile information, manage tags, set custom fields, and configure GDPR consent. If the email already exists, the subscriber will be updated. Status, consent, tag and profile changes may trigger account automations.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +15,7 @@ export let manageSubscriber = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       email: z
         .string()
         .describe('The subscriber email address. Required when creating a new subscriber.'),
@@ -88,7 +90,7 @@ export let manageSubscriber = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 
@@ -96,26 +98,27 @@ export let manageSubscriber = SlateTool.create(spec, {
       email: ctx.input.email
     };
 
-    if (ctx.input.newEmail) subscriber.new_email = ctx.input.newEmail;
-    if (ctx.input.firstName) subscriber.first_name = ctx.input.firstName;
-    if (ctx.input.lastName) subscriber.last_name = ctx.input.lastName;
-    if (ctx.input.address1) subscriber.address1 = ctx.input.address1;
-    if (ctx.input.address2) subscriber.address2 = ctx.input.address2;
-    if (ctx.input.city) subscriber.city = ctx.input.city;
-    if (ctx.input.state) subscriber.state = ctx.input.state;
-    if (ctx.input.zip) subscriber.zip = ctx.input.zip;
-    if (ctx.input.country) subscriber.country = ctx.input.country;
-    if (ctx.input.phone) subscriber.phone = ctx.input.phone;
-    if (ctx.input.smsNumber) subscriber.sms_number = ctx.input.smsNumber;
+    if (ctx.input.newEmail !== undefined) subscriber.new_email = ctx.input.newEmail;
+    if (ctx.input.firstName !== undefined) subscriber.first_name = ctx.input.firstName;
+    if (ctx.input.lastName !== undefined) subscriber.last_name = ctx.input.lastName;
+    if (ctx.input.address1 !== undefined) subscriber.address1 = ctx.input.address1;
+    if (ctx.input.address2 !== undefined) subscriber.address2 = ctx.input.address2;
+    if (ctx.input.city !== undefined) subscriber.city = ctx.input.city;
+    if (ctx.input.state !== undefined) subscriber.state = ctx.input.state;
+    if (ctx.input.zip !== undefined) subscriber.zip = ctx.input.zip;
+    if (ctx.input.country !== undefined) subscriber.country = ctx.input.country;
+    if (ctx.input.phone !== undefined) subscriber.phone = ctx.input.phone;
+    if (ctx.input.smsNumber !== undefined) subscriber.sms_number = ctx.input.smsNumber;
     if (ctx.input.smsConsent !== undefined) subscriber.sms_consent = ctx.input.smsConsent;
-    if (ctx.input.timeZone) subscriber.time_zone = ctx.input.timeZone;
-    if (ctx.input.ipAddress) subscriber.ip_address = ctx.input.ipAddress;
-    if (ctx.input.userId) subscriber.user_id = ctx.input.userId;
+    if (ctx.input.timeZone !== undefined) subscriber.time_zone = ctx.input.timeZone;
+    if (ctx.input.ipAddress !== undefined) subscriber.ip_address = ctx.input.ipAddress;
+    if (ctx.input.userId !== undefined) subscriber.user_id = ctx.input.userId;
     if (ctx.input.customFields) subscriber.custom_fields = ctx.input.customFields;
     if (ctx.input.tags) subscriber.tags = ctx.input.tags;
     if (ctx.input.removeTags) subscriber.remove_tags = ctx.input.removeTags;
     if (ctx.input.euConsent) subscriber.eu_consent = ctx.input.euConsent;
-    if (ctx.input.euConsentMessage) subscriber.eu_consent_message = ctx.input.euConsentMessage;
+    if (ctx.input.euConsentMessage !== undefined)
+      subscriber.eu_consent_message = ctx.input.euConsentMessage;
     if (ctx.input.status) subscriber.status = ctx.input.status;
     if (ctx.input.initialStatus) subscriber.initial_status = ctx.input.initialStatus;
     if (ctx.input.prospect !== undefined) subscriber.prospect = ctx.input.prospect;

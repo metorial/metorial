@@ -35,8 +35,6 @@ import {
   searchMessages,
   sendMessage
 } from './tools';
-import { channelMessage, inboundWebhook, newMessage, serverMemberChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -74,5 +72,5 @@ export let provider = Slate.create({
     deleteInvite,
     fetchServerInvites
   ],
-  triggers: [inboundWebhook, newMessage, channelMessage, serverMemberChanges]
+  triggers: []
 });

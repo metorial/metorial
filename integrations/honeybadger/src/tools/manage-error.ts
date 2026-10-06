@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HoneybadgerClient } from '../lib/client';
+import { projectIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageError = SlateTool.create(spec, {
@@ -14,7 +15,7 @@ export let manageError = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project ID'),
+      projectId: projectIdSchema,
       action: z
         .enum([
           'resolve',
@@ -26,7 +27,8 @@ export let manageError = SlateTool.create(spec, {
           'unpause',
           'delete',
           'bulk_resolve',
-          'comment'
+          'comment',
+          'delete_comment'
         ])
         .describe('Action to perform'),
       faultId: z
@@ -48,11 +50,16 @@ export let manageError = SlateTool.create(spec, {
           'Occurrence count to pause until (for pause action, alternative to pauseTime)'
         ),
       query: z.string().optional().describe('Search query for bulk_resolve action'),
+      commentId: z.string().optional().describe('Comment ID for delete_comment'),
       commentBody: z.string().optional().describe('Comment text (for comment action)')
     })
   )
   .output(
     z.object({
+      queued: z
+        .boolean()
+        .optional()
+        .describe('Whether bulk resolution was queued for background processing'),
       success: z.boolean().describe('Whether the operation succeeded'),
       commentId: z
         .number()
@@ -61,20 +68,20 @@ export let manageError = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new HoneybadgerClient({ token: ctx.auth.token });
+    let client = new HoneybadgerClient(ctx.auth);
     let { projectId, action, faultId, assigneeId, pauseTime, pauseCount, query, commentBody } =
       ctx.input;
 
     if (action === 'bulk_resolve') {
-      await client.bulkResolveFaults(projectId, query);
+      const result = await client.bulkResolveFaults(projectId, query);
       return {
-        output: { success: true },
-        message: `Bulk resolved errors${query ? ` matching "${query}"` : ''} in project ${projectId}.`
+        output: { success: true, queued: result.queued },
+        message: `${result.queued ? 'Queued bulk resolution of' : 'Resolved'} errors${query ? ` matching "${query}"` : ''} in project ${projectId}.`
       };
     }
 
     if (!faultId) {
-      throw new Error('faultId is required for this action');
+      throw createApiServiceError('faultId is required for this action');
     }
 
     switch (action) {
@@ -95,7 +102,8 @@ export let manageError = SlateTool.create(spec, {
         return { output: { success: true }, message: `Unignored error **${faultId}**.` };
 
       case 'assign':
-        if (!assigneeId) throw new Error('assigneeId is required for assign action');
+        if (!Number.isSafeInteger(assigneeId) || (assigneeId ?? 0) <= 0)
+          throw createApiServiceError('assigneeId is required for assign action');
         await client.updateFault(projectId, faultId, { assigneeId });
         return {
           output: { success: true },
@@ -103,10 +111,17 @@ export let manageError = SlateTool.create(spec, {
         };
 
       case 'pause': {
+        if (pauseTime && pauseCount !== undefined)
+          throw createApiServiceError('Use either pauseTime or pauseCount, not both.');
+        if (pauseCount !== undefined && ![10, 100, 1000].includes(pauseCount))
+          throw createApiServiceError('pauseCount must be 10, 100, or 1000.');
         let pause: { time?: string; count?: number } = {};
         if (pauseTime) pause.time = pauseTime;
         else if (pauseCount) pause.count = pauseCount;
-        else throw new Error('Either pauseTime or pauseCount is required for pause action');
+        else
+          throw createApiServiceError(
+            'Either pauseTime or pauseCount is required for pause action'
+          );
         await client.pauseFault(projectId, faultId, pause);
         return {
           output: { success: true },
@@ -126,7 +141,8 @@ export let manageError = SlateTool.create(spec, {
         return { output: { success: true }, message: `Deleted error **${faultId}**.` };
 
       case 'comment': {
-        if (!commentBody) throw new Error('commentBody is required for comment action');
+        if (!commentBody)
+          throw createApiServiceError('commentBody is required for comment action');
         let result = await client.createComment(projectId, faultId, commentBody);
         return {
           output: { success: true, commentId: result.id },
@@ -134,8 +150,14 @@ export let manageError = SlateTool.create(spec, {
         };
       }
 
+      case 'delete_comment': {
+        if (!ctx.input.commentId)
+          throw createApiServiceError('commentId is required for delete_comment.');
+        await client.deleteComment(projectId, faultId, ctx.input.commentId);
+        return { output: { success: true }, message: 'Deleted the comment.' };
+      }
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw createApiServiceError(`Unknown action: ${action}`);
     }
   })
   .build();

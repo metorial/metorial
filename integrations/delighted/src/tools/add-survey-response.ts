@@ -1,13 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectUnavailableDelighted, unavailableMessage } from '../lib/unavailable';
 import { spec } from '../spec';
 
 export let addSurveyResponse = SlateTool.create(spec, {
   name: 'Add Survey Response',
   key: 'add_survey_response',
-  description: `Programmatically add a survey response for a person. Useful for importing responses collected outside of Delighted.`,
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }
@@ -39,29 +42,5 @@ export let addSurveyResponse = SlateTool.create(spec, {
       updatedAt: z.number().describe('Unix timestamp of last update')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.createSurveyResponse({
-      personId: ctx.input.personId,
-      score: ctx.input.score,
-      comment: ctx.input.comment,
-      personProperties: ctx.input.personProperties,
-      createdAt: ctx.input.createdAt
-    });
-
-    return {
-      output: {
-        responseId: result.responseId,
-        person: result.person,
-        surveyType: result.surveyType,
-        score: result.score,
-        comment: result.comment,
-        permalink: result.permalink,
-        createdAt: result.createdAt,
-        updatedAt: result.updatedAt
-      },
-      message: `Survey response added with score **${result.score}** (${result.surveyType}).`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();

@@ -17,8 +17,6 @@ import {
   updatePullRequest,
   updateRepository
 } from './tools';
-import { codePush, pullRequestEvent, repositoryEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     getFileContent,
     searchCode
   ],
-  triggers: [codePush, pullRequestEvent, repositoryEvent]
+  triggers: []
 });

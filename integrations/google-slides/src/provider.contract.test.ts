@@ -28,7 +28,7 @@ describe('google-slides provider contract', () => {
         'batch_update',
         'delete_element'
       ],
-      triggerIds: ['inbound_webhook', 'presentation_changed'],
+      triggerIds: [],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'create_presentation', readOnly: false, destructive: false },
@@ -44,13 +44,10 @@ describe('google-slides provider contract', () => {
         { id: 'batch_update', readOnly: false, destructive: true },
         { id: 'delete_element', readOnly: false, destructive: true }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'presentation_changed', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(14);
+    expect(contract.actions).toHaveLength(12);
 
     let expectedScopes = {
       create_presentation: googleSlidesActionScopes.createPresentation,
@@ -64,9 +61,7 @@ describe('google-slides provider contract', () => {
       manage_speaker_notes: googleSlidesActionScopes.manageSpeakerNotes,
       embed_sheets_chart: googleSlidesActionScopes.embedSheetsChart,
       batch_update: googleSlidesActionScopes.batchUpdate,
-      delete_element: googleSlidesActionScopes.deleteElement,
-      inbound_webhook: googleSlidesActionScopes.inboundWebhook,
-      presentation_changed: googleSlidesActionScopes.presentationChanged
+      delete_element: googleSlidesActionScopes.deleteElement
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

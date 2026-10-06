@@ -14,8 +14,6 @@ import {
   sendSurvey,
   unsubscribePerson
 } from './tools';
-import { surveyResponseTrigger, unsubscribeTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     listAutopilotMembers,
     removeFromAutopilot
   ],
-  triggers: [surveyResponseTrigger, unsubscribeTrigger]
+  triggers: []
 });

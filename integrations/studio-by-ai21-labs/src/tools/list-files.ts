@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fileSchema, mapFile } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listFiles = SlateTool.create(spec, {
@@ -18,27 +19,37 @@ export let listFiles = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Filter by these labels (case-sensitive)'),
-      offset: z.number().int().optional().describe('Pagination offset'),
-      limit: z.number().int().optional().describe('Maximum number of files to return')
+      offset: z.number().int().min(0).optional().describe('Pagination offset, default 0'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Maximum number of files to return, 1-1000; default 1000'),
+      name: z.string().optional().describe('Exact file name to filter by'),
+      status: z
+        .enum([
+          'DB_RECORD_CREATED',
+          'UPLOADED',
+          'UPLOAD_FAILED',
+          'PROCESSED',
+          'PROCESSING_FAILED'
+        ])
+        .optional()
+        .describe('Processing status to filter by'),
+      path: z.string().optional().describe('Library path to filter by')
     })
   )
   .output(
     z.object({
-      files: z
-        .array(
-          z.object({
-            fileId: z.string().describe('Unique file identifier'),
-            name: z.string().describe('File name'),
-            fileType: z.string().optional().describe('File format'),
-            sizeBytes: z.number().optional().describe('File size in bytes'),
-            labels: z.array(z.string()).optional().describe('File labels'),
-            status: z.string().optional().describe('File processing status'),
-            publicUrl: z.string().optional().describe('Public source URL'),
-            creationDate: z.string().optional().describe('Upload timestamp'),
-            lastUpdated: z.string().optional().describe('Last update timestamp')
-          })
-        )
-        .describe('List of files')
+      files: z.array(fileSchema).describe('List of files'),
+      offset: z.number().describe('Offset used for this page'),
+      limit: z.number().describe('Page size used'),
+      nextOffset: z
+        .number()
+        .optional()
+        .describe('Next offset when a full page was returned; the next page may be empty')
     })
   )
   .handleInvocation(async ctx => {
@@ -47,25 +58,30 @@ export let listFiles = SlateTool.create(spec, {
     let result = await client.listFiles({
       labels: ctx.input.labels,
       offset: ctx.input.offset,
-      limit: ctx.input.limit
+      limit: ctx.input.limit ?? 1000,
+      name: ctx.input.name,
+      status: ctx.input.status,
+      path: ctx.input.path
     });
 
-    let files = (Array.isArray(result) ? result : (result.files ?? result.data ?? [])).map(
-      (f: any) => ({
-        fileId: f.fileId ?? f.file_id ?? f.id,
-        name: f.name ?? f.fileName,
-        fileType: f.fileType ?? f.file_type,
-        sizeBytes: f.sizeBytes ?? f.size_bytes,
-        labels: f.labels,
-        status: f.status,
-        publicUrl: f.publicUrl ?? f.public_url,
-        creationDate: f.creationDate ?? f.creation_date,
-        lastUpdated: f.lastUpdated ?? f.last_updated
-      })
-    );
+    const data = Array.isArray(result)
+      ? result
+      : isApiErrorRecord(result)
+        ? (result.files ?? result.data)
+        : undefined;
+    if (!Array.isArray(data))
+      throw createApiServiceError('AI21 Studio returned an invalid file listing.');
+    let files = data.map(mapFile);
+    const offset = ctx.input.offset ?? 0;
+    const limit = ctx.input.limit ?? 1000;
 
     return {
-      output: { files },
+      output: {
+        files,
+        offset,
+        limit,
+        nextOffset: files.length === limit ? offset + files.length : undefined
+      },
       message: `Found **${files.length}** file(s) in the library.`
     };
   })

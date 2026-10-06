@@ -1,18 +1,17 @@
 {
   "name": "@metorial/flutterwave",
-  "description": "Process payments across multiple African and global markets using cards, bank transfers, mobile money, USSD, and digital wallets. Send payouts to bank accounts, mobile money wallets, and Flutterwave wallets in multiple currencies. Create and manage subscription billing with payment plans. Generate virtual accounts (dynamic or static) for receiving bank transfer payments. Create and manage payout subaccounts (wallets) with wallet-to-wallet transfers. Pay bills including airtime, data, cable, power, and tolls. Manage transaction disputes, refunds, and settlements. Verify identity via bank account and BVN resolution. Receive webhook notifications for charge, transfer, and subscription events.",
+  "description": "Use the supported Flutterwave API v3 to inspect transactions, fees, payouts, refunds and settlements; manage payment plans, subscriptions and beneficiaries; issue and retrieve virtual accounts; discover banks and bill products, and submit and inspect bill payments. API v3 Secret Keys determine test or live mode. Financial requests may be asynchronous and require status readback.",
   "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
   "skills": [
-    "process card payments",
-    "send payouts and transfers",
-    "manage subscriptions and billing",
-    "generate virtual accounts",
-    "collect mobile money payments",
-    "pay bills and airtime",
-    "manage refunds and disputes",
-    "verify bank account identity",
-    "create payout wallets",
-    "track settlements and reports"
+    "inspect payment transactions",
+    "send and inspect payouts",
+    "manage payment plans and subscriptions",
+    "issue and retrieve virtual accounts",
+    "discover and pay bill products",
+    "initiate and inspect refunds",
+    "resolve bank accounts",
+    "manage payout beneficiaries",
+    "inspect settlements"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/flutterwave.png"
 }

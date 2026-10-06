@@ -1,263 +1,181 @@
-import { createAxios, SlateAuth } from 'slates';
-import { z } from 'zod';
+import { createAxios, normalizeOAuthTokenResponse, SlateAuth } from 'slates';
+import { MakeClient, resolveZone } from './lib/client';
+import { serviceFailure, tokenValue } from './lib/http';
+import { id, invalid, malformed, parse, record, z, zone, zoneInput } from './lib/schemas';
 
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string(),
-      refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
-    })
+const output = z.object({
+  token: z.string(),
+  refreshToken: z.string().optional(),
+  expiresAt: z.string().optional(),
+  zoneUrl: zone.optional(),
+  authMode: z.enum(['oauth', 'api_token']).optional(),
+  userId: id.optional()
+});
+type AuthOutput = z.output<typeof output>;
+const scopes = [
+  'scenarios:read',
+  'scenarios:write',
+  'scenarios:run',
+  'connections:read',
+  'connections:write',
+  'hooks:read',
+  'hooks:write',
+  'datastores:read',
+  'datastores:write',
+  'teams:read',
+  'organizations:read',
+  'user:read',
+  'udts:read'
+].map(scope => ({
+  scope,
+  title: scope,
+  description: `Access required by the supported ${scope.split(':')[0]} workflows.`
+}));
+async function exchange(
+  body: Record<string, string>,
+  zoneUrl: z.output<typeof zone> | undefined,
+  previous?: AuthOutput
+) {
+  let data: unknown;
+  try {
+    data = (
+      await createAxios({
+        timeout: 30000,
+        maxRedirects: 0,
+        maxContentLength: 1024 * 1024
+      }).post<unknown>(
+        'https://www.make.com/oauth/v2/token',
+        new URLSearchParams(body).toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      )
+    ).data;
+  } catch (error) {
+    throw serviceFailure(error);
+  }
+  const response = parse(record, data);
+  tokenValue(response.access_token, 'OAuth access token');
+  if (response.refresh_token !== undefined && response.refresh_token !== null)
+    tokenValue(response.refresh_token, 'OAuth refresh token');
+  if (
+    response.token_type !== undefined &&
+    (typeof response.token_type !== 'string' || response.token_type.toLowerCase() !== 'bearer')
   )
+    throw malformed();
+  if (
+    typeof response.expires_in !== 'number' ||
+    !Number.isSafeInteger(response.expires_in) ||
+    response.expires_in <= 0 ||
+    response.expires_in > Math.floor((8640000000000000 - Date.now()) / 1000)
+  )
+    throw malformed();
+  const tokens = normalizeOAuthTokenResponse(response, {
+    providerLabel: 'Make',
+    required: true,
+    expiresInType: 'number',
+    previousRefreshToken: previous?.refreshToken
+  });
+  if (!tokens.refreshToken)
+    throw invalid(
+      'Make did not provide a refresh token. Reconnect using the confidential-client OAuth flow.'
+    );
+  return { ...previous, ...tokens, authMode: 'oauth' as const, zoneUrl };
+}
+async function profile(ctx: {
+  output: AuthOutput;
+  input: { zoneUrl?: string };
+  config?: Record<string, unknown>;
+}) {
+  const regional = resolveZone(ctx.output.zoneUrl, ctx.config?.zoneUrl, ctx.input.zoneUrl);
+  const client = new MakeClient({ ...ctx.output, zoneUrl: regional });
+  const user = await client.getCurrentUser();
+  return {
+    profile: {
+      id: String(user.id),
+      name: user.name ?? undefined,
+      email: user.email ?? undefined,
+      imageUrl: user.avatar ?? undefined,
+      zoneUrl: client.zoneUrl
+    }
+  };
+}
+export const auth = SlateAuth.create()
+  .output(output)
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth',
     key: 'oauth',
-
-    scopes: [
-      {
-        title: 'Scenarios Read',
-        description: 'List and view scenarios',
-        scope: 'scenarios:read'
-      },
-      {
-        title: 'Scenarios Write',
-        description: 'Create, update, and delete scenarios',
-        scope: 'scenarios:write'
-      },
-      {
-        title: 'Scenarios Run',
-        description: 'Execute scenarios on demand',
-        scope: 'scenarios:run'
-      },
-      {
-        title: 'Connections Read',
-        description: 'List and view connections',
-        scope: 'connections:read'
-      },
-      {
-        title: 'Connections Write',
-        description: 'Create, update, and delete connections',
-        scope: 'connections:write'
-      },
-      { title: 'Hooks Read', description: 'List and view webhooks', scope: 'hooks:read' },
-      {
-        title: 'Hooks Write',
-        description: 'Create, update, and delete webhooks',
-        scope: 'hooks:write'
-      },
-      {
-        title: 'Data Stores Read',
-        description: 'List and view data stores and records',
-        scope: 'datastores:read'
-      },
-      {
-        title: 'Data Stores Write',
-        description: 'Create, update, and delete data stores and records',
-        scope: 'datastores:write'
-      },
-      { title: 'Teams Read', description: 'List and view teams', scope: 'teams:read' },
-      {
-        title: 'Teams Write',
-        description: 'Create, update, and delete teams',
-        scope: 'teams:write'
-      },
-      {
-        title: 'Organizations Read',
-        description: 'List and view organizations',
-        scope: 'organizations:read'
-      },
-      {
-        title: 'Organizations Write',
-        description: 'Create, update, and delete organizations',
-        scope: 'organizations:write'
-      },
-      {
-        title: 'User Read',
-        description: 'View user profiles and information',
-        scope: 'user:read'
-      },
-      { title: 'User Write', description: 'Update user profiles', scope: 'user:write' },
-      {
-        title: 'SDK Apps Read',
-        description: 'List and view custom apps',
-        scope: 'sdk-apps:read'
-      },
-      {
-        title: 'SDK Apps Write',
-        description: 'Create and manage custom apps',
-        scope: 'sdk-apps:write'
-      },
-      {
-        title: 'Notifications Read',
-        description: 'View notifications',
-        scope: 'notifications:read'
-      },
-      {
-        title: 'Notifications Write',
-        description: 'Manage notifications',
-        scope: 'notifications:write'
-      },
-      { title: 'Analytics Read', description: 'View analytics data', scope: 'analytics:read' },
-      { title: 'Keys Read', description: 'List and view encryption keys', scope: 'keys:read' },
-      {
-        title: 'Keys Write',
-        description: 'Create and manage encryption keys',
-        scope: 'keys:write'
-      },
-      { title: 'Devices Read', description: 'List and view devices', scope: 'devices:read' },
-      {
-        title: 'Devices Write',
-        description: 'Create and manage devices',
-        scope: 'devices:write'
-      },
-      { title: 'DLQs Read', description: 'View incomplete executions', scope: 'dlqs:read' },
-      {
-        title: 'DLQs Write',
-        description: 'Manage incomplete executions',
-        scope: 'dlqs:write'
-      },
-      {
-        title: 'Templates Read',
-        description: 'List and view templates',
-        scope: 'templates:read'
-      },
-      {
-        title: 'Templates Write',
-        description: 'Create and manage templates',
-        scope: 'templates:write'
-      },
-      {
-        title: 'Team Variables Read',
-        description: 'View team variables',
-        scope: 'teams-variables:read'
-      },
-      {
-        title: 'Team Variables Write',
-        description: 'Manage team variables',
-        scope: 'team-variables:write'
-      },
-      {
-        title: 'Org Variables Read',
-        description: 'View organization variables',
-        scope: 'organizations-variables:read'
-      },
-      {
-        title: 'Org Variables Write',
-        description: 'Manage organization variables',
-        scope: 'organizations-variables:write'
-      },
-      {
-        title: 'Functions Read',
-        description: 'View custom functions',
-        scope: 'functions:read'
-      },
-      {
-        title: 'Functions Write',
-        description: 'Manage custom functions',
-        scope: 'functions:write'
-      }
-    ],
-
-    getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
-        client_id: ctx.clientId,
+    scopes,
+    inputSchema: z.object({ zoneUrl: zoneInput }),
+    async getAuthorizationUrl(ctx) {
+      const requested = ctx.scopes.length ? ctx.scopes : scopes.map(s => s.scope);
+      const params = new URLSearchParams({
+        client_id: tokenValue(ctx.clientId, 'OAuth client ID'),
         response_type: 'code',
         redirect_uri: ctx.redirectUri,
         state: ctx.state,
-        scope: ctx.scopes.join(' ')
+        scope: requested.join(' ')
       });
-
-      return {
-        url: `https://www.make.com/oauth/v2/authorize?${params.toString()}`
-      };
+      resolveZone(undefined, ctx.config?.zoneUrl, ctx.input.zoneUrl);
+      return { url: `https://www.make.com/oauth/v2/authorize?${params}` };
     },
-
-    handleCallback: async ctx => {
-      let http = createAxios();
-
-      let response = await http.post(
-        'https://www.make.com/oauth/v2/token',
-        new URLSearchParams({
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
+    async handleCallback(ctx) {
+      const tokens = await exchange(
+        {
+          client_id: tokenValue(ctx.clientId, 'OAuth client ID'),
+          client_secret: tokenValue(ctx.clientSecret, 'OAuth client secret'),
           grant_type: 'authorization_code',
-          code: ctx.code,
+          code: tokenValue(ctx.code, 'OAuth authorization code'),
           redirect_uri: ctx.redirectUri
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
+        },
+        resolveZone(undefined, ctx.config?.zoneUrl, ctx.input.zoneUrl)
       );
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
+      const user = await new MakeClient(tokens).getCurrentUser();
+      return { output: { ...tokens, userId: user.id } };
+    },
+    async handleTokenRefresh(ctx: {
+      output: AuthOutput;
+      input: { zoneUrl?: string };
+      clientId: string;
+      clientSecret: string;
+      config?: Record<string, unknown>;
+    }) {
+      const saved = resolveZone(ctx.output.zoneUrl, ctx.config?.zoneUrl, ctx.input.zoneUrl);
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: await exchange(
+          {
+            client_id: tokenValue(ctx.clientId, 'OAuth client ID'),
+            client_secret: tokenValue(ctx.clientSecret, 'OAuth client secret'),
+            grant_type: 'refresh_token',
+            refresh_token: tokenValue(ctx.output.refreshToken, 'OAuth refresh token')
+          },
+          saved,
+          ctx.output
+        )
       };
     },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
-      }
-
-      let http = createAxios();
-
-      let response = await http.post(
-        'https://www.make.com/oauth/v2/token',
-        new URLSearchParams({
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt
-        }
-      };
-    }
+    getProfile: profile
   })
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Token',
     key: 'api_token',
-
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Make API token. Generate from Profile > API tab in your Make account.')
+        .min(1)
+        .describe(
+          'Make API token with permissions for the requested workflows, including organizations:read for connected-user validation.'
+        ),
+      zoneUrl: zoneInput
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
+    async getOutput(ctx) {
+      const tokens = {
+        token: tokenValue(ctx.input.token),
+        authMode: 'api_token' as const,
+        zoneUrl: resolveZone(undefined, ctx.config?.zoneUrl, ctx.input.zoneUrl)
       };
-    }
+      const user = await new MakeClient(tokens).getCurrentUser();
+      return { output: { ...tokens, userId: user.id } };
+    },
+    getProfile: profile
   });

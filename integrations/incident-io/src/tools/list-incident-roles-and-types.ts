@@ -41,7 +41,7 @@ export let listIncidentRolesAndTypes = SlateTool.create(spec, {
       client.listIncidentTypes()
     ]);
 
-    let roles = rolesResult.incident_roles.map((r: any) => ({
+    let roles = rolesResult.incident_roles.map(r => ({
       roleId: r.id,
       name: r.name,
       description: r.description || undefined,
@@ -49,7 +49,7 @@ export let listIncidentRolesAndTypes = SlateTool.create(spec, {
       shortform: r.shortform || undefined
     }));
 
-    let incidentTypes = typesResult.incident_types.map((t: any) => ({
+    let incidentTypes = typesResult.incident_types.map(t => ({
       incidentTypeId: t.id,
       name: t.name,
       description: t.description || undefined,

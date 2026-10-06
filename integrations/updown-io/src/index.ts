@@ -17,8 +17,6 @@ import {
   updateCheck,
   updateStatusPage
 } from './tools';
-import { monitoringEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     deleteStatusPage,
     listNodes
   ],
-  triggers: [monitoringEvents]
+  triggers: []
 });

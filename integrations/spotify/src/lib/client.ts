@@ -1,609 +1,796 @@
-import { createAxios } from 'slates';
-import type {
-  PlayHistoryItem,
-  SimplifiedAlbum,
-  SimplifiedPlaylist,
-  SpotifyAlbum,
-  SpotifyArtist,
-  SpotifyAudioFeatures,
-  SpotifyCursorPaginated,
-  SpotifyDevice,
-  SpotifyPaginated,
-  SpotifyPlaybackState,
-  SpotifyPlaylist,
-  SpotifyQueue,
-  SpotifySavedAlbum,
-  SpotifySavedTrack,
-  SpotifySearchResult,
-  SpotifyTrack,
-  SpotifyUser
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
+import {
+  albumSchema,
+  artistSchema,
+  audioSchema,
+  cursorSchema,
+  deviceSchema,
+  fullAlbumSchema,
+  fullTrackSchema,
+  historySchema,
+  pageSchema,
+  parse,
+  playbackSchema,
+  playlistEntrySchema,
+  playlistSchema,
+  queueSchema,
+  savedAlbumSchema,
+  savedTrackSchema,
+  simplifiedPlaylistSchema,
+  trackSchema,
+  userSchema,
+  validatePageLinks
 } from './types';
+import {
+  API_ROOT,
+  identifier,
+  ids,
+  market,
+  protect,
+  requireLegacy,
+  spotifyError,
+  uri,
+  whole
+} from './validation';
 
+type PageInput = { limit?: number; offset?: number; market?: string };
 export class SpotifyClient {
   private axios;
-
-  constructor(private config: { token: string; market?: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://api.spotify.com/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
+  constructor(
+    private config: {
+      token: string;
+      refreshToken?: string;
+      market?: string;
+      endpointCompatibility?: 'current' | 'legacy';
+      input?: unknown;
+    }
+  ) {
+    if (!config.token)
+      throw createApiServiceError('Reconnect Spotify before making a request.');
+    market(config.market);
+    protect(
+      config.input,
+      [config.token, config.refreshToken].filter(
+        (value): value is string => typeof value === 'string' && value.length > 0
+      )
+    );
+    this.axios = createAuthenticatedAxios({
+      baseURL: API_ROOT,
+      authHeader: { value: `Bearer ${config.token}` },
+      maxRedirects: 0,
+      timeout: 30000,
+      maxContentLength: 4 * 1024 * 1024,
+      maxBodyLength: 1024 * 1024,
+      errorMapping: {
+        extractResponseData: response => {
+          const data: unknown = response.data;
+          const nativeError =
+            data && typeof data === 'object' && 'error' in data ? data.error : undefined;
+          const quota =
+            nativeError &&
+            typeof nativeError === 'object' &&
+            'reason' in nativeError &&
+            nativeError.reason === 'QUOTA_EXCEEDED';
+          const header = getResponseHeaderValue(response.headers, 'retry-after');
+          return {
+            error: {
+              status: response.status,
+              message: 'Spotify request was rejected.',
+              ...(quota ? { code: 'QUOTA_EXCEEDED' } : {})
+            },
+            ...(header && /^\d{1,7}$/.test(header)
+              ? { retryAfterSeconds: Number(header) }
+              : {})
+          };
+        }
       }
     });
+    this.axios.interceptors.request.use(request => {
+      protect(
+        { path: request.url, params: request.params, data: request.data },
+        [config.token, config.refreshToken].filter(
+          (value): value is string => typeof value === 'string' && value.length > 0
+        )
+      );
+      return request;
+    });
   }
-
-  // ==================== Search ====================
-
+  get legacy() {
+    return this.config.endpointCompatibility === 'legacy';
+  }
+  requireLegacy(operation: string) {
+    requireLegacy(this.legacy, operation);
+  }
+  private query(params: PageInput = {}) {
+    whole(params.limit, 'limit', 1, 50);
+    whole(params.offset, 'offset');
+    return pickDefined({
+      limit: params.limit,
+      offset: params.offset,
+      market: market(params.market ?? this.config.market)
+    });
+  }
+  private async request<T extends z.ZodType>(
+    method: 'get' | 'post' | 'put' | 'delete',
+    path: string,
+    schema: T,
+    params?: object,
+    data?: object,
+    status = 200
+  ): Promise<z.output<T>> {
+    let dispatched = false;
+    try {
+      protect(
+        { path, params, data },
+        [this.config.token, this.config.refreshToken].filter(
+          (value): value is string => typeof value === 'string' && value.length > 0
+        )
+      );
+      dispatched = method !== 'get';
+      const response = await this.axios.request<unknown>({ method, url: path, params, data });
+      protect(
+        { data: response.data, headers: response.headers },
+        [this.config.token, this.config.refreshToken].filter(
+          (value): value is string => typeof value === 'string' && value.length > 0
+        )
+      );
+      if (response.status !== status)
+        throw createApiServiceError(
+          'Spotify returned an unexpected response status. Inspect changed state before retrying.'
+        );
+      return parse(schema, response.data);
+    } catch (error) {
+      const safe = spotifyError(error, dispatched);
+      if (dispatched) safe.data.outcomeUncertain = true;
+      throw safe;
+    }
+  }
+  private async empty(
+    method: 'post' | 'put' | 'delete',
+    path: string,
+    params?: object,
+    data?: object,
+    status = 204
+  ) {
+    await this.request(
+      method,
+      path,
+      z.union([z.literal(''), z.undefined(), z.null()]),
+      params,
+      data,
+      status
+    );
+  }
+  private async page<T extends z.ZodType>(
+    path: string,
+    schema: T,
+    params: PageInput = {},
+    extra?: object
+  ) {
+    const result = await this.request('get', path, pageSchema(schema), {
+      ...this.query(params),
+      ...extra
+    });
+    validatePageLinks(result, path);
+    if (
+      (params.offset !== undefined && result.offset !== params.offset) ||
+      (params.limit !== undefined && result.limit !== params.limit) ||
+      result.items.length > result.limit
+    )
+      throw createApiServiceError(
+        'Spotify returned a page inconsistent with the requested offset or limit.'
+      );
+    return result;
+  }
+  private async exact<T extends z.ZodType>(
+    path: string,
+    schema: T,
+    id: string,
+    params?: object
+  ) {
+    const result = await this.request('get', path, schema, params);
+    const row = result as { id?: string; linked_from?: { id?: string } };
+    if (row.id !== id && row.linked_from?.id !== id)
+      throw createApiServiceError(
+        'Spotify returned a different resource identity. No alternative resource was silently selected.'
+      );
+    return result;
+  }
   async search(params: {
     query: string;
     types: string[];
     market?: string;
     limit?: number;
     offset?: number;
-  }): Promise<SpotifySearchResult> {
-    let searchParams: Record<string, string> = {
+  }) {
+    if (!params.query.trim() || !params.types.length)
+      throw createApiServiceError(
+        'Supply a nonempty search query and at least one content type.'
+      );
+    whole(params.limit, 'limit', 1, this.legacy ? 50 : 10);
+    whole(params.offset, 'offset', 0, 1000);
+    const schema = z.object({
+      tracks: pageSchema(fullTrackSchema.nullable()).optional(),
+      artists: pageSchema(artistSchema.nullable()).optional(),
+      albums: pageSchema(albumSchema.nullable()).optional(),
+      playlists: pageSchema(simplifiedPlaylistSchema.nullable()).optional()
+    });
+    const result = await this.request('get', '/search', schema, {
       q: params.query,
-      type: params.types.join(',')
-    };
-    if (params.market || this.config.market) {
-      searchParams.market = params.market || this.config.market!;
-    }
-    if (params.limit) searchParams.limit = String(params.limit);
-    if (params.offset) searchParams.offset = String(params.offset);
-
-    let response = await this.axios.get('/search', { params: searchParams });
-    return response.data as SpotifySearchResult;
-  }
-
-  // ==================== Artists ====================
-
-  async getArtist(artistId: string): Promise<SpotifyArtist> {
-    let response = await this.axios.get(`/artists/${artistId}`);
-    return response.data as SpotifyArtist;
-  }
-
-  async getArtistAlbums(
-    artistId: string,
-    params?: {
-      includeGroups?: string;
-      market?: string;
-      limit?: number;
-      offset?: number;
-    }
-  ): Promise<SpotifyPaginated<SimplifiedAlbum>> {
-    let searchParams: Record<string, string> = {};
-    if (params?.includeGroups) searchParams.include_groups = params.includeGroups;
-    if (params?.market || this.config.market)
-      searchParams.market = params?.market || this.config.market!;
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.offset) searchParams.offset = String(params.offset);
-
-    let response = await this.axios.get(`/artists/${artistId}/albums`, {
-      params: searchParams
+      type: [...new Set(params.types)].join(','),
+      ...this.query({ ...params, limit: params.limit ?? (this.legacy ? 20 : 5) })
     });
-    return response.data as SpotifyPaginated<SimplifiedAlbum>;
-  }
-
-  async getArtistTopTracks(
-    artistId: string,
-    market?: string
-  ): Promise<{ tracks: SpotifyTrack[] }> {
-    let params: Record<string, string> = {};
-    if (market || this.config.market) params.market = market || this.config.market!;
-
-    let response = await this.axios.get(`/artists/${artistId}/top-tracks`, { params });
-    return response.data as { tracks: SpotifyTrack[] };
-  }
-
-  async getRelatedArtists(artistId: string): Promise<{ artists: SpotifyArtist[] }> {
-    let response = await this.axios.get(`/artists/${artistId}/related-artists`);
-    return response.data as { artists: SpotifyArtist[] };
-  }
-
-  // ==================== Albums ====================
-
-  async getAlbum(albumId: string, market?: string): Promise<SpotifyAlbum> {
-    let params: Record<string, string> = {};
-    if (market || this.config.market) params.market = market || this.config.market!;
-
-    let response = await this.axios.get(`/albums/${albumId}`, { params });
-    return response.data as SpotifyAlbum;
-  }
-
-  async getAlbumTracks(
-    albumId: string,
-    params?: {
-      market?: string;
-      limit?: number;
-      offset?: number;
+    for (const type of params.types) {
+      const key = `${type}s` as keyof typeof result;
+      const page = result[key];
+      if (!page)
+        throw createApiServiceError('Spotify omitted a requested search result collection.');
+      validatePageLinks(page, '/search');
+      if (
+        page.limit !== (params.limit ?? (this.legacy ? 20 : 5)) ||
+        page.offset !== (params.offset ?? 0) ||
+        page.items.length > page.limit
+      )
+        throw createApiServiceError('Spotify returned inconsistent search paging metadata.');
     }
-  ): Promise<SpotifyPaginated<SpotifyTrack>> {
-    let searchParams: Record<string, string> = {};
-    if (params?.market || this.config.market)
-      searchParams.market = params?.market || this.config.market!;
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.offset) searchParams.offset = String(params.offset);
-
-    let response = await this.axios.get(`/albums/${albumId}/tracks`, { params: searchParams });
-    return response.data as SpotifyPaginated<SpotifyTrack>;
+    return result;
   }
-
-  async getNewReleases(params?: {
-    limit?: number;
-    offset?: number;
-  }): Promise<{ albums: SpotifyPaginated<SimplifiedAlbum> }> {
-    let searchParams: Record<string, string> = {};
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.offset) searchParams.offset = String(params.offset);
-
-    let response = await this.axios.get('/browse/new-releases', { params: searchParams });
-    return response.data as { albums: SpotifyPaginated<SimplifiedAlbum> };
+  getArtist(id: string) {
+    return this.exact(`/artists/${identifier(id)}`, artistSchema, id);
   }
-
-  // ==================== Tracks ====================
-
-  async getTrack(trackId: string, market?: string): Promise<SpotifyTrack> {
-    let params: Record<string, string> = {};
-    if (market || this.config.market) params.market = market || this.config.market!;
-
-    let response = await this.axios.get(`/tracks/${trackId}`, { params });
-    return response.data as SpotifyTrack;
-  }
-
-  async getSeveralTracks(
-    trackIds: string[],
-    market?: string
-  ): Promise<{ tracks: SpotifyTrack[] }> {
-    let params: Record<string, string> = { ids: trackIds.join(',') };
-    if (market || this.config.market) params.market = market || this.config.market!;
-
-    let response = await this.axios.get('/tracks', { params });
-    return response.data as { tracks: SpotifyTrack[] };
-  }
-
-  async getAudioFeatures(trackId: string): Promise<SpotifyAudioFeatures> {
-    let response = await this.axios.get(`/audio-features/${trackId}`);
-    return response.data as SpotifyAudioFeatures;
-  }
-
-  async getSeveralAudioFeatures(
-    trackIds: string[]
-  ): Promise<{ audio_features: SpotifyAudioFeatures[] }> {
-    let response = await this.axios.get('/audio-features', {
-      params: { ids: trackIds.join(',') }
-    });
-    return response.data as { audio_features: SpotifyAudioFeatures[] };
-  }
-
-  // ==================== Playlists ====================
-
-  async getPlaylist(
-    playlistId: string,
-    params?: {
-      market?: string;
-      fields?: string;
-    }
-  ): Promise<SpotifyPlaylist> {
-    let searchParams: Record<string, string> = {};
-    if (params?.market || this.config.market)
-      searchParams.market = params?.market || this.config.market!;
-    if (params?.fields) searchParams.fields = params.fields;
-
-    let response = await this.axios.get(`/playlists/${playlistId}`, { params: searchParams });
-    return response.data as SpotifyPlaylist;
-  }
-
-  async getCurrentUserPlaylists(params?: {
-    limit?: number;
-    offset?: number;
-  }): Promise<SpotifyPaginated<SimplifiedPlaylist>> {
-    let searchParams: Record<string, string> = {};
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.offset) searchParams.offset = String(params.offset);
-
-    let response = await this.axios.get('/me/playlists', { params: searchParams });
-    return response.data as SpotifyPaginated<SimplifiedPlaylist>;
-  }
-
-  async createPlaylist(
-    userId: string,
-    data: {
-      name: string;
-      description?: string;
-      public?: boolean;
-      collaborative?: boolean;
-    }
-  ): Promise<SpotifyPlaylist> {
-    let response = await this.axios.post(`/users/${userId}/playlists`, data);
-    return response.data as SpotifyPlaylist;
-  }
-
-  async updatePlaylistDetails(
-    playlistId: string,
-    data: {
-      name?: string;
-      description?: string;
-      public?: boolean;
-      collaborative?: boolean;
-    }
-  ): Promise<void> {
-    await this.axios.put(`/playlists/${playlistId}`, data);
-  }
-
-  async addItemsToPlaylist(
-    playlistId: string,
-    uris: string[],
-    position?: number
-  ): Promise<{ snapshot_id: string }> {
-    let body: Record<string, any> = { uris };
-    if (position !== undefined) body.position = position;
-
-    let response = await this.axios.post(`/playlists/${playlistId}/tracks`, body);
-    return response.data as { snapshot_id: string };
-  }
-
-  async removeItemsFromPlaylist(
-    playlistId: string,
-    uris: string[],
-    snapshotId?: string
-  ): Promise<{ snapshot_id: string }> {
-    let body: Record<string, any> = {
-      tracks: uris.map(uri => ({ uri }))
-    };
-    if (snapshotId) body.snapshot_id = snapshotId;
-
-    let response = await this.axios.delete(`/playlists/${playlistId}/tracks`, { data: body });
-    return response.data as { snapshot_id: string };
-  }
-
-  async reorderPlaylistItems(
-    playlistId: string,
-    rangeStart: number,
-    insertBefore: number,
-    rangeLength?: number,
-    snapshotId?: string
-  ): Promise<{ snapshot_id: string }> {
-    let body: Record<string, any> = {
-      range_start: rangeStart,
-      insert_before: insertBefore
-    };
-    if (rangeLength !== undefined) body.range_length = rangeLength;
-    if (snapshotId) body.snapshot_id = snapshotId;
-
-    let response = await this.axios.put(`/playlists/${playlistId}/tracks`, body);
-    return response.data as { snapshot_id: string };
-  }
-
-  async replacePlaylistItems(
-    playlistId: string,
-    uris: string[]
-  ): Promise<{ snapshot_id: string }> {
-    let response = await this.axios.put(`/playlists/${playlistId}/tracks`, { uris });
-    return response.data as { snapshot_id: string };
-  }
-
-  async getPlaylistTracks(
-    playlistId: string,
-    params?: {
-      market?: string;
-      limit?: number;
-      offset?: number;
-      fields?: string;
-    }
-  ): Promise<SpotifyPaginated<any>> {
-    let searchParams: Record<string, string> = {};
-    if (params?.market || this.config.market)
-      searchParams.market = params?.market || this.config.market!;
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.offset) searchParams.offset = String(params.offset);
-    if (params?.fields) searchParams.fields = params.fields;
-
-    let response = await this.axios.get(`/playlists/${playlistId}/tracks`, {
-      params: searchParams
-    });
-    return response.data as SpotifyPaginated<any>;
-  }
-
-  // ==================== Player / Playback ====================
-
-  async getPlaybackState(market?: string): Promise<SpotifyPlaybackState | null> {
-    let params: Record<string, string> = {};
-    if (market || this.config.market) params.market = market || this.config.market!;
-
-    let response = await this.axios.get('/me/player', { params });
-    if (response.status === 204) return null;
-    return response.data as SpotifyPlaybackState;
-  }
-
-  async getAvailableDevices(): Promise<{ devices: SpotifyDevice[] }> {
-    let response = await this.axios.get('/me/player/devices');
-    return response.data as { devices: SpotifyDevice[] };
-  }
-
-  async getCurrentlyPlaying(market?: string): Promise<SpotifyPlaybackState | null> {
-    let params: Record<string, string> = {};
-    if (market || this.config.market) params.market = market || this.config.market!;
-
-    let response = await this.axios.get('/me/player/currently-playing', { params });
-    if (response.status === 204) return null;
-    return response.data as SpotifyPlaybackState;
-  }
-
-  async startPlayback(params?: {
-    deviceId?: string;
-    contextUri?: string;
-    uris?: string[];
-    offset?: { position?: number; uri?: string };
-    positionMs?: number;
-  }): Promise<void> {
-    let queryParams: Record<string, string> = {};
-    if (params?.deviceId) queryParams.device_id = params.deviceId;
-
-    let body: Record<string, any> = {};
-    if (params?.contextUri) body.context_uri = params.contextUri;
-    if (params?.uris) body.uris = params.uris;
-    if (params?.offset) body.offset = params.offset;
-    if (params?.positionMs !== undefined) body.position_ms = params.positionMs;
-
-    await this.axios.put('/me/player/play', body, { params: queryParams });
-  }
-
-  async pausePlayback(deviceId?: string): Promise<void> {
-    let params: Record<string, string> = {};
-    if (deviceId) params.device_id = deviceId;
-
-    await this.axios.put('/me/player/pause', {}, { params });
-  }
-
-  async skipToNext(deviceId?: string): Promise<void> {
-    let params: Record<string, string> = {};
-    if (deviceId) params.device_id = deviceId;
-
-    await this.axios.post('/me/player/next', {}, { params });
-  }
-
-  async skipToPrevious(deviceId?: string): Promise<void> {
-    let params: Record<string, string> = {};
-    if (deviceId) params.device_id = deviceId;
-
-    await this.axios.post('/me/player/previous', {}, { params });
-  }
-
-  async seekToPosition(positionMs: number, deviceId?: string): Promise<void> {
-    let params: Record<string, string> = { position_ms: String(positionMs) };
-    if (deviceId) params.device_id = deviceId;
-
-    await this.axios.put('/me/player/seek', {}, { params });
-  }
-
-  async setRepeatMode(state: 'track' | 'context' | 'off', deviceId?: string): Promise<void> {
-    let params: Record<string, string> = { state };
-    if (deviceId) params.device_id = deviceId;
-
-    await this.axios.put('/me/player/repeat', {}, { params });
-  }
-
-  async setVolume(volumePercent: number, deviceId?: string): Promise<void> {
-    let params: Record<string, string> = { volume_percent: String(volumePercent) };
-    if (deviceId) params.device_id = deviceId;
-
-    await this.axios.put('/me/player/volume', {}, { params });
-  }
-
-  async toggleShuffle(state: boolean, deviceId?: string): Promise<void> {
-    let params: Record<string, string> = { state: String(state) };
-    if (deviceId) params.device_id = deviceId;
-
-    await this.axios.put('/me/player/shuffle', {}, { params });
-  }
-
-  async transferPlayback(deviceIds: string[], play?: boolean): Promise<void> {
-    let body: Record<string, any> = { device_ids: deviceIds };
-    if (play !== undefined) body.play = play;
-
-    await this.axios.put('/me/player', body);
-  }
-
-  async addToQueue(uri: string, deviceId?: string): Promise<void> {
-    let params: Record<string, string> = { uri };
-    if (deviceId) params.device_id = deviceId;
-
-    await this.axios.post('/me/player/queue', {}, { params });
-  }
-
-  async getQueue(): Promise<SpotifyQueue> {
-    let response = await this.axios.get('/me/player/queue');
-    return response.data as SpotifyQueue;
-  }
-
-  // ==================== User Library ====================
-
-  async getSavedTracks(params?: {
-    market?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<SpotifyPaginated<SpotifySavedTrack>> {
-    let searchParams: Record<string, string> = {};
-    if (params?.market || this.config.market)
-      searchParams.market = params?.market || this.config.market!;
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.offset) searchParams.offset = String(params.offset);
-
-    let response = await this.axios.get('/me/tracks', { params: searchParams });
-    return response.data as SpotifyPaginated<SpotifySavedTrack>;
-  }
-
-  async saveTracks(trackIds: string[]): Promise<void> {
-    await this.axios.put('/me/tracks', { ids: trackIds });
-  }
-
-  async removeSavedTracks(trackIds: string[]): Promise<void> {
-    await this.axios.delete('/me/tracks', { data: { ids: trackIds } });
-  }
-
-  async checkSavedTracks(trackIds: string[]): Promise<boolean[]> {
-    let response = await this.axios.get('/me/tracks/contains', {
-      params: { ids: trackIds.join(',') }
-    });
-    return response.data as boolean[];
-  }
-
-  async getSavedAlbums(params?: {
-    market?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<SpotifyPaginated<SpotifySavedAlbum>> {
-    let searchParams: Record<string, string> = {};
-    if (params?.market || this.config.market)
-      searchParams.market = params?.market || this.config.market!;
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.offset) searchParams.offset = String(params.offset);
-
-    let response = await this.axios.get('/me/albums', { params: searchParams });
-    return response.data as SpotifyPaginated<SpotifySavedAlbum>;
-  }
-
-  async saveAlbums(albumIds: string[]): Promise<void> {
-    await this.axios.put('/me/albums', { ids: albumIds });
-  }
-
-  async removeSavedAlbums(albumIds: string[]): Promise<void> {
-    await this.axios.delete('/me/albums', { data: { ids: albumIds } });
-  }
-
-  async checkSavedAlbums(albumIds: string[]): Promise<boolean[]> {
-    let response = await this.axios.get('/me/albums/contains', {
-      params: { ids: albumIds.join(',') }
-    });
-    return response.data as boolean[];
-  }
-
-  // ==================== User Profile ====================
-
-  async getCurrentUser(): Promise<SpotifyUser> {
-    let response = await this.axios.get('/me');
-    return response.data as SpotifyUser;
-  }
-
-  async getUserProfile(userId: string): Promise<SpotifyUser> {
-    let response = await this.axios.get(`/users/${userId}`);
-    return response.data as SpotifyUser;
-  }
-
-  // ==================== Personalization ====================
-
-  async getTopItems(
-    type: 'artists' | 'tracks',
-    params?: {
-      timeRange?: string;
-      limit?: number;
-      offset?: number;
-    }
-  ): Promise<SpotifyPaginated<SpotifyArtist | SpotifyTrack>> {
-    let searchParams: Record<string, string> = {};
-    if (params?.timeRange) searchParams.time_range = params.timeRange;
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.offset) searchParams.offset = String(params.offset);
-
-    let response = await this.axios.get(`/me/top/${type}`, { params: searchParams });
-    return response.data as SpotifyPaginated<SpotifyArtist | SpotifyTrack>;
-  }
-
-  async getRecentlyPlayed(params?: {
-    limit?: number;
-    after?: string;
-    before?: string;
-  }): Promise<SpotifyCursorPaginated<PlayHistoryItem>> {
-    let searchParams: Record<string, string> = {};
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.after) searchParams.after = params.after;
-    if (params?.before) searchParams.before = params.before;
-
-    let response = await this.axios.get('/me/player/recently-played', {
-      params: searchParams
-    });
-    return response.data as SpotifyCursorPaginated<PlayHistoryItem>;
-  }
-
-  // ==================== Follow ====================
-
-  async followArtistsOrUsers(type: 'artist' | 'user', ids: string[]): Promise<void> {
-    await this.axios.put(
-      '/me/following',
-      { ids },
-      {
-        params: { type }
-      }
+  getArtistAlbums(id: string, params: PageInput & { includeGroups?: string } = {}) {
+    if (
+      params.includeGroups
+        ?.split(',')
+        .some(v => !['album', 'single', 'appears_on', 'compilation'].includes(v))
+    )
+      throw createApiServiceError(
+        'albumTypes must use documented comma-separated album, single, appears_on or compilation values.'
+      );
+    return this.page(
+      `/artists/${identifier(id)}/albums`,
+      albumSchema,
+      params,
+      pickDefined({ include_groups: params.includeGroups })
     );
   }
-
-  async unfollowArtistsOrUsers(type: 'artist' | 'user', ids: string[]): Promise<void> {
-    await this.axios.delete('/me/following', {
-      params: { type },
-      data: { ids }
-    });
+  getArtistTopTracks(id: string, country?: string) {
+    this.requireLegacy('Artist top tracks');
+    return this.request(
+      'get',
+      `/artists/${identifier(id)}/top-tracks`,
+      z.object({ tracks: z.array(fullTrackSchema) }),
+      pickDefined({ market: market(country ?? this.config.market) })
+    );
   }
-
-  async checkFollowing(type: 'artist' | 'user', ids: string[]): Promise<boolean[]> {
-    let response = await this.axios.get('/me/following/contains', {
-      params: { type, ids: ids.join(',') }
-    });
-    return response.data as boolean[];
+  getRelatedArtists(id: string) {
+    this.requireLegacy('Related artists');
+    return this.request(
+      'get',
+      `/artists/${identifier(id)}/related-artists`,
+      z.object({ artists: z.array(artistSchema) })
+    );
   }
-
-  async getFollowedArtists(params?: {
-    limit?: number;
-    after?: string;
-  }): Promise<{ artists: SpotifyCursorPaginated<SpotifyArtist> }> {
-    let searchParams: Record<string, string> = { type: 'artist' };
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.after) searchParams.after = params.after;
-
-    let response = await this.axios.get('/me/following', { params: searchParams });
-    return response.data as { artists: SpotifyCursorPaginated<SpotifyArtist> };
+  async getAlbum(id: string, country?: string) {
+    const result = await this.exact(
+      `/albums/${identifier(id)}`,
+      fullAlbumSchema,
+      id,
+      pickDefined({ market: market(country ?? this.config.market) })
+    );
+    validatePageLinks(result.tracks, `/albums/${identifier(id)}/tracks`);
+    return result;
   }
-
-  async followPlaylist(playlistId: string, isPublic?: boolean): Promise<void> {
-    let body: Record<string, any> = {};
-    if (isPublic !== undefined) body.public = isPublic;
-
-    await this.axios.put(`/playlists/${playlistId}/followers`, body);
+  getAlbumTracks(id: string, params?: PageInput) {
+    return this.page(`/albums/${identifier(id)}/tracks`, trackSchema, params);
   }
-
-  async unfollowPlaylist(playlistId: string): Promise<void> {
-    await this.axios.delete(`/playlists/${playlistId}/followers`);
+  async getNewReleases(params?: PageInput) {
+    this.requireLegacy('New releases');
+    const result = await this.request(
+      'get',
+      '/browse/new-releases',
+      z.object({ albums: pageSchema(albumSchema) }),
+      this.query(params)
+    );
+    validatePageLinks(result.albums, '/browse/new-releases');
+    if (
+      (params?.limit !== undefined && result.albums.limit !== params.limit) ||
+      (params?.offset !== undefined && result.albums.offset !== params.offset) ||
+      result.albums.items.length > result.albums.limit
+    )
+      throw createApiServiceError(
+        'Spotify returned inconsistent new-release paging metadata.'
+      );
+    return result.albums;
   }
-
-  // ==================== Browse ====================
-
-  async getCategories(params?: {
-    locale?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<{ categories: SpotifyPaginated<any> }> {
-    let searchParams: Record<string, string> = {};
-    if (params?.locale) searchParams.locale = params.locale;
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.offset) searchParams.offset = String(params.offset);
-
-    let response = await this.axios.get('/browse/categories', { params: searchParams });
-    return response.data as { categories: SpotifyPaginated<any> };
+  getTrack(id: string, country?: string) {
+    return this.exact(
+      `/tracks/${identifier(id)}`,
+      fullTrackSchema,
+      id,
+      pickDefined({ market: market(country ?? this.config.market) })
+    );
   }
-
-  async getCategoryPlaylists(
-    categoryId: string,
-    params?: {
-      limit?: number;
-      offset?: number;
+  async getSeveralTracks(values: string[], country?: string) {
+    ids(values, 50);
+    if (this.legacy) {
+      const result = await this.request(
+        'get',
+        '/tracks',
+        z.object({ tracks: z.array(fullTrackSchema.nullable()) }),
+        {
+          ids: values.join(','),
+          ...pickDefined({ market: market(country ?? this.config.market) })
+        }
+      );
+      if (
+        result.tracks.length !== values.length ||
+        result.tracks.some(
+          (v, i) => v && v.id !== values[i] && v.linked_from?.id !== values[i]
+        )
+      )
+        throw createApiServiceError('Spotify returned an inconsistent multi-track receipt.');
+      return result;
     }
-  ): Promise<{ playlists: SpotifyPaginated<SimplifiedPlaylist> }> {
-    let searchParams: Record<string, string> = {};
-    if (params?.limit) searchParams.limit = String(params.limit);
-    if (params?.offset) searchParams.offset = String(params.offset);
-
-    let response = await this.axios.get(`/browse/categories/${categoryId}/playlists`, {
-      params: searchParams
+    const tracks: z.infer<typeof fullTrackSchema>[] = [];
+    for (const id of values)
+      try {
+        tracks.push(await this.getTrack(id, country));
+      } catch (error) {
+        const safe = spotifyError(error);
+        safe.data.completedReadCount = tracks.length;
+        safe.data.requestedReadCount = values.length;
+        safe.data.noWrites = true;
+        throw safe;
+      }
+    return { tracks };
+  }
+  getAudioFeatures(id: string) {
+    this.requireLegacy('Audio features');
+    return this.exact(`/audio-features/${identifier(id)}`, audioSchema, id);
+  }
+  async getSeveralAudioFeatures(values: string[]) {
+    this.requireLegacy('Audio features');
+    ids(values, 50);
+    const result = await this.request(
+      'get',
+      '/audio-features',
+      z.object({ audio_features: z.array(audioSchema.nullable()) }),
+      { ids: values.join(',') }
+    );
+    if (
+      result.audio_features.length !== values.length ||
+      result.audio_features.some((v, i) => v && v.id !== values[i])
+    )
+      throw createApiServiceError('Spotify returned an inconsistent audio-feature receipt.');
+    return result;
+  }
+  async getPlaylist(id: string, params: { market?: string } = {}) {
+    const result = await this.exact(
+      `/playlists/${identifier(id)}`,
+      playlistSchema,
+      id,
+      pickDefined({ market: market(params.market ?? this.config.market) })
+    );
+    if (result.items) validatePageLinks(result.items, `/playlists/${identifier(id)}/items`);
+    if (result.tracks) validatePageLinks(result.tracks, `/playlists/${identifier(id)}/tracks`);
+    return result;
+  }
+  getCurrentUserPlaylists(params?: PageInput) {
+    return this.page('/me/playlists', simplifiedPlaylistSchema, params);
+  }
+  async createPlaylist(
+    userId: string,
+    data: { name: string; description?: string; public?: boolean; collaborative?: boolean }
+  ) {
+    identifier(userId, true);
+    if (!data.name.trim()) throw createApiServiceError('Supply a nonempty playlist name.');
+    if (data.collaborative && data.public !== false)
+      throw createApiServiceError('A collaborative playlist must explicitly be private.');
+    const result = await this.request(
+      'post',
+      this.legacy ? `/users/${identifier(userId, true)}/playlists` : '/me/playlists',
+      playlistSchema,
+      undefined,
+      pickDefined(data),
+      201
+    );
+    const recoverableId = /^[A-Za-z0-9]{1,256}$/.test(result.id);
+    if (
+      !recoverableId ||
+      !result.snapshot_id.trim() ||
+      result.owner.id !== userId ||
+      result.name !== data.name ||
+      (data.public !== undefined && result.public !== data.public) ||
+      (data.collaborative !== undefined && result.collaborative !== data.collaborative) ||
+      (data.description !== undefined && result.description !== data.description)
+    ) {
+      const error = createApiServiceError(
+        'Spotify returned an incomplete or inconsistent playlist creation receipt. Creation may have succeeded. Retain any reported resource and manually reconcile the intended account before retrying; no automatic retry was performed.'
+      );
+      error.data.outcomeUncertain = true;
+      if (recoverableId) error.data.reportedPlaylistId = result.id;
+      throw error;
+    }
+    return result;
+  }
+  updatePlaylistDetails(
+    id: string,
+    data: { name?: string; description?: string; public?: boolean; collaborative?: boolean }
+  ) {
+    if (!Object.values(data).some(v => v !== undefined))
+      throw createApiServiceError('Supply at least one playlist detail to update.');
+    if (data.name !== undefined && !data.name.trim())
+      throw createApiServiceError('Playlist name must not be empty.');
+    if (data.collaborative && data.public !== false)
+      throw createApiServiceError(
+        'A collaborative playlist update must explicitly set isPublic to false.'
+      );
+    return this.empty(
+      'put',
+      `/playlists/${identifier(id)}`,
+      undefined,
+      pickDefined(data),
+      200
+    );
+  }
+  private itemPath(id: string) {
+    return `/playlists/${identifier(id)}/${this.legacy ? 'tracks' : 'items'}`;
+  }
+  private playlistUris(values: string[]) {
+    if (!values.length || values.length > 100)
+      throw createApiServiceError('Supply from 1 through 100 playlist item URIs.');
+    return values.map(v => uri(v, ['track', 'episode']));
+  }
+  addItemsToPlaylist(id: string, values: string[], position?: number) {
+    whole(position, 'position');
+    return this.request(
+      'post',
+      this.itemPath(id),
+      z.object({ snapshot_id: z.string().min(1) }),
+      undefined,
+      pickDefined({ uris: this.playlistUris(values), position }),
+      201
+    );
+  }
+  removeItemsFromPlaylist(id: string, values: string[], snapshot?: string) {
+    return this.request(
+      'delete',
+      this.itemPath(id),
+      z.object({ snapshot_id: z.string().min(1) }),
+      undefined,
+      pickDefined({
+        [this.legacy ? 'tracks' : 'items']: this.playlistUris(values).map(v => ({ uri: v })),
+        snapshot_id: snapshot
+      })
+    );
+  }
+  reorderPlaylistItems(
+    id: string,
+    start: number,
+    before: number,
+    length?: number,
+    snapshot?: string
+  ) {
+    whole(start, 'rangeStart');
+    whole(before, 'insertBefore');
+    whole(length, 'rangeLength', 1);
+    return this.request(
+      'put',
+      this.itemPath(id),
+      z.object({ snapshot_id: z.string().min(1) }),
+      undefined,
+      pickDefined({
+        range_start: start,
+        insert_before: before,
+        range_length: length,
+        snapshot_id: snapshot
+      })
+    );
+  }
+  getPlaylistTracks(id: string, params?: PageInput) {
+    return this.page(this.itemPath(id), playlistEntrySchema, params, {
+      additional_types: 'track,episode'
     });
-    return response.data as { playlists: SpotifyPaginated<SimplifiedPlaylist> };
+  }
+  async getPlaybackState(country?: string, current = false) {
+    const path = current ? '/me/player/currently-playing' : '/me/player';
+    try {
+      const response = await this.axios.get<unknown>(path, {
+        params: pickDefined({
+          market: market(country ?? this.config.market),
+          additional_types: 'track,episode'
+        })
+      });
+      protect(
+        { data: response.data, headers: response.headers },
+        [this.config.token, this.config.refreshToken].filter(
+          (value): value is string => typeof value === 'string' && value.length > 0
+        )
+      );
+      if (response.status === 204) {
+        if (response.data !== '' && response.data !== undefined && response.data !== null)
+          throw createApiServiceError(
+            'Spotify returned content for an empty playback response.'
+          );
+        return null;
+      }
+      if (response.status !== 200)
+        throw createApiServiceError('Spotify returned an unexpected playback status.');
+      return parse(playbackSchema, response.data);
+    } catch (error) {
+      throw spotifyError(error);
+    }
+  }
+  getCurrentlyPlaying(country?: string) {
+    return this.getPlaybackState(country, true);
+  }
+  getAvailableDevices() {
+    return this.request(
+      'get',
+      '/me/player/devices',
+      z.object({ devices: z.array(deviceSchema) })
+    );
+  }
+  getQueue() {
+    return this.request('get', '/me/player/queue', queueSchema);
+  }
+  startPlayback(
+    params: {
+      deviceId?: string;
+      contextUri?: string;
+      uris?: string[];
+      offset?: { position?: number; uri?: string };
+      positionMs?: number;
+    } = {}
+  ) {
+    if (params.contextUri !== undefined && params.uris !== undefined)
+      throw createApiServiceError('Use contextUri or uris, not both.');
+    if (params.contextUri !== undefined)
+      uri(params.contextUri, ['album', 'artist', 'playlist']);
+    if (params.uris !== undefined) {
+      if (!params.uris.length || params.uris.length > 100)
+        throw createApiServiceError('Supply from 1 through 100 playback track URIs.');
+      params.uris.forEach(v => uri(v, ['track']));
+    }
+    if (params.offset) {
+      if (!params.contextUri || !/^spotify:(album|playlist):/.test(params.contextUri))
+        throw createApiServiceError(
+          'Playback offset requires an album or playlist contextUri.'
+        );
+      if (params.offset.position !== undefined && params.offset.uri !== undefined)
+        throw createApiServiceError('Use one playback offset selector.');
+      whole(params.offset.position, 'offsetPosition');
+      if (params.offset.uri) uri(params.offset.uri, ['track']);
+    }
+    whole(params.positionMs, 'positionMs');
+    return this.empty(
+      'put',
+      '/me/player/play',
+      pickDefined({ device_id: params.deviceId }),
+      pickDefined({
+        context_uri: params.contextUri,
+        uris: params.uris,
+        offset: params.offset,
+        position_ms: params.positionMs
+      })
+    );
+  }
+  pausePlayback(deviceId?: string) {
+    return this.empty('put', '/me/player/pause', pickDefined({ device_id: deviceId }));
+  }
+  skipToNext(deviceId?: string) {
+    return this.empty('post', '/me/player/next', pickDefined({ device_id: deviceId }));
+  }
+  skipToPrevious(deviceId?: string) {
+    return this.empty('post', '/me/player/previous', pickDefined({ device_id: deviceId }));
+  }
+  seekToPosition(position: number, deviceId?: string) {
+    whole(position, 'positionMs');
+    return this.empty(
+      'put',
+      '/me/player/seek',
+      pickDefined({ position_ms: position, device_id: deviceId })
+    );
+  }
+  setRepeatMode(state: 'track' | 'context' | 'off', deviceId?: string) {
+    return this.empty('put', '/me/player/repeat', pickDefined({ state, device_id: deviceId }));
+  }
+  setVolume(volume: number, deviceId?: string) {
+    whole(volume, 'volumePercent', 0, 100);
+    return this.empty(
+      'put',
+      '/me/player/volume',
+      pickDefined({ volume_percent: volume, device_id: deviceId })
+    );
+  }
+  toggleShuffle(state: boolean, deviceId?: string) {
+    return this.empty(
+      'put',
+      '/me/player/shuffle',
+      pickDefined({ state, device_id: deviceId })
+    );
+  }
+  transferPlayback(deviceIds: string[], play?: boolean) {
+    if (deviceIds.length !== 1 || !deviceIds[0])
+      throw createApiServiceError('Transfer playback to exactly one current device ID.');
+    return this.empty(
+      'put',
+      '/me/player',
+      undefined,
+      pickDefined({ device_ids: deviceIds, play })
+    );
+  }
+  addToQueue(value: string, deviceId?: string) {
+    return this.empty(
+      'post',
+      '/me/player/queue',
+      pickDefined({ uri: uri(value, ['track', 'episode']), device_id: deviceId })
+    );
+  }
+  getSavedTracks(params?: PageInput) {
+    return this.page('/me/tracks', savedTrackSchema, params);
+  }
+  getSavedAlbums(params?: PageInput) {
+    return this.page('/me/albums', savedAlbumSchema, params);
+  }
+  private library(method: 'put' | 'delete', type: string, values: string[]) {
+    ids(values, this.legacy ? 50 : 40, type === 'user');
+    if (!this.legacy)
+      return this.empty(
+        method,
+        '/me/library',
+        { uris: values.map(v => `spotify:${type}:${v}`).join(',') },
+        undefined,
+        200
+      );
+    if (type === 'artist' || type === 'user')
+      return this.empty(method, '/me/following', { type }, { ids: values });
+    if (type === 'playlist')
+      return this.empty(
+        method,
+        `/playlists/${identifier(values[0]!)}/followers`,
+        undefined,
+        method === 'put' ? {} : undefined,
+        200
+      );
+    return this.empty(method, `/me/${type}s`, undefined, { ids: values }, 200);
+  }
+  private async contains(type: string, values: string[]) {
+    ids(values, this.legacy ? 50 : 40, type === 'user');
+    const path = !this.legacy
+      ? '/me/library/contains'
+      : type === 'artist' || type === 'user'
+        ? '/me/following/contains'
+        : `/me/${type}s/contains`;
+    const params = this.legacy
+      ? { ids: values.join(','), ...(['artist', 'user'].includes(type) ? { type } : {}) }
+      : { uris: values.map(v => `spotify:${type}:${v}`).join(',') };
+    const result = await this.request('get', path, z.array(z.boolean()), params);
+    if (result.length !== values.length)
+      throw createApiServiceError(
+        'Spotify returned an incomplete membership receipt; missing entries were not treated as false.'
+      );
+    return result;
+  }
+  saveTracks(values: string[]) {
+    return this.library('put', 'track', values);
+  }
+  removeSavedTracks(values: string[]) {
+    return this.library('delete', 'track', values);
+  }
+  checkSavedTracks(values: string[]) {
+    return this.contains('track', values);
+  }
+  saveAlbums(values: string[]) {
+    return this.library('put', 'album', values);
+  }
+  removeSavedAlbums(values: string[]) {
+    return this.library('delete', 'album', values);
+  }
+  checkSavedAlbums(values: string[]) {
+    return this.contains('album', values);
+  }
+  getCurrentUser() {
+    return this.request('get', '/me', userSchema);
+  }
+  getUserProfile(id: string) {
+    this.requireLegacy('Other user profiles');
+    return this.exact(`/users/${identifier(id, true)}`, userSchema, id);
+  }
+  getTopItems(type: 'artists' | 'tracks', params: PageInput & { timeRange?: string } = {}) {
+    return type === 'artists'
+      ? this.page(
+          '/me/top/artists',
+          artistSchema,
+          params,
+          pickDefined({ time_range: params.timeRange })
+        )
+      : this.page(
+          '/me/top/tracks',
+          fullTrackSchema,
+          params,
+          pickDefined({ time_range: params.timeRange })
+        );
+  }
+  async getRecentlyPlayed(params: { limit?: number; after?: string; before?: string } = {}) {
+    if (params.after !== undefined && params.before !== undefined)
+      throw createApiServiceError('Supply after or before, not both.');
+    whole(params.limit, 'limit', 1, 50);
+    for (const value of [params.after, params.before])
+      if (
+        value !== undefined &&
+        (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)))
+      )
+        throw createApiServiceError(
+          'Recently played cursors must be nonnegative safe integer millisecond timestamps.'
+        );
+    const result = await this.request(
+      'get',
+      '/me/player/recently-played',
+      cursorSchema(historySchema),
+      pickDefined(params)
+    );
+    validatePageLinks(result, '/me/player/recently-played');
+    if (
+      (params.limit !== undefined && result.limit !== params.limit) ||
+      result.items.length > result.limit
+    )
+      throw createApiServiceError(
+        'Spotify returned inconsistent recent-history paging metadata.'
+      );
+    return result;
+  }
+  followArtistsOrUsers(type: 'artist' | 'user', values: string[]) {
+    return this.library('put', type, values);
+  }
+  unfollowArtistsOrUsers(type: 'artist' | 'user', values: string[]) {
+    return this.library('delete', type, values);
+  }
+  checkFollowing(type: 'artist' | 'user', values: string[]) {
+    return this.contains(type, values);
+  }
+  async getFollowedArtists(params: { limit?: number; after?: string } = {}) {
+    whole(params.limit, 'limit', 1, 50);
+    if (params.after !== undefined) identifier(params.after);
+    const result = await this.request(
+      'get',
+      '/me/following',
+      z.object({ artists: cursorSchema(artistSchema) }),
+      pickDefined({ ...params, type: 'artist' })
+    );
+    validatePageLinks(result.artists, '/me/following');
+    if (
+      (params.limit !== undefined && result.artists.limit !== params.limit) ||
+      result.artists.items.length > result.artists.limit
+    )
+      throw createApiServiceError(
+        'Spotify returned inconsistent followed-artist paging metadata.'
+      );
+    return result;
+  }
+  followPlaylist(id: string, isPublic?: boolean) {
+    if (!this.legacy && isPublic !== undefined)
+      throw createApiServiceError(
+        'The current save-playlist endpoint has no follow-visibility option. Omit isPublic or use confirmed legacy endpoint access.'
+      );
+    if (this.legacy)
+      return this.empty(
+        'put',
+        `/playlists/${identifier(id)}/followers`,
+        undefined,
+        pickDefined({ public: isPublic }),
+        200
+      );
+    return this.library('put', 'playlist', [id]);
+  }
+  unfollowPlaylist(id: string) {
+    return this.library('delete', 'playlist', [id]);
   }
 }

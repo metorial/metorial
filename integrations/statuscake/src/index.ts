@@ -35,8 +35,6 @@ import {
   updateSslTest,
   updateUptimeTest
 } from './tools';
-import { monitoringAlert } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -74,5 +72,5 @@ export let provider = Slate.create({
     deleteMaintenanceWindow,
     listMonitoringLocations
   ],
-  triggers: [monitoringAlert]
+  triggers: []
 });

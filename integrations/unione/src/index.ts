@@ -28,8 +28,6 @@ import {
   validateDomain,
   validateEmail
 } from './tools';
-import { emailStatusTrigger, spamBlockTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -60,5 +58,5 @@ export let provider = Slate.create({
     listProjects,
     deleteProject
   ],
-  triggers: [emailStatusTrigger, spamBlockTrigger]
+  triggers: []
 });

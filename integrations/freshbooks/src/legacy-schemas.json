@@ -1,0 +1,2810 @@
+{
+  "manage_clients": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "clientId": {
+          "description": "Client ID (required for update/delete)",
+          "type": "number"
+        },
+        "firstName": {
+          "description": "First name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Last name",
+          "type": "string"
+        },
+        "organization": {
+          "description": "Organization/company name",
+          "type": "string"
+        },
+        "email": {
+          "description": "Primary email address",
+          "type": "string"
+        },
+        "phone": {
+          "description": "Phone number (work)",
+          "type": "string"
+        },
+        "mobilePhone": {
+          "description": "Mobile phone number",
+          "type": "string"
+        },
+        "currencyCode": {
+          "description": "Preferred currency code (e.g. USD, CAD)",
+          "type": "string"
+        },
+        "language": {
+          "description": "Communication language (e.g. en)",
+          "type": "string"
+        },
+        "billingStreet": {
+          "description": "Billing street address",
+          "type": "string"
+        },
+        "billingCity": {
+          "description": "Billing city",
+          "type": "string"
+        },
+        "billingProvince": {
+          "description": "Billing state/province",
+          "type": "string"
+        },
+        "billingPostalCode": {
+          "description": "Billing postal/zip code",
+          "type": "string"
+        },
+        "billingCountry": {
+          "description": "Billing country",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "number",
+          "description": "Unique client ID"
+        },
+        "firstName": {
+          "description": "First name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastName": {
+          "description": "Last name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "organization": {
+          "description": "Organization/company name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "description": "Primary email address",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phone": {
+          "description": "Phone number (work)",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mobilePhone": {
+          "description": "Mobile phone number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currencyCode": {
+          "description": "Preferred currency code (e.g. USD, CAD)",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "language": {
+          "description": "Communication language (e.g. en)",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billingStreet": {
+          "description": "Billing street address",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billingCity": {
+          "description": "Billing city",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billingProvince": {
+          "description": "Billing state/province",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billingPostalCode": {
+          "description": "Billing postal/zip code",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billingCountry": {
+          "description": "Billing country",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["clientId"],
+      "additionalProperties": false
+    }
+  },
+  "list_clients": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (default: 25, max: 100)",
+          "type": "number"
+        },
+        "searchEmail": {
+          "description": "Filter by email address",
+          "type": "string"
+        },
+        "searchOrganization": {
+          "description": "Filter by organization name",
+          "type": "string"
+        },
+        "searchFirstName": {
+          "description": "Filter by first name",
+          "type": "string"
+        },
+        "searchLastName": {
+          "description": "Filter by last name",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clients": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "clientId": {
+                "type": "number",
+                "description": "Unique client ID"
+              },
+              "firstName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "organization": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currencyCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["clientId"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of matching clients"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page number"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total number of pages"
+        }
+      },
+      "required": ["clients", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "get_client": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "number",
+          "description": "The client ID to retrieve"
+        }
+      },
+      "required": ["clientId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "number"
+        },
+        "firstName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "organization": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mobilePhone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currencyCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billingStreet": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billingCity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billingProvince": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billingPostalCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billingCountry": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outstandingBalance": {
+          "description": "Outstanding balance amount"
+        }
+      },
+      "required": ["clientId"],
+      "additionalProperties": false
+    }
+  },
+  "manage_invoices": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete", "send", "markAsSent"],
+          "description": "Action to perform"
+        },
+        "invoiceId": {
+          "description": "Invoice ID (required for update/delete/send/markAsSent)",
+          "type": "number"
+        },
+        "customerId": {
+          "description": "Client ID to invoice (required for create)",
+          "type": "number"
+        },
+        "createDate": {
+          "description": "Invoice date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "dueOffsetDays": {
+          "description": "Number of days until payment is due",
+          "type": "number"
+        },
+        "currencyCode": {
+          "description": "Three-letter currency code (e.g. USD, CAD)",
+          "type": "string"
+        },
+        "invoiceNumber": {
+          "description": "Custom invoice number (auto-generated if omitted)",
+          "type": "string"
+        },
+        "poNumber": {
+          "description": "Purchase order number",
+          "type": "string"
+        },
+        "discountValue": {
+          "description": "Discount percentage (0-100)",
+          "type": "string"
+        },
+        "terms": {
+          "description": "Payment terms text",
+          "type": "string"
+        },
+        "notes": {
+          "description": "Additional notes",
+          "type": "string"
+        },
+        "lines": {
+          "description": "Line items for the invoice",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Line item description"
+              },
+              "qty": {
+                "type": "number",
+                "description": "Quantity"
+              },
+              "unitCost": {
+                "type": "string",
+                "description": "Unit cost amount (e.g. \"100.00\")"
+              },
+              "taxName1": {
+                "description": "First tax name (must match a configured tax)",
+                "type": "string"
+              },
+              "taxAmount1": {
+                "description": "First tax percentage",
+                "type": "string"
+              },
+              "taxName2": {
+                "description": "Second tax name (must match a configured tax)",
+                "type": "string"
+              },
+              "taxAmount2": {
+                "description": "Second tax percentage",
+                "type": "string"
+              }
+            },
+            "required": ["name", "qty", "unitCost"],
+            "additionalProperties": false
+          }
+        },
+        "emailRecipients": {
+          "description": "Email addresses for sending (required for \"send\" action)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "invoiceId": {
+          "type": "number",
+          "description": "Invoice ID"
+        },
+        "invoiceNumber": {
+          "description": "Invoice number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "customerId": {
+          "description": "Client ID",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "Invoice status code",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount": {
+          "description": "Total amount"
+        },
+        "outstandingAmount": {
+          "description": "Outstanding amount"
+        },
+        "currencyCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dueDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["invoiceId"],
+      "additionalProperties": false
+    }
+  },
+  "list_invoices": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (default: 25, max: 100)",
+          "type": "number"
+        },
+        "customerId": {
+          "description": "Filter by client ID",
+          "type": "number"
+        },
+        "status": {
+          "description": "Filter by status (1=draft, 2=sent, 3=viewed, 4=paid, 5=auto-paid, 6=partial, 7=disputed, 8=overdue)",
+          "type": "number"
+        },
+        "dateFrom": {
+          "description": "Filter invoices created on or after this date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "dateTo": {
+          "description": "Filter invoices created on or before this date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "invoiceNumber": {
+          "description": "Filter by invoice number",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "invoices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "invoiceId": {
+                "type": "number"
+              },
+              "invoiceNumber": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "customerId": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "amount": {},
+              "outstandingAmount": {},
+              "currencyCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "dueDate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["invoiceId"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number"
+        },
+        "currentPage": {
+          "type": "number"
+        },
+        "totalPages": {
+          "type": "number"
+        }
+      },
+      "required": ["invoices", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "get_invoice": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "invoiceId": {
+          "type": "number",
+          "description": "The invoice ID to retrieve"
+        }
+      },
+      "required": ["invoiceId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "invoiceId": {
+          "type": "number"
+        },
+        "invoiceNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "customerId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount": {},
+        "outstandingAmount": {},
+        "currencyCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dueDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dueOffsetDays": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "discountValue": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "terms": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "poNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "lineId": {
+                "type": "number"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "qty": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "unitCost": {},
+              "amount": {},
+              "taxName1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "taxAmount1": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "taxName2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "taxAmount2": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["invoiceId"],
+      "additionalProperties": false
+    }
+  },
+  "manage_payments": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "paymentId": {
+          "description": "Payment ID (required for update/delete)",
+          "type": "number"
+        },
+        "invoiceId": {
+          "description": "Invoice ID to apply payment to (required for create)",
+          "type": "number"
+        },
+        "amount": {
+          "description": "Payment amount (e.g. \"100.00\")",
+          "type": "string"
+        },
+        "date": {
+          "description": "Payment date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "paymentType": {
+          "description": "Payment method (e.g. \"Check\", \"Credit\", \"Cash\", \"Bank Transfer\", \"Credit Card\")",
+          "type": "string"
+        },
+        "note": {
+          "description": "Payment reference or note",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "paymentId": {
+          "type": "number",
+          "description": "Payment ID"
+        },
+        "invoiceId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clientId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount": {},
+        "date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paymentType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["paymentId"],
+      "additionalProperties": false
+    }
+  },
+  "list_payments": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (default: 25, max: 100)",
+          "type": "number"
+        },
+        "clientId": {
+          "description": "Filter by client ID",
+          "type": "number"
+        },
+        "invoiceId": {
+          "description": "Filter by invoice ID",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "payments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "paymentId": {
+                "type": "number"
+              },
+              "invoiceId": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "clientId": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "amount": {},
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "paymentType": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["paymentId"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number"
+        },
+        "currentPage": {
+          "type": "number"
+        },
+        "totalPages": {
+          "type": "number"
+        }
+      },
+      "required": ["payments", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "manage_estimates": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete", "send"],
+          "description": "Action to perform"
+        },
+        "estimateId": {
+          "description": "Estimate ID (required for update/delete/send)",
+          "type": "number"
+        },
+        "customerId": {
+          "description": "Client ID (required for create)",
+          "type": "number"
+        },
+        "createDate": {
+          "description": "Estimate date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "currencyCode": {
+          "description": "Three-letter currency code",
+          "type": "string"
+        },
+        "estimateNumber": {
+          "description": "Custom estimate number",
+          "type": "string"
+        },
+        "poNumber": {
+          "description": "Purchase order number",
+          "type": "string"
+        },
+        "discountValue": {
+          "description": "Discount percentage (0-100)",
+          "type": "string"
+        },
+        "terms": {
+          "description": "Terms text",
+          "type": "string"
+        },
+        "notes": {
+          "description": "Additional notes",
+          "type": "string"
+        },
+        "lines": {
+          "description": "Line items",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Line item description"
+              },
+              "qty": {
+                "type": "number",
+                "description": "Quantity"
+              },
+              "unitCost": {
+                "type": "string",
+                "description": "Unit cost amount (e.g. \"100.00\")"
+              },
+              "taxName1": {
+                "description": "First tax name",
+                "type": "string"
+              },
+              "taxAmount1": {
+                "description": "First tax percentage",
+                "type": "string"
+              },
+              "taxName2": {
+                "description": "Second tax name",
+                "type": "string"
+              },
+              "taxAmount2": {
+                "description": "Second tax percentage",
+                "type": "string"
+              }
+            },
+            "required": ["name", "qty", "unitCost"],
+            "additionalProperties": false
+          }
+        },
+        "emailRecipients": {
+          "description": "Email addresses for sending (required for \"send\" action)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "estimateId": {
+          "type": "number"
+        },
+        "estimateNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "customerId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount": {},
+        "currencyCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["estimateId"],
+      "additionalProperties": false
+    }
+  },
+  "manage_expenses": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "expenseId": {
+          "description": "Expense ID (required for update/delete)",
+          "type": "number"
+        },
+        "amount": {
+          "description": "Expense amount (e.g. \"50.00\")",
+          "type": "string"
+        },
+        "currencyCode": {
+          "description": "Three-letter currency code",
+          "type": "string"
+        },
+        "date": {
+          "description": "Expense date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "categoryId": {
+          "description": "Expense category ID",
+          "type": "number"
+        },
+        "vendorName": {
+          "description": "Vendor/merchant name",
+          "type": "string"
+        },
+        "clientId": {
+          "description": "Client ID to associate expense with",
+          "type": "number"
+        },
+        "projectId": {
+          "description": "Project ID to associate expense with",
+          "type": "number"
+        },
+        "notes": {
+          "description": "Expense notes",
+          "type": "string"
+        },
+        "taxName1": {
+          "description": "First tax name",
+          "type": "string"
+        },
+        "taxPercent1": {
+          "description": "First tax percentage",
+          "type": "string"
+        },
+        "taxName2": {
+          "description": "Second tax name",
+          "type": "string"
+        },
+        "taxPercent2": {
+          "description": "Second tax percentage",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "expenseId": {
+          "type": "number"
+        },
+        "amount": {},
+        "currencyCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "categoryId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vendorName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clientId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "Expense status (0=internal, 1=outstanding, 2=invoiced, 4=recouped)",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["expenseId"],
+      "additionalProperties": false
+    }
+  },
+  "list_expenses": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (default: 25, max: 100)",
+          "type": "number"
+        },
+        "clientId": {
+          "description": "Filter by client ID",
+          "type": "number"
+        },
+        "categoryId": {
+          "description": "Filter by expense category ID",
+          "type": "number"
+        },
+        "projectId": {
+          "description": "Filter by project ID",
+          "type": "number"
+        },
+        "dateFrom": {
+          "description": "Filter expenses on or after this date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "dateTo": {
+          "description": "Filter expenses on or before this date (YYYY-MM-DD)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "expenses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "expenseId": {
+                "type": "number"
+              },
+              "amount": {},
+              "currencyCode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "categoryId": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "vendorName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "clientId": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "notes": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["expenseId"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number"
+        },
+        "currentPage": {
+          "type": "number"
+        },
+        "totalPages": {
+          "type": "number"
+        }
+      },
+      "required": ["expenses", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "manage_time_entries": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "timeEntryId": {
+          "description": "Time entry ID (required for update/delete)",
+          "type": "number"
+        },
+        "duration": {
+          "description": "Duration in seconds (e.g. 3600 for 1 hour)",
+          "type": "number"
+        },
+        "startedAt": {
+          "description": "UTC timestamp when work began (ISO 8601 or Unix timestamp)",
+          "type": "string"
+        },
+        "clientId": {
+          "description": "Client ID to bill",
+          "type": "number"
+        },
+        "projectId": {
+          "description": "Project ID to associate with",
+          "type": "number"
+        },
+        "note": {
+          "description": "Description of work performed",
+          "type": "string"
+        },
+        "billable": {
+          "description": "Whether this time is billable (default: true)",
+          "type": "boolean"
+        },
+        "isLogged": {
+          "description": "Whether to stop the timer (true = stopped/logged, false = timer still running)",
+          "type": "boolean"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timeEntryId": {
+          "type": "number"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "startedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clientId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billable": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "billed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "isLogged": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["timeEntryId"],
+      "additionalProperties": false
+    }
+  },
+  "list_time_entries": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page",
+          "type": "number"
+        },
+        "projectId": {
+          "description": "Filter by project ID",
+          "type": "number"
+        },
+        "clientId": {
+          "description": "Filter by client ID",
+          "type": "number"
+        },
+        "billable": {
+          "description": "Filter by billable status",
+          "type": "boolean"
+        },
+        "billed": {
+          "description": "Filter by billed status",
+          "type": "boolean"
+        },
+        "startedFrom": {
+          "description": "Filter entries started after this date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "startedTo": {
+          "description": "Filter entries started before this date (YYYY-MM-DD)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "timeEntries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timeEntryId": {
+                "type": "number"
+              },
+              "duration": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "startedAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "clientId": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "projectId": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "billable": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "billed": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "isLogged": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["timeEntryId"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number"
+        },
+        "currentPage": {
+          "type": "number"
+        },
+        "totalPages": {
+          "type": "number"
+        }
+      },
+      "required": ["timeEntries", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "manage_projects": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "projectId": {
+          "description": "Project ID (required for update/delete)",
+          "type": "number"
+        },
+        "title": {
+          "description": "Project title (required for create)",
+          "type": "string"
+        },
+        "clientId": {
+          "description": "Client ID (required for create)",
+          "type": "number"
+        },
+        "projectType": {
+          "description": "Project billing type (required for create)",
+          "type": "string",
+          "enum": ["fixed_price", "hourly_rate"]
+        },
+        "fixedPrice": {
+          "description": "Fixed price amount (for fixed_price projects)",
+          "type": "string"
+        },
+        "rate": {
+          "description": "Hourly rate (for hourly_rate projects)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Project description",
+          "type": "string"
+        },
+        "dueDate": {
+          "description": "Project due date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "complete": {
+          "description": "Whether the project is complete",
+          "type": "boolean"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "number"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clientId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projectType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fixedPrice": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dueDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "complete": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "active": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "loggedDuration": {
+          "description": "Total logged time in seconds",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["projectId"],
+      "additionalProperties": false
+    }
+  },
+  "list_projects": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "projectId": {
+                "type": "number"
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "clientId": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "projectType": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "fixedPrice": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rate": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "complete": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "active": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "loggedDuration": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["projectId"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number"
+        },
+        "currentPage": {
+          "type": "number"
+        },
+        "totalPages": {
+          "type": "number"
+        }
+      },
+      "required": ["projects", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "manage_taxes": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "taxId": {
+          "description": "Tax ID (required for update/delete)",
+          "type": "number"
+        },
+        "name": {
+          "description": "Tax name (e.g. \"GST\", \"HST\", \"VAT\") - required for create",
+          "type": "string"
+        },
+        "amount": {
+          "description": "Tax percentage as string (e.g. \"13\")",
+          "type": "string"
+        },
+        "compound": {
+          "description": "Whether this tax is compound (calculated on top of primary taxes)",
+          "type": "boolean"
+        },
+        "number": {
+          "description": "Tax registration/submission number",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "taxId": {
+          "type": "number"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "compound": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["taxId"],
+      "additionalProperties": false
+    }
+  },
+  "list_taxes": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "taxes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taxId": {
+                "type": "number"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "amount": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "compound": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "number": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["taxId"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number"
+        },
+        "currentPage": {
+          "type": "number"
+        },
+        "totalPages": {
+          "type": "number"
+        }
+      },
+      "required": ["taxes", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "manage_items": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "itemId": {
+          "description": "Item ID (required for update/delete)",
+          "type": "number"
+        },
+        "name": {
+          "description": "Item name (required for create)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Item description",
+          "type": "string"
+        },
+        "unitCost": {
+          "description": "Unit cost amount (e.g. \"100.00\")",
+          "type": "string"
+        },
+        "currencyCode": {
+          "description": "Currency code for the unit cost",
+          "type": "string"
+        },
+        "inventory": {
+          "description": "Inventory count (decimal string)",
+          "type": "string"
+        },
+        "sku": {
+          "description": "SKU identifier",
+          "type": "string"
+        },
+        "tax1": {
+          "description": "First tax ID to apply",
+          "type": "number"
+        },
+        "tax2": {
+          "description": "Second tax ID to apply",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "number"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unitCost": {},
+        "inventory": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sku": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tax1": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tax2": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["itemId"],
+      "additionalProperties": false
+    }
+  },
+  "list_items": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "itemId": {
+                "type": "number"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "unitCost": {},
+              "inventory": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sku": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["itemId"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number"
+        },
+        "currentPage": {
+          "type": "number"
+        },
+        "totalPages": {
+          "type": "number"
+        }
+      },
+      "required": ["items", "totalCount", "currentPage", "totalPages"],
+      "additionalProperties": false
+    }
+  },
+  "manage_credit_notes": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "creditNoteId": {
+          "description": "Credit note ID (required for update/delete)",
+          "type": "number"
+        },
+        "customerId": {
+          "description": "Client ID (required for create)",
+          "type": "number"
+        },
+        "createDate": {
+          "description": "Credit note date (YYYY-MM-DD)",
+          "type": "string"
+        },
+        "currencyCode": {
+          "description": "Three-letter currency code",
+          "type": "string"
+        },
+        "notes": {
+          "description": "Additional notes",
+          "type": "string"
+        },
+        "lines": {
+          "description": "Line items",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Line item description"
+              },
+              "qty": {
+                "type": "number",
+                "description": "Quantity"
+              },
+              "unitCost": {
+                "type": "string",
+                "description": "Unit cost amount (e.g. \"100.00\")"
+              },
+              "taxName1": {
+                "description": "First tax name",
+                "type": "string"
+              },
+              "taxAmount1": {
+                "description": "First tax percentage",
+                "type": "string"
+              },
+              "taxName2": {
+                "description": "Second tax name",
+                "type": "string"
+              },
+              "taxAmount2": {
+                "description": "Second tax percentage",
+                "type": "string"
+              }
+            },
+            "required": ["name", "qty", "unitCost"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "creditNoteId": {
+          "type": "number"
+        },
+        "creditNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "customerId": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "amount": {},
+        "currencyCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["creditNoteId"],
+      "additionalProperties": false
+    }
+  }
+}

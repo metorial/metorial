@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AssetApiClient } from '../lib/client';
+import { invalid, protect } from '../lib/contracts';
 import { spec } from '../spec';
 
 let assetOutputSchema = z.object({
@@ -39,7 +40,10 @@ Requires a Write API token.`,
       tags: z.array(z.string()).optional().describe('Filter by asset tag names'),
       ids: z.array(z.string()).optional().describe('Filter by specific asset IDs'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
-      pageSize: z.number().optional().describe('Number of results per page')
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Maximum assets to return, integer 1-100; sent as native limit.')
     })
   )
   .output(
@@ -50,12 +54,19 @@ Requires a Write API token.`,
     })
   )
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing assets.');
+      invalid('Write API token is required for managing assets.');
     }
 
     let client = new AssetApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 
@@ -97,11 +108,11 @@ Requires a Write API token.`,
 export let uploadAsset = SlateTool.create(spec, {
   name: 'Upload Asset',
   key: 'upload_asset',
-  description: `Upload a new asset to the Prismic media library from a public URL. Supports images (PNG, JPEG, WEBP, GIF up to 10MB) and other files (up to 100MB).
+  description: `Upload a new asset to the Prismic media library from a public URL. The public HTTPS source must resolve to public IPv4 addresses and return at most 4 MiB without redirects.
 Requires a Write API token.`,
   constraints: [
-    'Images must be PNG, JPEG, WEBP, GIF, JPE, JPG, ICO, or JFIF format, max 10MB.',
-    'Other files including videos can be up to 100MB.'
+    'This tool transfers at most 4 MiB per upload. Larger provider-supported uploads require other tooling.',
+    'No source redirects, custom ports, private addresses or embedded credentials are accepted.'
   ],
   tags: {
     destructive: false
@@ -114,17 +125,27 @@ Requires a Write API token.`,
       notes: z.string().optional().describe('Internal notes about the asset'),
       credits: z.string().optional().describe('Attribution/credits text'),
       alt: z.string().optional().describe('Alternative text for accessibility'),
-      tags: z.array(z.string()).optional().describe('Tags to apply to the asset')
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Existing media-library tag names; missing or ambiguous names are refused.')
     })
   )
   .output(assetOutputSchema)
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing assets.');
+      invalid('Write API token is required for managing assets.');
     }
 
     let client = new AssetApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 
@@ -174,17 +195,27 @@ Requires a Write API token.`,
       notes: z.string().optional().describe('Updated internal notes'),
       credits: z.string().optional().describe('Updated attribution/credits'),
       alt: z.string().optional().describe('Updated alternative text'),
-      tags: z.array(z.string()).optional().describe('Updated tags (replaces existing tags)')
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Existing media-library tag names; replaces tags, empty array clears them.')
     })
   )
   .output(assetOutputSchema)
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing assets.');
+      invalid('Write API token is required for managing assets.');
     }
 
     let client = new AssetApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 
@@ -238,12 +269,19 @@ Requires a Write API token.`,
     })
   )
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing assets.');
+      invalid('Write API token is required for managing assets.');
     }
 
     let client = new AssetApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 

@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let managePod = SlateTool.create(spec, {
   name: 'Manage Pod',
   key: 'manage_pod',
-  description: `Perform lifecycle actions on a Pod: start, stop, restart, reset, or terminate. Use this to control the state of a running or stopped Pod.`,
+  description: `Perform lifecycle actions on a Pod: start, stop, restart, or terminate. Use this to control the state of a running or stopped Pod.`,
   instructions: [
     'Pods with a network volume attached cannot be stopped, only terminated.',
-    'Resetting a Pod clears the container disk but preserves the /workspace volume.',
+    'The reset action is retained for compatibility but is no longer supported by Runpod; use restart or recreate the Pod.',
     'Terminating a Pod permanently deletes it.'
   ],
   tags: {
@@ -21,7 +21,9 @@ export let managePod = SlateTool.create(spec, {
       podId: z.string().describe('ID of the Pod to manage'),
       action: z
         .enum(['start', 'stop', 'restart', 'reset', 'terminate'])
-        .describe('Action to perform on the Pod')
+        .describe(
+          'Lifecycle action. reset is retained for compatibility and returns an unsupported-operation error.'
+        )
     })
   )
   .output(

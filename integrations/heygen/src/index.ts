@@ -5,23 +5,28 @@ import {
   createStreamingToken,
   createVideoFromPrompt,
   deleteAsset,
+  deleteTranslation,
   deleteVideo,
   generateFromTemplate,
   generateSpeech,
+  getCurrentUser,
+  getFileUrl,
   getRemainingQuota,
   getTemplate,
   getTranslationStatus,
+  getVideoAgentStatus,
   getVideoStatus,
   listAssets,
   listAvatars,
   listTalkingPhotos,
   listTemplates,
+  listTranslationLanguages,
+  listTranslations,
   listVideos,
   listVoices,
   translateVideo,
   uploadAsset
 } from './tools';
-import { videoEvents } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -37,6 +42,8 @@ export let provider = Slate.create({
     listTemplates,
     getTemplate,
     translateVideo,
+    listTranslations,
+    deleteTranslation,
     getTranslationStatus,
     generateSpeech,
     createStreamingToken,
@@ -44,7 +51,11 @@ export let provider = Slate.create({
     uploadAsset,
     deleteAsset,
     getRemainingQuota,
+    getCurrentUser,
+    getVideoAgentStatus,
+    listTranslationLanguages,
+    getFileUrl,
     listTalkingPhotos
   ],
-  triggers: [videoEvents]
+  triggers: []
 });

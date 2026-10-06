@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteMessage = SlateTool.create(spec, {
   name: 'Delete Message',
   key: 'delete_message',
-  description: `Permanently delete a message from a Webex space. The message must belong to the authenticated user, or the user must be a moderator of the space.`,
+  description: `Delete a message from a Webex space. Compliance retention can preserve content. The message must belong to the authenticated user, or the user must be a moderator of the space.`,
   tags: {
     destructive: true,
     readOnly: false

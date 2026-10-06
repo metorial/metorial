@@ -1,73 +1,23 @@
-# <img src="https://provider-logos.metorial-cdn.com/rudderstack.png" height="20"> Rudderstack
+# RudderStack
 
-Collect, route, and process customer event data across websites, apps, and servers. Send identify, track, page, screen, group, and alias events via HTTP API. Manage event transformations with custom JavaScript or Python functions. Create and enforce tracking plans to validate incoming event data. Access event audit data for data governance and schema inspection. Suppress users and delete collected data for GDPR/CCPA compliance. Run Reverse ETL syncs to route warehouse data back to business tools. Fetch enriched user profiles for real-time personalization via the Activation API. Test event transformation and delivery for source-destination setups. Manage data catalog events and properties. Access audit logs for security monitoring.
+Collect customer events and manage their processing and governance. This integration provides 17 tools:
 
-## Tools
+- Send Event and Send Batch Events support identify, track, page, screen, group and alias ingestion.
+- List Transformations, Manage Transformation, List Libraries, Manage Library and Publish Transformations manage draft and published code revisions.
+- List Tracking Plans, Manage Tracking Plan and List Tracking Plan Events manage plans and queued catalog event associations.
+- Get Event Audit and Get Audit Logs inspect event models and security activity.
+- Suppress User, List Regulations and Cancel Regulation manage suppression requests and history.
+- Manage Reverse ETL Sync lists, starts, inspects and requests cancellation of connection syncs.
+- Test Event Delivery selects transformation or real delivery stages for a destination or an entire source.
 
-### Get Audit Logs
+Configure a workspace Service Access Token and its US or EU region. Audit logs require an organization Admin token and Enterprise access; a separate optional organization token can be provided. HTTP ingestion additionally requires a Source Write Key and approved Data Plane URL. The older `datePlaneUrl` spelling remains an optional fallback for `dataPlaneUrl`.
 
-Retrieve audit logs from RudderStack for security auditing. Tracks CRUD operations on sources, destinations, connections, and transformations. Supports filtering by workspace and date range.
+Transformation/library lists contain published resources. To inspect drafts, request revision history by resource ID. Publishing code may run validation and affect connected destinations; deleting a model can retain revision history.
 
-### Get Event Audit
+Catalog event updates are queued and can take minutes to appear. Removing a tracking-plan event association retains its catalog event. Pagination uses page numbers for plan events, offsets for Reverse ETL, and `nextCursor` plus `nextOffset` for audit logs and regulations; retain the same filters when continuing.
 
-Retrieve event model information from RudderStack's Event Audit API for data governance. Returns metadata about all events and their schemas, payload versions, and data types flowing through your sources. Useful for diagnosing inconsistencies in event data.
+Ingestion acknowledgement does not confirm delivery. Router tests send real events, and source tests fan out to every connected destination. User transformations can make external requests. Test results conceal destination request URLs, headers, parameters, bodies, files and raw downstream responses, retaining stage metadata and status.
 
-### List Libraries
+Suppression and Event Audit require feature access. Their current official reference pages omit detailed contracts, so retained legacy routes need account-specific confirmation. Suppression acknowledgement does not confirm downstream deletion. Cancellation cannot restore data already deleted; regulation and audit history remains.
 
-Retrieve all transformation libraries and optionally their version history. Libraries are reusable code modules shared across transformations.
-
-### List Regulations
-
-Retrieve all user suppression regulations created via the User Suppression API, or delete a specific regulation by its ID. Useful for reviewing compliance actions and managing existing regulations.
-
-### List Tracking Plans
-
-Retrieve all tracking plans in your workspace, or get the details of a specific tracking plan by ID. Tracking plans define schemas for validating incoming event data.
-
-### List Transformations
-
-Retrieve all transformations and optionally their version history. Use this to see all transformations in your workspace or to inspect the revision history of a specific transformation.
-
-### Manage Library
-
-Create, update, or delete a RudderStack transformation library. Libraries are reusable JavaScript or Python modules that can be imported and shared across multiple transformations. Supports creating new libraries, updating code/description, publishing, and deleting libraries.
-
-### Manage Reverse ETL Sync
-
-Trigger, stop, or check the status of a Reverse ETL sync. Reverse ETL routes customer data from your data warehouse to downstream destinations. Use this to programmatically orchestrate syncs, check sync progress, or halt running syncs.
-
-### Manage Tracking Plan
-
-Create, update, or delete a RudderStack tracking plan. Tracking plans monitor and validate incoming event data against predefined schemas, flagging violations like unplanned events or incorrect properties. Also supports upserting or removing events within a tracking plan.
-
-### Manage Transformation
-
-Create, update, or delete a RudderStack transformation. Transformations are custom JavaScript or Python functions that modify event payloads before they reach destinations. Supports creating new transformations, updating code/description, publishing, and deleting transformations.
-
-### Publish Transformations
-
-Publish one or more transformations and/or libraries in a single operation, making their latest revisions live for incoming event traffic. RudderStack runs validation tests before publishing to ensure no exceptions.
-
-### Send Batch Events
-
-Send multiple customer events to RudderStack in a single batch request. Each event in the batch includes a \
-
-### Send Event
-
-Send a customer event to RudderStack via the HTTP API. Supports all standard event types: **identify**, **track**, **page**, **screen**, **group**, and **alias**. Requires a Data Plane URL and Source Write Key to be configured. Use this tool for server-side event tracking, importing historical data, or programmatically sending events.
-
-### Suppress User
-
-Create a user suppression regulation in RudderStack for GDPR/CCPA compliance. Supports two modes: - **suppress**: Stops collecting data for specified users at the source level. - **suppress_with_delete**: Stops collecting data and deletes existing data from specified destinations.
-
-### Test Event Delivery
-
-Test event transformation and delivery for a given source or source-destination setup without using the Live Events tab. Verifies that events are correctly transformed and delivered through the pipeline.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Reverse ETL cancellation targets the connection and is asynchronous. Poll the exact sync for a terminal state. This integration does not provision sources, destinations, warehouse connections or Profiles/Activation resources.

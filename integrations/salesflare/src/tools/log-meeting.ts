@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let logMeeting = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let logMeeting = SlateTool.create(spec, {
   key: 'log_meeting',
   description: `Log a meeting in Salesflare. Requires a date and participant contact IDs. Optionally set end date, subject, description, notes, and meeting type (in-person or phone).`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -35,7 +35,7 @@ export let logMeeting = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let data: Record<string, any> = {
+    let data: Row = {
       date: ctx.input.date,
       participants: ctx.input.participantIds,
       type: ctx.input.type
@@ -46,8 +46,8 @@ export let logMeeting = SlateTool.create(spec, {
     if (ctx.input.notes) data.notes = ctx.input.notes;
 
     let result = await client.createMeeting(data);
-    let meetingData = Array.isArray(result) ? result[0] : result;
-    let meetingId = meetingData?.id ?? 0;
+    let meetingData = result;
+    let meetingId = meetingData.id;
 
     return {
       output: {

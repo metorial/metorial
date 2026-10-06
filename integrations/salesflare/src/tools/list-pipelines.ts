@@ -1,6 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  Client,
+  id,
+  object,
+  optionalBoolean,
+  optionalNumber,
+  type Row,
+  text
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let listPipelines = SlateTool.create(spec, {
@@ -23,8 +31,11 @@ export let listPipelines = SlateTool.create(spec, {
           z.object({
             pipelineId: z.number().describe('Pipeline ID'),
             name: z.string().describe('Pipeline name'),
-            isDefault: z.boolean().describe('Whether this is the default pipeline'),
-            recurring: z.boolean().describe('Whether this pipeline uses recurring revenue'),
+            isDefault: z.boolean().optional().describe('Whether this is the default pipeline'),
+            recurring: z
+              .boolean()
+              .optional()
+              .describe('Whether this pipeline uses recurring revenue'),
             currency: z
               .object({
                 currencyId: z.number().optional(),
@@ -45,7 +56,8 @@ export let listPipelines = SlateTool.create(spec, {
                   color: z.string().optional().describe('Stage color')
                 })
               )
-              .describe('Stages in this pipeline')
+              .optional()
+              .describe('Stages in this pipeline, when provided')
           })
         )
         .describe('List of pipelines with their stages'),
@@ -55,31 +67,45 @@ export let listPipelines = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let params: Record<string, any> = {};
+    let params: Row = {};
     if (ctx.input.search) params.search = ctx.input.search;
 
     let pipelines = await client.listPipelines(params);
-    let list = Array.isArray(pipelines) ? pipelines : [];
+    let list = pipelines;
 
-    let mapped = list.map((p: any) => ({
-      pipelineId: p.id,
-      name: p.name,
-      isDefault: !!p.default_pipeline,
-      recurring: !!p.recurring,
-      currency: p.currency
-        ? {
-            currencyId: p.currency.id,
-            iso: p.currency.iso
-          }
-        : undefined,
-      stages: (p.stages || []).map((s: any) => ({
-        stageId: s.id,
-        name: s.name,
-        probability: s.probability,
-        order: s.order,
-        color: s.color
-      }))
-    }));
+    const mapped = list.map(p => {
+      const currency = p.currency == null ? undefined : object(p.currency);
+      const stages =
+        p.stages === undefined
+          ? undefined
+          : (() => {
+              if (!Array.isArray(p.stages))
+                throw createApiServiceError('Salesflare returned invalid pipeline stages.');
+              return p.stages.map(value => {
+                const stage = object(value);
+                return {
+                  stageId: id(stage.id),
+                  name: text(stage.name, 'stage name'),
+                  probability: optionalNumber(stage.probability, 'stage probability'),
+                  order: optionalNumber(stage.order, 'stage order'),
+                  color: stage.color == null ? undefined : text(stage.color, 'stage color')
+                };
+              });
+            })();
+      return {
+        pipelineId: p.id,
+        name: text(p.name, 'pipeline name'),
+        isDefault: optionalBoolean(p.default_pipeline, 'default pipeline flag'),
+        recurring: optionalBoolean(p.recurring, 'recurring pipeline flag'),
+        currency: currency
+          ? {
+              currencyId: currency.id == null ? undefined : id(currency.id),
+              iso: currency.iso == null ? undefined : text(currency.iso, 'currency code')
+            }
+          : undefined,
+        stages
+      };
+    });
 
     return {
       output: {

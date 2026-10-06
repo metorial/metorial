@@ -1,6 +1,6 @@
 # Writer
 
-Generate text and chat completions using Writer's Palmyra family of large language models. Create and manage Knowledge Graphs for RAG-based question answering with inline citations. Upload, list, retrieve, and delete files for use with Knowledge Graphs and agents. Analyze images via vision capabilities. Perform web searches for real-time information retrieval. Invoke no-code AI agents as microservices for text generation and research tasks. Use tool calling to integrate custom functions, Knowledge Graph queries, vision, translation, model delegation, and web search within chat conversations. Parse PDFs to extract structured content. Configure guardrails for content safety including toxic content detection and PII protection.
+Generate text and chat responses with available Palmyra and external models. Use custom function calling, Knowledge Graph retrieval, web search, and structured JSON responses. Create and manage Knowledge Graphs, upload text or binary files, discover processing status, prepare original files for download, and invoke deployed no-code agents. List models, graphs, files, and agents to discover IDs for subsequent actions; graph, file, and agent lists expose pagination cursors.
 
 ## License
 

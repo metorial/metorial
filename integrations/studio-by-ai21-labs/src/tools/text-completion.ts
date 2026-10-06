@@ -1,6 +1,5 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let penaltySchema = z
@@ -20,8 +19,13 @@ let penaltySchema = z
 export let textCompletion = SlateTool.create(spec, {
   name: 'Text Completion',
   key: 'text_completion',
-  description: `Generate text completions using AI21's Jurassic-2 models. Provide a prompt and receive one or more continuations. Supports configurable temperature, penalties, and stop sequences.`,
+  description:
+    'DEPRECATED — use `chat_completion` instead. AI21 retired the Jurassic-2 text completion API.',
+  instructions: [
+    'Use chat_completion with task instructions and supplied context, or maestro_run with validation requirements. These APIs do not reproduce the retired response semantics automatically.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true,
     destructive: false
   }
@@ -65,38 +69,9 @@ export let textCompletion = SlateTool.create(spec, {
         .describe('Generated completions')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.textCompletion({
-      model: ctx.input.model,
-      prompt: ctx.input.prompt,
-      maxTokens: ctx.input.maxTokens,
-      temperature: ctx.input.temperature,
-      topP: ctx.input.topP,
-      numResults: ctx.input.numResults,
-      stopSequences: ctx.input.stopSequences,
-      presencePenalty: ctx.input.presencePenalty,
-      countPenalty: ctx.input.countPenalty,
-      frequencyPenalty: ctx.input.frequencyPenalty
-    });
-
-    let completions = (result.completions ?? []).map((c: any) => ({
-      text: c.data?.text ?? '',
-      finishReason: c.finishReason?.reason ?? c.finish_reason
-    }));
-
-    let output = {
-      completionId: result.id,
-      completions
-    };
-
-    let firstText = completions[0]?.text ?? '';
-    let preview = firstText.substring(0, 200) + (firstText.length > 200 ? '...' : '');
-
-    return {
-      output,
-      message: `Generated **${completions.length}** completion(s) using **${ctx.input.model}**.\n\n> ${preview}`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'AI21 retired the Jurassic-2 text completion API. Use chat_completion with explicit task instructions and context, or maestro_run with validation requirements.'
+    );
   })
   .build();

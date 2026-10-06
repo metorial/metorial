@@ -1,71 +1,72 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { spec } from '../spec';
-
-export let manageTimesheets = SlateTool.create(spec, {
-  name: 'Manage Timesheets',
-  key: 'manage_timesheets',
-  description: `List, retrieve, or approve employee timesheets. View submitted timesheets for review and approve them for payroll processing.`,
-  tags: {
-    destructive: false
-  }
-})
-  .input(
-    z.object({
-      action: z.enum(['list', 'get', 'approve']).describe('Action to perform'),
-      timesheetId: z.string().optional().describe('Timesheet ID (for get, approve)'),
-      employmentId: z.string().optional().describe('Filter by employment ID when listing'),
-      status: z.string().optional().describe('Filter by status when listing'),
-      page: z.number().optional().describe('Page number'),
-      pageSize: z.number().optional().describe('Page size')
-    })
-  )
-  .output(
-    z.object({
-      timesheet: z.record(z.string(), z.any()).optional().describe('Single timesheet record'),
-      timesheets: z
-        .array(z.record(z.string(), z.any()))
-        .optional()
-        .describe('List of timesheet records'),
-      totalCount: z.number().optional().describe('Total count for list')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment ?? 'production'
-    });
-
-    if (ctx.input.action === 'approve') {
-      let result = await client.approveTimesheet(ctx.input.timesheetId!);
-      let timesheet = result?.data ?? result?.timesheet ?? result;
+import { collection, pageOutput, pageParams, single } from '../lib/client';
+import { remoteTool } from '../lib/tool';
+import {
+  fail,
+  id,
+  pageSchema,
+  pageSizeSchema,
+  paginationOutput,
+  recordSchema,
+  rejectFields
+} from '../lib/validation';
+export let manageTimesheets = remoteTool(
+  {
+    name: 'Manage Timesheets',
+    key: 'manage_timesheets',
+    description:
+      'List and read timesheets or approve a submitted timesheet for payroll. Approval may have payroll effects and does not prove payroll completion.',
+    tags: { destructive: true }
+  },
+  z.object({
+    action: z.enum(['list', 'get', 'approve']),
+    timesheetId: z.string().optional(),
+    employmentId: z
+      .string()
+      .optional()
+      .describe('Legacy list filter; not documented by the current timesheet endpoint.'),
+    status: z.string().optional(),
+    page: pageSchema,
+    pageSize: pageSizeSchema
+  }),
+  z.object({
+    timesheet: recordSchema.optional(),
+    timesheets: z.array(recordSchema).optional(),
+    ...paginationOutput
+  }),
+  async (client, input) => {
+    if (input.action === 'list') {
+      rejectFields(
+        input,
+        ['employmentId'],
+        'The current timesheet list does not document employmentId filtering. Omit it and inspect employment_id on the returned page.'
+      );
+      let value = await client.get('/timesheets', {
+        ...pageParams(input),
+        status: input.status
+      });
       return {
-        output: { timesheet },
-        message: `Approved timesheet **${ctx.input.timesheetId}**.`
+        output: { timesheets: collection(value, 'timesheets'), ...pageOutput(value) },
+        message: 'Retrieved a timesheet page.'
       };
     }
-
-    if (ctx.input.action === 'get') {
-      let result = await client.getTimesheet(ctx.input.timesheetId!);
-      let timesheet = result?.data ?? result?.timesheet ?? result;
-      return {
-        output: { timesheet },
-        message: `Retrieved timesheet **${ctx.input.timesheetId}**.`
-      };
-    }
-
-    // list
-    let result = await client.listTimesheets({
-      employmentId: ctx.input.employmentId,
-      status: ctx.input.status,
-      page: ctx.input.page,
-      pageSize: ctx.input.pageSize
-    });
-    let timesheets = result?.data ?? result?.timesheets ?? [];
-    let totalCount = result?.total_count ?? timesheets.length;
+    let timesheetId = id(input.timesheetId, 'Timesheet ID');
+    let current = await client.entity('/timesheets', 'timesheet', timesheetId);
+    if (input.action === 'get')
+      return { output: { timesheet: current }, message: 'Retrieved the current timesheet.' };
+    if (current.status !== 'submitted')
+      fail(
+        'Timesheet approval requires submitted status. Read its current state before retrying.'
+      );
+    let timesheet = single(
+      await client.post(`/timesheets/${timesheetId}/approve`),
+      'timesheet',
+      timesheetId
+    );
     return {
-      output: { timesheets, totalCount },
-      message: `Found **${totalCount}** timesheet(s).`
+      output: { timesheet },
+      message:
+        'Remote accepted timesheet approval for payroll. Payroll processing is not confirmed.'
     };
-  });
+  }
+);

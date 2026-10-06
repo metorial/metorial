@@ -1,31 +1,37 @@
-import { SlateTool } from 'slates';
+import { anyOf, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { dataObject, resourceSchema } from '../lib/response';
 import { createClient } from '../lib/utils';
 import { spec } from '../spec';
 
 export let getPerson = SlateTool.create(spec, {
   name: 'Get Person',
   key: 'get_person',
-  description: `Retrieve detailed information about a specific person (worker) by their ID. Returns full profile including personal details, employment history, manager info, and direct reports.`,
+  description: `Retrieve detailed information about a specific person (worker) by their ID. Returns the documented personal information for that worker. Call list_people to discover worker IDs.`,
   tags: {
     readOnly: true
   }
 })
+  .scopes(anyOf('people:read'))
   .input(
     z.object({
-      personId: z.string().describe('The unique ID of the person/worker')
+      personId: z
+        .string()
+        .describe('worker_id from list_people; this differs from its HRIS profile id.')
     })
   )
   .output(
     z.object({
-      person: z.record(z.string(), z.any()).describe('Full person/worker profile')
+      person: resourceSchema.describe('Full person/worker profile')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
 
     let result = await client.getPerson(ctx.input.personId);
-    let person = result?.data ?? result;
+    let person = dataObject(result, 'person');
+    if (String(person.worker_id) !== ctx.input.personId)
+      throw createApiServiceError('Deel returned a different resource identity.');
 
     return {
       output: { person },

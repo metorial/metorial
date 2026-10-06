@@ -1,6 +1,8 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  downloadResults,
+  getCurrentAccount,
   getReport,
   getReportRun,
   listCollections,
@@ -19,17 +21,11 @@ import {
   manageReportSchedule,
   runReport
 } from './tools';
-import {
-  dataSourceEvents,
-  definitionEvents,
-  memberEvents,
-  reportEvents,
-  reportRunEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentAccount,
+    downloadResults,
     getReport,
     listReports,
     manageReport,
@@ -48,5 +44,5 @@ export let provider = Slate.create({
     manageDefinition,
     listMembers
   ],
-  triggers: [reportEvents, reportRunEvents, dataSourceEvents, definitionEvents, memberEvents]
+  triggers: []
 });

@@ -1,16 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SpotifyClient } from '../lib/client';
+import { paging, pagingOutputSchema } from '../lib/types';
 import { spec } from '../spec';
 
 let simplifiedArtistSchema = z.object({
   artistId: z.string(),
   name: z.string(),
-  genres: z.array(z.string()),
-  popularity: z.number(),
+  genres: z.array(z.string()).optional(),
+  popularity: z.number().optional(),
   imageUrl: z.string().nullable(),
   spotifyUrl: z.string(),
-  followers: z.number()
+  followers: z.number().optional()
 });
 
 let simplifiedAlbumSchema = z.object({
@@ -34,7 +35,7 @@ let simplifiedTrackSchema = z.object({
   name: z.string(),
   durationMs: z.number(),
   explicit: z.boolean(),
-  popularity: z.number(),
+  popularity: z.number().optional(),
   artists: z.array(
     z.object({
       artistId: z.string(),
@@ -46,7 +47,7 @@ let simplifiedTrackSchema = z.object({
     name: z.string()
   }),
   spotifyUrl: z.string(),
-  previewUrl: z.string().nullable(),
+  previewUrl: z.string().nullable().optional(),
   uri: z.string()
 });
 
@@ -55,8 +56,8 @@ let simplifiedPlaylistSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   isPublic: z.boolean().nullable(),
-  totalTracks: z.number(),
-  ownerName: z.string().nullable(),
+  totalTracks: z.number().optional(),
+  ownerName: z.string().nullable().optional(),
   imageUrl: z.string().nullable(),
   spotifyUrl: z.string()
 });
@@ -84,12 +85,16 @@ export let searchCatalog = SlateTool.create(spec, {
         .min(1)
         .max(50)
         .optional()
-        .describe('Maximum number of results per type (default 20, max 50)'),
+        .describe(
+          'Maximum number of results per type (current mode: default 5, max 10; confirmed legacy mode: default 20, max 50)'
+        ),
       offset: z.number().min(0).optional().describe('Offset for pagination')
     })
   )
   .output(
     z.object({
+      pages: z.record(z.string(), pagingOutputSchema).optional(),
+      unavailableResults: z.record(z.string(), z.number()).optional(),
       tracks: z.array(simplifiedTrackSchema).optional(),
       artists: z.array(simplifiedArtistSchema).optional(),
       albums: z.array(simplifiedAlbumSchema).optional(),
@@ -99,7 +104,10 @@ export let searchCatalog = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SpotifyClient({
       token: ctx.auth.token,
-      market: ctx.config.market
+      refreshToken: ctx.auth.refreshToken,
+      input: ctx.input,
+      market: ctx.config.market,
+      endpointCompatibility: ctx.config.endpointCompatibility
     });
 
     let result = await client.search({
@@ -110,59 +118,77 @@ export let searchCatalog = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let output: Record<string, any> = {};
+    let output: Record<string, unknown> = {
+      pages: Object.fromEntries(
+        Object.entries(result).map(([key, page]) => [key, paging(page)])
+      ),
+      unavailableResults: Object.fromEntries(
+        Object.entries(result).map(([key, page]) => [
+          key,
+          page.items.filter(v => v === null).length
+        ])
+      )
+    };
 
     if (result.tracks) {
-      output.tracks = result.tracks.items.map(t => ({
-        trackId: t.id,
-        name: t.name,
-        durationMs: t.duration_ms,
-        explicit: t.explicit,
-        popularity: t.popularity,
-        artists: t.artists.map(a => ({ artistId: a.id, name: a.name })),
-        album: { albumId: t.album.id, name: t.album.name },
-        spotifyUrl: t.external_urls.spotify,
-        previewUrl: t.preview_url,
-        uri: t.uri
-      }));
+      output.tracks = result.tracks.items
+        .filter(v => v !== null)
+        .map(t => ({
+          trackId: t.id,
+          name: t.name,
+          durationMs: t.duration_ms,
+          explicit: t.explicit,
+          popularity: t.popularity,
+          artists: t.artists.map(a => ({ artistId: a.id, name: a.name })),
+          album: { albumId: t.album.id, name: t.album.name },
+          spotifyUrl: t.external_urls.spotify,
+          previewUrl: t.preview_url,
+          uri: t.uri
+        }));
     }
 
     if (result.artists) {
-      output.artists = result.artists.items.map(a => ({
-        artistId: a.id,
-        name: a.name,
-        genres: a.genres,
-        popularity: a.popularity,
-        imageUrl: a.images?.[0]?.url ?? null,
-        spotifyUrl: a.external_urls.spotify,
-        followers: a.followers.total
-      }));
+      output.artists = result.artists.items
+        .filter(v => v !== null)
+        .map(a => ({
+          artistId: a.id,
+          name: a.name,
+          genres: a.genres,
+          popularity: a.popularity,
+          imageUrl: a.images?.[0]?.url ?? null,
+          spotifyUrl: a.external_urls.spotify,
+          followers: a.followers?.total
+        }));
     }
 
     if (result.albums) {
-      output.albums = result.albums.items.map(a => ({
-        albumId: a.id,
-        name: a.name,
-        albumType: a.album_type,
-        totalTracks: a.total_tracks,
-        releaseDate: a.release_date,
-        artists: a.artists.map(ar => ({ artistId: ar.id, name: ar.name })),
-        imageUrl: a.images?.[0]?.url ?? null,
-        spotifyUrl: a.external_urls.spotify
-      }));
+      output.albums = result.albums.items
+        .filter(v => v !== null)
+        .map(a => ({
+          albumId: a.id,
+          name: a.name,
+          albumType: a.album_type,
+          totalTracks: a.total_tracks,
+          releaseDate: a.release_date,
+          artists: a.artists.map(ar => ({ artistId: ar.id, name: ar.name })),
+          imageUrl: a.images?.[0]?.url ?? null,
+          spotifyUrl: a.external_urls.spotify
+        }));
     }
 
     if (result.playlists) {
-      output.playlists = result.playlists.items.map(p => ({
-        playlistId: p.id,
-        name: p.name,
-        description: p.description,
-        isPublic: p.public,
-        totalTracks: p.tracks.total,
-        ownerName: p.owner.display_name,
-        imageUrl: p.images?.[0]?.url ?? null,
-        spotifyUrl: p.external_urls.spotify
-      }));
+      output.playlists = result.playlists.items
+        .filter(v => v !== null)
+        .map(p => ({
+          playlistId: p.id,
+          name: p.name,
+          description: p.description,
+          isPublic: p.public,
+          totalTracks: (p.items !== undefined ? p.items : p.tracks)?.total,
+          ownerName: p.owner.display_name,
+          imageUrl: p.images?.[0]?.url ?? null,
+          spotifyUrl: p.external_urls.spotify
+        }));
     }
 
     let counts = ctx.input.types
@@ -176,7 +202,7 @@ export let searchCatalog = SlateTool.create(spec, {
                 ? 'albums'
                 : 'playlists';
         let items = output[key];
-        return `${items?.length ?? 0} ${key}`;
+        return `${Array.isArray(items) ? items.length : 0} ${key}`;
       })
       .join(', ');
 

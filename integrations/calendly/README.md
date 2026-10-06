@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/calendly.svg" height="20"> Calendly
 
-List, retrieve, and cancel scheduled events. Book meetings programmatically on behalf of invitees using available time slots. Retrieve event types and their configurations. Query user availability, available time slots, busy times, and availability schedules. Create single-use scheduling links with optional overrides. List and manage invitees, mark no-shows, and access custom question responses and UTM tracking data. Manage organization memberships, invite or remove users. Retrieve routing form configurations and submissions. Subscribe to webhooks for new bookings, cancellations, and routing form submissions.
+List, retrieve, and cancel scheduled events. Book meetings programmatically on behalf of invitees using available time slots. Retrieve event types and their configurations. Query user availability, available time slots, busy times, and availability schedules. Create single-use scheduling links with optional overrides. List and manage invitees, mark no-shows, and access custom question responses and UTM tracking data. Manage organization memberships, invite or remove users. Retrieve routing form configurations and submissions.
 
 ## Tools
 

@@ -6,13 +6,16 @@ import { spec } from '../spec';
 export let getHighlights = SlateTool.create(spec, {
   name: 'Get Highlights',
   key: 'get_highlights',
-  description: `Retrieve AI-generated highlights (notes) for a meeting. Each highlight includes the text, timestamp, source (manual or AI-generated), and an associated topic with title and summary. Only available after the transcript is complete.`,
+  description:
+    'DEPRECATED — use `get_notes` instead. Retrieve meeting highlights with text, timestamps, sources and topics. Available only after transcript processing is complete.',
+  instructions: ['Use get_notes for the current structured notes and Markdown content.'],
   constraints: [
     'Highlights are only available after the transcript has been fully processed.'
   ],
   tags: {
     destructive: false,
-    readOnly: true
+    readOnly: true,
+    deprecated: true
   }
 })
   .input(
@@ -32,7 +35,7 @@ export let getHighlights = SlateTool.create(spec, {
             startTime: z
               .number()
               .describe('Start time in seconds when this highlight occurs.'),
-            source: z.string().describe('Source of the highlight (e.g., "ai" or "manual").'),
+            source: z.string().describe('Source of the highlight ("auto" or "manual").'),
             topicTitle: z.string().describe('Title of the topic this highlight belongs to.'),
             topicSummary: z.string().describe('Summary of the topic.')
           })

@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'ramp',
   name: 'Ramp',
   description:
-    'Corporate spend management platform providing corporate cards, bill payments, reimbursements, and accounting automation.',
+    'Read corporate spending and business data; manage users, departments, spend programs, approved bills, cards and funds.',
   metadata: {},
   config,
   auth

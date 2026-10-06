@@ -7,6 +7,7 @@ import {
   deleteFile,
   deleteKnowledgeGraph,
   downloadFile,
+  downloadOriginalFile,
   getAgentDetails,
   getFile,
   getKnowledgeGraph,
@@ -18,10 +19,9 @@ import {
   queryKnowledgeGraph,
   removeFileFromGraph,
   textCompletion,
-  updateKnowledgeGraph
+  updateKnowledgeGraph,
+  uploadFile
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -38,6 +38,8 @@ export let provider = Slate.create({
     getFile,
     deleteFile,
     downloadFile,
+    uploadFile,
+    downloadOriginalFile,
     addFileToGraph,
     removeFileFromGraph,
     invokeAgent,
@@ -45,5 +47,5 @@ export let provider = Slate.create({
     getAgentDetails,
     listModels
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

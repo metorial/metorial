@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageEmailAccount = SlateTool.create(spec, {
   name: 'Manage Email Account',
   key: 'manage_email_account',
-  description: `Pause, resume, update settings, or delete a connected email sending account. Supports updating daily limits, sending gaps, and warmup configuration.`,
+  description: `Pause, resume, update settings, or delete a connected email sending account. Supports updating daily limits and sending gaps. Resuming can send real emails; deletion removes the connected account.`,
   instructions: [
     'Use action "pause" to stop sending from this account, "resume" to re-enable sending, "delete" to remove the account.',
     'Settings updates (dailyLimit, sendingGap) are applied before the action.'
@@ -33,16 +33,25 @@ export let manageEmailAccount = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let { accountEmail, action } = ctx.input;
+    if (
+      ctx.input.dailyLimit === undefined &&
+      ctx.input.sendingGap === undefined &&
+      (!action || action === 'update')
+    ) {
+      throw invalid('Provide settings to update or a pause, resume, or delete action.');
+    }
+    if (ctx.input.sendingGap !== undefined && ctx.input.sendingGap < 0)
+      throw invalid('sendingGap must not be negative.');
 
     let updatePayload: Record<string, any> = {};
     if (ctx.input.dailyLimit !== undefined) updatePayload.daily_limit = ctx.input.dailyLimit;
-    if (ctx.input.sendingGap !== undefined) updatePayload.sending_gap = ctx.input.sendingGap;
+    if (ctx.input.sendingGap !== undefined)
+      updatePayload.sending_gap = ctx.input.sendingGap / 60;
 
-    if (Object.keys(updatePayload).length > 0) {
-      await client.updateAccount(accountEmail, updatePayload);
-    }
-
-    let result: any;
+    let result =
+      Object.keys(updatePayload).length > 0
+        ? await client.updateAccount(accountEmail, updatePayload)
+        : undefined;
 
     if (action === 'pause') {
       result = await client.pauseAccount(accountEmail);
@@ -54,10 +63,9 @@ export let manageEmailAccount = SlateTool.create(spec, {
         output: { email: accountEmail, success: true },
         message: `Deleted email account **${accountEmail}**.`
       };
-    } else {
-      result = await client.getAccount(accountEmail);
     }
 
+    if (!result) throw invalid('No account update was submitted.');
     return {
       output: {
         email: result?.email ?? accountEmail,

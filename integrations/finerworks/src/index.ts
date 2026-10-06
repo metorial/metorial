@@ -17,8 +17,6 @@ import {
   updateOrder,
   validateAddress
 } from './tools';
-import { orderStatusUpdate } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     browseFraming,
     listOrderStatusDefinitions
   ],
-  triggers: [orderStatusUpdate]
+  triggers: []
 });

@@ -1,18 +1,25 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientForContext } from '../lib/client';
 import { spec } from '../spec';
 
 export let deleteGroup = SlateTool.create(spec, {
   name: 'Delete Group',
   key: 'delete_group',
-  description: `Permanently delete a database group and all its databases. This action cannot be undone.`,
+  description: `Choose an organization with list_organizations. Delete a database group and all its databases. Recovery is available only to eligible organizations within Turso retention limits; do not rely on recovery.`,
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
   .input(
     z.object({
+      organizationSlug: z
+        .string()
+        .optional()
+        .describe(
+          'Organization slug. Call list_organizations to discover authorized organizations; older connections may use their saved organization.'
+        ),
       groupName: z.string().describe('Name of the group to delete')
     })
   )
@@ -22,10 +29,7 @@ export let deleteGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    const client = clientForContext(ctx);
 
     await client.deleteGroup(ctx.input.groupName);
 

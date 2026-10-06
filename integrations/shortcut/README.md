@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/shortcut.svg" height="20"> Shortcut
 
-Create, read, update, delete, and search stories, epics, objectives, and iterations for software project management. Manage workflows, teams, labels, custom fields, and documents. Assign stories to sprints, set deadlines and estimates, track workflow state changes, manage story relationships (blockers/blocked), and add comments and checklists. Upload files, link external files, and search across all work items with rich query operators. Receive webhooks for story, epic, comment, and workflow state changes.
+Create, read, update, delete, and search stories, epics, objectives, and iterations for software project management. Manage workflows, teams, labels, custom fields, and documents. Assign stories to sprints, set deadlines and estimates, track workflow state changes, manage story relationships (blockers/blocked), and add comments and checklists. Upload files, link external files, and search across all work items with rich query operators.
 
 ## Tools
 

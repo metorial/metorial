@@ -32,11 +32,11 @@ export let listPhoneNumbers = SlateTool.create(spec, {
           z.object({
             phoneNumberId: z.string().describe('Unique ID of the phone number'),
             phoneNumber: z.string().describe('Phone number in E.164 format'),
-            status: z.string().optional().describe('Current status of the number'),
-            connectionId: z.string().optional().describe('Associated connection ID'),
-            connectionName: z.string().optional().describe('Associated connection name'),
+            status: z.string().nullish().describe('Current status of the number'),
+            connectionId: z.string().nullish().describe('Associated connection ID'),
+            connectionName: z.string().nullish().describe('Associated connection name'),
             tags: z.array(z.string()).optional().describe('Tags associated with the number'),
-            createdAt: z.string().optional().describe('When the number was provisioned')
+            createdAt: z.string().nullish().describe('When the number was provisioned')
           })
         )
         .describe('List of phone numbers'),
@@ -55,7 +55,7 @@ export let listPhoneNumbers = SlateTool.create(spec, {
       pageSize: ctx.input.pageSize
     });
 
-    let phoneNumbers = (result.data ?? []).map((pn: any) => ({
+    let phoneNumbers = (result.data ?? []).map(pn => ({
       phoneNumberId: pn.id,
       phoneNumber: pn.phone_number,
       status: pn.status,

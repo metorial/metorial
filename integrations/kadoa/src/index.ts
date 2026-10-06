@@ -11,8 +11,6 @@ import {
   runWorkflow,
   startCrawl
 } from './tools';
-import { kadoaEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     adhocExtraction,
     getDataChanges
   ],
-  triggers: [kadoaEvents]
+  triggers: []
 });

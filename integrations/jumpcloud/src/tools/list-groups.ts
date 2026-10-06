@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listGroups = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listGroups = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       groupType: z.enum(['user', 'system']).describe('Type of groups to list'),
       limit: z
         .number()
@@ -44,41 +46,41 @@ export let listGroups = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      let groups: import('../lib/types').JumpCloudGroup[];
+      if (ctx.input.groupType === 'user') {
+        groups = await client.listUserGroups({
+          limit: ctx.input.limit,
+          skip: ctx.input.skip,
+          filter: ctx.input.filter,
+          sort: ctx.input.sort
+        });
+      } else {
+        groups = await client.listSystemGroups({
+          limit: ctx.input.limit,
+          skip: ctx.input.skip,
+          filter: ctx.input.filter,
+          sort: ctx.input.sort
+        });
+      }
 
-    let groups: any[];
-    if (ctx.input.groupType === 'user') {
-      groups = await client.listUserGroups({
-        limit: ctx.input.limit,
-        skip: ctx.input.skip,
-        filter: ctx.input.filter,
-        sort: ctx.input.sort
-      });
-    } else {
-      groups = await client.listSystemGroups({
-        limit: ctx.input.limit,
-        skip: ctx.input.skip,
-        filter: ctx.input.filter,
-        sort: ctx.input.sort
-      });
+      let mapped = groups.map(g => ({
+        groupId: g.id,
+        name: g.name,
+        description: g.description,
+        type: g.type,
+        membershipMethod: g.membershipMethod
+      }));
+
+      return {
+        output: {
+          groups: mapped
+        },
+        message: `Found **${mapped.length}** ${ctx.input.groupType} groups.`
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
     }
-
-    let mapped = groups.map(g => ({
-      groupId: g.id,
-      name: g.name,
-      description: g.description,
-      type: g.type,
-      membershipMethod: g.membershipMethod
-    }));
-
-    return {
-      output: {
-        groups: mapped
-      },
-      message: `Found **${mapped.length}** ${ctx.input.groupType} groups.`
-    };
   })
   .build();

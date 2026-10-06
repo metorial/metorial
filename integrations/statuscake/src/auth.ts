@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,9 +20,11 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      const token = ctx.input.token.trim();
+      await new Client({ token }).listUptimeTests({ limit: 1 });
       return {
         output: {
-          token: ctx.input.token
+          token
         }
       };
     }

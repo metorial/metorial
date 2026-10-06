@@ -19,8 +19,6 @@ import {
   stopTunnel,
   updateJob
 } from './tools';
-import { jobMonitor, testJobEvents, visualTestingEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +40,5 @@ export let provider = Slate.create({
     getUserConcurrency,
     listStorageFiles
   ],
-  triggers: [testJobEvents, visualTestingEvents, jobMonitor]
+  triggers: []
 });

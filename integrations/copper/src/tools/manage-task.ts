@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageContinuation, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 let taskOutputSchema = z.object({
@@ -30,12 +31,13 @@ let mapTask = (t: any) => ({
   taskId: t.id,
   name: t.name,
   assigneeId: t.assignee_id,
-  relatedResource: t.related_resource
-    ? {
-        resourceId: t.related_resource.id,
-        type: t.related_resource.type
-      }
-    : null,
+  relatedResource:
+    t.related_resource?.id == null && t.related_resource?.type == null
+      ? null
+      : {
+          resourceId: t.related_resource.id,
+          type: t.related_resource.type
+        },
   dueDate: t.due_date,
   reminderDate: t.reminder_date,
   priority: t.priority,
@@ -86,23 +88,24 @@ export let createTask = SlateTool.create(spec, {
   )
   .output(taskOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'create_task');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = { name: ctx.input.name };
-    if (ctx.input.assigneeId) body.assignee_id = ctx.input.assigneeId;
+    if (ctx.input.assigneeId !== undefined) body.assignee_id = ctx.input.assigneeId;
     if (ctx.input.relatedResourceId && ctx.input.relatedResourceType) {
       body.related_resource = {
         id: ctx.input.relatedResourceId,
         type: ctx.input.relatedResourceType
       };
     }
-    if (ctx.input.dueDate) body.due_date = ctx.input.dueDate;
-    if (ctx.input.reminderDate) body.reminder_date = ctx.input.reminderDate;
-    if (ctx.input.priority) body.priority = ctx.input.priority;
-    if (ctx.input.status) body.status = ctx.input.status;
-    if (ctx.input.details) body.details = ctx.input.details;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.customFields) {
+    if (ctx.input.dueDate !== undefined) body.due_date = ctx.input.dueDate;
+    if (ctx.input.reminderDate !== undefined) body.reminder_date = ctx.input.reminderDate;
+    if (ctx.input.priority !== undefined) body.priority = ctx.input.priority;
+    if (ctx.input.status !== undefined) body.status = ctx.input.status;
+    if (ctx.input.details !== undefined) body.details = ctx.input.details;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.customFields !== undefined) {
       body.custom_fields = ctx.input.customFields.map(cf => ({
         custom_field_definition_id: cf.customFieldDefinitionId,
         value: cf.value
@@ -131,6 +134,7 @@ export let getTask = SlateTool.create(spec, {
   )
   .output(taskOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'get_task');
     let client = new Client(ctx.auth);
     let task = await client.getTask(ctx.input.taskId);
 
@@ -171,6 +175,7 @@ export let updateTask = SlateTool.create(spec, {
   )
   .output(taskOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'update_task');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {};
@@ -216,6 +221,7 @@ export let deleteTask = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'delete_task');
     let client = new Client(ctx.auth);
     await client.deleteTask(ctx.input.taskId);
 
@@ -252,30 +258,43 @@ export let searchTasks = SlateTool.create(spec, {
   .output(
     z.object({
       tasks: z.array(taskOutputSchema).describe('Matching task records'),
-      count: z.number().describe('Number of results returned')
+      count: z.number().describe('Number of results returned'),
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('A full page suggests another page may be available'),
+      nextPageNumber: z.number().optional().describe('Next page to request when available'),
+      atSearchLimit: z
+        .boolean()
+        .optional()
+        .describe('Narrow filters when the 100,000-result window is reached')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'search_tasks');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {
       page_number: ctx.input.pageNumber,
       page_size: ctx.input.pageSize
     };
-    if (ctx.input.sortBy) body.sort_by = ctx.input.sortBy;
-    if (ctx.input.sortDirection) body.sort_direction = ctx.input.sortDirection;
-    if (ctx.input.assigneeIds) body.assignee_ids = ctx.input.assigneeIds;
-    if (ctx.input.statuses) body.statuses = ctx.input.statuses;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.minimumDueDate) body.minimum_due_date = ctx.input.minimumDueDate;
-    if (ctx.input.maximumDueDate) body.maximum_due_date = ctx.input.maximumDueDate;
+    if (ctx.input.sortBy !== undefined) body.sort_by = ctx.input.sortBy;
+    if (ctx.input.sortDirection !== undefined) body.sort_direction = ctx.input.sortDirection;
+    if (ctx.input.assigneeIds !== undefined) body.assignee_ids = ctx.input.assigneeIds;
+    if (ctx.input.statuses !== undefined) body.statuses = ctx.input.statuses;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.minimumDueDate !== undefined)
+      body.minimum_due_date = ctx.input.minimumDueDate;
+    if (ctx.input.maximumDueDate !== undefined)
+      body.maximum_due_date = ctx.input.maximumDueDate;
 
     let tasks = await client.searchTasks(body);
 
     return {
       output: {
         tasks: tasks.map(mapTask),
-        count: tasks.length
+        count: tasks.length,
+        ...pageContinuation(ctx.input, tasks.length)
       },
       message: `Found **${tasks.length}** tasks matching the search criteria.`
     };

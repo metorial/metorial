@@ -19,7 +19,7 @@ export let validateKey = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, apiVersion: ctx.config.apiVersion });
     let result = await client.validateKey();
 
     return {

@@ -1,8 +1,37 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { getBaseUrl } from '../lib/helpers';
+import { invokeGusto } from '../lib/actions';
+import { companyIdSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  pagination: paginationSchema.optional(),
+  payrollId: z.string().describe('UUID of the payroll'),
+  companyId: z.string().nullable().optional(),
+  payPeriodStartDate: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Start date of the pay period'),
+  payPeriodEndDate: z.string().nullable().optional().describe('End date of the pay period'),
+  checkDate: z.string().nullable().optional().describe('Date employees are paid'),
+  processed: z.boolean().nullable().optional().describe('Whether payroll has been processed'),
+  processingStatus: z.string().nullable().optional().describe('Processing status'),
+  payrollType: z.string().nullable().optional().describe('Type of payroll'),
+  version: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Resource version for optimistic locking'),
+  totals: z
+    .any()
+    .optional()
+    .describe('Payroll totals including gross pay, net pay, taxes, etc.'),
+  employeeCompensations: z
+    .array(z.any())
+    .optional()
+    .describe('Per-employee compensation details')
+});
 
 export let getPayroll = SlateTool.create(spec, {
   name: 'Get Payroll',
@@ -14,52 +43,15 @@ export let getPayroll = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      companyId: z.string().describe('The UUID of the company'),
+      page: z
+        .number()
+        .optional()
+        .describe('Employee-compensation page number, starting at 1.'),
+      per: z.number().optional().describe('Employee compensations per page, 1 to 100.'),
+      companyId: companyIdSchema,
       payrollId: z.string().describe('The UUID of the payroll')
     })
   )
-  .output(
-    z.object({
-      payrollId: z.string().describe('UUID of the payroll'),
-      payPeriodStartDate: z.string().optional().describe('Start date of the pay period'),
-      payPeriodEndDate: z.string().optional().describe('End date of the pay period'),
-      checkDate: z.string().optional().describe('Date employees are paid'),
-      processed: z.boolean().optional().describe('Whether payroll has been processed'),
-      processingStatus: z.string().optional().describe('Processing status'),
-      payrollType: z.string().optional().describe('Type of payroll'),
-      version: z.string().optional().describe('Resource version for optimistic locking'),
-      totals: z
-        .any()
-        .optional()
-        .describe('Payroll totals including gross pay, net pay, taxes, etc.'),
-      employeeCompensations: z
-        .array(z.any())
-        .optional()
-        .describe('Per-employee compensation details')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: getBaseUrl(ctx.auth.environment)
-    });
-
-    let payroll = await client.getPayroll(ctx.input.companyId, ctx.input.payrollId);
-
-    return {
-      output: {
-        payrollId: payroll.payroll_uuid || payroll.uuid || payroll.id?.toString(),
-        payPeriodStartDate: payroll.pay_period?.start_date,
-        payPeriodEndDate: payroll.pay_period?.end_date,
-        checkDate: payroll.check_date,
-        processed: payroll.processed,
-        processingStatus: payroll.processing_status,
-        payrollType: payroll.payroll_type,
-        version: payroll.version,
-        totals: payroll.totals,
-        employeeCompensations: payroll.employee_compensations
-      },
-      message: `Retrieved payroll for period ${payroll.pay_period?.start_date || 'N/A'} to ${payroll.pay_period?.end_date || 'N/A'} (status: ${payroll.processing_status || 'unknown'}).`
-    };
-  })
+  .output(outputSchema)
+  .handleInvocation(ctx => invokeGusto('get_payroll', ctx.input, ctx.auth, outputSchema))
   .build();

@@ -58,8 +58,6 @@ import {
   updateGroupPropertyTool,
   updateSurveyTool
 } from './tools';
-import { featureFlagChangesTrigger, inboundWebhook, newEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -120,5 +118,5 @@ export let provider = Slate.create({
     getCurrentUserTool,
     listProjectsTool
   ],
-  triggers: [inboundWebhook, newEventsTrigger, featureFlagChangesTrigger]
+  triggers: []
 });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let queryEvents = SlateTool.create(spec, {
@@ -19,6 +20,7 @@ export let queryEvents = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       service: z
         .array(z.string())
         .describe('Event services to query, e.g. ["directory", "sso", "radius"]'),
@@ -32,7 +34,12 @@ export let queryEvents = SlateTool.create(spec, {
         .max(10000)
         .optional()
         .describe('Maximum events to return (default 100, max 10000)'),
-      searchAfter: z.any().optional().describe('Cursor from previous response for pagination'),
+      searchAfter: z
+        .any()
+        .optional()
+        .describe(
+          'Native continuation array; reuse the exact organization, service and time query. A cursor may also be present on the final page.'
+        ),
       searchQuery: z.string().optional().describe('Free-text search query')
     })
   )
@@ -59,40 +66,40 @@ export let queryEvents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      let result = await client.queryEvents({
+        service: ctx.input.service,
+        startTime: ctx.input.startTime,
+        endTime: ctx.input.endTime,
+        limit: ctx.input.limit,
+        searchAfter: ctx.input.searchAfter,
+        q: ctx.input.searchQuery
+      });
 
-    let result = await client.queryEvents({
-      service: ctx.input.service,
-      startTime: ctx.input.startTime,
-      endTime: ctx.input.endTime,
-      limit: ctx.input.limit,
-      searchAfter: ctx.input.searchAfter,
-      q: ctx.input.searchQuery
-    });
+      let events = result.events.map(e => ({
+        eventId: e.id,
+        timestamp: e.timestamp,
+        eventType: e.event_type,
+        service: e.service,
+        initiatedById: e.initiated_by?.id,
+        initiatedByType: e.initiated_by?.type,
+        initiatedByEmail: e.initiated_by?.email,
+        resourceId: e.resource?.id,
+        resourceType: e.resource?.type,
+        organization: e.organization,
+        rawEvent: e
+      }));
 
-    let events = result.events.map(e => ({
-      eventId: e.id,
-      timestamp: e.timestamp,
-      eventType: e.event_type,
-      service: e.service,
-      initiatedById: e.initiated_by?.id,
-      initiatedByType: e.initiated_by?.type,
-      initiatedByEmail: e.initiated_by?.email,
-      resourceId: e.resource?.id,
-      resourceType: e.resource?.type,
-      organization: e.organization,
-      rawEvent: e
-    }));
-
-    return {
-      output: {
-        events,
-        searchAfter: result.searchAfter
-      },
-      message: `Retrieved **${events.length}** events from Directory Insights.${result.searchAfter ? ' More results available via pagination.' : ''}`
-    };
+      return {
+        output: {
+          events,
+          searchAfter: result.searchAfter
+        },
+        message: `Retrieved **${events.length}** events from Directory Insights.${result.hasMore ? ' More results available via pagination.' : ''}`
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
+    }
   })
   .build();

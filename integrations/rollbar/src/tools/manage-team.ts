@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageTeam = SlateTool.create(spec, {
@@ -15,7 +15,7 @@ Requires an **account-level** access token.`,
     'Use action "delete" with a teamId to delete a team.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -58,9 +58,14 @@ Requires an **account-level** access token.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
-    let mapTeam = (t: any) => ({
+    let mapTeam = (t: {
+      id: number;
+      name: string;
+      access_level?: string;
+      account_id?: number;
+    }) => ({
       teamId: t.id,
       name: t.name,
       accessLevel: t.access_level,
@@ -77,7 +82,8 @@ Requires an **account-level** access token.`,
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for "get" action');
+      if (!ctx.input.teamId)
+        throw createApiServiceError('teamId is required for "get" action');
       let result = await client.getTeam(ctx.input.teamId);
       let team = mapTeam(result?.result);
       return {
@@ -87,7 +93,7 @@ Requires an **account-level** access token.`,
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for "create" action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for "create" action');
       let result = await client.createTeam({
         name: ctx.input.name,
         access_level: ctx.input.accessLevel
@@ -100,7 +106,8 @@ Requires an **account-level** access token.`,
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for "delete" action');
+      if (!ctx.input.teamId)
+        throw createApiServiceError('teamId is required for "delete" action');
       await client.deleteTeam(ctx.input.teamId);
       return {
         output: { deleted: true },
@@ -108,6 +115,6 @@ Requires an **account-level** access token.`,
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

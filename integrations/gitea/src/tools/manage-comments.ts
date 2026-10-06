@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let commentSchema = z.object({
@@ -22,11 +23,11 @@ export let listIssueComments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      issueNumber: z.number().describe('Issue or pull request number'),
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      issueNumber: integerInput(1).describe('Issue or pull request number'),
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page')
     })
   )
   .output(
@@ -35,7 +36,7 @@ export let listIssueComments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let comments = await client.listIssueComments(
       ctx.input.owner,
       ctx.input.repo,
@@ -72,15 +73,15 @@ export let createComment = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      issueNumber: z.number().describe('Issue or pull request number'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      issueNumber: integerInput(1).describe('Issue or pull request number'),
       body: z.string().describe('Comment body (supports Markdown)')
     })
   )
   .output(commentSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let c = await client.createIssueComment(
       ctx.input.owner,
       ctx.input.repo,
@@ -112,15 +113,15 @@ export let updateComment = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      commentId: z.number().describe('Comment ID to update'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      commentId: integerInput(1).describe('Comment ID to update'),
       body: z.string().describe('New comment body (supports Markdown)')
     })
   )
   .output(commentSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let c = await client.updateIssueComment(
       ctx.input.owner,
       ctx.input.repo,
@@ -152,9 +153,9 @@ export let deleteComment = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      commentId: z.number().describe('Comment ID to delete')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      commentId: integerInput(1).describe('Comment ID to delete')
     })
   )
   .output(
@@ -163,7 +164,7 @@ export let deleteComment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     await client.deleteIssueComment(ctx.input.owner, ctx.input.repo, ctx.input.commentId);
 
     return {

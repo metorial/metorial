@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listProjectsTool = SlateTool.create(spec, {
@@ -19,7 +20,7 @@ export let listProjectsTool = SlateTool.create(spec, {
       projects: z
         .array(
           z.object({
-            projectId: z.string().describe('Unique project identifier'),
+            projectId: projectIdSchema,
             name: z.string().describe('Display name of the project'),
             type: z.string().describe('Project type (e.g., object-detection, classification)'),
             imageCount: z.number().describe('Total number of images in the project'),

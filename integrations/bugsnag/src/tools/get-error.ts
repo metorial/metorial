@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugsnagClient } from '../lib/client';
 import { spec } from '../spec';
@@ -27,12 +27,22 @@ export let getError = SlateTool.create(spec, {
       eventsPerPage: z
         .number()
         .optional()
-        .describe('Number of events to include (default 5, max 30)')
+        .describe('Number of events to include (default 5, max 100)')
     })
   )
   .output(
     z.object({
       errorId: z.string().describe('Unique identifier of the error'),
+      eventsNextPageUrl: z
+        .string()
+        .optional()
+        .describe('Next-page URL for additional events; use List Events with the same error'),
+      commentsNextPageUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Next-page URL for additional comments; use Manage Comments list with the same error'
+        ),
       errorClass: z.string().optional().describe('Error class name'),
       message: z.string().optional().describe('Error message'),
       context: z.string().optional().describe('Context where the error occurred'),
@@ -77,57 +87,58 @@ export let getError = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
+    let client = new BugsnagClient(ctx.auth);
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('Project ID is required.');
+    if (!projectId) throw createApiServiceError('Project ID is required.');
 
     let error = await client.getError(projectId, ctx.input.errorId);
 
-    let output: any = {
-      errorId: error.id,
-      errorClass: error.error_class,
-      message: error.message,
-      context: error.context,
-      severity: error.severity,
-      status: error.status,
-      unhandled: error.unhandled,
-      eventsCount: error.events,
-      usersCount: error.users,
-      firstSeen: error.first_seen,
-      lastSeen: error.last_seen,
-      releaseStages: error.release_stages,
-      assignedCollaboratorId: error.assigned_collaborator_id,
-      url: error.url,
-      projectUrl: error.project_url
-    };
-
-    if (ctx.input.includeEvents) {
-      let events = await client.listErrorEvents(projectId, ctx.input.errorId, {
-        perPage: ctx.input.eventsPerPage || 5
-      });
-
-      output.recentEvents = events.map((e: any) => ({
+    const events = ctx.input.includeEvents
+      ? await client.listErrorEvents(projectId, ctx.input.errorId, {
+          perPage: ctx.input.eventsPerPage ?? 5
+        })
+      : undefined;
+    const eventsNextPageUrl = events ? client.pageInfo.nextPageUrl : undefined;
+    const comments = ctx.input.includeComments
+      ? await client.listComments(projectId, ctx.input.errorId)
+      : undefined;
+    const commentsNextPageUrl = comments ? client.pageInfo.nextPageUrl : undefined;
+    const output = {
+      errorId: error.id ?? undefined,
+      errorClass: error.error_class ?? undefined,
+      message: error.message ?? undefined,
+      context: error.context ?? undefined,
+      severity: error.overridden_severity ?? error.severity ?? undefined,
+      status: error.status ?? undefined,
+      unhandled: error.unhandled ?? undefined,
+      eventsCount: error.events ?? undefined,
+      usersCount: error.users ?? undefined,
+      firstSeen: error.first_seen ?? undefined,
+      lastSeen: error.last_seen ?? undefined,
+      releaseStages: error.release_stages ?? undefined,
+      assignedCollaboratorId: error.assigned_collaborator_id ?? undefined,
+      url: error.url ?? undefined,
+      projectUrl: error.project_url ?? undefined,
+      recentEvents: events?.map(e => ({
         eventId: e.id,
-        receivedAt: e.received_at,
-        severity: e.severity,
-        unhandled: e.unhandled,
-        user: e.user,
-        app: e.app,
-        device: e.device,
-        context: e.context
-      }));
-    }
-
-    if (ctx.input.includeComments) {
-      let comments = await client.listComments(projectId, ctx.input.errorId);
-      output.comments = comments.map((c: any) => ({
+        receivedAt: e.received_at ?? undefined,
+        severity: e.severity ?? undefined,
+        unhandled: e.unhandled ?? undefined,
+        user: e.user ?? undefined,
+        app: e.app ?? undefined,
+        device: e.device ?? undefined,
+        context: e.context ?? undefined
+      })),
+      comments: comments?.map(c => ({
         commentId: c.id,
-        message: c.message,
-        authorName: c.author?.name,
-        authorEmail: c.author?.email,
-        createdAt: c.created_at
-      }));
-    }
+        message: c.message ?? undefined,
+        authorName: c.collaborator?.name ?? undefined,
+        authorEmail: c.collaborator?.email ?? undefined,
+        createdAt: c.created_at ?? undefined
+      })),
+      eventsNextPageUrl,
+      commentsNextPageUrl
+    };
 
     return {
       output,

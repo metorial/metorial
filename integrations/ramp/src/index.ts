@@ -3,6 +3,8 @@ import { spec } from './spec';
 import {
   getBusiness,
   getReimbursement,
+  getResource,
+  getTaskStatus,
   getTransaction,
   listBills,
   listCards,
@@ -18,13 +20,6 @@ import {
   manageSpendProgram,
   manageUser
 } from './tools';
-import {
-  billEvents,
-  inboundWebhook,
-  reimbursementEvents,
-  transactionEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,8 +37,10 @@ export let provider = Slate.create({
     manageLimit,
     manageSpendProgram,
     getBusiness,
+    getResource,
+    getTaskStatus,
     listVendors,
     listEntities
   ],
-  triggers: [inboundWebhook, transactionEvents, billEvents, reimbursementEvents]
+  triggers: []
 });

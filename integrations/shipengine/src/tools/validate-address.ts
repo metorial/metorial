@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type AddressInput, createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let addressSchema = z.object({
@@ -24,7 +24,7 @@ let validationMessageSchema = z.object({
   code: z.string().describe('Message code'),
   message: z.string().describe('Human-readable message'),
   type: z.enum(['info', 'warning', 'error']).describe('Message severity'),
-  detailCode: z.string().describe('Detailed message code')
+  detailCode: z.string().optional().describe('Detailed message code')
 });
 
 export let validateAddress = SlateTool.create(spec, {
@@ -60,10 +60,7 @@ export let validateAddress = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
     let apiAddresses = ctx.input.addresses.map(addr => ({
       name: addr.name,
@@ -103,7 +100,7 @@ export let validateAddress = SlateTool.create(spec, {
   })
   .build();
 
-let mapAddress = (addr: any) => ({
+let mapAddress = (addr: AddressInput) => ({
   name: addr.name,
   companyName: addr.company_name,
   phone: addr.phone,

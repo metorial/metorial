@@ -16,8 +16,6 @@ import {
   manageUsers,
   updateFeatureFlag
 } from './tools';
-import { adminAudit, flagChange, impressions, metricAlert } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     manageGroups,
     listTrafficTypes
   ],
-  triggers: [flagChange, adminAudit, impressions, metricAlert]
+  triggers: []
 });

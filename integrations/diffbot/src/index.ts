@@ -8,8 +8,6 @@ import {
   manageCrawl,
   searchKnowledgeGraph
 } from './tools';
-import { crawlBulkJobCompleted, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -20,5 +18,5 @@ export let provider = Slate.create({
     manageCrawl,
     manageBulkJob
   ],
-  triggers: [inboundWebhook, crawlBulkJobCompleted]
+  triggers: []
 });

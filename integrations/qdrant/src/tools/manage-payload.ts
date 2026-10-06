@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { QdrantClient } from '../lib/client';
+import { validatePointSelector } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let managePayload = SlateTool.create(spec, {
@@ -15,7 +16,7 @@ export let managePayload = SlateTool.create(spec, {
     'Target points using either `pointIds` or `filter`, not both.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -54,8 +55,12 @@ export let managePayload = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePointSelector(ctx.input.pointIds, ctx.input.filter);
+    if (ctx.input.nestedKey !== undefined && ctx.input.action !== 'set') {
+      throw createApiServiceError('nestedKey is supported only for the set action.');
+    }
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 
@@ -63,7 +68,8 @@ export let managePayload = SlateTool.create(spec, {
     let result: any;
 
     if (ctx.input.action === 'set') {
-      if (!ctx.input.payload) throw new Error('payload is required for set action');
+      if (!ctx.input.payload)
+        throw createApiServiceError('payload is required for set action');
       result = await client.setPayload(
         ctx.input.collectionName,
         {
@@ -75,7 +81,8 @@ export let managePayload = SlateTool.create(spec, {
         wait
       );
     } else if (ctx.input.action === 'overwrite') {
-      if (!ctx.input.payload) throw new Error('payload is required for overwrite action');
+      if (!ctx.input.payload)
+        throw createApiServiceError('payload is required for overwrite action');
       result = await client.overwritePayload(
         ctx.input.collectionName,
         {
@@ -86,7 +93,8 @@ export let managePayload = SlateTool.create(spec, {
         wait
       );
     } else if (ctx.input.action === 'deleteKeys') {
-      if (!ctx.input.keys) throw new Error('keys is required for deleteKeys action');
+      if (!ctx.input.keys?.length)
+        throw createApiServiceError('keys must contain at least one key for deleteKeys.');
       result = await client.deletePayloadKeys(
         ctx.input.collectionName,
         {
@@ -106,15 +114,15 @@ export let managePayload = SlateTool.create(spec, {
         wait
       );
     } else {
-      throw new Error(`Unknown action: ${ctx.input.action}`);
+      throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
 
     return {
       output: {
-        operationId: result.result?.operation_id,
+        operationId: result.result?.operation_id ?? undefined,
         status: result.result?.status ?? 'completed'
       },
-      message: `Payload **${ctx.input.action}** operation completed on \`${ctx.input.collectionName}\`. Status: **${result.result?.status ?? 'completed'}**.`
+      message: `Payload **${ctx.input.action}** operation on \`${ctx.input.collectionName}\`. Status: **${result.result?.status ?? 'completed'}**.`
     };
   })
   .build();

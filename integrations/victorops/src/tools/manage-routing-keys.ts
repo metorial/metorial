@@ -47,7 +47,7 @@ export let manageRoutingKeys = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'list': {
         let data = await client.listRoutingKeys();
-        let routingKeys = data?.routingKeys ?? [];
+        let routingKeys = data.routingKeys;
         return {
           output: { routingKeys },
           message: `Found **${routingKeys.length}** routing key(s).`

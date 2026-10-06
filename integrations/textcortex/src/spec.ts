@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'textcortex',
   name: 'TextCortex',
   description:
-    'AI-powered text generation and content creation platform supporting 25+ languages and multiple AI models.',
+    'Discover AI models and generate, rewrite, summarize, translate, and draft content with TextCortex.',
   metadata: {},
   config,
   auth

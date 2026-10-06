@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwitchClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageChatSettings = SlateTool.create(spec, {
@@ -49,11 +50,11 @@ export let manageChatSettings = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId);
-    let user = await client.getAuthenticatedUser();
+    validateInput('manage_chat_settings', ctx.input, [ctx.auth.token]);
+    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId, ctx.auth.userId);
 
     if (ctx.input.action === 'get') {
-      let settings = await client.getChatSettings(ctx.input.broadcasterId, user.id);
+      let settings = await client.getChatSettings(ctx.input.broadcasterId);
 
       return {
         output: {
@@ -69,6 +70,7 @@ export let manageChatSettings = SlateTool.create(spec, {
       };
     }
 
+    let user = await client.getAuthenticatedUser();
     let settings = await client.updateChatSettings(ctx.input.broadcasterId, user.id, {
       emoteMode: ctx.input.emoteMode,
       followerMode: ctx.input.followerMode,

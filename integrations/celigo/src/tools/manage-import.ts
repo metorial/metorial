@@ -1,7 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  importId: z.string().optional().describe('ID of the affected import'),
+  name: z.string().optional().describe('Name of the import'),
+  deleted: z.boolean().optional().describe('Whether the import was deleted'),
+  rawResult: z.any().optional().describe('Credential-filtered native API response')
+});
 
 export let manageImport = SlateTool.create(spec, {
   name: 'Manage Import',
@@ -15,6 +23,18 @@ Use **action** to specify the operation. For "create" and "update", provide the 
 })
   .input(
     z.object({
+      replaceAll: z
+        .boolean()
+        .optional()
+        .describe(
+          'Required true for full-replace updates. Provide the complete writable configuration; omitted settings may be cleared.'
+        ),
+      cloneOptions: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Documented clone request; flow clones require _integrationId and connectionMap. Integration clones require connectionMap.'
+        ),
       action: z
         .enum(['get', 'create', 'update', 'clone', 'delete'])
         .describe('The operation to perform'),
@@ -28,71 +48,14 @@ Use **action** to specify the operation. For "create" and "update", provide the 
         .describe('Import configuration data (required for create and update)')
     })
   )
-  .output(
-    z.object({
-      importId: z.string().optional().describe('ID of the affected import'),
-      name: z.string().optional().describe('Name of the import'),
-      deleted: z.boolean().optional().describe('Whether the import was deleted'),
-      rawResult: z.any().optional().describe('Full API response')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let { action, importId, importData } = ctx.input;
-
-    if (action !== 'create' && !importId) {
-      throw new Error('importId is required for this action');
-    }
-
-    let result: any;
-    let message: string;
-
-    switch (action) {
-      case 'get': {
-        result = await client.getImport(importId!);
-        message = `Retrieved import **${result.name || result._id}**.`;
-        break;
-      }
-      case 'create': {
-        if (!importData) throw new Error('importData is required for create');
-        result = await client.createImport(importData);
-        message = `Created import **${result.name || result._id}**.`;
-        break;
-      }
-      case 'update': {
-        if (!importData) throw new Error('importData is required for update');
-        result = await client.updateImport(importId!, importData);
-        message = `Updated import **${result.name || result._id}**.`;
-        break;
-      }
-      case 'clone': {
-        result = await client.cloneImport(importId!);
-        message = `Cloned import **${importId}** → new import **${result._id}**.`;
-        break;
-      }
-      case 'delete': {
-        await client.deleteImport(importId!);
-        return {
-          output: {
-            importId: importId!,
-            deleted: true
-          },
-          message: `Deleted import **${importId}**.`
-        };
-      }
-    }
-
-    return {
-      output: {
-        importId: result?._id || importId,
-        name: result?.name,
-        rawResult: result
-      },
-      message
-    };
+    const result = await invoke('manage_import', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

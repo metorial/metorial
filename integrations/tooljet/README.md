@@ -1,57 +1,15 @@
-# <img src="https://provider-logos.metorial-cdn.com/tooljet.png" height="20"> Tooljet
+# ToolJet
 
-Manage users, workspaces, and applications on a ToolJet low-code platform instance. List, create, and update users with workspace assignments and group memberships. Retrieve workspace information and manage user-workspace relationships. Export and import applications between workspaces or instances, including pages, queries, data sources, and ToolJet Database data. Trigger workflow automations via webhooks with custom parameters.
+Manage users, workspace memberships and applications through ToolJet’s documented external API, and invoke separately configured workflow webhooks. The external API is an Enterprise self-hosted feature enabled by `ENABLE_EXTERNAL_API` and `EXTERNAL_API_ACCESS_TOKEN`; Community or Cloud support is not assumed. The exact configured token is sent as `Authorization: Basic <token>`, without username/password encoding. Connect with the explicit instance URL, including an HTTP/HTTPS scheme, port and deployment path. Previously stored instance settings remain a validated fallback; conflicting bindings are refused.
 
-## Tools
+Eleven existing tools remain: `list_users`, `get_user`, `create_user`, `update_user`, `update_user_role`, `list_workspaces`, `manage_user_workspaces`, `list_apps`, `export_app`, `import_app`, and `trigger_workflow`. Discover resource IDs using the list tools. No current-user identity is inferred from an instance-wide configured token, and dashboard/session routes are not used.
 
-### Create User
+Users support the documented status filter and native creation/read receipts. Creation requires explicit workspace assignments; omitting a password can send an invite. The retained legacy `archived` creation value is refused with instructions to archive after creation. Workspace replacement requires explicit ADMIN/MEMBER roles and active/archived statuses, encoded as native uppercase values, and group UUIDs. An explicit empty array removes all memberships; omitting it never implies removal. Updates return exact native readable state, distinguish server acknowledgment from unconfirmed roles/passwords, and provide reconciliation guidance after uncertain writes. No atomic compare-and-swap or physical user deletion is promised.
 
-Create a new user on the ToolJet instance with name, email, optional password, and workspace assignments including group memberships.
+Application exports produce downloadable JSON using the documented POST export endpoint. `exportTJDB` requests table schemas, not a guaranteed data backup. Export contents may include queries and data-source configuration. The legacy `exportData` output field remains declared but file contents are delivered as a download. Import acknowledgment contains no exact created-app ID; use `list_apps` and reconcile app, data-source and database effects before retrying. No undocumented app-delete rollback is attempted.
 
-### Export App
+`trigger_workflow` retains synchronous execution and adds documented `triggerAsync` and `status` actions plus the exact environment query value. Use the workflow’s separate Bearer token and copied webhook identifiers. Asynchronous receipts preserve `workflow_execution_id`; status returns native state without guessing completion. Timeout does not cancel execution, refund charges or reverse messages/external effects. Routes and execution limits depend on the deployed version and license.
 
-Export a ToolJet application from a workspace as JSON. The export includes pages, queries, data sources, environments, versions, and metadata. Optionally include ToolJet Database data or export specific/all versions.
+HTTP clients use a 30-second timeout, no redirects and a local 8 MiB JSON request/response/file bound. The unpaginated public user/workspace/app collections have a local 1,000-item safety bound; overflow is refused, never silently sliced. These are integration limits, not claims about provider pagination or capacity. There is no invented OAuth refresh, identity endpoint, signed-file renewal or trigger subscription.
 
-### Get User
-
-Look up a specific user by their UUID or email address. Returns the user's details including workspace memberships and group assignments.
-
-### Import App
-
-Import a ToolJet application JSON into a workspace. The import data should be the JSON previously exported from a ToolJet instance. Optionally specify a custom app name to override the original.
-
-### List Apps
-
-List all applications in a specific workspace, including their available versions.
-
-### List Users
-
-List all users on the ToolJet instance with their workspace permissions and group memberships. Optionally filter by group names.
-
-### List Workspaces
-
-Retrieve all workspaces on the ToolJet instance, including their status and available groups.
-
-### Manage User Workspaces
-
-Replace all workspace relations for a user or update a single workspace relation. Use **replaceAll** mode to set the complete list of workspace assignments (an empty array removes all). Use **updateOne** mode to update a specific workspace relation including status and group assignments.
-
-### Trigger Workflow
-
-Trigger a ToolJet workflow via its webhook endpoint. Each workflow has its own unique ID and bearer token found in the workflow's Triggers tab. Parameters can be passed via the request body.
-
-### Update User Role
-
-Update a user's role within a specific workspace. Common roles include "admin", "builder", and "end-user".
-
-### Update User
-
-Update an existing user's details such as name, email, password, or status. Identify the user by UUID or email address.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Official references: [external API](https://docs.tooljet.com/api/), [edition/base URL](https://docs.tooljet.com/api/tooljet-api/), [users](https://docs.tooljet.com/api/tooljet-api/users/get-all-users/), [membership replacement](https://docs.tooljet.com/api/tooljet-api/users/replace-user-workspaces/), [export](https://docs.tooljet.com/api/tooljet-api/apps/export-application/), [import](https://docs.tooljet.com/api/tooljet-api/apps/import-application/), [workflow webhooks](https://docs.tooljet.com/docs/workflows/triggers/webhook/).

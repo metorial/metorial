@@ -17,13 +17,6 @@ import {
   updatePostTool,
   voteFeatureRequestTool
 } from './tools';
-import {
-  newCommentTrigger,
-  newNpsScoreTrigger,
-  newPostTrigger,
-  newReactionTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -43,5 +36,5 @@ export let provider = Slate.create({
     checkNpsTool,
     listNpsResponsesTool
   ],
-  triggers: [newPostTrigger, newCommentTrigger, newReactionTrigger, newNpsScoreTrigger]
+  triggers: []
 });

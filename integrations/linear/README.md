@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/linear.png" height="20"> Linear
 
-Create, read, update, and delete issues across teams with support for priorities, labels, assignees, due dates, and workflow states. Manage projects that group related issues, and organize work into time-boxed cycles (sprints). Create and manage documents, comments, and file attachments. Search issues using vector similarity or rich filters. Configure teams, workflow states, and labels. Track customers and link them to issues. Subscribe to real-time webhooks for changes to issues, projects, cycles, comments, documents, and more.
+Create, read, update, and delete issues across teams with support for priorities, labels, assignees, due dates, and workflow states. Manage projects that group related issues, and organize work into time-boxed cycles (sprints). Create and manage documents, comments, and file attachments. Search issues using vector similarity or rich filters. Configure teams, workflow states, and labels. Track customers and link them to issues.
 
 ## Tools
 

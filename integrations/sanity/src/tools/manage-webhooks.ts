@@ -1,70 +1,63 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SanityClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { privateReceipt } from '../lib/http';
+import { dataset, invalid, type nativeHook, opaqueId, projectId } from '../lib/schemas';
 import { spec } from '../spec';
 
-export let manageWebhooks = SlateTool.create(spec, {
+export const publicHook = (
+  hook: z.output<typeof nativeHook>,
+  token: string,
+  additional: string[] = []
+) => {
+  const { secret: _, headers: __, ...safe } = hook;
+  const result = {
+    ...safe,
+    webhookId: hook.id,
+    isDisabled: hook.isDisabled ?? hook.isDisabledByUser
+  };
+  privateReceipt(token, additional)(result);
+  return result;
+};
+export const manageWebhooks = SlateTool.create(spec, {
   name: 'Manage Webhooks',
   key: 'manage_webhooks',
-  description: `List, create, or delete GROQ-powered webhooks in a Sanity project. Webhooks fire HTTP requests when content in the Content Lake changes. Supports GROQ-based filtering and custom projections for webhook payloads.`,
+  description:
+    'List, read, create, or delete GROQ-powered document webhooks in an accessible project. Creating a hook can deliver content to its receiver when content changes. Deletion does not erase previously delivered events, queued attempts, or external records.',
   instructions: [
-    'Use action "list" to see all webhooks configured in the project.',
-    'Use action "create" to set up a new webhook. A name and target URL are required.',
-    'Use action "delete" with a webhookId to remove a webhook.',
-    'The GROQ filter in the rule determines which documents trigger the webhook. The projection controls the payload shape.'
+    'Call list_projects and manage_datasets to discover scope. Creation requires a webhookName and targetUrl.',
+    'Use get with webhookId for exact native readback. Signature secrets and custom header values are not returned.'
   ],
-  tags: {
-    destructive: true
-  }
+  tags: { destructive: true }
 })
   .input(
     z.object({
-      action: z.enum(['list', 'create', 'delete']).describe('The operation to perform.'),
-      webhookId: z.string().optional().describe('Webhook ID. Required for "delete" action.'),
-      webhookName: z
-        .string()
+      projectId: projectId.optional(),
+      dataset: dataset.optional(),
+      action: z.enum(['list', 'create', 'delete', 'get']).describe('Operation to perform.'),
+      webhookId: opaqueId
         .optional()
-        .describe('Name for the webhook. Required for "create" action.'),
-      targetUrl: z
-        .string()
-        .optional()
-        .describe('URL that the webhook will send requests to. Required for "create" action.'),
-      targetDataset: z
-        .string()
-        .optional()
-        .describe(
-          'Dataset to scope the webhook to. Defaults to the configured dataset. Use "*" for all datasets.'
-        ),
+        .describe('Required for get/delete. Discover IDs with manage_webhooks action list.'),
+      webhookName: z.string().min(1).optional().describe('Required for create.'),
+      targetUrl: z.string().optional().describe('HTTPS receiver URL, required for create.'),
+      targetDataset: z.string().optional(),
       rule: z
         .object({
-          on: z
-            .array(z.enum(['create', 'update', 'delete']))
-            .optional()
-            .describe('Which document events trigger the webhook.'),
-          filter: z
-            .string()
-            .optional()
-            .describe('GROQ filter to match which documents trigger the webhook.'),
-          projection: z
-            .string()
-            .optional()
-            .describe('GROQ projection defining the webhook payload shape.')
+          on: z.array(z.enum(['create', 'update', 'delete'])).optional(),
+          filter: z.string().optional(),
+          projection: z.string().optional()
         })
+        .optional(),
+      httpMethod: z.enum(['POST', 'PUT', 'PATCH', 'DELETE', 'GET']).optional(),
+      secret: z
+        .string()
         .optional()
-        .describe('Webhook triggering rules.'),
-      httpMethod: z
-        .enum(['POST', 'PUT', 'PATCH', 'DELETE', 'GET'])
-        .optional()
-        .describe('HTTP method for the webhook request.'),
-      secret: z.string().optional().describe('Secret for webhook signature verification.'),
+        .describe('Create-only signature secret. Not returned in tool results.'),
       customHeaders: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Custom HTTP headers to include in webhook requests.'),
-      includeDrafts: z
-        .boolean()
-        .optional()
-        .describe('Whether to trigger on draft document changes.')
+        .describe('Create-only outgoing request headers. Values are not returned.'),
+      includeDrafts: z.boolean().optional()
     })
   )
   .output(
@@ -73,79 +66,110 @@ export let manageWebhooks = SlateTool.create(spec, {
         .array(
           z
             .object({
-              webhookId: z.string().describe('Webhook ID.'),
-              name: z.string().optional().describe('Webhook name.'),
-              url: z.string().optional().describe('Target URL.'),
-              dataset: z.string().optional().describe('Scoped dataset.'),
-              isDisabled: z.boolean().optional().describe('Whether the webhook is disabled.')
+              webhookId: z.string(),
+              name: z.string().optional(),
+              url: z.string().optional(),
+              dataset: z.string().optional(),
+              isDisabled: z.boolean().optional()
             })
             .passthrough()
         )
-        .optional()
-        .describe('List of webhooks (for "list" action).'),
-      created: z.any().optional().describe('Created webhook details (for "create" action).'),
-      deleted: z
-        .boolean()
-        .optional()
-        .describe('Whether the webhook was deleted (for "delete" action).')
+        .optional(),
+      created: z.unknown().optional(),
+      deleted: z.boolean().optional(),
+      webhook: z.unknown().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SanityClient({
-      token: ctx.auth.token,
-      projectId: ctx.config.projectId,
-      dataset: ctx.config.dataset,
-      apiVersion: ctx.config.apiVersion
-    });
-
-    if (ctx.input.action === 'list') {
-      let webhooks = await client.listWebhooks();
-      let mapped = (webhooks as any[]).map((w: any) => ({
-        webhookId: w.id,
-        name: w.name,
-        url: w.url,
-        dataset: w.dataset,
-        isDisabled: w.isDisabledByUser,
-        ...w
-      }));
+    const i = ctx.input;
+    const c = clientFor(ctx);
+    const creation = [
+      'webhookName',
+      'targetUrl',
+      'targetDataset',
+      'rule',
+      'httpMethod',
+      'secret',
+      'customHeaders',
+      'includeDrafts'
+    ] as const;
+    if (i.action !== 'create' && creation.some(key => i[key] !== undefined))
+      throw invalid('Creation fields apply only to action create.');
+    if (
+      (i.action === 'list' && i.webhookId !== undefined) ||
+      (i.action === 'create' && i.webhookId !== undefined)
+    )
+      throw invalid('webhookId applies only to get or delete.');
+    if (i.action === 'list') {
+      const webhooks = (await c.listWebhooks()).map(hook => publicHook(hook, ctx.auth.token));
+      return { output: { webhooks }, message: 'Retrieved native webhook discovery.' };
+    }
+    if (i.action === 'get') {
+      if (!i.webhookId) throw invalid('Provide webhookId for get.');
       return {
-        output: { webhooks: mapped },
-        message: `Found ${mapped.length} webhook(s) in the project.`
+        output: { webhook: publicHook(await c.getWebhook(i.webhookId), ctx.auth.token) },
+        message: 'Retrieved the exact webhook.'
       };
     }
-
-    if (ctx.input.action === 'create') {
-      if (!ctx.input.webhookName || !ctx.input.targetUrl) {
-        throw new Error('webhookName and targetUrl are required for "create" action.');
-      }
-      let result = await client.createWebhook({
-        name: ctx.input.webhookName,
-        url: ctx.input.targetUrl,
-        dataset: ctx.input.targetDataset || ctx.config.dataset,
-        apiVersion: ctx.config.apiVersion,
-        rule: ctx.input.rule,
-        httpMethod: ctx.input.httpMethod,
-        secret: ctx.input.secret,
-        headers: ctx.input.customHeaders,
-        includeDrafts: ctx.input.includeDrafts
-      });
-      return {
-        output: { created: result },
-        message: `Created webhook **${ctx.input.webhookName}** targeting \`${ctx.input.targetUrl}\`.`
-      };
-    }
-
-    if (ctx.input.action === 'delete') {
-      if (!ctx.input.webhookId) {
-        throw new Error('webhookId is required for "delete" action.');
-      }
-      await client.deleteWebhook(ctx.input.webhookId);
+    if (i.action === 'delete') {
+      if (!i.webhookId) throw invalid('Provide webhookId for delete.');
+      await c.deleteWebhook(i.webhookId);
       return {
         output: { deleted: true },
-        message: `Deleted webhook \`${ctx.input.webhookId}\`.`
+        message:
+          'Native deletion was accepted and the hook is absent or natively marked deleted. Prior deliveries and queued effects may remain.'
       };
     }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    if (!i.webhookName || !i.targetUrl)
+      throw invalid('Provide webhookName and targetUrl for create.');
+    let url: URL;
+    try {
+      url = new URL(i.targetUrl);
+    } catch {
+      throw invalid('Provide an absolute HTTPS webhook receiver URL.');
+    }
+    if (url.protocol !== 'https:' || url.username || url.password || url.hash)
+      throw invalid('Use an HTTPS receiver without embedded credentials or a fragment.');
+    if (
+      i.targetDataset !== undefined &&
+      i.targetDataset !== '*' &&
+      !dataset.safeParse(i.targetDataset).success
+    )
+      throw invalid('Provide a valid targetDataset or *.');
+    if (
+      i.customHeaders &&
+      Object.entries(i.customHeaders).some(
+        ([name, value]) =>
+          !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name) ||
+          Array.from(value).some(char => {
+            const n = char.charCodeAt(0);
+            return n === 10 || n === 13 || n === 0;
+          })
+      )
+    )
+      throw invalid('Provide valid HTTP header names and values without null, CR, or LF.');
+    const body = pickDefined({
+      type: 'document',
+      name: i.webhookName,
+      url: i.targetUrl,
+      dataset: i.targetDataset ?? c.dataset,
+      apiVersion: c.apiVersion,
+      rule: i.rule,
+      httpMethod: i.httpMethod,
+      secret: i.secret,
+      headers: i.customHeaders,
+      includeDrafts: i.includeDrafts
+    });
+    const hook = await c.createWebhook(body);
+    return {
+      output: {
+        created: publicHook(hook, ctx.auth.token, [
+          i.secret ?? '',
+          ...Object.values(i.customHeaders ?? {})
+        ])
+      },
+      message:
+        'Created and read back the webhook. Content delivery and notification effects may occur outside this call.'
+    };
   })
   .build();

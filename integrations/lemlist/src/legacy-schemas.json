@@ -1,0 +1,1031 @@
+{
+  "list_campaigns": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Filter campaigns by status",
+          "type": "string",
+          "enum": ["running", "draft", "archived", "ended", "paused", "errors"]
+        },
+        "offset": {
+          "description": "Pagination offset",
+          "type": "number"
+        },
+        "limit": {
+          "description": "Number of results per page (max 100)",
+          "type": "number"
+        },
+        "sortOrder": {
+          "description": "Sort order by creation date",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaigns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "campaignId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "hasError": {
+                "type": "boolean"
+              },
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["campaignId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["campaigns"],
+      "additionalProperties": false
+    }
+  },
+  "get_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "The ID of the campaign to retrieve"
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "hasError": {
+          "type": "boolean"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sequenceId": {
+          "type": "string"
+        },
+        "scheduleIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "senders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "senderId": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    }
+  },
+  "create_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name for the new campaign"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sequenceId": {
+          "type": "string"
+        },
+        "scheduleIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    }
+  },
+  "update_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "The ID of the campaign to update"
+        },
+        "action": {
+          "description": "Start or pause the campaign",
+          "type": "string",
+          "enum": ["start", "pause"]
+        },
+        "name": {
+          "description": "New campaign name",
+          "type": "string"
+        },
+        "stopOnEmailReplied": {
+          "description": "Stop outreach when a lead replies to an email",
+          "type": "boolean"
+        },
+        "stopOnMeetingBooked": {
+          "description": "Stop outreach when a meeting is booked",
+          "type": "boolean"
+        },
+        "stopOnLinkClicked": {
+          "description": "Stop outreach when a link is clicked",
+          "type": "boolean"
+        },
+        "autoLeadInterest": {
+          "description": "Automatically mark leads as interested",
+          "type": "boolean"
+        },
+        "disableTrackOpen": {
+          "description": "Disable open tracking",
+          "type": "boolean"
+        },
+        "disableTrackClick": {
+          "description": "Disable click tracking",
+          "type": "boolean"
+        },
+        "disableTrackReply": {
+          "description": "Disable reply tracking",
+          "type": "boolean"
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    }
+  },
+  "get_campaign_stats": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "The ID of the campaign"
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Start date in ISO 8601 format (e.g., 2024-01-01T00:00:00.000Z)"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "End date in ISO 8601 format (e.g., 2024-12-31T23:59:59.999Z)"
+        },
+        "channels": {
+          "description": "Filter stats by channels",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["email", "linkedin", "others"]
+          }
+        }
+      },
+      "required": ["campaignId", "startDate", "endDate"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadsTotal": {
+          "type": "number"
+        },
+        "leadsLaunched": {
+          "type": "number"
+        },
+        "leadsReached": {
+          "type": "number"
+        },
+        "leadsOpened": {
+          "type": "number"
+        },
+        "leadsClicked": {
+          "type": "number"
+        },
+        "leadsReplied": {
+          "type": "number"
+        },
+        "leadsInterested": {
+          "type": "number"
+        },
+        "leadsNotInterested": {
+          "type": "number"
+        },
+        "leadsUnsubscribed": {
+          "type": "number"
+        },
+        "messagesSent": {
+          "type": "number"
+        },
+        "messagesNotSent": {
+          "type": "number"
+        },
+        "messagesBounced": {
+          "type": "number"
+        },
+        "delivered": {
+          "type": "number"
+        },
+        "opened": {
+          "type": "number"
+        },
+        "clicked": {
+          "type": "number"
+        },
+        "replied": {
+          "type": "number"
+        },
+        "meetingBooked": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "add_lead_to_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "The ID of the campaign to add the lead to"
+        },
+        "email": {
+          "description": "Lead email address",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "Lead first name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Lead last name",
+          "type": "string"
+        },
+        "companyName": {
+          "description": "Lead company name",
+          "type": "string"
+        },
+        "jobTitle": {
+          "description": "Lead job title",
+          "type": "string"
+        },
+        "linkedinUrl": {
+          "description": "Lead LinkedIn profile URL",
+          "type": "string"
+        },
+        "phone": {
+          "description": "Lead phone number",
+          "type": "string"
+        },
+        "companyDomain": {
+          "description": "Lead company domain",
+          "type": "string"
+        },
+        "icebreaker": {
+          "description": "Personalized opening line for the lead",
+          "type": "string"
+        },
+        "picture": {
+          "description": "Lead profile picture URL",
+          "type": "string"
+        },
+        "deduplicate": {
+          "description": "Check if lead email exists in other campaigns before adding",
+          "type": "boolean"
+        },
+        "findEmail": {
+          "description": "Automatically find the lead email address (uses credits)",
+          "type": "boolean"
+        },
+        "verifyEmail": {
+          "description": "Verify the lead email address (uses credits)",
+          "type": "boolean"
+        },
+        "findPhone": {
+          "description": "Automatically find the lead phone number (uses credits)",
+          "type": "boolean"
+        },
+        "linkedinEnrichment": {
+          "description": "Enrich lead data from LinkedIn (uses credits)",
+          "type": "boolean"
+        },
+        "customVariables": {
+          "description": "Additional custom variables as key-value pairs",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "type": "string"
+        },
+        "campaignId": {
+          "type": "string"
+        },
+        "campaignName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "isPaused": {
+          "type": "boolean"
+        },
+        "contactId": {
+          "type": "string"
+        }
+      },
+      "required": ["leadId"],
+      "additionalProperties": false
+    }
+  },
+  "get_lead": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The email address of the lead to look up"
+        }
+      },
+      "required": ["email"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "leadId": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "companyName": {
+                "type": "string"
+              },
+              "isPaused": {
+                "type": "boolean"
+              },
+              "state": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "contactId": {
+                "type": "string"
+              },
+              "campaignId": {
+                "type": "string"
+              },
+              "campaignName": {
+                "type": "string"
+              },
+              "campaignStatus": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "variables": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "required": ["leadId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["leads"],
+      "additionalProperties": false
+    }
+  },
+  "list_campaign_leads": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "The ID of the campaign"
+        },
+        "state": {
+          "description": "Filter leads by state (e.g., scanned, contacted, interested, notInterested, skipped)",
+          "type": "string"
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "leadId": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "companyName": {
+                "type": "string"
+              },
+              "jobTitle": {
+                "type": "string"
+              },
+              "isPaused": {
+                "type": "boolean"
+              },
+              "state": {
+                "type": "string"
+              },
+              "contactId": {
+                "type": "string"
+              }
+            },
+            "required": ["leadId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["leads"],
+      "additionalProperties": false
+    }
+  },
+  "update_lead": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "The ID of the campaign the lead belongs to"
+        },
+        "leadId": {
+          "type": "string",
+          "description": "The ID of the lead to update"
+        },
+        "firstName": {
+          "description": "Updated first name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Updated last name",
+          "type": "string"
+        },
+        "companyName": {
+          "description": "Updated company name",
+          "type": "string"
+        },
+        "jobTitle": {
+          "description": "Updated job title",
+          "type": "string"
+        },
+        "action": {
+          "description": "Action to perform on the lead",
+          "type": "string",
+          "enum": ["interested", "not_interested", "pause", "resume"]
+        }
+      },
+      "required": ["campaignId", "leadId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "isPaused": {
+          "type": "boolean"
+        }
+      },
+      "required": ["leadId"],
+      "additionalProperties": false
+    }
+  },
+  "delete_lead": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "The ID of the campaign"
+        },
+        "leadId": {
+          "type": "string",
+          "description": "The ID of the lead to remove"
+        },
+        "permanentlyDelete": {
+          "description": "If true, permanently deletes the lead instead of unsubscribing",
+          "type": "boolean"
+        }
+      },
+      "required": ["campaignId", "leadId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "type": "string"
+        },
+        "removed": {
+          "type": "boolean"
+        }
+      },
+      "required": ["leadId", "removed"],
+      "additionalProperties": false
+    }
+  },
+  "get_activities": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "Activity type filter (e.g., emailsSent, emailsOpened, emailsClicked, emailsReplied, emailsBounced, linkedinInviteDone, linkedinReplied, aircallDone)",
+          "type": "string"
+        },
+        "campaignId": {
+          "description": "Filter activities by campaign ID",
+          "type": "string"
+        },
+        "leadId": {
+          "description": "Filter activities by lead ID",
+          "type": "string"
+        },
+        "isFirst": {
+          "description": "Only return the first activity of its type per lead",
+          "type": "boolean"
+        },
+        "offset": {
+          "description": "Pagination offset",
+          "type": "number"
+        },
+        "limit": {
+          "description": "Number of results per page (max 100)",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "activities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "activityId": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "leadId": {
+                "type": "string"
+              },
+              "campaignId": {
+                "type": "string"
+              },
+              "campaignName": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "leadEmail": {
+                "type": "string"
+              },
+              "leadFirstName": {
+                "type": "string"
+              },
+              "leadLastName": {
+                "type": "string"
+              },
+              "leadCompanyName": {
+                "type": "string"
+              },
+              "sequenceStep": {
+                "type": "number"
+              },
+              "userName": {
+                "type": "string"
+              },
+              "isFirst": {
+                "type": "boolean"
+              },
+              "errorMessage": {
+                "type": "string"
+              }
+            },
+            "required": ["activityId", "type"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["activities"],
+      "additionalProperties": false
+    }
+  },
+  "manage_unsubscribes": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["add", "remove", "check", "list"],
+          "description": "Action to perform"
+        },
+        "email": {
+          "description": "Email address (required for add, remove, and check actions)",
+          "type": "string"
+        },
+        "offset": {
+          "description": "Pagination offset (for list action)",
+          "type": "number"
+        },
+        "limit": {
+          "description": "Number of results (for list action, max 100)",
+          "type": "number"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "unsubscribed": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "unsubscribes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "campaignId": {
+                "type": "string"
+              },
+              "campaignName": {
+                "type": "string"
+              },
+              "unsubscribedAt": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "search_people_database": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "filters": {
+          "description": "Array of search filters",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "filterId": {
+                "type": "string",
+                "description": "Filter identifier (e.g., country, currentCompanyTechnologies, jobTitle, industry)"
+              },
+              "include": {
+                "description": "Values to include in the filter",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "exclude": {
+                "description": "Values to exclude from the filter",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["filterId"],
+            "additionalProperties": false
+          }
+        },
+        "search": {
+          "description": "Free text search query",
+          "type": "string"
+        },
+        "page": {
+          "description": "Page number (starts at 1)",
+          "type": "number"
+        },
+        "size": {
+          "description": "Results per page (max 25)",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "number"
+        },
+        "page": {
+          "type": "number"
+        },
+        "size": {
+          "type": "number"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "personId": {
+                "type": "string"
+              },
+              "fullName": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              },
+              "linkedinUrl": {
+                "type": "string"
+              },
+              "currentJobTitle": {
+                "type": "string"
+              },
+              "currentCompanyName": {
+                "type": "string"
+              },
+              "currentCompanyDomain": {
+                "type": "string"
+              },
+              "currentCompanyIndustry": {
+                "type": "string"
+              },
+              "currentCompanySize": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["results"],
+      "additionalProperties": false
+    }
+  },
+  "get_team_info": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "teamId": {
+          "type": "string"
+        },
+        "teamName": {
+          "type": "string"
+        },
+        "userIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "credits": {
+          "type": "number"
+        },
+        "creditDetails": {
+          "type": "object",
+          "properties": {
+            "remaining": {
+              "type": "number"
+            },
+            "freemium": {
+              "type": "number"
+            },
+            "subscription": {
+              "type": "number"
+            },
+            "gifted": {
+              "type": "number"
+            },
+            "paid": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["teamId"],
+      "additionalProperties": false
+    }
+  }
+}

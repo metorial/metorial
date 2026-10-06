@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { listIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteContact = SlateTool.create(spec, {
@@ -8,12 +9,13 @@ export let deleteContact = SlateTool.create(spec, {
   key: 'delete_contact',
   description: `Permanently remove a contact from a list. This action cannot be undone.`,
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
   .input(
     z.object({
-      listId: z.string().describe('ID of the list the contact belongs to'),
+      listId: listIdSchema,
       contactId: z.string().describe('ID of the contact to delete')
     })
   )
@@ -28,7 +30,7 @@ export let deleteContact = SlateTool.create(spec, {
 
     return {
       output: { deleted: true },
-      message: `Deleted contact \`${ctx.input.contactId}\` from list \`${ctx.input.listId}\`.`
+      message: `Deleted contact \`${client.safeText(ctx.input.contactId)}\` from list \`${client.safeText(ctx.input.listId)}\`.`
     };
   })
   .build();

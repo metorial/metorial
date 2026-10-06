@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'epic-games',
   name: 'Epic Games',
   description:
-    'Epic Online Services (EOS) integration for cross-platform game services including player authentication, friends, sanctions, player reports, ownership verification, and voice chat.',
+    'Use authorized Epic developer services for player identities, application-consented accounts, sanctions, reports, ownership and voice. Account OAuth and game-service clients are separate; the legacy friends HTTP path remains unverified.',
   metadata: {},
   config,
   auth

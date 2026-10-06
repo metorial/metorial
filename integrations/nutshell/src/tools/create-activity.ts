@@ -30,10 +30,7 @@ export let createActivity = SlateTool.create(spec, {
         .describe('Start time for the activity (ISO 8601 format)'),
       endTime: z.string().optional().describe('End time for the activity (ISO 8601 format)'),
       note: z.string().optional().describe('Note or description for the activity'),
-      status: z
-        .number()
-        .optional()
-        .describe('Activity status (0=scheduled, 1=logged, 2=canceled)')
+      status: z.number().optional().describe('New activity status (0=scheduled, 1=logged)')
     })
   )
   .output(
@@ -50,21 +47,23 @@ export let createActivity = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let activityData: Record<string, any> = {
+    let activityData: Record<string, unknown> = {
       name: ctx.input.name
     };
 
-    if (ctx.input.activityTypeId) activityData.activityTypeId = ctx.input.activityTypeId;
-    if (ctx.input.leadId) activityData.lead = { entityType: 'Leads', id: ctx.input.leadId };
+    if (ctx.input.activityTypeId !== undefined)
+      activityData.activityTypeId = ctx.input.activityTypeId;
+    if (ctx.input.leadId !== undefined)
+      activityData.lead = { entityType: 'Leads', id: ctx.input.leadId };
     if (ctx.input.contactIds) {
       activityData.participants = ctx.input.contactIds.map(id => ({
         entityType: 'Contacts',
         id
       }));
     }
-    if (ctx.input.startTime) activityData.startTime = ctx.input.startTime;
-    if (ctx.input.endTime) activityData.endTime = ctx.input.endTime;
-    if (ctx.input.note) activityData.note = ctx.input.note;
+    if (ctx.input.startTime !== undefined) activityData.startTime = ctx.input.startTime;
+    if (ctx.input.endTime !== undefined) activityData.endTime = ctx.input.endTime;
+    if (ctx.input.note !== undefined) activityData.note = ctx.input.note;
     if (ctx.input.status !== undefined) activityData.status = ctx.input.status;
 
     let result = await client.newActivity(activityData);

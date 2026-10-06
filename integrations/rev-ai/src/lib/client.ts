@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 // ---- Shared Types ----
 
@@ -25,6 +25,15 @@ export interface RevAIJob {
   transcriber?: string;
   verbatim?: boolean;
   wordCloud?: boolean;
+  summarization?: { status: string; model?: string; type?: string; failure?: string };
+  translation?: {
+    targetLanguages: Array<{
+      language: string;
+      status: string;
+      model?: string;
+      failure?: string;
+    }>;
+  };
 }
 
 export interface TranscriptMonologue {
@@ -44,6 +53,8 @@ export interface SentimentMessage {
   content: string;
   score: number;
   sentiment: string;
+  offset?: number;
+  length?: number;
   ts?: number;
   endTs?: number;
 }
@@ -53,6 +64,8 @@ export interface Topic {
   score: number;
   informants: Array<{
     content: string;
+    offset?: number;
+    length?: number;
     ts?: number;
     endTs?: number;
   }>;
@@ -79,40 +92,61 @@ export interface CustomVocabulary {
 export interface AccountInfo {
   email: string;
   balanceSeconds: number;
+  freeBalance?: number;
+  purchasedBalance?: number;
+  totalBalance?: number;
+  invoicedBalance?: number;
+  hipaaEnabled?: boolean;
 }
 
 // ---- Client ----
 
 export class RevAIClient {
-  private sttAxios: ReturnType<typeof createAxios>;
-  private sentimentAxios: ReturnType<typeof createAxios>;
-  private topicAxios: ReturnType<typeof createAxios>;
-  private langIdAxios: ReturnType<typeof createAxios>;
+  private sttAxios: ReturnType<typeof createAuthenticatedAxios>;
+  private sentimentAxios: ReturnType<typeof createAuthenticatedAxios>;
+  private topicAxios: ReturnType<typeof createAuthenticatedAxios>;
+  private vocabularyAxios: ReturnType<typeof createAuthenticatedAxios>;
+  private langIdAxios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    let headers = {
-      Authorization: `Bearer ${config.token}`,
-      'Content-Type': 'application/json'
+    if (!config.token?.trim()) {
+      throw createApiServiceError('A Rev AI access token is required. Reconnect the account.');
+    }
+    let options = {
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 60_000,
+      errorAdapter: (error: unknown) =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Rev AI',
+          reason: 'rev_ai_api_error',
+          detailKeys: ['detail', 'title', 'message']
+        })
     };
 
-    this.sttAxios = createAxios({
+    this.sttAxios = createAuthenticatedAxios({
       baseURL: 'https://api.rev.ai/speechtotext/v1',
-      headers
+      ...options
     });
 
-    this.sentimentAxios = createAxios({
+    this.sentimentAxios = createAuthenticatedAxios({
       baseURL: 'https://api.rev.ai/sentiment_analysis/v1',
-      headers
+      ...options
     });
 
-    this.topicAxios = createAxios({
+    this.topicAxios = createAuthenticatedAxios({
       baseURL: 'https://api.rev.ai/topic_extraction/v1',
-      headers
+      ...options
     });
 
-    this.langIdAxios = createAxios({
+    this.vocabularyAxios = createAuthenticatedAxios({
+      baseURL: 'https://api.rev.ai',
+      ...options
+    });
+
+    this.langIdAxios = createAuthenticatedAxios({
       baseURL: 'https://api.rev.ai/languageid/v1',
-      headers
+      ...options
     });
   }
 
@@ -122,7 +156,12 @@ export class RevAIClient {
     let response = await this.sttAxios.get('/account');
     return {
       email: response.data.email,
-      balanceSeconds: response.data.balance_seconds
+      balanceSeconds: response.data.balance_seconds,
+      freeBalance: response.data.free_balance ?? undefined,
+      purchasedBalance: response.data.purchased_balance ?? undefined,
+      totalBalance: response.data.total_balance ?? undefined,
+      invoicedBalance: response.data.invoiced_balance ?? undefined,
+      hipaaEnabled: response.data.hipaa_enabled ?? undefined
     };
   }
 
@@ -130,6 +169,7 @@ export class RevAIClient {
 
   async submitTranscriptionJob(params: {
     mediaUrl?: string;
+    sourceAuthHeaders?: Record<string, string>;
     metadata?: string;
     language?: string;
     skipDiarization?: boolean;
@@ -151,7 +191,12 @@ export class RevAIClient {
   }): Promise<RevAIJob> {
     let body: Record<string, unknown> = {};
 
-    if (params.mediaUrl !== undefined) body.media_url = params.mediaUrl;
+    if (params.mediaUrl !== undefined) {
+      body.source_config = {
+        url: params.mediaUrl,
+        ...(params.sourceAuthHeaders ? { auth_headers: params.sourceAuthHeaders } : {})
+      };
+    }
     if (params.metadata !== undefined) body.metadata = params.metadata;
     if (params.language !== undefined) body.language = params.language;
     if (params.skipDiarization !== undefined) body.skip_diarization = params.skipDiarization;
@@ -183,7 +228,9 @@ export class RevAIClient {
 
     if (params.translationConfig) {
       body.translation_config = {
-        target_languages: params.translationConfig.targetLanguages
+        target_languages: params.translationConfig.targetLanguages.map(language => ({
+          language
+        }))
       };
     }
 
@@ -196,11 +243,9 @@ export class RevAIClient {
     }
 
     if (params.diarizationConfig) {
-      let dc: Record<string, unknown> = {};
-      if (params.diarizationConfig.type) dc.type = params.diarizationConfig.type;
-      if (params.diarizationConfig.speakerCount)
-        dc.speaker_count = params.diarizationConfig.speakerCount;
-      body.diarization_config = dc;
+      if (params.diarizationConfig.type) body.diarization_type = params.diarizationConfig.type;
+      if (params.diarizationConfig.speakerCount !== undefined)
+        body.speakers_count = params.diarizationConfig.speakerCount;
     }
 
     let response = await this.sttAxios.post('/jobs', body);
@@ -208,7 +253,7 @@ export class RevAIClient {
   }
 
   async getTranscriptionJob(jobId: string): Promise<RevAIJob> {
-    let response = await this.sttAxios.get(`/jobs/${jobId}`);
+    let response = await this.sttAxios.get(`/jobs/${encodeURIComponent(jobId)}`);
     return this.normalizeJob(response.data);
   }
 
@@ -225,11 +270,11 @@ export class RevAIClient {
   }
 
   async deleteTranscriptionJob(jobId: string): Promise<void> {
-    await this.sttAxios.delete(`/jobs/${jobId}`);
+    await this.sttAxios.delete(`/jobs/${encodeURIComponent(jobId)}`);
   }
 
   async getTranscriptJson(jobId: string): Promise<{ monologues: TranscriptMonologue[] }> {
-    let response = await this.sttAxios.get(`/jobs/${jobId}/transcript`, {
+    let response = await this.sttAxios.get(`/jobs/${encodeURIComponent(jobId)}/transcript`, {
       headers: { Accept: 'application/vnd.rev.transcript.v1.0+json' }
     });
     let monologues = (response.data.monologues || []).map((m: Record<string, unknown>) => ({
@@ -237,16 +282,16 @@ export class RevAIClient {
       elements: ((m.elements || []) as Record<string, unknown>[]).map(e => ({
         type: e.type as string,
         value: e.value as string,
-        ts: e.ts as number | undefined,
-        endTs: e.end_ts as number | undefined,
-        confidence: e.confidence as number | undefined
+        ts: (e.ts ?? undefined) as number | undefined,
+        endTs: (e.end_ts ?? undefined) as number | undefined,
+        confidence: (e.confidence ?? undefined) as number | undefined
       }))
     }));
     return { monologues };
   }
 
   async getTranscriptText(jobId: string): Promise<string> {
-    let response = await this.sttAxios.get(`/jobs/${jobId}/transcript`, {
+    let response = await this.sttAxios.get(`/jobs/${encodeURIComponent(jobId)}/transcript`, {
       headers: { Accept: 'text/plain' }
     });
     return response.data as string;
@@ -254,7 +299,7 @@ export class RevAIClient {
 
   async getTranslatedTranscriptText(jobId: string, language: string): Promise<string> {
     let response = await this.sttAxios.get(
-      `/jobs/${jobId}/transcript/translation/${language}`,
+      `/jobs/${encodeURIComponent(jobId)}/transcript/translation/${encodeURIComponent(language)}`,
       {
         headers: { Accept: 'text/plain' }
       }
@@ -263,9 +308,12 @@ export class RevAIClient {
   }
 
   async getTranscriptSummary(jobId: string): Promise<string> {
-    let response = await this.sttAxios.get(`/jobs/${jobId}/transcript/summary`, {
-      headers: { Accept: 'text/plain' }
-    });
+    let response = await this.sttAxios.get(
+      `/jobs/${encodeURIComponent(jobId)}/transcript/summary`,
+      {
+        headers: { Accept: 'text/plain' }
+      }
+    );
     return response.data as string;
   }
 
@@ -278,7 +326,7 @@ export class RevAIClient {
     let queryParams: Record<string, string> = {};
     if (speakerChannel !== undefined) queryParams.speaker_channel = String(speakerChannel);
 
-    let response = await this.sttAxios.get(`/jobs/${jobId}/captions`, {
+    let response = await this.sttAxios.get(`/jobs/${encodeURIComponent(jobId)}/captions`, {
       headers: { Accept: accept },
       params: queryParams
     });
@@ -303,12 +351,14 @@ export class RevAIClient {
       body.notification_config = nc;
     }
 
-    let response = await this.sttAxios.post('/vocabularies', body);
+    let response = await this.vocabularyAxios.post('/vocabularies', body);
     return this.normalizeVocabulary(response.data);
   }
 
   async getCustomVocabulary(vocabularyId: string): Promise<CustomVocabulary> {
-    let response = await this.sttAxios.get(`/vocabularies/${vocabularyId}`);
+    let response = await this.vocabularyAxios.get(
+      `/vocabularies/${encodeURIComponent(vocabularyId)}`
+    );
     return this.normalizeVocabulary(response.data);
   }
 
@@ -316,12 +366,12 @@ export class RevAIClient {
     let queryParams: Record<string, string> = {};
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
 
-    let response = await this.sttAxios.get('/vocabularies', { params: queryParams });
+    let response = await this.vocabularyAxios.get('/vocabularies', { params: queryParams });
     return (response.data as Record<string, unknown>[]).map(v => this.normalizeVocabulary(v));
   }
 
   async deleteCustomVocabulary(vocabularyId: string): Promise<void> {
-    await this.sttAxios.delete(`/vocabularies/${vocabularyId}`);
+    await this.vocabularyAxios.delete(`/vocabularies/${encodeURIComponent(vocabularyId)}`);
   }
 
   // ---- Sentiment Analysis ----
@@ -332,12 +382,15 @@ export class RevAIClient {
     metadata?: string;
     notificationConfig?: { url: string; authHeaders?: Record<string, string> };
     language?: string;
+    deleteAfterSeconds?: number;
   }): Promise<RevAIJob> {
     let body: Record<string, unknown> = {};
     if (params.text !== undefined) body.text = params.text;
     if (params.json !== undefined) body.json = params.json;
     if (params.metadata !== undefined) body.metadata = params.metadata;
     if (params.language !== undefined) body.language = params.language;
+    if (params.deleteAfterSeconds !== undefined)
+      body.delete_after_seconds = params.deleteAfterSeconds;
     if (params.notificationConfig) {
       let nc: Record<string, unknown> = { url: params.notificationConfig.url };
       if (params.notificationConfig.authHeaders)
@@ -350,20 +403,22 @@ export class RevAIClient {
   }
 
   async getSentimentAnalysisJob(jobId: string): Promise<RevAIJob> {
-    let response = await this.sentimentAxios.get(`/jobs/${jobId}`);
+    let response = await this.sentimentAxios.get(`/jobs/${encodeURIComponent(jobId)}`);
     return this.normalizeJob(response.data);
   }
 
   async getSentimentAnalysisResult(jobId: string): Promise<{ messages: SentimentMessage[] }> {
-    let response = await this.sentimentAxios.get(`/jobs/${jobId}/result`, {
+    let response = await this.sentimentAxios.get(`/jobs/${encodeURIComponent(jobId)}/result`, {
       headers: { Accept: 'application/vnd.rev.sentiment.v1.0+json' }
     });
     let messages = ((response.data.messages || []) as Record<string, unknown>[]).map(m => ({
       content: m.content as string,
       score: m.score as number,
       sentiment: m.sentiment as string,
-      ts: m.ts as number | undefined,
-      endTs: m.end_ts as number | undefined
+      offset: (m.offset ?? undefined) as number | undefined,
+      length: (m.length ?? undefined) as number | undefined,
+      ts: (m.ts ?? undefined) as number | undefined,
+      endTs: (m.end_ts ?? undefined) as number | undefined
     }));
     return { messages };
   }
@@ -381,7 +436,7 @@ export class RevAIClient {
   }
 
   async deleteSentimentAnalysisJob(jobId: string): Promise<void> {
-    await this.sentimentAxios.delete(`/jobs/${jobId}`);
+    await this.sentimentAxios.delete(`/jobs/${encodeURIComponent(jobId)}`);
   }
 
   // ---- Topic Extraction ----
@@ -392,12 +447,15 @@ export class RevAIClient {
     metadata?: string;
     notificationConfig?: { url: string; authHeaders?: Record<string, string> };
     language?: string;
+    deleteAfterSeconds?: number;
   }): Promise<RevAIJob> {
     let body: Record<string, unknown> = {};
     if (params.text !== undefined) body.text = params.text;
     if (params.json !== undefined) body.json = params.json;
     if (params.metadata !== undefined) body.metadata = params.metadata;
     if (params.language !== undefined) body.language = params.language;
+    if (params.deleteAfterSeconds !== undefined)
+      body.delete_after_seconds = params.deleteAfterSeconds;
     if (params.notificationConfig) {
       let nc: Record<string, unknown> = { url: params.notificationConfig.url };
       if (params.notificationConfig.authHeaders)
@@ -410,7 +468,7 @@ export class RevAIClient {
   }
 
   async getTopicExtractionJob(jobId: string): Promise<RevAIJob> {
-    let response = await this.topicAxios.get(`/jobs/${jobId}`);
+    let response = await this.topicAxios.get(`/jobs/${encodeURIComponent(jobId)}`);
     return this.normalizeJob(response.data);
   }
 
@@ -421,7 +479,7 @@ export class RevAIClient {
     let queryParams: Record<string, string> = {};
     if (threshold !== undefined) queryParams.threshold = String(threshold);
 
-    let response = await this.topicAxios.get(`/jobs/${jobId}/result`, {
+    let response = await this.topicAxios.get(`/jobs/${encodeURIComponent(jobId)}/result`, {
       headers: { Accept: 'application/vnd.rev.topic.v1.0+json' },
       params: queryParams
     });
@@ -430,8 +488,10 @@ export class RevAIClient {
       score: t.score as number,
       informants: ((t.informants || []) as Record<string, unknown>[]).map(inf => ({
         content: inf.content as string,
-        ts: inf.ts as number | undefined,
-        endTs: inf.end_ts as number | undefined
+        offset: (inf.offset ?? undefined) as number | undefined,
+        length: (inf.length ?? undefined) as number | undefined,
+        ts: (inf.ts ?? undefined) as number | undefined,
+        endTs: (inf.end_ts ?? undefined) as number | undefined
       }))
     }));
     return { topics };
@@ -450,7 +510,7 @@ export class RevAIClient {
   }
 
   async deleteTopicExtractionJob(jobId: string): Promise<void> {
-    await this.topicAxios.delete(`/jobs/${jobId}`);
+    await this.topicAxios.delete(`/jobs/${encodeURIComponent(jobId)}`);
   }
 
   // ---- Language Identification ----
@@ -487,12 +547,12 @@ export class RevAIClient {
   }
 
   async getLanguageIdentificationJob(jobId: string): Promise<RevAIJob> {
-    let response = await this.langIdAxios.get(`/jobs/${jobId}`);
+    let response = await this.langIdAxios.get(`/jobs/${encodeURIComponent(jobId)}`);
     return this.normalizeJob(response.data);
   }
 
   async getLanguageIdentificationResult(jobId: string): Promise<LanguageIdResult> {
-    let response = await this.langIdAxios.get(`/jobs/${jobId}/result`, {
+    let response = await this.langIdAxios.get(`/jobs/${encodeURIComponent(jobId)}/result`, {
       headers: { Accept: 'application/vnd.rev.languageid.v1.0+json' }
     });
     return {
@@ -519,34 +579,72 @@ export class RevAIClient {
   }
 
   async deleteLanguageIdentificationJob(jobId: string): Promise<void> {
-    await this.langIdAxios.delete(`/jobs/${jobId}`);
+    await this.langIdAxios.delete(`/jobs/${encodeURIComponent(jobId)}`);
   }
 
   // ---- Normalization Helpers ----
 
   private normalizeJob(data: Record<string, unknown>): RevAIJob {
+    let summarization = data.summarization as
+      | {
+          status: string;
+          model?: string | null;
+          type?: string | null;
+          failure?: string | null;
+        }
+      | null
+      | undefined;
+    let translation = data.translation as
+      | {
+          target_languages?: Array<{
+            language: string;
+            status: string;
+            model?: string | null;
+            failure?: string | null;
+          }>;
+        }
+      | null
+      | undefined;
     return {
       jobId: data.id as string,
       status: data.status as string,
       createdOn: data.created_on as string,
-      completedOn: data.completed_on as string | undefined,
-      name: data.name as string | undefined,
-      mediaUrl: data.media_url as string | undefined,
-      metadata: data.metadata as string | undefined,
-      language: data.language as string | undefined,
-      durationSeconds: data.duration_seconds as number | undefined,
-      type: data.type as string | undefined,
-      failure: data.failure as string | undefined,
-      failureDetail: data.failure_detail as string | undefined,
-      deleteAfterSeconds: data.delete_after_seconds as number | undefined,
-      skipDiarization: data.skip_diarization as boolean | undefined,
-      skipPunctuation: data.skip_punctuation as boolean | undefined,
-      filterProfanity: data.filter_profanity as boolean | undefined,
-      removeDisfluencies: data.remove_disfluencies as boolean | undefined,
-      removeAtmospherics: data.remove_atmospherics as boolean | undefined,
-      speakerChannelsCount: data.speaker_channels_count as number | undefined,
-      transcriber: data.transcriber as string | undefined,
-      verbatim: data.verbatim as boolean | undefined
+      completedOn: (data.completed_on ?? undefined) as string | undefined,
+      name: (data.name ?? undefined) as string | undefined,
+      mediaUrl: (data.media_url ?? undefined) as string | undefined,
+      metadata: (data.metadata ?? undefined) as string | undefined,
+      language: (data.language ?? undefined) as string | undefined,
+      durationSeconds: (data.duration_seconds ?? undefined) as number | undefined,
+      type: (data.type ?? undefined) as string | undefined,
+      failure: (data.failure ?? undefined) as string | undefined,
+      failureDetail: (data.failure_detail ?? undefined) as string | undefined,
+      deleteAfterSeconds: (data.delete_after_seconds ?? undefined) as number | undefined,
+      skipDiarization: (data.skip_diarization ?? undefined) as boolean | undefined,
+      skipPunctuation: (data.skip_punctuation ?? undefined) as boolean | undefined,
+      filterProfanity: (data.filter_profanity ?? undefined) as boolean | undefined,
+      removeDisfluencies: (data.remove_disfluencies ?? undefined) as boolean | undefined,
+      removeAtmospherics: (data.remove_atmospherics ?? undefined) as boolean | undefined,
+      speakerChannelsCount: (data.speaker_channels_count ?? undefined) as number | undefined,
+      transcriber: (data.transcriber ?? undefined) as string | undefined,
+      verbatim: (data.verbatim ?? undefined) as boolean | undefined,
+      summarization: summarization
+        ? {
+            status: summarization.status,
+            model: summarization.model ?? undefined,
+            type: summarization.type ?? undefined,
+            failure: summarization.failure ?? undefined
+          }
+        : undefined,
+      translation: translation
+        ? {
+            targetLanguages: (translation.target_languages ?? []).map(target => ({
+              language: target.language,
+              status: target.status,
+              model: target.model ?? undefined,
+              failure: target.failure ?? undefined
+            }))
+          }
+        : undefined
     };
   }
 
@@ -554,11 +652,11 @@ export class RevAIClient {
     return {
       vocabularyId: data.id as string,
       status: data.status as string,
-      createdOn: data.created_on as string | undefined,
-      completedOn: data.completed_on as string | undefined,
-      metadata: data.metadata as string | undefined,
-      failure: data.failure as string | undefined,
-      failureDetail: data.failure_detail as string | undefined
+      createdOn: (data.created_on ?? undefined) as string | undefined,
+      completedOn: (data.completed_on ?? undefined) as string | undefined,
+      metadata: (data.metadata ?? undefined) as string | undefined,
+      failure: (data.failure ?? undefined) as string | undefined,
+      failureDetail: (data.failure_detail ?? undefined) as string | undefined
     };
   }
 }

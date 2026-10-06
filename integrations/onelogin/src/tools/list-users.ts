@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OneLoginClient } from '../lib/client';
+import { publicPagination } from '../lib/contracts';
 import { spec } from '../spec';
 
 let userSchema = z.object({
@@ -18,7 +19,7 @@ let userSchema = z.object({
     .nullable()
     .optional()
     .describe(
-      'User status (0=Unactivated, 1=Active, 2=Suspended, 3=Locked, 5=AwaitingPasswordReset, 7=PendingActivation, 8=SecurityQuestionRequired)'
+      'User status (0=Unactivated, 1=Active, 2=Suspended, 3=Locked, 4=PasswordExpired, 5=AwaitingPasswordReset, 7=PasswordPending, 8=SecurityQuestionRequired)'
     ),
   state: z
     .number()
@@ -46,6 +47,14 @@ export let listUsers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      afterCursor: z
+        .string()
+        .optional()
+        .describe('Opaque next cursor; repeat the same filters. Do not combine with page.'),
+      page: z
+        .number()
+        .optional()
+        .describe('Positive page number; do not combine with afterCursor.'),
       firstname: z.string().optional().describe('Filter by first name (supports wildcards *)'),
       lastname: z.string().optional().describe('Filter by last name (supports wildcards *)'),
       email: z.string().optional().describe('Filter by email address (supports wildcards *)'),
@@ -77,33 +86,39 @@ export let listUsers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      afterCursor: z
+        .string()
+        .nullable()
+        .describe('Native next cursor, or null when none is supplied'),
+      pagination: publicPagination,
       users: z.array(userSchema).describe('List of matching users')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
-    let params: Record<string, string | number | undefined> = {};
-    if (ctx.input.firstname) params.firstname = ctx.input.firstname;
-    if (ctx.input.lastname) params.lastname = ctx.input.lastname;
-    if (ctx.input.email) params.email = ctx.input.email;
-    if (ctx.input.username) params.username = ctx.input.username;
-    if (ctx.input.directoryId) params.directory_id = ctx.input.directoryId;
-    if (ctx.input.externalId) params.external_id = ctx.input.externalId;
-    if (ctx.input.appId) params.app_id = ctx.input.appId;
-    if (ctx.input.createdSince) params.created_since = ctx.input.createdSince;
-    if (ctx.input.createdUntil) params.created_until = ctx.input.createdUntil;
-    if (ctx.input.updatedSince) params.updated_since = ctx.input.updatedSince;
-    if (ctx.input.updatedUntil) params.updated_until = ctx.input.updatedUntil;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
+    let params: Record<string, string | number | undefined> = {
+      cursor: ctx.input.afterCursor,
+      page: ctx.input.page,
+      limit: ctx.input.limit
+    };
+    if (ctx.input.firstname !== undefined) params.firstname = ctx.input.firstname;
+    if (ctx.input.lastname !== undefined) params.lastname = ctx.input.lastname;
+    if (ctx.input.email !== undefined) params.email = ctx.input.email;
+    if (ctx.input.username !== undefined) params.username = ctx.input.username;
+    if (ctx.input.directoryId !== undefined) params.directory_id = ctx.input.directoryId;
+    if (ctx.input.externalId !== undefined) params.external_id = ctx.input.externalId;
+    if (ctx.input.appId !== undefined) params.app_id = ctx.input.appId;
+    if (ctx.input.createdSince !== undefined) params.created_since = ctx.input.createdSince;
+    if (ctx.input.createdUntil !== undefined) params.created_until = ctx.input.createdUntil;
+    if (ctx.input.updatedSince !== undefined) params.updated_since = ctx.input.updatedSince;
+    if (ctx.input.updatedUntil !== undefined) params.updated_until = ctx.input.updatedUntil;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
 
     let data = await client.listUsers(params);
-    let users = Array.isArray(data) ? data : data.data || [];
+    let users = data.data;
 
-    let mapped = users.map((u: any) => ({
+    let mapped = users.map(u => ({
       userId: u.id,
       username: u.username,
       email: u.email,
@@ -123,7 +138,11 @@ export let listUsers = SlateTool.create(spec, {
     }));
 
     return {
-      output: { users: mapped },
-      message: `Found **${mapped.length}** user(s).`
+      output: {
+        users: mapped,
+        afterCursor: data.pagination.afterCursor,
+        pagination: data.pagination
+      },
+      message: `Found **${mapped.length}** on this page; user(s).`
     };
   });

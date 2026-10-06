@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { orgIdInput } from '../lib/deployment';
 import { spec } from '../spec';
 
 export let flowFeedback = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let flowFeedback = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       flowId: z.string().describe('The ID of the flow the run belongs to'),
       runId: z.string().describe('The ID of the specific run to provide feedback for'),
       feedback: z.string().describe('The feedback text for the run')
@@ -25,10 +27,7 @@ export let flowFeedback = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx, ctx.input.orgId);
 
     await client.giveFeedback(ctx.input.flowId, ctx.input.runId, ctx.input.feedback);
 

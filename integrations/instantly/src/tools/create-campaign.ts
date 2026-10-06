@@ -36,7 +36,7 @@ export let createCampaign = SlateTool.create(spec, {
         .array(z.any())
         .optional()
         .describe(
-          'Email sequences with steps. Each step includes subject, body, and optional variants.'
+          'Provider sequence objects containing steps with variants. Each variant has subject and body. The API uses only the first sequence object.'
         )
     })
   )

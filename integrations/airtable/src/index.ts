@@ -14,8 +14,6 @@ import {
   uploadAttachmentTool,
   upsertRecordsTool
 } from './tools';
-import { baseChangesTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     listBasesTool,
     uploadAttachmentTool
   ],
-  triggers: [baseChangesTrigger]
+  triggers: []
 });

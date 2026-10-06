@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -15,6 +15,10 @@ export let updateCheck = SlateTool.create(spec, {
     z.object({
       checkId: z.number().describe('ID of the check to update'),
       name: z.string().optional().describe('New check name'),
+      requestHeaders: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Replace custom HTTP request headers'),
       hostname: z.string().optional().describe('New target hostname'),
       resolution: z
         .number()
@@ -65,13 +69,14 @@ export let updateCheck = SlateTool.create(spec, {
       accountEmail: ctx.auth.accountEmail
     });
 
-    let data: Record<string, any> = {};
+    let data: Record<string, unknown> = {};
 
     if (ctx.input.name !== undefined) data.name = ctx.input.name;
     if (ctx.input.hostname !== undefined) data.host = ctx.input.hostname;
     if (ctx.input.resolution !== undefined) data.resolution = ctx.input.resolution;
     if (ctx.input.paused !== undefined) data.paused = ctx.input.paused;
-    if (ctx.input.tags !== undefined) data.tags = ctx.input.tags;
+    if (ctx.input.tags !== undefined)
+      data.tags = ctx.input.tags ? ctx.input.tags.split(',').map(tag => tag.trim()) : [];
     if (ctx.input.ipv6 !== undefined) data.ipv6 = ctx.input.ipv6;
     if (ctx.input.responseTimeThreshold !== undefined)
       data.responsetime_threshold = ctx.input.responseTimeThreshold;
@@ -82,16 +87,30 @@ export let updateCheck = SlateTool.create(spec, {
     if (ctx.input.notifyWhenBackup !== undefined)
       data.notifywhenbackup = ctx.input.notifyWhenBackup;
     if (ctx.input.customMessage !== undefined) data.custom_message = ctx.input.customMessage;
-    if (ctx.input.integrationIds !== undefined)
-      data.integrationids = ctx.input.integrationIds.join(',');
+    if (ctx.input.integrationIds !== undefined) data.integrationids = ctx.input.integrationIds;
     if (ctx.input.userIds !== undefined) data.userids = ctx.input.userIds.join(',');
     if (ctx.input.teamIds !== undefined) data.teamids = ctx.input.teamIds.join(',');
-    if (ctx.input.probeFilters !== undefined) data.probe_filters = ctx.input.probeFilters;
+    if (ctx.input.probeFilters !== undefined)
+      data.probe_filters = ctx.input.probeFilters
+        ? ctx.input.probeFilters.split(',').map(filter => filter.trim())
+        : [];
     if (ctx.input.url !== undefined) data.url = ctx.input.url;
     if (ctx.input.encryption !== undefined) data.encryption = ctx.input.encryption;
     if (ctx.input.port !== undefined) data.port = ctx.input.port;
-    if (ctx.input.username !== undefined) data.auth = ctx.input.username;
-    if (ctx.input.password !== undefined) data.pass = ctx.input.password;
+    if (ctx.input.username !== undefined || ctx.input.password !== undefined) {
+      const current = (await client.getCheck(ctx.input.checkId)).check;
+      const settings =
+        typeof current.type === 'object'
+          ? (current.type.http ?? current.type.smtp)
+          : undefined;
+      const username = ctx.input.username ?? settings?.username;
+      const password = ctx.input.password ?? settings?.password;
+      if (typeof username !== 'string' || typeof password !== 'string')
+        throw createApiServiceError(
+          'Provide both username and password to set target authentication; use empty strings to clear it.'
+        );
+      data.auth = `${username}:${password}`;
+    }
     if (ctx.input.shouldContain !== undefined) data.shouldcontain = ctx.input.shouldContain;
     if (ctx.input.shouldNotContain !== undefined)
       data.shouldnotcontain = ctx.input.shouldNotContain;
@@ -105,11 +124,22 @@ export let updateCheck = SlateTool.create(spec, {
     if (ctx.input.expectedIp !== undefined) data.expectedip = ctx.input.expectedIp;
     if (ctx.input.nameServer !== undefined) data.nameserver = ctx.input.nameServer;
 
+    if (ctx.input.requestHeaders !== undefined)
+      data.requestheaders = Object.entries(ctx.input.requestHeaders).map(([name, value]) => {
+        if (!name.trim() || /[\r\n:]/.test(name) || /[\r\n]/.test(value))
+          throw createApiServiceError(
+            'Use valid HTTP header names and values without line breaks.'
+          );
+        return `${name}:${value}`;
+      });
     let result = await client.updateCheck(ctx.input.checkId, data);
 
     return {
       output: {
-        message: result.message || 'Check updated successfully'
+        message:
+          ('message' in result && typeof result.message === 'string'
+            ? result.message
+            : undefined) || 'Check updated successfully'
       },
       message: `Updated uptime check **${ctx.input.checkId}**.`
     };

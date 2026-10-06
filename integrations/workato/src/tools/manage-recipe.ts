@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import { idNumber, numericId, required } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageRecipeTool = SlateTool.create(spec, {
   name: 'Manage Recipe',
   key: 'manage_recipe',
-  description: `Create, update, or delete a Workato recipe. When creating, provide a name and optionally recipe code and folder. When updating, provide the recipe ID and the fields to change. The recipe must be stopped to update it.`,
+  description: `Create, update, or delete a Workato recipe. When creating, provide a name, valid recipe code, and a non-Home folder ID. When updating, provide the recipe ID and the fields to change. The recipe must be stopped to update it.`,
   instructions: [
     'To update a recipe, it must be stopped first. Use the Start/Stop Recipe tool if needed.',
     'Recipe code should be a valid JSON string representing the recipe logic.'
@@ -28,13 +29,13 @@ export let manageRecipeTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
+      success: z.boolean().optional().describe('Whether the operation succeeded'),
       recipeId: z.number().optional().describe('ID of the created/affected recipe')
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let {
+    const client = createClient(ctx);
+    const {
       action,
       recipeId,
       name,
@@ -43,41 +44,29 @@ export let manageRecipeTool = SlateTool.create(spec, {
       config: recipeConfig,
       folderId
     } = ctx.input;
-
     if (action === 'create') {
-      if (!name) throw new Error('Name is required when creating a recipe');
-      let result = await client.createRecipe({
+      const result = await client.createRecipe({
+        name: required(name, 'Name'),
+        description,
+        code,
+        config: recipeConfig,
+        folderId
+      });
+      const id = idNumber(result.id);
+      return { output: { success: true, recipeId: id }, message: `Created recipe ${id}.` };
+    }
+    const id = numericId(recipeId, 'recipeId');
+    if (action === 'update')
+      await client.updateRecipe(id, {
         name,
         description,
         code,
         config: recipeConfig,
         folderId
       });
-      return {
-        output: { success: result.success ?? true, recipeId: result.id },
-        message: `Created recipe **${name}** with ID ${result.id}.`
-      };
-    }
-
-    if (!recipeId) throw new Error('Recipe ID is required for update/delete');
-
-    if (action === 'update') {
-      await client.updateRecipe(recipeId, {
-        name,
-        description,
-        code,
-        config: recipeConfig
-      });
-      return {
-        output: { success: true, recipeId: Number(recipeId) },
-        message: `Updated recipe **${recipeId}**.`
-      };
-    }
-
-    // delete
-    await client.deleteRecipe(recipeId);
+    else await client.deleteRecipe(id);
     return {
-      output: { success: true, recipeId: Number(recipeId) },
-      message: `Deleted recipe **${recipeId}**.`
+      output: { success: true, recipeId: idNumber(id) },
+      message: `Recipe ${action} accepted for ${id}.`
     };
   });

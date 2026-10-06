@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalid } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageFolders = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let manageFolders = SlateTool.create(spec, {
   key: 'manage_folders',
   description: `Create, delete, copy, or move folders in the ImageKit Media Library. Copy and move operations on folders are asynchronous and return a job ID that can be checked with the returned bulk job ID.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -51,21 +52,38 @@ export let manageFolders = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (
+      ctx.input.operation !== 'create' &&
+      (ctx.input.folderName !== undefined || ctx.input.parentFolderPath !== undefined)
+    )
+      throw invalid('folderName and parentFolderPath apply only to create.');
+    if (
+      ctx.input.operation === 'create' &&
+      (ctx.input.folderPath !== undefined || ctx.input.destinationPath !== undefined)
+    )
+      throw invalid('folderPath and destinationPath do not apply to create.');
+    if (
+      !['copy', 'move'].includes(ctx.input.operation) &&
+      ctx.input.destinationPath !== undefined
+    )
+      throw invalid('destinationPath applies only to copy and move.');
+    if (ctx.input.operation !== 'copy' && ctx.input.includeVersions !== undefined)
+      throw invalid('includeVersions applies only to copy.');
     if (ctx.input.operation === 'create') {
       if (!ctx.input.folderName || !ctx.input.parentFolderPath) {
-        throw new Error('folderName and parentFolderPath are required for create operation');
+        throw invalid('folderName and parentFolderPath are required for create operation');
       }
       await client.createFolder(ctx.input.folderName, ctx.input.parentFolderPath);
 
       return {
         output: { success: true },
-        message: `Created folder **${ctx.input.folderName}** in \`${ctx.input.parentFolderPath}\`.`
+        message:
+          'ImageKit accepted folder creation. Names can be normalized and missing parent folders are created automatically.'
       };
     }
 
     if (ctx.input.operation === 'delete') {
-      if (!ctx.input.folderPath)
-        throw new Error('folderPath is required for delete operation');
+      if (!ctx.input.folderPath) throw invalid('folderPath is required for delete operation');
       await client.deleteFolder(ctx.input.folderPath);
 
       return {
@@ -76,7 +94,7 @@ export let manageFolders = SlateTool.create(spec, {
 
     if (ctx.input.operation === 'copy') {
       if (!ctx.input.folderPath || !ctx.input.destinationPath) {
-        throw new Error('folderPath and destinationPath are required for copy operation');
+        throw invalid('folderPath and destinationPath are required for copy operation');
       }
       let result = await client.copyFolder(
         ctx.input.folderPath,
@@ -92,7 +110,7 @@ export let manageFolders = SlateTool.create(spec, {
 
     if (ctx.input.operation === 'move') {
       if (!ctx.input.folderPath || !ctx.input.destinationPath) {
-        throw new Error('folderPath and destinationPath are required for move operation');
+        throw invalid('folderPath and destinationPath are required for move operation');
       }
       let result = await client.moveFolder(ctx.input.folderPath, ctx.input.destinationPath);
 
@@ -102,6 +120,6 @@ export let manageFolders = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown operation: ${ctx.input.operation}`);
+    throw invalid(`Unknown operation: ${ctx.input.operation}`);
   })
   .build();

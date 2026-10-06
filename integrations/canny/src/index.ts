@@ -31,8 +31,6 @@ import {
   updateCompanyTool,
   updatePostTool
 } from './tools';
-import { commentEventsTrigger, postEventsTrigger, voteEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -66,5 +64,5 @@ export let provider = Slate.create({
     enqueueAutopilotFeedbackTool,
     listOpportunitiesTool
   ],
-  triggers: [postEventsTrigger, commentEventsTrigger, voteEventsTrigger]
+  triggers: []
 });

@@ -19,14 +19,6 @@ import {
   updateAction,
   updateIssue
 } from './tools';
-import {
-  actionEvents,
-  inspectionEvents,
-  issueEvents,
-  mediaEvents,
-  trainingEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +40,5 @@ export let provider = Slate.create({
     manageSchedules,
     manageAssets
   ],
-  triggers: [inspectionEvents, actionEvents, issueEvents, mediaEvents, trainingEvents]
+  triggers: []
 });

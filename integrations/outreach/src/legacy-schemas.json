@@ -1,0 +1,1436 @@
+[
+  {
+    "key": "manage_prospect",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform on the prospect"
+        },
+        "prospectId": {
+          "description": "Prospect ID (required for update/delete)",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "First name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Last name",
+          "type": "string"
+        },
+        "email": {
+          "description": "Primary email address",
+          "type": "string"
+        },
+        "title": {
+          "description": "Job title",
+          "type": "string"
+        },
+        "company": {
+          "description": "Company name (if not linking to an account)",
+          "type": "string"
+        },
+        "phone": {
+          "description": "Work phone number",
+          "type": "string"
+        },
+        "mobilePhone": {
+          "description": "Mobile phone number",
+          "type": "string"
+        },
+        "homePhone": {
+          "description": "Home phone number",
+          "type": "string"
+        },
+        "addressStreet": {
+          "description": "Street address",
+          "type": "string"
+        },
+        "addressCity": {
+          "description": "City",
+          "type": "string"
+        },
+        "addressState": {
+          "description": "State",
+          "type": "string"
+        },
+        "addressZip": {
+          "description": "ZIP/postal code",
+          "type": "string"
+        },
+        "addressCountry": {
+          "description": "Country",
+          "type": "string"
+        },
+        "linkedInUrl": {
+          "description": "LinkedIn profile URL",
+          "type": "string"
+        },
+        "twitterUsername": {
+          "description": "Twitter/X username",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags to assign to the prospect",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "accountId": {
+          "description": "Account ID to associate with",
+          "type": "string"
+        },
+        "ownerId": {
+          "description": "User ID of the prospect owner",
+          "type": "string"
+        },
+        "customFields": {
+          "description": "Custom field values as key-value pairs (e.g. custom1, custom2, ...)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "prospectId": {
+          "description": "ID of the prospect",
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "deleted": {
+          "description": "True if the prospect was deleted",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "get_prospect",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "prospectId": {
+          "type": "string",
+          "description": "ID of the prospect to retrieve"
+        }
+      },
+      "required": ["prospectId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "prospectId": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "linkedInUrl": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "accountId": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "engagedAt": {
+          "type": "string"
+        },
+        "openCount": {
+          "type": "number"
+        },
+        "replyCount": {
+          "type": "number"
+        },
+        "clickCount": {
+          "type": "number"
+        },
+        "customFields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["prospectId"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_prospects",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "description": "Filter by email address",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "Filter by first name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Filter by last name",
+          "type": "string"
+        },
+        "accountId": {
+          "description": "Filter by account ID",
+          "type": "string"
+        },
+        "ownerId": {
+          "description": "Filter by owner user ID",
+          "type": "string"
+        },
+        "tag": {
+          "description": "Filter by tag",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results per page (max 1000)",
+          "type": "number"
+        },
+        "pageOffset": {
+          "description": "Page offset for pagination",
+          "type": "number"
+        },
+        "sortBy": {
+          "description": "Sort field (e.g. \"createdAt\", \"-updatedAt\" for descending)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "prospects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "prospectId": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "company": {
+                "type": "string"
+              },
+              "accountId": {
+                "type": "string"
+              },
+              "ownerId": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": ["prospectId"],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "totalCount": {
+          "type": "number"
+        }
+      },
+      "required": ["prospects", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_account",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "accountId": {
+          "description": "Account ID (required for update/delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Account/company name",
+          "type": "string"
+        },
+        "domain": {
+          "description": "Company domain (e.g. example.com)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Account description",
+          "type": "string"
+        },
+        "industry": {
+          "description": "Industry",
+          "type": "string"
+        },
+        "numberOfEmployees": {
+          "description": "Number of employees",
+          "type": "number"
+        },
+        "website": {
+          "description": "Website URL",
+          "type": "string"
+        },
+        "linkedInUrl": {
+          "description": "LinkedIn company URL",
+          "type": "string"
+        },
+        "locality": {
+          "description": "City/locality",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags to assign",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ownerId": {
+          "description": "User ID of the account owner",
+          "type": "string"
+        },
+        "customFields": {
+          "description": "Custom field values as key-value pairs",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_accounts",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Filter by account name",
+          "type": "string"
+        },
+        "domain": {
+          "description": "Filter by domain",
+          "type": "string"
+        },
+        "ownerId": {
+          "description": "Filter by owner user ID",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageOffset": {
+          "description": "Page offset for pagination",
+          "type": "number"
+        },
+        "sortBy": {
+          "description": "Sort field (e.g. \"name\", \"-createdAt\")",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "domain": {
+                "type": "string"
+              },
+              "industry": {
+                "type": "string"
+              },
+              "locality": {
+                "type": "string"
+              },
+              "ownerId": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": ["accountId"],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "totalCount": {
+          "type": "number"
+        }
+      },
+      "required": ["accounts", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_sequence",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update"],
+          "description": "Action to perform"
+        },
+        "sequenceId": {
+          "description": "Sequence ID (required for update)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Sequence name",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description of the sequence",
+          "type": "string"
+        },
+        "sequenceType": {
+          "description": "Type: \"interval\" (days between steps) or \"date\" (specific dates)",
+          "type": "string",
+          "enum": ["interval", "date"]
+        },
+        "enabled": {
+          "description": "Whether the sequence is enabled",
+          "type": "boolean"
+        },
+        "tags": {
+          "description": "Tags",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ownerId": {
+          "description": "User ID of the sequence owner",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sequenceId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "sequenceType": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["sequenceId"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_sequences",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Filter by sequence name",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Filter by enabled/disabled state",
+          "type": "boolean"
+        },
+        "ownerId": {
+          "description": "Filter by owner user ID",
+          "type": "string"
+        },
+        "tag": {
+          "description": "Filter by tag",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageOffset": {
+          "description": "Page offset for pagination",
+          "type": "number"
+        },
+        "sortBy": {
+          "description": "Sort field (e.g. \"name\", \"-createdAt\")",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sequences": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sequenceId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "sequenceType": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "ownerId": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": ["sequenceId"],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "totalCount": {
+          "type": "number"
+        }
+      },
+      "required": ["sequences", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_sequence_state",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update"],
+          "description": "Action to perform"
+        },
+        "sequenceStateId": {
+          "description": "Sequence state ID (required for update)",
+          "type": "string"
+        },
+        "prospectId": {
+          "description": "Prospect ID (required for create)",
+          "type": "string"
+        },
+        "sequenceId": {
+          "description": "Sequence ID (required for create)",
+          "type": "string"
+        },
+        "mailboxId": {
+          "description": "Mailbox ID to send from",
+          "type": "string"
+        },
+        "state": {
+          "description": "Enrollment state",
+          "type": "string",
+          "enum": ["active", "paused", "finished", "disabled"]
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sequenceStateId": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "prospectId": {
+          "type": "string"
+        },
+        "sequenceId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["sequenceStateId"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_mailings",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "prospectId": {
+          "description": "Filter by prospect ID",
+          "type": "string"
+        },
+        "sequenceId": {
+          "description": "Filter by sequence ID",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageOffset": {
+          "description": "Page offset for pagination",
+          "type": "number"
+        },
+        "sortBy": {
+          "description": "Sort field (e.g. \"-createdAt\")",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mailings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "mailingId": {
+                "type": "string"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "prospectId": {
+                "type": "string"
+              },
+              "sequenceId": {
+                "type": "string"
+              },
+              "bouncedAt": {
+                "type": "string"
+              },
+              "deliveredAt": {
+                "type": "string"
+              },
+              "openedAt": {
+                "type": "string"
+              },
+              "repliedAt": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "openCount": {
+                "type": "number"
+              },
+              "clickCount": {
+                "type": "number"
+              }
+            },
+            "required": ["mailingId"],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "totalCount": {
+          "type": "number"
+        }
+      },
+      "required": ["mailings", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_task",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task ID to update"
+        },
+        "state": {
+          "description": "Task state",
+          "type": "string",
+          "enum": ["incomplete", "complete"]
+        },
+        "dueAt": {
+          "description": "Due date (ISO 8601 format)",
+          "type": "string"
+        },
+        "note": {
+          "description": "Task note",
+          "type": "string"
+        }
+      },
+      "required": ["taskId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "taskType": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "dueAt": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        },
+        "prospectId": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["taskId"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_tasks",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "state": {
+          "description": "Filter by task state",
+          "type": "string",
+          "enum": ["incomplete", "complete"]
+        },
+        "taskType": {
+          "description": "Filter by task type",
+          "type": "string",
+          "enum": ["action_item", "call", "email", "in_person"]
+        },
+        "ownerId": {
+          "description": "Filter by owner user ID",
+          "type": "string"
+        },
+        "prospectId": {
+          "description": "Filter by prospect ID",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageOffset": {
+          "description": "Page offset for pagination",
+          "type": "number"
+        },
+        "sortBy": {
+          "description": "Sort field (e.g. \"dueAt\", \"-createdAt\")",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "taskType": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "dueAt": {
+                "type": "string"
+              },
+              "completedAt": {
+                "type": "string"
+              },
+              "prospectId": {
+                "type": "string"
+              },
+              "ownerId": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": ["taskId"],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "totalCount": {
+          "type": "number"
+        }
+      },
+      "required": ["tasks", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_opportunity",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update"],
+          "description": "Action to perform"
+        },
+        "opportunityId": {
+          "description": "Opportunity ID (required for update)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Opportunity name",
+          "type": "string"
+        },
+        "amount": {
+          "description": "Deal amount",
+          "type": "number"
+        },
+        "probability": {
+          "description": "Win probability (0-100)",
+          "type": "number"
+        },
+        "closeDate": {
+          "description": "Expected close date (ISO 8601)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description",
+          "type": "string"
+        },
+        "opportunityType": {
+          "description": "Opportunity type",
+          "type": "string"
+        },
+        "externalSource": {
+          "description": "External source (e.g. CRM identifier)",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "accountId": {
+          "description": "Account ID",
+          "type": "string"
+        },
+        "ownerId": {
+          "description": "Owner user ID",
+          "type": "string"
+        },
+        "stageId": {
+          "description": "Stage ID",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "probability": {
+          "type": "number"
+        },
+        "closeDate": {
+          "type": "string"
+        },
+        "stageName": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["opportunityId"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_opportunities",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "description": "Filter by account ID",
+          "type": "string"
+        },
+        "ownerId": {
+          "description": "Filter by owner user ID",
+          "type": "string"
+        },
+        "name": {
+          "description": "Filter by opportunity name",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageOffset": {
+          "description": "Page offset for pagination",
+          "type": "number"
+        },
+        "sortBy": {
+          "description": "Sort field (e.g. \"closeDate\", \"-amount\")",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "opportunityId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "number"
+              },
+              "probability": {
+                "type": "number"
+              },
+              "closeDate": {
+                "type": "string"
+              },
+              "stageName": {
+                "type": "string"
+              },
+              "accountId": {
+                "type": "string"
+              },
+              "ownerId": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": ["opportunityId"],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "totalCount": {
+          "type": "number"
+        }
+      },
+      "required": ["opportunities", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_template",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update"],
+          "description": "Action to perform"
+        },
+        "templateId": {
+          "description": "Template ID (required for update)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Template name",
+          "type": "string"
+        },
+        "subject": {
+          "description": "Email subject line",
+          "type": "string"
+        },
+        "bodyHtml": {
+          "description": "HTML body content",
+          "type": "string"
+        },
+        "bodyText": {
+          "description": "Plain text body content",
+          "type": "string"
+        },
+        "shareType": {
+          "description": "Sharing level",
+          "type": "string",
+          "enum": ["private", "read_only", "shared"]
+        },
+        "tags": {
+          "description": "Tags",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ownerId": {
+          "description": "Owner user ID",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templateId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "shareType": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["templateId"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_snippet",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update"],
+          "description": "Action to perform"
+        },
+        "snippetId": {
+          "description": "Snippet ID (required for update)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Snippet name",
+          "type": "string"
+        },
+        "bodyHtml": {
+          "description": "HTML content",
+          "type": "string"
+        },
+        "bodyText": {
+          "description": "Plain text content",
+          "type": "string"
+        },
+        "shareType": {
+          "description": "Sharing level",
+          "type": "string",
+          "enum": ["private", "read_only", "shared"]
+        },
+        "tags": {
+          "description": "Tags",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ownerId": {
+          "description": "Owner user ID",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "snippetId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "shareType": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["snippetId"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "create_call",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "direction": {
+          "description": "Call direction",
+          "type": "string",
+          "enum": ["inbound", "outbound"]
+        },
+        "disposition": {
+          "description": "Call outcome/disposition",
+          "type": "string"
+        },
+        "note": {
+          "description": "Call notes",
+          "type": "string"
+        },
+        "dialedAt": {
+          "description": "When the call was dialed (ISO 8601)",
+          "type": "string"
+        },
+        "answeredAt": {
+          "description": "When the call was answered (ISO 8601)",
+          "type": "string"
+        },
+        "completedAt": {
+          "description": "When the call ended (ISO 8601)",
+          "type": "string"
+        },
+        "prospectId": {
+          "description": "Prospect ID the call was with",
+          "type": "string"
+        },
+        "userId": {
+          "description": "User ID who made/received the call",
+          "type": "string"
+        },
+        "sequenceId": {
+          "description": "Sequence ID if part of a sequence",
+          "type": "string"
+        },
+        "callDispositionId": {
+          "description": "Call disposition ID",
+          "type": "string"
+        },
+        "callPurposeId": {
+          "description": "Call purpose ID",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "callId": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string"
+        },
+        "disposition": {
+          "type": "string"
+        },
+        "dialedAt": {
+          "type": "string"
+        },
+        "answeredAt": {
+          "type": "string"
+        },
+        "completedAt": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": ["callId"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_users",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "description": "Filter by email",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageOffset": {
+          "description": "Page offset for pagination",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "locked": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "type": "string"
+              }
+            },
+            "required": ["userId"],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "totalCount": {
+          "type": "number"
+        }
+      },
+      "required": ["users", "hasMore"],
+      "additionalProperties": false
+    }
+  }
+]

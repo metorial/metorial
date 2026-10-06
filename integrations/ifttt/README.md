@@ -1,45 +1,35 @@
-# <img src="https://provider-logos.metorial-cdn.com/ifttt.png" height="20"> Ifttt
+# IFTTT
 
-Automate workflows by connecting 900+ services through conditional Applets composed of triggers, queries, and actions. Manage connections between services on behalf of users, subscribe to trigger events from connected services, execute actions programmatically, and retrieve data via queries. Send and receive arbitrary HTTP requests through the Webhooks service to integrate with any public API. Notify IFTTT of real-time changes via the Realtime API for near-instant Applet execution. Handle connection lifecycle events (enabled/disabled) and trigger event webhooks. Run JavaScript runtime scripts to process trigger events without a dedicated backend.
+Use the IFTTT Connect and Realtime APIs with an existing Platform service and provisioned connections. This integration reads service context and user configuration, discovers field options, performs queries, replaces complete connection configuration, and submits actions, test events or realtime notifications. Accepted requests do not prove downstream Applet completion.
+
+## Authentication
+
+**Service Key** uses the Platform Service Key from your service API settings. Setup verifies `/v2/me` and binds its actual service ID. User-specific operations additionally require your service's connected `userId`; this is not an IFTTT account ID. Connection definitions can be read without a connected user. Keys are static credentials; regenerate them in IFTTT and reconnect when needed.
+
+**Webhooks Key (execution unavailable)** stores a Maker key separately without requiring a Platform Service Key. It has no documented identity endpoint and currently enables no callable webhook execution. `fire_webhook` refuses before any request because the required credential cannot be transmitted confidentially through this connection. Follow [IFTTT's Webhooks Documentation instructions](https://help.ifttt.com/hc/en-us/articles/115010230347-Webhooks-service-FAQ) to invoke an event directly using a trusted HTTP client. This also applies to an optional Webhooks key on Service Key authentication.
 
 ## Tools
 
-### Fire Webhook
+| Tool key | Outcome |
+| --- | --- |
+| `get_current_context` | Read actual service ID, authentication level, and connected login when a user is supplied. |
+| `get_connection` | Read the exact connection definition and native user status/configuration. |
+| `get_field_options` | Read one field's options from native trigger/action/query/feature options; connected user required. |
+| `perform_query` | Read native list results or query ingredients; preserve continuation cursor and fields. |
+| `update_connection` | Replace the entire `user_features` configuration and read the current native configuration back. Omitted features/settings are removed. |
+| `run_action` | Submit an action for the connected user; acceptance does not establish completed external effects. |
+| `test_trigger` | Submit a test event that may deliver to the connection's webhook receiver. |
+| `send_realtime_notification` | Request polling for specified users/trigger identities; this does not contain event data or a delivery receipt. |
+| `fire_webhook` | Retained compatibility entry that refuses before dispatch while confidential execution is unavailable. |
 
-Trigger an IFTTT webhook event via the Maker Webhooks service. This fires the "Receive a web request" trigger, which can activate any Applet connected to it. Supports passing up to 3 simple string values, or a full JSON payload for the JSON trigger variant.
+For pagination, pass `nextCursor` and `nextFields` from a list response to the next query call. A continuation object without a usable cursor is rejected instead of implying a complete result. The API's query ingredient response is preserved as `items` when the native type is `query`. An omitted `limit` uses the provider's behavior; positive integer limits are validated without imposing an undocumented default or maximum.
 
-### Get Connection
+## Limits
 
-Retrieve the details and current status of an IFTTT connection. Returns the connection's configuration including its triggers, actions, queries, and the user's field settings if a user ID is provided.
+The APIs expose no general connection/Applet inventory or creation endpoint used by this integration. Provision connections and dynamic fields in the IFTTT Platform. There is no OAuth flow, Applet creation, runtime-script administration, subscription registration, arbitrary outbound URL, or rollback tool here. Actions and events can have irreversible external effects. Recheck the exact target after a timeout or failed receipt before retrying. Configuration readback describes current state; it does not prove every requested setting or external effect succeeded.
 
-### Get Field Options
-
-Retrieve the available options for a dynamic field in a trigger, action, or query. Useful for discovering valid values before running an action, performing a query, or configuring a trigger. Returns a list of label-value pairs (may include nested categories).
-
-### Perform Query
-
-Execute a query on a connected IFTTT service to retrieve data. Queries let you fetch additional data from connected services, such as retrieving device states, listing items, or getting current values. Supports pagination with cursor-based navigation.
-
-### Run Action
-
-Execute an action on a connected IFTTT service for a specific user. Actions are the output side of Applets, such as creating calendar events, sending messages, controlling smart home devices, posting to social media, etc. The available action fields depend on the connected service's action definition.
-
-### Send Realtime Notification
-
-Notify IFTTT's Realtime API that new trigger events are available. This causes IFTTT to immediately poll your trigger endpoints for the specified users or trigger identities, enabling near-instant Applet runs instead of waiting for the normal ~1 hour polling cycle.
-
-### Test Trigger
-
-Simulate a trigger event for a specific connection and user. This sends a test request that simulates an event firing for the user, which IFTTT will then forward to your webhook endpoint. Useful for testing and debugging connection integrations.
-
-### Update Connection
-
-Update a user's IFTTT connection configuration. This replaces the current stored configuration for the user, including trigger fields, action fields, and query fields. Use **Get Connection** first to see current settings.
+[IFTTT Webhooks](https://help.ifttt.com/hc/en-us/articles/115010230347-Webhooks-service-FAQ) requires Pro or higher; its queries require Pro+. Platform service publishing requires the appropriate partner access. See [Connect API](https://ifttt.com/docs/connect_api) and [Realtime API](https://ifttt.com/docs/api_reference) for provider prerequisites.
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

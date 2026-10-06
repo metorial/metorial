@@ -1,6 +1,6 @@
 # Hotspotsystem
 
-Manage Wi-Fi hotspot locations, customers, subscribers, vouchers, and transactions. Retrieve hotspot location data, access customer records with social login details, list newsletter subscribers, query voucher/access code details, and track access transactions (MAC, voucher, social, and paid types). Receive webhooks for new customer registrations, subscriber sign-ups, and transaction events.
+Manage Wi-Fi hotspot locations, customers, subscribers, vouchers, and transactions. Retrieve hotspot location data, access customer records with social login details, list newsletter subscribers, query voucher/access code details, and track access transactions (MAC, voucher, social, and paid types).
 
 ## License
 

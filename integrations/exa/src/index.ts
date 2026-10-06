@@ -16,6 +16,7 @@ import {
   getContentsTool,
   getExportTool,
   getResearchTool,
+  getTeamInfoTool,
   getWebsetItemTool,
   getWebsetTool,
   listWebsetItemsTool,
@@ -24,8 +25,6 @@ import {
   updateEnrichmentTool,
   updateWebsetTool
 } from './tools';
-import { websetEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,7 +49,8 @@ export let provider = Slate.create({
     createMonitorTool,
     deleteMonitorTool,
     createExportTool,
-    getExportTool
+    getExportTool,
+    getTeamInfoTool
   ],
-  triggers: [websetEventsTrigger]
+  triggers: []
 });

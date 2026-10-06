@@ -4,8 +4,9 @@ import { MezmoClient } from '../lib/client';
 import { spec } from '../spec';
 
 let boardOutputSchema = z.object({
-  boardId: z.string().describe('Unique board identifier'),
-  title: z.string().describe('Board title')
+  boardId: z.string().min(1).describe('Unique board identifier'),
+  accountId: z.string().optional().describe('Organization account identifier, when returned'),
+  title: z.string().min(1).describe('Board title')
 });
 
 export let listBoards = SlateTool.create(spec, {
@@ -17,6 +18,7 @@ export let listBoards = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of items returned'),
       boards: z.array(boardOutputSchema).describe('List of boards')
     })
   )
@@ -24,13 +26,14 @@ export let listBoards = SlateTool.create(spec, {
     let client = new MezmoClient({ token: ctx.auth.token });
     let boards = await client.listBoards();
 
-    let mapped = (Array.isArray(boards) ? boards : []).map(b => ({
-      boardId: b.boardID || b.id || '',
-      title: b.title || ''
+    let mapped = boards.map(b => ({
+      boardId: b.boardID,
+      accountId: b.account,
+      title: b.title
     }));
 
     return {
-      output: { boards: mapped },
+      output: { boards: mapped, returnedCount: mapped.length },
       message: `Found **${mapped.length}** board(s).`
     };
   })
@@ -44,20 +47,36 @@ export let createBoard = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      title: z.string().describe('Title for the new board')
+      title: z.string().min(1).describe('Title for the new board'),
+      account: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          'Organization account identifier from List Boards, if available and required for creation'
+        ),
+      categories: z
+        .array(z.string())
+        .optional()
+        .describe('Existing board category identifiers')
     })
   )
   .output(boardOutputSchema)
   .handleInvocation(async ctx => {
     let client = new MezmoClient({ token: ctx.auth.token });
-    let result = await client.createBoard({ title: ctx.input.title });
+    let result = await client.createBoard({
+      title: ctx.input.title,
+      account: ctx.input.account,
+      category: ctx.input.categories
+    });
 
     return {
       output: {
-        boardId: result.boardID || result.id || '',
-        title: result.title || ''
+        boardId: result.boardID,
+        accountId: result.account,
+        title: result.title
       },
-      message: `Created board **${result.title}** with ID \`${result.boardID || result.id}\`.`
+      message: `Created board **${result.title}** with ID \`${result.boardID}\`.`
     };
   })
   .build();
@@ -70,7 +89,7 @@ export let deleteBoard = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      boardId: z.string().describe('ID of the board to delete')
+      boardId: z.string().min(1).describe('ID of the board to delete')
     })
   )
   .output(

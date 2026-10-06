@@ -20,10 +20,14 @@ import {
   getJobTool,
   getSourceTool,
   getStreamPropertiesTool,
+  getWorkspaceTool,
   listConnectionsTool,
+  listDestinationDefinitionsTool,
   listDestinationsTool,
   listJobsTool,
+  listOrganizationsTool,
   listPermissionsTool,
+  listSourceDefinitionsTool,
   listSourcesTool,
   listTagsTool,
   listWorkspacesTool,
@@ -34,8 +38,6 @@ import {
   updateTagTool,
   updateWorkspaceTool
 } from './tools';
-
-import { jobCompletedTrigger, syncNotificationTrigger } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -60,6 +62,10 @@ export let provider = Slate.create({
     listJobsTool,
     cancelJobTool,
     listWorkspacesTool,
+    getWorkspaceTool,
+    listOrganizationsTool,
+    listSourceDefinitionsTool,
+    listDestinationDefinitionsTool,
     createWorkspaceTool,
     updateWorkspaceTool,
     deleteWorkspaceTool,
@@ -72,5 +78,5 @@ export let provider = Slate.create({
     updateTagTool,
     deleteTagTool
   ],
-  triggers: [syncNotificationTrigger, jobCompletedTrigger]
+  triggers: []
 });

@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { flattenResource } from '../lib/helpers';
+import { flattenResource, validateInput } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getProspect = SlateTool.create(spec, {
@@ -36,17 +36,18 @@ export let getProspect = SlateTool.create(spec, {
       openCount: z.number().optional(),
       replyCount: z.number().optional(),
       clickCount: z.number().optional(),
-      customFields: z.record(z.string(), z.any()).optional()
+      customFields: z.record(z.string(), z.unknown()).optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
     let resource = await client.getProspect(ctx.input.prospectId);
     let flat = flattenResource(resource);
 
-    let customFields: Record<string, any> = {};
+    let customFields: Record<string, unknown> = {};
     for (let [key, value] of Object.entries(flat)) {
-      if (key.startsWith('custom') && value !== null && value !== undefined) {
+      if (/^custom[1-9]\d*$/.test(key) && value !== null && value !== undefined) {
         customFields[key] = value;
       }
     }

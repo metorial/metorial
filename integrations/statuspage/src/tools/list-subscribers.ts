@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listSubscribers = SlateTool.create(spec, {
@@ -13,6 +14,17 @@ export let listSubscribers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageId: pageIdSchema,
+      includeAllStates: z
+        .boolean()
+        .optional()
+        .describe(
+          'Include active, unconfirmed and quarantined subscriptions. Cannot be combined with state.'
+        ),
+      query: z
+        .string()
+        .optional()
+        .describe('Search contact information; not supported for Slack subscribers.'),
       type: z
         .enum(['email', 'sms', 'webhook', 'slack', 'teams', 'integration_partner'])
         .optional()
@@ -21,8 +33,11 @@ export let listSubscribers = SlateTool.create(spec, {
         .enum(['active', 'unconfirmed', 'quarantined'])
         .optional()
         .describe('Filter by subscriber state'),
-      limit: z.number().optional().describe('Maximum number of subscribers per page'),
-      page: z.number().optional().describe('Page number for pagination'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Positive page size; defaults to 100. Keyword searches accept at most 100.'),
+      page: z.number().optional().describe('Zero-based page number: 0 is the first page.'),
       sortField: z.string().optional().describe('Field to sort by, e.g. "created_at"'),
       sortDirection: z.enum(['asc', 'desc']).optional().describe('Sort direction')
     })
@@ -46,20 +61,26 @@ export let listSubscribers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, pageId: ctx.config.pageId });
+    let client = new Client({
+      token: ctx.auth.token,
+      pageId: ctx.input.pageId ?? ctx.config.pageId
+    });
 
+    if (ctx.input.includeAllStates && ctx.input.state)
+      throw createApiServiceError('Choose includeAllStates or state, not both.');
     let raw = await client.listSubscribers({
+      query: ctx.input.query,
       type: ctx.input.type,
-      state: ctx.input.state,
+      state: ctx.input.includeAllStates ? 'all' : ctx.input.state,
       limit: ctx.input.limit,
       page: ctx.input.page,
       sortField: ctx.input.sortField,
       sortDirection: ctx.input.sortDirection
     });
 
-    let subscribers = raw.map((s: any) => ({
+    let subscribers = raw.map(s => ({
       subscriberId: s.id,
-      type: s.type,
+      type: s.type ?? s.mode,
       emailAddress: s.email,
       phoneNumber: s.phone_number,
       webhookEndpoint: s.endpoint,

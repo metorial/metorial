@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCampaignAnalytics = SlateTool.create(spec, {
@@ -27,8 +27,18 @@ export let getCampaignAnalytics = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Multiple campaign IDs to include.'),
-      startDate: z.string().optional().describe('Start date in YYYY-MM-DD format.'),
-      endDate: z.string().optional().describe('End date in YYYY-MM-DD format.'),
+      startDate: z
+        .string()
+        .optional()
+        .describe(
+          'Start date (YYYY-MM-DD) or ISO 8601 timestamp with a time zone. Date-only values use UTC midnight.'
+        ),
+      endDate: z
+        .string()
+        .optional()
+        .describe(
+          'End date (YYYY-MM-DD) or ISO 8601 timestamp with a time zone. Date-only values use UTC midnight.'
+        ),
       view: z
         .enum(['summary', 'overview', 'daily', 'steps'])
         .optional()
@@ -45,6 +55,24 @@ export let getCampaignAnalytics = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { view, campaignId, campaignIds, startDate, endDate } = ctx.input;
 
+    if (campaignId && campaignIds?.length)
+      throw invalid('Use campaignId or campaignIds, not both.');
+    if ((view === 'daily' || view === 'steps') && campaignIds !== undefined)
+      throw invalid('daily and steps views accept a single campaignId, not campaignIds.');
+    for (let date of [startDate, endDate]) {
+      if (
+        date !== undefined &&
+        (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2}))?$/.test(
+          date
+        ) ||
+          !Number.isFinite(Date.parse(date)))
+      )
+        throw invalid(
+          'Use YYYY-MM-DD or a valid ISO 8601 timestamp with a time zone for analytics dates.'
+        );
+    }
+    if (startDate && endDate && Date.parse(startDate) > Date.parse(endDate))
+      throw invalid('startDate must be on or before endDate.');
     let analytics: any;
 
     if (view === 'overview') {

@@ -1,10 +1,12 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { connectionFor } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      baseUrl: z.string().optional()
     })
   )
   .addTokenAuth({
@@ -15,13 +17,19 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Retool API access token. Organization admins can create access tokens from Settings > API.'
+          'Retool API access token from Settings > Retool API. Select only the scopes needed by your tools; availability depends on the organization and deployment.'
+        ),
+      baseUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Retool instance origin for your organization or Space, including a self-hosted port when needed. Defaults to the documented legacy cloud API origin https://api.retool.com. Use the target organization or Space domain when required.'
         )
     }),
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          ...connectionFor({ auth: ctx.input, config: ctx.config })
         }
       };
     }

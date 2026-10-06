@@ -6,17 +6,19 @@ import {
   deleteLibrary,
   deleteTransformation,
   getLibrary,
+  getLibraryVersion,
   getTransformation,
+  getTransformationVersion,
   listLibraries,
   listLibraryVersions,
   listTransformations,
   listTransformationVersions,
+  manageDestinationConnection,
   publish,
+  testTransformations,
   updateLibrary,
   updateTransformation
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -33,7 +35,11 @@ export let provider = Slate.create({
     updateLibrary,
     deleteLibrary,
     listLibraryVersions,
-    publish
+    publish,
+    getTransformationVersion,
+    getLibraryVersion,
+    manageDestinationConnection,
+    testTransformations
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

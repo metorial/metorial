@@ -11,8 +11,6 @@ import {
   listOperations,
   withdraw
 } from './tools';
-import { invoiceStatus } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     getFeePlans,
     createDeposit
   ],
-  triggers: [invoiceStatus]
+  triggers: []
 });

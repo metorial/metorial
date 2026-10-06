@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { recordSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -22,27 +23,33 @@ export let listUsers = SlateTool.create(spec, {
         .describe('Number of results per page (2-100)'),
       departmentId: z.string().optional().describe('Filter by department ID'),
       locationId: z.string().optional().describe('Filter by location ID'),
-      entityId: z.string().optional().describe('Filter by business entity ID')
+      entityId: z.string().optional().describe('Filter by business entity ID'),
+      email: z.string().optional().describe('Exact user email filter'),
+      status: z
+        .string()
+        .optional()
+        .describe(
+          'Filter by USER_DRAFT, USER_ACTIVE, USER_INACTIVE or USER_SUSPENDED. Invitation/onboarding response statuses are not accepted as list filters.'
+        )
     })
   )
   .output(
     z.object({
-      users: z.array(z.any()).describe('List of user objects'),
+      users: z.array(recordSchema).describe('List of user objects'),
       nextCursor: z.string().optional().describe('Cursor for fetching the next page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = clientFor(ctx);
 
     let result = await client.listUsers({
       start: ctx.input.cursor,
       pageSize: ctx.input.pageSize,
       departmentId: ctx.input.departmentId,
       locationId: ctx.input.locationId,
-      entityId: ctx.input.entityId
+      entityId: ctx.input.entityId,
+      email: ctx.input.email,
+      status: ctx.input.status
     });
 
     return {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -27,6 +27,7 @@ export let createTask = SlateTool.create(spec, {
     z.object({
       taskType: z
         .string()
+        .regex(/^[a-z][a-z0-9_]*$/)
         .describe(
           'Type of annotation task (e.g., imageannotation, textcollection, documenttranscription, videoannotation, lidarannotation, namedentityrecognition, segmentannotation)'
         ),
@@ -51,13 +52,20 @@ export let createTask = SlateTool.create(spec, {
         .describe('Custom key-value metadata (max 10KB)'),
       priority: z
         .number()
+        .int()
+        .min(10)
+        .max(30)
         .optional()
-        .describe('Task priority: 10 (low), 20 (normal), or 30 (high)'),
+        .describe('Task priority from 10 (lowest) through 30 (highest)'),
       uniqueId: z
         .string()
         .optional()
         .describe('Custom deduplication identifier (must be unique across all projects)'),
-      tags: z.array(z.string()).optional().describe('Up to 5 arbitrary labels for the task'),
+      tags: z
+        .array(z.string().min(1))
+        .max(5)
+        .optional()
+        .describe('Up to 5 arbitrary labels for the task'),
       taskParams: z
         .record(z.string(), z.any())
         .optional()
@@ -79,17 +87,19 @@ export let createTask = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let body: Record<string, any> = {};
-    if (ctx.input.project) body.project = ctx.input.project;
-    if (ctx.input.batch) body.batch = ctx.input.batch;
-    if (ctx.input.instruction) body.instruction = ctx.input.instruction;
-    if (ctx.input.callbackUrl) body.callback_url = ctx.input.callbackUrl;
-    if (ctx.input.metadata) body.metadata = ctx.input.metadata;
+    let body: Record<string, unknown> = { ...ctx.input.taskParams };
+    if (ctx.input.project !== undefined) body.project = ctx.input.project;
+    if (ctx.input.batch !== undefined) body.batch = ctx.input.batch;
+    if (ctx.input.instruction !== undefined) body.instruction = ctx.input.instruction;
+    if (ctx.input.callbackUrl !== undefined) body.callback_url = ctx.input.callbackUrl;
+    if (ctx.input.metadata !== undefined) body.metadata = ctx.input.metadata;
     if (ctx.input.priority !== undefined) body.priority = ctx.input.priority;
-    if (ctx.input.uniqueId) body.unique_id = ctx.input.uniqueId;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.taskParams) {
-      Object.assign(body, ctx.input.taskParams);
+    if (ctx.input.uniqueId !== undefined) body.unique_id = ctx.input.uniqueId;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (!body.project && !body.batch) {
+      throw createApiServiceError(
+        'Provide a project or batch name. Call list_projects or list_batches to discover one.'
+      );
     }
 
     let result = await client.createTask(ctx.input.taskType, body);

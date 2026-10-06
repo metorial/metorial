@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageParams, paginationSchema, readRows } from '../lib/response';
 import { spec } from '../spec';
 
 export let listSalaries = SlateTool.create(spec, {
@@ -19,24 +20,17 @@ export let listSalaries = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      salaries: z.array(z.record(z.string(), z.any())).describe('List of salary records')
+      pagination: paginationSchema.optional(),
+      salaries: z.array(z.record(z.string(), z.unknown())).describe('List of salary records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    const client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
-    let result = await client.listSalaries({
-      page: ctx.input.page,
-      perPage: ctx.input.perPage
-    });
-
-    let salaries = result?.salaries || [];
-
+    const result = await client.list('salaries', { ...pageParams(ctx.input, true) }, true);
+    const salaries = readRows(result, 'salaries');
     return {
-      output: { salaries },
+      output: { salaries, pagination: result.pagination },
       message: `Retrieved **${salaries.length}** salary record(s).`
     };
   })

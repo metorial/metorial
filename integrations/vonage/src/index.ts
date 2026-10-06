@@ -13,8 +13,6 @@ import {
   sendSms,
   verifyUser
 } from './tools';
-import { messageEvents, verifyEvents, voiceEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     manageApplications,
     getAccountInfo
   ],
-  triggers: [messageEvents, voiceEvents, verifyEvents]
+  triggers: []
 });

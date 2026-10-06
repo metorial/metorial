@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ModeClient } from '../lib/client';
+import { ModeClient, requireToken } from '../lib/client';
 import { getEmbedded, normalizeDefinition } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -9,13 +9,15 @@ let definitionSchema = z.object({
   name: z.string().describe('Name of the definition'),
   description: z.string().describe('Description of the definition'),
   createdAt: z.string(),
-  updatedAt: z.string()
+  updatedAt: z.string(),
+  source: z.string().optional().describe('SQL SELECT statement'),
+  dataSourceId: z.number().optional().describe('Numeric data source ID')
 });
 
 export let listDefinitions = SlateTool.create(spec, {
   name: 'List Definitions',
   key: 'list_definitions',
-  description: `List metric definitions in the workspace. Definitions provide a shared vocabulary for key metrics across the organization. Optionally filter by tokens.`,
+  description: `List SQL definitions in the workspace. Definitions store reusable SQL SELECT statements. Optionally filter by tokens.`,
   tags: {
     readOnly: true
   }
@@ -34,11 +36,7 @@ export let listDefinitions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let data = await client.listDefinitions({
       tokens: ctx.input.tokens
@@ -55,8 +53,8 @@ export let listDefinitions = SlateTool.create(spec, {
 export let manageDefinition = SlateTool.create(spec, {
   name: 'Manage Definition',
   key: 'manage_definition',
-  description: `Create, update, or delete a metric definition in the workspace.
-Use **create** to add a new shared metric definition.
+  description: `Create, update, or delete a SQL definition in the workspace.
+Use **create** to add a new shared SQL definition.
 Use **update** to modify an existing definition.
 Use **delete** to remove a definition.`,
   tags: {
@@ -71,23 +69,23 @@ Use **delete** to remove a definition.`,
         .optional()
         .describe('Token of the definition (required for update/delete)'),
       name: z.string().optional().describe('Name of the definition'),
-      description: z.string().optional().describe('Description of the definition')
+      description: z.string().optional().describe('Description of the definition'),
+      source: z.string().optional().describe('SQL SELECT statement for the definition'),
+      dataSourceId: z.number().optional().describe('Numeric ID of the associated data source')
     })
   )
   .output(definitionSchema)
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let { action } = ctx.input;
 
     if (action === 'create') {
       let raw = await client.createDefinition({
         name: ctx.input.name,
-        description: ctx.input.description
+        description: ctx.input.description,
+        source: ctx.input.source,
+        data_source_id: ctx.input.dataSourceId
       });
       let definition = normalizeDefinition(raw);
       return {
@@ -97,10 +95,15 @@ Use **delete** to remove a definition.`,
     }
 
     if (action === 'update') {
-      let body: Record<string, any> = {};
-      if (ctx.input.name !== undefined) body.name = ctx.input.name;
-      if (ctx.input.description !== undefined) body.description = ctx.input.description;
-      let raw = await client.updateDefinition(ctx.input.definitionToken!, body);
+      const raw = await client.updateDefinition(
+        requireToken(ctx.input.definitionToken, 'definitionToken'),
+        {
+          name: ctx.input.name,
+          description: ctx.input.description,
+          source: ctx.input.source,
+          data_source_id: ctx.input.dataSourceId
+        }
+      );
       let definition = normalizeDefinition(raw);
       return {
         output: definition,
@@ -109,9 +112,11 @@ Use **delete** to remove a definition.`,
     }
 
     // delete
-    let existing = await client.getDefinition(ctx.input.definitionToken!);
+    let existing = await client.getDefinition(
+      requireToken(ctx.input.definitionToken, 'definitionToken')
+    );
     let definition = normalizeDefinition(existing);
-    await client.deleteDefinition(ctx.input.definitionToken!);
+    await client.deleteDefinition(requireToken(ctx.input.definitionToken, 'definitionToken'));
     return {
       output: definition,
       message: `Deleted definition **${definition.name}**.`

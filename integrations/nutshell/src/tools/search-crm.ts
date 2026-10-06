@@ -40,7 +40,7 @@ export let searchCrm = SlateTool.create(spec, {
 
     let results = await client.searchUniversal(ctx.input.searchQuery);
 
-    let mapped = results.map((r: any) => ({
+    let mapped = results.map(r => ({
       entityId: r.id,
       entityType: r.entityType,
       name: r.name || r.description

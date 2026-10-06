@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaveClient } from '../lib/client';
+import type { SalesTax } from '../lib/contracts';
+import { decimalNumber } from '../lib/validation';
 import { spec } from '../spec';
 
 let salesTaxOutputSchema = z.object({
@@ -26,17 +28,20 @@ let salesTaxOutputSchema = z.object({
   modifiedAt: z.string().optional().describe('Last modification timestamp')
 });
 
-let mapSalesTax = (t: any) => ({
+let mapSalesTax = (t: SalesTax) => ({
   salesTaxId: t.id,
   name: t.name,
   abbreviation: t.abbreviation,
   description: t.description,
   taxNumber: t.taxNumber,
-  rate: t.rate,
+  rate: decimalNumber(t.rate, 2),
   isCompound: t.isCompound,
   isRecoverable: t.isRecoverable,
   isArchived: t.isArchived,
-  rates: t.rates,
+  rates: t.rates.map(rate => ({
+    effective: rate.effective,
+    rate: decimalNumber(rate.rate, 2)
+  })),
   createdAt: t.createdAt,
   modifiedAt: t.modifiedAt
 });
@@ -51,9 +56,14 @@ export let listSalesTaxes = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('sales_tax:read'))
   .input(
     z.object({
-      businessId: z.string().describe('ID of the business to list sales taxes for'),
+      businessId: z
+        .string()
+        .describe(
+          'ID of the business to list sales taxes for. Call list_businesses to discover a permitted business ID.'
+        ),
       page: z.number().optional().describe('Page number (starts at 1, default: 1)'),
       pageSize: z.number().optional().describe('Number of results per page (default: 20)')
     })
@@ -70,8 +80,8 @@ export let listSalesTaxes = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.listSalesTaxes(
       ctx.input.businessId,
-      ctx.input.page || 1,
-      ctx.input.pageSize || 20
+      ctx.input.page ?? 1,
+      ctx.input.pageSize ?? 20
     );
 
     return {
@@ -91,11 +101,17 @@ export let listSalesTaxes = SlateTool.create(spec, {
 export let createSalesTax = SlateTool.create(spec, {
   name: 'Create Sales Tax',
   key: 'create_sales_tax',
+  tags: { readOnly: false },
   description: `Create a new sales tax entry for a Wave business. Configure the tax rate, abbreviation, and whether it is compound or recoverable.`
 })
+  .scopes(anyOf('sales_tax:write'))
   .input(
     z.object({
-      businessId: z.string().describe('ID of the business to create the sales tax for'),
+      businessId: z
+        .string()
+        .describe(
+          'ID of the business to create the sales tax for. Call list_businesses to discover a permitted business ID.'
+        ),
       name: z.string().describe('Sales tax name (e.g., "State Sales Tax")'),
       abbreviation: z.string().describe('Short abbreviation (e.g., "GST", "HST", "VAT")'),
       rate: z.number().describe('Tax rate as a percentage (e.g., 13 for 13%)'),
@@ -113,15 +129,9 @@ export let createSalesTax = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.createSalesTax(ctx.input);
 
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to create sales tax: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
-
     return {
       output: mapSalesTax(result.data),
-      message: `Created sales tax **${result.data.name}** (${result.data.abbreviation}) at ${result.data.rate}%.`
+      message: `Created sales tax **${result.data.name}** (${result.data.abbreviation}) at ${decimalNumber(result.data.rate, 2)}%.`
     };
   })
   .build();
@@ -131,20 +141,43 @@ export let createSalesTax = SlateTool.create(spec, {
 export let updateSalesTax = SlateTool.create(spec, {
   name: 'Update Sales Tax',
   key: 'update_sales_tax',
-  description: `Update an existing sales tax entry's details. Only the fields you provide will be updated; omitted fields remain unchanged. Note: to change the rate, use the Wave UI or the salesTaxRateCreate mutation with an effective date.`,
+  tags: { readOnly: false },
+  description: `Update an existing sales tax entry's details. Only the fields you provide will be updated; omitted fields remain unchanged. To change rates, provide the documented effective-date rates array in percentage units.`,
   instructions: [
-    'The rate field cannot be changed via patchSalesTax. To change rates, a new rate entry with an effective date must be created.'
+    'Supply rates with effective dates to update the documented rate schedule. The rates use percentage units, such as 5 for 5%.'
   ]
 })
+  .scopes(anyOf('sales_tax:write'))
   .input(
     z.object({
       salesTaxId: z.string().describe('ID of the sales tax to update'),
+      rates: z
+        .array(
+          z.object({
+            effective: z.string().describe('Effective date (YYYY-MM-DD).'),
+            rate: z
+              .number()
+              .describe(
+                'Rate as a percentage, such as 5 for 5%; at most four percentage decimal places.'
+              )
+          })
+        )
+        .optional()
+        .describe(
+          'Documented effective-date rate schedule. Omit to keep current rates; supplied rates affect tax calculations.'
+        ),
       name: z.string().optional().describe('Updated sales tax name'),
       abbreviation: z.string().optional().describe('Updated abbreviation'),
       description: z.string().optional().describe('Updated description'),
       taxNumber: z.string().optional().describe('Updated tax registration number'),
-      isCompound: z.boolean().optional().describe('Updated compound tax status'),
-      isRecoverable: z.boolean().optional().describe('Updated recoverable status')
+      isCompound: z
+        .boolean()
+        .optional()
+        .describe('Legacy field unsupported by tax updates; omit it.'),
+      isRecoverable: z
+        .boolean()
+        .optional()
+        .describe('Legacy field unsupported by tax updates; omit it.')
     })
   )
   .output(salesTaxOutputSchema)
@@ -152,12 +185,6 @@ export let updateSalesTax = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let { salesTaxId, ...rest } = ctx.input;
     let result = await client.patchSalesTax({ id: salesTaxId, ...rest });
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to update sales tax: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
 
     return {
       output: mapSalesTax(result.data),
@@ -171,11 +198,10 @@ export let updateSalesTax = SlateTool.create(spec, {
 export let archiveSalesTax = SlateTool.create(spec, {
   name: 'Archive Sales Tax',
   key: 'archive_sales_tax',
-  description: `Archive a sales tax entry. Archived sales taxes are hidden from active listings but are not deleted.`,
-  tags: {
-    destructive: true
-  }
+  tags: { readOnly: false, destructive: true },
+  description: `Archive a sales tax entry. Archived sales taxes are hidden from active listings but are not deleted.`
 })
+  .scopes(anyOf('sales_tax:write'))
   .input(
     z.object({
       salesTaxId: z.string().describe('ID of the sales tax to archive')
@@ -188,13 +214,7 @@ export let archiveSalesTax = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new WaveClient(ctx.auth.token);
-    let result = await client.archiveSalesTax(ctx.input.salesTaxId);
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to archive sales tax: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
+    await client.archiveSalesTax(ctx.input.salesTaxId);
 
     return {
       output: { success: true },

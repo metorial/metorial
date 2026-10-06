@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -19,7 +19,11 @@ let locationInfoSchema = z
 
 let fundingInfoSchema = z
   .object({
-    fundingRounds: z.number().optional().describe('Number of funding rounds'),
+    fundingRounds: z
+      .number()
+      .optional()
+      .describe('Number of funding rounds when the provider value is safely numeric'),
+    fundingRoundsText: z.string().optional().describe('Native provider funding-round text'),
     fundingTotalUsd: z.number().optional().describe('Total funding in USD'),
     lastFundingOn: z.string().optional().describe('Date of last funding round'),
     lastFundingType: z.string().optional().describe('Type of last funding round'),
@@ -112,6 +116,10 @@ Returns employee counts, revenue range, technologies, funding details, SIC/NAICS
 })
   .input(
     z.object({
+      companyId: z
+        .string()
+        .optional()
+        .describe('LeadIQ company ID returned by company or advanced search.'),
       name: z.string().optional().describe('Company name to search for'),
       domain: z.string().optional().describe('Company domain (e.g., acme.com)'),
       linkedinId: z.string().optional().describe('LinkedIn company ID'),
@@ -129,7 +137,21 @@ Returns employee counts, revenue range, technologies, funding details, SIC/NAICS
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (
+      ![
+        ctx.input.companyId,
+        ctx.input.name,
+        ctx.input.domain,
+        ctx.input.linkedinId,
+        ctx.input.linkedinUrl
+      ].some(value => value?.trim())
+    )
+      throw createApiServiceError(
+        'Provide a company ID, name, domain or LinkedIn identifier.',
+        { reason: 'invalid_input' }
+      );
     let input: Record<string, any> = {};
+    if (ctx.input.companyId) input.id = ctx.input.companyId;
     if (ctx.input.name) input.name = ctx.input.name;
     if (ctx.input.domain) input.domain = ctx.input.domain;
     if (ctx.input.linkedinId) input.linkedinId = ctx.input.linkedinId;
@@ -138,7 +160,15 @@ Returns employee counts, revenue range, technologies, funding details, SIC/NAICS
 
     let result = await client.searchCompany(input);
 
-    let results = (result.results ?? []).map((r: any) => ({
+    if (
+      !Array.isArray(result?.results) ||
+      typeof result.totalResults !== 'number' ||
+      typeof result.hasMore !== 'boolean'
+    )
+      throw createApiServiceError('LeadIQ returned an invalid company-search page.', {
+        reason: 'invalid_api_response'
+      });
+    let results = result.results.map((r: any) => ({
       companyId: r.id,
       name: r.name,
       alternativeNames: r.alternativeNames,
@@ -186,12 +216,12 @@ Returns employee counts, revenue range, technologies, funding details, SIC/NAICS
       updatedDate: r.updatedDate
     }));
 
-    let totalResults = result.totalResults ?? 0;
+    let totalResults = result.totalResults;
 
     return {
       output: {
         totalResults,
-        hasMore: result.hasMore ?? false,
+        hasMore: result.hasMore,
         results
       },
       message:

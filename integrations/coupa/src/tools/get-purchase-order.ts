@@ -31,14 +31,14 @@ export let getPurchaseOrder = SlateTool.create(spec, {
       createdAt: z.string().nullable().optional().describe('Creation timestamp'),
       updatedAt: z.string().nullable().optional().describe('Last update timestamp'),
       createdBy: z.any().nullable().optional().describe('Creator user object'),
-      rawData: z.any().optional().describe('Complete raw PO data')
+      rawData: z
+        .any()
+        .optional()
+        .describe('Native data with documented credential fields omitted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let po = await client.getPurchaseOrder(ctx.input.purchaseOrderId);
 
@@ -53,7 +53,7 @@ export let getPurchaseOrder = SlateTool.create(spec, {
         currency: po.currency ?? null,
         paymentTerms: po['payment-term'] ?? po.payment_term ?? null,
         orderLines: po['order-lines'] ?? po.order_lines ?? null,
-        totalAmount: po.total ?? po.total ?? null,
+        totalAmount: po.total ?? null,
         createdAt: po['created-at'] ?? po.created_at ?? null,
         updatedAt: po['updated-at'] ?? po.updated_at ?? null,
         createdBy: po['created-by'] ?? po.created_by ?? null,

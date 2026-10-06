@@ -3,11 +3,14 @@ import { spec } from './spec';
 import {
   createAsset,
   createEntry,
+  downloadAsset,
   getAsset,
+  getCurrentUser,
   getEntry,
   listContentTypes,
   listEnvironments,
   listLocales,
+  listSpaces,
   manageAssetLifecycle,
   manageContentType,
   manageEntryLifecycle,
@@ -19,11 +22,12 @@ import {
   syncContent,
   updateEntry
 } from './tools';
-import { assetEvents, contentTypeEvents, entryEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    listSpaces,
+    downloadAsset,
     searchEntries,
     getEntry,
     createEntry,
@@ -42,5 +46,5 @@ export let provider = Slate.create({
     scheduleAction,
     manageRelease
   ],
-  triggers: [entryEvents, assetEvents, contentTypeEvents]
+  triggers: []
 });

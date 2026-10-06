@@ -29,8 +29,6 @@ import {
   unsubscribe,
   updateSubscriber
 } from './tools';
-import { formSubscribeEvent, purchaseEvent, subscriberEvent, tagEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,5 +60,5 @@ export let provider = Slate.create({
     managePosts,
     manageSnippets
   ],
-  triggers: [subscriberEvent, tagEvent, purchaseEvent, formSubscribeEvent]
+  triggers: []
 });

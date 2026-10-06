@@ -1,6 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import {
+  invalid,
+  nonemptyPatch,
+  recordSchema,
+  required,
+  taskReceipt,
+  unsupported
+} from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageUser = SlateTool.create(spec, {
@@ -12,7 +20,9 @@ export let manageUser = SlateTool.create(spec, {
 - **deactivate** / **reactivate**: Changes the user's active status.`,
   instructions: [
     'For invite action, role must be one of: BUSINESS_ADMIN, BUSINESS_USER, BUSINESS_BOOKKEEPER',
-    'For invite, an idempotencyKey is auto-generated if not provided'
+    'Invitations are asynchronous. Use get_task_status and a user readback before claiming completion.',
+    'Keep the task ID and caller-supplied idempotencyKey. Ramp may reject a duplicate key; an ambiguous request requires task or exact-email readback before another create attempt. Generated keys change between invocations.',
+    'Updating email is not supported by the current API. Name and manager fields are supported.'
   ]
 })
   .input(
@@ -35,6 +45,12 @@ export let manageUser = SlateTool.create(spec, {
       locationId: z.string().optional().describe('Location ID to assign'),
       directManagerId: z.string().optional().describe('Direct manager user ID'),
       isManager: z.boolean().optional().describe('Whether the user is a manager'),
+      isDraft: z
+        .boolean()
+        .optional()
+        .describe(
+          "For invite: create a draft user without sending an invitation. Defaults to the provider's normal invitation behavior when omitted."
+        ),
       idempotencyKey: z
         .string()
         .optional()
@@ -43,74 +59,93 @@ export let manageUser = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      result: z.any().describe('API response from the action')
+      result: recordSchema.describe(
+        'API resource, deferred receipt, or empty-success acknowledgment'
+      ),
+      taskId: z
+        .string()
+        .optional()
+        .describe('Deferred user-invitation task identifier, when submitted.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let { action } = ctx.input;
-
-    if (action === 'invite') {
-      if (!ctx.input.email || !ctx.input.firstName || !ctx.input.lastName || !ctx.input.role) {
-        throw new Error('email, firstName, lastName, and role are required for invite action');
-      }
-
+    let client = clientFor(ctx);
+    if (ctx.input.action === 'invite') {
+      required(ctx.input.email, 'email');
+      required(ctx.input.firstName, 'firstName');
+      required(ctx.input.lastName, 'lastName');
+      required(ctx.input.role, 'role');
+      if (!z.email().safeParse(ctx.input.email).success)
+        throw invalid('email must be a valid email address.');
+      if ((ctx.input.firstName?.length ?? 0) > 255 || (ctx.input.lastName?.length ?? 0) > 255)
+        throw invalid('User names must not exceed 255 characters.');
       let result = await client.createUserInvite({
-        email: ctx.input.email,
-        firstName: ctx.input.firstName,
-        lastName: ctx.input.lastName,
-        role: ctx.input.role,
+        email: required(ctx.input.email, 'email'),
+        firstName: required(ctx.input.firstName, 'firstName'),
+        lastName: required(ctx.input.lastName, 'lastName'),
+        role: required(ctx.input.role, 'role'),
         departmentId: ctx.input.departmentId,
         locationId: ctx.input.locationId,
         directManagerId: ctx.input.directManagerId,
         isManager: ctx.input.isManager,
-        idempotencyKey: ctx.input.idempotencyKey || crypto.randomUUID()
+        isDraft: ctx.input.isDraft,
+        idempotencyKey:
+          ctx.input.idempotencyKey === undefined
+            ? crypto.randomUUID()
+            : required(ctx.input.idempotencyKey, 'idempotencyKey')
       });
-
+      let taskId = taskReceipt(result);
       return {
-        output: { result },
-        message: `Invited **${ctx.input.email}** as **${ctx.input.role}**.`
+        output: { result, taskId },
+        message: ctx.input.isDraft
+          ? 'Submitted a draft-user creation task without requesting an invitation email.'
+          : 'Submitted the user invitation task. Check its status and read back the user.'
       };
     }
-
-    if (!ctx.input.userId) {
-      throw new Error('userId is required for update, deactivate, and reactivate actions');
-    }
-
-    if (action === 'update') {
-      let result = await client.updateUser(ctx.input.userId, {
+    required(ctx.input.userId, 'userId');
+    if (ctx.input.action === 'update') {
+      unsupported(ctx.input, ['email', 'isDraft', 'idempotencyKey'], 'User update');
+      let fields = {
         departmentId: ctx.input.departmentId,
         locationId: ctx.input.locationId,
         directManagerId: ctx.input.directManagerId,
-        role: ctx.input.role
-      });
-
+        role: ctx.input.role,
+        firstName: ctx.input.firstName,
+        lastName: ctx.input.lastName,
+        isManager: ctx.input.isManager
+      };
+      nonemptyPatch(fields);
+      for (let [key, value] of Object.entries(fields))
+        if (typeof value === 'string') required(value, key);
+      let result = await client.updateUser(required(ctx.input.userId, 'userId'), fields);
       return {
         output: { result },
-        message: `Updated user **${ctx.input.userId}**.`
+        message: 'Ramp acknowledged the user update. Read the user to confirm its state.'
       };
     }
-
-    if (action === 'deactivate') {
-      let result = await client.deactivateUser(ctx.input.userId);
-      return {
-        output: { result },
-        message: `Deactivated user **${ctx.input.userId}**.`
-      };
-    }
-
-    if (action === 'reactivate') {
-      let result = await client.reactivateUser(ctx.input.userId);
-      return {
-        output: { result },
-        message: `Reactivated user **${ctx.input.userId}**.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
+    unsupported(
+      ctx.input,
+      [
+        'email',
+        'firstName',
+        'lastName',
+        'role',
+        'departmentId',
+        'locationId',
+        'directManagerId',
+        'isManager',
+        'isDraft',
+        'idempotencyKey'
+      ],
+      'User status change'
+    );
+    let result =
+      ctx.input.action === 'deactivate'
+        ? await client.deactivateUser(required(ctx.input.userId, 'userId'))
+        : await client.reactivateUser(required(ctx.input.userId, 'userId'));
+    return {
+      output: { result },
+      message: 'Ramp acknowledged the user status change. Read the user to confirm its state.'
+    };
   })
   .build();

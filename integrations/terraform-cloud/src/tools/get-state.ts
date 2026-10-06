@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { parseResource, sensitivity, text } from '../lib/contracts';
 import { createClient } from '../lib/helpers';
 import { mapPagination, mapStateVersion } from '../lib/mappers';
 import { spec } from '../spec';
@@ -59,7 +60,7 @@ export let listStateVersionsTool = SlateTool.create(spec, {
 export let getCurrentStateTool = SlateTool.create(spec, {
   name: 'Get Current State',
   key: 'get_current_state',
-  description: `Get the current (latest) state version for a workspace, including its outputs. Returns state metadata and all output values that can be used by other workspaces.`,
+  description: `Get the current (latest) state version for a workspace, including fully paginated public outputs. Sensitive values are always hidden. Returns state metadata and output values that can be used by other workspaces.`,
   tags: {
     readOnly: true
   }
@@ -72,6 +73,12 @@ export let getCurrentStateTool = SlateTool.create(spec, {
   .output(
     z.object({
       stateVersion: stateVersionSchema,
+      outputsReady: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the provider finished extracting outputs; false is a pending state, not an empty result'
+        ),
       outputs: z.array(
         z.object({
           outputId: z.string(),
@@ -88,29 +95,23 @@ export let getCurrentStateTool = SlateTool.create(spec, {
     let response = await client.getCurrentStateVersion(ctx.input.workspaceId);
     let stateVersion = mapStateVersion(response.data);
 
-    let outputs: Array<{
-      outputId: string;
-      name: string;
-      sensitive: boolean;
-      type: string;
-      value: any;
-    }> = [];
-    try {
-      let outputsResponse = await client.getStateVersionOutputs(stateVersion.stateVersionId);
-      outputs = (outputsResponse.data || []).map((o: any) => ({
-        outputId: o.id || '',
-        name: o.attributes?.name || '',
-        sensitive: o.attributes?.sensitive ?? false,
-        type: o.attributes?.type || '',
-        value: o.attributes?.value ?? null
-      }));
-    } catch {
-      // outputs may not be available
-    }
+    const outputs = stateVersion.resourcesProcessed
+      ? (await client.getStateVersionOutputs(stateVersion.stateVersionId)).data.map(value => {
+          const output = parseResource(value, 'state-version-outputs');
+          const a = output.attributes;
+          return {
+            outputId: output.id,
+            name: text(a.name),
+            sensitive: sensitivity(a.sensitive),
+            type: text(a.type),
+            value: sensitivity(a.sensitive) ? null : (a.value ?? null)
+          };
+        })
+      : [];
 
     return {
-      output: { stateVersion, outputs },
-      message: `Current state version: serial **${stateVersion.serial}** (${stateVersion.stateVersionId}), with **${outputs.length}** output(s).`
+      output: { stateVersion, outputs, outputsReady: stateVersion.resourcesProcessed },
+      message: `Current state version: serial **${stateVersion.serial}** (${stateVersion.stateVersionId}), ${stateVersion.resourcesProcessed ? `with **${outputs.length}** output(s).` : '— outputs are still processing; retry after resourcesProcessed becomes true.'}`
     };
   })
   .build();

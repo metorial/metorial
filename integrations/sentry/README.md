@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/sentry.svg" height="20"> Sentry
 
-Track, manage, and resolve application errors and performance issues. List, query, and bulk-update issues and error events with filters like status, assignment, and tags. Create and manage releases, associate commits, and upload source maps. Configure issue alert rules and metric alert rules with notification actions. Set up cron monitors to detect missed or failed scheduled jobs. Build custom dashboards with configurable widgets. Run ad-hoc Discover queries across errors and transactions for performance analysis. Manage organizations, teams, projects, and members. Provision users via SCIM. Access session replay data. Receive webhooks for issues, errors, alerts, comments, and installation events.
+Track, manage, and resolve application errors and performance issues. List, query, and bulk-update issues and error events with filters like status, assignment, and tags. Create and manage releases, associate commits, and upload source maps. Configure issue alert rules and metric alert rules with notification actions. Set up cron monitors to detect missed or failed scheduled jobs. Build custom dashboards with configurable widgets. Run ad-hoc Discover queries across errors and transactions for performance analysis. Manage organizations, teams, projects, and members. Provision users via SCIM. Access session replay data.
 
 ## Tools
 

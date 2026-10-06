@@ -1,13 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fail } from '../lib/native';
 import { spec } from '../spec';
 
 let playlistTrackSchema = z.object({
   trackId: z.string().describe('Track ID (URN)'),
   title: z.string().describe('Track title'),
-  duration: z.number().describe('Duration in milliseconds'),
-  username: z.string().describe('Uploader username')
+  duration: z.number().nullable().optional().describe('Duration in milliseconds'),
+  username: z.string().optional().describe('Uploader username')
 });
 
 export let getPlaylist = SlateTool.create(spec, {
@@ -18,43 +19,90 @@ export let getPlaylist = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      playlistId: z.string().describe('Playlist ID or URN')
+      playlistId: z.string().describe('Playlist ID or URN'),
+      listTracks: z
+        .boolean()
+        .optional()
+        .describe(
+          'Read a native paginated track page rather than relying on the possibly partial embedded tracks'
+        ),
+      nextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact native continuation for this playlist track list; requires listTracks'
+        ),
+      secretToken: z
+        .string()
+        .optional()
+        .describe('Native secret token for authorized private-playlist access, when required')
     })
   )
   .output(
     z.object({
       playlistId: z.string().describe('Unique identifier (URN) of the playlist'),
       title: z.string().describe('Title of the playlist'),
-      description: z.string().nullable().describe('Playlist description'),
-      permalinkUrl: z.string().describe('URL to the playlist on SoundCloud'),
-      duration: z.number().describe('Total duration in milliseconds'),
-      trackCount: z.number().describe('Number of tracks'),
-      likesCount: z.number().describe('Number of likes'),
-      repostsCount: z.number().describe('Number of reposts'),
-      isAlbum: z.boolean().describe('Whether marked as an album'),
-      sharing: z.string().describe('Sharing setting'),
-      createdAt: z.string().describe('When the playlist was created'),
-      lastModified: z.string().describe('When the playlist was last modified'),
-      username: z.string().describe('Creator username'),
-      userId: z.string().describe('Creator user ID'),
-      tracks: z.array(playlistTrackSchema).describe('Tracks in the playlist')
+      description: z.string().nullable().optional().describe('Playlist description'),
+      permalinkUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('URL to the playlist on SoundCloud'),
+      duration: z.number().nullable().optional().describe('Total duration in milliseconds'),
+      trackCount: z.number().nullable().optional().describe('Number of tracks'),
+      likesCount: z.number().nullable().optional().describe('Number of likes'),
+      repostsCount: z.number().nullable().optional().describe('Number of reposts'),
+      isAlbum: z.boolean().optional().describe('Whether marked as an album'),
+      sharing: z.string().nullable().optional().describe('Sharing setting'),
+      createdAt: z.string().nullable().optional().describe('When the playlist was created'),
+      lastModified: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('When the playlist was last modified'),
+      username: z.string().optional().describe('Creator username'),
+      userId: z.string().optional().describe('Creator user ID'),
+      tracks: z
+        .array(playlistTrackSchema)
+        .optional()
+        .describe(
+          'Embedded tracks or the requested native track page; not an invented complete inventory'
+        ),
+      nextHref: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native next track page, when supplied'),
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('Whether this native track page has a continuation')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
-    let playlist = await client.getPlaylist(ctx.input.playlistId);
+    if (ctx.input.nextHref && !ctx.input.listTracks)
+      throw fail('nextHref requires listTracks for the same playlist.');
+    let playlist = await client.getPlaylist(ctx.input.playlistId, ctx.input.secretToken);
+    const page = ctx.input.listTracks
+      ? await client.getPlaylistTracks(
+          ctx.input.playlistId,
+          ctx.input.nextHref,
+          ctx.input.secretToken
+        )
+      : undefined;
 
-    let tracks = (playlist.tracks || []).map(t => ({
-      trackId: t.urn || String(t.id),
+    let tracks = (page?.collection ?? playlist.tracks)?.map(t => ({
+      trackId: t.urn,
       title: t.title,
       duration: t.duration,
-      username: t.user?.username || ''
+      username: t.user?.username
     }));
 
     return {
       output: {
-        playlistId: playlist.urn || String(playlist.id),
+        playlistId: playlist.urn,
         title: playlist.title,
         description: playlist.description,
         permalinkUrl: playlist.permalink_url,
@@ -66,9 +114,11 @@ export let getPlaylist = SlateTool.create(spec, {
         sharing: playlist.sharing,
         createdAt: playlist.created_at,
         lastModified: playlist.last_modified,
-        username: playlist.user?.username || '',
-        userId: playlist.user?.urn || String(playlist.user?.id),
-        tracks
+        username: playlist.user?.username,
+        userId: playlist.user?.urn,
+        tracks,
+        nextHref: page?.next_href,
+        hasMore: page ? !!page.next_href : undefined
       },
       message: `Retrieved playlist **"${playlist.title}"** with ${playlist.track_count} tracks.`
     };
@@ -100,14 +150,18 @@ export let createPlaylist = SlateTool.create(spec, {
     z.object({
       playlistId: z.string().describe('Unique identifier (URN) of the created playlist'),
       title: z.string().describe('Title'),
-      permalinkUrl: z.string().describe('URL to the playlist on SoundCloud'),
-      sharing: z.string().describe('Sharing setting'),
-      trackCount: z.number().describe('Number of tracks'),
-      createdAt: z.string().describe('When the playlist was created')
+      permalinkUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('URL to the playlist on SoundCloud'),
+      sharing: z.string().nullable().optional().describe('Sharing setting'),
+      trackCount: z.number().nullable().optional().describe('Number of tracks'),
+      createdAt: z.string().nullable().optional().describe('When the playlist was created')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let playlist = await client.createPlaylist({
       title: ctx.input.title,
@@ -119,7 +173,7 @@ export let createPlaylist = SlateTool.create(spec, {
 
     return {
       output: {
-        playlistId: playlist.urn || String(playlist.id),
+        playlistId: playlist.urn,
         title: playlist.title,
         permalinkUrl: playlist.permalink_url,
         sharing: playlist.sharing,
@@ -158,14 +212,22 @@ export let updatePlaylist = SlateTool.create(spec, {
     z.object({
       playlistId: z.string().describe('Unique identifier (URN) of the updated playlist'),
       title: z.string().describe('Updated title'),
-      permalinkUrl: z.string().describe('URL to the playlist on SoundCloud'),
-      sharing: z.string().describe('Sharing setting'),
-      trackCount: z.number().describe('Number of tracks'),
-      lastModified: z.string().describe('When the playlist was last modified')
+      permalinkUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('URL to the playlist on SoundCloud'),
+      sharing: z.string().nullable().optional().describe('Sharing setting'),
+      trackCount: z.number().nullable().optional().describe('Number of tracks'),
+      lastModified: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('When the playlist was last modified')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let playlist = await client.updatePlaylist(ctx.input.playlistId, {
       title: ctx.input.title,
@@ -177,7 +239,7 @@ export let updatePlaylist = SlateTool.create(spec, {
 
     return {
       output: {
-        playlistId: playlist.urn || String(playlist.id),
+        playlistId: playlist.urn,
         title: playlist.title,
         permalinkUrl: playlist.permalink_url,
         sharing: playlist.sharing,
@@ -206,7 +268,7 @@ export let deletePlaylist = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     await client.deletePlaylist(ctx.input.playlistId);
 

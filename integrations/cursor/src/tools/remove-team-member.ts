@@ -19,7 +19,12 @@ export let removeTeamMember = SlateTool.create(spec, {
   .input(
     z.object({
       email: z.string().optional().describe('Email of the member to remove'),
-      userId: z.string().optional().describe('Encoded user ID of the member to remove')
+      userId: z
+        .string()
+        .optional()
+        .describe(
+          'Encoded user ID from list_team_members. Provide userId or email, never both'
+        )
     })
   )
   .output(

@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, records } from '../lib/client';
 import { spec } from '../spec';
 
 export let complianceCheck = SlateTool.create(spec, {
   name: 'Compliance Check',
   key: 'compliance_check',
-  description: `Check opt-out and data privacy compliance status for contacts. Supports GDPR and CCPA compliance by identifying contacts who have opted out or have suppression flags. Use to ensure outreach respects contact preferences.`,
+  description: `Legacy Enterprise API capability, absent from the published current GTM Data API. Confirm route availability and separate entitlement with ZoomInfo before use. Check opt-out and data privacy compliance status for contacts. Returned provider preferences do not establish legal compliance or authorize outreach.`,
   constraints: ['Requires separate Compliance API subscription/entitlement.'],
   tags: {
     readOnly: true
@@ -27,17 +27,14 @@ export let complianceCheck = SlateTool.create(spec, {
   .output(
     z.object({
       results: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .describe('Compliance check results with opt-out status and preference data')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion
-    });
+    const client = Client.fromContext(ctx);
 
-    let params: Record<string, any> = {};
+    let params: Record<string, unknown> = {};
     if (ctx.input.emailAddresses) {
       params.emailAddress = ctx.input.emailAddresses;
     }
@@ -47,7 +44,7 @@ export let complianceCheck = SlateTool.create(spec, {
 
     let result = await client.searchCompliance(params);
 
-    let results = result.data || result.result || [];
+    const results = records(result);
 
     return {
       output: { results },

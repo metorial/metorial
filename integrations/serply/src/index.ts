@@ -11,8 +11,6 @@ import {
   videoSearch,
   webSearch
 } from './tools';
-import { searchEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     scholarSearch,
     serpRanking
   ],
-  triggers: [searchEvents]
+  triggers: []
 });

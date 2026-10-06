@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { recordSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getTransaction = SlateTool.create(spec, {
@@ -18,14 +19,11 @@ export let getTransaction = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      transaction: z.any().describe('Full transaction object')
+      transaction: recordSchema.describe('Full transaction object')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = clientFor(ctx);
 
     let transaction = await client.getTransaction(ctx.input.transactionId);
 

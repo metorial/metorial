@@ -20,17 +20,6 @@ import {
   manageValetOrderTool,
   updateUserTool
 } from './tools';
-import {
-  invoiceEventsTrigger,
-  moveInEventsTrigger,
-  moveOutEventsTrigger,
-  siteEventsTrigger,
-  unitEventsTrigger,
-  unitRentalEventsTrigger,
-  userEventsTrigger,
-  valetOrderEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -53,14 +42,5 @@ export let provider = Slate.create({
     manageLeadTool,
     getSettingsTool
   ],
-  triggers: [
-    unitEventsTrigger,
-    moveInEventsTrigger,
-    moveOutEventsTrigger,
-    invoiceEventsTrigger,
-    userEventsTrigger,
-    unitRentalEventsTrigger,
-    valetOrderEventsTrigger,
-    siteEventsTrigger
-  ]
+  triggers: []
 });

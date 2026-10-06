@@ -8,7 +8,7 @@ export let searchEmployees = SlateTool.create(spec, {
   key: 'search_employees',
   description: `Search and list employees in SAP SuccessFactors. Supports OData filtering, pagination, and field selection. Use this to find employees by name, department, status, hire date, or any other employee attribute.`,
   instructions: [
-    'Use OData v2 filter syntax (e.g., "firstName eq \'John\'" or "status eq \'active\'")',
+    'Use OData v2 filter syntax (e.g., "firstName eq \'John\'" or "status eq \'t\'" for active users)',
     'Combine filters with "and"/"or" operators',
     'Use $top and $skip for pagination'
   ],
@@ -23,7 +23,7 @@ export let searchEmployees = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          "OData $filter expression (e.g., \"department eq 'HR' and status eq 'active'\")"
+          "OData $filter expression (e.g., \"department eq 'HR' and status eq 't'\"). User status codes include t/f (active/inactive), T/F (external 360 users), and e/d (external suite users)."
         ),
       select: z
         .string()
@@ -34,6 +34,12 @@ export let searchEmployees = SlateTool.create(spec, {
       expand: z.string().optional().describe('Navigation properties to expand'),
       orderBy: z.string().optional().describe('Field to sort by (e.g., "lastName asc")'),
       top: z.number().optional().describe('Maximum number of records to return').default(100),
+      nextPage: z
+        .string()
+        .optional()
+        .describe(
+          'Exact nextLink from the preceding result. Keep the entity and original query unchanged; do not combine with skip.'
+        ),
       skip: z.number().optional().describe('Number of records to skip for pagination'),
       includeCount: z
         .boolean()
@@ -47,6 +53,13 @@ export let searchEmployees = SlateTool.create(spec, {
       employees: z
         .array(z.record(z.string(), z.unknown()))
         .describe('List of matching employee records'),
+      nextLink: z
+        .string()
+        .optional()
+        .describe(
+          'Exact provider continuation URL; pass it as nextPage to retrieve the next page.'
+        ),
+      hasMore: z.boolean().optional().describe('Whether SAP returned another page.'),
       totalCount: z
         .number()
         .optional()
@@ -66,13 +79,16 @@ export let searchEmployees = SlateTool.create(spec, {
       orderBy: ctx.input.orderBy,
       top: ctx.input.top,
       skip: ctx.input.skip,
+      nextPage: ctx.input.nextPage,
       inlineCount: ctx.input.includeCount
     });
 
     return {
       output: {
         employees: result.results,
-        totalCount: result.count
+        totalCount: result.count,
+        nextLink: result.nextLink,
+        hasMore: result.hasMore
       },
       message: `Found **${result.results.length}** employees${result.count !== undefined ? ` (${result.count} total)` : ''}`
     };

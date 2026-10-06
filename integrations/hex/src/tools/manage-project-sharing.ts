@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type HexProject, validateSharing } from '../lib/client';
 import { spec } from '../spec';
 
 let accessLevelEnum = z.enum(['NONE', 'APP_ONLY', 'CAN_VIEW', 'CAN_EDIT', 'FULL_ACCESS']);
@@ -8,9 +8,11 @@ let accessLevelEnum = z.enum(['NONE', 'APP_ONLY', 'CAN_VIEW', 'CAN_EDIT', 'FULL_
 export let manageProjectSharing = SlateTool.create(spec, {
   name: 'Manage Project Sharing',
   key: 'manage_project_sharing',
+  tags: { destructive: true },
   description: `Configure sharing permissions for a Hex project. Supports setting access at multiple levels: individual users, groups, collections, workspace-wide, and public web. Access levels include NONE, APP_ONLY, CAN_VIEW, CAN_EDIT, and FULL_ACCESS. You can update one or more sharing levels in a single call.`,
   instructions: [
-    'Provide at least one of the sharing options (users, groups, collections, workspace, or publicWeb).'
+    'Provide at least one of the sharing options (users, groups, collections, workspace, or publicWeb).',
+    'Each sharing category is updated sequentially. Earlier changes can remain applied if a later category fails; inspect current sharing before retrying. Public web access can disclose the app.'
   ]
 })
   .input(
@@ -61,8 +63,12 @@ export let manageProjectSharing = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
     let { projectId, users, groups, collections, workspace, publicWeb } = ctx.input;
+    validateSharing(ctx.input);
 
     let updatedSharing = {
       usersUpdated: false,
@@ -72,7 +78,7 @@ export let manageProjectSharing = SlateTool.create(spec, {
       publicWebUpdated: false
     };
 
-    let project: any;
+    let project: HexProject | undefined;
 
     if (users && users.length > 0) {
       project = await client.editProjectSharingUsers(projectId, {

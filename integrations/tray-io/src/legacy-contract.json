@@ -1,0 +1,879 @@
+{
+  "list_connectors": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "connectorName": {
+                "type": "string",
+                "description": "Programmatic name of the connector (e.g., \"salesforce\", \"slack\")"
+              },
+              "version": {
+                "type": "string",
+                "description": "Connector version (e.g., \"8.1\")"
+              },
+              "title": {
+                "type": "string",
+                "description": "Human-readable connector name"
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of the connector"
+              }
+            },
+            "required": ["connectorName", "version", "title", "description"],
+            "additionalProperties": false
+          },
+          "description": "List of available connectors"
+        }
+      },
+      "required": ["connectors"],
+      "additionalProperties": false
+    }
+  },
+  "get_connector_operations": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectorName": {
+          "type": "string",
+          "description": "Programmatic name of the connector (e.g., \"salesforce\", \"slack\")"
+        },
+        "version": {
+          "type": "string",
+          "description": "Connector version (e.g., \"8.1\")"
+        },
+        "includeServiceEnvironments": {
+          "default": false,
+          "description": "Whether to also return service environments for authentication setup",
+          "type": "boolean"
+        }
+      },
+      "required": ["connectorName", "version", "includeServiceEnvironments"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "operationName": {
+                "type": "string",
+                "description": "Programmatic operation name (e.g., \"find_records\", \"send_message\")"
+              },
+              "title": {
+                "type": "string",
+                "description": "Human-readable operation name"
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of what the operation does"
+              },
+              "inputSchema": {
+                "description": "JSON Schema defining the required and optional input parameters"
+              },
+              "outputSchema": {
+                "description": "JSON Schema defining the output structure"
+              },
+              "hasDynamicOutput": {
+                "type": "boolean",
+                "description": "Whether the output schema varies based on input"
+              }
+            },
+            "required": [
+              "operationName",
+              "title",
+              "description",
+              "inputSchema",
+              "outputSchema",
+              "hasDynamicOutput"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of available operations"
+        },
+        "serviceEnvironments": {
+          "description": "Service environments for authentication setup (only if requested)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "serviceEnvironmentId": {
+                "type": "string",
+                "description": "ID of the service environment"
+              },
+              "title": {
+                "type": "string",
+                "description": "Name of the service environment"
+              },
+              "scopes": {
+                "type": "array",
+                "items": {},
+                "description": "Available OAuth scopes"
+              },
+              "userData": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User data schema for authentication"
+              },
+              "credentials": {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Credentials schema for authentication"
+              }
+            },
+            "required": ["serviceEnvironmentId", "title", "scopes", "userData", "credentials"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["operations"],
+      "additionalProperties": false
+    }
+  },
+  "call_connector": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectorName": {
+          "type": "string",
+          "description": "Programmatic name of the connector (e.g., \"salesforce\", \"twilio-output\")"
+        },
+        "version": {
+          "type": "string",
+          "description": "Connector version (e.g., \"8.1\", \"2.1\")"
+        },
+        "operationName": {
+          "type": "string",
+          "description": "Operation name to execute (e.g., \"send_sms\", \"find_records\")"
+        },
+        "authId": {
+          "type": "string",
+          "description": "Authentication ID (UUID) for the target service"
+        },
+        "operationInput": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Input parameters for the operation, matching the operation input schema"
+        }
+      },
+      "required": ["connectorName", "version", "operationName", "authId", "operationInput"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "description": "Operation outcome: \"success\" or \"error\""
+        },
+        "connectorOutput": {
+          "description": "Response data from the third-party service"
+        }
+      },
+      "required": ["outcome", "connectorOutput"],
+      "additionalProperties": false
+    }
+  },
+  "list_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "externalUserId": {
+          "description": "Filter users by your application's external user ID",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "description": "Tray.io internal user ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "User display name"
+              },
+              "externalUserId": {
+                "type": "string",
+                "description": "External user ID from your application"
+              }
+            },
+            "required": ["userId", "name", "externalUserId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["users"],
+      "additionalProperties": false
+    }
+  },
+  "create_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name for the new user"
+        },
+        "externalUserId": {
+          "type": "string",
+          "description": "Your application's unique identifier for this user"
+        },
+        "generateAccessToken": {
+          "default": false,
+          "description": "Whether to also generate a user access token (valid for 2 days)",
+          "type": "boolean"
+        }
+      },
+      "required": ["name", "externalUserId", "generateAccessToken"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Tray.io internal user ID"
+        },
+        "accessToken": {
+          "description": "User access token if requested (valid for 2 days)",
+          "type": "string"
+        }
+      },
+      "required": ["userId"],
+      "additionalProperties": false
+    }
+  },
+  "delete_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Tray.io internal user ID to delete"
+        }
+      },
+      "required": ["userId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the user was successfully deleted"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "generate_user_token": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Tray.io internal user ID"
+        }
+      },
+      "required": ["userId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accessToken": {
+          "type": "string",
+          "description": "User access token (valid for 2 days)"
+        }
+      },
+      "required": ["accessToken"],
+      "additionalProperties": false
+    }
+  },
+  "list_solutions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "solutions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "solutionId": {
+                "type": "string",
+                "description": "Unique solution ID"
+              },
+              "title": {
+                "type": "string",
+                "description": "Solution title"
+              },
+              "description": {
+                "type": "string",
+                "description": "Solution description"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Solution tags"
+              }
+            },
+            "required": ["solutionId", "title", "description", "tags"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["solutions"],
+      "additionalProperties": false
+    }
+  },
+  "list_solution_instances": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "solutionInstances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "solutionInstanceId": {
+                "type": "string",
+                "description": "Unique instance ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Instance name"
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether the instance is currently active"
+              },
+              "created": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "owner": {
+                "type": "string",
+                "description": "Owner user ID"
+              },
+              "hasNewerVersion": {
+                "type": "boolean",
+                "description": "Whether a newer solution version is available"
+              }
+            },
+            "required": [
+              "solutionInstanceId",
+              "name",
+              "enabled",
+              "created",
+              "owner",
+              "hasNewerVersion"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["solutionInstances"],
+      "additionalProperties": false
+    }
+  },
+  "get_solution_instance": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "solutionInstanceId": {
+          "type": "string",
+          "description": "ID of the solution instance to retrieve"
+        }
+      },
+      "required": ["solutionInstanceId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "solutionInstanceId": {
+          "type": "string",
+          "description": "Unique instance ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Instance name"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the instance is currently active"
+        },
+        "created": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "authValues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "externalId": {
+                "type": "string",
+                "description": "External ID of the auth slot"
+              },
+              "authId": {
+                "type": "string",
+                "description": "Authentication ID assigned to this slot"
+              }
+            },
+            "required": ["externalId", "authId"],
+            "additionalProperties": false
+          },
+          "description": "Authentication values"
+        },
+        "configValues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "externalId": {
+                "type": "string",
+                "description": "External ID of the config slot"
+              },
+              "value": {
+                "type": "string",
+                "description": "Configuration value"
+              }
+            },
+            "required": ["externalId", "value"],
+            "additionalProperties": false
+          },
+          "description": "Configuration values"
+        }
+      },
+      "required": [
+        "solutionInstanceId",
+        "name",
+        "enabled",
+        "created",
+        "authValues",
+        "configValues"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "create_solution_instance": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "solutionId": {
+          "type": "string",
+          "description": "ID of the solution to instantiate"
+        },
+        "instanceName": {
+          "type": "string",
+          "description": "Display name for the new instance"
+        },
+        "configValues": {
+          "description": "Initial configuration values",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "externalId": {
+                "type": "string",
+                "description": "External ID of the config slot"
+              },
+              "value": {
+                "type": "string",
+                "description": "Value to assign"
+              }
+            },
+            "required": ["externalId", "value"],
+            "additionalProperties": false
+          }
+        },
+        "authValues": {
+          "description": "Initial authentication values",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "externalId": {
+                "type": "string",
+                "description": "External ID of the auth slot"
+              },
+              "authId": {
+                "type": "string",
+                "description": "Authentication ID to assign"
+              }
+            },
+            "required": ["externalId", "authId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["solutionId", "instanceName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "solutionInstanceId": {
+          "type": "string",
+          "description": "ID of the created instance"
+        },
+        "name": {
+          "type": "string",
+          "description": "Instance name"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the instance is enabled"
+        },
+        "created": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["solutionInstanceId", "name", "enabled", "created"],
+      "additionalProperties": false
+    }
+  },
+  "update_solution_instance": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "solutionInstanceId": {
+          "type": "string",
+          "description": "ID of the solution instance to update"
+        },
+        "instanceName": {
+          "description": "New display name",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Enable or disable the instance",
+          "type": "boolean"
+        },
+        "configValues": {
+          "description": "Updated configuration values",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "externalId": {
+                "type": "string",
+                "description": "External ID of the config slot"
+              },
+              "value": {
+                "type": "string",
+                "description": "New value"
+              }
+            },
+            "required": ["externalId", "value"],
+            "additionalProperties": false
+          }
+        },
+        "authValues": {
+          "description": "Updated authentication values",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "externalId": {
+                "type": "string",
+                "description": "External ID of the auth slot"
+              },
+              "authId": {
+                "type": "string",
+                "description": "New authentication ID"
+              }
+            },
+            "required": ["externalId", "authId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["solutionInstanceId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "solutionInstanceId": {
+          "type": "string",
+          "description": "ID of the updated instance"
+        },
+        "name": {
+          "type": "string",
+          "description": "Instance name"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Current enabled state"
+        },
+        "created": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["solutionInstanceId", "name", "enabled", "created"],
+      "additionalProperties": false
+    }
+  },
+  "delete_solution_instance": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "solutionInstanceId": {
+          "type": "string",
+          "description": "ID of the solution instance to delete"
+        }
+      },
+      "required": ["solutionInstanceId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the instance was successfully deleted"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "upgrade_solution_instance": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "solutionInstanceId": {
+          "type": "string",
+          "description": "ID of the solution instance to upgrade"
+        }
+      },
+      "required": ["solutionInstanceId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "solutionInstanceId": {
+          "type": "string",
+          "description": "ID of the upgraded instance"
+        }
+      },
+      "required": ["solutionInstanceId"],
+      "additionalProperties": false
+    }
+  },
+  "list_authentications": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "authentications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "authenticationId": {
+                "type": "string",
+                "description": "Unique authentication ID (UUID)"
+              },
+              "name": {
+                "type": "string",
+                "description": "Authentication display name"
+              },
+              "serviceId": {
+                "type": "string",
+                "description": "ID of the associated service"
+              },
+              "serviceName": {
+                "type": "string",
+                "description": "Programmatic name of the service"
+              },
+              "serviceTitle": {
+                "type": "string",
+                "description": "Human-readable service name"
+              },
+              "serviceEnvironmentId": {
+                "type": "string",
+                "description": "Service environment ID"
+              }
+            },
+            "required": [
+              "authenticationId",
+              "name",
+              "serviceId",
+              "serviceName",
+              "serviceTitle",
+              "serviceEnvironmentId"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["authentications"],
+      "additionalProperties": false
+    }
+  },
+  "create_authentication": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name for the authentication (e.g., \"My Salesforce Prod\")"
+        },
+        "serviceId": {
+          "type": "string",
+          "description": "Service ID for the connector"
+        },
+        "serviceEnvironmentId": {
+          "type": "string",
+          "description": "Service environment ID (from the connector's service environments)"
+        },
+        "credentialData": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Credential data matching the service environment's credentials schema (e.g., { \"api_key\": \"...\" })"
+        },
+        "scopes": {
+          "description": "OAuth scopes if applicable",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hidden": {
+          "default": false,
+          "description": "Whether to hide this authentication from the user in the UI",
+          "type": "boolean"
+        }
+      },
+      "required": ["name", "serviceId", "serviceEnvironmentId", "credentialData", "hidden"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "authenticationId": {
+          "type": "string",
+          "description": "ID of the created authentication"
+        }
+      },
+      "required": ["authenticationId"],
+      "additionalProperties": false
+    }
+  },
+  "delete_authentication": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "authenticationId": {
+          "type": "string",
+          "description": "ID of the authentication to delete"
+        }
+      },
+      "required": ["authenticationId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the authentication was successfully deleted"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  }
+}

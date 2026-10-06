@@ -1,0 +1,1694 @@
+{
+  "query_documents": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "documentType": {
+          "description": "Filter by custom type (e.g., \"blog_post\", \"page\")",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Filter by one or more tags",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "predicates": {
+          "description": "Custom Prismic predicates for advanced filtering",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fullTextSearch": {
+          "description": "Full-text search query",
+          "type": "string"
+        },
+        "lang": {
+          "description": "Language code to filter by (use \"*\" for all languages)",
+          "type": "string"
+        },
+        "orderings": {
+          "description": "Ordering expression, e.g., \"[my.blog_post.date desc]\"",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results per page (1-100, default 20)",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number to retrieve (default 1)",
+          "type": "number"
+        },
+        "after": {
+          "description": "Document ID to paginate after (for cursor-based pagination)",
+          "type": "string"
+        },
+        "fetchLinks": {
+          "description": "Comma-separated list of fields to fetch from linked documents",
+          "type": "string"
+        },
+        "graphQuery": {
+          "description": "GraphQuery string for precise field selection",
+          "type": "string"
+        },
+        "ref": {
+          "description": "Content ref to query (defaults to master/published ref)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number",
+          "description": "Current page number"
+        },
+        "resultsPerPage": {
+          "type": "number",
+          "description": "Number of results per page"
+        },
+        "totalResults": {
+          "type": "number",
+          "description": "Total number of matching documents"
+        },
+        "totalPages": {
+          "type": "number",
+          "description": "Total number of pages"
+        },
+        "nextPage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL for the next page of results"
+        },
+        "prevPage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL for the previous page of results"
+        },
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "documentId": {
+                "type": "string",
+                "description": "Unique document ID"
+              },
+              "uid": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User-friendly unique identifier"
+              },
+              "type": {
+                "type": "string",
+                "description": "Document type (custom type)"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Tags applied to the document"
+              },
+              "lang": {
+                "type": "string",
+                "description": "Language code of the document"
+              },
+              "firstPublicationDate": {
+                "type": "string",
+                "description": "ISO date of first publication"
+              },
+              "lastPublicationDate": {
+                "type": "string",
+                "description": "ISO date of last publication"
+              },
+              "url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Resolved URL of the document"
+              },
+              "href": {
+                "type": "string",
+                "description": "API URL of the document"
+              },
+              "slugs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "URL slugs for the document"
+              },
+              "alternateLanguages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "documentId": {
+                      "type": "string"
+                    },
+                    "uid": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "lang": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["documentId", "uid", "type", "lang"],
+                  "additionalProperties": false
+                },
+                "description": "Alternate language versions"
+              },
+              "data": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Document field data"
+              }
+            },
+            "required": [
+              "documentId",
+              "uid",
+              "type",
+              "tags",
+              "lang",
+              "firstPublicationDate",
+              "lastPublicationDate",
+              "url",
+              "href",
+              "slugs",
+              "alternateLanguages",
+              "data"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Array of matching documents"
+        }
+      },
+      "required": [
+        "page",
+        "resultsPerPage",
+        "totalResults",
+        "totalPages",
+        "nextPage",
+        "prevPage",
+        "documents"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "get_document": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "documentId": {
+          "description": "Document ID to retrieve",
+          "type": "string"
+        },
+        "uid": {
+          "description": "Document UID to retrieve (requires documentType)",
+          "type": "string"
+        },
+        "documentType": {
+          "description": "Document type for UID-based lookup (required when using uid)",
+          "type": "string"
+        },
+        "lang": {
+          "description": "Language code (use \"*\" for all languages)",
+          "type": "string"
+        },
+        "fetchLinks": {
+          "description": "Comma-separated list of fields to fetch from linked documents",
+          "type": "string"
+        },
+        "graphQuery": {
+          "description": "GraphQuery string for precise field selection",
+          "type": "string"
+        },
+        "ref": {
+          "description": "Content ref to query (defaults to master/published ref)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "documentId": {
+          "type": "string",
+          "description": "Unique document ID"
+        },
+        "uid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "User-friendly unique identifier"
+        },
+        "type": {
+          "type": "string",
+          "description": "Document type"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags applied to the document"
+        },
+        "lang": {
+          "type": "string",
+          "description": "Language code"
+        },
+        "firstPublicationDate": {
+          "type": "string",
+          "description": "ISO date of first publication"
+        },
+        "lastPublicationDate": {
+          "type": "string",
+          "description": "ISO date of last publication"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Resolved URL"
+        },
+        "href": {
+          "type": "string",
+          "description": "API URL"
+        },
+        "slugs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "URL slugs"
+        },
+        "alternateLanguages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "documentId": {
+                "type": "string"
+              },
+              "uid": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "lang": {
+                "type": "string"
+              }
+            },
+            "required": ["documentId", "uid", "type", "lang"],
+            "additionalProperties": false
+          },
+          "description": "Alternate language versions"
+        },
+        "data": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Document field data"
+        }
+      },
+      "required": [
+        "documentId",
+        "uid",
+        "type",
+        "tags",
+        "lang",
+        "firstPublicationDate",
+        "lastPublicationDate",
+        "url",
+        "href",
+        "slugs",
+        "alternateLanguages",
+        "data"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "get_repository_info": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "refId": {
+                "type": "string",
+                "description": "Ref identifier"
+              },
+              "ref": {
+                "type": "string",
+                "description": "Ref value to use in queries"
+              },
+              "label": {
+                "type": "string",
+                "description": "Ref label (e.g., \"Master\")"
+              },
+              "isMasterRef": {
+                "description": "Whether this is the master (published) ref",
+                "type": "boolean"
+              },
+              "scheduledAt": {
+                "description": "ISO date if this is a scheduled release",
+                "type": "string"
+              }
+            },
+            "required": ["refId", "ref", "label"],
+            "additionalProperties": false
+          },
+          "description": "Available content refs (versions)"
+        },
+        "types": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Map of type ID to human-readable label"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "All tags used in the repository"
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "languageId": {
+                "type": "string",
+                "description": "Language code (e.g., \"en-us\")"
+              },
+              "name": {
+                "type": "string",
+                "description": "Human-readable language name"
+              }
+            },
+            "required": ["languageId", "name"],
+            "additionalProperties": false
+          },
+          "description": "Configured languages"
+        },
+        "bookmarks": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Named bookmarks mapping to document IDs"
+        }
+      },
+      "required": ["refs", "types", "tags", "languages", "bookmarks"],
+      "additionalProperties": false
+    }
+  },
+  "list_custom_types": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "customTypes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "typeId": {
+                "type": "string",
+                "description": "Custom type ID"
+              },
+              "label": {
+                "type": "string",
+                "description": "Human-readable label"
+              },
+              "repeatable": {
+                "type": "boolean",
+                "description": "Whether multiple documents of this type can exist"
+              },
+              "status": {
+                "type": "boolean",
+                "description": "Whether the custom type is active"
+              },
+              "json": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "JSON schema defining the type structure"
+              }
+            },
+            "required": ["typeId", "label", "repeatable", "status", "json"],
+            "additionalProperties": false
+          },
+          "description": "All custom types in the repository"
+        }
+      },
+      "required": ["customTypes"],
+      "additionalProperties": false
+    }
+  },
+  "get_custom_type": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "typeId": {
+          "type": "string",
+          "description": "The custom type ID to retrieve"
+        }
+      },
+      "required": ["typeId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "typeId": {
+          "type": "string",
+          "description": "Custom type ID"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label"
+        },
+        "repeatable": {
+          "type": "boolean",
+          "description": "Whether multiple documents of this type can exist"
+        },
+        "status": {
+          "type": "boolean",
+          "description": "Whether the custom type is active"
+        },
+        "json": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "JSON schema defining the type structure"
+        }
+      },
+      "required": ["typeId", "label", "repeatable", "status", "json"],
+      "additionalProperties": false
+    }
+  },
+  "create_custom_type": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "typeId": {
+          "type": "string",
+          "description": "Unique ID for the custom type (lowercase, hyphens allowed)"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label"
+        },
+        "repeatable": {
+          "type": "boolean",
+          "description": "Whether multiple documents of this type can exist"
+        },
+        "status": {
+          "description": "Whether the type is active (default true)",
+          "type": "boolean"
+        },
+        "json": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "JSON schema defining the type structure (tabs with field definitions)"
+        }
+      },
+      "required": ["typeId", "label", "repeatable", "json"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "typeId": {
+          "type": "string",
+          "description": "Custom type ID"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label"
+        },
+        "repeatable": {
+          "type": "boolean",
+          "description": "Whether multiple documents of this type can exist"
+        },
+        "status": {
+          "type": "boolean",
+          "description": "Whether the custom type is active"
+        },
+        "json": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "JSON schema defining the type structure"
+        }
+      },
+      "required": ["typeId", "label", "repeatable", "status", "json"],
+      "additionalProperties": false
+    }
+  },
+  "update_custom_type": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "typeId": {
+          "type": "string",
+          "description": "ID of the custom type to update"
+        },
+        "label": {
+          "type": "string",
+          "description": "Updated human-readable label"
+        },
+        "repeatable": {
+          "type": "boolean",
+          "description": "Whether multiple documents of this type can exist"
+        },
+        "status": {
+          "type": "boolean",
+          "description": "Whether the type is active"
+        },
+        "json": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Updated JSON schema"
+        }
+      },
+      "required": ["typeId", "label", "repeatable", "status", "json"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "typeId": {
+          "type": "string",
+          "description": "Custom type ID"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label"
+        },
+        "repeatable": {
+          "type": "boolean",
+          "description": "Whether multiple documents of this type can exist"
+        },
+        "status": {
+          "type": "boolean",
+          "description": "Whether the custom type is active"
+        },
+        "json": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "JSON schema defining the type structure"
+        }
+      },
+      "required": ["typeId", "label", "repeatable", "status", "json"],
+      "additionalProperties": false
+    }
+  },
+  "delete_custom_type": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "typeId": {
+          "type": "string",
+          "description": "ID of the custom type to delete"
+        }
+      },
+      "required": ["typeId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the custom type was successfully deleted"
+        },
+        "typeId": {
+          "type": "string",
+          "description": "ID of the deleted custom type"
+        }
+      },
+      "required": ["deleted", "typeId"],
+      "additionalProperties": false
+    }
+  },
+  "list_shared_slices": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sharedSlices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sliceId": {
+                "type": "string",
+                "description": "Shared slice ID"
+              },
+              "type": {
+                "type": "string",
+                "description": "Slice type identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Display name"
+              },
+              "description": {
+                "description": "Slice description",
+                "type": "string"
+              },
+              "variations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "variationId": {
+                      "type": "string",
+                      "description": "Variation ID"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Variation name"
+                    },
+                    "description": {
+                      "description": "Variation description",
+                      "type": "string"
+                    },
+                    "docURL": {
+                      "description": "Documentation URL",
+                      "type": "string"
+                    },
+                    "version": {
+                      "description": "Variation version",
+                      "type": "string"
+                    },
+                    "primary": {
+                      "description": "Primary zone field definitions",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "items": {
+                      "description": "Repeatable zone field definitions",
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    },
+                    "imageUrl": {
+                      "description": "Screenshot URL",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["variationId", "name"],
+                  "additionalProperties": false
+                },
+                "description": "Slice variations"
+              }
+            },
+            "required": ["sliceId", "type", "name", "variations"],
+            "additionalProperties": false
+          },
+          "description": "All shared slices"
+        }
+      },
+      "required": ["sharedSlices"],
+      "additionalProperties": false
+    }
+  },
+  "create_shared_slice": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sliceId": {
+          "type": "string",
+          "description": "Unique ID for the shared slice"
+        },
+        "type": {
+          "type": "string",
+          "description": "Slice type identifier (typically \"SharedSlice\")"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the slice"
+        },
+        "description": {
+          "description": "Description of the slice",
+          "type": "string"
+        },
+        "variations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "variationId": {
+                "type": "string",
+                "description": "Variation ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Variation name"
+              },
+              "description": {
+                "description": "Variation description",
+                "type": "string"
+              },
+              "docURL": {
+                "description": "Documentation URL",
+                "type": "string"
+              },
+              "version": {
+                "description": "Variation version",
+                "type": "string"
+              },
+              "primary": {
+                "description": "Primary zone field definitions",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "items": {
+                "description": "Repeatable zone field definitions",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "imageUrl": {
+                "description": "Screenshot URL",
+                "type": "string"
+              }
+            },
+            "required": ["variationId", "name"],
+            "additionalProperties": false
+          },
+          "description": "Slice variations"
+        }
+      },
+      "required": ["sliceId", "type", "name", "variations"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sliceId": {
+          "type": "string",
+          "description": "Shared slice ID"
+        },
+        "type": {
+          "type": "string",
+          "description": "Slice type identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name"
+        },
+        "description": {
+          "description": "Slice description",
+          "type": "string"
+        },
+        "variations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "variationId": {
+                "type": "string",
+                "description": "Variation ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Variation name"
+              },
+              "description": {
+                "description": "Variation description",
+                "type": "string"
+              },
+              "docURL": {
+                "description": "Documentation URL",
+                "type": "string"
+              },
+              "version": {
+                "description": "Variation version",
+                "type": "string"
+              },
+              "primary": {
+                "description": "Primary zone field definitions",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "items": {
+                "description": "Repeatable zone field definitions",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "imageUrl": {
+                "description": "Screenshot URL",
+                "type": "string"
+              }
+            },
+            "required": ["variationId", "name"],
+            "additionalProperties": false
+          },
+          "description": "Slice variations"
+        }
+      },
+      "required": ["sliceId", "type", "name", "variations"],
+      "additionalProperties": false
+    }
+  },
+  "update_shared_slice": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sliceId": {
+          "type": "string",
+          "description": "ID of the shared slice to update"
+        },
+        "type": {
+          "type": "string",
+          "description": "Slice type identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Updated display name"
+        },
+        "description": {
+          "description": "Updated description",
+          "type": "string"
+        },
+        "variations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "variationId": {
+                "type": "string",
+                "description": "Variation ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Variation name"
+              },
+              "description": {
+                "type": "string"
+              },
+              "docURL": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "primary": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "items": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "imageUrl": {
+                "type": "string"
+              }
+            },
+            "required": ["variationId", "name"],
+            "additionalProperties": false
+          },
+          "description": "Updated slice variations"
+        }
+      },
+      "required": ["sliceId", "type", "name", "variations"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sliceId": {
+          "type": "string",
+          "description": "Shared slice ID"
+        },
+        "type": {
+          "type": "string",
+          "description": "Slice type identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name"
+        },
+        "description": {
+          "description": "Slice description",
+          "type": "string"
+        },
+        "variations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "variationId": {
+                "type": "string",
+                "description": "Variation ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Variation name"
+              },
+              "description": {
+                "description": "Variation description",
+                "type": "string"
+              },
+              "docURL": {
+                "description": "Documentation URL",
+                "type": "string"
+              },
+              "version": {
+                "description": "Variation version",
+                "type": "string"
+              },
+              "primary": {
+                "description": "Primary zone field definitions",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "items": {
+                "description": "Repeatable zone field definitions",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "imageUrl": {
+                "description": "Screenshot URL",
+                "type": "string"
+              }
+            },
+            "required": ["variationId", "name"],
+            "additionalProperties": false
+          },
+          "description": "Slice variations"
+        }
+      },
+      "required": ["sliceId", "type", "name", "variations"],
+      "additionalProperties": false
+    }
+  },
+  "delete_shared_slice": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sliceId": {
+          "type": "string",
+          "description": "ID of the shared slice to delete"
+        }
+      },
+      "required": ["sliceId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the slice was successfully deleted"
+        },
+        "sliceId": {
+          "type": "string",
+          "description": "ID of the deleted slice"
+        }
+      },
+      "required": ["deleted", "sliceId"],
+      "additionalProperties": false
+    }
+  },
+  "list_assets": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assetType": {
+          "description": "Filter by asset type",
+          "type": "string",
+          "enum": ["image", "document", "video"]
+        },
+        "keyword": {
+          "description": "Search keyword to filter assets",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Filter by asset tag names",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ids": {
+          "description": "Filter by specific asset IDs",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cursor": {
+          "description": "Pagination cursor from a previous response",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "assetId": {
+                "type": "string",
+                "description": "Unique asset ID"
+              },
+              "url": {
+                "type": "string",
+                "description": "Public URL of the asset (served via imgix for images)"
+              },
+              "filename": {
+                "type": "string",
+                "description": "Original filename"
+              },
+              "extension": {
+                "type": "string",
+                "description": "File extension"
+              },
+              "size": {
+                "type": "number",
+                "description": "File size in bytes"
+              },
+              "kind": {
+                "type": "string",
+                "description": "Asset kind (image, document, video)"
+              },
+              "width": {
+                "description": "Image width in pixels",
+                "type": "number"
+              },
+              "height": {
+                "description": "Image height in pixels",
+                "type": "number"
+              },
+              "notes": {
+                "description": "Internal notes",
+                "type": "string"
+              },
+              "credits": {
+                "description": "Attribution/credits",
+                "type": "string"
+              },
+              "alt": {
+                "description": "Alternative text for accessibility",
+                "type": "string"
+              },
+              "tags": {
+                "description": "Asset tag names",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "lastModified": {
+                "type": "number",
+                "description": "Last modified timestamp"
+              },
+              "createdAt": {
+                "type": "number",
+                "description": "Creation timestamp"
+              }
+            },
+            "required": [
+              "assetId",
+              "url",
+              "filename",
+              "extension",
+              "size",
+              "kind",
+              "lastModified",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of assets"
+        },
+        "total": {
+          "type": "number",
+          "description": "Total number of matching assets"
+        },
+        "cursor": {
+          "description": "Cursor for next page of results",
+          "type": "string"
+        }
+      },
+      "required": ["assets", "total"],
+      "additionalProperties": false
+    }
+  },
+  "upload_asset": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Public URL of the file to upload"
+        },
+        "filename": {
+          "type": "string",
+          "description": "Filename for the uploaded asset"
+        },
+        "notes": {
+          "description": "Internal notes about the asset",
+          "type": "string"
+        },
+        "credits": {
+          "description": "Attribution/credits text",
+          "type": "string"
+        },
+        "alt": {
+          "description": "Alternative text for accessibility",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags to apply to the asset",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["url", "filename"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "description": "Unique asset ID"
+        },
+        "url": {
+          "type": "string",
+          "description": "Public URL of the asset (served via imgix for images)"
+        },
+        "filename": {
+          "type": "string",
+          "description": "Original filename"
+        },
+        "extension": {
+          "type": "string",
+          "description": "File extension"
+        },
+        "size": {
+          "type": "number",
+          "description": "File size in bytes"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Asset kind (image, document, video)"
+        },
+        "width": {
+          "description": "Image width in pixels",
+          "type": "number"
+        },
+        "height": {
+          "description": "Image height in pixels",
+          "type": "number"
+        },
+        "notes": {
+          "description": "Internal notes",
+          "type": "string"
+        },
+        "credits": {
+          "description": "Attribution/credits",
+          "type": "string"
+        },
+        "alt": {
+          "description": "Alternative text for accessibility",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Asset tag names",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lastModified": {
+          "type": "number",
+          "description": "Last modified timestamp"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": [
+        "assetId",
+        "url",
+        "filename",
+        "extension",
+        "size",
+        "kind",
+        "lastModified",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "update_asset": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "description": "ID of the asset to update"
+        },
+        "notes": {
+          "description": "Updated internal notes",
+          "type": "string"
+        },
+        "credits": {
+          "description": "Updated attribution/credits",
+          "type": "string"
+        },
+        "alt": {
+          "description": "Updated alternative text",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Updated tags (replaces existing tags)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["assetId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "description": "Unique asset ID"
+        },
+        "url": {
+          "type": "string",
+          "description": "Public URL of the asset (served via imgix for images)"
+        },
+        "filename": {
+          "type": "string",
+          "description": "Original filename"
+        },
+        "extension": {
+          "type": "string",
+          "description": "File extension"
+        },
+        "size": {
+          "type": "number",
+          "description": "File size in bytes"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Asset kind (image, document, video)"
+        },
+        "width": {
+          "description": "Image width in pixels",
+          "type": "number"
+        },
+        "height": {
+          "description": "Image height in pixels",
+          "type": "number"
+        },
+        "notes": {
+          "description": "Internal notes",
+          "type": "string"
+        },
+        "credits": {
+          "description": "Attribution/credits",
+          "type": "string"
+        },
+        "alt": {
+          "description": "Alternative text for accessibility",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Asset tag names",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lastModified": {
+          "type": "number",
+          "description": "Last modified timestamp"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": [
+        "assetId",
+        "url",
+        "filename",
+        "extension",
+        "size",
+        "kind",
+        "lastModified",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "delete_asset": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "description": "ID of the asset to delete"
+        }
+      },
+      "required": ["assetId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the asset was successfully deleted"
+        },
+        "assetId": {
+          "type": "string",
+          "description": "ID of the deleted asset"
+        }
+      },
+      "required": ["deleted", "assetId"],
+      "additionalProperties": false
+    }
+  },
+  "create_migration_document": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Document title"
+        },
+        "type": {
+          "type": "string",
+          "description": "Custom type ID for the document"
+        },
+        "uid": {
+          "description": "User-friendly unique identifier",
+          "type": "string"
+        },
+        "lang": {
+          "description": "Language code (defaults to repository master locale)",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags to apply to the document",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "alternateLanguageDocumentId": {
+          "description": "ID of existing document to link as an alternate language",
+          "type": "string"
+        },
+        "data": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Document field data matching the custom type schema"
+        }
+      },
+      "required": ["title", "type", "data"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "documentId": {
+          "type": "string",
+          "description": "ID of the created or updated document"
+        },
+        "title": {
+          "type": "string",
+          "description": "Document title"
+        },
+        "type": {
+          "type": "string",
+          "description": "Document type"
+        },
+        "lang": {
+          "type": "string",
+          "description": "Language code"
+        },
+        "uid": {
+          "description": "Document UID if set",
+          "type": "string"
+        }
+      },
+      "required": ["documentId", "title", "type", "lang"],
+      "additionalProperties": false
+    }
+  },
+  "update_migration_document": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "documentId": {
+          "type": "string",
+          "description": "ID of the document to update"
+        },
+        "title": {
+          "type": "string",
+          "description": "Updated document title"
+        },
+        "type": {
+          "type": "string",
+          "description": "Custom type ID for the document"
+        },
+        "uid": {
+          "description": "Updated UID",
+          "type": "string"
+        },
+        "lang": {
+          "description": "Language code",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Updated tags",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "alternateLanguageDocumentId": {
+          "description": "ID of existing document to link as alternate language",
+          "type": "string"
+        },
+        "data": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Updated document field data"
+        }
+      },
+      "required": ["documentId", "title", "type", "data"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "documentId": {
+          "type": "string",
+          "description": "ID of the created or updated document"
+        },
+        "title": {
+          "type": "string",
+          "description": "Document title"
+        },
+        "type": {
+          "type": "string",
+          "description": "Document type"
+        },
+        "lang": {
+          "type": "string",
+          "description": "Language code"
+        },
+        "uid": {
+          "description": "Document UID if set",
+          "type": "string"
+        }
+      },
+      "required": ["documentId", "title", "type", "lang"],
+      "additionalProperties": false
+    }
+  }
+}

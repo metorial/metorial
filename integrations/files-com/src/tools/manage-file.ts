@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { nativeId, reject, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageFile = SlateTool.create(spec, {
@@ -43,42 +44,58 @@ export let manageFile = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
+      success: z
+        .boolean()
+        .describe(
+          'True only for native successful completion; pending operations return false'
+        ),
+      status: z.string().optional().describe('Native operation status'),
+      fileMigrationId: z
+        .number()
+        .optional()
+        .describe('Pending operation ID for get_file_operation'),
       path: z.string().optional().describe('Path of the resulting file/folder'),
       type: z.string().optional().describe('"file" or "directory"')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let { action, path, destination, overwrite, recursive, structure } = ctx.input;
 
     if (action === 'copy') {
-      if (!destination) throw new Error('Destination is required for copy action');
+      if (!destination) reject('Destination is required for copy action');
       let result = await client.copyFile(path, destination, { overwrite, structure });
       return {
         output: {
-          success: true,
-          path: String(result.path ?? destination),
-          type: result.type ? String(result.type) : undefined
+          success: result.status === 'success',
+          status: text(result.status),
+          fileMigrationId:
+            result.file_migration_id === undefined || result.file_migration_id === null
+              ? undefined
+              : nativeId(result.file_migration_id),
+          path: undefined,
+          type: undefined
         },
-        message: `Copied \`${path}\` to \`${destination}\``
+        message: `Files.com copy status: ${text(result.status)}. Follow a pending operation with get_file_operation.`
       };
     }
 
     if (action === 'move') {
-      if (!destination) throw new Error('Destination is required for move action');
+      if (!destination) reject('Destination is required for move action');
       let result = await client.moveFile(path, destination, { overwrite });
       return {
         output: {
-          success: true,
-          path: String(result.path ?? destination),
-          type: result.type ? String(result.type) : undefined
+          success: result.status === 'success',
+          status: text(result.status),
+          fileMigrationId:
+            result.file_migration_id === undefined || result.file_migration_id === null
+              ? undefined
+              : nativeId(result.file_migration_id),
+          path: undefined,
+          type: undefined
         },
-        message: `Moved \`${path}\` to \`${destination}\``
+        message: `Files.com move status: ${text(result.status)}. Follow a pending operation with get_file_operation.`
       };
     }
 

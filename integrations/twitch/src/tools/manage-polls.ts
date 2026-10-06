@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwitchClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let managePolls = SlateTool.create(spec, {
@@ -72,7 +73,18 @@ export let managePolls = SlateTool.create(spec, {
             pollId: z.string(),
             title: z.string(),
             status: z.string(),
-            startedAt: z.string()
+            startedAt: z.string(),
+            choices: z
+              .array(
+                z.object({
+                  choiceId: z.string(),
+                  title: z.string(),
+                  votes: z.number(),
+                  channelPointsVotes: z.number()
+                })
+              )
+              .optional(),
+            durationSeconds: z.number().optional()
           })
         )
         .optional(),
@@ -80,11 +92,14 @@ export let managePolls = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId);
+    validateInput('manage_polls', ctx.input, [ctx.auth.token]);
+    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId, ctx.auth.userId);
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.title || !ctx.input.choices || !ctx.input.durationSeconds) {
-        throw new Error('title, choices, and durationSeconds are required to create a poll');
+        throw createApiServiceError(
+          'title, choices, and durationSeconds are required to create a poll'
+        );
       }
 
       let poll = await client.createPoll(ctx.input.broadcasterId, {
@@ -109,7 +124,7 @@ export let managePolls = SlateTool.create(spec, {
             status: poll.status,
             durationSeconds: poll.duration,
             startedAt: poll.started_at,
-            endedAt: poll.ended_at
+            endedAt: poll.ended_at ?? undefined
           }
         },
         message: `Created poll: **${poll.title}** with ${poll.choices.length} choices for ${poll.duration}s`
@@ -118,7 +133,7 @@ export let managePolls = SlateTool.create(spec, {
 
     if (ctx.input.action === 'end') {
       if (!ctx.input.pollId || !ctx.input.endStatus) {
-        throw new Error('pollId and endStatus are required to end a poll');
+        throw createApiServiceError('pollId and endStatus are required to end a poll');
       }
 
       let poll = await client.endPoll(
@@ -141,7 +156,7 @@ export let managePolls = SlateTool.create(spec, {
             status: poll.status,
             durationSeconds: poll.duration,
             startedAt: poll.started_at,
-            endedAt: poll.ended_at
+            endedAt: poll.ended_at ?? undefined
           }
         },
         message: `Ended poll: **${poll.title}** (${ctx.input.endStatus})`
@@ -159,7 +174,14 @@ export let managePolls = SlateTool.create(spec, {
       pollId: p.id,
       title: p.title,
       status: p.status,
-      startedAt: p.started_at
+      startedAt: p.started_at,
+      choices: p.choices.map(c => ({
+        choiceId: c.id,
+        title: c.title,
+        votes: c.votes,
+        channelPointsVotes: c.channel_points_votes
+      })),
+      durationSeconds: p.duration
     }));
 
     return {

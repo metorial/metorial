@@ -12,8 +12,6 @@ import {
   searchPeople,
   webSearch
 } from './tools';
-import { companyScreeningPoll, inboundWebhook, peopleChangesPoll } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     getInvestorPortfolio,
     findDecisionMakers
   ],
-  triggers: [inboundWebhook, companyScreeningPoll, peopleChangesPoll]
+  triggers: []
 });

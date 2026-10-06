@@ -8,6 +8,7 @@ export * from './delete-collection';
 export * from './delete-object';
 export * from './generative-search';
 export * from './get-collection';
+export * from './get-current-user';
 export * from './get-object';
 export * from './list-collections';
 export * from './list-objects';

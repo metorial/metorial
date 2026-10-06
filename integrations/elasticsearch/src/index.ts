@@ -22,8 +22,6 @@ import {
   searchDocumentsTool,
   updateDocumentTool
 } from './tools';
-import { inboundWebhook, watcherAlertTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     reindexTool,
     graphExploreTool
   ],
-  triggers: [inboundWebhook, watcherAlertTrigger]
+  triggers: []
 });

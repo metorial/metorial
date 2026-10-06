@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, record } from '../lib/client';
+import { personParams } from '../lib/params';
 import { spec } from '../spec';
 
 let experienceSchema = z
@@ -70,7 +71,7 @@ let educationSchema = z
   })
   .describe('Education entry');
 
-let personOutputSchema = z
+export let personOutputSchema = z
   .object({
     personId: z
       .string()
@@ -124,6 +125,41 @@ let personOutputSchema = z
   })
   .describe('Enriched person profile');
 
+export const personEnrichmentInputSchema = z.object({
+  name: z.string().optional().describe('Full name of the person (e.g. "John Smith")'),
+  firstName: z.string().optional().describe('First name of the person'),
+  lastName: z.string().optional().describe('Last name of the person'),
+  middleName: z.string().optional().describe('Middle name of the person'),
+  email: z.string().optional().describe('Email address associated with the person'),
+  phone: z.string().optional().describe('Phone number beginning with + and a country code'),
+  linkedinUrl: z.string().optional().describe('LinkedIn profile URL'),
+  facebookUrl: z.string().optional().describe('Facebook profile URL'),
+  twitterUrl: z.string().optional().describe('Twitter/X profile URL'),
+  githubUrl: z.string().optional().describe('GitHub profile URL'),
+  company: z.string().optional().describe('Company name where the person works or worked'),
+  school: z.string().optional().describe('School name the person attended'),
+  location: z
+    .string()
+    .optional()
+    .describe('Location of the person (e.g. "San Francisco, CA")'),
+  locality: z.string().optional().describe('City/locality of the person'),
+  region: z.string().optional().describe('State/region of the person'),
+  country: z
+    .string()
+    .optional()
+    .describe('Country where the person lives (e.g. United States)'),
+  streetAddress: z.string().optional().describe('Street address of the person'),
+  postalCode: z.string().optional().describe('Postal/zip code of the person'),
+  birthDate: z.string().optional().describe('Birth date of the person (YYYY-MM-DD or YYYY)'),
+  minLikelihood: z
+    .number()
+    .min(0)
+    .max(10)
+    .optional()
+    .describe('Minimum confidence score (0-10) for match, defaults to 2'),
+  titlecase: z.boolean().optional().describe('Titlecase the output fields')
+});
+
 export let enrichPerson = SlateTool.create(spec, {
   name: 'Enrich Person',
   key: 'enrich_person',
@@ -141,42 +177,7 @@ Returns comprehensive person data including employment history, education, socia
     readOnly: true
   }
 })
-  .input(
-    z.object({
-      name: z.string().optional().describe('Full name of the person (e.g. "John Smith")'),
-      firstName: z.string().optional().describe('First name of the person'),
-      lastName: z.string().optional().describe('Last name of the person'),
-      middleName: z.string().optional().describe('Middle name of the person'),
-      email: z.string().optional().describe('Email address associated with the person'),
-      phone: z.string().optional().describe('Phone number associated with the person'),
-      linkedinUrl: z.string().optional().describe('LinkedIn profile URL'),
-      facebookUrl: z.string().optional().describe('Facebook profile URL'),
-      twitterUrl: z.string().optional().describe('Twitter/X profile URL'),
-      githubUrl: z.string().optional().describe('GitHub profile URL'),
-      company: z.string().optional().describe('Company name where the person works or worked'),
-      school: z.string().optional().describe('School name the person attended'),
-      location: z
-        .string()
-        .optional()
-        .describe('Location of the person (e.g. "San Francisco, CA")'),
-      locality: z.string().optional().describe('City/locality of the person'),
-      region: z.string().optional().describe('State/region of the person'),
-      country: z.string().optional().describe('Country of the person (ISO 3166-1 alpha-2)'),
-      streetAddress: z.string().optional().describe('Street address of the person'),
-      postalCode: z.string().optional().describe('Postal/zip code of the person'),
-      birthDate: z
-        .string()
-        .optional()
-        .describe('Birth date of the person (YYYY-MM-DD or YYYY)'),
-      minLikelihood: z
-        .number()
-        .min(0)
-        .max(10)
-        .optional()
-        .describe('Minimum confidence score (0-10) for match, defaults to 2'),
-      titlecase: z.boolean().optional().describe('Titlecase the output fields')
-    })
-  )
+  .input(personEnrichmentInputSchema)
   .output(personOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({
@@ -184,31 +185,10 @@ Returns comprehensive person data including employment history, education, socia
       sandbox: ctx.config.sandbox
     });
 
-    let params: Record<string, unknown> = {};
-    if (ctx.input.name) params.name = ctx.input.name;
-    if (ctx.input.firstName) params.first_name = ctx.input.firstName;
-    if (ctx.input.lastName) params.last_name = ctx.input.lastName;
-    if (ctx.input.middleName) params.middle_name = ctx.input.middleName;
-    if (ctx.input.email) params.email = ctx.input.email;
-    if (ctx.input.phone) params.phone = ctx.input.phone;
-    if (ctx.input.linkedinUrl) params.profile = ctx.input.linkedinUrl;
-    if (ctx.input.facebookUrl) params.profile = ctx.input.facebookUrl;
-    if (ctx.input.twitterUrl) params.profile = ctx.input.twitterUrl;
-    if (ctx.input.githubUrl) params.profile = ctx.input.githubUrl;
-    if (ctx.input.company) params.company = ctx.input.company;
-    if (ctx.input.school) params.school = ctx.input.school;
-    if (ctx.input.location) params.location = ctx.input.location;
-    if (ctx.input.locality) params.locality = ctx.input.locality;
-    if (ctx.input.region) params.region = ctx.input.region;
-    if (ctx.input.country) params.country = ctx.input.country;
-    if (ctx.input.streetAddress) params.street_address = ctx.input.streetAddress;
-    if (ctx.input.postalCode) params.postal_code = ctx.input.postalCode;
-    if (ctx.input.birthDate) params.birth_date = ctx.input.birthDate;
-    if (ctx.input.minLikelihood !== undefined) params.min_likelihood = ctx.input.minLikelihood;
-    if (ctx.input.titlecase !== undefined) params.titlecase = ctx.input.titlecase;
+    let params = personParams(ctx.input);
 
     let result = await client.enrichPerson(params);
-    let data = result.data || result;
+    let data = record(result.data ?? result);
 
     let output = mapPersonData(data);
     output.likelihood = result.likelihood ?? data.likelihood ?? null;
@@ -319,7 +299,11 @@ export let mapPersonData = (data: any) => {
         gpa: edu.gpa ?? null
       })) ?? null,
     certifications: data.certifications ?? null,
-    languages: data.languages ?? null,
+    languages: Array.isArray(data.languages)
+      ? data.languages
+          .map((language: any) => (typeof language === 'string' ? language : language?.name))
+          .filter((name: unknown) => typeof name === 'string')
+      : null,
     likelihood: null as number | null
   };
 };

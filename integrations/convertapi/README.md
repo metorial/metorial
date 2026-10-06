@@ -1,11 +1,21 @@
-# <img src="logo.png" height="20"> Convertapi
+# ConvertAPI
 
-Convert files between 300+ formats including PDF, DOCX, XLSX, PPTX, HTML, JPG, PNG, and more. Merge, split, encrypt, decrypt, compress, watermark, and repair PDF documents. Extract text, images, tables, and form data from PDFs and emails with OCR support. Generate documents dynamically from Word templates or HTML+JSON. Protect documents with password and AES 256-bit encryption. Chain multiple conversions using temporary file storage without re-uploading. Run asynchronous conversions with webhook notifications. Discover supported formats and conversion parameters. Track account usage and conversion consumption.
+Convert files, process PDFs, retrieve asynchronous conversion results, and manage temporary files. The integration exposes 17 tools: the 15 existing conversion, PDF, account, discovery and storage tools, plus `download_file` and `delete_async_job`.
 
-## License
+Connect with an API token or JWT from [ConvertAPI authentication settings](https://www.convertapi.com/a/authentication). The optional Owner or Admin Master Token enables account information. Regular conversion credentials cannot establish account identity through `/user`; a limited connection label does not verify an account or validate conversion permission. Legacy credentials remain usable when the provider accepts them. A Master Token and conversion token must belong to the intended account; the API does not provide a documented way to prove this binding using an ordinary conversion token.
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
+Choose automatic routing or a documented regional server, including Japan. Regional routing does not establish legal compliance. Tokens are supplied in request headers; JWT expiration and credential rotation remain the account owner's responsibility.
 
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Use `list_supported_conversions` before converting. It returns current converter inventory with optional parameter metadata. File extensions remain in `sourceFormat` and `destinationFormat`; additive `converterSourceFormat` and `converterDestinationFormat` identify the actual routes when a single route name exists; plural route arrays preserve multiple native aliases without guessing their pairing. For example, PDF protection produces a PDF while using the `protect` converter. Discovery is an unpaginated provider inventory; no invented pagination or continuation is applied.
+
+Source files require exactly one public HTTP(S) URL, exact stored file ID, or canonical base64 content with a file name. Existing string parameters and storage defaults are retained. Parameters cannot override source files, storage, authentication, jobs or callbacks. Consult native metadata for format-specific parameters.
+
+Generated files are downloadable whether `storeFile` is true or false. Stored URLs and file IDs grant access to the content and expire after up to three hours. They cannot be renewed after the provider deletes the data. In-memory results are delivered as files; raw base64 and extracted text bytes are not returned in ordinary result fields. The legacy nullable `textContent` field remains, always null. `conversionTime` remains numeric when provided and is omitted when absent; duration and its unit are never invented; current documentation does not establish a unit for this legacy field. The legacy numeric `apiKey` account identifier is optional because current account responses can omit it.
+
+Specialized PDF tools use the current `protect`, `unprotect`, `text-watermark`, `split`, `compress`, `merge`, `txt` and `pdfa` routes. Existing `splitByPage`, watermark string options, permission booleans and `ocrEnabled` are translated to the documented parameters. Text watermarking requires `watermarkText`; image watermarking is not exposed. Explicit OCR options are supported for PDF input; omit them for other formats. PDF/A uses the provider default PDF/A-2b setting and does not prove archival or legal compliance.
+
+Every conversion can consume credits. Deleting a file or job retention record does not refund credits, reverse history or prove processing was cancelled. Deletes distinguish an accepted and verified removal from an already missing or expired resource. Output files and asynchronous job records have separate retention. A request can succeed before its response is lost; reconcile the exact resource before retrying. No file/job inventory or recovery-by-marker endpoint is documented, so ambiguous submissions may require account-owner inspection and automatic retention expiry.
+
+Asynchronous conversion remains available with polling. Processing, completed and missing states follow native HTTP 202, 200 and 404; authentication, conversion and service failures are reported separately. This integration does not expose callbacks or triggers. Undocumented historical converter aliases are not asserted to be retired; generic conversion callers should discover currently supported routes.
+
+See [SPEC.md](./SPEC.md) for the capability map and official references. Private controlled verification requires a dedicated account, exact credential hashes, explicit conversion and retained-credit authorization, and independent `qpdf`/`pdftotext` observers. No live provider operations were used during this refresh.

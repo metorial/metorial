@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let transferResource = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let transferResource = SlateTool.create(spec, {
   key: 'transfer_resource',
   description: `Transfer a workflow or credential to a different project. Useful for reorganizing resources across projects.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -28,10 +28,7 @@ export let transferResource = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
     if (ctx.input.resourceType === 'workflow') {
       await client.transferWorkflow(ctx.input.resourceId, ctx.input.destinationProjectId);

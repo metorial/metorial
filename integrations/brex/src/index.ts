@@ -2,6 +2,10 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createTransfer,
+  downloadExpenseReceipt,
+  getCurrentUser,
+  getFileUrl,
+  getResource,
   listAccounts,
   listBudgets,
   listCards,
@@ -17,11 +21,13 @@ import {
   manageVendor,
   updateExpense
 } from './tools';
-import { brexEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    getResource,
+    downloadExpenseReceipt,
+    getFileUrl,
     listUsers,
     manageUser,
     listCards,
@@ -38,5 +44,5 @@ export let provider = Slate.create({
     listAccounts,
     listDepartmentsLocations
   ],
-  triggers: [brexEvents]
+  triggers: []
 });

@@ -17,6 +17,7 @@ export let finalizeBatch = SlateTool.create(spec, {
       batchName: z.string().describe('Name of the batch to finalize'),
       priority: z
         .number()
+        .int()
         .min(10)
         .max(30)
         .optional()
@@ -36,11 +37,11 @@ export let finalizeBatch = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.finalizeBatch(ctx.input.batchName);
-
     if (ctx.input.priority !== undefined) {
       await client.prioritizeBatch(ctx.input.batchName, ctx.input.priority);
     }
+
+    let result = await client.finalizeBatch(ctx.input.batchName);
 
     return {
       output: {

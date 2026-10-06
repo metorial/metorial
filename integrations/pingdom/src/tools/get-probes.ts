@@ -13,12 +13,15 @@ export let getProbes = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      onlyActive: z.boolean().optional().describe('Only return active probes. Default: true'),
+      limit: z.number().optional().describe('Maximum probes to return'),
+      offset: z.number().optional().describe('Offset for pagination'),
+      onlyActive: z.boolean().optional().describe('Only return active probes. Default: false'),
       includeDeleted: z.boolean().optional().describe('Include deleted probes')
     })
   )
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of records returned in this response'),
       probes: z
         .array(
           z.object({
@@ -44,11 +47,13 @@ export let getProbes = SlateTool.create(spec, {
     });
 
     let result = await client.listProbes({
+      limit: ctx.input.limit,
+      offset: ctx.input.offset,
       onlyactive: ctx.input.onlyActive,
       includedeleted: ctx.input.includeDeleted
     });
 
-    let probes = (result.probes || []).map((p: any) => ({
+    let probes = result.probes.map(p => ({
       probeId: p.id,
       name: p.name,
       country: p.country,
@@ -62,7 +67,7 @@ export let getProbes = SlateTool.create(spec, {
     }));
 
     return {
-      output: { probes },
+      output: { probes, returnedCount: probes.length },
       message: `Found **${probes.length}** probe server(s).`
     };
   })

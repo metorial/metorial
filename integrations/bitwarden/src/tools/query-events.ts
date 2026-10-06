@@ -26,7 +26,9 @@ export let queryEvents = SlateTool.create(spec, {
   description: `Query the organization's event logs. Filter by date range, acting user, or related item. Returns timestamped records of user actions, vault operations, collection changes, and more. Supports up to 367 days of history.`,
   constraints: [
     'Date range cannot exceed 367 days.',
-    'Defaults to last 30 days if no date range is provided.'
+    'Defaults to the last 30 days; start alone ends now, and end alone begins 30 days earlier.',
+    'Choose actingUserId or itemId; combining these native filters is refused.',
+    'Queries are bounded to 100 pages, 10,000 records and 4 MiB per response. Narrow the date range when a bound is reached; results are never silently truncated.'
   ],
   tags: {
     destructive: false,
@@ -55,8 +57,7 @@ export let queryEvents = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.auth.serverUrl
+      ...ctx.auth
     });
 
     let events = await client.listAllEvents({

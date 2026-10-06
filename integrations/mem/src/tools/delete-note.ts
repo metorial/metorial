@@ -19,7 +19,9 @@ export let deleteNote = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      requestId: z.string().describe('The request ID confirming the deletion.')
+      requestId: z
+        .string()
+        .describe('The request ID returned by the permanent deletion endpoint.')
     })
   )
   .handleInvocation(async ctx => {
@@ -31,7 +33,8 @@ export let deleteNote = SlateTool.create(spec, {
       output: {
         requestId: response.request_id
       },
-      message: `Deleted note \`${ctx.input.noteId}\`.`
+      message:
+        'Mem accepted the permanent note deletion. Read the exact note ID to verify retirement; deletion cannot be restored.'
     };
   })
   .build();

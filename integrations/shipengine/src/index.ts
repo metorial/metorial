@@ -8,12 +8,15 @@ import {
   createShipment,
   createWarehouse,
   deleteWarehouse,
+  downloadShippingDocument,
   estimateRates,
   findServicePoints,
   getRates,
+  getShippingResource,
   listCarriers,
   listLabels,
   listShipments,
+  listShippingResources,
   listWarehouses,
   recognizeAddress,
   schedulePickup,
@@ -23,16 +26,6 @@ import {
   validateAddress,
   voidLabel
 } from './tools';
-import {
-  batchCompletedTrigger,
-  carrierConnectedTrigger,
-  orderSourceRefreshTrigger,
-  rateUpdatedTrigger,
-  reportCompleteTrigger,
-  salesOrderImportedTrigger,
-  trackingTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -56,15 +49,10 @@ export let provider = Slate.create({
     findServicePoints,
     schedulePickup,
     cancelPickup,
-    createManifest
+    createManifest,
+    getShippingResource,
+    listShippingResources,
+    downloadShippingDocument
   ],
-  triggers: [
-    trackingTrigger,
-    batchCompletedTrigger,
-    carrierConnectedTrigger,
-    rateUpdatedTrigger,
-    reportCompleteTrigger,
-    salesOrderImportedTrigger,
-    orderSourceRefreshTrigger
-  ]
+  triggers: []
 });

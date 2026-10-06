@@ -2,9 +2,11 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   deleteSubscriber,
+  getCurrentUser,
   getSubscriber,
   listAccounts,
   listBroadcasts,
+  listCampaignSubscriptions,
   listConversions,
   listCustomFields,
   listEventActions,
@@ -20,11 +22,11 @@ import {
   recordEvent,
   unsubscribe
 } from './tools';
-import { subscriberActivity } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    listCampaignSubscriptions,
     manageSubscriber,
     getSubscriber,
     listSubscribers,
@@ -44,5 +46,5 @@ export let provider = Slate.create({
     listForms,
     listAccounts
   ],
-  triggers: [subscriberActivity]
+  triggers: []
 });

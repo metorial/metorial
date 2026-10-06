@@ -14,6 +14,7 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
+        .min(1)
         .describe('Your E2B API key (prefixed with e2b_). Obtain it from the E2B dashboard.')
     }),
     getOutput: async ctx => {

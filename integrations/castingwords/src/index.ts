@@ -9,8 +9,6 @@ import {
   retrieveTranscript,
   upgradeAudiofile
 } from './tools';
-import { audiofileEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     getInvoice,
     getPrepayBalance
   ],
-  triggers: [audiofileEvents]
+  triggers: []
 });

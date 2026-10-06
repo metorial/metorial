@@ -46,7 +46,7 @@ Queries can be parameterized via \`args\` for safe variable injection.`,
 
     return {
       output: { results },
-      message: `Query executed successfully. Returned results from graph **${ctx.config.graphName}**.`
+      message: 'Read the native Datalog results.'
     };
   })
   .build();

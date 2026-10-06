@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TaskRouterClient } from '../lib/taskrouter-client';
+import { fail, validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let workerSchema = z.object({
@@ -16,22 +17,30 @@ let workerSchema = z.object({
 export let manageWorkersTool = SlateTool.create(spec, {
   name: 'Manage Workers',
   key: 'manage_workers',
-  description: `Create, read, update, delete, or list workers (agents) in a TaskRouter workspace. Workers represent the agents who handle tasks in your Flex contact center. You can update their attributes, activity status, and availability.`,
+  description: `Create, read, update, delete, or list workers (agents) in a TaskRouter workspace. Workers represent the agents who handle tasks in your Flex contact center. You can update their attributes and current activity. Activity availability determines whether they can accept tasks.`,
   instructions: [
     'Worker attributes must be a valid JSON string.',
     "Use the activitySid to change a worker's current activity/status."
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque continuation from nextPageToken; retain the same resource and filters.'
+        ),
       action: z
         .enum(['create', 'get', 'update', 'delete', 'list'])
         .describe('Action to perform'),
-      workspaceSid: z.string().describe('Workspace SID'),
+      workspaceSid: z
+        .string()
+        .describe('Workspace SID. Call list_workspaces to discover authorized workspaces.'),
       workerSid: z.string().optional().describe('Worker SID (required for get/update/delete)'),
       friendlyName: z.string().optional().describe('Friendly name for the worker'),
       activitySid: z.string().optional().describe('Activity SID to set as current activity'),
@@ -45,20 +54,30 @@ export let manageWorkersTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Native continuation; omitted when this page is exhausted.'),
+      hasMore: z.boolean().optional().describe('Whether a next page is available.'),
       workers: z.array(workerSchema).describe('Worker records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TaskRouterClient(ctx.auth.token, ctx.auth.accountSid);
+    validateInput('manage_workers', ctx.input);
+    let client = new TaskRouterClient(
+      ctx.auth.token,
+      ctx.auth.accountSid,
+      ctx.input.pageToken
+    );
 
     if (ctx.input.action === 'list') {
       let params: Record<string, string | undefined> = {
-        PageSize: String(ctx.input.pageSize || 50)
+        PageSize: String(ctx.input.pageSize ?? 50)
       };
-      if (ctx.input.targetWorkersExpression) {
+      if (ctx.input.targetWorkersExpression !== undefined) {
         params.TargetWorkersExpression = ctx.input.targetWorkersExpression;
       }
-      if (ctx.input.friendlyName) {
+      if (ctx.input.friendlyName !== undefined) {
         params.FriendlyName = ctx.input.friendlyName;
       }
       if (ctx.input.activitySid) {
@@ -75,13 +94,13 @@ export let manageWorkersTool = SlateTool.create(spec, {
         dateUpdated: w.date_updated
       }));
       return {
-        output: { workers },
+        output: { workers, nextPageToken: result.nextPageToken, hasMore: result.hasMore },
         message: `Found **${workers.length}** workers in workspace.`
       };
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.workerSid) throw new Error('workerSid is required');
+      if (!ctx.input.workerSid) throw fail('workerSid is required');
       let w = await client.getWorker(ctx.input.workspaceSid, ctx.input.workerSid);
       return {
         output: {
@@ -102,8 +121,7 @@ export let manageWorkersTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.friendlyName)
-        throw new Error('friendlyName is required to create a worker');
+      if (!ctx.input.friendlyName) throw fail('friendlyName is required to create a worker');
       let params: Record<string, string | undefined> = {
         FriendlyName: ctx.input.friendlyName,
         ActivitySid: ctx.input.activitySid,
@@ -129,7 +147,7 @@ export let manageWorkersTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.workerSid) throw new Error('workerSid is required');
+      if (!ctx.input.workerSid) throw fail('workerSid is required');
       let params: Record<string, string | undefined> = {
         FriendlyName: ctx.input.friendlyName,
         ActivitySid: ctx.input.activitySid,
@@ -155,7 +173,7 @@ export let manageWorkersTool = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.workerSid) throw new Error('workerSid is required');
+    if (!ctx.input.workerSid) throw fail('workerSid is required');
     await client.deleteWorker(ctx.input.workspaceSid, ctx.input.workerSid);
     return {
       output: {

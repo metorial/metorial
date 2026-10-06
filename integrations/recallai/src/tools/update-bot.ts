@@ -1,5 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import {
+  automaticAudioOutputPayload,
+  automaticAudioOutputSchema,
+  automaticLeavePayload,
+  automaticLeaveSchema,
+  recordingConfigPayload,
+  recordingConfigSchema
+} from '../lib/bot-config';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -7,7 +15,10 @@ export let updateBotTool = SlateTool.create(spec, {
   name: 'Update Scheduled Bot',
   key: 'update_bot',
   description: `Update a scheduled bot's configuration before it joins a meeting. You can change the meeting URL, bot name, join time, recording config, and other settings. Only non-dispatched (scheduled) bots can be updated.`,
-  instructions: ['Only bots that have not yet started joining can be updated.'],
+  instructions: [
+    'Only bots that have not yet started joining can be updated.',
+    'For Calendar V2 bots, use schedule_bot_for_event instead.'
+  ],
   constraints: [
     'Rate limit: 300 requests per minute per workspace.',
     'Cannot update a bot that has already been dispatched or joined a meeting.'
@@ -23,6 +34,11 @@ export let updateBotTool = SlateTool.create(spec, {
       meetingUrl: z.string().optional().describe('New meeting URL'),
       botName: z.string().optional().describe('New display name for the bot'),
       joinAt: z.string().optional().describe('New scheduled join time (ISO 8601)'),
+      recordingConfig: recordingConfigSchema.optional(),
+      automaticLeave: automaticLeaveSchema.optional(),
+      automaticAudioOutput: automaticAudioOutputSchema
+        .optional()
+        .describe('Audio played when recording starts; also enables output_media audio'),
       metadata: z
         .record(z.string(), z.unknown())
         .optional()
@@ -48,7 +64,10 @@ export let updateBotTool = SlateTool.create(spec, {
       meetingUrl: ctx.input.meetingUrl,
       botName: ctx.input.botName,
       joinAt: ctx.input.joinAt,
-      metadata: ctx.input.metadata
+      metadata: ctx.input.metadata,
+      recordingConfig: recordingConfigPayload(ctx.input.recordingConfig),
+      automaticLeave: automaticLeavePayload(ctx.input.automaticLeave),
+      automaticAudioOutput: automaticAudioOutputPayload(ctx.input.automaticAudioOutput)
     });
 
     return {

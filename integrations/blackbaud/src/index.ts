@@ -22,8 +22,6 @@ import {
   updateAction,
   updateConstituent
 } from './tools';
-import { actionEvents, constituentEvents, giftEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     listLists,
     getListResults
   ],
-  triggers: [constituentEvents, giftEvents, actionEvents]
+  triggers: []
 });

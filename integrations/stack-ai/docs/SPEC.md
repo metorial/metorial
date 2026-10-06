@@ -1,95 +1,35 @@
-# Slates Specification for Stack Ai
+# Stack AI integration specification
 
-## Overview
+## Authentication and workflow identity
 
-Stack AI is an enterprise platform for building and deploying AI agents and workflows using a no-code drag-and-drop interface. StackAI is an enterprise platform for building and deploying AI agents, with a strong focus on governance and security. It provides a visual workflow builder, knowledge base management (RAG), integrations with enterprise systems (SharePoint, Salesforce, Slack, etc.), and multiple deployment options including API, chatbot, and third-party messaging channels.
+Use a bearer API key generated in Settings > API Keys. Copy a published workflow API URL from Export View > API to resolve the organization and flow IDs. The documented deployed origin is `https://stack-inference.com`; exported URLs using `https://api.stack-ai.com` are also accepted. API URL parsing restricts credentials to these provider origins and the workflow execution path.
 
-## Authentication
+The optional deployment URL during connection supplies the default organization and workflow. The `run_flow` tool can instead take the exported URL or explicit flow/organization IDs. Existing stored organization configuration remains supported. Authenticated requests do not follow redirects, and invalid or dot-segment path identifiers fail before sending. An organization ID is required only by organization-scoped paths. No public identity discovery or OAuth refresh contract was found; the integration does not invent either.
 
-Stack AI uses **Bearer token authentication** for its API. There are two contexts for authentication:
+## Confirmed public operations
 
-### API Key (Public Key) — For running deployed flows
+| Tool | Provider operation | Behavior |
+| --- | --- | --- |
+| `run_flow` | `POST /inference/v0/run/{org_id}/{flow_id}` | Workflow-specific JSON inputs; optional integer version and verbosity. Retains the existing object output contract; the current official response schema is unconstrained. |
+| `upload_document` | `POST /upload_to_supabase_user` | Multipart file and org/user_id/flow_id/node_id query fields. Requires a deployed workflow Files Node; returns upload acceptance metadata. |
+| `list_knowledge_base_resources` | `GET /v1/knowledge-bases/{knowledge_base_id}/resources` | Opaque cursor; page size 1–100; direction next/prev. The current official response schema is unconstrained, so the established data/cursor/has_more mapping still needs live confirmation. |
+| `upload_knowledge_base_resource` | `POST /v1/knowledge-bases/{knowledge_base_id}/resources` | Multipart file; HTTP 202 starts indexing and returns message/resource_id. Acceptance does not mean indexing has finished. |
+| `get_project_analytics` | `GET /analytics/org/{org_id}/flows/{flow_id}` | Array of run logs; zero-based page, positive page size, ISO datetime range, optional user ID and execution state filters. |
+| `get_organization_analytics` | `GET /organizations/analytics/projects-run-summary` | Array of project summaries, including project IDs/names for workflow discovery; pagination and ISO datetime range. |
 
-Before making API calls, you'll need to obtain your API Keys. Navigate to Settings → API Keys to generate your credentials. Once you have your credentials (a public API Key) and understand the required parameters, you can do your first call.
+Upload content may be UTF-8 text or base64 file bytes. Base64 must be valid and omit a data URL prefix. Uploaded file names cannot include directory paths. No download operation is implemented.
 
-The API key is passed as a Bearer token in the `Authorization` header:
+## Preserved management contracts
 
-```
-Authorization: Bearer YOUR_PUBLIC_KEY
-```
+The established tool keys and routes are retained for feedback; workflow document listing/deletion; knowledge-base CRUD, synchronization and resource deletion; connection listing/details/health/browse/deletion; storage usage; conversation listing/rename/archive/deletion; manager conversation listing; folders; tool-provider listing and generic action execution. Their absence from today's public reference does not establish removal. No authoritative public SDK or source was found that verifies their current request/response contracts or management credential scopes.
 
-When running a deployed flow, you also need:
+These tools retain the prior payloads and output fields. Unexpected payload shapes fail clearly. Cursor metadata is exposed only where the established contract provides it; no undocumented cursor request parameters are added. Generic external actions and workflow execution are marked destructive because their configured behavior can change or delete external data or send messages. Obtain action IDs and input schemas from the Stack AI action configuration.
 
-- **org_id**: Your organization ID (part of the URL path)
-- **flow_id**: The flow/project ID (part of the URL path)
-- **user_id**: Your user ID, optionally combined with a conversation handle (`user_id-conversation_id`)
+## Official sources
 
-The flow execution endpoint is: `POST https://api.stack-ai.com/inference/v0/run/{org_id}/{flow_id}`
-
-### OAuth2 Bearer Token — For management API
-
-The management API uses OAuth2PasswordBearer authentication with a Token URL: token. All management endpoints (documents, connections, tools, analytics, etc.) use this pattern:
-
-```
-Authorization: Bearer YOUR_OAUTH2_TOKEN
-```
-
-## Features
-
-### Flow Execution
-
-Run published AI workflows programmatically by sending inputs and receiving outputs as JSON. Integrate your interface as an API. Once your flow is ready for production, you can deploy it as an API. Supports text inputs, audio (base64), URLs, and file uploads. You can specify a flow version and control verbosity of the response.
-
-### Document Management
-
-Upload, list, download, and delete files in user-specific document buckets associated with a flow and node. Upload data to your Knowledge Base programmatically. Requires org_id, flow_id, node_id, and user_id to scope file operations.
-
-### Knowledge Bases
-
-A knowledge base is a centralized repository of information, documents, or data that can be searched and referenced. StackAI enables users to leverage a powerful and flexible RAG system through a simple drag-and-drop interface. By connecting directly to their knowledge base, users can effortlessly incorporate contextual search capabilities. Knowledge bases support configurable search parameters including output format (chunks, pages, docs), query strategy (semantic, keyword, hybrid), and metadata filtering.
-
-### Connections
-
-Manage integrations with external services. Connections can be created via credentials or OAuth flows. Create a new connection from an OAuth callback. This endpoint is used to create a new connection for providers that use the OAuth protocol. The OAuth flow is initialized by the stack frontend, where the user is redirected to the provider's authorization page. Once the user authorizes the application, they are redirected back to the stack frontend with a code parameter. This code is then sent to this endpoint, which uses it to create a new connection. Connections support role-based access control (RBAC) at the organization, user, and group levels. You can check connection health and browse connection resources.
-
-### Tools (Actions)
-
-An Action node allows your workflow to interact with external systems. You can use it to send data to other apps, update databases, trigger web searches, or automate other tasks across services. The API allows listing native tool providers, running actions, retrieving input/output schemas, and managing custom tool providers defined via OpenAPI schemas.
-
-### Conversations and Messages
-
-Manage conversation histories for deployed chat-based flows. Retrieve user conversations and messages associated with a project.
-
-### Analytics
-
-Project analytics. List with the flow run logs matching the given filters. Query run logs with filters for date range. Retrieve per-project summaries including total runs, errors, tokens, and users. Also provides storage usage analytics across knowledge bases.
-
-### Folders
-
-Organize projects into folders within the platform.
-
-### Notifications
-
-Manage platform notifications.
-
-### Manager
-
-Access conversation management features for projects, including listing user conversations with filtering and pagination.
-
-## Events
-
-Stack AI supports event-driven workflow triggers through its **Trigger Node** system. A Trigger Node will start your workflow when a certain event occurs, such as an email being received in your Gmail account, or a pull request created on Github.
-
-The API exposes a **Triggers** section that allows managing trigger configurations for workflows. Triggers are associated with tool providers and include input/output parameter schemas.
-
-### Email Triggers
-
-Trigger outputs include Sender (string), Thread ID (string), and Attachments (files). Workflows can be activated when emails are received, with access to sender, subject, body, thread ID, and attachments.
-
-### Form Submission Triggers
-
-The Typeform Form Submission Trigger node monitors your Typeform forms and activates your workflow automatically whenever a new form response is submitted. Captures form data in real-time.
-
-### Third-Party Service Triggers
-
-Triggers are available for various integrated providers (e.g., GitHub pull requests, Slack events). The specific triggers available depend on the connected provider and are discoverable via the tools API, which lists available triggers per provider with their input/output parameters.
+- [API reference](https://docs.stackai.com/interface-and-deployment/api-reference)
+- [Run Flow](https://docs.stackai.com/interface-and-deployment/api-reference/run-flow)
+- [API deployment and workflow file upload](https://docs.stackai.com/interface-and-deployment/end-user-interfaces/api)
+- [Knowledge-base files](https://docs.stackai.com/interface-and-deployment/api-reference/knowledge-bases)
+- [Analytics](https://docs.stackai.com/interface-and-deployment/api-reference/analytics)
+- [Company GitHub organization](https://github.com/stackai)

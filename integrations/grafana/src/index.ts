@@ -56,8 +56,6 @@ import {
   updatePlaylist,
   updateTeam
 } from './tools';
-import { alertNotification, annotationEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -116,5 +114,5 @@ export let provider = Slate.create({
     updateOrgUserRole,
     removeOrgUser
   ],
-  triggers: [alertNotification, annotationEvents]
+  triggers: []
 });

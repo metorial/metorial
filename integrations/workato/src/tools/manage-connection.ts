@@ -1,15 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import { field, idNumber, numericId, required } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageConnectionTool = SlateTool.create(spec, {
   name: 'Manage Connection',
   key: 'manage_connection',
-  description: `Create, disconnect, or delete a connection to a third-party application. When creating, specify the provider name and optional credential inputs. Connections can be disconnected (revoked) or permanently deleted.`,
+  description: `Create, disconnect, or delete a connection to a third-party application. When creating, specify the provider name and a non-Home folder ID and optional credential inputs. Connections can be disconnected (revoked) or permanently deleted.`,
   instructions: [
     'A connection used by active recipes cannot be deleted. Stop the recipes first.',
-    'When creating a connection, the input fields depend on the provider. Use shell_connection mode to create a placeholder connection without credential verification.'
+    'When creating a connection, the input fields depend on the provider. Use shellConnection=true to create a placeholder connection without credential verification.'
   ],
   tags: {
     destructive: true
@@ -34,61 +35,63 @@ export let manageConnectionTool = SlateTool.create(spec, {
         .record(z.string(), z.unknown())
         .optional()
         .describe('Provider-specific credential fields (e.g. host_name, api_token)'),
+      shellConnection: z
+        .boolean()
+        .optional()
+        .describe(
+          'Create a placeholder without testing or establishing credentials; defaults to false. False can authenticate a third-party application.'
+        ),
       force: z.boolean().optional().describe('Force disconnect even if connection is in use')
     })
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
+      success: z.boolean().optional().describe('Whether the operation succeeded'),
       connectionId: z.number().optional().describe('ID of the created/affected connection'),
       status: z.string().optional().describe('Status of the operation')
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let { action, connectionId, name, provider, folderId, connectionInput, force } = ctx.input;
-
+    const client = createClient(ctx);
+    const {
+      action,
+      connectionId,
+      name,
+      provider,
+      folderId,
+      connectionInput,
+      force,
+      shellConnection
+    } = ctx.input;
     if (action === 'create') {
-      if (!name || !provider)
-        throw new Error('Name and provider are required when creating a connection');
-      let result = await client.createConnection({
-        name,
-        provider,
+      const result = await client.createConnection({
+        name: required(name, 'Name'),
+        provider: required(provider, 'Provider'),
         folderId,
-        input: connectionInput
+        input: connectionInput,
+        shellConnection
       });
+      const id = idNumber(result.id);
       return {
         output: {
           success: true,
-          connectionId: result.id,
-          status: result.authorization_status ?? 'created'
+          connectionId: id,
+          status: field(result, 'authorization_status', z.string().optional())
         },
-        message: `Created connection **${name}** (${provider}) with ID ${result.id}.`
+        message: `Created connection ${id}. A shell connection has not been authenticated.`
       };
     }
-
-    if (!connectionId) throw new Error('Connection ID is required for disconnect/delete');
-
-    if (action === 'disconnect') {
-      let result = await client.disconnectConnection(connectionId, force);
-      return {
-        output: {
-          success: result.success ?? true,
-          connectionId: Number(connectionId),
-          status: result.status ?? 'disconnected'
-        },
-        message: `Disconnected connection **${connectionId}**.`
-      };
-    }
-
-    // delete
-    let result = await client.deleteConnection(connectionId);
+    const id = numericId(connectionId, 'connectionId');
+    const result =
+      action === 'disconnect'
+        ? await client.disconnectConnection(id, force)
+        : await client.deleteConnection(id);
     return {
       output: {
-        success: result.success ?? true,
-        connectionId: Number(connectionId),
-        status: result.status ?? 'deleted'
+        success: true,
+        connectionId: idNumber(id),
+        status: field(result, 'status', z.string().optional())
       },
-      message: `Deleted connection **${connectionId}**.`
+      message: `Connection ${action} accepted for ${id}.`
     };
   });

@@ -18,8 +18,6 @@ import {
   prepareCheckoutTool,
   toggleEventSalesTool
 } from './tools';
-import { inboundWebhook, newAttendeeTrigger, newTransactionTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     listUsersTool,
     getCategoriesTool
   ],
-  triggers: [inboundWebhook, newAttendeeTrigger, newTransactionTrigger]
+  triggers: []
 });

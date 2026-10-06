@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -28,16 +29,8 @@ export let auth = SlateAuth.create()
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.mixmax.com/v1',
-        headers: {
-          'X-API-Token': ctx.output.token
-        }
-      });
-
-      let response = await http.get('/users/me');
-      let user = response.data;
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let user = await new Client({ token: ctx.output.token }).getCurrentUser();
 
       return {
         profile: {

@@ -24,8 +24,6 @@ import {
   trackEvent,
   updateFlowStatus
 } from './tools';
-import { newEvents, newProfiles, webhookEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -52,5 +50,5 @@ export let provider = Slate.create({
     manageCoupons,
     requestProfileDeletion
   ],
-  triggers: [webhookEvents, newEvents, newProfiles]
+  triggers: []
 });

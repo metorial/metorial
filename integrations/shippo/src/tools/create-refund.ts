@@ -8,7 +8,7 @@ export let createRefund = SlateTool.create(spec, {
   key: 'create_refund',
   description: `Request a refund for an unused shipping label. You must explicitly request refunds — unused labels are not automatically refunded. Provide the transaction (label) ID to refund.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -28,11 +28,11 @@ export let createRefund = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
-    let result = (await client.createRefund({
+    let result = await client.createRefund({
       transaction: ctx.input.transactionId
-    })) as Record<string, any>;
+    });
 
     return {
       output: {
@@ -40,7 +40,7 @@ export let createRefund = SlateTool.create(spec, {
         status: result.status,
         transactionId: result.transaction
       },
-      message: `Refund ${result.status === 'SUCCESS' ? '✅ processed' : `status: ${result.status}`} for transaction ${ctx.input.transactionId} (refund: ${result.object_id}).`
+      message: `Refund request status: ${result.status ?? 'unreported'} for transaction ${ctx.input.transactionId} (refund: ${result.object_id}).`
     };
   })
   .build();

@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { nonempty, optionalText, rows } from '../lib/contracts';
+import { templateOutput } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getTemplate = SlateTool.create(spec, {
@@ -14,6 +17,7 @@ export let getTemplate = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       templateUid: z.string().describe('UID of the template to retrieve')
     })
   )
@@ -37,27 +41,19 @@ export let getTemplate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.getTemplate(ctx.input.templateUid);
-
-    let availableModifications = (result.available_modifications || []).map((m: any) => ({
-      name: m.name,
-      type: m.type
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const result = await client.getTemplate(ctx.input.templateUid);
+    const availableModifications = rows(result.available_modifications).map(item => ({
+      name: nonempty(item.name),
+      type: optionalText(item.type)
     }));
-
     return {
       output: {
-        templateUid: result.uid,
-        name: result.name,
-        width: result.width,
-        height: result.height,
-        previewUrl: result.preview_url || null,
-        tags: result.tags || [],
+        ...templateOutput(result),
         availableModifications,
-        createdAt: result.created_at
+        createdAt: nonempty(result.created_at)
       },
-      message: `Template **${result.name}** (${result.width}x${result.height}) has ${availableModifications.length} modifiable layer(s).`
+      message: `Retrieved the exact template and ${availableModifications.length} modifiable layer(s).`
     };
   })
   .build();

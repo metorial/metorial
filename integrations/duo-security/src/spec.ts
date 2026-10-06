@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'duo-security',
   name: 'Duo Security',
   description:
-    'Cisco Duo Security multi-factor authentication and access security platform. Manage users, groups, phones, admins, integrations, and retrieve authentication logs.',
+    'Cisco Duo Security multi-factor authentication and access security platform. Manage users, groups, phones and administrators, discover protected applications, and read account context and logs.',
   metadata: {},
   config,
   auth

@@ -9,8 +9,11 @@ import {
   createParcelTemplate,
   createRefund,
   createShipment,
+  downloadShippingDocument,
+  getCurrentContext,
   getRates,
   getShipment,
+  getShippingResource,
   getTransaction,
   listAddresses,
   listCarrierAccounts,
@@ -24,11 +27,12 @@ import {
   trackShipment,
   validateAddress
 } from './tools';
-import { batchEvents, trackingUpdated, transactionEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentContext,
+    getShippingResource,
+    downloadShippingDocument,
     createAddress,
     validateAddress,
     listAddresses,
@@ -52,5 +56,5 @@ export let provider = Slate.create({
     createBatch,
     purchaseBatch
   ],
-  triggers: [trackingUpdated, transactionEvents, batchEvents]
+  triggers: []
 });

@@ -1,0 +1,393 @@
+{
+  "enrich_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "Full name of the person (e.g. \"John Smith\")",
+        "type": "string"
+      },
+      "firstName": {
+        "description": "First name of the person",
+        "type": "string"
+      },
+      "lastName": {
+        "description": "Last name of the person",
+        "type": "string"
+      },
+      "middleName": {
+        "description": "Middle name of the person",
+        "type": "string"
+      },
+      "email": {
+        "description": "Email address associated with the person",
+        "type": "string"
+      },
+      "phone": {
+        "description": "Phone number associated with the person",
+        "type": "string"
+      },
+      "linkedinUrl": {
+        "description": "LinkedIn profile URL",
+        "type": "string"
+      },
+      "facebookUrl": {
+        "description": "Facebook profile URL",
+        "type": "string"
+      },
+      "twitterUrl": {
+        "description": "Twitter/X profile URL",
+        "type": "string"
+      },
+      "githubUrl": {
+        "description": "GitHub profile URL",
+        "type": "string"
+      },
+      "company": {
+        "description": "Company name where the person works or worked",
+        "type": "string"
+      },
+      "school": {
+        "description": "School name the person attended",
+        "type": "string"
+      },
+      "location": {
+        "description": "Location of the person (e.g. \"San Francisco, CA\")",
+        "type": "string"
+      },
+      "locality": {
+        "description": "City/locality of the person",
+        "type": "string"
+      },
+      "region": {
+        "description": "State/region of the person",
+        "type": "string"
+      },
+      "country": {
+        "description": "Country of the person (ISO 3166-1 alpha-2)",
+        "type": "string"
+      },
+      "streetAddress": {
+        "description": "Street address of the person",
+        "type": "string"
+      },
+      "postalCode": {
+        "description": "Postal/zip code of the person",
+        "type": "string"
+      },
+      "birthDate": {
+        "description": "Birth date of the person (YYYY-MM-DD or YYYY)",
+        "type": "string"
+      },
+      "minLikelihood": {
+        "description": "Minimum confidence score (0-10) for match, defaults to 2",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 10
+      },
+      "titlecase": {
+        "description": "Titlecase the output fields",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "search_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "sql": {
+        "description": "SQL query to search for persons (e.g. \"SELECT * FROM person WHERE location_country='united states' AND job_title='software engineer'\")",
+        "type": "string"
+      },
+      "elasticsearchQuery": {
+        "description": "Elasticsearch DSL query as JSON string",
+        "type": "string"
+      },
+      "size": {
+        "description": "Number of results to return per page (1-100, default 10)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "scrollToken": {
+        "description": "Pagination token from a previous search response",
+        "type": "string"
+      },
+      "dataset": {
+        "description": "Dataset to search (default: \"all\")",
+        "type": "string"
+      },
+      "titlecase": {
+        "description": "Titlecase the output fields",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "identify_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "Full name of the person",
+        "type": "string"
+      },
+      "firstName": {
+        "description": "First name of the person",
+        "type": "string"
+      },
+      "lastName": {
+        "description": "Last name of the person",
+        "type": "string"
+      },
+      "email": {
+        "description": "Email address associated with the person",
+        "type": "string"
+      },
+      "phone": {
+        "description": "Phone number associated with the person",
+        "type": "string"
+      },
+      "linkedinUrl": {
+        "description": "LinkedIn profile URL",
+        "type": "string"
+      },
+      "company": {
+        "description": "Company name where the person works or worked",
+        "type": "string"
+      },
+      "school": {
+        "description": "School name the person attended",
+        "type": "string"
+      },
+      "location": {
+        "description": "Location of the person",
+        "type": "string"
+      },
+      "locality": {
+        "description": "City/locality of the person",
+        "type": "string"
+      },
+      "region": {
+        "description": "State/region of the person",
+        "type": "string"
+      },
+      "country": {
+        "description": "Country of the person",
+        "type": "string"
+      },
+      "titlecase": {
+        "description": "Titlecase the output fields",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "retrieve_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "personId": {
+        "type": "string",
+        "description": "The unique PDL Person ID to retrieve"
+      },
+      "titlecase": {
+        "description": "Titlecase the output fields",
+        "type": "boolean"
+      }
+    },
+    "required": ["personId"],
+    "additionalProperties": false
+  },
+  "enrich_company": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "Company name (e.g. \"Google\")",
+        "type": "string"
+      },
+      "website": {
+        "description": "Company website URL (e.g. \"google.com\")",
+        "type": "string"
+      },
+      "linkedinUrl": {
+        "description": "Company LinkedIn profile URL",
+        "type": "string"
+      },
+      "ticker": {
+        "description": "Stock ticker symbol (e.g. \"GOOGL\")",
+        "type": "string"
+      },
+      "location": {
+        "description": "Company headquarters location",
+        "type": "string"
+      },
+      "locality": {
+        "description": "City/locality of the company",
+        "type": "string"
+      },
+      "region": {
+        "description": "State/region of the company",
+        "type": "string"
+      },
+      "country": {
+        "description": "Country of the company",
+        "type": "string"
+      },
+      "streetAddress": {
+        "description": "Street address of the company",
+        "type": "string"
+      },
+      "postalCode": {
+        "description": "Postal/zip code of the company",
+        "type": "string"
+      },
+      "titlecase": {
+        "description": "Titlecase the output fields",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "search_company": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "sql": {
+        "description": "SQL query to search for companies (e.g. \"SELECT * FROM company WHERE industry='technology'\")",
+        "type": "string"
+      },
+      "elasticsearchQuery": {
+        "description": "Elasticsearch DSL query as JSON string",
+        "type": "string"
+      },
+      "size": {
+        "description": "Number of results to return per page (1-100, default 10)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "scrollToken": {
+        "description": "Pagination token from a previous search response",
+        "type": "string"
+      },
+      "titlecase": {
+        "description": "Titlecase the output fields",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "enrich_ip": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "ip": {
+        "type": "string",
+        "description": "IP address to enrich (IPv4 or IPv6)"
+      },
+      "returnIfUnmatched": {
+        "description": "Return partial data even if no full match is found",
+        "type": "boolean"
+      }
+    },
+    "required": ["ip"],
+    "additionalProperties": false
+  },
+  "enrich_job_title": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "jobTitle": {
+        "type": "string",
+        "description": "Raw job title to enrich (e.g. \"senior software eng\")"
+      },
+      "titlecase": {
+        "description": "Titlecase the output fields",
+        "type": "boolean"
+      }
+    },
+    "required": ["jobTitle"],
+    "additionalProperties": false
+  },
+  "enrich_skill": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "skill": {
+        "type": "string",
+        "description": "Raw skill to enrich (e.g. \"machine learn\")"
+      },
+      "titlecase": {
+        "description": "Titlecase the output fields",
+        "type": "boolean"
+      }
+    },
+    "required": ["skill"],
+    "additionalProperties": false
+  },
+  "clean_company": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyName": {
+        "type": "string",
+        "description": "Raw company name to clean (e.g. \"google inc\")"
+      }
+    },
+    "required": ["companyName"],
+    "additionalProperties": false
+  },
+  "clean_location": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "location": {
+        "type": "string",
+        "description": "Raw location string to clean (e.g. \"sf bay area\" or \"new york, ny\")"
+      }
+    },
+    "required": ["location"],
+    "additionalProperties": false
+  },
+  "clean_school": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "schoolName": {
+        "type": "string",
+        "description": "Raw school name to clean (e.g. \"mit\" or \"stanford u\")"
+      }
+    },
+    "required": ["schoolName"],
+    "additionalProperties": false
+  },
+  "autocomplete": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "field": {
+        "type": "string",
+        "description": "Field to autocomplete on (e.g. \"company\", \"school\", \"title\", \"skill\", \"region\", \"country\", \"locality\", \"major\", \"industry\")"
+      },
+      "text": {
+        "description": "Text prefix to search for suggestions (e.g. \"goog\" for companies, \"stanf\" for schools)",
+        "type": "string"
+      },
+      "size": {
+        "description": "Number of suggestions to return (1-100, default 10)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "titlecase": {
+        "description": "Titlecase the output fields",
+        "type": "boolean"
+      }
+    },
+    "required": ["field"],
+    "additionalProperties": false
+  }
+}

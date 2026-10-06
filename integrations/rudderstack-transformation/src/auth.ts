@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,13 +15,17 @@ export let auth = SlateAuth.create()
       serviceAccessToken: z
         .string()
         .describe(
-          'Workspace-level Service Access Token (SAT) or Personal Access Token (PAT). Generate this from your RudderStack dashboard with appropriate permissions for Transformations and Libraries.'
+          'Workspace-level Service Access Token (recommended) with Transformations Create & Delete, Connect and Edit, Transformation Libraries Edit and Destinations Connect permissions; or a Personal Access Token with Read-Write role for testing/personal use. This management API uses Bearer auth, separate from the Basic-auth Test API.'
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.serviceAccessToken.trim())
+        throw createApiServiceError(
+          'Provide a RudderStack Service Access Token or Personal Access Token.'
+        );
       return {
         output: {
-          token: ctx.input.serviceAccessToken
+          token: ctx.input.serviceAccessToken.trim()
         }
       };
     }

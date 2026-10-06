@@ -1,458 +1,175 @@
-import { createAxios } from 'slates';
+import { ServiceError } from '@lowerdeck/error';
+import {
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined,
+  requestAxios
+} from 'slates';
+import {
+  type AshbyAuth,
+  credential,
+  id,
+  pageInput,
+  providerFailure,
+  type Row,
+  row,
+  rows,
+  safeApiError,
+  safeData,
+  text,
+  unexpected
+} from './contracts';
 
 export class AshbyClient {
-  private token: string;
-
-  constructor(config: { token: string }) {
-    this.token = config.token;
-  }
-
-  private getAxios() {
-    return createAxios({
+  private readonly http: ReturnType<typeof createAuthenticatedAxios>;
+  readonly warnings: string[] = [];
+  constructor(private readonly auth: AshbyAuth) {
+    const token = credential(auth.token);
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.ashbyhq.com',
+      timeout: 60_000,
+      maxRedirects: 0,
+      maxContentLength: 16 * 1024 * 1024,
+      maxBodyLength: 2 * 1024 * 1024,
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Basic ${btoa(`${this.token}:`)}`
-      }
+        Accept: 'application/json',
+        Authorization: `Basic ${Buffer.from(`${token}:`).toString('base64')}`
+      },
+      errorAdapter: safeApiError
     });
   }
-
-  private async post(endpoint: string, data: Record<string, any> = {}) {
-    let axios = this.getAxios();
-    let response = await axios.post(endpoint, data);
-    return response.data;
-  }
-
-  // ---- Candidates ----
-
-  async createCandidate(params: {
-    firstName: string;
-    lastName: string;
-    primaryEmailAddress?: { value: string; type: string; isPrimary: boolean };
-    primaryPhoneNumber?: { value: string; type: string; isPrimary: boolean };
-    socialLinks?: Array<{ type: string; url: string }>;
-    sourceId?: string;
-    creditedToUserId?: string;
-  }) {
-    return this.post('/candidate.create', params);
-  }
-
-  async getCandidate(candidateId: string) {
-    return this.post('/candidate.info', { candidateId });
-  }
-
-  async listCandidates(
-    params: { cursor?: string; perPage?: number; syncToken?: string } = {}
-  ) {
-    return this.post('/candidate.list', {
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.perPage ? { perPage: params.perPage } : {}),
-      ...(params.syncToken ? { syncToken: params.syncToken } : {})
-    });
-  }
-
-  async searchCandidates(params: { email?: string; name?: string }) {
-    return this.post('/candidate.search', params);
-  }
-
-  async updateCandidate(
-    candidateId: string,
-    params: {
-      name?: string;
-      primaryEmailAddress?: { value: string; type: string; isPrimary: boolean };
-      primaryPhoneNumber?: { value: string; type: string; isPrimary: boolean };
-      socialLinks?: Array<{ type: string; url: string }>;
+  async post(endpoint: string, body: Row = {}): Promise<Row> {
+    if (!/^\/[a-zA-Z]+\.[a-zA-Z]+$/.test(endpoint)) return unexpected();
+    const data = pickDefined(body);
+    safeData(data, this.auth);
+    const response = await requestAxios(
+      'Ashby request',
+      () => this.http.post<unknown>(endpoint, data),
+      safeApiError
+    );
+    if (response.status !== 200) throw safeApiError({ response: { status: response.status } });
+    const envelope = row(response.data);
+    if (envelope.success === false) return providerFailure(envelope);
+    if (envelope.success !== true || !Object.hasOwn(envelope, 'results')) return unexpected();
+    if (envelope.warnings !== undefined) {
+      if (!Array.isArray(envelope.warnings)) return unexpected();
+      for (const warning of envelope.warnings)
+        this.warnings.push(
+          warning === 'unable_to_add_application_metadata'
+            ? warning
+            : 'provider_warning_details_omitted'
+        );
     }
+    const { warnings: _warnings, ...result } = envelope;
+    return row(safeData(result, this.auth));
+  }
+  async exact(endpoint: string, body: Row, expected: string): Promise<Row> {
+    const response = await this.post(endpoint, body);
+    if (row(response.results).id !== expected) return unexpected();
+    return response;
+  }
+  async sequence(
+    steps: { label: string; run: () => Promise<unknown> }[],
+    confirmedResource?: () => Row
   ) {
-    return this.post('/candidate.update', { candidateId, ...params });
+    const completed: string[] = [];
+    try {
+      for (const step of steps) {
+        await step.run();
+        completed.push(step.label);
+      }
+    } catch (error) {
+      if (!completed.length) throw error;
+      const failure = createApiServiceError(
+        `Ashby accepted these prior operations: ${completed.join(', ')}. The remaining operation or readback failed; completion may be unknown. Read the exact resource before retrying; operations are not atomic.`,
+        {
+          reason: 'ashby_partial_write',
+          upstreamStatus:
+            error instanceof ServiceError ? error.data.upstreamStatus : undefined,
+          upstreamCode: error instanceof ServiceError ? error.data.upstreamCode : undefined
+        }
+      );
+      failure.data.completedActions = completed;
+      if (confirmedResource)
+        failure.data.confirmedResource = safeData(confirmedResource(), this.auth);
+      throw failure;
+    }
+    return completed;
   }
-
-  async addCandidateTag(candidateId: string, tagId: string) {
-    return this.post('/candidate.addTag', { candidateId, tagId });
+  getCandidate(candidateId: string) {
+    const key = id(candidateId, 'Candidate ID');
+    return this.exact('/candidate.info', { id: key }, key);
   }
-
-  async createCandidateNote(candidateId: string, note: string) {
-    return this.post('/candidate.createNote', { candidateId, note });
+  getApplication(applicationId: string, expand?: string[]) {
+    const key = id(applicationId, 'Application ID');
+    return this.exact('/application.info', { applicationId: key, expand }, key);
   }
-
-  async listCandidateNotes(candidateId: string) {
-    return this.post('/candidate.listNotes', { candidateId });
+  getJob(jobId: string) {
+    const key = id(jobId, 'Job ID');
+    return this.exact('/job.info', { id: key }, key);
   }
-
-  async anonymizeCandidate(candidateId: string) {
-    return this.post('/candidate.anonymize', { candidateId });
+  getOffer(offerId: string) {
+    const key = id(offerId, 'Offer ID');
+    return this.exact('/offer.info', { offerId: key }, key);
   }
-
-  async addCandidateProject(candidateId: string, projectId: string) {
-    return this.post('/candidate.addProject', { candidateId, projectId });
-  }
-
-  // ---- Applications ----
-
-  async createApplication(params: {
-    candidateId: string;
-    jobId: string;
-    interviewPlanId?: string;
-    interviewStageId?: string;
-    sourceId?: string;
-    creditedToUserId?: string;
-    createdAt?: string;
-  }) {
-    return this.post('/application.create', params);
-  }
-
-  async getApplication(applicationId: string, expand?: string[]) {
-    return this.post('/application.info', {
-      applicationId,
-      ...(expand && expand.length > 0 ? { expand } : {})
-    });
-  }
-
-  async listApplications(
-    params: { cursor?: string; perPage?: number; syncToken?: string } = {}
+  async list(
+    endpoint: string,
+    params: { cursor?: string; perPage?: number; syncToken?: string },
+    extra: Row = {}
   ) {
-    return this.post('/application.list', {
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.perPage ? { perPage: params.perPage } : {}),
-      ...(params.syncToken ? { syncToken: params.syncToken } : {})
-    });
+    const result = await this.post(endpoint, { ...pageInput(params), ...extra });
+    if (result.moreDataAvailable === true && result.nextCursor === params.cursor)
+      return unexpected();
+    return result;
   }
-
-  async changeApplicationStage(params: {
-    applicationId: string;
-    interviewStageId: string;
-    archiveReasonId?: string;
-  }) {
-    return this.post('/application.changeStage', params);
+  async findSchedule(scheduleId: string, applicationId?: string): Promise<Row> {
+    const expected = id(scheduleId, 'Interview schedule ID');
+    let cursor: string | undefined;
+    const seen = new Set<string>();
+    for (let page = 0; page < 100; page++) {
+      const response = await this.list(
+        '/interviewSchedule.list',
+        { perPage: 100, cursor },
+        { applicationId }
+      );
+      const matches = rows(response.results).filter(item => item.id === expected);
+      if (matches.length > 1) return unexpected();
+      if (matches.length === 1) {
+        if (applicationId !== undefined && matches[0]?.applicationId !== applicationId)
+          return unexpected();
+        return { success: true, results: matches[0] };
+      }
+      if (response.moreDataAvailable === false)
+        throw createApiServiceError(
+          'The selected schedule was not found. Refresh schedule listing and verify application identity.',
+          { reason: 'ashby_validation' }
+        );
+      if (
+        response.moreDataAvailable !== true ||
+        typeof response.nextCursor !== 'string' ||
+        !response.nextCursor ||
+        seen.has(response.nextCursor)
+      )
+        return unexpected();
+      cursor = response.nextCursor;
+      seen.add(cursor);
+    }
+    throw createApiServiceError(
+      'Schedule lookup exceeded 100 pages. Provide the exact applicationId to narrow lookup before updating.',
+      { reason: 'ashby_validation' }
+    );
   }
-
-  async changeApplicationSource(params: { applicationId: string; sourceId: string }) {
-    return this.post('/application.changeSource', params);
-  }
-
-  async transferApplication(params: {
-    applicationId: string;
-    jobId: string;
-    interviewStageId?: string;
-    interviewPlanId?: string;
-  }) {
-    return this.post('/application.transfer', params);
-  }
-
-  async updateApplication(applicationId: string, params: Record<string, any>) {
-    return this.post('/application.update', { applicationId, ...params });
-  }
-
-  async addHiringTeamMember(params: { applicationId: string; userId: string; role: string }) {
-    return this.post('/application.addHiringTeamMember', params);
-  }
-
-  async removeHiringTeamMember(params: {
-    applicationId: string;
-    userId: string;
-    role: string;
-  }) {
-    return this.post('/application.removeHiringTeamMember', params);
-  }
-
-  async listApplicationHistory(applicationId: string) {
-    return this.post('/application.listHistory', { applicationId });
-  }
-
-  // ---- Application Feedback ----
-
-  async listApplicationFeedback(applicationId: string) {
-    return this.post('/applicationFeedback.list', { applicationId });
-  }
-
-  async submitApplicationFeedback(params: {
-    applicationId: string;
-    feedbackFormDefinitionId: string;
-    submittedValues: Record<string, any>;
-  }) {
-    return this.post('/applicationFeedback.submit', params);
-  }
-
-  // ---- Jobs ----
-
-  async createJob(params: {
-    title: string;
-    teamId?: string;
-    locationId?: string;
-    departmentId?: string;
-    defaultInterviewPlanId?: string;
-  }) {
-    return this.post('/job.create', params);
-  }
-
-  async getJob(jobId: string) {
-    return this.post('/job.info', { jobId });
-  }
-
-  async listJobs(params: { cursor?: string; perPage?: number; syncToken?: string } = {}) {
-    return this.post('/job.list', {
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.perPage ? { perPage: params.perPage } : {}),
-      ...(params.syncToken ? { syncToken: params.syncToken } : {})
-    });
-  }
-
-  async searchJobs(params: { term?: string; status?: string }) {
-    return this.post('/job.search', params);
-  }
-
-  async updateJob(jobId: string, params: Record<string, any>) {
-    return this.post('/job.update', { jobId, ...params });
-  }
-
-  async setJobStatus(jobId: string, status: string) {
-    return this.post('/job.setStatus', { jobId, status });
-  }
-
-  async updateJobCompensation(jobId: string, compensation: Record<string, any>) {
-    return this.post('/job.updateCompensation', { jobId, ...compensation });
-  }
-
-  // ---- Offers ----
-
-  async createOffer(params: Record<string, any>) {
-    return this.post('/offer.create', params);
-  }
-
-  async getOffer(offerId: string) {
-    return this.post('/offer.info', { offerId });
-  }
-
-  async listOffers(params: { cursor?: string; perPage?: number } = {}) {
-    return this.post('/offer.list', {
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.perPage ? { perPage: params.perPage } : {})
-    });
-  }
-
-  async updateOffer(offerId: string, params: Record<string, any>) {
-    return this.post('/offer.update', { offerId, ...params });
-  }
-
-  async approveOffer(offerId: string) {
-    return this.post('/offer.approve', { offerId });
-  }
-
-  async startOffer(offerId: string) {
-    return this.post('/offer.start', { offerId });
-  }
-
-  // ---- Interviews ----
-
-  async listInterviews(params: { cursor?: string; perPage?: number } = {}) {
-    return this.post('/interview.list', {
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.perPage ? { perPage: params.perPage } : {})
-    });
-  }
-
-  async getInterview(interviewId: string) {
-    return this.post('/interview.info', { interviewId });
-  }
-
-  async createInterviewSchedule(params: {
-    applicationId: string;
-    interviewEvents: Array<{
-      interviewId: string;
-      startTime: string;
-      endTime: string;
-      interviewerUserIds: string[];
-    }>;
-  }) {
-    return this.post('/interviewSchedule.create', params);
-  }
-
-  async updateInterviewSchedule(interviewScheduleId: string, params: Record<string, any>) {
-    return this.post('/interviewSchedule.update', { interviewScheduleId, ...params });
-  }
-
-  async cancelInterviewSchedule(interviewScheduleId: string) {
-    return this.post('/interviewSchedule.cancel', { interviewScheduleId });
-  }
-
-  async listInterviewSchedules(params: { cursor?: string; perPage?: number } = {}) {
-    return this.post('/interviewSchedule.list', {
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.perPage ? { perPage: params.perPage } : {})
-    });
-  }
-
-  // ---- Organization: Departments ----
-
-  async createDepartment(params: { name: string; parentId?: string }) {
-    return this.post('/department.create', params);
-  }
-
-  async listDepartments() {
-    return this.post('/department.list', {});
-  }
-
-  async archiveDepartment(departmentId: string) {
-    return this.post('/department.archive', { departmentId });
-  }
-
-  // ---- Organization: Locations ----
-
-  async createLocation(params: {
-    name: string;
-    isRemote?: boolean;
-    address?: Record<string, any>;
-  }) {
-    return this.post('/location.create', params);
-  }
-
-  async listLocations() {
-    return this.post('/location.list', {});
-  }
-
-  // ---- Organization: Users ----
-
-  async listUsers(params: { cursor?: string; perPage?: number } = {}) {
-    return this.post('/user.list', {
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.perPage ? { perPage: params.perPage } : {})
-    });
-  }
-
-  async searchUsers(params: { term?: string }) {
-    return this.post('/user.search', params);
-  }
-
-  // ---- Openings ----
-
-  async createOpening(params: {
-    jobId: string;
-    targetHireDate?: string;
-    targetStartDate?: string;
-    openingState?: string;
-  }) {
-    return this.post('/opening.create', params);
-  }
-
-  async listOpenings(params: { cursor?: string; perPage?: number } = {}) {
-    return this.post('/opening.list', {
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.perPage ? { perPage: params.perPage } : {})
-    });
-  }
-
-  // ---- Sources ----
-
-  async listSources() {
-    return this.post('/source.list', {});
-  }
-
-  // ---- Tags ----
-
-  async listCandidateTags() {
-    return this.post('/candidateTag.list', {});
-  }
-
-  async createCandidateTag(params: { title: string }) {
-    return this.post('/candidateTag.create', params);
-  }
-
-  // ---- Archive Reasons ----
-
-  async listArchiveReasons() {
-    return this.post('/archiveReason.list', {});
-  }
-
-  // ---- Interview Stages ----
-
-  async listInterviewStages(params: { cursor?: string; perPage?: number } = {}) {
-    return this.post('/interviewStage.list', {
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.perPage ? { perPage: params.perPage } : {})
-    });
-  }
-
-  // ---- Custom Fields ----
-
-  async setCustomFieldValue(params: {
-    objectType: string;
-    objectId: string;
-    fieldId: string;
-    value: any;
-  }) {
-    return this.post('/customField.setValue', {
-      objectType: params.objectType,
-      objectId: params.objectId,
-      fieldId: params.fieldId,
-      fieldValue: params.value
-    });
-  }
-
-  // ---- Webhooks ----
-
-  async createWebhook(params: {
-    webhookType: string;
-    requestUrl: string;
-    secretToken: string;
-  }) {
-    return this.post('/webhook.create', params);
-  }
-
-  async deleteWebhook(webhookId: string) {
-    return this.post('/webhook.delete', { webhookId });
-  }
-
-  async updateWebhook(params: {
-    webhookId: string;
-    enabled?: boolean;
-    requestUrl?: string;
-    secretToken?: string;
-  }) {
-    return this.post('/webhook.update', params);
-  }
-
-  // ---- Job Postings ----
-
-  async listJobPostings(params: { cursor?: string; perPage?: number } = {}) {
-    return this.post('/jobPosting.list', {
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.perPage ? { perPage: params.perPage } : {})
-    });
-  }
-
-  async getJobPosting(jobPostingId: string) {
-    return this.post('/jobPosting.info', { jobPostingId });
-  }
-
-  async updateJobPosting(jobPostingId: string, params: Record<string, any>) {
-    return this.post('/jobPosting.update', { jobPostingId, ...params });
-  }
-
-  // ---- Surveys ----
-
-  async createSurveyRequest(params: {
-    surveyFormDefinitionId: string;
-    applicationId: string;
-  }) {
-    return this.post('/surveyRequest.create', params);
-  }
-
-  async listSurveySubmissions(params: { cursor?: string; perPage?: number } = {}) {
-    return this.post('/surveySubmission.list', {
-      ...(params.cursor ? { cursor: params.cursor } : {}),
-      ...(params.perPage ? { perPage: params.perPage } : {})
-    });
-  }
-
-  // ---- Referrals ----
-
-  async createReferral(params: Record<string, any>) {
-    return this.post('/referral.create', params);
-  }
-
-  // ---- Reports ----
-
-  async generateReport(params: Record<string, any>) {
-    return this.post('/report.generate', params);
+  async roleId(value: string) {
+    if (/^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(value))
+      return id(value, 'Hiring role ID');
+    text(value, 'Hiring role');
+    const roles = rows((await this.post('/applicationHiringTeamRole.list')).results);
+    const matches = roles.filter(role => role.name === value || role.title === value);
+    if (matches.length !== 1)
+      throw createApiServiceError(
+        'Hiring role name is missing or ambiguous. Use list_organization hiring_roles and pass the exact role ID.',
+        { reason: 'ashby_validation' }
+      );
+    return id(matches[0]?.id, 'Hiring role ID');
   }
 }

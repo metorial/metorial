@@ -1,6 +1,7 @@
 export * from './cancel-deployment';
 export * from './create-stack';
 export * from './delete-stack';
+export * from './get-current-user';
 export * from './get-deployment';
 export * from './get-stack';
 export * from './list-audit-logs';

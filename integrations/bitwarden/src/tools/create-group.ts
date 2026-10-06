@@ -18,7 +18,9 @@ export let createGroup = SlateTool.create(spec, {
       accessAll: z
         .boolean()
         .default(false)
-        .describe('Whether the group should have access to all collections'),
+        .describe(
+          'Legacy field: false only. The current Public API uses explicit collection assignments; true is refused before any change.'
+        ),
       externalId: z
         .string()
         .optional()
@@ -27,7 +29,19 @@ export let createGroup = SlateTool.create(spec, {
         .array(
           z.object({
             collectionId: z.string().describe('Collection ID'),
-            readOnly: z.boolean().default(false).describe('Whether access is read-only')
+            readOnly: z.boolean().default(false).describe('Whether access is read-only'),
+            hidePasswords: z
+              .boolean()
+              .optional()
+              .describe(
+                'Hide passwords permission; omitted values preserve existing assignment settings on updates.'
+              ),
+            manage: z
+              .boolean()
+              .optional()
+              .describe(
+                'Manage collection permission; omitted values preserve existing assignment settings on updates.'
+              )
           })
         )
         .optional()
@@ -39,29 +53,32 @@ export let createGroup = SlateTool.create(spec, {
     z.object({
       groupId: z.string().describe('ID of the created group'),
       name: z.string().describe('Name of the created group'),
-      accessAll: z.boolean().describe('Access-all setting'),
+      accessAll: z
+        .boolean()
+        .nullable()
+        .describe(
+          'Legacy accessAll response; null when not exposed by the current Public API'
+        ),
       externalId: z.string().nullable().describe('External ID')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.auth.serverUrl
+      ...ctx.auth
     });
 
     let group = await client.createGroup({
       name: ctx.input.name,
       accessAll: ctx.input.accessAll,
       externalId: ctx.input.externalId,
+      memberIds: ctx.input.memberIds,
       collections: ctx.input.collections?.map(c => ({
         id: c.collectionId,
-        readOnly: c.readOnly
+        readOnly: c.readOnly,
+        hidePasswords: c.hidePasswords,
+        manage: c.manage
       }))
     });
-
-    if (ctx.input.memberIds && ctx.input.memberIds.length > 0) {
-      await client.updateGroupMemberIds(group.id, ctx.input.memberIds);
-    }
 
     return {
       output: {

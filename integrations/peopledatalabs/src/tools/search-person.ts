@@ -25,7 +25,7 @@ Returns matching person records with pagination support.`,
     'Provide either a SQL query or an Elasticsearch JSON query string, but not both.',
     "SQL example: `SELECT * FROM person WHERE job_title_role='engineering' AND location_country='united states'`",
     'Elasticsearch example: `{"bool":{"must":[{"term":{"job_title_role":"engineering"}}]}}`',
-    'Use scroll_token from the response to paginate through results.'
+    'Repeat the same query and pass scrollToken from the response to paginate through results.'
   ],
   constraints: [
     'Maximum of 100 results per request (size parameter).',
@@ -53,12 +53,17 @@ Returns matching person records with pagination support.`,
         .min(1)
         .max(100)
         .optional()
-        .describe('Number of results to return per page (1-100, default 10)'),
+        .describe('Number of results to return per page (1-100, default 1)'),
       scrollToken: z
         .string()
         .optional()
         .describe('Pagination token from a previous search response'),
-      dataset: z.string().optional().describe('Dataset to search (default: "all")'),
+      dataset: z
+        .string()
+        .optional()
+        .describe(
+          'Dataset to search (provider default: "resume"); supports comma-separated inclusions and exclusions'
+        ),
       titlecase: z.boolean().optional().describe('Titlecase the output fields')
     })
   )

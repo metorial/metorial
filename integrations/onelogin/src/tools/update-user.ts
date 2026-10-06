@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let updateUser = SlateTool.create(spec, {
   name: 'Update User',
   key: 'update_user',
-  description: `Update an existing user's profile in OneLogin. Supports updating name, email, username, department, title, phone, status, state, group, roles, manager, and custom attributes. Only provided fields will be updated.`,
+  description: `Update an existing user's profile in OneLogin. Supports updating name, email, username, department, title, phone, status, state, group, roles, manager, and custom attributes. Only provided fields are sent. OneLogin mappings and provisioning can run asynchronously; the returned user is an acknowledgment, not proof those workflows have completed.`,
   tags: {
     destructive: false
   }
@@ -30,7 +30,9 @@ export let updateUser = SlateTool.create(spec, {
       status: z
         .number()
         .optional()
-        .describe('New status (0=Unactivated, 1=Active, 2=Suspended, 3=Locked)'),
+        .describe(
+          'New status (0=Unactivated, 1=Active, 2=Suspended, 3=Locked, 4=PasswordExpired)'
+        ),
       state: z
         .number()
         .optional()
@@ -61,12 +63,9 @@ export let updateUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (ctx.input.email !== undefined) body.email = ctx.input.email;
     if (ctx.input.username !== undefined) body.username = ctx.input.username;
     if (ctx.input.firstname !== undefined) body.firstname = ctx.input.firstname;

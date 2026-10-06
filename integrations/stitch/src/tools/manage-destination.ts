@@ -1,27 +1,27 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { StitchConnectClient } from '../lib/client';
+import { resolveRegion, StitchConnectClient } from '../lib/client';
 import { spec } from '../spec';
 
 let destinationOutputSchema = z.object({
   destinationId: z.number().describe('Unique identifier for the destination'),
   type: z
     .string()
-    .describe('Destination type (e.g., redshift, bigquery, snowflake, postgres)'),
+    .describe('Destination type (e.g., redshift, bigquery_v2, snowflake, postgres)'),
   name: z.string().nullable().describe('Display name'),
   properties: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .optional()
     .describe('Connection properties (excludes sensitive credentials)'),
   createdAt: z.string().nullable().describe('ISO 8601 creation timestamp'),
   updatedAt: z.string().nullable().describe('ISO 8601 last updated timestamp'),
-  reportCard: z.any().optional().describe('Configuration status report card')
+  reportCard: z.unknown().optional().describe('Configuration status report card')
 });
 
 export let getDestination = SlateTool.create(spec, {
   name: 'Get Destination',
   key: 'get_destination',
-  description: `Retrieves the current destination (data warehouse) configuration. Stitch supports only a single destination per account. Also supports listing available destination types for discovery.`,
+  description: `Retrieves the current destination (data warehouse) configuration. Standard plans support one destination; other plans may support more. Also supports listing available destination types for discovery.`,
   tags: {
     readOnly: true
   }
@@ -48,11 +48,11 @@ export let getDestination = SlateTool.create(spec, {
         .optional()
         .describe('Current destination(s) configured for the account'),
       destinationTypes: z
-        .array(z.any())
+        .array(z.unknown())
         .optional()
         .describe('Available destination types (when listTypes is true)'),
       destinationTypeDetails: z
-        .any()
+        .unknown()
         .optional()
         .describe('Configuration details for a specific destination type')
     })
@@ -60,11 +60,11 @@ export let getDestination = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
-    if (ctx.input.destinationType) {
+    if (ctx.input.destinationType !== undefined) {
       let details = await client.getDestinationType(ctx.input.destinationType);
       return {
         output: { destinationTypeDetails: details },
@@ -82,7 +82,7 @@ export let getDestination = SlateTool.create(spec, {
     }
 
     let rawDestinations = await client.listDestinations();
-    let destinations = rawDestinations.map((d: any) => ({
+    let destinations = rawDestinations.map(d => ({
       destinationId: d.id,
       type: d.type,
       name: d.name || d.display_name || null,
@@ -105,23 +105,33 @@ export let getDestination = SlateTool.create(spec, {
 export let createDestination = SlateTool.create(spec, {
   name: 'Create Destination',
   key: 'create_destination',
-  description: `Creates a new destination (data warehouse) for the Stitch account. Only one destination can be configured per account. The destination is where Stitch loads replicated data.`,
+  description: `Creates a new destination (data warehouse) for the Stitch account. Destination limits depend on your account plan. The destination is where Stitch loads replicated data.`,
   instructions: [
     'Use "get_destination" with listTypes=true to find valid destination types and required properties.'
   ],
-  constraints: ['Only one destination is supported per Stitch account.'],
+  constraints: [
+    'Standard plans support one destination. Creating a destination may connect a warehouse and incur data-transfer charges.'
+  ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
       type: z
         .string()
-        .describe('Destination type (e.g., "redshift", "bigquery", "snowflake", "postgres")'),
+        .describe(
+          'Destination type (e.g., "redshift", "bigquery_v2", "snowflake", "postgres")'
+        ),
       name: z.string().optional().describe('Display name for the destination'),
+      ignoreUnmappedSources: z
+        .boolean()
+        .optional()
+        .describe(
+          'Set true to avoid automatically connecting existing unmapped sources to this new destination.'
+        ),
       properties: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .describe('Connection properties specific to the destination type')
     })
   )
@@ -129,13 +139,14 @@ export let createDestination = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let dest = await client.createDestination({
       type: ctx.input.type,
       name: ctx.input.name,
+      ignore_unmapped_sources: ctx.input.ignoreUnmappedSources,
       properties: ctx.input.properties
     });
 
@@ -157,17 +168,22 @@ export let createDestination = SlateTool.create(spec, {
 export let updateDestination = SlateTool.create(spec, {
   name: 'Update Destination',
   key: 'update_destination',
-  description: `Updates the destination (data warehouse) configuration. Can modify connection properties and name. The destination type cannot be changed after creation.`,
+  description: `Updates the destination (data warehouse) configuration. Modifies connection properties. Rename destinations in the Stitch dashboard; the documented update endpoint does not support renaming. The destination type cannot be changed after creation.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
       destinationId: z.number().describe('ID of the destination to update'),
-      name: z.string().optional().describe('New display name'),
+      name: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy field: renaming is unavailable through the documented API; use the dashboard'
+        ),
       properties: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Updated connection properties')
     })
@@ -176,11 +192,11 @@ export let updateDestination = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.properties !== undefined) body.properties = ctx.input.properties;
 
@@ -225,8 +241,8 @@ export let deleteDestination = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     await client.deleteDestination(ctx.input.destinationId);

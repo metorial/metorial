@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MakeClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageConnection = SlateTool.create(spec, {
@@ -14,6 +15,12 @@ export let manageConnection = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      confirmed: z
+        .boolean()
+        .optional()
+        .describe(
+          'Explicitly acknowledge the provider confirmation for referenced resources or app installation; omission does not bypass it.'
+        ),
       connectionId: z.number().describe('ID of the connection to manage'),
       action: z.enum(['get', 'rename', 'verify', 'delete']).describe('Action to perform'),
       name: z
@@ -36,65 +43,38 @@ export let manageConnection = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MakeClient({
-      token: ctx.auth.token,
-      zoneUrl: ctx.config.zoneUrl
-    });
-
-    let { connectionId, action } = ctx.input;
-
-    if (action === 'get') {
-      let result = await client.getConnection(connectionId);
-      let c = result.connection ?? result;
-      return {
-        output: {
-          connectionId: c.id,
-          name: c.name,
-          accountName: c.accountName,
-          accountType: c.accountType
-        },
-        message: `Connection **${c.name ?? c.accountName}** (ID: ${c.id}).`
-      };
-    }
-
-    if (action === 'rename') {
-      if (!ctx.input.name) {
-        throw new Error('name is required for rename action');
-      }
-      let result = await client.renameConnection(connectionId, ctx.input.name);
-      let c = result.connection ?? result;
-      return {
-        output: {
-          connectionId: c.id ?? connectionId,
-          name: c.name ?? ctx.input.name
-        },
-        message: `Connection ${connectionId} renamed to **${ctx.input.name}**.`
-      };
-    }
-
+    const client = clientFor(ctx);
+    const { action, connectionId } = ctx.input;
     if (action === 'verify') {
-      let result = await client.verifyConnection(connectionId);
-      let verified = result.verified ?? result;
+      const result = await client.verifyConnection(connectionId);
       return {
-        output: {
-          connectionId,
-          verified: Boolean(verified)
-        },
-        message: `Connection ${connectionId} verification: **${verified ? 'Valid' : 'Invalid'}**.`
+        output: { connectionId, verified: result.verified },
+        message: `Make reports connection verified: ${result.verified}. Verification can contact the linked third-party API.`
       };
     }
-
     if (action === 'delete') {
-      await client.deleteConnection(connectionId, true);
+      await client.deleteConnection(connectionId, ctx.input.confirmed);
       return {
-        output: {
-          connectionId,
-          deleted: true
-        },
-        message: `Connection ${connectionId} **deleted**.`
+        output: { connectionId, deleted: true },
+        message:
+          'Make acknowledged exact connection deletion. Dependent scenarios can stop working; prior third-party effects remain.'
       };
     }
-
-    throw new Error(`Unknown action: ${action}`);
+    if (action === 'rename' && ctx.input.name === undefined)
+      throw invalid('name is required for rename.');
+    const c = (
+      action === 'get'
+        ? await client.getConnection(connectionId)
+        : await client.updateConnection(connectionId, { name: ctx.input.name! })
+    ).connection;
+    return {
+      output: {
+        connectionId: c.id,
+        name: c.name,
+        accountName: c.accountName ?? undefined,
+        accountType: c.accountType ?? undefined
+      },
+      message: 'The exact native connection receipt was confirmed.'
+    };
   })
   .build();

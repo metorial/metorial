@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paymentAmount } from '../lib/validation';
 import { spec } from '../spec';
 
 let paymentItemSchema = z.object({
@@ -26,6 +27,12 @@ export let getPayment = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      openAmountExact: z
+        .string()
+        .optional()
+        .describe(
+          'Exact decimal open amount; use this if the numeric value is omitted because it exceeds the safe range'
+        ),
       openAmount: z.number().optional().describe('Remaining open amount'),
       currency: z.string().optional().describe('Currency code'),
       paymentStatus: z.string().optional().describe('Payment status of the voucher'),
@@ -36,35 +43,14 @@ export let getPayment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let payment = await client.getPayment(ctx.input.paymentId);
-
-    let paymentItems = (payment.paymentItems || []).map((item: any) => ({
-      paymentItemType: item.paymentItemType,
-      postingDate: item.postingDate,
-      amount: item.amount,
-      currency: item.currency
-    }));
-
-    let output = {
-      openAmount: payment.openAmount,
-      currency: payment.currency,
-      paymentStatus: payment.paymentStatus,
-      voucherType: payment.voucherType,
-      voucherStatus: payment.voucherStatus,
-      paidDate: payment.paidDate,
-      paymentItems
-    };
-
-    let statusMessage =
-      payment.openAmount === 0
-        ? `Fully paid${payment.paidDate ? ` on ${payment.paidDate}` : ''}`
-        : `Open amount: **${payment.openAmount} ${payment.currency || ''}**`;
-
+    const payment = await new Client({ token: ctx.auth.token }).getPayment(
+      ctx.input.paymentId
+    );
+    const amount = paymentAmount(payment.openAmount);
+    const output = { ...payment, openAmount: amount.numeric, openAmountExact: amount.exact };
     return {
       output,
-      message: `Payment for ${payment.voucherType || 'voucher'} — ${statusMessage}, status: **${payment.paymentStatus || payment.voucherStatus}**, ${paymentItems.length} payment item(s).`
+      message: `Payment status: **${payment.paymentStatus}**; open amount ${amount.exact}${payment.currency ? ` ${payment.currency}` : ''}. A balanced amount alone does not establish that a voucher was paid.`
     };
   })
   .build();

@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { integer, reject, stateMessage } from '../lib/contracts';
+import { deliverGeneratedFiles, videoOutput } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let generateVideo = SlateTool.create(spec, {
@@ -9,6 +12,7 @@ export let generateVideo = SlateTool.create(spec, {
   description: `Generate a video from a Bannerbear video template. Supports three build packs: **Overlay** (static graphic on video), **Transcribe** (auto-transcribed subtitles), and **Multi Overlay** (slideshow overlays). Includes trimming, zoom/pan, blur, and external media input.`,
   instructions: [
     'Provide a video template UID (not a regular template UID). Video templates are created from regular templates with a render type.',
+    'Use frames and frameDurations only with a Multi Overlay template. Overlay and Transcribe require inputMediaUrl.',
     'For Transcribe videos, the transcription may need approval before final rendering if approval_required is set on the video template.'
   ],
   constraints: [
@@ -22,6 +26,7 @@ export let generateVideo = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       videoTemplateUid: z.string().describe('UID of the video template to generate from'),
       inputMediaUrl: z.string().optional().describe('URL of the input video or audio file'),
       modifications: z
@@ -57,10 +62,41 @@ export let generateVideo = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Trim the output video to this length'),
-      trimFrom: z.number().optional().describe('Start time offset in seconds for trimming'),
-      zoom: z.boolean().optional().describe('Enable Ken Burns zoom/pan effect'),
+      trimFrom: z
+        .number()
+        .optional()
+        .describe('Whole-second start offset, converted to the native HH:MM:SS field'),
+      zoomPosition: z
+        .enum(['center', 'top', 'right', 'bottom', 'left'])
+        .optional()
+        .describe(
+          'Native panning position. Omit the legacy zoom toggle when using this field.'
+        ),
+      blurLevel: z
+        .number()
+        .optional()
+        .describe(
+          'Native blur intensity from 1 to 10. Omit the legacy blur toggle when using this field.'
+        ),
+      trimStartTime: z
+        .string()
+        .optional()
+        .describe('Trim start in HH:MM:SS. Omit legacy trimFrom when using this field.'),
+      trimEndTime: z
+        .string()
+        .optional()
+        .describe('Trim end in HH:MM:SS. Cannot be combined with trimToLengthInSeconds.'),
+      zoom: z
+        .boolean()
+        .optional()
+        .describe(
+          'Legacy toggle: true applies the documented center panning effect; false omits it'
+        ),
       zoomFactor: z.number().optional().describe('Zoom factor for the zoom effect'),
-      blur: z.boolean().optional().describe('Apply blur filter to the background video'),
+      blur: z
+        .boolean()
+        .optional()
+        .describe('Legacy toggle: true applies blur intensity 1; false omits it'),
       createGifPreview: z
         .boolean()
         .optional()
@@ -83,34 +119,54 @@ export let generateVideo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.createVideo({
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    if (ctx.input.zoomPosition !== undefined && ctx.input.zoom !== undefined)
+      reject('Use zoomPosition or the legacy zoom toggle, not both.');
+    if (ctx.input.blurLevel !== undefined && ctx.input.blur !== undefined)
+      reject('Use blurLevel or the legacy blur toggle, not both.');
+    if (ctx.input.trimFrom !== undefined && ctx.input.trimStartTime !== undefined)
+      reject('Use trimFrom or trimStartTime, not both.');
+    const seconds =
+      ctx.input.trimFrom === undefined ? undefined : integer(ctx.input.trimFrom, 0);
+    const trimStart =
+      seconds === undefined
+        ? ctx.input.trimStartTime
+        : `${String(Math.floor(seconds / 3600)).padStart(2, '0')}:${String(Math.floor((seconds % 3600) / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+    const clock = (value: string | undefined): number | undefined => {
+      if (value === undefined) return undefined;
+      if (!/^\d{2,}:[0-5]\d:[0-5]\d$/.test(value)) reject('Use HH:MM:SS for trimming times.');
+      const [hours = 0, minutes = 0, seconds = 0] = value.split(':').map(Number);
+      const total = hours * 3600 + minutes * 60 + seconds;
+      if (!Number.isSafeInteger(total)) reject('Provide a safe trimming time.');
+      return total;
+    };
+    const start = clock(trimStart),
+      end = clock(ctx.input.trimEndTime);
+    if (end !== undefined && end <= (start ?? 0))
+      reject('trimEndTime must be later than the start time.');
+    if (ctx.input.trimToLengthInSeconds !== undefined && end !== undefined)
+      reject('Use a duration or trimEndTime, not both.');
+    const result = await client.createVideo({
       video_template: ctx.input.videoTemplateUid,
       input_media_url: ctx.input.inputMediaUrl,
       modifications: ctx.input.modifications,
       frames: ctx.input.frames,
       frame_durations: ctx.input.frameDurations,
       trim_to_length_in_seconds: ctx.input.trimToLengthInSeconds,
-      trim_from: ctx.input.trimFrom,
-      zoom: ctx.input.zoom,
+      trim_start_time: trimStart,
+      trim_end_time: ctx.input.trimEndTime,
+      zoom: ctx.input.zoomPosition ?? (ctx.input.zoom ? 'center' : undefined),
       zoom_factor: ctx.input.zoomFactor,
-      blur: ctx.input.blur,
+      blur: ctx.input.blurLevel ?? (ctx.input.blur ? 1 : undefined),
       create_gif_preview: ctx.input.createGifPreview,
       webhook_url: ctx.input.webhookUrl,
       metadata: ctx.input.metadata
     });
-
+    const output = videoOutput(result);
+    await deliverGeneratedFiles(ctx, 'video', result);
     return {
-      output: {
-        videoUid: result.uid,
-        status: result.status,
-        videoUrl: result.video_url || null,
-        percentRendered: result.percent_rendered ?? null,
-        lengthInSeconds: result.length_in_seconds ?? null,
-        createdAt: result.created_at
-      },
-      message: `Video generation ${result.status === 'completed' ? 'completed' : 'initiated'} (UID: ${result.uid}). ${result.video_url ? `[View video](${result.video_url})` : 'Video is still rendering.'}`
+      output,
+      message: `Video generation ${stateMessage(result.status)} (UID: ${output.videoUid}). Read its status with get_resource.`
     };
   })
   .build();

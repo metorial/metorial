@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageGroupMembership = SlateTool.create(spec, {
@@ -17,6 +18,7 @@ export let manageGroupMembership = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       action: z.enum(['add', 'remove', 'list']).describe('Action to perform'),
       groupType: z.enum(['user', 'system']).describe('Type of group'),
       groupId: z.string().describe('Group ID'),
@@ -46,69 +48,78 @@ export let manageGroupMembership = SlateTool.create(spec, {
         )
         .optional()
         .describe('Current group members (returned for list action)'),
-      success: z.boolean().describe('Whether the action succeeded')
+      success: z
+        .boolean()
+        .describe(
+          'Whether the native request was accepted; membership propagation is not independently confirmed'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      if (ctx.input.action === 'list') {
+        if (ctx.input.memberId !== undefined)
+          throw createApiServiceError('Omit memberId when listing membership.');
+        let members: Array<{ to: { id: string; type: string } }>;
+        if (ctx.input.groupType === 'user') {
+          members = await client.listUserGroupMembers(ctx.input.groupId, {
+            limit: ctx.input.limit,
+            skip: ctx.input.skip
+          });
+        } else {
+          members = await client.listSystemGroupMembers(ctx.input.groupId, {
+            limit: ctx.input.limit,
+            skip: ctx.input.skip
+          });
+        }
 
-    if (ctx.input.action === 'list') {
-      let members: Array<{ to: { id: string; type: string } }>;
+        let mapped = members.map(m => ({
+          memberId: m.to.id,
+          memberType: m.to.type
+        }));
+
+        return {
+          output: {
+            groupId: ctx.input.groupId,
+            action: 'list',
+            members: mapped,
+            success: true
+          },
+          message: `Found **${mapped.length}** members in ${ctx.input.groupType} group.`
+        };
+      }
+
+      if (ctx.input.limit !== undefined || ctx.input.skip !== undefined)
+        throw createApiServiceError('Omit paging fields when changing membership.');
+      if (!ctx.input.memberId)
+        throw createApiServiceError('memberId is required for add/remove actions');
+
       if (ctx.input.groupType === 'user') {
-        members = await client.listUserGroupMembers(ctx.input.groupId, {
-          limit: ctx.input.limit,
-          skip: ctx.input.skip
+        await client.manageUserGroupMembers(ctx.input.groupId, {
+          op: ctx.input.action as 'add' | 'remove',
+          type: 'user',
+          id: ctx.input.memberId
         });
       } else {
-        members = await client.listSystemGroupMembers(ctx.input.groupId, {
-          limit: ctx.input.limit,
-          skip: ctx.input.skip
+        await client.manageSystemGroupMembers(ctx.input.groupId, {
+          op: ctx.input.action as 'add' | 'remove',
+          type: 'system',
+          id: ctx.input.memberId
         });
       }
 
-      let mapped = members.map(m => ({
-        memberId: m.to.id,
-        memberType: m.to.type
-      }));
-
+      let actionLabel = ctx.input.action === 'add' ? 'Added' : 'Removed';
       return {
         output: {
           groupId: ctx.input.groupId,
-          action: 'list',
-          members: mapped,
+          action: ctx.input.action,
           success: true
         },
-        message: `Found **${mapped.length}** members in ${ctx.input.groupType} group.`
+        message: `${actionLabel} ${ctx.input.groupType} \`${ctx.input.memberId}\` ${ctx.input.action === 'add' ? 'to' : 'from'} group \`${ctx.input.groupId}\`.`
       };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
     }
-
-    if (!ctx.input.memberId) throw new Error('memberId is required for add/remove actions');
-
-    if (ctx.input.groupType === 'user') {
-      await client.manageUserGroupMembers(ctx.input.groupId, {
-        op: ctx.input.action as 'add' | 'remove',
-        type: 'user',
-        id: ctx.input.memberId
-      });
-    } else {
-      await client.manageSystemGroupMembers(ctx.input.groupId, {
-        op: ctx.input.action as 'add' | 'remove',
-        type: 'system',
-        id: ctx.input.memberId
-      });
-    }
-
-    let actionLabel = ctx.input.action === 'add' ? 'Added' : 'Removed';
-    return {
-      output: {
-        groupId: ctx.input.groupId,
-        action: ctx.input.action,
-        success: true
-      },
-      message: `${actionLabel} ${ctx.input.groupType} \`${ctx.input.memberId}\` ${ctx.input.action === 'add' ? 'to' : 'from'} group \`${ctx.input.groupId}\`.`
-    };
   })
   .build();

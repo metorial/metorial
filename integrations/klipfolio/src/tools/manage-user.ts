@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { createdId, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageUser = SlateTool.create(spec, {
@@ -8,11 +9,12 @@ export let manageUser = SlateTool.create(spec, {
   key: 'manage_user',
   description: `Create, update, or delete a user. Also supports managing group memberships and dashboard assignments for a user.`,
   instructions: [
-    'Use action "create" to invite a new user, "update" to modify, or "delete" to remove.',
+    'Use action "create" to add a new user, "update" to modify, or "delete" to remove.',
     'You can add/remove users from groups and assign/unassign dashboards in the same call.'
   ],
   constraints: [
-    'Cannot delete your own account, the super admin, or technical/business contacts.'
+    'Cannot delete your own account, the super admin, or technical/business contacts.',
+    'Adding users can consume seats. sendEmail sends a real welcome email. Group and dashboard changes affect access immediately; earlier changes remain if a later request fails.'
   ]
 })
   .input(
@@ -23,10 +25,18 @@ export let manageUser = SlateTool.create(spec, {
       lastName: z.string().optional().describe('Last name (required for create)'),
       email: z.string().optional().describe('Email address (required for create)'),
       externalId: z.string().optional().describe('External identifier'),
-      roles: z.array(z.string()).optional().describe('Role IDs to assign (for create)'),
+      roles: z
+        .array(z.string())
+        .optional()
+        .describe('Role IDs to assign; at least one is required for create'),
       password: z.string().optional().describe('Password (for create)'),
       clientId: z.string().optional().describe('Client ID (for create)'),
-      sendEmail: z.boolean().optional().describe('Send invitation email (for create)'),
+      sendEmail: z
+        .boolean()
+        .optional()
+        .describe(
+          'Send a welcome email when creating; default false. Enabling sends a real email.'
+        ),
       addToGroupIds: z.array(z.string()).optional().describe('Group IDs to add the user to'),
       removeFromGroupIds: z
         .array(z.string())
@@ -49,12 +59,19 @@ export let manageUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.firstName) throw new Error('firstName is required when creating a user');
-      if (!ctx.input.lastName) throw new Error('lastName is required when creating a user');
-      if (!ctx.input.email) throw new Error('email is required when creating a user');
+      if (!ctx.input.firstName)
+        throw createApiServiceError('firstName is required when creating a user');
+      if (!ctx.input.lastName)
+        throw createApiServiceError('lastName is required when creating a user');
+      if (!ctx.input.email)
+        throw createApiServiceError('email is required when creating a user');
+
+      if (!ctx.input.roles?.length)
+        throw createApiServiceError('At least one role ID is required when creating a user.');
 
       let result = await client.createUser({
         firstName: ctx.input.firstName,
@@ -67,8 +84,7 @@ export let manageUser = SlateTool.create(spec, {
         sendEmail: ctx.input.sendEmail
       });
 
-      let location = result?.meta?.location;
-      let userId = location ? location.split('/').pop() : undefined;
+      let userId = createdId(result, 'users');
 
       if (userId && ctx.input.addToGroupIds) {
         for (let groupId of ctx.input.addToGroupIds) {
@@ -87,7 +103,22 @@ export let manageUser = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.userId) throw new Error('userId is required when updating a user');
+      if (
+        ctx.input.firstName === undefined &&
+        ctx.input.lastName === undefined &&
+        ctx.input.email === undefined &&
+        ctx.input.externalId === undefined &&
+        ctx.input.addToGroupIds === undefined &&
+        ctx.input.removeFromGroupIds === undefined &&
+        ctx.input.assignTabIds === undefined &&
+        ctx.input.unassignTabInstanceIds === undefined
+      )
+        throw createApiServiceError(
+          'Provide at least one supported field or association to update.',
+          { reason: 'invalid_input' }
+        );
+      if (!ctx.input.userId)
+        throw createApiServiceError('userId is required when updating a user');
 
       if (
         ctx.input.firstName !== undefined ||
@@ -132,7 +163,8 @@ export let manageUser = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.userId) throw new Error('userId is required when deleting a user');
+      if (!ctx.input.userId)
+        throw createApiServiceError('userId is required when deleting a user');
       await client.deleteUser(ctx.input.userId);
 
       return {
@@ -141,6 +173,6 @@ export let manageUser = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

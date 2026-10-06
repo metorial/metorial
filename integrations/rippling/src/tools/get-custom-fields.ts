@@ -24,13 +24,16 @@ export let listCustomFields = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
     let fields = await client.listCustomFields({
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
 
-    let items = Array.isArray(fields) ? fields : [];
+    let items = fields;
 
     return {
       output: {

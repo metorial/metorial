@@ -25,10 +25,7 @@ export let deleteMedia = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.deleteFile(ctx.input.fileId);
 
@@ -36,7 +33,7 @@ export let deleteMedia = SlateTool.create(spec, {
       output: {
         deletedFile: result
       },
-      message: `Deleted media file **${ctx.input.fileId}**.`
+      message: `Strapi accepted deletion of media file **${ctx.input.fileId}**.`
     };
   })
   .build();

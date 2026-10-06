@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HootsuiteClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,9 +9,10 @@ export let manageTeamsTool = SlateTool.create(spec, {
   description: `List, create, and manage teams within a Hootsuite organization.
 Use **list** to see all teams in an organization. Use **get** to fetch a team's details.
 Use **create** to create a new team. Use **add_member** or **remove_member** to manage team membership.
-Use **list_members** to see members in a team. Use **list_social_profiles** to see social profiles assigned to a team.`,
+Use **list_members** to see members in a team. Use **list_social_profiles** to see social profiles assigned to a team. Provide organizationId for these operations, or allow discovery among your authorized organizations. The legacy **remove_member** route is retained, but its availability is not documented by the current public API; do not assume it can undo an addition.`,
   tags: {
-    readOnly: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -30,7 +31,9 @@ Use **list_members** to see members in a team. Use **list_social_profiles** to s
       organizationId: z
         .string()
         .optional()
-        .describe('Organization ID (required for list, create)'),
+        .describe(
+          'Organization ID from get_user_info; required for list/create, optional for organization-scoped team operations'
+        ),
       teamId: z
         .string()
         .optional()
@@ -86,12 +89,12 @@ Use **list_members** to see members in a team. Use **list_social_profiles** to s
 
     if (action === 'list') {
       if (!ctx.input.organizationId)
-        throw new Error('organizationId is required for list action');
+        throw createApiServiceError('organizationId is required for list action');
       let result = await client.getOrganizationTeams(
         ctx.input.organizationId,
         ctx.input.cursor
       );
-      let teams = result.teams.map((t: any) => ({
+      let teams = result.teams.map(t => ({
         teamId: String(t.id),
         teamName: t.name,
         organizationId: t.organizationId ? String(t.organizationId) : ctx.input.organizationId
@@ -110,7 +113,7 @@ Use **list_members** to see members in a team. Use **list_social_profiles** to s
     }
 
     if (action === 'get') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for get action');
+      if (!ctx.input.teamId) throw createApiServiceError('teamId is required for get action');
       let team = await client.getTeam(ctx.input.teamId);
 
       return {
@@ -133,7 +136,9 @@ Use **list_members** to see members in a team. Use **list_social_profiles** to s
 
     if (action === 'create') {
       if (!ctx.input.organizationId || !ctx.input.teamName) {
-        throw new Error('organizationId and teamName are required for create action');
+        throw createApiServiceError(
+          'organizationId and teamName are required for create action'
+        );
       }
       let team = await client.createTeam(ctx.input.organizationId, ctx.input.teamName);
 
@@ -156,9 +161,14 @@ Use **list_members** to see members in a team. Use **list_social_profiles** to s
     }
 
     if (action === 'list_members') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for list_members action');
-      let result = await client.getTeamMembers(ctx.input.teamId, ctx.input.cursor);
-      let members = result.members.map((m: any) => ({
+      if (!ctx.input.teamId)
+        throw createApiServiceError('teamId is required for list_members action');
+      let result = await client.getTeamMembers(
+        ctx.input.teamId,
+        ctx.input.cursor,
+        ctx.input.organizationId
+      );
+      let members = result.members.map(m => ({
         memberId: String(m.id),
         fullName: m.fullName,
         email: m.email
@@ -178,9 +188,13 @@ Use **list_members** to see members in a team. Use **list_social_profiles** to s
 
     if (action === 'add_member') {
       if (!ctx.input.teamId || !ctx.input.memberId) {
-        throw new Error('teamId and memberId are required for add_member action');
+        throw createApiServiceError('teamId and memberId are required for add_member action');
       }
-      await client.addTeamMember(ctx.input.teamId, ctx.input.memberId);
+      await client.addTeamMember(
+        ctx.input.teamId,
+        ctx.input.memberId,
+        ctx.input.organizationId
+      );
 
       return {
         output: {
@@ -196,7 +210,9 @@ Use **list_members** to see members in a team. Use **list_social_profiles** to s
 
     if (action === 'remove_member') {
       if (!ctx.input.teamId || !ctx.input.memberId) {
-        throw new Error('teamId and memberId are required for remove_member action');
+        throw createApiServiceError(
+          'teamId and memberId are required for remove_member action'
+        );
       }
       await client.removeTeamMember(ctx.input.teamId, ctx.input.memberId);
 
@@ -214,9 +230,13 @@ Use **list_members** to see members in a team. Use **list_social_profiles** to s
 
     // list_social_profiles
     if (!ctx.input.teamId)
-      throw new Error('teamId is required for list_social_profiles action');
-    let profiles = await client.getTeamSocialProfiles(ctx.input.teamId, ctx.input.cursor);
-    let socialProfiles = profiles.map((p: any) => ({
+      throw createApiServiceError('teamId is required for list_social_profiles action');
+    let result = await client.getTeamSocialProfiles(
+      ctx.input.teamId,
+      ctx.input.cursor,
+      ctx.input.organizationId
+    );
+    let socialProfiles = result.profiles.map(p => ({
       socialProfileId: String(p.id),
       type: p.type
     }));
@@ -226,7 +246,7 @@ Use **list_members** to see members in a team. Use **list_social_profiles** to s
         teams: undefined,
         members: undefined,
         socialProfiles,
-        cursor: undefined,
+        cursor: result.cursor,
         success: undefined
       },
       message: `Found **${socialProfiles.length}** social profile(s) accessible to team **${ctx.input.teamId}**.`

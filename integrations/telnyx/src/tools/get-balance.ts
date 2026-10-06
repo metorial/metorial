@@ -14,10 +14,14 @@ export let getBalance = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      balance: z.string().optional().describe('Current account balance'),
-      currency: z.string().optional().describe('Currency code (e.g., "USD")'),
-      creditLimit: z.string().optional().describe('Credit limit on the account'),
-      availableCredit: z.string().optional().describe('Available credit')
+      balance: z.string().nullish().describe('Current account balance'),
+      currency: z.string().nullish().describe('Currency code (e.g., "USD")'),
+      creditLimit: z.string().nullish().describe('Credit limit on the account'),
+      availableCredit: z.string().nullish().describe('Available credit'),
+      pending: z
+        .string()
+        .optional()
+        .describe('Native pending amount, in the returned currency')
     })
   )
   .handleInvocation(async ctx => {
@@ -29,9 +33,10 @@ export let getBalance = SlateTool.create(spec, {
         balance: result.balance,
         currency: result.currency,
         creditLimit: result.credit_limit,
-        availableCredit: result.available_credit
+        availableCredit: result.available_credit,
+        pending: result.pending
       },
-      message: `Account balance: **${result.balance} ${result.currency ?? 'USD'}**.`
+      message: `Account balance: **${result.balance} ${result.currency}**.`
     };
   })
   .build();

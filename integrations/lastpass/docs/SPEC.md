@@ -1,58 +1,19 @@
-Let me get more details on the LastPass Enterprise API capabilities.Now let me look at the Nango integration docs for more details on the API structure and available commands:Now I have enough information to write a comprehensive specification. Let me compile everything:
+# LastPass Enterprise API
 
-# Slates Specification for LastPass
+Seven tools retain their original public keys and input field names. Requests POST JSON to `https://lastpass.com/enterpriseapi.php` with integer `cid`, secret `provhash`, command `cmd` and native `data`. No OAuth or bearer vault endpoint is inferred. The separate REST API uses `Authorization: Api-Key lpkey_...` and requires early-access enrollment; it is not substituted for this API.
 
-## Overview
+| Public key | Native command and contract |
+| --- | --- |
+| get_users | `getuserdata`: exact username plus native `pagesize` / zero-based `pageindex`, optional disabled/admin 0/1 filters. Native `Users`, `Groups`, `Invited`, `total` and `count`. |
+| get_shared_folders | `getsfdata` with `data: "all"`; numeric-ID folder map and numeric recipient permissions. No vault site or secret content read. |
+| get_event_report | `reporting`: from/to, user/search, optional admin and microsecond `next` timestamp. Up to 10,000 events per request; account-local times use oldest admin, or oldest user if no admin exists. |
+| provision_users | `batchadd`: user array containing username, optional fullname/groups. Accepts native status without inventing per-user receipt. Notifications/history can remain. |
+| deprovision_user | `deluser`: username and deleteaction 0 deactivate, 1 remove company membership, 2 permanent account/vault deletion. No default escalation or transfer claim. |
+| manage_user | `resetpassword` / `disablemultifactor`: username object and OK/WARN receipt; `disableuser`: email array and `success`, disabled_users/unchanged_users receipt. Sequential, non-atomic. |
+| manage_group_membership | `batchchangegrp`: username/add/del array, OK/WARN and optional errors. Read current memberships to reconcile warnings. |
 
-LastPass is a cloud-based password manager for enterprises and individuals that securely stores credentials, enables password sharing, and provides admin controls for user provisioning and security policy enforcement. LastPass is a cloud-based password manager that stores users' login information online in a secure database and allows users to generate unique passwords for each site they visit. The Enterprise/Business API (known as the Provisioning API) allows administrators to manage users, groups, shared folders, and retrieve event reports programmatically.
+Missing status is accepted only for the documented typed read payloads, not as a mutation confirmation. Unknown HTTP/logical status, invalid shape and ambiguous native disable receipts raise actionable service failures. Native warnings do not imply full success. Known configured provisioning-hash reflections are refused; public failures discard raw transport parents. Shared internal tracing is a separate layer and is not universally claimed to sanitize unknown secrets or every encoding.
 
-## Authentication
+There is no suitable identity endpoint in this Enterprise command surface. CID is configured account context. No file-delivery capability or renewal is invented. No old triggers remain.
 
-LastPass uses a proprietary key-based authentication scheme for its Enterprise API. LastPass APIs are authenticated via a unique key called a provisioning hash. Every API request requires two credentials:
-
-- **Company ID (CID)**: Also referred to as the Account Number or tenant ID. Navigate to the Dashboard tab. The CID (account number) is located at the top of the page, preceded by the words "Account number".
-
-- **Provisioning Hash (provhash)**: A secret key that acts as the API secret. To create a Provisioning Hash, follow the below steps: Go to Advanced -> Enterprise API. If the user has not previously created a provisioning hash, click Create provisioning hash -> OK, then the provisioning hash is shown at the top of the page.
-
-Both values are obtained from the LastPass Admin Console at `admin.lastpass.com`. To obtain these credentials, log in to your LastPass admin console at admin.lastpass.com and navigate to Advanced > Enterprise API.
-
-API requests are sent as POST requests to the LastPass Enterprise API endpoint. Each request body includes the `cid`, `provhash`, and a `cmd` parameter specifying the operation. For example:
-
-```json
-{
-  "cid": "1234567",
-  "provhash": "your_provisioning_hash",
-  "cmd": "getuserdata",
-  "data": {}
-}
-```
-
-If the user has already created a provisioning hash, then generating a new one will invalidate the previous hash, and will require updating all integrations with the newly generated hash.
-
-**Requirements**: A business account is required to use the LastPass integration. Admin access to the LastPass Enterprise/Business account is needed to generate credentials.
-
-## Features
-
-### User Management
-
-Administrators can provision and deprovision users through the API. Our powerful API can be used to create users, deprovision users, manage groups and auto-add users to shared folders. This includes creating new user accounts (individually or in batch), disabling/deleting accounts, and requiring master password changes. When a user is provisioned, an email is sent to the user with their temporary password or an activation link (if their account exists already).
-
-### User Data Retrieval
-
-User Data is used to get account details about the user. This includes retrieving information such as admin status, number of stored sites, last login time, last password change, security score, group memberships, and whether the account is active or disabled.
-
-### Group Management
-
-The API allows creating, managing, and deleting groups. Groups can be used to organize users and assign policies or shared folders to groups of users at once. The LastPass Provisioning API does not support managing groups for pre-configured SSO (Cloud) apps for LastPass Business accounts.
-
-### Shared Folder Management
-
-Detailed Shared Folder Data is used to get a detailed list of all shared folders, the sites within them, and the permissions granted to them. The API allows retrieving shared folder details including folder names, contained sites, user permissions (read-only, admin, give access), and security scores.
-
-### Event Reporting
-
-Event Report is used to gather information about events that have taken place in the user's LastPass Business account. Administrators can query audit logs by specifying date ranges and optionally filtering by user. Events include actions such as login attempts (successful and failed), password changes, shared folder activity, and administrative actions. Each event includes a timestamp, username, action type, IP address, and associated data.
-
-## Events
-
-The provider does not support webhooks or purpose-built event subscription mechanisms. Event data is only available through the Event Reporting API, which is a pull-based query interface for retrieving historical audit logs.
+Current official support pages were read publicly on 2026-10-06, including user data (updated 2026-07-22), provisioning (updated 2026-06-19), shared folders, reporting, batch groups, deletion, password reset, MFA disable and user disable. See the implementation report for exact sources and offline verification evidence.

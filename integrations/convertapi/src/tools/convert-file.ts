@@ -1,21 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deliverFiles } from '../lib/files';
+import { buildFileSource, fileSourceSchema } from '../lib/validation';
 import { spec } from '../spec';
-
-let fileSourceSchema = z
-  .object({
-    url: z.string().optional().describe('Public URL of the file to convert'),
-    fileId: z
-      .string()
-      .optional()
-      .describe('ConvertAPI file ID of a previously uploaded or converted file'),
-    base64Data: z.string().optional().describe('Base64-encoded file content'),
-    fileName: z.string().optional().describe('File name (required when using base64Data)')
-  })
-  .describe(
-    'File source — provide exactly one of: url, fileId, or base64Data (with fileName)'
-  );
 
 let convertedFileSchema = z.object({
   fileName: z.string().describe('Name of the converted file'),
@@ -31,7 +19,7 @@ let convertedFileSchema = z.object({
 export let convertFile = SlateTool.create(spec, {
   name: 'Convert File',
   key: 'convert_file',
-  description: `Convert a file between 300+ supported formats including PDF, DOCX, XLSX, PPTX, HTML, JPG, PNG, and more.
+  description: `Convert a file between supported formats including PDF, DOCX, XLSX, PPTX, HTML, JPG, PNG, and more.
 Provide the source file via URL, file ID, or base64-encoded content. Optionally store the result on ConvertAPI's server for chaining or later download.
 Supports format-specific parameters like page size, orientation, quality, and image dimensions.`,
   instructions: [
@@ -73,48 +61,35 @@ Supports format-specific parameters like page size, orientation, quality, and im
   .output(
     z.object({
       conversionCost: z.number().describe('Number of conversion credits consumed'),
-      conversionTime: z.number().describe('Conversion duration in seconds'),
+      conversionTime: z
+        .number()
+        .optional()
+        .describe('Provider-reported legacy duration, when present'),
       files: z.array(convertedFileSchema).describe('Converted output files')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
+      masterToken: ctx.auth.masterToken,
       region: ctx.config.region
     });
 
     let fileSource = buildFileSource(ctx.input.file);
 
-    let result = await client.convert({
+    let rawResult = await client.convert({
       sourceFormat: ctx.input.sourceFormat,
       destinationFormat: ctx.input.destinationFormat,
       files: [fileSource],
       storeFile: ctx.input.storeFile,
       parameters: ctx.input.conversionParameters
     });
+    let result = await deliverFiles(ctx, rawResult);
 
     let fileNames = result.files.map(f => f.fileName).join(', ');
     return {
       output: result,
-      message: `Converted **${ctx.input.sourceFormat}** → **${ctx.input.destinationFormat}** in ${result.conversionTime}s. Output: ${fileNames} (cost: ${result.conversionCost} credit${result.conversionCost !== 1 ? 's' : ''}).`
+      message: `Converted **${ctx.input.sourceFormat}** → **${ctx.input.destinationFormat}**. Output: ${fileNames} (cost: ${result.conversionCost} credit${result.conversionCost !== 1 ? 's' : ''}).`
     };
   })
   .build();
-
-function buildFileSource(file: {
-  url?: string;
-  fileId?: string;
-  base64Data?: string;
-  fileName?: string;
-}) {
-  if (file.url) {
-    return { type: 'url' as const, url: file.url };
-  }
-  if (file.fileId) {
-    return { type: 'fileId' as const, fileId: file.fileId };
-  }
-  if (file.base64Data && file.fileName) {
-    return { type: 'base64' as const, fileName: file.fileName, data: file.base64Data };
-  }
-  throw new Error('Provide exactly one of: url, fileId, or base64Data (with fileName)');
-}

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { phantom } from '../lib/responses';
 import { spec } from '../spec';
 
 export let getPhantom = SlateTool.create(spec, {
@@ -21,6 +22,9 @@ export let getPhantom = SlateTool.create(spec, {
       phantomId: z.string().describe('Unique identifier of the Phantom'),
       name: z.string().describe('Name of the Phantom'),
       scriptId: z.string().optional().describe('ID of the associated script'),
+      script: z.string().optional().describe('Script name'),
+      scriptOrg: z.string().optional().describe('Script owner organization name'),
+      branch: z.string().optional().describe('Script branch'),
       launchType: z.string().optional().describe('Launch type (e.g., manually, repeatedly)'),
       s3Folder: z.string().optional().describe('Cloud storage folder for results'),
       orgS3Folder: z.string().optional().describe('Organization-level storage folder'),
@@ -41,21 +45,7 @@ export let getPhantom = SlateTool.create(spec, {
     let agent = await client.fetchAgent(ctx.input.phantomId);
 
     return {
-      output: {
-        phantomId: String(agent.id),
-        name: agent.name ?? '',
-        scriptId: agent.scriptId ? String(agent.scriptId) : undefined,
-        launchType: agent.launchType ?? undefined,
-        s3Folder: agent.s3Folder ?? undefined,
-        orgS3Folder: agent.orgS3Folder ?? undefined,
-        executionTimeLimit: agent.executionTimeLimit ?? undefined,
-        lastEndMessage: agent.lastEndMessage ?? undefined,
-        lastEndStatus: agent.lastEndStatus ?? undefined,
-        lastLaunchTimestamp: agent.lastLaunch ?? undefined,
-        argument: agent.argument ?? undefined,
-        proxy: agent.proxy ?? undefined,
-        notifications: agent.notifications ?? undefined
-      },
+      output: phantom(agent),
       message: `Retrieved Phantom **${agent.name}** (ID: ${agent.id}).`
     };
   })

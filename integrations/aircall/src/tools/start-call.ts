@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { id, phone } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let startCall = SlateTool.create(spec, {
@@ -22,26 +23,23 @@ export let startCall = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      callId: z.number().describe('ID of the created call'),
-      direction: z.string().describe('Call direction'),
-      status: z.string().describe('Initial call status')
+      accepted: z.boolean().optional(),
+      confirmed: z.boolean().optional(),
+      callId: z.number().optional().describe('ID of the created call'),
+      direction: z.string().optional().describe('Call direction'),
+      status: z.string().optional().describe('Initial call status')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth);
-    let call = await client.startOutboundCall(
-      ctx.input.userId,
-      ctx.input.numberId,
-      ctx.input.to
+    await new Client(ctx.auth).startOutboundCall(
+      id(ctx.input.userId),
+      id(ctx.input.numberId),
+      phone(ctx.input.to)
     );
-
     return {
-      output: {
-        callId: call.id,
-        direction: call.direction || 'outbound',
-        status: call.status || 'initial'
-      },
-      message: `Started outbound call **#${call.id}** to ${ctx.input.to} for user #${ctx.input.userId}.`
+      output: { accepted: true, confirmed: false },
+      message:
+        'Aircall acknowledged the outbound-call request. It returned no call ID or connection status; do not retry blindly because a call may already start.'
     };
   })
   .build();

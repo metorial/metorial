@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HoneybadgerReportingClient } from '../lib/reporting-client';
 import { spec } from '../spec';
@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let sendEvents = SlateTool.create(spec, {
   name: 'Send Events',
   key: 'send_events',
-  description: `Send custom events to Honeybadger Insights. Events appear in the Insights dashboard where they can be queried and visualized. Useful for tracking user signups, payment events, performance metrics, or any structured data.`,
+  description: `Send custom events to Honeybadger Insights. Accepted events are processed asynchronously and can then be queried in Insights. Useful for tracking user signups, payment events, performance metrics, or any structured data.`,
   instructions: [
-    'Each event is a flat JSON object with arbitrary fields.',
+    'Each event is a JSON object (nested structures are supported) with arbitrary fields.',
     'A `ts` field (RFC3339 timestamp) is optional — server time is used if omitted.',
     'Requires a project API key configured in authentication.'
   ],
@@ -21,9 +21,9 @@ export let sendEvents = SlateTool.create(spec, {
   .input(
     z.object({
       events: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .describe(
-          'Array of event objects to send. Each is a flat JSON object with arbitrary fields.'
+          'Array of event objects to send. Each is a JSON object (nested structures are supported) with arbitrary fields.'
         )
     })
   )
@@ -35,12 +35,13 @@ export let sendEvents = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.projectToken) {
-      throw new Error(
+      throw createApiServiceError(
         'A project API key is required to send events. Configure it in your authentication settings.'
       );
     }
     let reportingClient = new HoneybadgerReportingClient({
-      projectToken: ctx.auth.projectToken
+      projectToken: ctx.auth.projectToken,
+      region: ctx.auth.region
     });
     await reportingClient.sendEvents(ctx.input.events);
 
@@ -49,7 +50,7 @@ export let sendEvents = SlateTool.create(spec, {
         success: true,
         eventCount: ctx.input.events.length
       },
-      message: `Sent **${ctx.input.events.length}** event(s) to Honeybadger Insights.`
+      message: `Accepted **${ctx.input.events.length}** event(s) to Honeybadger Insights.`
     };
   })
   .build();

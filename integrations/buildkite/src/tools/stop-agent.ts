@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let stopAgent = SlateTool.create(spec, {
@@ -14,7 +15,8 @@ export let stopAgent = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      agentId: z.string().describe('UUID of the agent to stop'),
+      ...organizationInput,
+      agentId: z.string().describe('Agent UUID from list_agents to stop'),
       force: z
         .boolean()
         .optional()
@@ -27,10 +29,7 @@ export let stopAgent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     await client.stopAgent(ctx.input.agentId, ctx.input.force);
 

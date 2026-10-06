@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getDataConnection = SlateTool.create(spec, {
   name: 'Get Data Connection',
   key: 'get_data_connection',
-  description: `Retrieve detailed configuration for a specific data connection, including connection type, description, and metadata.`,
+  description: `Retrieve safe metadata for a specific data connection, including its name, connection type and optional description. Credentials and connection configuration are excluded.`,
   tags: {
     readOnly: true
   }
@@ -21,13 +21,16 @@ export let getDataConnection = SlateTool.create(spec, {
       dataConnectionId: z.string(),
       name: z.string(),
       type: z.string(),
-      description: z.string().nullable(),
-      createdAt: z.string(),
-      updatedAt: z.string()
+      description: z.string().nullable().optional(),
+      createdAt: z.string().optional(),
+      updatedAt: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
     let connection = await client.getDataConnection(ctx.input.dataConnectionId);
 
     return {

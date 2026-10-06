@@ -1,13 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VonageRestClient } from '../lib/client';
+import { invalid, protect } from '../lib/validation';
 import { spec } from '../spec';
 
 export let checkVerification = SlateTool.create(spec, {
   name: 'Check Verification Code',
   key: 'check_verification',
   description: `Check a verification code submitted by a user against an active Vonage Verify v2 request. Also supports cancelling an in-progress verification.
-Requires the **API Key, Secret & Application JWT** auth method.`,
+Supports API key/secret or application JWT. Checking consumes attempts; cancellation has provider timing restrictions.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -34,6 +35,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
     })
   )
   .handleInvocation(async ctx => {
+    protect(ctx.input, [ctx.auth.apiSecret, ctx.auth.privateKey ?? '']);
     let client = new VonageRestClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret,
@@ -50,7 +52,7 @@ Requires the **API Key, Secret & Application JWT** auth method.`,
     }
 
     if (!ctx.input.code) {
-      throw new Error('Code is required for the "check" action');
+      throw invalid('Code is required for the "check" action');
     }
 
     let result = await client.checkVerificationCode(ctx.input.requestId, ctx.input.code);

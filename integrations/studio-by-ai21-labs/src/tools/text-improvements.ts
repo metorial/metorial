@@ -1,13 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let textImprovements = SlateTool.create(spec, {
   name: 'Text Improvements',
   key: 'text_improvements',
-  description: `Analyze text and suggest improvements for fluency, vocabulary, and clarity. Select one or more improvement types to apply.`,
+  description:
+    'DEPRECATED — use `chat_completion` instead. AI21 retired the specialized text improvements API.',
+  instructions: [
+    'Use chat_completion with task instructions and supplied context, or maestro_run with validation requirements. These APIs do not reproduce the retired response semantics automatically.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true,
     destructive: false
   }
@@ -50,27 +54,9 @@ export let textImprovements = SlateTool.create(spec, {
         .describe('List of improvement suggestions')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.textImprovements({
-      text: ctx.input.text,
-      types: ctx.input.types
-    });
-
-    let improvements = (result.improvements ?? []).map((imp: any) => ({
-      originalText: imp.originalText ?? imp.original_text ?? '',
-      suggestions: (imp.suggestions ?? []).map((s: any) => ({
-        text: s.text ?? s
-      })),
-      improvementType: imp.improvementType ?? imp.improvement_type,
-      startIndex: imp.startIndex ?? imp.start_index,
-      endIndex: imp.endIndex ?? imp.end_index
-    }));
-
-    return {
-      output: { improvements },
-      message: `Found **${improvements.length}** improvement suggestion(s) for types: ${ctx.input.types.join(', ')}.`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'AI21 retired the specialized text improvements API. Use chat_completion with explicit task instructions and context, or maestro_run with validation requirements.'
+    );
   })
   .build();

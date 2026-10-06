@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema, versionNumberSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let trainModelTool = SlateTool.create(spec, {
@@ -14,8 +15,8 @@ export let trainModelTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project URL slug'),
-      versionNumber: z.number().describe('Version number to train on'),
+      projectId: projectIdSchema,
+      versionNumber: versionNumberSchema,
       speed: z
         .enum(['fast', 'accurate'])
         .optional()
@@ -26,7 +27,7 @@ export let trainModelTool = SlateTool.create(spec, {
         .describe(
           'Specific model architecture (e.g., "rfdetr-nano"). Overrides speed if provided.'
         ),
-      epochs: z.number().optional().describe('Number of training epochs'),
+      epochs: z.number().int().positive().optional().describe('Number of training epochs'),
       checkpoint: z.string().optional().describe('Checkpoint to resume training from')
     })
   )

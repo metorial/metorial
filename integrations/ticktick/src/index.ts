@@ -14,8 +14,6 @@ import {
   updateProject,
   updateTask
 } from './tools';
-import { inboundWebhook, taskChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     batchTasks,
     getUser
   ],
-  triggers: [inboundWebhook, taskChanges]
+  triggers: []
 });

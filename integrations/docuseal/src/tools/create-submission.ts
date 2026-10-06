@@ -12,13 +12,13 @@ let submitterSchema = z.object({
   name: z.string().optional().describe('Submitter display name'),
   phone: z.string().optional().describe('Phone in E.164 format (e.g. +1234567890)'),
   values: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .optional()
     .describe('Pre-filled field values (field name -> value)'),
   externalId: z.string().optional().describe('Your application identifier for this submitter'),
   completed: z.boolean().optional().describe('Set true to auto-sign (counter-signing)'),
   metadata: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .optional()
     .describe('Custom metadata for this submitter'),
   sendEmail: z.boolean().optional().describe('Send email notification to this submitter'),
@@ -41,7 +41,7 @@ let submitterSchema = z.object({
 export let createSubmission = SlateTool.create(spec, {
   name: 'Create Submission',
   key: 'create_submission',
-  description: `Create a signature request (submission) from an existing template and send it to one or more submitters for signing. Supports sequential or parallel signing order, field pre-filling, expiration dates, custom email messaging, 2FA, and auto-signing.`,
+  description: `Create a signature request (submission) from an existing template and send it to one or more submitters for signing. Email invitations default to enabled; pass sendEmail=false to suppress them. Auto-signing with completed=true is irreversible. Supports sequential or parallel signing order, field pre-filling, expiration dates, custom email messaging, 2FA, and auto-signing.`,
   instructions: [
     'Provide at least one submitter with an email address.',
     'Use role names that match the roles defined in the template.',
@@ -75,7 +75,7 @@ export let createSubmission = SlateTool.create(spec, {
         .optional()
         .describe('Expiration date-time (ISO 8601) after which the submission is unavailable'),
       variables: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Dynamic content variables for DOCX/HTML templates'),
       message: z
@@ -128,7 +128,7 @@ export let createSubmission = SlateTool.create(spec, {
       message: ctx.input.message
     });
 
-    let submitters = (Array.isArray(data) ? data : [data]).map((s: any) => ({
+    let submitters = data.map(s => ({
       submitterId: s.id,
       submissionId: s.submission_id,
       uuid: s.uuid,

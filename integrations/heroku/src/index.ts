@@ -20,8 +20,6 @@ import {
   scaleFormation,
   updateApp
 } from './tools';
-import { appWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     createLogSession,
     getAccount
   ],
-  triggers: [appWebhook]
+  triggers: []
 });

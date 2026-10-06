@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { type ApiResource, nextUrlSchema, pausedState, teamNameSchema } from '../lib/api';
 import { UptimeClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -20,71 +21,86 @@ let monitorSchema = z.object({
 export let listMonitors = SlateTool.create(spec, {
   name: 'List Monitors',
   key: 'list_monitors',
-  description: `List uptime monitors in your Better Stack account. Supports filtering by name, URL, monitor type, paused state, and monitor group. Returns paginated results with monitor status and configuration details.`,
+  description: `List uptime monitors with status and configuration details. Name and URL filters are applied by the provider. Monitor type, paused state and group filters are applied to each returned page; follow nextUrl to inspect every page.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      teamName: teamNameSchema,
+      nextUrl: nextUrlSchema,
       page: z.number().optional().describe('Page number for pagination (default: 1)'),
       perPage: z
         .number()
         .optional()
-        .describe('Number of results per page (default: 20, max: 50)'),
+        .describe('Number of results per page (default: 50, max: 250)'),
       pronounceableName: z.string().optional().describe('Filter by pronounceable name'),
       url: z.string().optional().describe('Filter by monitored URL'),
       monitorType: z
         .string()
         .optional()
         .describe(
-          'Filter by monitor type (e.g., status, keyword, ping, tcp, udp, smtp, pop, imap)'
+          'Filter this returned page by monitor type (e.g., status, keyword, ping, tcp)'
         ),
-      paused: z.boolean().optional().describe('Filter by paused state'),
-      monitorGroupId: z.string().optional().describe('Filter by monitor group ID')
+      paused: z.boolean().optional().describe('Filter this returned page by paused state'),
+      monitorGroupId: z
+        .string()
+        .optional()
+        .describe('Filter this returned page by monitor group ID')
     })
   )
   .output(
     z.object({
       monitors: z.array(monitorSchema).describe('List of monitors'),
+      nextUrl: z.string().optional().describe('Next-page URL, when available'),
       hasMore: z.boolean().describe('Whether more results are available')
     })
   )
   .handleInvocation(async ctx => {
     let client = new UptimeClient({
       token: ctx.auth.token,
-      teamName: ctx.config.teamName
+      tokenType: ctx.auth.tokenType,
+      teamName: ctx.input.teamName ?? ctx.config.teamName
     });
 
     let result = await client.listMonitors({
+      nextUrl: ctx.input.nextUrl,
       page: ctx.input.page,
       perPage: ctx.input.perPage,
       pronounceableName: ctx.input.pronounceableName,
-      url: ctx.input.url,
-      monitorType: ctx.input.monitorType,
-      paused: ctx.input.paused,
-      monitorGroupId: ctx.input.monitorGroupId ? Number(ctx.input.monitorGroupId) : undefined
+      url: ctx.input.url
     });
 
-    let monitors = (result.data || []).map((item: any) => {
-      let attrs = item.attributes || item;
-      return {
-        monitorId: String(item.id),
-        name: attrs.pronounceable_name || attrs.name || null,
-        url: attrs.url || null,
-        monitorType: attrs.monitor_type || null,
-        status: attrs.status || null,
-        paused: attrs.paused ?? null,
-        pronounceableName: attrs.pronounceable_name || null,
-        checkFrequency: attrs.check_frequency ?? null,
-        lastCheckedAt: attrs.last_checked_at || null,
-        createdAt: attrs.created_at || null,
-        updatedAt: attrs.updated_at || null
-      };
-    });
+    let monitors = result.data
+      .filter(
+        item =>
+          (ctx.input.monitorType === undefined ||
+            item.attributes.monitor_type === ctx.input.monitorType) &&
+          (ctx.input.paused === undefined ||
+            pausedState(item.attributes) === ctx.input.paused) &&
+          (ctx.input.monitorGroupId === undefined ||
+            String(item.attributes.monitor_group_id) === ctx.input.monitorGroupId)
+      )
+      .map((item: ApiResource) => {
+        let attrs = item.attributes;
+        return {
+          monitorId: String(item.id),
+          name: attrs.pronounceable_name || attrs.name || null,
+          url: attrs.url || null,
+          monitorType: attrs.monitor_type || null,
+          status: attrs.status || null,
+          paused: pausedState(attrs),
+          pronounceableName: attrs.pronounceable_name || null,
+          checkFrequency: attrs.check_frequency ?? null,
+          lastCheckedAt: attrs.last_checked_at || null,
+          createdAt: attrs.created_at || null,
+          updatedAt: attrs.updated_at || null
+        };
+      });
 
     let hasMore = !!result.pagination?.next;
 
     return {
-      output: { monitors, hasMore },
+      output: { monitors, hasMore, nextUrl: result.pagination?.next ?? undefined },
       message: `Found **${monitors.length}** monitor(s)${hasMore ? ' (more available)' : ''}.`
     };
   })

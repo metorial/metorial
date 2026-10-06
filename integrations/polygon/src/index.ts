@@ -18,8 +18,6 @@ import {
   getUnifiedSnapshot,
   searchTickers
 } from './tools';
-import { inboundWebhook, newMarketNews, stockPriceChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     getSplitsDividends,
     getUnifiedSnapshot
   ],
-  triggers: [inboundWebhook, newMarketNews, stockPriceChange]
+  triggers: []
 });

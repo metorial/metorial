@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listDashboards = SlateTool.create(spec, {
@@ -33,10 +34,13 @@ export let listDashboards = SlateTool.create(spec, {
           lastUpdated: z.string().optional()
         })
       ),
-      total: z.number().optional()
+      total: z.number().optional(),
+      nextOffset: z.number().optional(),
+      hasMore: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listTabs({
@@ -54,10 +58,18 @@ export let listDashboards = SlateTool.create(spec, {
       lastUpdated: tab.last_updated
     }));
 
+    const offset = ctx.input.offset ?? 0;
+    const hasMore =
+      result.data.length > 0 &&
+      (typeof result.meta?.total === 'number'
+        ? offset + dashboards.length < result.meta.total
+        : dashboards.length === (ctx.input.limit ?? 25));
     return {
       output: {
         dashboards,
-        total: result?.meta?.total
+        total: result?.meta?.total,
+        hasMore,
+        nextOffset: hasMore ? offset + dashboards.length : undefined
       },
       message: `Found **${dashboards.length}** dashboard(s)${result?.meta?.total ? ` out of ${result.meta.total} total` : ''}.`
     };

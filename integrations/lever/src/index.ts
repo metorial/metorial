@@ -3,11 +3,14 @@ import { spec } from './spec';
 import {
   addNoteTool,
   createOpportunityTool,
+  downloadFileTool,
   getOpportunityActivityTool,
   getOpportunityTool,
   getPipelineMetadataTool,
+  getResourceTool,
   listOpportunitiesTool,
   listPostingsTool,
+  listResourcesTool,
   listUsersTool,
   manageInterviewTool,
   managePostingTool,
@@ -16,15 +19,12 @@ import {
   updateContactTool,
   updateOpportunityTool
 } from './tools';
-import {
-  contactEventsTrigger,
-  interviewEventsTrigger,
-  opportunityEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getResourceTool,
+    listResourcesTool,
+    downloadFileTool,
     listOpportunitiesTool,
     getOpportunityTool,
     createOpportunityTool,
@@ -40,5 +40,5 @@ export let provider = Slate.create({
     manageRequisitionTool,
     updateContactTool
   ],
-  triggers: [opportunityEventsTrigger, interviewEventsTrigger, contactEventsTrigger]
+  triggers: []
 });

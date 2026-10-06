@@ -1,4 +1,6 @@
 export * from './create-transaction';
+export * from './get-invoice-pdf';
+export * from './get-resource';
 export * from './get-user';
 export * from './list-businesses';
 export * from './list-vendors';

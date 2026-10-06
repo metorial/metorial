@@ -1,5 +1,56 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  requestAxiosData,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { deelError } from './lib/errors';
+import { objectResponse, requireText } from './lib/response';
+
+let exchangeToken = async (
+  clientId: string,
+  clientSecret: string,
+  values: Record<string, string>,
+  previousRefreshToken?: string
+) => {
+  requireText(clientId, 'OAuth client ID');
+  requireText(clientSecret, 'OAuth client secret');
+  let http = createAxios({ baseURL: 'https://app.deel.com', timeout: 30000, maxRedirects: 0 });
+  let data = objectResponse(
+    await requestAxiosData(
+      'OAuth token exchange',
+      () =>
+        http.post('/oauth2/tokens', new URLSearchParams(values).toString(), {
+          headers: {
+            Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }),
+      deelError
+    ),
+    'OAuth token'
+  );
+  let seconds = Number(data.expires_in);
+  if (
+    !Number.isFinite(seconds) ||
+    seconds <= 0 ||
+    !Number.isFinite(new Date(Date.now() + seconds * 1000).getTime())
+  )
+    throw createApiServiceError(
+      'Deel returned an invalid OAuth token expiry. Reconnect the account.',
+      { reason: 'oauth_token_response' }
+    );
+  let output = normalizeOAuthTokenResponse(data, {
+    providerLabel: 'Deel',
+    required: true,
+    previousRefreshToken
+  });
+  requireText(output.token, 'OAuth access token');
+  requireText(output.refreshToken, 'OAuth refresh token');
+  return output;
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -7,7 +58,8 @@ export let auth = SlateAuth.create()
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
-      clientId: z.string().optional()
+      clientId: z.string().optional(),
+      redirectUri: z.string().optional()
     })
   )
   .addOauth({
@@ -18,12 +70,12 @@ export let auth = SlateAuth.create()
       {
         type: 'docs.auth.oauth',
         name: 'OAuth documentation',
-        url: 'https://developer.deel.com/docs/oauth2'
+        url: 'https://developer.deel.com/api/stable/oauth'
       },
       {
         type: 'docs.auth.oauth_scopes',
         name: 'OAuth scopes',
-        url: 'https://developer.deel.com/docs/scopes-1'
+        url: 'https://developer.deel.com/api/stable/authentication#available-scopes'
       }
     ],
 
@@ -35,11 +87,6 @@ export let auth = SlateAuth.create()
         scope: 'contracts:write'
       },
       { title: 'People Read', description: 'Read people/worker data', scope: 'people:read' },
-      {
-        title: 'People Write',
-        description: 'Modify people/worker data',
-        scope: 'people:write'
-      },
       {
         title: 'Timesheets Read',
         description: 'Read timesheet data',
@@ -80,16 +127,12 @@ export let auth = SlateAuth.create()
         description: 'Read organization data',
         scope: 'organizations:read'
       },
-      {
-        title: 'Organizations Write',
-        description: 'Manage organization data',
-        scope: 'organizations:write'
-      },
       { title: 'Workers Read', description: 'Read worker profiles', scope: 'worker:read' },
       { title: 'Workers Write', description: 'Modify worker profiles', scope: 'worker:write' }
     ],
 
     getAuthorizationUrl: async ctx => {
+      requireText(ctx.clientId, 'OAuth client ID');
       let params = new URLSearchParams({
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
@@ -97,81 +140,51 @@ export let auth = SlateAuth.create()
         state: ctx.state,
         response_type: 'code'
       });
-
-      return {
-        url: `https://app.deel.com/oauth2/authorize?${params.toString()}`
-      };
+      return { url: `https://app.deel.com/oauth2/authorize?${params}` };
     },
-
-    handleCallback: async ctx => {
-      let http = createAxios({ baseURL: 'https://app.deel.com' });
-
-      let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
-
-      let response = await http.post(
-        '/oauth2/tokens',
-        {
+    handleCallback: async ctx => ({
+      output: {
+        ...(await exchangeToken(ctx.clientId, ctx.clientSecret, {
           grant_type: 'authorization_code',
           code: ctx.code,
           redirect_uri: ctx.redirectUri
-        },
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      let data = response.data;
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+        })),
+        clientId: ctx.clientId,
+        redirectUri: ctx.redirectUri
       }
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
-          clientId: ctx.clientId
-        }
+    }),
+    handleTokenRefresh: async (ctx: {
+      clientId: string;
+      clientSecret: string;
+      output: {
+        token: string;
+        refreshToken?: string;
+        expiresAt?: string;
+        clientId?: string;
+        redirectUri?: string;
       };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let http = createAxios({ baseURL: 'https://app.deel.com' });
-
-      let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
-
-      let response = await http.post(
-        '/oauth2/tokens',
-        {
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken
-        },
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/json'
-          }
-        }
+    }) => {
+      let refreshToken = requireText(
+        ctx.output.refreshToken,
+        'Refresh token; reconnect Deel if it is missing'
       );
-
-      let data = response.data;
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
+      // Older saved connections have no redirect URI; retain their previously supported refresh payload.
+      let redirectUri = ctx.output.redirectUri;
+      if (redirectUri !== undefined) requireText(redirectUri, 'OAuth redirect URI');
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt,
-          clientId: ctx.clientId
+          ...(await exchangeToken(
+            ctx.clientId,
+            ctx.clientSecret,
+            {
+              grant_type: 'refresh_token',
+              refresh_token: refreshToken,
+              ...(redirectUri ? { redirect_uri: redirectUri } : {})
+            },
+            refreshToken
+          )),
+          clientId: ctx.clientId,
+          redirectUri
         }
       };
     }
@@ -188,7 +201,7 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiToken
+          token: requireText(ctx.input.apiToken, 'Deel API token')
         }
       };
     }

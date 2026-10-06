@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FivetranClient } from '../lib/client';
+import { connectionId, groupId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let connectionSummarySchema = z.object({
-  connectionId: z.string().describe('Unique identifier of the connection'),
-  groupId: z.string().describe('Group this connection belongs to'),
+  connectionId: connectionId,
+  groupId: groupId,
   service: z.string().describe('Connector service type (e.g., "github", "salesforce")'),
   schema: z.string().optional().describe('Schema name in the destination'),
   paused: z.boolean().optional().describe('Whether the connection is paused'),
@@ -23,6 +24,7 @@ let connectionSummarySchema = z.object({
 export let listConnections = SlateTool.create(spec, {
   name: 'List Connections',
   key: 'list_connections',
+  tags: { readOnly: true },
   description: `List all connections (connectors) in the Fivetran account, or within a specific group. Returns summary information about each connection including its status, service type, and sync state.`
 })
   .input(
@@ -54,8 +56,8 @@ export let listConnections = SlateTool.create(spec, {
       service: c.service,
       schema: c.schema,
       paused: c.paused,
-      setupState: c.setup_state,
-      syncState: c.sync_state,
+      setupState: c.status.setup_state,
+      syncState: c.status.sync_state,
       syncFrequency: c.sync_frequency,
       succeededAt: c.succeeded_at,
       failedAt: c.failed_at,

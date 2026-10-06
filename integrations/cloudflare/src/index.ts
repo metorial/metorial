@@ -21,12 +21,6 @@ import {
   queryAnalyticsTool,
   updateZoneSettingsTool
 } from './tools';
-import {
-  dnsRecordChangesTrigger,
-  notificationWebhookTrigger,
-  zoneStatusChangesTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +44,5 @@ export let provider = Slate.create({
     manageStreamTool,
     manageNotificationsTool
   ],
-  triggers: [notificationWebhookTrigger, dnsRecordChangesTrigger, zoneStatusChangesTrigger]
+  triggers: []
 });

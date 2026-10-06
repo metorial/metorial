@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { orgIdInput } from '../lib/deployment';
 import { spec } from '../spec';
 
 export let listDocuments = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let listDocuments = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       flowId: z.string().describe('The flow ID containing the document node'),
       nodeId: z.string().describe('The document node ID within the flow'),
       userId: z.string().describe('The user ID that owns the document bucket')
@@ -25,10 +27,7 @@ export let listDocuments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx, ctx.input.orgId);
 
     let files = await client.listDocuments(
       ctx.input.flowId,
@@ -56,6 +55,7 @@ export let deleteDocument = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       flowId: z.string().describe('The flow ID containing the document node'),
       nodeId: z.string().describe('The document node ID within the flow'),
       userId: z.string().describe('The user ID that owns the document bucket'),
@@ -68,10 +68,7 @@ export let deleteDocument = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    let client = createClient(ctx, ctx.input.orgId);
 
     await client.deleteDocument(
       ctx.input.flowId,

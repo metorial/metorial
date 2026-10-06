@@ -8,7 +8,9 @@ export let shortenLinkTool = SlateTool.create(spec, {
   key: 'shorten_link',
   description: `Shorten a URL using Hootsuite's Ow.ly link shortener.
 Returns a shortened Ow.ly URL for use in social media posts.`,
-  constraints: ['Available to Hootsuite Enterprise users only.'],
+  constraints: [
+    'The legacy Ow.ly API route is retained, but current public API availability is undocumented. The dashboard shortener remains available. Created short links can retain history and have no documented API deletion.'
+  ],
   tags: {
     readOnly: false
   }
@@ -31,10 +33,10 @@ Returns a shortened Ow.ly URL for use in social media posts.`,
 
     return {
       output: {
-        shortenedUrl: result.shortenedUrl || result.shortUrl || result.url || '',
+        shortenedUrl: result.shortenedUrl,
         originalUrl: ctx.input.url
       },
-      message: `Shortened **${ctx.input.url}** → **${result.shortenedUrl || result.shortUrl || result.url}**.`
+      message: `Shortened **${ctx.input.url}** → **${result.shortenedUrl}**.`
     };
   })
   .build();

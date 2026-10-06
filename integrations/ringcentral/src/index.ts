@@ -14,14 +14,6 @@ import {
   sendTeamMessage,
   updatePresence
 } from './tools';
-import {
-  messageEvents,
-  presenceEvents,
-  smsEvents,
-  teamMessagingEvents,
-  telephonyEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +30,5 @@ export let provider = Slate.create({
     listExtensions,
     listPhoneNumbers
   ],
-  triggers: [telephonyEvents, smsEvents, presenceEvents, messageEvents, teamMessagingEvents]
+  triggers: []
 });

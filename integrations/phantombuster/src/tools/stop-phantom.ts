@@ -8,6 +8,7 @@ export let stopPhantom = SlateTool.create(spec, {
   key: 'stop_phantom',
   description: `Abort a currently running Phantom execution. Stops all running instances of the specified Phantom.`,
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
@@ -27,7 +28,7 @@ export let stopPhantom = SlateTool.create(spec, {
 
     return {
       output: { stopped: true },
-      message: `Phantom **${ctx.input.phantomId}** has been stopped.`
+      message: `Phantom **${ctx.input.phantomId}** received a stop command. Read its output or execution status to confirm completion.`
     };
   })
   .build();

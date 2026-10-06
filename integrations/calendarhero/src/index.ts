@@ -12,8 +12,6 @@ import {
   searchContacts,
   updateContact
 } from './tools';
-import { contactEvents, meetingEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     updateContact,
     deleteContact
   ],
-  triggers: [meetingEvents, contactEvents]
+  triggers: []
 });

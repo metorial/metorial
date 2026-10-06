@@ -1,11 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubActionsClient } from '../lib/client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let workflowRunSchema = z.object({
   runId: z.number().describe('Workflow run ID'),
   name: z.string().nullable().describe('Workflow run name'),
+  displayTitle: z
+    .string()
+    .optional()
+    .describe('Display title from the workflow run-name or event'),
   workflowId: z.number().describe('Workflow ID'),
   headBranch: z.string().nullable().describe('Head branch'),
   headSha: z.string().describe('Head commit SHA'),
@@ -27,6 +32,9 @@ export let listWorkflowRuns = SlateTool.create(spec, {
   name: 'List Workflow Runs',
   key: 'list_workflow_runs',
   description: `List workflow runs for a repository, optionally filtered by a specific workflow, branch, event, status, or actor. Returns run status, conclusions, and metadata for each run.`,
+  constraints: [
+    'GitHub caps filtered searches at 1,000 runs; narrow the creation-date filter for larger histories.'
+  ],
   tags: {
     readOnly: true
   }
@@ -39,6 +47,13 @@ export let listWorkflowRuns = SlateTool.create(spec, {
         .union([z.number(), z.string()])
         .optional()
         .describe('Filter by workflow ID or file name'),
+      created: z
+        .string()
+        .optional()
+        .describe(
+          'Creation date/time filter using GitHub search syntax, such as 2026-01-01..2026-02-01'
+        ),
+      headSha: z.string().optional().describe('Filter by exact commit SHA'),
       actor: z.string().optional().describe('Filter by the user who triggered the run'),
       branch: z.string().optional().describe('Filter by branch name'),
       event: z
@@ -64,9 +79,12 @@ export let listWorkflowRuns = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new GitHubActionsClient(ctx.auth.token);
     let data = await client.listWorkflowRuns(ctx.input.owner, ctx.input.repo, {
       workflowId: ctx.input.workflowId,
+      created: ctx.input.created,
+      headSha: ctx.input.headSha,
       actor: ctx.input.actor,
       branch: ctx.input.branch,
       event: ctx.input.event,
@@ -76,9 +94,10 @@ export let listWorkflowRuns = SlateTool.create(spec, {
       excludePullRequests: ctx.input.excludePullRequests
     });
 
-    let runs = (data.workflow_runs ?? []).map((r: any) => ({
+    let runs = (data.workflow_runs ?? []).map(r => ({
       runId: r.id,
-      name: r.name,
+      name: r.name ?? null,
+      displayTitle: r.display_title,
       workflowId: r.workflow_id,
       headBranch: r.head_branch,
       headSha: r.head_sha,

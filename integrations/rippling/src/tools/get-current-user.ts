@@ -20,16 +20,19 @@ export let getCurrentUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
     let user = await client.getCurrentUser();
 
     return {
       output: {
         userId: user.id || '',
         workEmail: user.workEmail,
-        companyId: user.companyId
+        companyId: user.company
       },
-      message: `Current user: **${user.workEmail || user.id}** (Company: ${user.companyId || 'unknown'}).`
+      message: 'Retrieved the authenticated user identity.'
     };
   })
   .build();

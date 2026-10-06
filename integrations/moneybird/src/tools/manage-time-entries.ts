@@ -1,6 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoneybirdClient } from '../lib/client';
+import { administrationIdSchema } from '../lib/schemas';
+import {
+  checkedOutput,
+  exactId,
+  fail,
+  nullableId,
+  validateToolInput
+} from '../lib/validation';
 import { spec } from '../spec';
 
 let timeEntrySchema = z.object({
@@ -18,10 +26,18 @@ let timeEntrySchema = z.object({
   updatedAt: z.string().nullable()
 });
 
+const outputSchema = z.object({
+  nextPage: z.number().int().positive().optional(),
+  previousPage: z.number().int().positive().optional(),
+  timeEntry: timeEntrySchema.optional(),
+  timeEntries: z.array(timeEntrySchema).optional(),
+  deleted: z.boolean().optional()
+});
+
 export let manageTimeEntries = SlateTool.create(spec, {
   name: 'Manage Time Entries',
   key: 'manage_time_entries',
-  description: `List, get, create, update, or delete time entries. Time entries track time spent on projects and can be billed to customers by converting them to invoices.`,
+  description: `List, get, create, update, or delete time entries. Time entries track time spent on projects and can be billed to customers by converting them to invoices. Call list_administrations to choose administrationId when no default is saved.`,
   instructions: [
     'For "list", use filter to narrow results (e.g., "state:open", "period:this_month", "contact_id:123", "project_id:456").',
     'For "create", provide startedAt and endedAt in ISO 8601 format.'
@@ -29,6 +45,7 @@ export let manageTimeEntries = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      administrationId: administrationIdSchema,
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete'])
         .describe('Operation to perform'),
@@ -43,6 +60,10 @@ export let manageTimeEntries = SlateTool.create(spec, {
       startedAt: z.string().optional().describe('Start time ISO 8601 (for create/update)'),
       endedAt: z.string().optional().describe('End time ISO 8601 (for create/update)'),
       description: z.string().optional().describe('Work description (for create/update)'),
+      userId: z
+        .string()
+        .optional()
+        .describe('Administration user ID to associate (for create/update).'),
       contactId: z.string().optional().describe('Contact ID (for create/update)'),
       projectId: z.string().optional().describe('Project ID (for create/update)'),
       billable: z
@@ -51,92 +72,93 @@ export let manageTimeEntries = SlateTool.create(spec, {
         .describe('Whether the time entry is billable (for create/update)')
     })
   )
-  .output(
-    z.object({
-      timeEntry: timeEntrySchema.optional(),
-      timeEntries: z.array(timeEntrySchema).optional(),
-      deleted: z.boolean().optional()
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new MoneybirdClient({
-      token: ctx.auth.token,
-      administrationId: ctx.config.administrationId
-    });
+    validateToolInput('manage_time_entries', ctx.input);
+    return checkedOutput(outputSchema, async () => {
+      let client = new MoneybirdClient({
+        token: ctx.auth.token,
+        administrationId: ctx.input.administrationId ?? ctx.config.administrationId
+      });
 
-    let mapEntry = (e: any) => ({
-      timeEntryId: String(e.id),
-      contactId: e.contact_id ? String(e.contact_id) : null,
-      projectId: e.project_id ? String(e.project_id) : null,
-      userId: e.user_id ? String(e.user_id) : null,
-      salesInvoiceId: e.sales_invoice_id ? String(e.sales_invoice_id) : null,
-      startedAt: e.started_at || null,
-      endedAt: e.ended_at || null,
-      description: e.description || null,
-      pausedDuration: e.paused_duration ?? null,
-      billable: e.billable ?? null,
-      createdAt: e.created_at || null,
-      updatedAt: e.updated_at || null
-    });
+      let mapEntry = (e: any) => ({
+        timeEntryId: exactId(e.id),
+        contactId: nullableId(e.contact_id),
+        projectId: nullableId(e.project_id),
+        userId: nullableId(e.user_id),
+        salesInvoiceId: nullableId(e.sales_invoice_id),
+        startedAt: e.started_at ?? null,
+        endedAt: e.ended_at ?? null,
+        description: e.description ?? null,
+        pausedDuration: e.paused_duration ?? null,
+        billable: e.billable ?? null,
+        createdAt: e.created_at ?? null,
+        updatedAt: e.updated_at ?? null
+      });
 
-    switch (ctx.input.action) {
-      case 'list': {
-        let entries = await client.listTimeEntries({
-          filter: ctx.input.filter,
-          query: ctx.input.query,
-          page: ctx.input.page,
-          perPage: ctx.input.perPage
-        });
-        let mapped = entries.map(mapEntry);
-        return {
-          output: { timeEntries: mapped },
-          message: `Found ${mapped.length} time entr${mapped.length === 1 ? 'y' : 'ies'}.`
-        };
+      switch (ctx.input.action) {
+        case 'list': {
+          let entries = await client.listTimeEntries({
+            filter: ctx.input.filter,
+            query: ctx.input.query,
+            page: ctx.input.page,
+            perPage: ctx.input.perPage
+          });
+          let mapped = entries.map(mapEntry);
+          return {
+            output: { timeEntries: mapped, ...client.pagination },
+            message: `Found ${mapped.length} time entr${mapped.length === 1 ? 'y' : 'ies'}.`
+          };
+        }
+        case 'get': {
+          if (!ctx.input.timeEntryId) throw fail('timeEntryId is required for get');
+          let entry = await client.getTimeEntry(ctx.input.timeEntryId);
+          return {
+            output: { timeEntry: mapEntry(entry) },
+            message: `Retrieved time entry: "${entry.description || entry.id}".`
+          };
+        }
+        case 'create': {
+          let entryData: Record<string, any> = {};
+          if (ctx.input.userId !== undefined) entryData.user_id = ctx.input.userId;
+          if (ctx.input.startedAt) entryData.started_at = ctx.input.startedAt;
+          if (ctx.input.endedAt) entryData.ended_at = ctx.input.endedAt;
+          if (ctx.input.description) entryData.description = ctx.input.description;
+          if (ctx.input.contactId) entryData.contact_id = ctx.input.contactId;
+          if (ctx.input.projectId) entryData.project_id = ctx.input.projectId;
+          if (ctx.input.billable !== undefined) entryData.billable = ctx.input.billable;
+          let entry = await client.createTimeEntry(entryData);
+          return {
+            output: { timeEntry: mapEntry(entry) },
+            message: `Created time entry: "${entry.description || entry.id}".`
+          };
+        }
+        case 'update': {
+          if (!ctx.input.timeEntryId) throw fail('timeEntryId is required for update');
+          let entryData: Record<string, any> = {};
+          if (ctx.input.userId !== undefined) entryData.user_id = ctx.input.userId;
+          if (ctx.input.startedAt !== undefined) entryData.started_at = ctx.input.startedAt;
+          if (ctx.input.endedAt !== undefined) entryData.ended_at = ctx.input.endedAt;
+          if (ctx.input.description !== undefined)
+            entryData.description = ctx.input.description;
+          if (ctx.input.contactId !== undefined) entryData.contact_id = ctx.input.contactId;
+          if (ctx.input.projectId !== undefined) entryData.project_id = ctx.input.projectId;
+          if (ctx.input.billable !== undefined) entryData.billable = ctx.input.billable;
+          let entry = await client.updateTimeEntry(ctx.input.timeEntryId, entryData);
+          return {
+            output: { timeEntry: mapEntry(entry) },
+            message: `Updated time entry: "${entry.description || entry.id}".`
+          };
+        }
+        case 'delete': {
+          if (!ctx.input.timeEntryId) throw fail('timeEntryId is required for delete');
+          await client.deleteTimeEntry(ctx.input.timeEntryId);
+          return {
+            output: { deleted: true },
+            message: `Deleted time entry ${ctx.input.timeEntryId}.`
+          };
+        }
       }
-      case 'get': {
-        if (!ctx.input.timeEntryId) throw new Error('timeEntryId is required for get');
-        let entry = await client.getTimeEntry(ctx.input.timeEntryId);
-        return {
-          output: { timeEntry: mapEntry(entry) },
-          message: `Retrieved time entry: "${entry.description || entry.id}".`
-        };
-      }
-      case 'create': {
-        let entryData: Record<string, any> = {};
-        if (ctx.input.startedAt) entryData.started_at = ctx.input.startedAt;
-        if (ctx.input.endedAt) entryData.ended_at = ctx.input.endedAt;
-        if (ctx.input.description) entryData.description = ctx.input.description;
-        if (ctx.input.contactId) entryData.contact_id = ctx.input.contactId;
-        if (ctx.input.projectId) entryData.project_id = ctx.input.projectId;
-        if (ctx.input.billable !== undefined) entryData.billable = ctx.input.billable;
-        let entry = await client.createTimeEntry(entryData);
-        return {
-          output: { timeEntry: mapEntry(entry) },
-          message: `Created time entry: "${entry.description || entry.id}".`
-        };
-      }
-      case 'update': {
-        if (!ctx.input.timeEntryId) throw new Error('timeEntryId is required for update');
-        let entryData: Record<string, any> = {};
-        if (ctx.input.startedAt !== undefined) entryData.started_at = ctx.input.startedAt;
-        if (ctx.input.endedAt !== undefined) entryData.ended_at = ctx.input.endedAt;
-        if (ctx.input.description !== undefined) entryData.description = ctx.input.description;
-        if (ctx.input.contactId !== undefined) entryData.contact_id = ctx.input.contactId;
-        if (ctx.input.projectId !== undefined) entryData.project_id = ctx.input.projectId;
-        if (ctx.input.billable !== undefined) entryData.billable = ctx.input.billable;
-        let entry = await client.updateTimeEntry(ctx.input.timeEntryId, entryData);
-        return {
-          output: { timeEntry: mapEntry(entry) },
-          message: `Updated time entry: "${entry.description || entry.id}".`
-        };
-      }
-      case 'delete': {
-        if (!ctx.input.timeEntryId) throw new Error('timeEntryId is required for delete');
-        await client.deleteTimeEntry(ctx.input.timeEntryId);
-        return {
-          output: { deleted: true },
-          message: `Deleted time entry ${ctx.input.timeEntryId}.`
-        };
-      }
-    }
-  });
+    });
+  })
+  .build();

@@ -1,120 +1,179 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RuntimeClient } from '../lib/client';
+import { resolveRuntimeParams, runtimeScopeFields } from '../lib/schemas';
 import { spec } from '../spec';
+
+const conversationSchema = z.object({
+  conversationId: z.string(),
+  channel: z.string().optional(),
+  integration: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  tags: z.record(z.string(), z.string()).optional()
+});
+const mapConversation = (conversation: Record<string, unknown>) => ({
+  conversationId: conversation.id as string,
+  channel: conversation.channel as string | undefined,
+  integration: conversation.integration as string | undefined,
+  createdAt: conversation.createdAt as string,
+  updatedAt: conversation.updatedAt as string,
+  tags: conversation.tags as Record<string, string> | undefined
+});
 
 export let manageConversationTool = SlateTool.create(spec, {
   name: 'Manage Conversation',
   key: 'manage_conversation',
-  description: `Create, retrieve, or list conversations for a bot. Conversations represent exchanges between users and a bot within an integration channel. Use **get-or-create** to idempotently ensure a conversation exists.`,
-  tags: {
-    readOnly: false
-  }
+  description:
+    'Create, get, update, delete, or list bot conversations and manage their participants. Call list_workspaces then list_bots to discover bot IDs. Creation requires an installed integration channel; use the integration identity fields to act as that integration.',
+  tags: { destructive: true }
 })
   .input(
     z.object({
-      action: z
-        .enum(['create', 'get', 'get-or-create', 'list'])
-        .describe('Operation to perform'),
-      botId: z.string().optional().describe('Bot ID. Falls back to config botId.'),
-      conversationId: z.string().optional().describe('Conversation ID (required for get)'),
+      action: z.enum([
+        'create',
+        'get',
+        'get-or-create',
+        'list',
+        'update',
+        'delete',
+        'list-participants',
+        'add-participant',
+        'remove-participant'
+      ]),
+      ...runtimeScopeFields,
+      conversationId: z
+        .string()
+        .optional()
+        .describe('Conversation ID, required except for create, get-or-create, and list.'),
       channel: z
         .string()
         .optional()
-        .describe('Channel name for the conversation (required for create and get-or-create)'),
+        .describe(
+          'Installed integration channel name, required for create and get-or-create.'
+        ),
       tags: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Tags to associate with the conversation'),
-      nextToken: z.string().optional().describe('Pagination token for list')
+        .describe(
+          'Declared conversation tags; required for update, defaults to an empty object for creation.'
+        ),
+      discriminateByTags: z
+        .array(z.string())
+        .optional()
+        .describe('Tag keys used to match an existing conversation for get-or-create.'),
+      userId: z
+        .string()
+        .optional()
+        .describe(
+          'User ID required for add-participant and remove-participant. Discover users with manage_user list.'
+        ),
+      nextToken: z
+        .string()
+        .optional()
+        .describe('Pagination token for list or list-participants.')
     })
   )
   .output(
     z.object({
-      conversation: z
-        .object({
-          conversationId: z.string(),
-          channel: z.string().optional(),
-          createdAt: z.string(),
-          updatedAt: z.string(),
-          tags: z.record(z.string(), z.string()).optional()
-        })
-        .optional(),
-      conversations: z
-        .array(
-          z.object({
-            conversationId: z.string(),
-            channel: z.string().optional(),
-            createdAt: z.string(),
-            updatedAt: z.string()
-          })
-        )
-        .optional(),
+      conversation: conversationSchema.optional(),
+      conversations: z.array(conversationSchema).optional(),
+      participants: z.array(z.record(z.string(), z.unknown())).optional(),
+      participant: z.record(z.string(), z.unknown()).optional(),
+      conversationId: z.string().optional(),
+      userId: z.string().optional(),
+      deleted: z.boolean().optional(),
+      removed: z.boolean().optional(),
+      created: z.boolean().optional(),
       nextToken: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let botId = ctx.input.botId || ctx.config.botId;
-    if (!botId) throw new Error('botId is required (provide in input or config)');
-
-    let client = new RuntimeClient({ token: ctx.auth.token, botId });
-
-    if (ctx.input.action === 'list') {
-      let result = await client.listConversations({ nextToken: ctx.input.nextToken });
-      let conversations = (result.conversations || []).map((c: Record<string, unknown>) => ({
-        conversationId: c.id as string,
-        channel: c.channel as string | undefined,
-        createdAt: c.createdAt as string,
-        updatedAt: c.updatedAt as string
-      }));
+    const client = new RuntimeClient({
+      token: ctx.auth.token,
+      ...resolveRuntimeParams(ctx.input, ctx.config)
+    });
+    const { action, conversationId, tags, userId } = ctx.input;
+    if (action === 'list') {
+      const result = await client.listConversations({ nextToken: ctx.input.nextToken });
+      const conversations = (result.conversations ?? []).map(mapConversation);
       return {
         output: { conversations, nextToken: result.meta?.nextToken },
         message: `Found **${conversations.length}** conversation(s).`
       };
     }
-
-    if (ctx.input.action === 'get') {
-      if (!ctx.input.conversationId)
-        throw new Error('conversationId is required for get action');
-      let result = await client.getConversation(ctx.input.conversationId);
-      let c = result.conversation;
+    if (action === 'create' || action === 'get-or-create') {
+      if (!ctx.input.channel?.trim())
+        throw createApiServiceError(
+          'channel is required for create and get-or-create. Choose an installed integration channel.'
+        );
+      if (
+        action === 'get-or-create' &&
+        ctx.input.discriminateByTags?.some(key => tags?.[key] === undefined)
+      )
+        throw createApiServiceError('Every discriminateByTags key must be present in tags.');
+      const data = { channel: ctx.input.channel, tags };
+      const result =
+        action === 'create'
+          ? await client.createConversation(data)
+          : await client.getOrCreateConversation({
+              ...data,
+              discriminateByTags: ctx.input.discriminateByTags
+            });
       return {
         output: {
-          conversation: {
-            conversationId: c.id,
-            channel: c.channel,
-            createdAt: c.createdAt,
-            updatedAt: c.updatedAt,
-            tags: c.tags
-          }
+          conversation: mapConversation(result.conversation),
+          created: result.meta?.created
         },
-        message: `Retrieved conversation **${c.id}**.`
+        message: `Retrieved or created conversation **${result.conversation.id}**.`
       };
     }
-
-    if (ctx.input.action === 'create' || ctx.input.action === 'get-or-create') {
-      if (!ctx.input.channel)
-        throw new Error('channel is required for create / get-or-create');
-      let fn =
-        ctx.input.action === 'create'
-          ? client.createConversation.bind(client)
-          : client.getOrCreateConversation.bind(client);
-      let result = await fn({ channel: ctx.input.channel, tags: ctx.input.tags });
-      let c = result.conversation;
+    if (!conversationId?.trim())
+      throw createApiServiceError(`conversationId is required for ${action}.`);
+    if (action === 'get' || action === 'update') {
+      if (action === 'update' && !tags)
+        throw createApiServiceError(
+          'tags is required for update. Use empty values to unset declared tags.'
+        );
+      const result =
+        action === 'get'
+          ? await client.getConversation(conversationId)
+          : await client.updateConversation(conversationId, tags ?? {});
+      return {
+        output: { conversation: mapConversation(result.conversation) },
+        message: `Retrieved ${action === 'update' ? 'updated ' : ''}conversation **${conversationId}**.`
+      };
+    }
+    if (action === 'delete') {
+      await client.deleteConversation(conversationId);
+      return {
+        output: { conversationId, deleted: true },
+        message: `Deleted conversation **${conversationId}**.`
+      };
+    }
+    if (action === 'list-participants') {
+      const result = await client.listParticipants(conversationId, ctx.input.nextToken);
       return {
         output: {
-          conversation: {
-            conversationId: c.id,
-            channel: c.channel,
-            createdAt: c.createdAt,
-            updatedAt: c.updatedAt,
-            tags: c.tags
-          }
+          conversationId,
+          participants: result.participants,
+          nextToken: result.meta?.nextToken
         },
-        message: `${ctx.input.action === 'create' ? 'Created' : 'Got or created'} conversation **${c.id}**.`
+        message: `Retrieved participants for conversation **${conversationId}**.`
       };
     }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    if (!userId?.trim()) throw createApiServiceError(`userId is required for ${action}.`);
+    if (action === 'add-participant') {
+      const result = await client.addParticipant(conversationId, userId);
+      return {
+        output: { conversationId, userId, participant: result.participant },
+        message: `Added user **${userId}** to conversation **${conversationId}**.`
+      };
+    }
+    await client.removeParticipant(conversationId, userId);
+    return {
+      output: { conversationId, userId, removed: true },
+      message: `Removed user **${userId}** from conversation **${conversationId}**.`
+    };
   })
   .build();

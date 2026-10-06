@@ -6,8 +6,8 @@ export let spec = SlateSpecification.create({
   key: 'lmnt',
   name: 'LMNT',
   description:
-    'AI-powered text-to-speech and voice cloning platform. Generate lifelike speech from text using pre-built or custom cloned voices with support for multiple languages and real-time streaming.',
-  metadata: {},
+    'Retired integration: LMNT has shut down its speech generation service. Existing tool contracts remain available for compatibility and report that the provider is unavailable.',
+  metadata: { deprecated: true, retirementNoticeUrl: 'https://docs.lmnt.com/' },
   config,
   auth
 });

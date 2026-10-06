@@ -1,24 +1,38 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GreenhouseClient } from '../lib/client';
-import { mapCandidate } from '../lib/mappers';
+import { candidateOutputSchema, mapCandidate } from '../lib/mappers';
 import { spec } from '../spec';
-
-export let listCandidatesTool = SlateTool.create(spec, {
-  name: 'List Candidates',
+export const listCandidatesTool = SlateTool.create(spec, {
   key: 'list_candidates',
-  description: `List and search candidates in Greenhouse. Supports filtering by email, date ranges, and associated job. Returns paginated results.`,
-  tags: { readOnly: true }
+  name: 'List Candidates',
+  description:
+    'List candidates by email or one date range. Harvest v3 job filtering is available through list_applications.',
+  tags: { readOnly: true, destructive: false }
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (starts at 1)'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque nextCursor from the preceding response. Pass cursor alone for subsequent pages.'
+        ),
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy first-page selector. Only page 1 is supported; use cursor for subsequent pages.'
+        ),
       perPage: z
         .number()
         .optional()
         .describe('Number of results per page (max 500, default 50)'),
       email: z.string().optional().describe('Filter candidates by email address'),
-      jobId: z.string().optional().describe('Filter candidates associated with this job'),
+      jobId: z
+        .string()
+        .optional()
+        .describe('Retired v3 filter. Use list_applications with jobId, then get_candidate.'),
       createdAfter: z
         .string()
         .optional()
@@ -39,50 +53,20 @@ export let listCandidatesTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      candidates: z.array(
-        z.object({
-          candidateId: z.string(),
-          firstName: z.string(),
-          lastName: z.string(),
-          company: z.string().nullable(),
-          title: z.string().nullable(),
-          emailAddresses: z.array(z.object({ value: z.string(), type: z.string() })),
-          phoneNumbers: z.array(z.object({ value: z.string(), type: z.string() })),
-          tags: z.array(z.string()),
-          applicationIds: z.array(z.string()),
-          createdAt: z.string().nullable(),
-          updatedAt: z.string().nullable()
-        })
-      ),
-      hasMore: z.boolean()
+      candidates: z.array(candidateOutputSchema),
+      hasMore: z.boolean(),
+      nextCursor: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GreenhouseClient({
-      token: ctx.auth.token,
-      onBehalfOf: ctx.config.onBehalfOf
-    });
-    let perPage = ctx.input.perPage || 50;
-
-    let results = await client.listCandidates({
-      page: ctx.input.page,
-      perPage,
-      email: ctx.input.email,
-      jobId: ctx.input.jobId ? Number.parseInt(ctx.input.jobId, 10) : undefined,
-      createdAfter: ctx.input.createdAfter,
-      createdBefore: ctx.input.createdBefore,
-      updatedAfter: ctx.input.updatedAfter,
-      updatedBefore: ctx.input.updatedBefore
-    });
-
-    let candidates = results.map(mapCandidate);
-
+    const page = await new GreenhouseClient(ctx.auth, ctx.config).listCandidates(ctx.input);
     return {
       output: {
-        candidates,
-        hasMore: results.length >= perPage
+        candidates: page.items.map(mapCandidate),
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor
       },
-      message: `Found ${candidates.length} candidate(s)${ctx.input.email ? ` matching email "${ctx.input.email}"` : ''}.${candidates.length >= perPage ? ' More results may be available on the next page.' : ''}`
+      message: `Retrieved ${page.items.length} result(s).`
     };
   })
   .build();

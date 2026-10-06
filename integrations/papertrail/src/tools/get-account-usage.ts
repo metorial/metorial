@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let getAccountUsage = SlateTool.create(spec, {
   name: 'Get Account Usage',
   key: 'get_account_usage',
-  description: `Retrieve Papertrail account information and usage data, including the account name, plan details, and log volume consumed.`,
+  description: `DEPRECATED — use \`get_usage\` instead. Retrieve Papertrail account information and usage data, including the account name, plan details, and log volume consumed.`,
+  instructions: [
+    'Use get_usage to retrieve documented usage values; the API does not expose account identity or plan names.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

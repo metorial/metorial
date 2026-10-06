@@ -1,16 +1,49 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class QdrantClient {
   private http;
+  readonly clusterEndpoint: string;
 
-  constructor(config: { clusterEndpoint: string; token: string }) {
-    let baseURL = config.clusterEndpoint.replace(/\/+$/, '');
-    this.http = createAxios({
-      baseURL,
-      headers: {
-        'api-key': config.token,
-        'Content-Type': 'application/json'
-      }
+  constructor(config: { clusterEndpoint?: string; token: string }) {
+    if (!config.clusterEndpoint?.trim()) {
+      throw createApiServiceError(
+        'Set the Qdrant cluster endpoint in connection settings before using database tools.'
+      );
+    }
+    let endpoint: URL;
+    try {
+      endpoint = new URL(config.clusterEndpoint);
+    } catch {
+      throw createApiServiceError(
+        'The Qdrant cluster endpoint must be a valid HTTP or HTTPS URL.'
+      );
+    }
+    if (
+      !['http:', 'https:'].includes(endpoint.protocol) ||
+      endpoint.username ||
+      endpoint.password ||
+      endpoint.search ||
+      endpoint.hash
+    ) {
+      throw createApiServiceError(
+        'The Qdrant cluster endpoint must be an HTTP or HTTPS URL without credentials, query parameters, or fragments.'
+      );
+    }
+    if (!config.token) {
+      throw createApiServiceError(
+        'A database API key is required for database operations. Reconnect with a database API key.'
+      );
+    }
+    this.clusterEndpoint = endpoint.toString().replace(/\/+$/, '');
+    this.http = createAuthenticatedAxios({
+      baseURL: this.clusterEndpoint,
+      authHeader: { name: 'api-key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Qdrant',
+          reason: 'qdrant_api_error'
+        })
     });
   }
 
@@ -43,6 +76,7 @@ export class QdrantClient {
       hnswConfig?: any;
       quantizationConfig?: any;
       sparseVectors?: any;
+      optimizersConfig?: any;
     }
   ): Promise<any> {
     let body: any = { vectors: params.vectors };
@@ -54,6 +88,8 @@ export class QdrantClient {
     if (params.quantizationConfig !== undefined)
       body.quantization_config = params.quantizationConfig;
     if (params.sparseVectors !== undefined) body.sparse_vectors = params.sparseVectors;
+    if (params.optimizersConfig !== undefined)
+      body.optimizers_config = params.optimizersConfig;
     let response = await this.http.put(
       `/collections/${encodeURIComponent(collectionName)}`,
       body
@@ -231,25 +267,16 @@ export class QdrantClient {
       params?: any;
     }
   ): Promise<any[]> {
-    let body: any = {
-      positive: options.positive
-    };
-    if (options.negative !== undefined) body.negative = options.negative;
-    if (options.strategy !== undefined) body.strategy = options.strategy;
-    if (options.filter !== undefined) body.filter = options.filter;
-    if (options.limit !== undefined) body.limit = options.limit;
-    if (options.offset !== undefined) body.offset = options.offset;
-    if (options.withPayload !== undefined) body.with_payload = options.withPayload;
-    if (options.withVector !== undefined) body.with_vector = options.withVector;
-    if (options.scoreThreshold !== undefined) body.score_threshold = options.scoreThreshold;
-    if (options.using !== undefined) body.using = options.using;
-    if (options.params !== undefined) body.params = options.params;
-
-    let response = await this.http.post(
-      `/collections/${encodeURIComponent(collectionName)}/points/recommend`,
-      body
-    );
-    return response.data.result;
+    return this.queryPoints(collectionName, {
+      ...options,
+      query: {
+        recommend: {
+          positive: options.positive,
+          negative: options.negative,
+          strategy: options.strategy
+        }
+      }
+    });
   }
 
   async discoverPoints(
@@ -266,23 +293,13 @@ export class QdrantClient {
       params?: any;
     }
   ): Promise<any[]> {
-    let body: any = {
-      context: options.context
-    };
-    if (options.target !== undefined) body.target = options.target;
-    if (options.filter !== undefined) body.filter = options.filter;
-    if (options.limit !== undefined) body.limit = options.limit;
-    if (options.offset !== undefined) body.offset = options.offset;
-    if (options.withPayload !== undefined) body.with_payload = options.withPayload;
-    if (options.withVector !== undefined) body.with_vector = options.withVector;
-    if (options.using !== undefined) body.using = options.using;
-    if (options.params !== undefined) body.params = options.params;
-
-    let response = await this.http.post(
-      `/collections/${encodeURIComponent(collectionName)}/points/discover`,
-      body
-    );
-    return response.data.result;
+    return this.queryPoints(collectionName, {
+      ...options,
+      query:
+        options.target !== undefined
+          ? { discover: { target: options.target, context: options.context } }
+          : { context: options.context }
+    });
   }
 
   // ========== Payload ==========

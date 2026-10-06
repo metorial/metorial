@@ -1,6 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AshbyClient } from '../lib/client';
+import {
+  invalid,
+  mapApplication,
+  pageOutput,
+  pageSchema,
+  rows,
+  warningsSchema
+} from '../lib/contracts';
 import { spec } from '../spec';
 
 let applicationOutputSchema = z.object({
@@ -28,32 +36,6 @@ let applicationOutputSchema = z.object({
   updatedAt: z.string().describe('Last updated timestamp')
 });
 
-let mapApplication = (app: any) => ({
-  applicationId: app.id,
-  status: app.status || '',
-  candidateName:
-    app.candidate?.name ||
-    [app.candidate?.firstName, app.candidate?.lastName].filter(Boolean).join(' ') ||
-    'Unknown',
-  candidateId: app.candidate?.id || app.candidateId || '',
-  jobTitle: app.job?.title || '',
-  jobId: app.job?.id || app.jobId || '',
-  currentStage: app.currentInterviewStage
-    ? {
-        stageId: app.currentInterviewStage.id,
-        title: app.currentInterviewStage.title || ''
-      }
-    : undefined,
-  source: app.source
-    ? {
-        sourceId: app.source.id,
-        title: app.source.title || ''
-      }
-    : undefined,
-  createdAt: app.createdAt || '',
-  updatedAt: app.updatedAt || ''
-});
-
 export let listApplicationsTool = SlateTool.create(spec, {
   name: 'List Applications',
   key: 'list_applications',
@@ -71,6 +53,12 @@ export let listApplicationsTool = SlateTool.create(spec, {
     z.object({
       applicationId: z.string().optional().describe('Application ID to get specific details'),
       cursor: z.string().optional().describe('Pagination cursor'),
+      syncToken: z
+        .string()
+        .optional()
+        .describe(
+          'Incremental sync token. Preserve it with each cursor; restart without both values if expired.'
+        ),
       perPage: z.number().optional().describe('Number of results per page'),
       expand: z
         .array(z.enum(['openings', 'applicationFormSubmissions', 'referrals']))
@@ -87,32 +75,33 @@ export let listApplicationsTool = SlateTool.create(spec, {
         .array(applicationOutputSchema)
         .optional()
         .describe('List of applications (when listing)'),
-      nextCursor: z.string().optional().describe('Pagination cursor for the next page')
+      nextCursor: z.string().optional().describe('Pagination cursor for the next page'),
+      warnings: warningsSchema,
+      pageInfo: pageSchema.optional(),
+      completedActions: z.array(z.string()).optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AshbyClient({ token: ctx.auth.token });
-    let { applicationId, cursor, perPage, expand } = ctx.input;
-
-    if (applicationId) {
-      let result = await client.getApplication(applicationId, expand);
-      let application = mapApplication(result.results);
-
+    const client = new AshbyClient(ctx.auth),
+      input = ctx.input;
+    if (input.applicationId !== undefined) {
+      if (input.cursor !== undefined || input.syncToken !== undefined)
+        invalid('Pagination parameters cannot be used with an exact applicationId.');
+      const result = await client.getApplication(input.applicationId, input.expand);
       return {
-        output: { application },
-        message: `Retrieved application **${application.applicationId}** for ${application.candidateName} - ${application.jobTitle}.`
+        output: { application: mapApplication(result.results), warnings: client.warnings },
+        message: 'Retrieved the exact visible application.'
       };
     }
-
-    let result = await client.listApplications({ cursor, perPage });
-    let applications = (result.results || []).map(mapApplication);
-
+    const result = await client.list('/application.list', input, { expand: input.expand });
     return {
       output: {
-        applications,
-        nextCursor: result.moreDataAvailable ? result.nextCursor : undefined
+        applications: rows(result.results).map(mapApplication),
+        ...pageOutput(result),
+        warnings: client.warnings
       },
-      message: `Found **${applications.length}** applications${result.moreDataAvailable ? ' (more available)' : ''}.`
+      message:
+        'Retrieved one application page. Follow pageInfo until moreDataAvailable is false.'
     };
   })
   .build();

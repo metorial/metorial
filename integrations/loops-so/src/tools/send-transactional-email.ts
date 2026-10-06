@@ -9,11 +9,14 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
   description: `Send a transactional email to a recipient using a pre-built template. Supports dynamic data variables for template personalization and optional file attachments. Can optionally add the recipient as a contact in your audience.`,
   instructions: [
     'Use the List Transactional Emails tool to discover available template IDs and their required data variables.',
-    'Data variables must match the variables defined in the template.'
+    'Data variables must match the variables defined in the template.',
+    'This sends a real email, including to unsubscribed contacts. A successful response confirms provider acceptance, not delivery.',
+    'Use a stable unique idempotencyKey for this logical send. Do not repeat an uncertain send automatically.'
   ],
   constraints: [
     'Attachments must be enabled on your Loops account.',
-    'Each attachment must be base64-encoded.'
+    'Each attachment must be base64-encoded.',
+    'The complete JSON request must be smaller than 4 MB, including encoded attachments.'
   ],
   tags: {
     destructive: false,
@@ -22,6 +25,12 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe(
+          "Optional unique request ID, at most 100 characters. Sent in Idempotency-Key; reuse is limited to the provider's 24-hour window."
+        ),
       email: z.string().describe('Recipient email address'),
       transactionalId: z.string().describe('ID of the transactional email template to send'),
       dataVariables: z
@@ -61,12 +70,13 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
       transactionalId: ctx.input.transactionalId,
       dataVariables: ctx.input.dataVariables,
       addToAudience: ctx.input.addToAudience,
-      attachments: ctx.input.attachments
+      attachments: ctx.input.attachments,
+      idempotencyKey: ctx.input.idempotencyKey
     });
 
     return {
       output: { success: result.success },
-      message: `Sent transactional email (template \`${ctx.input.transactionalId}\`) to **${ctx.input.email}**.`
+      message: 'Loops accepted the transactional email request. Delivery is not yet confirmed.'
     };
   })
   .build();

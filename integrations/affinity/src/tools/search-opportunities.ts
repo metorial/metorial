@@ -14,7 +14,7 @@ let opportunitySchema = z.object({
 export let searchOpportunities = SlateTool.create(spec, {
   name: 'Search Opportunities',
   key: 'search_opportunities',
-  description: `Search for opportunity (deal) records in Affinity. Filter by name or list. Returns matching opportunities with their associations.`,
+  description: `Search for opportunity records by name. Optional listId filters each provider page locally. Continue with nextPageToken even if a filtered page is empty. Returns matching opportunities with their associations.`,
   tags: {
     readOnly: true
   }
@@ -46,7 +46,7 @@ export let searchOpportunities = SlateTool.create(spec, {
       pageToken: ctx.input.pageToken
     });
 
-    let opportunities = (result.opportunities ?? result ?? []).map((o: any) => ({
+    let opportunities = (result.opportunities ?? result ?? []).map(o => ({
       opportunityId: o.id,
       name: o.name ?? null,
       listId: o.list_id,

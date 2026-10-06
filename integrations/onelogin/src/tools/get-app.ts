@@ -29,18 +29,22 @@ export let getApp = SlateTool.create(spec, {
       visible: z.boolean().nullable().optional().describe('Portal visibility'),
       roleIds: z.array(z.number()).nullable().optional().describe('Associated role IDs'),
       provisioning: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .nullable()
         .optional()
         .describe('Provisioning settings'),
-      sso: z.record(z.string(), z.any()).nullable().optional().describe('SSO configuration'),
+      sso: z
+        .record(z.string(), z.unknown())
+        .nullable()
+        .optional()
+        .describe('SSO configuration'),
       configuration: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .nullable()
         .optional()
         .describe('App-specific configuration'),
       parameters: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .nullable()
         .optional()
         .describe('Custom parameter mappings'),
@@ -49,10 +53,7 @@ export let getApp = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
     let a = await client.getApp(ctx.input.appId);
 

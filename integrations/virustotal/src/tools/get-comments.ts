@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 let resourceTypeMap: Record<string, string> = {
@@ -14,6 +15,9 @@ export let getComments = SlateTool.create(spec, {
   name: 'Get Comments',
   key: 'get_comments',
   description: `Retrieve community comments for a VirusTotal resource (file, URL, domain, or IP address). Comments include analysis notes, threat intelligence, and other context contributed by community members.`,
+  constraints: [
+    'Use non-sensitive public indicators; submitted or queried indicators may be scanned and included in the community dataset.'
+  ],
   tags: {
     readOnly: true
   }
@@ -55,7 +59,8 @@ export let getComments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    let client = new Client(ctx.auth);
     let apiType = resourceTypeMap[ctx.input.resourceType] ?? ctx.input.resourceType;
     let result = await client.getComments(
       apiType,
@@ -64,8 +69,8 @@ export let getComments = SlateTool.create(spec, {
       ctx.input.cursor
     );
 
-    let comments = (result?.data ?? []).map((c: any) => ({
-      commentId: c.id ?? '',
+    let comments = (result?.data ?? []).map(c => ({
+      commentId: c.id,
       text: c.attributes?.text,
       date: c.attributes?.date?.toString(),
       votes: c.attributes?.votes
@@ -80,7 +85,7 @@ export let getComments = SlateTool.create(spec, {
     return {
       output: {
         comments,
-        nextCursor: result?.links?.next ? result.meta?.cursor : undefined
+        nextCursor: result.meta?.cursor
       },
       message: `Found **${comments.length}** comments on ${ctx.input.resourceType} \`${ctx.input.resourceId}\`.`
     };

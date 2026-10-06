@@ -1,6 +1,6 @@
 {
   "name": "@atlassian/confluence",
-  "description": "Create, read, update, and delete pages, blog posts, comments, and attachments in Confluence spaces. Manage spaces, permissions, labels, and content restrictions. Search content using Confluence Query Language (CQL). Upload and download file attachments with versioning. Manage users, groups, and group memberships. Create and manage whiteboards, databases, folders, and templates. View and update inline tasks. Access audit logs. Listen for webhooks on page, blog, comment, attachment, space, label, and user events.",
+  "description": "Create, read, update, and delete pages, blog posts, comments, and attachments in Confluence spaces. Manage spaces, permissions, labels, and content restrictions. Search content using Confluence Query Language (CQL). Upload and download file attachments with versioning. Manage users, groups, and group memberships. Create and manage whiteboards, databases, folders, and templates. View and update inline tasks. Access audit logs.",
   "categories": [
     "document-processing",
     "email-and-messaging",

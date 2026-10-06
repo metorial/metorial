@@ -1,23 +1,29 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { workspaceClient } from '../lib/client';
+import { workspaceId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getDatasetRecord = SlateTool.create(spec, {
   name: 'Get Dataset Record',
   key: 'get_dataset_record',
-  description: `Retrieves a single record from a Census dataset by its primary key. Datasets make warehouse data accessible via API. Can also list all available datasets when no datasetId is provided.`,
-  constraints: ['Available only on the Census Enterprise Plan.'],
+  description: `Retrieves a single record from a Census dataset by its primary key. Datasets make warehouse data accessible via API. Can also list the available legacy datasets returned by the provider when no datasetId is provided.`,
+  constraints: [
+    'Legacy record-access routes are absent from the current public API reference. Availability must be confirmed for your workspace; list_datasets returns current SQL metadata and does not replace record lookup.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      workspaceId,
       datasetId: z
         .number()
         .optional()
-        .describe('ID of the dataset to query. Omit to list all available datasets.'),
+        .describe(
+          'ID of the dataset to query. Omit to list the available legacy datasets returned by the provider.'
+        ),
       recordId: z
         .string()
         .optional()
@@ -32,8 +38,8 @@ export let getDatasetRecord = SlateTool.create(spec, {
         .array(
           z.object({
             datasetId: z.number().describe('Dataset ID.'),
-            name: z.string().describe('Dataset name.'),
-            libraryId: z.number().describe('Library ID the dataset belongs to.')
+            name: z.string().optional().describe('Dataset name.'),
+            libraryId: z.number().optional().describe('Library ID the dataset belongs to.')
           })
         )
         .optional()
@@ -45,12 +51,11 @@ export let getDatasetRecord = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = await workspaceClient(ctx);
 
-    if (!ctx.input.datasetId) {
+    if (ctx.input.datasetId === undefined) {
+      if (ctx.input.recordId !== undefined)
+        throw createApiServiceError('datasetId is required with recordId.');
       let datasets = await client.listDatasets();
       let mapped = datasets.map(d => ({
         datasetId: d.id,
@@ -64,7 +69,7 @@ export let getDatasetRecord = SlateTool.create(spec, {
     }
 
     if (!ctx.input.recordId) {
-      throw new Error('recordId is required when datasetId is provided.');
+      throw createApiServiceError('recordId is required when datasetId is provided.');
     }
 
     let record = await client.getDatasetRecord(ctx.input.datasetId, ctx.input.recordId);

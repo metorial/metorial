@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CloudAgentsClient } from '../lib/client';
+import { CurrentAgentsClient } from '../lib/current-client';
 import { spec } from '../spec';
 
 export let getApiKeyInfo = SlateTool.create(spec, {
@@ -15,21 +15,23 @@ export let getApiKeyInfo = SlateTool.create(spec, {
   .output(
     z.object({
       apiKeyName: z.string().describe('Name of the API key'),
-      userEmail: z.string().describe('Email associated with the API key'),
+      userEmail: z.string().optional().describe('Owner email, when the key is user-scoped'),
+      userId: z.number().optional().describe('Numeric owner ID, when the key is user-scoped'),
       createdAt: z.string().describe('ISO 8601 timestamp of when the key was created')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CloudAgentsClient({ token: ctx.auth.token });
+    let client = new CurrentAgentsClient({ token: ctx.auth.token });
     let result = await client.getApiKeyInfo();
 
     return {
       output: {
         apiKeyName: result.apiKeyName,
         userEmail: result.userEmail,
+        userId: result.userId,
         createdAt: result.createdAt
       },
-      message: `API key **${result.apiKeyName}** belongs to \`${result.userEmail}\`.`
+      message: `API key **${result.apiKeyName}**${result.userEmail ? ` belongs to ${result.userEmail}` : ' is not tied to an individual user'}.`
     };
   })
   .build();

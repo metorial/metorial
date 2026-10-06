@@ -15,7 +15,9 @@ The scheduled time must be in **UTC ISO-8601 format** (e.g. \`2025-03-01T14:00:0
   ],
   constraints: [
     'Scheduled time must be in UTC ISO-8601 format; other timezones are rejected.',
-    'Tags require the social profile to belong to an organization.'
+    'Tags require the social profile to belong to an organization.',
+    'Hootsuite can accept some profiles and reject others in one request. Inspect returned message IDs and failures before retrying to avoid duplicate posts.',
+    'Scheduling can publish publicly or send notifications; use only profiles and notification destinations you are authorized to affect.'
   ],
   tags: {
     destructive: false,
@@ -32,7 +34,7 @@ The scheduled time must be in **UTC ISO-8601 format** (e.g. \`2025-03-01T14:00:0
       mediaUrls: z
         .array(
           z.object({
-            url: z.string().describe('Public URL of the media file')
+            url: z.string().describe('Existing ow.ly media URL supported by Hootsuite')
           })
         )
         .optional()
@@ -66,12 +68,37 @@ The scheduled time must be in **UTC ISO-8601 format** (e.g. \`2025-03-01T14:00:0
           z.object({
             messageId: z.string().describe('Hootsuite message ID'),
             state: z.string().describe('Message state (e.g. SCHEDULED)'),
-            socialProfileId: z.string().describe('Social profile this message targets'),
-            scheduledSendTime: z.string().describe('Scheduled send time'),
+            socialProfileId: z
+              .string()
+              .optional()
+              .describe('Target social profile ID when reported'),
+            scheduledSendTime: z
+              .string()
+              .describe(
+                'Provider-reported scheduled send time, or the requested time if omitted'
+              ),
             text: z.string().optional().describe('Message text')
           })
         )
-        .describe('Created messages, one per social profile')
+        .describe('Accepted message receipts; failed profiles do not have a created message'),
+      failures: z
+        .array(
+          z.object({
+            code: z.number().optional().describe('Provider error code'),
+            socialProfileId: z
+              .string()
+              .optional()
+              .describe('Rejected social profile ID when reported')
+          })
+        )
+        .optional()
+        .describe('Provider-reported failures; messages may still have been created'),
+      complete: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether there are no reported failures and a receipt for each requested profile'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -91,17 +118,30 @@ The scheduled time must be in **UTC ISO-8601 format** (e.g. \`2025-03-01T14:00:0
       webhookUrls: ctx.input.webhookUrls
     });
 
-    let messages = (results || []).map((msg: any) => ({
-      messageId: String(msg.id),
-      state: msg.state || 'SCHEDULED',
-      socialProfileId: String(msg.socialProfile?.id || ''),
+    let messages = results.messages.map(msg => ({
+      messageId: msg.id,
+      state: msg.state,
+      socialProfileId: msg.socialProfile?.id,
       scheduledSendTime: msg.scheduledSendTime || ctx.input.scheduledSendTime,
       text: msg.text
     }));
 
     return {
-      output: { messages },
-      message: `Scheduled ${messages.length} message(s) for **${ctx.input.scheduledSendTime}** across ${ctx.input.socialProfileIds.length} social profile(s).`
+      output: {
+        messages,
+        failures: results.errors,
+        complete:
+          !results.errors.length &&
+          messages.length === ctx.input.socialProfileIds.length &&
+          new Set(messages.map(message => message.messageId)).size === messages.length &&
+          new Set(messages.map(message => message.socialProfileId)).size === messages.length &&
+          messages.every(
+            message =>
+              message.socialProfileId !== undefined &&
+              ctx.input.socialProfileIds.includes(message.socialProfileId)
+          )
+      },
+      message: `Hootsuite returned **${messages.length}** accepted message receipt(s) and **${results.errors.length}** failure(s). Inspect these receipts before retrying or changing scheduled posts.`
     };
   })
   .build();

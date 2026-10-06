@@ -1,3 +1,4 @@
+export * from './get-current-user';
 export * from './get-sequence';
 export * from './get-statistics';
 export * from './get-team-performance';

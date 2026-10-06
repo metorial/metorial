@@ -30,7 +30,7 @@ export let getAccount = SlateTool.create(spec, {
   key: 'get_account',
   description: `Retrieve your RocketReach account details including credit usage and rate limits. Shows how many lookup and export credits you have remaining.
 
-Useful for monitoring API usage and ensuring you have sufficient credits before performing bulk operations.`,
+Check the credit information actually returned by your plan before enrichment; omitted usage fields remain unknown.`,
   tags: {
     readOnly: true
   }
@@ -50,7 +50,18 @@ Useful for monitoring API usage and ensuring you have sufficient credits before 
         .array(creditUsageSchema)
         .optional()
         .describe('Credit allocation and usage details'),
-      rateLimits: z.array(rateLimitSchema).optional().describe('Current rate limit status')
+      rateLimits: z.array(rateLimitSchema).optional().describe('Current rate limit status'),
+      lookupCreditBalance: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Legacy lookup balance when returned by the account endpoint'),
+      lifetimeCreditsSpent: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Legacy lifetime lookup consumption when returned'),
+      planName: z.string().nullable().optional().describe('Plan name when returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -58,14 +69,14 @@ Useful for monitoring API usage and ensuring you have sufficient credits before 
 
     let result = await client.getAccount();
 
-    let creditUsage = (result.credit_usage || []).map((c: any) => ({
+    let creditUsage = (result.credit_usage || []).map(c => ({
       creditType: c.credit_type,
       allocated: c.allocated,
       used: c.used,
       remaining: c.remaining
     }));
 
-    let rateLimits = (result.rate_limits || []).map((r: any) => ({
+    let rateLimits = (result.rate_limits || []).map(r => ({
       action: r.action,
       duration: r.duration,
       limit: r.limit,
@@ -80,16 +91,19 @@ Useful for monitoring API usage and ensuring you have sufficient credits before 
       email: result.email,
       accountState: result.state,
       creditUsage,
-      rateLimits
+      rateLimits,
+      lookupCreditBalance: result.lookup_credit_balance,
+      lifetimeCreditsSpent: result.lifetime_credits_spent,
+      planName: result.plan?.name
     };
 
     let creditSummary = creditUsage
-      .map((c: any) => `${c.creditType}: ${c.remaining}/${c.allocated} remaining`)
+      .map(c => `${c.creditType}: ${c.remaining}/${c.allocated} remaining`)
       .join(', ');
 
     return {
       output,
-      message: `Account: **${[result.first_name, result.last_name].filter(Boolean).join(' ') || result.email || 'Unknown'}**. Credits: ${creditSummary || 'N/A'}.`
+      message: `Account: **${[result.first_name, result.last_name].filter(Boolean).join(' ') || result.email || 'Unknown'}**. Credits: ${creditSummary || (result.lookup_credit_balance === undefined ? 'Not returned by provider' : `${result.lookup_credit_balance} lookup credits`)}.`
     };
   })
   .build();

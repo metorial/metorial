@@ -1,10 +1,11 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { AdminClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string().describe('Botpress Personal Access Token (PAT) or Bot Access Key')
+      token: z.string().describe('Botpress Personal Access Token (PAT)')
     })
   )
   .addTokenAuth({
@@ -15,6 +16,8 @@ export let auth = SlateAuth.create()
       token: z.string().describe('Personal Access Token from Botpress Profile Settings')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('A Botpress Personal Access Token is required.');
       return {
         output: {
           token: ctx.input.token
@@ -22,22 +25,14 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.botpress.cloud'
-      });
-
-      let response = await http.get('/v1/admin/account', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let account = response.data.account;
+      let { account } = await new AdminClient({ token: ctx.output.token }).getAccount();
+      if (!account?.id)
+        throw createApiServiceError('Botpress did not return the authenticated account.');
       return {
         profile: {
           id: account?.id,
           email: account?.email,
-          name: account?.name
+          name: account?.displayName
         }
       };
     }

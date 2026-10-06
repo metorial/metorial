@@ -1,0 +1,1081 @@
+{
+  "list_surveys": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Maximum number of surveys to return",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Number of surveys to skip for pagination",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "surveyId": {
+                "type": "string",
+                "description": "Unique survey identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Survey name"
+              },
+              "status": {
+                "type": "string",
+                "description": "Survey status (draft, inProgress, paused, completed)"
+              },
+              "type": {
+                "type": "string",
+                "description": "Survey type (link or app)"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last update timestamp"
+              }
+            },
+            "required": ["surveyId", "name", "status", "type", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["surveys"],
+      "additionalProperties": false
+    }
+  },
+  "get_survey": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "ID of the survey to retrieve"
+        }
+      },
+      "required": ["surveyId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "Unique survey identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Survey name"
+        },
+        "status": {
+          "type": "string",
+          "description": "Survey status"
+        },
+        "type": {
+          "type": "string",
+          "description": "Survey type (link or app)"
+        },
+        "environmentId": {
+          "type": "string",
+          "description": "Environment the survey belongs to"
+        },
+        "questions": {
+          "type": "array",
+          "items": {},
+          "description": "Array of survey questions with their configuration"
+        },
+        "endings": {
+          "description": "End screen configurations",
+          "type": "array",
+          "items": {}
+        },
+        "welcomeCard": {
+          "description": "Welcome card configuration"
+        },
+        "hiddenFields": {
+          "description": "Hidden fields configuration"
+        },
+        "displayOption": {
+          "description": "Display option setting",
+          "type": "string"
+        },
+        "languages": {
+          "description": "Language configurations",
+          "type": "array",
+          "items": {}
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": [
+        "surveyId",
+        "name",
+        "status",
+        "type",
+        "environmentId",
+        "questions",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "create_survey": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "environmentId": {
+          "type": "string",
+          "description": "ID of the environment to create the survey in"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the survey"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["link", "app"],
+          "description": "Survey type: \"link\" for shareable link surveys, \"app\" for in-app surveys"
+        },
+        "status": {
+          "default": "draft",
+          "description": "Initial survey status",
+          "type": "string",
+          "enum": ["draft", "inProgress", "paused", "completed"]
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Question type: openText, multipleChoiceSingle, multipleChoiceMulti, rating, nps, date, matrix, consent, fileUpload, ranking, address, cta, contactInfo, pictureSelection"
+              },
+              "headline": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Question headline text, keyed by language code, e.g. { \"default\": \"How are you?\" }"
+              },
+              "id": {
+                "description": "Question ID (auto-generated if omitted)",
+                "type": "string"
+              },
+              "required": {
+                "description": "Whether the question is required",
+                "type": "boolean"
+              },
+              "subheader": {
+                "description": "Subheader text, keyed by language code",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "inputType": {
+                "description": "Input type for openText questions (text, email, url, number, phone)",
+                "type": "string"
+              },
+              "placeholder": {
+                "description": "Placeholder text, keyed by language code",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "choices": {
+                "description": "Choices for multiple choice questions",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Choice label, keyed by language code"
+                    }
+                  },
+                  "required": ["label"],
+                  "additionalProperties": false
+                }
+              },
+              "range": {
+                "description": "Range for rating questions (3, 5, 7, 10)",
+                "type": "number"
+              },
+              "scale": {
+                "description": "Scale type for rating (number, star, smiley)",
+                "type": "string"
+              },
+              "lowerLabel": {
+                "description": "Lower label for NPS/rating",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "upperLabel": {
+                "description": "Upper label for NPS/rating",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["type", "headline"],
+            "additionalProperties": {}
+          },
+          "description": "Array of survey questions"
+        },
+        "displayOption": {
+          "description": "How often the survey should be displayed",
+          "type": "string",
+          "enum": ["displayOnce", "displayMultiple", "respondMultiple", "displaySome"]
+        },
+        "autoClose": {
+          "description": "Auto-close the survey after this many seconds",
+          "type": "number"
+        },
+        "autoComplete": {
+          "description": "Number of responses after which to auto-complete",
+          "type": "number"
+        },
+        "delay": {
+          "description": "Delay in seconds before showing the survey",
+          "type": "number"
+        },
+        "endings": {
+          "description": "End screen configurations",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "default": "endScreen",
+                "type": "string"
+              },
+              "headline": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "subheader": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "buttonLabel": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "buttonLink": {
+                "type": "string"
+              }
+            },
+            "required": ["type"],
+            "additionalProperties": {}
+          }
+        },
+        "welcomeCard": {
+          "description": "Welcome card configuration",
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "headline": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "html": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "buttonLabel": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["enabled"],
+          "additionalProperties": {}
+        },
+        "hiddenFields": {
+          "description": "Hidden fields configuration",
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "fieldIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["environmentId", "name", "type", "status", "questions"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "ID of the created survey"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the created survey"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the created survey"
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of the created survey"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["surveyId", "name", "status", "type", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "update_survey": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "ID of the survey to update"
+        },
+        "name": {
+          "description": "Updated survey name",
+          "type": "string"
+        },
+        "status": {
+          "description": "Updated survey status",
+          "type": "string",
+          "enum": ["draft", "inProgress", "paused", "completed"]
+        },
+        "questions": {
+          "description": "Updated array of survey questions",
+          "type": "array",
+          "items": {}
+        },
+        "displayOption": {
+          "description": "Updated display option",
+          "type": "string",
+          "enum": ["displayOnce", "displayMultiple", "respondMultiple", "displaySome"]
+        },
+        "autoClose": {
+          "description": "Auto-close after this many seconds",
+          "type": "number"
+        },
+        "autoComplete": {
+          "description": "Auto-complete after this many responses",
+          "type": "number"
+        },
+        "delay": {
+          "description": "Display delay in seconds",
+          "type": "number"
+        },
+        "endings": {
+          "description": "Updated end screen configurations",
+          "type": "array",
+          "items": {}
+        },
+        "welcomeCard": {
+          "description": "Updated welcome card configuration"
+        },
+        "hiddenFields": {
+          "description": "Updated hidden fields configuration"
+        },
+        "redirectUrl": {
+          "description": "Redirect URL after survey completion",
+          "type": "string"
+        }
+      },
+      "required": ["surveyId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "ID of the updated survey"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the updated survey"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the updated survey"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["surveyId", "name", "status", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "delete_survey": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "ID of the survey to delete"
+        }
+      },
+      "required": ["surveyId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "ID of the deleted survey"
+        }
+      },
+      "required": ["surveyId"],
+      "additionalProperties": false
+    }
+  },
+  "list_responses": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "ID of the survey to list responses for"
+        },
+        "limit": {
+          "description": "Maximum number of responses to return",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Number of responses to skip for pagination",
+          "type": "number"
+        }
+      },
+      "required": ["surveyId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "responses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "responseId": {
+                "type": "string",
+                "description": "Unique response identifier"
+              },
+              "surveyId": {
+                "type": "string",
+                "description": "Associated survey ID"
+              },
+              "finished": {
+                "type": "boolean",
+                "description": "Whether the response is complete"
+              },
+              "answers": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "Response answers keyed by question ID"
+              },
+              "meta": {
+                "description": "Response metadata (user agent, country, etc.)"
+              },
+              "contactAttributes": {
+                "description": "Contact attributes of the respondent"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Response creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Response last update timestamp"
+              }
+            },
+            "required": [
+              "responseId",
+              "surveyId",
+              "finished",
+              "answers",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["responses"],
+      "additionalProperties": false
+    }
+  },
+  "create_response": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "ID of the survey to create a response for"
+        },
+        "answers": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Response answers keyed by question ID"
+        },
+        "finished": {
+          "default": true,
+          "description": "Whether the response is complete",
+          "type": "boolean"
+        },
+        "meta": {
+          "description": "Optional metadata for the response",
+          "type": "object",
+          "properties": {
+            "userAgent": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["surveyId", "answers", "finished"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "responseId": {
+          "type": "string",
+          "description": "ID of the created response"
+        },
+        "surveyId": {
+          "type": "string",
+          "description": "Associated survey ID"
+        },
+        "finished": {
+          "type": "boolean",
+          "description": "Whether the response is complete"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["responseId", "surveyId", "finished", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "update_response": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "responseId": {
+          "type": "string",
+          "description": "ID of the response to update"
+        },
+        "answers": {
+          "description": "Updated response answers keyed by question ID",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "finished": {
+          "description": "Set to true to mark the response as complete",
+          "type": "boolean"
+        }
+      },
+      "required": ["responseId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "responseId": {
+          "type": "string",
+          "description": "ID of the updated response"
+        },
+        "finished": {
+          "type": "boolean",
+          "description": "Whether the response is complete"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["responseId", "finished", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "delete_response": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "responseId": {
+          "type": "string",
+          "description": "ID of the response to delete"
+        }
+      },
+      "required": ["responseId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "responseId": {
+          "type": "string",
+          "description": "ID of the deleted response"
+        }
+      },
+      "required": ["responseId"],
+      "additionalProperties": false
+    }
+  },
+  "get_account_info": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "description": "Project ID",
+          "type": "string"
+        },
+        "projectName": {
+          "description": "Project name",
+          "type": "string"
+        },
+        "environmentType": {
+          "description": "Environment type (production or development)",
+          "type": "string"
+        },
+        "environmentId": {
+          "description": "Environment ID",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_contacts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Maximum number of contacts to return",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Number of contacts to skip for pagination",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string",
+                "description": "Unique contact identifier"
+              },
+              "attributes": {
+                "description": "Contact attributes",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "createdAt": {
+                "description": "Contact creation timestamp",
+                "type": "string"
+              },
+              "updatedAt": {
+                "description": "Contact last update timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["contactId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["contacts"],
+      "additionalProperties": false
+    }
+  },
+  "list_action_classes": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "actionClasses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "actionClassId": {
+                "type": "string",
+                "description": "Unique action class identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Action class name"
+              },
+              "type": {
+                "description": "Action class type",
+                "type": "string"
+              },
+              "description": {
+                "description": "Action class description",
+                "type": "string"
+              },
+              "environmentId": {
+                "description": "Environment ID",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["actionClassId", "name"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["actionClasses"],
+      "additionalProperties": false
+    }
+  },
+  "create_action_class": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "environmentId": {
+          "type": "string",
+          "description": "ID of the environment to create the action class in"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the action class"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["code", "noCode", "automatic"],
+          "description": "Type of action: \"code\" for custom events, \"noCode\" for UI-tracked actions, \"automatic\" for built-in actions"
+        },
+        "description": {
+          "description": "Description of the action class",
+          "type": "string"
+        }
+      },
+      "required": ["environmentId", "name", "type"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "actionClassId": {
+          "type": "string",
+          "description": "ID of the created action class"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the created action class"
+        }
+      },
+      "required": ["actionClassId", "name"],
+      "additionalProperties": false
+    }
+  },
+  "delete_action_class": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "actionClassId": {
+          "type": "string",
+          "description": "ID of the action class to delete"
+        }
+      },
+      "required": ["actionClassId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "actionClassId": {
+          "type": "string",
+          "description": "ID of the deleted action class"
+        }
+      },
+      "required": ["actionClassId"],
+      "additionalProperties": false
+    }
+  },
+  "list_attribute_classes": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "attributeClasses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "attributeClassId": {
+                "type": "string",
+                "description": "Unique attribute class identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Attribute class name"
+              },
+              "type": {
+                "description": "Attribute class type",
+                "type": "string"
+              },
+              "description": {
+                "description": "Attribute class description",
+                "type": "string"
+              },
+              "environmentId": {
+                "description": "Environment ID",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["attributeClassId", "name"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["attributeClasses"],
+      "additionalProperties": false
+    }
+  },
+  "create_attribute_class": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "environmentId": {
+          "type": "string",
+          "description": "ID of the environment to create the attribute class in"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the attribute class"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["code", "noCode", "automatic"],
+          "description": "Type of attribute class"
+        },
+        "description": {
+          "description": "Description of the attribute class",
+          "type": "string"
+        }
+      },
+      "required": ["environmentId", "name", "type"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "attributeClassId": {
+          "type": "string",
+          "description": "ID of the created attribute class"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the created attribute class"
+        }
+      },
+      "required": ["attributeClassId", "name"],
+      "additionalProperties": false
+    }
+  },
+  "delete_attribute_class": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "attributeClassId": {
+          "type": "string",
+          "description": "ID of the attribute class to delete"
+        }
+      },
+      "required": ["attributeClassId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "attributeClassId": {
+          "type": "string",
+          "description": "ID of the deleted attribute class"
+        }
+      },
+      "required": ["attributeClassId"],
+      "additionalProperties": false
+    }
+  }
+}

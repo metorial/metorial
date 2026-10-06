@@ -1,0 +1,2793 @@
+[
+  {
+    "service": "flex",
+    "path": "/v1/Configuration",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "UiVersion": {
+        "type": "string"
+      }
+    },
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "date_created",
+      "date_updated",
+      "attributes",
+      "status",
+      "taskrouter_workspace_sid",
+      "taskrouter_target_workflow_sid",
+      "taskrouter_target_taskqueue_sid",
+      "taskrouter_taskqueues",
+      "taskrouter_skills",
+      "taskrouter_worker_channels",
+      "taskrouter_worker_attributes",
+      "taskrouter_offline_activity_sid",
+      "runtime_domain",
+      "messaging_service_instance_sid",
+      "chat_service_instance_sid",
+      "flex_service_instance_sid",
+      "flex_instance_sid",
+      "ui_language",
+      "ui_attributes",
+      "ui_dependencies",
+      "ui_version",
+      "service_version",
+      "call_recording_enabled",
+      "call_recording_webhook_url",
+      "crm_enabled",
+      "crm_type",
+      "crm_callback_url",
+      "crm_fallback_url",
+      "crm_attributes",
+      "public_attributes",
+      "plugin_service_enabled",
+      "plugin_service_attributes",
+      "integrations",
+      "outbound_call_flows",
+      "serverless_service_sids",
+      "queue_stats_configuration",
+      "notifications",
+      "markdown",
+      "url",
+      "flex_insights_hr",
+      "flex_insights_drilldown",
+      "flex_url",
+      "channel_configs",
+      "debugger_integration",
+      "flex_ui_status_report",
+      "agent_conv_end_methods",
+      "citrix_voice_vdi",
+      "offline_config"
+    ],
+    "rowSidPattern": null
+  },
+  {
+    "service": "flex",
+    "path": "/v1/Configuration",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "date_created",
+      "date_updated",
+      "attributes",
+      "status",
+      "taskrouter_workspace_sid",
+      "taskrouter_target_workflow_sid",
+      "taskrouter_target_taskqueue_sid",
+      "taskrouter_taskqueues",
+      "taskrouter_skills",
+      "taskrouter_worker_channels",
+      "taskrouter_worker_attributes",
+      "taskrouter_offline_activity_sid",
+      "runtime_domain",
+      "messaging_service_instance_sid",
+      "chat_service_instance_sid",
+      "flex_service_instance_sid",
+      "flex_instance_sid",
+      "ui_language",
+      "ui_attributes",
+      "ui_dependencies",
+      "ui_version",
+      "service_version",
+      "call_recording_enabled",
+      "call_recording_webhook_url",
+      "crm_enabled",
+      "crm_type",
+      "crm_callback_url",
+      "crm_fallback_url",
+      "crm_attributes",
+      "public_attributes",
+      "plugin_service_enabled",
+      "plugin_service_attributes",
+      "integrations",
+      "outbound_call_flows",
+      "serverless_service_sids",
+      "queue_stats_configuration",
+      "notifications",
+      "markdown",
+      "url",
+      "flex_insights_hr",
+      "flex_insights_drilldown",
+      "flex_url",
+      "channel_configs",
+      "debugger_integration",
+      "flex_ui_status_report",
+      "agent_conv_end_methods",
+      "citrix_voice_vdi",
+      "offline_config"
+    ],
+    "rowSidPattern": null
+  },
+  {
+    "service": "flex",
+    "path": "/v1/FlexFlows",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "flex_flows",
+    "rowFields": [
+      "account_sid",
+      "date_created",
+      "date_updated",
+      "sid",
+      "friendly_name",
+      "chat_service_sid",
+      "channel_type",
+      "contact_identity",
+      "enabled",
+      "integration_type",
+      "integration",
+      "long_lived",
+      "janitor_enabled",
+      "url"
+    ],
+    "rowSidPattern": "^FO[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/FlexFlows",
+    "method": "post",
+    "status": [201],
+    "required": ["FriendlyName", "ChatServiceSid", "ChannelType"],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "ChatServiceSid": {
+        "type": "string",
+        "pattern": "^IS[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "ChannelType": {
+        "type": "string",
+        "enum": ["web", "sms", "facebook", "whatsapp", "line", "custom"]
+      },
+      "ContactIdentity": {
+        "type": "string"
+      },
+      "Enabled": {
+        "type": "boolean"
+      },
+      "IntegrationType": {
+        "type": "string",
+        "enum": ["studio", "external", "task"]
+      },
+      "Integration.FlowSid": {
+        "type": "string",
+        "pattern": "^FW[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Integration.Url": {
+        "type": "string"
+      },
+      "Integration.WorkspaceSid": {
+        "type": "string",
+        "pattern": "^WS[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Integration.WorkflowSid": {
+        "type": "string",
+        "pattern": "^WW[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Integration.Channel": {
+        "type": "string"
+      },
+      "Integration.Timeout": {
+        "type": "integer"
+      },
+      "Integration.Priority": {
+        "type": "integer"
+      },
+      "Integration.CreationOnMessage": {
+        "type": "boolean"
+      },
+      "LongLived": {
+        "type": "boolean"
+      },
+      "JanitorEnabled": {
+        "type": "boolean"
+      },
+      "Integration.RetryCount": {
+        "type": "integer"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "date_created",
+      "date_updated",
+      "sid",
+      "friendly_name",
+      "chat_service_sid",
+      "channel_type",
+      "contact_identity",
+      "enabled",
+      "integration_type",
+      "integration",
+      "long_lived",
+      "janitor_enabled",
+      "url"
+    ],
+    "rowSidPattern": "^FO[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/FlexFlows/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "date_created",
+      "date_updated",
+      "sid",
+      "friendly_name",
+      "chat_service_sid",
+      "channel_type",
+      "contact_identity",
+      "enabled",
+      "integration_type",
+      "integration",
+      "long_lived",
+      "janitor_enabled",
+      "url"
+    ],
+    "rowSidPattern": "^FO[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/FlexFlows/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "ChatServiceSid": {
+        "type": "string",
+        "pattern": "^IS[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "ChannelType": {
+        "type": "string",
+        "enum": ["web", "sms", "facebook", "whatsapp", "line", "custom"]
+      },
+      "ContactIdentity": {
+        "type": "string"
+      },
+      "Enabled": {
+        "type": "boolean"
+      },
+      "IntegrationType": {
+        "type": "string",
+        "enum": ["studio", "external", "task"]
+      },
+      "Integration.FlowSid": {
+        "type": "string",
+        "pattern": "^FW[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Integration.Url": {
+        "type": "string"
+      },
+      "Integration.WorkspaceSid": {
+        "type": "string",
+        "pattern": "^WS[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Integration.WorkflowSid": {
+        "type": "string",
+        "pattern": "^WW[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Integration.Channel": {
+        "type": "string"
+      },
+      "Integration.Timeout": {
+        "type": "integer"
+      },
+      "Integration.Priority": {
+        "type": "integer"
+      },
+      "Integration.CreationOnMessage": {
+        "type": "boolean"
+      },
+      "LongLived": {
+        "type": "boolean"
+      },
+      "JanitorEnabled": {
+        "type": "boolean"
+      },
+      "Integration.RetryCount": {
+        "type": "integer"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "date_created",
+      "date_updated",
+      "sid",
+      "friendly_name",
+      "chat_service_sid",
+      "channel_type",
+      "contact_identity",
+      "enabled",
+      "integration_type",
+      "integration",
+      "long_lived",
+      "janitor_enabled",
+      "url"
+    ],
+    "rowSidPattern": "^FO[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/FlexFlows/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  },
+  {
+    "service": "flex",
+    "path": "/v1/Interactions/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "channel",
+      "routing",
+      "url",
+      "links",
+      "interaction_context_sid",
+      "webhook_ttid"
+    ],
+    "rowSidPattern": "^KD[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/Interactions/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {
+      "WebhookTtid": {
+        "type": "string"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "channel",
+      "routing",
+      "url",
+      "links",
+      "interaction_context_sid",
+      "webhook_ttid"
+    ],
+    "rowSidPattern": "^KD[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/Interactions",
+    "method": "post",
+    "status": [200],
+    "required": ["Channel"],
+    "body": {
+      "Channel": {},
+      "Routing": {},
+      "InteractionContextSid": {
+        "type": "string",
+        "pattern": "^HQ[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "WebhookTtid": {
+        "type": "string"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "channel",
+      "routing",
+      "url",
+      "links",
+      "interaction_context_sid",
+      "webhook_ttid"
+    ],
+    "rowSidPattern": "^KD[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/Interactions/{InteractionSid}/Channels/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "interaction_sid",
+      "type",
+      "status",
+      "error_code",
+      "error_message",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^UO[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/Interactions/{InteractionSid}/Channels/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": ["Status"],
+    "body": {
+      "Status": {
+        "type": "string",
+        "enum": ["closed", "inactive"]
+      },
+      "Routing": {}
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "interaction_sid",
+      "type",
+      "status",
+      "error_code",
+      "error_message",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^UO[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/Interactions/{InteractionSid}/Channels",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "channels",
+    "rowFields": [
+      "sid",
+      "interaction_sid",
+      "type",
+      "status",
+      "error_code",
+      "error_message",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^UO[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/Interactions/{InteractionSid}/Channels/{ChannelSid}/Participants",
+    "method": "post",
+    "status": [200],
+    "required": ["Type", "MediaProperties"],
+    "body": {
+      "Type": {
+        "type": "string",
+        "enum": ["supervisor", "customer", "external", "agent", "unknown"]
+      },
+      "MediaProperties": {},
+      "RoutingProperties": {}
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "type",
+      "interaction_sid",
+      "channel_sid",
+      "url",
+      "routing_properties"
+    ],
+    "rowSidPattern": "^UT[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/Interactions/{InteractionSid}/Channels/{ChannelSid}/Participants",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "participants",
+    "rowFields": [
+      "sid",
+      "type",
+      "interaction_sid",
+      "channel_sid",
+      "url",
+      "routing_properties"
+    ],
+    "rowSidPattern": "^UT[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "flex",
+    "path": "/v1/Interactions/{InteractionSid}/Channels/{ChannelSid}/Participants/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": ["Status"],
+    "body": {
+      "Status": {
+        "type": "string",
+        "enum": ["closed", "wrapup"]
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "type",
+      "interaction_sid",
+      "channel_sid",
+      "url",
+      "routing_properties"
+    ],
+    "rowSidPattern": "^UT[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Activities/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "available",
+      "date_created",
+      "date_updated",
+      "friendly_name",
+      "sid",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WA[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Activities/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "available",
+      "date_created",
+      "date_updated",
+      "friendly_name",
+      "sid",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WA[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Activities/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Activities",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "Available": {
+        "type": "string"
+      },
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "activities",
+    "rowFields": [
+      "account_sid",
+      "available",
+      "date_created",
+      "date_updated",
+      "friendly_name",
+      "sid",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WA[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Activities",
+    "method": "post",
+    "status": [201],
+    "required": ["FriendlyName"],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "Available": {
+        "type": "boolean"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "available",
+      "date_created",
+      "date_updated",
+      "friendly_name",
+      "sid",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WA[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Tasks/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "age",
+      "assignment_status",
+      "attributes",
+      "addons",
+      "date_created",
+      "date_updated",
+      "task_queue_entered_date",
+      "priority",
+      "reason",
+      "sid",
+      "task_queue_sid",
+      "task_queue_friendly_name",
+      "task_channel_sid",
+      "task_channel_unique_name",
+      "timeout",
+      "workflow_sid",
+      "workflow_friendly_name",
+      "workspace_sid",
+      "url",
+      "links",
+      "virtual_start_time",
+      "ignore_capacity",
+      "routing_target"
+    ],
+    "rowSidPattern": "^WT[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Tasks/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {
+      "Attributes": {
+        "type": "string"
+      },
+      "AssignmentStatus": {
+        "type": "string",
+        "enum": ["pending", "reserved", "assigned", "canceled", "completed", "wrapping"]
+      },
+      "Reason": {
+        "type": "string"
+      },
+      "Priority": {
+        "type": "integer"
+      },
+      "TaskChannel": {
+        "type": "string"
+      },
+      "VirtualStartTime": {
+        "type": "string"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "age",
+      "assignment_status",
+      "attributes",
+      "addons",
+      "date_created",
+      "date_updated",
+      "task_queue_entered_date",
+      "priority",
+      "reason",
+      "sid",
+      "task_queue_sid",
+      "task_queue_friendly_name",
+      "task_channel_sid",
+      "task_channel_unique_name",
+      "timeout",
+      "workflow_sid",
+      "workflow_friendly_name",
+      "workspace_sid",
+      "url",
+      "links",
+      "virtual_start_time",
+      "ignore_capacity",
+      "routing_target"
+    ],
+    "rowSidPattern": "^WT[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Tasks/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Tasks",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "Priority": {
+        "type": "integer"
+      },
+      "AssignmentStatus": {
+        "type": "array"
+      },
+      "WorkflowSid": {
+        "type": "string",
+        "pattern": "^WW[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "WorkflowName": {
+        "type": "string"
+      },
+      "TaskQueueSid": {
+        "type": "string",
+        "pattern": "^WQ[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "TaskQueueName": {
+        "type": "string"
+      },
+      "EvaluateTaskAttributes": {
+        "type": "string"
+      },
+      "RoutingTarget": {
+        "type": "string"
+      },
+      "Ordering": {
+        "type": "string"
+      },
+      "HasAddons": {
+        "type": "boolean"
+      },
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "tasks",
+    "rowFields": [
+      "account_sid",
+      "age",
+      "assignment_status",
+      "attributes",
+      "addons",
+      "date_created",
+      "date_updated",
+      "task_queue_entered_date",
+      "priority",
+      "reason",
+      "sid",
+      "task_queue_sid",
+      "task_queue_friendly_name",
+      "task_channel_sid",
+      "task_channel_unique_name",
+      "timeout",
+      "workflow_sid",
+      "workflow_friendly_name",
+      "workspace_sid",
+      "url",
+      "links",
+      "virtual_start_time",
+      "ignore_capacity",
+      "routing_target"
+    ],
+    "rowSidPattern": "^WT[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Tasks",
+    "method": "post",
+    "status": [201],
+    "required": [],
+    "body": {
+      "Timeout": {
+        "type": "integer"
+      },
+      "Priority": {
+        "type": "integer"
+      },
+      "TaskChannel": {
+        "type": "string"
+      },
+      "WorkflowSid": {
+        "type": "string",
+        "pattern": "^WW[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Attributes": {
+        "type": "string"
+      },
+      "VirtualStartTime": {
+        "type": "string"
+      },
+      "RoutingTarget": {
+        "type": "string"
+      },
+      "IgnoreCapacity": {
+        "type": "string"
+      },
+      "TaskQueueSid": {
+        "type": "string",
+        "pattern": "^WQ[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "age",
+      "assignment_status",
+      "attributes",
+      "addons",
+      "date_created",
+      "date_updated",
+      "task_queue_entered_date",
+      "priority",
+      "reason",
+      "sid",
+      "task_queue_sid",
+      "task_queue_friendly_name",
+      "task_channel_sid",
+      "task_channel_unique_name",
+      "timeout",
+      "workflow_sid",
+      "workflow_friendly_name",
+      "workspace_sid",
+      "url",
+      "links",
+      "virtual_start_time",
+      "ignore_capacity",
+      "routing_target"
+    ],
+    "rowSidPattern": "^WT[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/TaskQueues/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "assignment_activity_sid",
+      "assignment_activity_name",
+      "date_created",
+      "date_updated",
+      "friendly_name",
+      "max_reserved_workers",
+      "reservation_activity_sid",
+      "reservation_activity_name",
+      "sid",
+      "target_workers",
+      "task_order",
+      "url",
+      "workspace_sid",
+      "links"
+    ],
+    "rowSidPattern": "^WQ[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/TaskQueues/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "TargetWorkers": {
+        "type": "string"
+      },
+      "ReservationActivitySid": {
+        "type": "string",
+        "pattern": "^WA[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "AssignmentActivitySid": {
+        "type": "string",
+        "pattern": "^WA[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "MaxReservedWorkers": {
+        "type": "integer"
+      },
+      "TaskOrder": {
+        "type": "string",
+        "enum": ["FIFO", "LIFO"]
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "assignment_activity_sid",
+      "assignment_activity_name",
+      "date_created",
+      "date_updated",
+      "friendly_name",
+      "max_reserved_workers",
+      "reservation_activity_sid",
+      "reservation_activity_name",
+      "sid",
+      "target_workers",
+      "task_order",
+      "url",
+      "workspace_sid",
+      "links"
+    ],
+    "rowSidPattern": "^WQ[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/TaskQueues/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/TaskQueues",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "EvaluateWorkerAttributes": {
+        "type": "string"
+      },
+      "WorkerSid": {
+        "type": "string",
+        "pattern": "^WK[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Ordering": {
+        "type": "string"
+      },
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "task_queues",
+    "rowFields": [
+      "account_sid",
+      "assignment_activity_sid",
+      "assignment_activity_name",
+      "date_created",
+      "date_updated",
+      "friendly_name",
+      "max_reserved_workers",
+      "reservation_activity_sid",
+      "reservation_activity_name",
+      "sid",
+      "target_workers",
+      "task_order",
+      "url",
+      "workspace_sid",
+      "links"
+    ],
+    "rowSidPattern": "^WQ[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/TaskQueues",
+    "method": "post",
+    "status": [201],
+    "required": ["FriendlyName"],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "TargetWorkers": {
+        "type": "string"
+      },
+      "MaxReservedWorkers": {
+        "type": "integer"
+      },
+      "TaskOrder": {
+        "type": "string",
+        "enum": ["FIFO", "LIFO"]
+      },
+      "ReservationActivitySid": {
+        "type": "string",
+        "pattern": "^WA[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "AssignmentActivitySid": {
+        "type": "string",
+        "pattern": "^WA[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "assignment_activity_sid",
+      "assignment_activity_name",
+      "date_created",
+      "date_updated",
+      "friendly_name",
+      "max_reserved_workers",
+      "reservation_activity_sid",
+      "reservation_activity_name",
+      "sid",
+      "target_workers",
+      "task_order",
+      "url",
+      "workspace_sid",
+      "links"
+    ],
+    "rowSidPattern": "^WQ[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/TaskQueues/{TaskQueueSid}/Statistics",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "EndDate": {
+        "type": "string"
+      },
+      "Minutes": {
+        "type": "integer"
+      },
+      "StartDate": {
+        "type": "string"
+      },
+      "TaskChannel": {
+        "type": "string"
+      },
+      "SplitByWaitTime": {
+        "type": "string"
+      }
+    },
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "cumulative",
+      "realtime",
+      "task_queue_sid",
+      "workspace_sid",
+      "url"
+    ],
+    "rowSidPattern": null
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Workers",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "ActivityName": {
+        "type": "string"
+      },
+      "ActivitySid": {
+        "type": "string",
+        "pattern": "^WA[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Available": {
+        "type": "string"
+      },
+      "FriendlyName": {
+        "type": "string"
+      },
+      "TargetWorkersExpression": {
+        "type": "string"
+      },
+      "TaskQueueName": {
+        "type": "string"
+      },
+      "TaskQueueSid": {
+        "type": "string",
+        "pattern": "^WQ[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Ordering": {
+        "type": "string"
+      },
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "workers",
+    "rowFields": [
+      "account_sid",
+      "activity_name",
+      "activity_sid",
+      "attributes",
+      "available",
+      "date_created",
+      "date_status_changed",
+      "date_updated",
+      "friendly_name",
+      "sid",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WK[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Workers",
+    "method": "post",
+    "status": [201],
+    "required": ["FriendlyName"],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "ActivitySid": {
+        "type": "string",
+        "pattern": "^WA[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Attributes": {
+        "type": "string"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "activity_name",
+      "activity_sid",
+      "attributes",
+      "available",
+      "date_created",
+      "date_status_changed",
+      "date_updated",
+      "friendly_name",
+      "sid",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WK[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Workers/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "activity_name",
+      "activity_sid",
+      "attributes",
+      "available",
+      "date_created",
+      "date_status_changed",
+      "date_updated",
+      "friendly_name",
+      "sid",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WK[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Workers/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {
+      "ActivitySid": {
+        "type": "string",
+        "pattern": "^WA[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Attributes": {
+        "type": "string"
+      },
+      "FriendlyName": {
+        "type": "string"
+      },
+      "RejectPendingReservations": {
+        "type": "boolean"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "activity_name",
+      "activity_sid",
+      "attributes",
+      "available",
+      "date_created",
+      "date_status_changed",
+      "date_updated",
+      "friendly_name",
+      "sid",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WK[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Workers/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Workers/{WorkerSid}/Statistics",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "Minutes": {
+        "type": "integer"
+      },
+      "StartDate": {
+        "type": "string"
+      },
+      "EndDate": {
+        "type": "string"
+      },
+      "TaskChannel": {
+        "type": "string"
+      }
+    },
+    "collection": null,
+    "rowFields": ["account_sid", "cumulative", "worker_sid", "workspace_sid", "url"],
+    "rowSidPattern": null
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Workflows/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "assignment_callback_url",
+      "configuration",
+      "date_created",
+      "date_updated",
+      "document_content_type",
+      "fallback_assignment_callback_url",
+      "friendly_name",
+      "sid",
+      "task_reservation_timeout",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WW[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Workflows/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "AssignmentCallbackUrl": {
+        "type": "string"
+      },
+      "FallbackAssignmentCallbackUrl": {
+        "type": "string"
+      },
+      "Configuration": {
+        "type": "string"
+      },
+      "TaskReservationTimeout": {
+        "type": "integer"
+      },
+      "ReEvaluateTasks": {
+        "type": "string"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "assignment_callback_url",
+      "configuration",
+      "date_created",
+      "date_updated",
+      "document_content_type",
+      "fallback_assignment_callback_url",
+      "friendly_name",
+      "sid",
+      "task_reservation_timeout",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WW[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Workflows/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Workflows",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "workflows",
+    "rowFields": [
+      "account_sid",
+      "assignment_callback_url",
+      "configuration",
+      "date_created",
+      "date_updated",
+      "document_content_type",
+      "fallback_assignment_callback_url",
+      "friendly_name",
+      "sid",
+      "task_reservation_timeout",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WW[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Workflows",
+    "method": "post",
+    "status": [201],
+    "required": ["FriendlyName", "Configuration"],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "Configuration": {
+        "type": "string"
+      },
+      "AssignmentCallbackUrl": {
+        "type": "string"
+      },
+      "FallbackAssignmentCallbackUrl": {
+        "type": "string"
+      },
+      "TaskReservationTimeout": {
+        "type": "integer"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "assignment_callback_url",
+      "configuration",
+      "date_created",
+      "date_updated",
+      "document_content_type",
+      "fallback_assignment_callback_url",
+      "friendly_name",
+      "sid",
+      "task_reservation_timeout",
+      "workspace_sid",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WW[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "date_created",
+      "date_updated",
+      "default_activity_name",
+      "default_activity_sid",
+      "event_callback_url",
+      "events_filter",
+      "friendly_name",
+      "multi_task_enabled",
+      "sid",
+      "timeout_activity_name",
+      "timeout_activity_sid",
+      "prioritize_queue_order",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WS[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {
+      "DefaultActivitySid": {
+        "type": "string",
+        "pattern": "^WA[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "EventCallbackUrl": {
+        "type": "string"
+      },
+      "EventsFilter": {
+        "type": "string"
+      },
+      "FriendlyName": {
+        "type": "string"
+      },
+      "MultiTaskEnabled": {
+        "type": "boolean"
+      },
+      "TimeoutActivitySid": {
+        "type": "string",
+        "pattern": "^WA[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "PrioritizeQueueOrder": {
+        "type": "string",
+        "enum": ["FIFO", "LIFO"]
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "date_created",
+      "date_updated",
+      "default_activity_name",
+      "default_activity_sid",
+      "event_callback_url",
+      "events_filter",
+      "friendly_name",
+      "multi_task_enabled",
+      "sid",
+      "timeout_activity_name",
+      "timeout_activity_sid",
+      "prioritize_queue_order",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WS[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "workspaces",
+    "rowFields": [
+      "account_sid",
+      "date_created",
+      "date_updated",
+      "default_activity_name",
+      "default_activity_sid",
+      "event_callback_url",
+      "events_filter",
+      "friendly_name",
+      "multi_task_enabled",
+      "sid",
+      "timeout_activity_name",
+      "timeout_activity_sid",
+      "prioritize_queue_order",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WS[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces",
+    "method": "post",
+    "status": [201],
+    "required": ["FriendlyName"],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "EventCallbackUrl": {
+        "type": "string"
+      },
+      "EventsFilter": {
+        "type": "string"
+      },
+      "MultiTaskEnabled": {
+        "type": "boolean"
+      },
+      "Template": {
+        "type": "string"
+      },
+      "PrioritizeQueueOrder": {
+        "type": "string",
+        "enum": ["FIFO", "LIFO"]
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "date_created",
+      "date_updated",
+      "default_activity_name",
+      "default_activity_sid",
+      "event_callback_url",
+      "events_filter",
+      "friendly_name",
+      "multi_task_enabled",
+      "sid",
+      "timeout_activity_name",
+      "timeout_activity_sid",
+      "prioritize_queue_order",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^WS[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "taskrouter",
+    "path": "/v1/Workspaces/{WorkspaceSid}/Statistics",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "Minutes": {
+        "type": "integer"
+      },
+      "StartDate": {
+        "type": "string"
+      },
+      "EndDate": {
+        "type": "string"
+      },
+      "TaskChannel": {
+        "type": "string"
+      },
+      "SplitByWaitTime": {
+        "type": "string"
+      }
+    },
+    "collection": null,
+    "rowFields": ["realtime", "cumulative", "account_sid", "workspace_sid", "url"],
+    "rowSidPattern": null
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations",
+    "method": "post",
+    "status": [201],
+    "required": [],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "UniqueName": {
+        "type": "string"
+      },
+      "DateCreated": {
+        "type": "string"
+      },
+      "DateUpdated": {
+        "type": "string"
+      },
+      "MessagingServiceSid": {
+        "type": "string",
+        "pattern": "^MG[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "Attributes": {
+        "type": "string"
+      },
+      "State": {
+        "type": "string",
+        "enum": ["initializing", "inactive", "active", "closed"]
+      },
+      "Timers.Inactive": {
+        "type": "string"
+      },
+      "Timers.Closed": {
+        "type": "string"
+      },
+      "Bindings.Email.Address": {
+        "type": "string"
+      },
+      "Bindings.Email.Name": {
+        "type": "string"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "chat_service_sid",
+      "messaging_service_sid",
+      "sid",
+      "friendly_name",
+      "unique_name",
+      "attributes",
+      "state",
+      "date_created",
+      "date_updated",
+      "timers",
+      "url",
+      "links",
+      "bindings"
+    ],
+    "rowSidPattern": "^CH[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "StartDate": {
+        "type": "string"
+      },
+      "EndDate": {
+        "type": "string"
+      },
+      "State": {
+        "type": "string",
+        "enum": ["initializing", "inactive", "active", "closed"]
+      },
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "conversations",
+    "rowFields": [
+      "account_sid",
+      "chat_service_sid",
+      "messaging_service_sid",
+      "sid",
+      "friendly_name",
+      "unique_name",
+      "attributes",
+      "state",
+      "date_created",
+      "date_updated",
+      "timers",
+      "url",
+      "links",
+      "bindings"
+    ],
+    "rowSidPattern": "^CH[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "DateCreated": {
+        "type": "string"
+      },
+      "DateUpdated": {
+        "type": "string"
+      },
+      "Attributes": {
+        "type": "string"
+      },
+      "MessagingServiceSid": {
+        "type": "string",
+        "pattern": "^MG[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "State": {
+        "type": "string",
+        "enum": ["initializing", "inactive", "active", "closed"]
+      },
+      "Timers.Inactive": {
+        "type": "string"
+      },
+      "Timers.Closed": {
+        "type": "string"
+      },
+      "UniqueName": {
+        "type": "string"
+      },
+      "Bindings.Email.Address": {
+        "type": "string"
+      },
+      "Bindings.Email.Name": {
+        "type": "string"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "chat_service_sid",
+      "messaging_service_sid",
+      "sid",
+      "friendly_name",
+      "unique_name",
+      "attributes",
+      "state",
+      "date_created",
+      "date_updated",
+      "timers",
+      "url",
+      "links",
+      "bindings"
+    ],
+    "rowSidPattern": "^CH[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "chat_service_sid",
+      "messaging_service_sid",
+      "sid",
+      "friendly_name",
+      "unique_name",
+      "attributes",
+      "state",
+      "date_created",
+      "date_updated",
+      "timers",
+      "url",
+      "links",
+      "bindings"
+    ],
+    "rowSidPattern": "^CH[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{ConversationSid}/Messages",
+    "method": "post",
+    "status": [201],
+    "required": [],
+    "body": {
+      "Author": {
+        "type": "string"
+      },
+      "Body": {
+        "type": "string"
+      },
+      "DateCreated": {
+        "type": "string"
+      },
+      "DateUpdated": {
+        "type": "string"
+      },
+      "Attributes": {
+        "type": "string"
+      },
+      "MediaSid": {
+        "type": "string",
+        "pattern": "^ME[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "ContentSid": {
+        "type": "string",
+        "pattern": "^HX[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "ContentVariables": {
+        "type": "string"
+      },
+      "Subject": {
+        "type": "string"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "conversation_sid",
+      "sid",
+      "index",
+      "author",
+      "body",
+      "media",
+      "attributes",
+      "participant_sid",
+      "date_created",
+      "date_updated",
+      "url",
+      "delivery",
+      "links",
+      "content_sid"
+    ],
+    "rowSidPattern": "^IM[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{ConversationSid}/Messages",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "Order": {
+        "type": "string",
+        "enum": ["asc", "desc"]
+      },
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "messages",
+    "rowFields": [
+      "account_sid",
+      "conversation_sid",
+      "sid",
+      "index",
+      "author",
+      "body",
+      "media",
+      "attributes",
+      "participant_sid",
+      "date_created",
+      "date_updated",
+      "url",
+      "delivery",
+      "links",
+      "content_sid"
+    ],
+    "rowSidPattern": "^IM[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{ConversationSid}/Messages/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {
+      "Author": {
+        "type": "string"
+      },
+      "Body": {
+        "type": "string"
+      },
+      "DateCreated": {
+        "type": "string"
+      },
+      "DateUpdated": {
+        "type": "string"
+      },
+      "Attributes": {
+        "type": "string"
+      },
+      "Subject": {
+        "type": "string"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "conversation_sid",
+      "sid",
+      "index",
+      "author",
+      "body",
+      "media",
+      "attributes",
+      "participant_sid",
+      "date_created",
+      "date_updated",
+      "url",
+      "delivery",
+      "links",
+      "content_sid"
+    ],
+    "rowSidPattern": "^IM[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{ConversationSid}/Messages/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{ConversationSid}/Messages/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "conversation_sid",
+      "sid",
+      "index",
+      "author",
+      "body",
+      "media",
+      "attributes",
+      "participant_sid",
+      "date_created",
+      "date_updated",
+      "url",
+      "delivery",
+      "links",
+      "content_sid"
+    ],
+    "rowSidPattern": "^IM[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{ConversationSid}/Participants",
+    "method": "post",
+    "status": [201],
+    "required": [],
+    "body": {
+      "Identity": {
+        "type": "string"
+      },
+      "MessagingBinding.Address": {
+        "type": "string"
+      },
+      "MessagingBinding.ProxyAddress": {
+        "type": "string"
+      },
+      "DateCreated": {
+        "type": "string"
+      },
+      "DateUpdated": {
+        "type": "string"
+      },
+      "Attributes": {
+        "type": "string"
+      },
+      "MessagingBinding.ProjectedAddress": {
+        "type": "string"
+      },
+      "RoleSid": {
+        "type": "string",
+        "pattern": "^RL[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "conversation_sid",
+      "sid",
+      "identity",
+      "attributes",
+      "messaging_binding",
+      "role_sid",
+      "date_created",
+      "date_updated",
+      "url",
+      "last_read_message_index",
+      "last_read_timestamp"
+    ],
+    "rowSidPattern": "^MB[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{ConversationSid}/Participants",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "participants",
+    "rowFields": [
+      "account_sid",
+      "conversation_sid",
+      "sid",
+      "identity",
+      "attributes",
+      "messaging_binding",
+      "role_sid",
+      "date_created",
+      "date_updated",
+      "url",
+      "last_read_message_index",
+      "last_read_timestamp"
+    ],
+    "rowSidPattern": "^MB[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{ConversationSid}/Participants/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": [],
+    "body": {
+      "DateCreated": {
+        "type": "string"
+      },
+      "DateUpdated": {
+        "type": "string"
+      },
+      "Attributes": {
+        "type": "string"
+      },
+      "RoleSid": {
+        "type": "string",
+        "pattern": "^RL[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      },
+      "MessagingBinding.ProxyAddress": {
+        "type": "string"
+      },
+      "MessagingBinding.ProjectedAddress": {
+        "type": "string"
+      },
+      "Identity": {
+        "type": "string"
+      },
+      "LastReadMessageIndex": {
+        "type": "integer"
+      },
+      "LastReadTimestamp": {
+        "type": "string"
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "conversation_sid",
+      "sid",
+      "identity",
+      "attributes",
+      "messaging_binding",
+      "role_sid",
+      "date_created",
+      "date_updated",
+      "url",
+      "last_read_message_index",
+      "last_read_timestamp"
+    ],
+    "rowSidPattern": "^MB[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{ConversationSid}/Participants/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  },
+  {
+    "service": "conversations",
+    "path": "/v1/Conversations/{ConversationSid}/Participants/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "account_sid",
+      "conversation_sid",
+      "sid",
+      "identity",
+      "attributes",
+      "messaging_binding",
+      "role_sid",
+      "date_created",
+      "date_updated",
+      "url",
+      "last_read_message_index",
+      "last_read_timestamp"
+    ],
+    "rowSidPattern": "^MB[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "studio",
+    "path": "/v2/Flows/{FlowSid}/Executions",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "status": {
+        "type": "string",
+        "enum": ["active", "ended"]
+      },
+      "DateCreatedFrom": {
+        "type": "string"
+      },
+      "DateCreatedTo": {
+        "type": "string"
+      },
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "executions",
+    "rowFields": [
+      "sid",
+      "account_sid",
+      "flow_sid",
+      "contact_channel_address",
+      "contact_sid",
+      "flow_version",
+      "context",
+      "status",
+      "date_created",
+      "date_updated",
+      "initiated_by",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^FN[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "studio",
+    "path": "/v2/Flows/{FlowSid}/Executions",
+    "method": "post",
+    "status": [201],
+    "required": ["To", "From"],
+    "body": {
+      "To": {
+        "type": "string"
+      },
+      "From": {
+        "type": "string"
+      },
+      "Parameters": {}
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "account_sid",
+      "flow_sid",
+      "contact_channel_address",
+      "contact_sid",
+      "flow_version",
+      "context",
+      "status",
+      "date_created",
+      "date_updated",
+      "initiated_by",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^FN[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "studio",
+    "path": "/v2/Flows/{FlowSid}/Executions/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "account_sid",
+      "flow_sid",
+      "contact_channel_address",
+      "contact_sid",
+      "flow_version",
+      "context",
+      "status",
+      "date_created",
+      "date_updated",
+      "initiated_by",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^FN[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "studio",
+    "path": "/v2/Flows/{FlowSid}/Executions/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  },
+  {
+    "service": "studio",
+    "path": "/v2/Flows/{FlowSid}/Executions/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": ["Status"],
+    "body": {
+      "Status": {
+        "type": "string",
+        "enum": ["active", "ended"]
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "account_sid",
+      "flow_sid",
+      "contact_channel_address",
+      "contact_sid",
+      "flow_version",
+      "context",
+      "status",
+      "date_created",
+      "date_updated",
+      "initiated_by",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^FN[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "studio",
+    "path": "/v2/Flows",
+    "method": "post",
+    "status": [201],
+    "required": ["FriendlyName", "Status", "Definition"],
+    "body": {
+      "FriendlyName": {
+        "type": "string"
+      },
+      "Status": {
+        "type": "string",
+        "enum": ["draft", "published"]
+      },
+      "Definition": {},
+      "CommitMessage": {
+        "type": "string"
+      },
+      "AuthorSid": {
+        "type": "string",
+        "pattern": "^US[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "account_sid",
+      "author_sid",
+      "friendly_name",
+      "definition",
+      "status",
+      "revision",
+      "commit_message",
+      "valid",
+      "errors",
+      "warnings",
+      "date_created",
+      "date_updated",
+      "webhook_url",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^FW[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "studio",
+    "path": "/v2/Flows",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {
+      "PageSize": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000
+      },
+      "Page": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "PageToken": {
+        "type": "string"
+      }
+    },
+    "collection": "flows",
+    "rowFields": [
+      "sid",
+      "account_sid",
+      "author_sid",
+      "friendly_name",
+      "definition",
+      "status",
+      "revision",
+      "commit_message",
+      "valid",
+      "errors",
+      "warnings",
+      "date_created",
+      "date_updated",
+      "webhook_url",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^FW[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "studio",
+    "path": "/v2/Flows/{Sid}",
+    "method": "post",
+    "status": [200],
+    "required": ["Status"],
+    "body": {
+      "Status": {
+        "type": "string",
+        "enum": ["draft", "published"]
+      },
+      "FriendlyName": {
+        "type": "string"
+      },
+      "Definition": {},
+      "CommitMessage": {
+        "type": "string"
+      },
+      "AuthorSid": {
+        "type": "string",
+        "pattern": "^US[0-9a-fA-F]{32}$",
+        "minLength": 34,
+        "maxLength": 34
+      }
+    },
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "account_sid",
+      "author_sid",
+      "friendly_name",
+      "definition",
+      "status",
+      "revision",
+      "commit_message",
+      "valid",
+      "errors",
+      "warnings",
+      "date_created",
+      "date_updated",
+      "webhook_url",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^FW[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "studio",
+    "path": "/v2/Flows/{Sid}",
+    "method": "get",
+    "status": [200],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [
+      "sid",
+      "account_sid",
+      "author_sid",
+      "friendly_name",
+      "definition",
+      "status",
+      "revision",
+      "commit_message",
+      "valid",
+      "errors",
+      "warnings",
+      "date_created",
+      "date_updated",
+      "webhook_url",
+      "url",
+      "links"
+    ],
+    "rowSidPattern": "^FW[0-9a-fA-F]{32}$"
+  },
+  {
+    "service": "studio",
+    "path": "/v2/Flows/{Sid}",
+    "method": "delete",
+    "status": [204],
+    "required": [],
+    "body": {},
+    "query": {},
+    "collection": null,
+    "rowFields": [],
+    "rowSidPattern": null
+  }
+]

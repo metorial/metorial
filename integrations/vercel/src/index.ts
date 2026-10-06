@@ -20,12 +20,6 @@ import {
   promoteDeploymentTool,
   updateProjectTool
 } from './tools';
-import {
-  deploymentEventsTrigger,
-  domainEventsTrigger,
-  projectEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +42,5 @@ export let provider = Slate.create({
     manageDeployHooksTool,
     promoteDeploymentTool
   ],
-  triggers: [deploymentEventsTrigger, projectEventsTrigger, domainEventsTrigger]
+  triggers: []
 });

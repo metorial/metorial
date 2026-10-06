@@ -1,7 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  downloadFile,
   generateUploadUrl,
+  getDeploymentInfo,
   getDocumentDeltas,
   listDocuments,
   manageEnvironmentVariables,
@@ -9,8 +11,6 @@ import {
   runMutation,
   runQuery
 } from './tools';
-import { dataChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -20,7 +20,9 @@ export let provider = Slate.create({
     listDocuments,
     getDocumentDeltas,
     manageEnvironmentVariables,
-    generateUploadUrl
+    generateUploadUrl,
+    getDeploymentInfo,
+    downloadFile
   ],
-  triggers: [inboundWebhook, dataChanges]
+  triggers: []
 });

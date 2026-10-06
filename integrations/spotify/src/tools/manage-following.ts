@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SpotifyClient } from '../lib/client';
+import { paging, pagingOutputSchema } from '../lib/types';
 import { spec } from '../spec';
 
 export let manageFollowing = SlateTool.create(spec, {
@@ -52,9 +53,9 @@ export let manageFollowing = SlateTool.create(spec, {
           z.object({
             artistId: z.string(),
             name: z.string(),
-            genres: z.array(z.string()),
-            popularity: z.number(),
-            followers: z.number(),
+            genres: z.array(z.string()).optional(),
+            popularity: z.number().optional(),
+            followers: z.number().optional(),
             imageUrl: z.string().nullable(),
             spotifyUrl: z.string()
           })
@@ -68,6 +69,7 @@ export let manageFollowing = SlateTool.create(spec, {
           })
         )
         .optional(),
+      paging: pagingOutputSchema.optional(),
       nextCursor: z.string().nullable().optional(),
       total: z.number().optional(),
       success: z.boolean().optional()
@@ -76,15 +78,18 @@ export let manageFollowing = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SpotifyClient({
       token: ctx.auth.token,
-      market: ctx.config.market
+      refreshToken: ctx.auth.refreshToken,
+      input: ctx.input,
+      market: ctx.config.market,
+      endpointCompatibility: ctx.config.endpointCompatibility
     });
 
     let { action } = ctx.input;
 
     if (action === 'follow') {
-      if (!ctx.input.type) throw new Error('type is required for "follow" action');
+      if (!ctx.input.type) throw createApiServiceError('type is required for "follow" action');
       if (!ctx.input.ids || ctx.input.ids.length === 0)
-        throw new Error('ids is required for "follow" action');
+        throw createApiServiceError('ids is required for "follow" action');
       await client.followArtistsOrUsers(ctx.input.type, ctx.input.ids);
       return {
         output: { success: true },
@@ -93,9 +98,10 @@ export let manageFollowing = SlateTool.create(spec, {
     }
 
     if (action === 'unfollow') {
-      if (!ctx.input.type) throw new Error('type is required for "unfollow" action');
+      if (!ctx.input.type)
+        throw createApiServiceError('type is required for "unfollow" action');
       if (!ctx.input.ids || ctx.input.ids.length === 0)
-        throw new Error('ids is required for "unfollow" action');
+        throw createApiServiceError('ids is required for "unfollow" action');
       await client.unfollowArtistsOrUsers(ctx.input.type, ctx.input.ids);
       return {
         output: { success: true },
@@ -104,13 +110,13 @@ export let manageFollowing = SlateTool.create(spec, {
     }
 
     if (action === 'check') {
-      if (!ctx.input.type) throw new Error('type is required for "check" action');
+      if (!ctx.input.type) throw createApiServiceError('type is required for "check" action');
       if (!ctx.input.ids || ctx.input.ids.length === 0)
-        throw new Error('ids is required for "check" action');
+        throw createApiServiceError('ids is required for "check" action');
       let results = await client.checkFollowing(ctx.input.type, ctx.input.ids);
       let checkResults = ctx.input.ids.map((id, i) => ({
         itemId: id,
-        isFollowing: results[i] ?? false
+        isFollowing: results[i]!
       }));
       return {
         output: { checkResults },
@@ -129,7 +135,7 @@ export let manageFollowing = SlateTool.create(spec, {
         name: a.name,
         genres: a.genres,
         popularity: a.popularity,
-        followers: a.followers.total,
+        followers: a.followers?.total,
         imageUrl: a.images?.[0]?.url ?? null,
         spotifyUrl: a.external_urls.spotify
       }));
@@ -138,6 +144,7 @@ export let manageFollowing = SlateTool.create(spec, {
         output: {
           followedArtists,
           nextCursor: result.artists.cursors.after,
+          paging: paging(result.artists),
           total: result.artists.total
         },
         message: `Retrieved ${followedArtists.length} followed artists${result.artists.total ? ` (${result.artists.total} total)` : ''}.`
@@ -146,7 +153,7 @@ export let manageFollowing = SlateTool.create(spec, {
 
     if (action === 'followPlaylist') {
       if (!ctx.input.playlistId)
-        throw new Error('playlistId is required for "followPlaylist" action');
+        throw createApiServiceError('playlistId is required for "followPlaylist" action');
       await client.followPlaylist(ctx.input.playlistId, ctx.input.isPublic);
       return {
         output: { success: true },
@@ -156,13 +163,14 @@ export let manageFollowing = SlateTool.create(spec, {
 
     if (action === 'unfollowPlaylist') {
       if (!ctx.input.playlistId)
-        throw new Error('playlistId is required for "unfollowPlaylist" action');
+        throw createApiServiceError('playlistId is required for "unfollowPlaylist" action');
       await client.unfollowPlaylist(ctx.input.playlistId);
       return {
         output: { success: true },
-        message: 'Unfollowed playlist.'
+        message:
+          'Spotify accepted the unfollow request. This does not delete the playlist or its history.'
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   });

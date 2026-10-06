@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listEnvironments = SlateTool.create(spec, {
@@ -11,7 +11,16 @@ export let listEnvironments = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      projectId: z
+        .number()
+        .optional()
+        .describe('Project ID from manage_project; required with an account token.'),
+      page: z.number().optional().describe('Page number, starting at 1'),
+      limit: z.number().optional().describe('Page size, default 20; maximum 5000')
+    })
+  )
   .output(
     z.object({
       environments: z
@@ -28,12 +37,15 @@ export let listEnvironments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
-    let result = await client.listEnvironments();
-    let environments = (result?.result || []).map((e: any) => ({
-      name: e.name || e,
-      visible: e.visible
+    let result = await client.listEnvironments({
+      page: ctx.input.page,
+      limit: ctx.input.limit
+    });
+    let environments = result.result.environments.map(e => ({
+      name: e.environment,
+      visible: e.visible === undefined ? undefined : Boolean(e.visible)
     }));
 
     return {

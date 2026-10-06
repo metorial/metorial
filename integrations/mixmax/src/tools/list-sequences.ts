@@ -3,11 +3,6 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let _recipientSchema = z.object({
-  email: z.string().describe('Recipient email address'),
-  name: z.string().optional().describe('Recipient name')
-});
-
 let sequenceSchema = z.object({
   sequenceId: z.string().describe('Unique identifier for the sequence'),
   name: z.string().optional().describe('Name of the sequence'),
@@ -48,18 +43,14 @@ export let listSequences = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let data: any;
-    if (ctx.input.search) {
-      data = await client.searchSequences(ctx.input.search);
-    } else {
-      data = await client.listSequences({
-        limit: ctx.input.limit,
-        next: ctx.input.cursor
-      });
-    }
+    let data = await client.listSequences({
+      name: ctx.input.search,
+      limit: ctx.input.limit,
+      next: ctx.input.cursor
+    });
 
-    let results = data.results || data || [];
-    let sequences = results.map((s: any) => ({
+    let results = data.results;
+    let sequences = results.map(s => ({
       sequenceId: s._id,
       name: s.name,
       userId: s.userId,

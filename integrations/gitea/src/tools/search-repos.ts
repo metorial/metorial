@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let searchRepos = SlateTool.create(spec, {
@@ -21,8 +22,12 @@ export let searchRepos = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter repositories by owner username or organization name'),
-      page: z.number().optional().describe('Page number for pagination (starts at 1)'),
-      limit: z.number().optional().describe('Number of results per page (max 50)'),
+      page: integerInput(1).optional().describe('Page number for pagination (starts at 1)'),
+      limit: integerInput(0)
+        .optional()
+        .describe(
+          'Results per page; zero uses the instance default and the server sets the maximum'
+        ),
       sort: z
         .enum(['alpha', 'created', 'updated', 'size', 'id'])
         .optional()
@@ -57,38 +62,28 @@ export let searchRepos = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
 
-    let repos: any;
-    if (ctx.input.owner) {
-      repos = await client.searchRepos({
-        q: ctx.input.query,
-        page: ctx.input.page,
-        limit: ctx.input.limit,
-        sort: ctx.input.sort,
-        order: ctx.input.order
-      });
-      repos = repos.filter(
-        (r: any) => r.owner.login.toLowerCase() === ctx.input.owner!.toLowerCase()
-      );
-    } else if (ctx.input.query) {
-      repos = await client.searchRepos({
-        q: ctx.input.query,
-        page: ctx.input.page,
-        limit: ctx.input.limit,
-        sort: ctx.input.sort,
-        order: ctx.input.order
-      });
-    } else {
-      repos = await client.listMyRepos({
-        page: ctx.input.page,
-        limit: ctx.input.limit,
-        sort: ctx.input.sort,
-        order: ctx.input.order
-      });
-    }
+    const owner = ctx.input.owner
+      ? await client.getUserByUsername(ctx.input.owner)
+      : !ctx.input.query && (ctx.input.sort || ctx.input.order)
+        ? await client.getAuthenticatedUser()
+        : undefined;
+    const repos =
+      owner || ctx.input.query
+        ? await client.searchRepos({
+            q: ctx.input.query,
+            includeDesc: true,
+            uid: owner?.id,
+            exclusive: ctx.input.owner ? true : undefined,
+            page: ctx.input.page,
+            limit: ctx.input.limit,
+            sort: ctx.input.sort ?? (ctx.input.order ? 'alpha' : undefined),
+            order: ctx.input.order
+          })
+        : await client.listMyRepos({ page: ctx.input.page, limit: ctx.input.limit });
 
-    let repositories = repos.map((r: any) => ({
+    let repositories = repos.map(r => ({
       repositoryId: r.id,
       name: r.name,
       fullName: r.full_name,

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, targetId } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSurvey = SlateTool.create(spec, {
@@ -22,7 +22,8 @@ export let getSurvey = SlateTool.create(spec, {
       name: z.string().describe('Survey name'),
       status: z.string().describe('Survey status'),
       type: z.string().describe('Survey type (link or app)'),
-      environmentId: z.string().describe('Environment the survey belongs to'),
+      environmentId: z.string().describe('Environment or compatible workspace target ID'),
+      workspaceId: z.string().optional().describe('Current workspace ID'),
       questions: z
         .array(z.any())
         .describe('Array of survey questions with their configuration'),
@@ -31,6 +32,14 @@ export let getSurvey = SlateTool.create(spec, {
       hiddenFields: z.any().optional().describe('Hidden fields configuration'),
       displayOption: z.string().optional().describe('Display option setting'),
       languages: z.array(z.any()).optional().describe('Language configurations'),
+      triggers: z
+        .array(z.unknown())
+        .optional()
+        .describe('Current action associations when returned'),
+      followUps: z
+        .array(z.unknown())
+        .optional()
+        .describe('Configured follow-up actions when returned'),
       createdAt: z.string().describe('Creation timestamp'),
       updatedAt: z.string().describe('Last update timestamp')
     })
@@ -38,7 +47,8 @@ export let getSurvey = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     let survey = await client.getSurvey(ctx.input.surveyId);
@@ -46,18 +56,21 @@ export let getSurvey = SlateTool.create(spec, {
     return {
       output: {
         surveyId: survey.id,
-        name: survey.name ?? '',
-        status: survey.status ?? '',
-        type: survey.type ?? '',
-        environmentId: survey.environmentId ?? '',
-        questions: survey.questions ?? [],
+        name: survey.name,
+        status: survey.status,
+        type: survey.type,
+        environmentId: targetId(survey),
+        workspaceId: survey.workspaceId,
+        questions: survey.questions,
         endings: survey.endings,
         welcomeCard: survey.welcomeCard,
         hiddenFields: survey.hiddenFields,
         displayOption: survey.displayOption,
         languages: survey.languages,
-        createdAt: survey.createdAt ?? '',
-        updatedAt: survey.updatedAt ?? ''
+        triggers: survey.triggers,
+        followUps: survey.followUps,
+        createdAt: survey.createdAt,
+        updatedAt: survey.updatedAt
       },
       message: `Retrieved survey **${survey.name}** (${survey.status}).`
     };

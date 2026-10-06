@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SatisMeterClient } from '../lib/client';
+import { projectIdSchema, resolveProject } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getUnsubscribesTool = SlateTool.create(spec, {
@@ -11,7 +12,7 @@ export let getUnsubscribesTool = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ projectId: projectIdSchema }))
   .output(
     z.object({
       emails: z.array(z.string()).describe('List of unsubscribed email addresses')
@@ -19,9 +20,11 @@ export let getUnsubscribesTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new SatisMeterClient(ctx.auth.token, ctx.auth.writeKey);
-    let result = await client.getUnsubscribedEmails(ctx.config.projectId);
+    let result = await client.getUnsubscribedEmails(
+      resolveProject(ctx.input.projectId, ctx.config)
+    );
 
-    let emails: string[] = result?.data?.attributes?.emails || [];
+    let emails = result;
 
     return {
       output: { emails },
@@ -43,6 +46,7 @@ export let updateUnsubscribesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       emails: z.array(z.string()).describe('Complete list of email addresses to unsubscribe')
     })
   )
@@ -54,10 +58,13 @@ export let updateUnsubscribesTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new SatisMeterClient(ctx.auth.token, ctx.auth.writeKey);
-    await client.updateUnsubscribedEmails(ctx.config.projectId, ctx.input.emails);
+    let emails = await client.updateUnsubscribedEmails(
+      resolveProject(ctx.input.projectId, ctx.config),
+      ctx.input.emails
+    );
 
     return {
-      output: { emails: ctx.input.emails, success: true },
+      output: { emails, success: true },
       message: `Updated unsubscribe list with **${ctx.input.emails.length}** email(s).`
     };
   })

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/geocodio",
-  "description": "Geocode addresses to latitude/longitude coordinates and reverse geocode coordinates to addresses for US, Canadian, and Mexican locations. Parse and standardize addresses, batch geocode up to 10,000 addresses or upload spreadsheets for large-scale processing. Append enrichment data including Census demographics, Congressional districts, school districts, timezones, ACS socioeconomic data, Canadian electoral ridings, and USPS details. Calculate driving distances and travel times between locations, including distance matrices. Deduplicate addresses using stable address keys and receive webhook notifications when async jobs complete.",
+  "description": "Geocode addresses to latitude/longitude coordinates and reverse geocode coordinates to addresses for US, Canadian, and Mexican locations. Parse and standardize addresses, batch geocode up to 10,000 addresses or upload spreadsheets for large-scale processing. Append enrichment data including Census demographics, Congressional districts, school districts, timezones, ACS socioeconomic data, Canadian electoral ridings, and USPS details. Calculate driving distances and travel times between locations, including distance matrices.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "forward geocode addresses",

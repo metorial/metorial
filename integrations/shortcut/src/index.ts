@@ -29,8 +29,6 @@ import {
   updateObjective,
   updateStory
 } from './tools';
-import { workspaceEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,5 +60,5 @@ export let provider = Slate.create({
     getDocument,
     updateDocument
   ],
-  triggers: [workspaceEvents]
+  triggers: []
 });

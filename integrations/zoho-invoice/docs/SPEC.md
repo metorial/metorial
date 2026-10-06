@@ -94,9 +94,9 @@ Use `ZohoInvoice.fullaccess.all` for full access to all modules.
 | Contact, invoice/recurring-invoice, estimate, payment, credit-note, expense, project/time-entry, and item operations | The matching documented CREATE, READ, and UPDATE scopes listed above |
 | Product-wide resource access | `ZohoInvoice.fullaccess.all` |
 
-The [Zoho Invoice OAuth documentation](https://www.zoho.com/invoice/api/v3/oauth/) documents resource-level CREATE, READ, UPDATE, and DELETE operations, but not resource-level ALL. Current tools and polling triggers create, read, and update these resources and expose no delete operation, so DELETE variants are omitted.
+The [Zoho Invoice OAuth documentation](https://www.zoho.com/invoice/api/v3/oauth/) documents resource-level CREATE, READ, UPDATE, and DELETE operations, but not resource-level ALL. Current tools create, read, and update these resources and expose no delete operation, so DELETE variants are omitted.
 
-The integration requests the documented operation-specific scopes used by current tools and polling triggers, plus `ZohoInvoice.fullaccess.all` for product-wide resource access. Unused operation variants are omitted.
+The integration requests the documented operation-specific scopes used by current tools, plus `ZohoInvoice.fullaccess.all` for product-wide resource access. Unused operation variants are omitted.
 ## Features
 
 ### Invoice Management

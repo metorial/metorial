@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'stack-ai',
   name: 'Stack AI',
   description:
-    'Enterprise platform for building and deploying AI agents and workflows. Execute flows, manage knowledge bases, handle documents, monitor analytics, and manage connections to external services.',
+    'Run published Stack AI workflows, upload files to workflow Files Nodes or knowledge bases, retrieve run analytics, and use existing knowledge-base, connection, conversation, folder, and action management tools.',
   metadata: {},
   config,
   auth

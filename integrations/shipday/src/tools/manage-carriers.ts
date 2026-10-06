@@ -1,23 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShipdayClient } from '../lib/client';
+import { fail, id, optionalBoolean, optionalNumber, optionalString } from '../lib/validation';
 import { spec } from '../spec';
 
 let carrierSchema = z
   .object({
-    carrierId: z.number().optional().describe('Unique carrier identifier'),
-    personalId: z.string().optional().describe('Internal personal ID'),
-    name: z.string().optional().describe('Full name of the carrier'),
-    codeName: z.string().optional().describe('Code name for the carrier'),
-    phoneNumber: z.string().optional().describe('Phone number in E.164 format'),
-    email: z.string().optional().describe('Email address'),
-    companyId: z.number().optional().describe('Company ID'),
-    areaId: z.number().optional().describe('Operational area ID'),
-    isOnShift: z.boolean().optional().describe('Whether carrier is currently on shift'),
-    isActive: z.boolean().optional().describe('Whether carrier is active'),
-    carrierPhoto: z.string().optional().describe('URL to profile photo'),
-    latitude: z.number().optional().describe('Last known latitude'),
-    longitude: z.number().optional().describe('Last known longitude')
+    carrierId: z.number().nullish().describe('Unique carrier identifier'),
+    personalId: z.string().nullish().describe('Internal personal ID'),
+    name: z.string().nullish().describe('Full name of the carrier'),
+    codeName: z.string().nullish().describe('Code name for the carrier'),
+    phoneNumber: z.string().nullish().describe('Phone number in E.164 format'),
+    email: z.string().nullish().describe('Email address'),
+    companyId: z.number().nullish().describe('Company ID'),
+    areaId: z.number().nullish().describe('Operational area ID'),
+    isOnShift: z.boolean().nullish().describe('Whether carrier is currently on shift'),
+    isActive: z.boolean().nullish().describe('Whether carrier is active'),
+    carrierPhoto: z.string().nullish().describe('URL to profile photo'),
+    latitude: z.number().nullish().describe('Last known latitude'),
+    longitude: z.number().nullish().describe('Last known longitude')
   })
   .passthrough();
 
@@ -46,7 +47,11 @@ export let manageCarriers = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation was successful'),
+      success: z.boolean().describe('Whether the operation was confirmed'),
+      carrierId: z
+        .number()
+        .optional()
+        .describe('Native created carrier ID; generated login passwords are not returned'),
       carriers: z
         .array(carrierSchema)
         .optional()
@@ -58,24 +63,40 @@ export let manageCarriers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ShipdayClient({ token: ctx.auth.token });
 
+    if (
+      ctx.input.action === 'list' &&
+      [ctx.input.name, ctx.input.email, ctx.input.phoneNumber, ctx.input.carrierId].some(
+        value => value !== undefined
+      )
+    )
+      fail('Carrier listing does not accept mutation fields.');
+    if (
+      ctx.input.action === 'delete' &&
+      [ctx.input.name, ctx.input.email, ctx.input.phoneNumber].some(
+        value => value !== undefined
+      )
+    )
+      fail('Carrier deletion only uses carrierId.');
+    if (ctx.input.action === 'add' && ctx.input.carrierId !== undefined)
+      fail('Carrier creation does not accept an existing carrierId.');
     if (ctx.input.action === 'list') {
       let carriers = await client.getCarriers();
-      let carrierList = Array.isArray(carriers) ? carriers : [];
+      let carrierList = carriers;
 
       let mapped = carrierList.map((c: Record<string, unknown>) => ({
-        carrierId: c.id as number | undefined,
-        personalId: c.personalId as string | undefined,
-        name: c.name as string | undefined,
-        codeName: c.codeName as string | undefined,
-        phoneNumber: c.phoneNumber as string | undefined,
-        email: c.email as string | undefined,
-        companyId: c.companyId as number | undefined,
-        areaId: c.areaId as number | undefined,
-        isOnShift: c.isOnShift as boolean | undefined,
-        isActive: c.isActive as boolean | undefined,
-        carrierPhoto: c.carrierPhoto as string | undefined,
-        latitude: c.carrrierLocationLat as number | undefined,
-        longitude: c.carrrierLocationLng as number | undefined
+        carrierId: optionalNumber(c.id),
+        personalId: optionalString(c.personalId),
+        name: optionalString(c.name),
+        codeName: optionalString(c.codeName),
+        phoneNumber: optionalString(c.phoneNumber),
+        email: optionalString(c.email),
+        companyId: optionalNumber(c.companyId),
+        areaId: optionalNumber(c.areaId),
+        isOnShift: optionalBoolean(c.isOnShift),
+        isActive: optionalBoolean(c.isActive),
+        carrierPhoto: optionalString(c.carrierPhoto),
+        latitude: optionalNumber(c.carrrierLocationLat),
+        longitude: optionalNumber(c.carrrierLocationLng)
       }));
 
       return {
@@ -90,9 +111,9 @@ export let manageCarriers = SlateTool.create(spec, {
 
     if (ctx.input.action === 'add') {
       if (!ctx.input.name || !ctx.input.email || !ctx.input.phoneNumber) {
-        throw new Error('name, email, and phoneNumber are required to add a carrier');
+        fail('name, email, and phoneNumber are required to add a carrier');
       }
-      let _result = await client.addCarrier({
+      let result = await client.addCarrier({
         name: ctx.input.name,
         email: ctx.input.email,
         phoneNumber: ctx.input.phoneNumber
@@ -100,15 +121,17 @@ export let manageCarriers = SlateTool.create(spec, {
       return {
         output: {
           success: true,
-          responseMessage: `Carrier added: ${ctx.input.name}`
+          responseMessage:
+            'Carrier creation confirmed; use Shipday to manage its login credentials.',
+          carrierId: id(result.carrierId, 'Created carrier ID')
         },
-        message: `Added carrier **${ctx.input.name}** (${ctx.input.email}).`
+        message: `Shipday confirmed carrier creation (ID: ${result.carrierId}).`
       };
     }
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.carrierId) {
-        throw new Error('carrierId is required to delete a carrier');
+        fail('carrierId is required to delete a carrier');
       }
       await client.deleteCarrier(ctx.input.carrierId);
       return {
@@ -120,6 +143,6 @@ export let manageCarriers = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    fail('Unsupported carrier action.');
   })
   .build();

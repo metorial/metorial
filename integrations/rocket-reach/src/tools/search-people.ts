@@ -22,8 +22,7 @@ export let searchPeople = SlateTool.create(spec, {
 Useful for lead generation, prospecting, and finding people at specific companies or in specific roles.`,
   instructions: [
     'Search results do not include contact information. Use the Lookup Person tool with a profileId from the results to get emails and phone numbers.',
-    'Prepend a "-" to any filter value to exclude it (e.g., "-Google" to exclude people at Google).',
-    'For location filtering, append "::~50mi" to a location string to search within a 50-mile radius.'
+    'Use the returned pagination.nextStart as start with the same filters for another page; omitted pagination is unknown.'
   ],
   constraints: [
     'Maximum 100 results per page.',
@@ -51,7 +50,7 @@ Useful for lead generation, prospecting, and finding people at specific companie
       location: z
         .string()
         .optional()
-        .describe('Location to filter by. Append "::~50mi" for radius search.'),
+        .describe('Location to filter by using a provider-supported location value.'),
       skills: z.array(z.string()).optional().describe('Skills to filter by'),
       department: z.string().optional().describe('Department to filter by'),
       managementLevels: z.string().optional().describe('Management level filter'),
@@ -84,7 +83,14 @@ Useful for lead generation, prospecting, and finding people at specific companie
         .object({
           start: z.number().optional().describe('Current start index'),
           pageSize: z.number().optional().describe('Results per page'),
-          totalResults: z.number().optional().describe('Total number of matching results')
+          totalResults: z.number().optional().describe('Total number of matching results'),
+          nextStart: z
+            .number()
+            .nullable()
+            .optional()
+            .describe(
+              'Provider continuation index; pass it as start with the same filters. Null or 0 means no further page.'
+            )
         })
         .optional()
         .describe('Pagination information')
@@ -93,7 +99,7 @@ Useful for lead generation, prospecting, and finding people at specific companie
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let query: Record<string, any> = {};
+    let query: Record<string, string[]> = {};
     if (ctx.input.name) query.name = [ctx.input.name];
     if (ctx.input.currentTitle) query.current_title = [ctx.input.currentTitle];
     if (ctx.input.currentEmployer) query.current_employer = [ctx.input.currentEmployer];
@@ -107,7 +113,7 @@ Useful for lead generation, prospecting, and finding people at specific companie
     if (ctx.input.school) query.school = [ctx.input.school];
     if (ctx.input.degree) query.degree = [ctx.input.degree];
     if (ctx.input.major) query.major = [ctx.input.major];
-    if (ctx.input.yearsExperience) query.years_experience = ctx.input.yearsExperience;
+    if (ctx.input.yearsExperience) query.years_experience = [ctx.input.yearsExperience];
     if (ctx.input.keyword) query.keyword = [ctx.input.keyword];
 
     let result = await client.searchPeople({
@@ -117,7 +123,7 @@ Useful for lead generation, prospecting, and finding people at specific companie
       orderBy: ctx.input.orderBy
     });
 
-    let profiles = (result.profiles || result || []).map((p: any) => ({
+    let profiles = result.records.map(p => ({
       profileId: p.id,
       name: p.name,
       currentTitle: p.current_title,
@@ -128,16 +134,12 @@ Useful for lead generation, prospecting, and finding people at specific companie
       profilePic: p.profile_pic
     }));
 
-    let totalResults = result.pagination?.total ?? result.total ?? undefined;
+    let totalResults = result.pagination.totalResults;
 
     return {
       output: {
         profiles,
-        pagination: {
-          start: ctx.input.start ?? 1,
-          pageSize: ctx.input.pageSize ?? 10,
-          totalResults
-        }
+        pagination: result.pagination
       },
       message: `Found ${profiles.length} matching profiles${totalResults !== undefined ? ` out of ${totalResults} total` : ''}.`
     };

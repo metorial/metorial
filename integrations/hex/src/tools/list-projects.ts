@@ -20,6 +20,10 @@ export let listProjects = SlateTool.create(spec, {
         .optional()
         .describe('Number of results per page (1-100)'),
       after: z.string().optional().describe('Pagination cursor for the next page'),
+      before: z
+        .string()
+        .optional()
+        .describe('Previous-page cursor; do not combine with after'),
       sortBy: z.string().optional().describe('Field to sort by'),
       sortDirection: z.enum(['ASC', 'DESC']).optional().describe('Sort direction'),
       statuses: z.array(z.string()).optional().describe('Filter by project statuses'),
@@ -45,16 +49,26 @@ export let listProjects = SlateTool.create(spec, {
           status: z.string().nullable(),
           categories: z.array(z.string()),
           creator: z
-            .object({ userId: z.string(), email: z.string(), name: z.string() })
+            .object({
+              userId: z.string().optional(),
+              email: z.string(),
+              name: z.string().optional()
+            })
             .nullable(),
           owner: z
-            .object({ userId: z.string(), email: z.string(), name: z.string() })
+            .object({
+              userId: z.string().optional(),
+              email: z.string(),
+              name: z.string().optional()
+            })
             .nullable(),
           createdAt: z.string(),
           updatedAt: z.string(),
           publishedAt: z.string().nullable()
         })
       ),
+      returnedCount: z.number().optional(),
+      previousCursor: z.string().optional(),
       nextCursor: z
         .string()
         .optional()
@@ -62,11 +76,15 @@ export let listProjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
 
     let result = await client.listProjects({
       limit: ctx.input.limit,
       after: ctx.input.after,
+      before: ctx.input.before,
       sortBy: ctx.input.sortBy,
       sortDirection: ctx.input.sortDirection,
       statuses: ctx.input.statuses,
@@ -79,12 +97,14 @@ export let listProjects = SlateTool.create(spec, {
       includeSharing: ctx.input.includeSharing
     });
 
-    let projects = result.values ?? [];
+    let projects = result.values;
 
     return {
       output: {
         projects,
-        nextCursor: result.pagination?.after
+        returnedCount: result.values.length,
+        previousCursor: result.pagination.before,
+        nextCursor: result.pagination.after
       },
       message: `Found **${projects.length}** project(s).${result.pagination?.after ? ' More results available.' : ''}`
     };

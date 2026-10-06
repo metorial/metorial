@@ -54,12 +54,10 @@ export let createIncident = SlateTool.create(spec, {
 
     return {
       output: {
-        incidentNumber: String(result?.incidentNumber ?? ''),
-        error: result?.error
+        incidentNumber: result.incidentNumber,
+        error: result.error
       },
-      message: result?.error
-        ? `Failed to create incident: ${result.error}`
-        : `Created incident **#${result?.incidentNumber}**.`
+      message: `Created incident **#${result.incidentNumber}** and requested paging of the specified targets.`
     };
   })
   .build();

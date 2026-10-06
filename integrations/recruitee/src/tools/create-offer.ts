@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createOffer = SlateTool.create(spec, {
   name: 'Create Job Offer',
   key: 'create_offer',
-  description: `Create a new job offer or talent pool in Recruitee. Set the **kind** to "talent_pool" to create a talent pool instead of a job. New offers are created as drafts by default — set the **status** to "published" to make them immediately visible on the careers site.`,
+  description: `Create a new job offer or talent pool in Recruitee. Set the **kind** to "talent_pool" to create a talent pool instead of a job. New offers default to draft. A requested status uses a separate transition followed by a readback; a failed transition can leave the created offer in its actual earlier status. Publishing exposes it on the careers site.`,
   tags: {
     readOnly: false
   }
@@ -33,16 +33,13 @@ export let createOffer = SlateTool.create(spec, {
     z.object({
       offerId: z.number().describe('ID of the created offer'),
       title: z.string().describe('Offer title'),
-      kind: z.string().describe('Offer type: job or talent_pool'),
+      kind: z.string().optional().describe('Offer type when returned'),
       status: z.string().describe('Offer status'),
-      createdAt: z.string().describe('Creation timestamp')
+      createdAt: z.string().optional().describe('Creation timestamp when returned')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
+    let client = await RecruiteeClient.forContext(ctx);
 
     let result = await client.createOffer({
       title: ctx.input.title,

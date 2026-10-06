@@ -1,13 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapQuery } from '../lib/models';
 import { spec } from '../spec';
 
 let querySchema = z.object({
   queryId: z.string().describe('Unique identifier of the query'),
   name: z.string().optional().describe('Name of the query'),
   datasourceId: z.string().optional().describe('ID of the datasource the query belongs to'),
-  parameters: z.array(z.any()).optional().describe('Parameters the query accepts'),
+  parameters: z.array(z.unknown()).optional().describe('Parameters the query accepts'),
   queryVerb: z
     .string()
     .optional()
@@ -34,20 +35,10 @@ export let searchQueries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      appId: ctx.input.appId
-    });
+    let client = Client.fromContext(ctx, ctx.input.appId);
     let results = await client.searchQueries({ name: ctx.input.name });
 
-    let queries = results.map((q: any) => ({
-      queryId: q._id,
-      name: q.name,
-      datasourceId: q.datasourceId,
-      parameters: q.parameters,
-      queryVerb: q.queryVerb
-    }));
+    let queries = results.map(row => mapQuery(row));
 
     return {
       output: { queries },

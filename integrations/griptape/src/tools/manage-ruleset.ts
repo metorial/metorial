@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageRuleset = SlateTool.create(spec, {
@@ -40,8 +41,8 @@ export let manageRuleset = SlateTool.create(spec, {
       ruleText: z.string().optional().describe('Rule text content (for rule operations)'),
       ruleIds: z.array(z.string()).optional().describe('Rule IDs to attach to a ruleset'),
       metadata: z.record(z.string(), z.any()).optional().describe('Custom metadata'),
-      page: z.number().optional().describe('Page number (for list)'),
-      pageSize: z.number().optional().describe('Page size (for list)'),
+      page: z.number().int().min(1).optional().describe('Page number (for list)'),
+      pageSize: z.number().int().min(1).optional().describe('Page size (for list)'),
       aliasFilter: z
         .string()
         .optional()
@@ -83,6 +84,7 @@ export let manageRuleset = SlateTool.create(spec, {
         )
         .optional()
         .describe('List of rules'),
+      pagination: paginationSchema.optional().describe('Page navigation metadata'),
       totalCount: z.number().optional().describe('Total count')
     })
   )
@@ -91,7 +93,7 @@ export let manageRuleset = SlateTool.create(spec, {
 
     // ── Ruleset Operations ─────────────────────
     if (ctx.input.action === 'create_ruleset') {
-      if (!ctx.input.name) throw new Error('Name is required');
+      if (!ctx.input.name) throw createApiServiceError('Name is required');
       let result = await client.createRuleset({
         name: ctx.input.name,
         alias: ctx.input.alias,
@@ -114,7 +116,7 @@ export let manageRuleset = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get_ruleset') {
-      if (!ctx.input.rulesetId) throw new Error('rulesetId is required');
+      if (!ctx.input.rulesetId) throw createApiServiceError('rulesetId is required');
       let result = await client.getRuleset(ctx.input.rulesetId);
       return {
         output: {
@@ -131,7 +133,7 @@ export let manageRuleset = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update_ruleset') {
-      if (!ctx.input.rulesetId) throw new Error('rulesetId is required');
+      if (!ctx.input.rulesetId) throw createApiServiceError('rulesetId is required');
       let result = await client.updateRuleset(ctx.input.rulesetId, {
         name: ctx.input.name,
         alias: ctx.input.alias,
@@ -154,7 +156,7 @@ export let manageRuleset = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete_ruleset') {
-      if (!ctx.input.rulesetId) throw new Error('rulesetId is required');
+      if (!ctx.input.rulesetId) throw createApiServiceError('rulesetId is required');
       await client.deleteRuleset(ctx.input.rulesetId);
       return {
         output: { rulesetId: ctx.input.rulesetId, deleted: true },
@@ -176,15 +178,19 @@ export let manageRuleset = SlateTool.create(spec, {
         createdAt: r.created_at
       }));
       return {
-        output: { rulesets, totalCount: result.pagination.totalCount },
+        output: {
+          rulesets,
+          pagination: result.pagination,
+          totalCount: result.pagination.totalCount
+        },
         message: `Found **${result.pagination.totalCount}** ruleset(s).`
       };
     }
 
     // ── Rule Operations ────────────────────────
     if (ctx.input.action === 'create_rule') {
-      if (!ctx.input.name) throw new Error('Name is required');
-      if (!ctx.input.ruleText) throw new Error('ruleText is required');
+      if (!ctx.input.name) throw createApiServiceError('Name is required');
+      if (!ctx.input.ruleText) throw createApiServiceError('ruleText is required');
       let result = await client.createRule({
         name: ctx.input.name,
         rule: ctx.input.ruleText,
@@ -203,7 +209,7 @@ export let manageRuleset = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get_rule') {
-      if (!ctx.input.ruleId) throw new Error('ruleId is required');
+      if (!ctx.input.ruleId) throw createApiServiceError('ruleId is required');
       let result = await client.getRule(ctx.input.ruleId);
       return {
         output: {
@@ -218,7 +224,7 @@ export let manageRuleset = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update_rule') {
-      if (!ctx.input.ruleId) throw new Error('ruleId is required');
+      if (!ctx.input.ruleId) throw createApiServiceError('ruleId is required');
       let result = await client.updateRule(ctx.input.ruleId, {
         name: ctx.input.name,
         rule: ctx.input.ruleText,
@@ -237,7 +243,7 @@ export let manageRuleset = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete_rule') {
-      if (!ctx.input.ruleId) throw new Error('ruleId is required');
+      if (!ctx.input.ruleId) throw createApiServiceError('ruleId is required');
       await client.deleteRule(ctx.input.ruleId);
       return {
         output: { ruleId: ctx.input.ruleId, deleted: true },
@@ -258,11 +264,15 @@ export let manageRuleset = SlateTool.create(spec, {
         createdAt: r.created_at
       }));
       return {
-        output: { rules, totalCount: result.pagination.totalCount },
+        output: {
+          rules,
+          pagination: result.pagination,
+          totalCount: result.pagination.totalCount
+        },
         message: `Found **${result.pagination.totalCount}** rule(s).`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

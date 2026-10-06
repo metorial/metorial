@@ -48,7 +48,7 @@ export let importDesign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = Client.fromContext(ctx);
     let job = await client.createImportJobFromUrl({
       title: ctx.input.title,
       url: ctx.input.url,
@@ -79,7 +79,13 @@ export let getImportJob = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      jobId: z.string().describe('The import job ID to check')
+      jobId: z.string().describe('The import job ID to check'),
+      sourceType: z
+        .enum(['url', 'binary'])
+        .optional()
+        .describe(
+          'Job family: URL is the default for Import Design; binary selects an existing binary-upload import job'
+        )
     })
   )
   .output(
@@ -105,8 +111,8 @@ export let getImportJob = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let job = await client.getImportJob(ctx.input.jobId);
+    let client = Client.fromContext(ctx);
+    let job = await client.getImportJob(ctx.input.jobId, ctx.input.sourceType);
 
     return {
       output: job,

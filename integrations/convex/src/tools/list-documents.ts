@@ -9,14 +9,14 @@ export let listDocuments = SlateTool.create(spec, {
   description: `List documents from a Convex table using the Streaming Export API snapshot endpoint.
 Retrieves a paginated snapshot of documents from a specific table or across all tables.
 Useful for browsing data, exporting records, or inspecting table contents.
-Requires deploy key authentication.`,
+Requires deployment administration permission and Streaming Export availability on your plan.`,
   instructions: [
     'Use the tableName parameter to filter documents from a specific table',
     'Use cursor and snapshotId for paginating through large result sets',
     'The snapshotId must remain consistent across pages of the same snapshot'
   ],
   constraints: [
-    'Requires deploy key (admin) authentication',
+    'Requires deployment data-view permission and Streaming Export availability',
     'Returns up to a page of results at a time; use cursor for pagination'
   ],
   tags: {
@@ -41,7 +41,9 @@ Requires deploy key authentication.`,
   .output(
     z.object({
       documents: z.array(z.any()).describe('Array of documents from the snapshot'),
-      cursor: z.string().describe('Cursor for fetching the next page'),
+      cursor: z
+        .string()
+        .describe('Opaque cursor for the next page; empty when no cursor remains'),
       snapshotId: z.string().describe('Snapshot ID for consistent pagination'),
       hasMore: z.boolean().describe('Whether more documents are available')
     })
@@ -66,7 +68,7 @@ Requires deploy key authentication.`,
     return {
       output: {
         documents: result.values || [],
-        cursor: result.cursor,
+        cursor: result.cursor ?? '',
         snapshotId: result.snapshot,
         hasMore: result.hasMore
       },

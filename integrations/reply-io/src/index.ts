@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getCurrentUser,
   getSequence,
   getStatistics,
   getTeamPerformance,
@@ -17,11 +18,10 @@ import {
   manageTemplate,
   pushContactToCampaign
 } from './tools';
-import { contactEvents, emailEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     listSequences,
     getSequence,
     manageSequence,
@@ -38,5 +38,5 @@ export let provider = Slate.create({
     listSchedules,
     pushContactToCampaign
   ],
-  triggers: [emailEvents, contactEvents]
+  triggers: []
 });

@@ -1,109 +1,41 @@
-Now let me get the complete list of webhook events:Now I have all the information needed. Let me compile the specification.
+# ImageKit integration
 
-# Slates Specification for ImageKit
+Fourteen public tools retain the twelve existing keys and add `get_bulk_job_status` and `download_file`. Authentication uses a private API key as the HTTP Basic username with an empty password, against the current v1 API. Connection validation reads a single Media Library page. A validated connection fingerprint identifies key continuity; it is not a provider account or user ID. The API offers no suitable self/profile endpoint.
 
-## Overview
+| Capability | Tools |
+| --- | --- |
+| Upload/search/detail/update/delete | `upload_file`, `list_files`, `get_file`, `update_file`, `delete_files` |
+| Copy/move/rename; tags | `copy_move_file`, `manage_tags` |
+| Custom field definitions; technical metadata | `manage_custom_metadata_fields`, `get_file_metadata` |
+| Folders and async jobs | `manage_folders`, `get_bulk_job_status` |
+| Version history and restore/delete | `manage_file_versions` |
+| Purge requests and status | `purge_cache` |
+| Original published-file or version download | `download_file` |
 
-ImageKit is a cloud-based image and video optimization, transformation, and delivery platform with an integrated Digital Asset Management (DAM) system. It provides real-time URL-based media processing, a CDN for delivery, and APIs for file upload, management, metadata, and cache operations. It can connect to external storage providers like AWS S3, Google Cloud Storage, and Azure Blob Storage.
+List results expose a page count and an optional next offset when the provider page is full; this does not guarantee another page or provide a total. Search can contain folder entries, which are omitted while preserving the provider’s page offset. ImageKit ignores tags/name parameters with `searchQuery`; combine filters inside the query instead. Standard native thumbnails use `thumbnail`, while uploads use `thumbnailUrl`.
 
-## Authentication
+Uploads use multipart v1 server-side authentication. Supported post-processing types are transformation, gif-to-video, thumbnail, and abs, with the documented value/protocol requirements. Queued pre-processing returns `status: queued` without fabricated file fields. Processing and extensions can consume credits. Update publish options retain `publish.isPublished` and `publish.includeFileVersions`.
 
-ImageKit authenticates API requests using API keys. Authentication to the API is performed via HTTP Basic Auth. Provide your private API key as the basic auth username value. You do not need to provide a password.
+Bulk deletion and tag operations use native success arrays and preserve partial/unconfirmed outcomes. File rename can succeed while its requested purge fails. Folder copy sends `includeVersions`; file copy sends `includeFileVersions`. Folder jobs retain native Pending, Completed, and Partial success statuses, bound to the requested job ID. No automatic write retry or chained resource creation is performed.
 
-The private key always starts with a `private_` prefix. You can view your API keys in the ImageKit.io dashboard under the developer options.
+Version identities come from `versionInfo.id`. A historical version’s asset `fileId` may differ from its parent’s current file ID. Restore/delete apply only to noncurrent versions. Downloads resolve the exact parent and requested version, preserve the native object-version query, use `orig-true` to disable automatic optimization, and sign the encoded endpoint-relative URL using the documented HMAC-SHA1 algorithm. Links expire after five minutes and can be renewed only for the same connection, asset identity, path, version, and endpoint. The optional custom CDN endpoint must exactly match the provider URL; unpublished assets are unavailable through CDN delivery.
 
-To authenticate, pass the private key as the Basic Auth username with an empty password. The Base64-encoded value of `your_private_api_key:` (note the trailing colon) is sent in the `Authorization: Basic <encoded_value>` header.
+Deletes leave audit history and may leave cached copies. Deleted custom field names cannot be reused; reserved fields cannot be deleted, and schema types cannot be changed. Copy/move into existing destinations can append versions, so controlled tests reject occupied destinations. The private suite is active, with independent native readbacks and original-byte checks; writes require explicit authorization for controlled media, delivery bandwidth, and retained history. No authenticated provider operation was performed during this refresh. Paid cache purges, global metadata field writes, and AI processing remain live-unverified.
 
-**Key types:**
+Official sources:
 
-- **Standard keys**: A standard API key has read and write access to all the APIs. At any time, you can have a maximum of 5 standard keys.
-- **Restricted keys**: A restricted API key allows only the minimum level of access that you specify across all the APIs. Use restricted keys for integrations that only need access to specific operations.
+- [Current OpenAPI](https://github.com/imagekit-developer/openapi/blob/main/openapi.yml)
+- [API keys](https://imagekit.io/docs/api-keys)
+- [List and search](https://imagekit.io/docs/api-reference/digital-asset-management-dam/list-and-search-assets)
+- [Original delivery and download links](https://imagekit.io/docs/core-delivery-features)
+- [URL signing](https://imagekit.io/docs/media-delivery-basic-security)
+- [Official signing implementation](https://github.com/imagekit-developer/imagekit-nodejs/blob/main/src/resources/helper.ts)
+- [Asset versioning](https://imagekit.io/docs/dam/asset-versioning)
+- [Manage files and folders](https://imagekit.io/docs/dam/manage-assets)
+- [Metadata fields](https://imagekit.io/docs/dam/custom-metadata)
 
-**Required credentials:**
+Current-file download links use ImageKit’s native current URL and can follow a later overwrite during their five-minute validity. Exact historical downloads require a native `ik-obj-version` selector; version IDs are not substituted for this opaque selector. Renewal rechecks the original version, asset ID, path, connection, and endpoint, and refuses changed bindings.
 
-- **Private API Key** (required): Used for server-side API authentication.
-- **Public API Key** (required for client-side uploads): Used in frontend SDKs to identify the account.
-- **URL Endpoint** (required for URL generation): Your ImageKit URL endpoint, e.g., `https://ik.imagekit.io/your_imagekit_id/`.
+Renewal also preserves the exact opaque CDN selector. A changed current version requires a new download; an unpinned historical URL cannot substitute for it. Previously prepared downloads without this proof must be requested again.
 
-**Client-side uploads:** For secure client-side file uploads, the server generates authentication parameters (token, expiry timestamp, and HMAC signature) using the private key. These parameters are passed to the client SDK, which uses them along with the public key to upload files without exposing the private key.
-
-## Features
-
-### File Upload
-
-Upload files to the ImageKit Media Library from the server or client side. Supports uploading from file streams, byte arrays, URLs, or Base64-encoded data. During upload, besides file name, you can set many other parameters like tags, auto AI tagging, AI background removal, custom metadata, etc.
-
-- You can apply pre-transformation to modify images & videos before they are uploaded to ImageKit.
-- You can apply post-transformation to eagerly transform images & videos once upload is complete.
-- You can apply several post-transformations to an asset, with a maximum limit of five.
-- You can include a webhookUrl parameter during file upload. The final status of extensions will be delivered to this endpoint as a POST request.
-
-### Digital Asset Management
-
-Build a Headless DAM solution by natively integrating the ImageKit Media Library with search, list, copy, move, and other operations exposed via APIs.
-
-- Organize your assets in folders and subfolders. Create virtual collections to group assets based on your requirements.
-- Search millions of assets quickly. ImageKit DAM provides a powerful search experience, from simple auto-suggestions to advanced search queries. You can also use AI-powered visual search to find assets based on their content.
-- File operations include listing, getting details, updating, deleting, copying, moving, renaming, and managing file versions.
-- Bulk operations are supported for adding and removing tags.
-
-### File Metadata
-
-Get a file's metadata by its file ID or URL. This includes embedded EXIF data, image dimensions, and other technical metadata.
-
-### Custom Metadata Fields
-
-Create, read, and update custom metadata fields in your ImageKit Media Library via APIs. These fields can then be updated for your files via the Update File or Upload File API.
-
-- Custom metadata supports various data types and can be used for storing business-specific information about assets.
-
-### Image and Video Transformations
-
-50+ real-time optimizations, transformations, and streaming capabilities via a URL-based image and video processing API.
-
-- Resize, crop, add overlays (text and images), apply effects and enhancements, format conversion, and quality optimization.
-- Video-specific: trimming, thumbnail generation, adaptive bitrate streaming (HLS/DASH), audio transformations.
-- AI transformations including background removal, upscaling, and more.
-- Transformations are applied by appending parameters to the asset URL, not via separate API calls.
-
-### AI-Powered Extensions
-
-ImageKit DAM provides AI-powered auto-tagging that automatically assigns tags to your files based on their content. The auto-tagging feature uses machine-learning algorithms to analyze the file's content and assign relevant tags.
-
-- ImageKit leverages label detection APIs by Google Cloud Vision and Amazon Rekognition to provide accurate and relevant tags.
-- Configurable minimum confidence threshold for tags.
-- AI-powered background removal via Remove.bg integration.
-- Use AI tasks to automate controlled vocabulary tagging and custom metadata updates.
-- AI-based image generation from text prompts.
-
-### Cache Management
-
-Initiate cache purge requests and check their status via APIs. This allows you to invalidate CDN-cached versions of assets when they are updated.
-
-## Events
-
-ImageKit uses webhooks to notify your application when an event occurs in your account. Webhooks are particularly useful for asynchronous events such as video encoding and extension processing during uploads.
-
-Webhooks are configured in the ImageKit dashboard under Developer options. You enter a valid HTTP(S) endpoint, select the events you want to receive, and click "Create." ImageKit follows the Standard Webhooks specification for secure webhook verification and sends `webhook-id`, `webhook-timestamp`, and `webhook-signature` HMAC-SHA256 signature headers.
-
-### Video Transformation Events
-
-Tracks the lifecycle of asynchronous video encoding/transformation operations.
-
-- **`video.transformation.accepted`**: Triggered when a new video transformation request is accepted for processing.
-- **`video.transformation.ready`**: Triggered when a video encoding is finished, and the transformed resource is ready to be served.
-- **`video.transformation.error`**: Triggered if an error occurs during encoding.
-
-### Upload Pre-Transformation Events
-
-Tracks the result of pre-transformations applied to files before they are stored.
-
-- **`upload.pre-transform.success`**: Triggered when a pre-transform happens successfully.
-- **`upload.pre-transform.error`**: Triggered if an error occurs during the pre-transformation.
-
-### Upload Post-Transformation Events
-
-Tracks the result of post-transformations applied to files after upload.
-
-- **`upload.post-transform.success`**: Triggered when a post-transform happens successfully. Each post-transformation will have its separate webhook sent.
-- **`upload.post-transform.error`**: Triggered if an error occurs during a post-transformation.
+Controlled cleanup checks the complete bounded native version inventory and independently verifies every known version’s original bytes and associated state. Missing privacy or publish proof, extra history, changed metadata, or unavailable historical selectors block destructive cleanup. Native omissions and concurrent changes remain reasons to inspect retained state; deletion does not imply erasing caches or audit history.

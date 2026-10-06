@@ -6,13 +6,12 @@ import { spec } from '../spec';
 export let generateSpeech = SlateTool.create(spec, {
   name: 'Generate Speech',
   key: 'generate_speech',
-  description: `Converts text into synthesized speech audio using LMNT's AI models. Select a voice from the voice library or use a custom cloned voice, choose the output format, and control expressiveness and stability parameters. Returns the generated audio as base64-encoded data.`,
-  instructions: [
-    'Use the **list_voices** tool first to find available voice IDs.',
-    'Specifying a language code is recommended for faster generation instead of relying on auto-detection.'
-  ],
+  description:
+    'DEPRECATED — LMNT has shut down. This tool is retained for existing workflows and cannot perform provider operations.',
+  instructions: ['Choose another speech provider; LMNT no longer operates this service.'],
   constraints: ['Maximum 5000 characters per request including spaces.'],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

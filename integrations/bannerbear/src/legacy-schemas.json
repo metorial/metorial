@@ -1,0 +1,1370 @@
+{
+  "generate_image": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templateUid": {
+          "type": "string",
+          "description": "UID of the template to generate an image from"
+        },
+        "modifications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the layer in the template to modify"
+              },
+              "text": {
+                "description": "Text content for a text layer",
+                "type": "string"
+              },
+              "color": {
+                "description": "Color value (hex) for the layer",
+                "type": "string"
+              },
+              "background": {
+                "description": "Background color (hex) for the layer",
+                "type": "string"
+              },
+              "image_url": {
+                "description": "URL of an image to use for an image layer",
+                "type": "string"
+              },
+              "star_rating": {
+                "description": "Star rating value (for star rating layers)",
+                "type": "number"
+              },
+              "chart_data": {
+                "description": "Comma-separated chart data values",
+                "type": "string"
+              },
+              "barcode_data": {
+                "description": "Data to encode in a barcode layer",
+                "type": "string"
+              },
+              "qr_data": {
+                "description": "Data to encode in a QR code layer",
+                "type": "string"
+              },
+              "font_family": {
+                "description": "Font family name to use for a text layer",
+                "type": "string"
+              },
+              "font_size": {
+                "description": "Font size for a text layer",
+                "type": "number"
+              },
+              "font_weight": {
+                "description": "Font weight (e.g. \"bold\") for a text layer",
+                "type": "string"
+              },
+              "effect": {
+                "description": "Effect to apply (e.g. \"Grayscale\", \"Sepia\")",
+                "type": "string"
+              },
+              "hide": {
+                "description": "Whether to hide this layer",
+                "type": "boolean"
+              }
+            },
+            "required": ["name"],
+            "additionalProperties": false,
+            "description": "Modification to apply to a template layer"
+          },
+          "description": "List of modifications to apply to template layers"
+        },
+        "transparent": {
+          "description": "Render with a transparent background",
+          "type": "boolean"
+        },
+        "renderPdf": {
+          "description": "Also generate a PDF version of the image",
+          "type": "boolean"
+        },
+        "metadata": {
+          "description": "Custom metadata to attach to the image (e.g. an external record ID)",
+          "type": "string"
+        },
+        "webhookUrl": {
+          "description": "URL to receive a POST when rendering completes",
+          "type": "string"
+        },
+        "templateVersion": {
+          "description": "Specific template version to use",
+          "type": "number"
+        }
+      },
+      "required": ["templateUid", "modifications"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "imageUid": {
+          "type": "string",
+          "description": "UID of the generated image"
+        },
+        "status": {
+          "type": "string",
+          "description": "Rendering status (pending, completed, failed)"
+        },
+        "imageUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL of the generated JPG image"
+        },
+        "imageUrlPng": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL of the generated PNG image"
+        },
+        "pdfUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL of the generated PDF (if requested)"
+        },
+        "templateUid": {
+          "type": "string",
+          "description": "UID of the template used"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the image was created"
+        }
+      },
+      "required": [
+        "imageUid",
+        "status",
+        "imageUrl",
+        "imageUrlPng",
+        "pdfUrl",
+        "templateUid",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "generate_video": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "videoTemplateUid": {
+          "type": "string",
+          "description": "UID of the video template to generate from"
+        },
+        "inputMediaUrl": {
+          "description": "URL of the input video or audio file",
+          "type": "string"
+        },
+        "modifications": {
+          "description": "List of modifications for Overlay/Multi Overlay build packs",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Layer name to modify"
+              },
+              "text": {
+                "description": "Text content",
+                "type": "string"
+              },
+              "image_url": {
+                "description": "Image URL",
+                "type": "string"
+              },
+              "color": {
+                "description": "Color (hex)",
+                "type": "string"
+              }
+            },
+            "required": ["name"],
+            "additionalProperties": false
+          }
+        },
+        "frames": {
+          "description": "Frames for Multi Overlay build pack, each frame is a list of modifications",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Layer name"
+                },
+                "text": {
+                  "description": "Text content",
+                  "type": "string"
+                },
+                "image_url": {
+                  "description": "Image URL",
+                  "type": "string"
+                }
+              },
+              "required": ["name"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "frameDurations": {
+          "description": "Duration in seconds for each frame in Multi Overlay",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "trimToLengthInSeconds": {
+          "description": "Trim the output video to this length",
+          "type": "number"
+        },
+        "trimFrom": {
+          "description": "Start time offset in seconds for trimming",
+          "type": "number"
+        },
+        "zoom": {
+          "description": "Enable Ken Burns zoom/pan effect",
+          "type": "boolean"
+        },
+        "zoomFactor": {
+          "description": "Zoom factor for the zoom effect",
+          "type": "number"
+        },
+        "blur": {
+          "description": "Apply blur filter to the background video",
+          "type": "boolean"
+        },
+        "createGifPreview": {
+          "description": "Also generate a GIF preview of the video",
+          "type": "boolean"
+        },
+        "webhookUrl": {
+          "description": "URL to receive a POST when rendering completes",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom metadata to attach",
+          "type": "string"
+        }
+      },
+      "required": ["videoTemplateUid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "videoUid": {
+          "type": "string",
+          "description": "UID of the generated video"
+        },
+        "status": {
+          "type": "string",
+          "description": "Rendering status"
+        },
+        "videoUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL of the generated video file"
+        },
+        "percentRendered": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rendering progress percentage"
+        },
+        "lengthInSeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total video length in seconds"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the video was created"
+        }
+      },
+      "required": [
+        "videoUid",
+        "status",
+        "videoUrl",
+        "percentRendered",
+        "lengthInSeconds",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "generate_collection": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templateSetUid": {
+          "type": "string",
+          "description": "UID of the template set to generate from"
+        },
+        "modifications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Layer name to modify"
+              },
+              "text": {
+                "description": "Text content",
+                "type": "string"
+              },
+              "color": {
+                "description": "Color (hex)",
+                "type": "string"
+              },
+              "image_url": {
+                "description": "Image URL",
+                "type": "string"
+              }
+            },
+            "required": ["name"],
+            "additionalProperties": false
+          },
+          "description": "List of modifications shared across all templates in the set"
+        },
+        "transparent": {
+          "description": "Render with transparent backgrounds",
+          "type": "boolean"
+        },
+        "metadata": {
+          "description": "Custom metadata to attach",
+          "type": "string"
+        },
+        "webhookUrl": {
+          "description": "URL to receive a POST when all images are rendered",
+          "type": "string"
+        }
+      },
+      "required": ["templateSetUid", "modifications"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "collectionUid": {
+          "type": "string",
+          "description": "UID of the generated collection"
+        },
+        "status": {
+          "type": "string",
+          "description": "Rendering status"
+        },
+        "imageUrls": {
+          "anyOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Map of template name to generated image URL"
+        },
+        "images": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "imageUid": {
+                    "type": "string",
+                    "description": "UID of the generated image"
+                  },
+                  "templateUid": {
+                    "type": "string",
+                    "description": "UID of the template used"
+                  },
+                  "imageUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "URL of the generated image"
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "Status of this image"
+                  }
+                },
+                "required": ["imageUid", "templateUid", "imageUrl", "status"],
+                "additionalProperties": false
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Detailed list of generated images"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the collection was created"
+        }
+      },
+      "required": ["collectionUid", "status", "imageUrls", "images", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "generate_animated_gif": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templateUid": {
+          "type": "string",
+          "description": "UID of the template to use for each frame"
+        },
+        "frames": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Layer name to modify"
+                },
+                "text": {
+                  "description": "Text content",
+                  "type": "string"
+                },
+                "image_url": {
+                  "description": "Image URL",
+                  "type": "string"
+                },
+                "color": {
+                  "description": "Color (hex)",
+                  "type": "string"
+                }
+              },
+              "required": ["name"],
+              "additionalProperties": false
+            }
+          },
+          "description": "List of frames, each containing modifications for that frame"
+        },
+        "inputMediaUrl": {
+          "description": "URL of a video to auto-generate frame thumbnails from",
+          "type": "string"
+        },
+        "fps": {
+          "description": "Frames per second (default varies)",
+          "type": "number"
+        },
+        "frameDurations": {
+          "description": "Duration in seconds for each frame",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "loop": {
+          "description": "Whether the GIF should loop (default true)",
+          "type": "boolean"
+        },
+        "metadata": {
+          "description": "Custom metadata to attach",
+          "type": "string"
+        },
+        "webhookUrl": {
+          "description": "URL to receive a POST when rendering completes",
+          "type": "string"
+        }
+      },
+      "required": ["templateUid", "frames"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "gifUid": {
+          "type": "string",
+          "description": "UID of the generated animated GIF"
+        },
+        "status": {
+          "type": "string",
+          "description": "Rendering status"
+        },
+        "imageUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL of the generated GIF file"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the GIF was created"
+        }
+      },
+      "required": ["gifUid", "status", "imageUrl", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "compose_movie": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number",
+          "description": "Output video width in pixels"
+        },
+        "height": {
+          "type": "number",
+          "description": "Output video height in pixels"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "assetUrl": {
+                "type": "string",
+                "description": "URL of the video clip or still image"
+              },
+              "trimToLengthInSeconds": {
+                "description": "Trim this clip to a specific length",
+                "type": "number"
+              },
+              "mute": {
+                "description": "Mute the audio of this clip",
+                "type": "boolean"
+              }
+            },
+            "required": ["assetUrl"],
+            "additionalProperties": false
+          },
+          "description": "Ordered list of video clips or images to combine"
+        },
+        "transition": {
+          "description": "Transition effect between clips",
+          "type": "string",
+          "enum": ["fade", "pixelize", "slidedown", "slideup", "slideleft", "slideright"]
+        },
+        "soundtrackUrl": {
+          "description": "URL of an audio file to overlay as soundtrack",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom metadata to attach",
+          "type": "string"
+        },
+        "webhookUrl": {
+          "description": "URL to receive a POST when rendering completes",
+          "type": "string"
+        }
+      },
+      "required": ["width", "height", "inputs"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "movieUid": {
+          "type": "string",
+          "description": "UID of the composed movie"
+        },
+        "status": {
+          "type": "string",
+          "description": "Rendering status"
+        },
+        "videoUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL of the composed movie file"
+        },
+        "percentRendered": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Rendering progress percentage"
+        },
+        "totalLengthInSeconds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Total movie length in seconds"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the movie was created"
+        }
+      },
+      "required": [
+        "movieUid",
+        "status",
+        "videoUrl",
+        "percentRendered",
+        "totalLengthInSeconds",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "capture_screenshot": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Full URL of the web page to screenshot"
+        },
+        "width": {
+          "description": "Browser viewport width in pixels",
+          "type": "number"
+        },
+        "height": {
+          "description": "Browser viewport height in pixels",
+          "type": "number"
+        },
+        "mobile": {
+          "description": "Use a mobile user agent",
+          "type": "boolean"
+        },
+        "language": {
+          "description": "ISO 639-1 language code for the browser (e.g. \"en\", \"fr\", \"de\")",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom metadata to attach",
+          "type": "string"
+        },
+        "webhookUrl": {
+          "description": "URL to receive a POST when the screenshot is ready",
+          "type": "string"
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "screenshotUid": {
+          "type": "string",
+          "description": "UID of the screenshot"
+        },
+        "status": {
+          "type": "string",
+          "description": "Rendering status"
+        },
+        "screenshotImageUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL of the captured screenshot image"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the screenshot was created"
+        }
+      },
+      "required": ["screenshotUid", "status", "screenshotImageUrl", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "manage_template": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "duplicate", "delete", "import"],
+          "description": "Operation to perform"
+        },
+        "templateUid": {
+          "description": "UID of the template (required for update, duplicate, delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Template name (for create or update)",
+          "type": "string"
+        },
+        "width": {
+          "description": "Template width in pixels (for create)",
+          "type": "number"
+        },
+        "height": {
+          "description": "Template height in pixels (for create)",
+          "type": "number"
+        },
+        "tags": {
+          "description": "Tags to assign to the template (for create or update)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "metadata": {
+          "description": "Custom metadata (for create or update)",
+          "type": "string"
+        },
+        "publicationIds": {
+          "description": "IDs of library publications to import (for import action)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templateUid": {
+          "description": "UID of the created/updated/duplicated template",
+          "type": "string"
+        },
+        "name": {
+          "description": "Template name",
+          "type": "string"
+        },
+        "width": {
+          "description": "Template width",
+          "type": "number"
+        },
+        "height": {
+          "description": "Template height",
+          "type": "number"
+        },
+        "previewUrl": {
+          "description": "Preview image URL",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tags": {
+          "description": "Template tags",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deleted": {
+          "description": "True if the template was deleted",
+          "type": "boolean"
+        },
+        "importedTemplates": {
+          "description": "List of imported templates (for import action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "templateUid": {
+                "type": "string",
+                "description": "UID of the imported template"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the imported template"
+              }
+            },
+            "required": ["templateUid", "name"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_templates": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number for pagination (default 1)",
+          "type": "number"
+        },
+        "limit": {
+          "description": "Number of results per page (max 100, default 25)",
+          "type": "number"
+        },
+        "tag": {
+          "description": "Filter templates by tag",
+          "type": "string"
+        },
+        "name": {
+          "description": "Filter templates by name",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "templateUid": {
+                "type": "string",
+                "description": "UID of the template"
+              },
+              "name": {
+                "type": "string",
+                "description": "Template name"
+              },
+              "width": {
+                "type": "number",
+                "description": "Template width in pixels"
+              },
+              "height": {
+                "type": "number",
+                "description": "Template height in pixels"
+              },
+              "previewUrl": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Preview image URL"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Template tags"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Timestamp when the template was created"
+              }
+            },
+            "required": [
+              "templateUid",
+              "name",
+              "width",
+              "height",
+              "previewUrl",
+              "tags",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of templates"
+        }
+      },
+      "required": ["templates"],
+      "additionalProperties": false
+    }
+  },
+  "get_template": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templateUid": {
+          "type": "string",
+          "description": "UID of the template to retrieve"
+        }
+      },
+      "required": ["templateUid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templateUid": {
+          "type": "string",
+          "description": "UID of the template"
+        },
+        "name": {
+          "type": "string",
+          "description": "Template name"
+        },
+        "width": {
+          "type": "number",
+          "description": "Template width in pixels"
+        },
+        "height": {
+          "type": "number",
+          "description": "Template height in pixels"
+        },
+        "previewUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Preview image URL"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Template tags"
+        },
+        "availableModifications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Layer name used in modifications"
+              },
+              "type": {
+                "description": "Layer type (e.g. text, image, shape)",
+                "type": "string"
+              }
+            },
+            "required": ["name"],
+            "additionalProperties": false
+          },
+          "description": "Available layers that can be modified"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the template was created"
+        }
+      },
+      "required": [
+        "templateUid",
+        "name",
+        "width",
+        "height",
+        "previewUrl",
+        "tags",
+        "availableModifications",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "create_editor_session": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templateUid": {
+          "type": "string",
+          "description": "UID of the template to open in the editor"
+        },
+        "mode": {
+          "description": "Editor mode: default (full editing), limited (no add/delete layers), or preview (read-only)",
+          "type": "string",
+          "enum": ["default", "limited", "preview"]
+        },
+        "metadata": {
+          "description": "Custom metadata to attach to the session",
+          "type": "string"
+        },
+        "customFonts": {
+          "description": "List of custom font URLs to make available in the editor",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["templateUid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sessionUid": {
+          "type": "string",
+          "description": "UID of the editor session"
+        },
+        "editorUrl": {
+          "type": "string",
+          "description": "URL to access the template editor (expires in 2 hours)"
+        },
+        "templateUid": {
+          "type": "string",
+          "description": "UID of the template being edited"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Editor mode"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the session was created"
+        }
+      },
+      "required": ["sessionUid", "editorUrl", "templateUid", "mode", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "create_signed_url": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templateUid": {
+          "type": "string",
+          "description": "UID of the template to create a signed base for"
+        }
+      },
+      "required": ["templateUid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "description": "The signed base URL for generating images on-demand"
+        },
+        "exampleUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Example URL showing how to append parameters"
+        },
+        "templateUid": {
+          "type": "string",
+          "description": "UID of the template"
+        }
+      },
+      "required": ["baseUrl", "exampleUrl", "templateUid"],
+      "additionalProperties": false
+    }
+  },
+  "join_pdfs": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pdfUrls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of URLs to PDF files to join, in order"
+        },
+        "webhookUrl": {
+          "description": "URL to receive a POST when joining completes",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom metadata to attach",
+          "type": "string"
+        }
+      },
+      "required": ["pdfUrls"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "joinUid": {
+          "type": "string",
+          "description": "UID of the PDF join operation"
+        },
+        "status": {
+          "type": "string",
+          "description": "Processing status"
+        },
+        "joinedPdfUrl": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL of the joined PDF file"
+        }
+      },
+      "required": ["joinUid", "status", "joinedPdfUrl"],
+      "additionalProperties": false
+    }
+  },
+  "rasterize_pdf": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pdfUrl": {
+          "type": "string",
+          "description": "URL of the PDF file to rasterize"
+        },
+        "dpi": {
+          "description": "Resolution in DPI (max 300, default varies)",
+          "type": "number"
+        },
+        "webhookUrl": {
+          "description": "URL to receive a POST when rasterization completes",
+          "type": "string"
+        }
+      },
+      "required": ["pdfUrl"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "rasterizeUid": {
+          "type": "string",
+          "description": "UID of the rasterization operation"
+        },
+        "status": {
+          "type": "string",
+          "description": "Processing status"
+        },
+        "imageUrlPng": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL of the rasterized PNG image"
+        },
+        "imageUrlJpg": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "URL of the rasterized JPG image"
+        }
+      },
+      "required": ["rasterizeUid", "status", "imageUrlPng", "imageUrlJpg"],
+      "additionalProperties": false
+    }
+  },
+  "diagnose_image": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "imageUid": {
+          "type": "string",
+          "description": "UID of the generated image to diagnose"
+        }
+      },
+      "required": ["imageUid"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "diagnosisUid": {
+          "type": "string",
+          "description": "UID of the diagnostic report"
+        },
+        "status": {
+          "type": "string",
+          "description": "Diagnosis status"
+        },
+        "report": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "description": "URL of the external image",
+                    "type": "string"
+                  },
+                  "result": {
+                    "description": "Result of the check (e.g. \"ok\", \"failed\")",
+                    "type": "string"
+                  },
+                  "comment": {
+                    "description": "Details about any issues found",
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Diagnostic findings for external images"
+        }
+      },
+      "required": ["diagnosisUid", "status", "report"],
+      "additionalProperties": false
+    }
+  },
+  "get_account": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountUid": {
+          "type": "string",
+          "description": "Account UID"
+        },
+        "planName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Current paid plan name"
+        },
+        "apiUsage": {
+          "type": "number",
+          "description": "Number of API calls used this month"
+        },
+        "apiQuota": {
+          "type": "number",
+          "description": "Total API call quota for the month"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Account creation timestamp"
+        }
+      },
+      "required": ["accountUid", "planName", "apiUsage", "apiQuota", "createdAt"],
+      "additionalProperties": false
+    }
+  }
+}

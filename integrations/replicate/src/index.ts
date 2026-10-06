@@ -36,8 +36,6 @@ import {
   updateDeployment,
   updateModel
 } from './tools';
-import { inboundWebhook, predictionCompleted, trainingCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -76,5 +74,5 @@ export let provider = Slate.create({
     getWebhookSigningSecret,
     getAccount
   ],
-  triggers: [inboundWebhook, predictionCompleted, trainingCompleted]
+  triggers: []
 });

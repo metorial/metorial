@@ -17,8 +17,6 @@ import {
   sendSms,
   updateLead
 } from './tools';
-import { callCompleted, leadCreated, leadUpdated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     manageTeamAgents,
     manageClient
   ],
-  triggers: [callCompleted, leadCreated, leadUpdated]
+  triggers: []
 });

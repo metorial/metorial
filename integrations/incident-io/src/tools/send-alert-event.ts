@@ -8,7 +8,7 @@ export let sendAlertEvent = SlateTool.create(spec, {
   key: 'send_alert_event',
   description: `Ingest an alert event into incident.io via an HTTP alert source. Use this to trigger or resolve alerts from external monitoring tools. Supports deduplication keys and custom metadata.`,
   instructions: [
-    'You need an HTTP alert source configured in incident.io. Use the alert source config ID, not the alert source ID.'
+    'This can page responders or create incidents through alert routes. You need an HTTP alert source and its secret configured in authentication. Use the alert source config ID, not the alert source ID.'
   ],
   constraints: ['Rate limited to 120 events per minute per alert source.'],
   tags: {
@@ -24,12 +24,15 @@ export let sendAlertEvent = SlateTool.create(spec, {
       status: z
         .enum(['firing', 'resolved'])
         .describe('Whether the alert is firing or resolved'),
-      description: z.string().optional().describe('Detailed description of the alert'),
+      description: z
+        .string()
+        .optional()
+        .describe('Detailed description of the alert; supports Markdown'),
       deduplicationKey: z
         .string()
         .optional()
         .describe(
-          'Unique key to deduplicate alerts; alerts with the same key are treated as the same alert'
+          'Unique key to deduplicate alerts; required for newly configured HTTP sources; alerts with the same key are treated as the same alert'
         ),
       metadata: z
         .record(z.string(), z.string())
@@ -43,13 +46,15 @@ export let sendAlertEvent = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      deduplicationKey: z.string(),
+      message: z.string(),
       accepted: z.boolean().describe('Whether the alert event was accepted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
-    await client.createAlertEvent(ctx.input.alertSourceConfigId, {
+    const result = await client.createAlertEvent(ctx.input.alertSourceConfigId, {
       title: ctx.input.title,
       status: ctx.input.status,
       description: ctx.input.description,
@@ -60,7 +65,9 @@ export let sendAlertEvent = SlateTool.create(spec, {
 
     return {
       output: {
-        accepted: true
+        accepted: true,
+        deduplicationKey: result.deduplication_key,
+        message: result.message
       },
       message: `Alert event "${ctx.input.title}" (${ctx.input.status}) sent successfully.`
     };

@@ -1,147 +1,19 @@
-Let me get more details on the webhook event types and some additional features.Now I have all the information I need. Let me compile the specification.
+# ShipEngine integration
 
-# Slates Specification for Shipengine
+The current ShipStation API documentation retains the ShipEngine API hosts and paths. This integration exposes 24 tools: address validation/recognition; rates/estimates; label purchase/void/list/tracking; shipment create/update/cancel/list; carrier/service/package discovery; warehouse create/update/delete/list; service-point search; pickup scheduling/cancellation; manifest creation; exact shipping-resource lookup; pickup/manifest listing; and existing-document downloads.
 
-## Overview
+API keys use the API-Key header. Choose the supported US or EU host during connection setup. Saved legacy host configuration remains readable. Connections are validated through account/settings, which provides label-layout settings rather than native account identity. The profile identifies the API-key connection and sandbox/production mode; it does not claim to identify a person or provider account.
 
-ShipEngine is a multi-carrier shipping and logistics API that provides a unified interface for creating shipping labels, comparing rates, validating addresses, and tracking packages across carriers like FedEx, UPS, USPS, and DHL. It supports both parcel and LTL (Less-Than-Truckload) shipping, and offers pre-negotiated discounted rates for accounts shipping from the US, Canada, and the UK. ShipEngine is being rebranded as ShipStation API, but all endpoints and functionality remain the same.
+Production labels can charge the account, and carrier pickups can incur fees. Shipments are cancelled through PUT /v1/shipments/{id}/cancel and remain in history. Pickup cancellation also retains history. Label void approval is distinct from observed void state and completed refunds. Warehouse updates return 204 and are read back; deletion requires independent 404 after an accepted exact delete.
 
-## Authentication
+Labels/manifests can produce multiple files. Document delivery validates PDF, PNG or ZPL content. Label URLs expire after 90 days, with no documented renewal operation; the integration stores usable document content instead of inventing renewal. Existing URL output fields remain available where the provider supplies them. No inline file data is exposed in structured output.
 
-To authenticate to ShipEngine, you need to include an `API-Key` header in each API call.
+Purchases by rate verify the documented rate lookup and its shipment before submitting; purchases by shipment and tracking responses verify the requested resource relationship. Explicit manifest labels cannot be combined with carrier, warehouse or date criteria. Safe existing label, shipment, pickup, manifest and request IDs remain available in error metadata after an uncertain or incomplete change, including document preparation failures. Do not automatically retry these operations.
 
-- **Method:** API Key via HTTP header
-- **Header name:** `API-Key`
-- **Base URLs:** `https://api.shipengine.com` (US) or `https://api.eu.shipengine.com` (EU)
-- All API requests must be made using HTTPS and TLS 1.1 or higher.
+Shipment updates preserve other documented writable fields and shipping-address instructions from the existing record. A response containing reflected connection credentials is not reused for updates. Monetary JSON keys are interpreted after JSON unescaping, so alternative key spelling cannot bypass the accuracy check; original numeric public field types and provider currencies remain unchanged.
 
-**Obtaining an API Key:**
-API keys can be found on the API Keys page of the ShipEngine account dashboard, which includes both production API keys for live carriers and Sandbox keys for testing.
+Native exact string IDs, money amounts/currencies and paging counts are preserved. Omitted/null metadata remains absent; no zero amount or USD currency is invented. Monetary JSON values that would lose semantic precision fail safely; exponent/trailing-zero equivalents remain accepted. Old label sort ship_date and service-point radiusUnit mi remain recognized inputs with truthful runtime refusal because current endpoints do not support them.
 
-**Sandbox vs. Production:**
-Sandbox API keys have a `TEST_` prefix. Production API keys do not have this prefix.
+Carrier-account administration, LTL freight, sales-order imports and event subscriptions are not exposed. Legacy event handlers and trigger-only helpers have been removed without replacement.
 
-**Example request header:**
-
-```
-API-Key: YOUR_API_KEY_HERE
-```
-
-There is no OAuth2 flow or scopes. API keys give full access to ShipEngine's functionality — there is no granular permission model per key.
-
-## Features
-
-### Address Validation
-
-ShipEngine supports address validation for virtually every country on Earth, including the United States, Canada, Great Britain, Australia, Germany, France, Norway, Spain, Sweden, Israel, Italy, and over 160 others. Address validation ensures accurate addresses and can reduce shipping costs by preventing address correction surcharges. ShipEngine cross-references multiple databases to validate addresses and identify potential deliverability issues.
-
-### Address Recognition (Parsing)
-
-The address-recognition API extracts address data from unstructured text such as emails, SMS messages, support tickets, or other documents, returning structured address data.
-
-- Address recognition is currently supported for the United States, Canada, Australia, New Zealand, the United Kingdom, and Ireland.
-
-### Rate Shopping
-
-Compare shipping rates across carriers to find the most cost-effective option. Rate estimates can also be retrieved with limited address information when full shipment details are not yet known.
-
-- Supports rating multiple shipments at once.
-- Supports duties and tariffs calculation for international shipments.
-- Supports retrieving previously quoted rates.
-
-### Shipping Labels
-
-ShipEngine makes it easy to create shipping labels for any carrier and download them in a variety of file formats. Labels can be customized with your own messages and images.
-
-- Labels can be created directly, from a rate quote, from a shipment, or from a sales order.
-- Supports return labels, paperless labels, and branded labels with custom logos.
-- Labels can be voided after creation.
-- Supports batch label creation for bulk operations.
-
-### Shipment Management
-
-Create, update, list, and manage shipments with details including origin/destination addresses, package dimensions, weight, carrier service, and insurance.
-
-- Supports multi-package shipments, international shipments with customs documentation, and delivery confirmation options.
-- Supports third-party billing, collect on delivery, and dangerous goods declarations.
-- Shipments can be organized using tags.
-- Supports creating manifests (scan forms) for end-of-day carrier pickups.
-- Shipping rules can automate carrier and service selection based on configured criteria.
-
-### Package Tracking
-
-Get the current status of a package or subscribe to real-time tracking updates via webhooks.
-
-- Track by carrier code and tracking number, or by ShipEngine label ID.
-- ShipEngine can track labels created outside of its API as long as it has an integration with the carrier.
-- Supports a branded tracking portal with custom colors, logos, and social media links.
-
-### Carrier Management
-
-Connect your own carrier accounts to ShipEngine, or use built-in ShipEngine carrier accounts with pre-negotiated rates.
-
-- List connected carriers, their available services, options, and package types.
-- Connect and disconnect carrier accounts programmatically.
-- Supports a wide range of carriers including FedEx, UPS, USPS, DHL Express, Canada Post, Royal Mail, DPD, and many more.
-
-### LTL (Less-Than-Truckload) Shipping
-
-Supports LTL freight shipping with a separate set of capabilities.
-
-- Request quotes and spot quotes from LTL carriers.
-- Schedule pickups and create Bills of Lading (BOL).
-- Track LTL shipments.
-- Each LTL carrier has different credential requirements that can be queried via the API.
-
-### Warehouse Management
-
-Create and manage warehouse locations that can be used as ship-from addresses on shipments and labels.
-
-### Sales Orders
-
-Connect and manage orders from external order sources via the Sales Order API.
-
-- Import orders from connected marketplaces and e-commerce platforms.
-- Create labels directly from sales orders.
-
-### Service Points (PUDO)
-
-Find carrier pick-up/drop-off (PUDO) locations and create labels for service point delivery.
-
-### Pickup Scheduling
-
-Schedule carrier pickups for your shipments.
-
-## Events
-
-ShipEngine supports webhooks that push real-time notifications to a configured HTTP endpoint when specific events occur. You can set up multiple URLs for the same event via the dashboard, though the API limits one URL per event. Webhooks can be configured via the dashboard or the API.
-
-The following webhook event types are available:
-
-### Tracking
-
-Get updates on any tracking event. Fires whenever a tracking status changes for a subscribed package (e.g., accepted, in transit, delivered, exception). The payload includes tracking number, status code, carrier details, estimated/actual delivery dates, and a full event history.
-
-### Batch Completed
-
-Get updates for completed batches. Fires when a batch label processing operation completes.
-
-### Rate Updated
-
-Get updates when a shipment rate has been updated.
-
-### Carrier Connected
-
-Fires when a new carrier account is connected to your ShipEngine account.
-
-### Report Complete
-
-Fires when a requested report has finished generating and is ready for download.
-
-### Order Source Refresh Complete
-
-Fires when an order source (e.g., a connected marketplace) has completed a refresh of its orders.
-
-### Sales Order Imported (Beta)
-
-Fires when sales orders are imported from a connected order source. The payload includes full order details such as customer info, items, pricing, and shipping addresses.
+Sources: [current official API reference](https://docs.shipstation.com/apis/shipengine/openapi), [authentication](https://docs.shipstation.com/apis/shipengine/docs/guides/auth), [sandbox](https://docs.shipstation.com/apis/shipengine/docs/getting-started/sandbox), [label download](https://docs.shipstation.com/apis/shipengine/docs/labels/downloading), [manifest creation](https://docs.shipstation.com/apis/shipengine/docs/reference/create-manifest), [pickups](https://docs.shipstation.com/apis/shipengine/docs/shipping/pickups).

@@ -18,17 +18,6 @@ import {
   searchContent,
   uploadFile
 } from './tools';
-import {
-  collaborationEvents,
-  commentEvents,
-  fileEvents,
-  folderEvents,
-  metadataEvents,
-  sharedLinkEvents,
-  signRequestEvents,
-  taskAssignmentEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -49,14 +38,5 @@ export let provider = Slate.create({
     listUsers,
     manageWebLink
   ] as any,
-  triggers: [
-    fileEvents,
-    folderEvents,
-    collaborationEvents,
-    commentEvents,
-    sharedLinkEvents,
-    metadataEvents,
-    taskAssignmentEvents,
-    signRequestEvents
-  ] as any
+  triggers: []
 });

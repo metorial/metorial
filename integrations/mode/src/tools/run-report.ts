@@ -7,16 +7,16 @@ import { spec } from '../spec';
 export let runReport = SlateTool.create(spec, {
   name: 'Run Report',
   key: 'run_report',
-  description: `Trigger a new execution (run) of a Mode report. Optionally pass parameters to customize the run. Returns the run's token and initial state so you can track its progress.`,
+  description: `Trigger a new execution (run) of a Mode report. This executes the report SQL and notebooks against its connected data sources and may incur warehouse costs or other report-defined effects. A successful request accepts an asynchronous run; inspect its status to determine success.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
       reportToken: z.string().describe('Token of the report to run'),
       parameters: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Optional key-value parameters to pass to the report run')
     })
@@ -28,15 +28,11 @@ export let runReport = SlateTool.create(spec, {
         .string()
         .describe('Current state of the run (e.g. pending, enqueued, succeeded, failed)'),
       createdAt: z.string().describe('ISO 8601 timestamp when the run was created'),
-      parameters: z.record(z.string(), z.any()).describe('Parameters passed to the run')
+      parameters: z.record(z.string(), z.unknown()).describe('Parameters passed to the run')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let raw = await client.createReportRun(ctx.input.reportToken, ctx.input.parameters);
     let run = normalizeReportRun(raw);
@@ -85,7 +81,7 @@ export let getReportRun = SlateTool.create(spec, {
       createdAt: z.string(),
       updatedAt: z.string(),
       completedAt: z.string(),
-      parameters: z.record(z.string(), z.any()),
+      parameters: z.record(z.string(), z.unknown()),
       queryRuns: z
         .array(
           z.object({
@@ -103,19 +99,18 @@ export let getReportRun = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let raw = await client.getReportRun(ctx.input.reportToken, ctx.input.runToken);
     let run = normalizeReportRun(raw);
 
-    let queryRuns: any[] | undefined;
+    let queryRuns: Omit<ReturnType<typeof normalizeQueryRun>, 'rawSource'>[] | undefined;
     if (ctx.input.includeQueryRuns) {
       let qrData = await client.listQueryRuns(ctx.input.reportToken, ctx.input.runToken);
-      queryRuns = getEmbedded(qrData, 'query_runs').map(normalizeQueryRun);
+      queryRuns = getEmbedded(qrData, 'query_runs').map(value => {
+        const { rawSource: _rawSource, ...run } = normalizeQueryRun(value);
+        return run;
+      });
     }
 
     return {
@@ -142,7 +137,7 @@ export let listReportRuns = SlateTool.create(spec, {
       filter: z
         .string()
         .optional()
-        .describe('Filter expression, e.g. "created_at.gt:2024-01-01"'),
+        .describe('Filter expression, e.g. "created_at.gt.2024-01-01T00:00:00Z"'),
       order: z.enum(['asc', 'desc']).optional().describe('Sort order'),
       orderBy: z.enum(['created_at', 'updated_at']).optional().describe('Field to order by')
     })
@@ -156,17 +151,13 @@ export let listReportRuns = SlateTool.create(spec, {
           createdAt: z.string(),
           updatedAt: z.string(),
           completedAt: z.string(),
-          parameters: z.record(z.string(), z.any())
+          parameters: z.record(z.string(), z.unknown())
         })
       )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let data = await client.listReportRuns(ctx.input.reportToken, {
       filter: ctx.input.filter,

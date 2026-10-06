@@ -25,17 +25,14 @@ export let listDisqualifyReasons = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
+    let client = await RecruiteeClient.forContext(ctx);
 
     let result = await client.listDisqualifyReasons();
     let reasons = result.disqualify_reasons || [];
 
     return {
       output: {
-        reasons: reasons.map((r: any) => ({
+        reasons: reasons.map(r => ({
           reasonId: r.id,
           name: r.name
         }))

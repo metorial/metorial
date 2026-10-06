@@ -1,11 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import {
-  buildEmbedIframe,
-  buildEmbedUrl,
-  extractVideoId,
-  isValidLoomUrl
-} from '../lib/client';
+import { buildEmbedIframe, buildEmbedUrl, parseLoomUrl } from '../lib/client';
 import { spec } from '../spec';
 
 export let generateEmbedCode = SlateTool.create(spec, {
@@ -55,16 +50,7 @@ export let generateEmbedCode = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!isValidLoomUrl(ctx.input.videoUrl)) {
-      throw new Error(
-        `Invalid Loom URL: "${ctx.input.videoUrl}". Expected format: https://www.loom.com/share/{videoId} or https://www.loom.com/embed/{videoId}`
-      );
-    }
-
-    let videoId = extractVideoId(ctx.input.videoUrl);
-    if (!videoId) {
-      throw new Error(`Could not extract video ID from URL: "${ctx.input.videoUrl}"`);
-    }
+    const { videoId } = parseLoomUrl(ctx.input.videoUrl);
 
     let embedOptions = {
       hideTopBar: ctx.input.hideTopBar,
@@ -83,7 +69,7 @@ export let generateEmbedCode = SlateTool.create(spec, {
     let outputDescription =
       format === 'url'
         ? `Generated embed URL for video \`${videoId}\`.`
-        : `Generated responsive embed HTML for video \`${videoId}\`.`;
+        : `Generated embed HTML for video \`${videoId}\`.`;
 
     return {
       output: {

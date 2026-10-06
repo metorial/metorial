@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let estimateRates = SlateTool.create(spec, {
@@ -17,7 +17,7 @@ export let estimateRates = SlateTool.create(spec, {
       fromCountryCode: z
         .string()
         .optional()
-        .describe('Origin country code (defaults to account country)'),
+        .describe('Origin country code (provide the shipment origin country)'),
       fromPostalCode: z.string().optional().describe('Origin postal code'),
       fromCityLocality: z.string().optional().describe('Origin city'),
       fromStateProvince: z.string().optional().describe('Origin state/province'),
@@ -26,14 +26,14 @@ export let estimateRates = SlateTool.create(spec, {
       toCityLocality: z.string().optional().describe('Destination city'),
       toStateProvince: z.string().optional().describe('Destination state/province'),
       weight: z.object({
-        value: z.number().describe('Weight value'),
+        value: z.number().finite().nonnegative().describe('Weight value in the selected unit'),
         unit: z.enum(['pound', 'ounce', 'gram', 'kilogram']).describe('Weight unit')
       }),
       dimensions: z
         .object({
-          length: z.number().describe('Length'),
-          width: z.number().describe('Width'),
-          height: z.number().describe('Height'),
+          length: z.number().finite().nonnegative().describe('Length'),
+          width: z.number().finite().nonnegative().describe('Width'),
+          height: z.number().finite().nonnegative().describe('Height'),
           unit: z.enum(['inch', 'centimeter']).describe('Unit')
         })
         .optional()
@@ -59,21 +59,21 @@ export let estimateRates = SlateTool.create(spec, {
           insuranceAmount: z.number().describe('Insurance cost'),
           confirmationAmount: z.number().describe('Confirmation cost'),
           otherAmount: z.number().describe('Other charges'),
-          currency: z.string().describe('Currency code'),
+          currency: z.string().describe('Currency of shippingAmount'),
+          insuranceCurrency: z.string().describe('Insurance amount currency'),
+          confirmationCurrency: z.string().describe('Confirmation amount currency'),
+          otherCurrency: z.string().describe('Other charges currency'),
           deliveryDays: z.number().optional().describe('Estimated delivery days'),
           estimatedDeliveryDate: z.string().optional().describe('Estimated delivery date'),
           guaranteedService: z.boolean().describe('Whether delivery is guaranteed'),
           trackable: z.boolean().describe('Whether shipment is trackable'),
-          packageType: z.string().describe('Package type')
+          packageType: z.string().optional().describe('Package type')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createClient(ctx);
 
     let results = await client.estimateRates({
       carrier_ids: ctx.input.carrierIds,
@@ -102,6 +102,9 @@ export let estimateRates = SlateTool.create(spec, {
       confirmationAmount: r.confirmation_amount.amount,
       otherAmount: r.other_amount.amount,
       currency: r.shipping_amount.currency,
+      insuranceCurrency: r.insurance_amount.currency,
+      confirmationCurrency: r.confirmation_amount.currency,
+      otherCurrency: r.other_amount.currency,
       deliveryDays: r.delivery_days,
       estimatedDeliveryDate: r.estimated_delivery_date,
       guaranteedService: r.guaranteed_service,

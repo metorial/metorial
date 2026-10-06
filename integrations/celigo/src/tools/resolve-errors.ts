@@ -1,14 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  resolved: z.boolean().describe('Whether the errors were successfully resolved'),
+  rawResult: z.any().optional().describe('API response')
+});
 
 export let resolveErrors = SlateTool.create(spec, {
   name: 'Resolve Errors',
   key: 'resolve_errors',
   description: `Mark one or more flow errors as resolved. Provide the error IDs from the errors list returned by the Get Flow Errors tool.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -18,30 +24,14 @@ export let resolveErrors = SlateTool.create(spec, {
       errorIds: z.array(z.string()).describe('List of error IDs to resolve')
     })
   )
-  .output(
-    z.object({
-      resolved: z.boolean().describe('Whether the errors were successfully resolved'),
-      rawResult: z.any().optional().describe('API response')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let result = await client.resolveErrors(
-      ctx.input.flowId,
-      ctx.input.processorId,
-      ctx.input.errorIds
-    );
-
-    return {
-      output: {
-        resolved: true,
-        rawResult: result
-      },
-      message: `Resolved **${ctx.input.errorIds.length}** error(s) for flow **${ctx.input.flowId}** / processor **${ctx.input.processorId}**.`
-    };
+    const result = await invoke('resolve_errors', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

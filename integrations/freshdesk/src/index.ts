@@ -41,8 +41,6 @@ import {
   updateTicket,
   updateTimeEntry
 } from './tools';
-import { contactEvents, ticketEvents, ticketEventsWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -86,5 +84,5 @@ export let provider = Slate.create({
     updateTimeEntry,
     deleteTimeEntry
   ],
-  triggers: [ticketEvents, contactEvents, ticketEventsWebhook]
+  triggers: []
 });

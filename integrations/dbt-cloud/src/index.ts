@@ -25,8 +25,6 @@ import {
   testWebhookTool,
   triggerJobRunTool
 } from './tools';
-import { jobRunEventTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -54,5 +52,5 @@ export let provider = Slate.create({
     testWebhookTool,
     manageWebhookTool
   ],
-  triggers: [jobRunEventTrigger]
+  triggers: []
 });

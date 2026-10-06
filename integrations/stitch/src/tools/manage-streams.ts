@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
-import { StitchConnectClient } from '../lib/client';
+import { resolveRegion, StitchConnectClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listStreams = SlateTool.create(spec, {
@@ -37,7 +37,7 @@ export let listStreams = SlateTool.create(spec, {
               .nullable()
               .describe('Column used for incremental replication'),
             metadata: z
-              .any()
+              .unknown()
               .optional()
               .describe('Stream metadata including field-level details')
           })
@@ -48,28 +48,36 @@ export let listStreams = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let rawStreams = await client.listStreams(ctx.input.sourceId);
-    let streamList = Array.isArray(rawStreams) ? rawStreams : rawStreams?.streams || [];
+    let streamList = rawStreams;
 
-    let streams = streamList.map((s: any) => {
-      let breadcrumb = s.metadata?.find?.((m: any) => m.breadcrumb?.length === 0);
-      let metadata = breadcrumb?.metadata || {};
+    let streams = streamList.map(s => {
+      let metadata = Array.isArray(s.metadata)
+        ? (s.metadata.find(m => m.breadcrumb.length === 0)?.metadata ?? {})
+        : isApiErrorRecord(s.metadata)
+          ? s.metadata
+          : {};
       return {
         streamId: s.stream_id,
-        streamName: s.stream_name || s.tap_stream_id,
+        streamName: s.stream_name,
         tapStreamId: s.tap_stream_id,
-        selected: metadata.selected ?? s.selected ?? null,
-        replicationMethod: metadata['replication-method'] || null,
-        replicationKey: metadata['replication-key'] || null,
+        selected:
+          typeof metadata.selected === 'boolean' ? metadata.selected : (s.selected ?? null),
+        replicationMethod:
+          typeof metadata['replication-method'] === 'string'
+            ? metadata['replication-method']
+            : null,
+        replicationKey:
+          typeof metadata['replication-key'] === 'string' ? metadata['replication-key'] : null,
         metadata: s.metadata
       };
     });
 
-    let selectedCount = streams.filter((s: any) => s.selected).length;
+    let selectedCount = streams.filter(s => s.selected).length;
 
     return {
       output: { streams },
@@ -96,15 +104,15 @@ export let getStream = SlateTool.create(spec, {
     z.object({
       streamId: z.number().describe('Stream ID'),
       streamName: z.string().describe('Stream/table name'),
-      schema: z.any().optional().describe('JSON Schema describing the stream fields'),
-      metadata: z.any().optional().describe('Stream and field-level metadata')
+      schema: z.unknown().optional().describe('JSON Schema describing the stream fields'),
+      metadata: z.unknown().optional().describe('Stream and field-level metadata')
     })
   )
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let stream = await client.getStream(ctx.input.sourceId, ctx.input.streamId);
@@ -112,11 +120,11 @@ export let getStream = SlateTool.create(spec, {
     return {
       output: {
         streamId: stream.stream_id,
-        streamName: stream.stream_name || stream.tap_stream_id,
+        streamName: stream.stream_name,
         schema: stream.schema,
         metadata: stream.metadata
       },
-      message: `Retrieved stream **${stream.stream_name || stream.tap_stream_id}** (ID: ${stream.stream_id}).`
+      message: `Retrieved stream **${stream.stream_name}** (ID: ${stream.stream_id}).`
     };
   })
   .build();
@@ -131,7 +139,7 @@ export let updateStreamSelection = SlateTool.create(spec, {
     'Each entry in the streams array should include the stream ID and the metadata to update.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -178,15 +186,15 @@ export let updateStreamSelection = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let streamUpdates = ctx.input.streams.map(s => {
-      let metadata: any[] = [];
+      let metadata: Array<{ breadcrumb: string[]; metadata: Record<string, unknown> }> = [];
 
       // Stream-level metadata
-      let streamMeta: Record<string, any> = {};
+      let streamMeta: Record<string, unknown> = {};
       if (s.selected !== undefined) streamMeta.selected = s.selected;
       if (s.replicationMethod) streamMeta['replication-method'] = s.replicationMethod;
       if (s.replicationKey) streamMeta['replication-key'] = s.replicationKey;

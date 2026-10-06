@@ -14,8 +14,6 @@ import {
   manageCampaignLead,
   updateLead
 } from './tools';
-import { inboundWebhook, prospectChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     listLeadStatuses,
     listLeadFields
   ],
-  triggers: [inboundWebhook, prospectChanges]
+  triggers: []
 });

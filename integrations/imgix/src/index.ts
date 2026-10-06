@@ -1,10 +1,13 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  addAsset,
   buildRenderUrl,
   createSource,
+  downloadAsset,
   generateSignedUrl,
   getAsset,
+  getFileUrl,
   getReports,
   getSource,
   listAssets,
@@ -14,10 +17,7 @@ import {
   updateAsset,
   updateSource
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
-
-export let provider = Slate.create({
+export const provider = Slate.create({
   spec,
   tools: [
     listSources,
@@ -31,7 +31,10 @@ export let provider = Slate.create({
     purgeCache,
     getReports,
     generateSignedUrl,
-    buildRenderUrl
+    buildRenderUrl,
+    addAsset,
+    downloadAsset,
+    getFileUrl
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

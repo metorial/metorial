@@ -1,11 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { graphqlValue, validateCollectionName, validateDistance } from '../lib/graphql';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 let buildWhereClause = (filter: any): string => {
   if (!filter) return '';
-  return `where: ${JSON.stringify(filter).replace(/"(\w+)":/g, '$1:')}`;
+  return `where: ${graphqlValue(filter)}`;
 };
 
 let buildSearchOperator = (input: any): string => {
@@ -26,13 +27,13 @@ let buildSearchOperator = (input: any): string => {
     return `nearVector: { ${params.join(', ')} }`;
   }
   if (input.nearObject) {
-    let params: string[] = [`id: "${input.nearObject.objectId}"`];
+    let params: string[] = [`id: ${JSON.stringify(input.nearObject.objectId)}`];
     if (input.nearObject.distance !== undefined)
       params.push(`distance: ${input.nearObject.distance}`);
     return `nearObject: { ${params.join(', ')} }`;
   }
   if (input.hybrid) {
-    let params: string[] = [`query: "${input.hybrid.query.replace(/"/g, '\\"')}"`];
+    let params: string[] = [`query: ${JSON.stringify(input.hybrid.query)}`];
     if (input.hybrid.alpha !== undefined) params.push(`alpha: ${input.hybrid.alpha}`);
     if (input.hybrid.vector) params.push(`vector: [${input.hybrid.vector.join(', ')}]`);
     if (input.hybrid.properties)
@@ -41,7 +42,7 @@ let buildSearchOperator = (input: any): string => {
     return `hybrid: { ${params.join(', ')} }`;
   }
   if (input.bm25) {
-    let params: string[] = [`query: "${input.bm25.query.replace(/"/g, '\\"')}"`];
+    let params: string[] = [`query: ${JSON.stringify(input.bm25.query)}`];
     if (input.bm25.properties)
       params.push(`properties: ${JSON.stringify(input.bm25.properties)}`);
     return `bm25: { ${params.join(', ')} }`;
@@ -72,15 +73,31 @@ Exactly one search method must be provided. Results can be filtered with a where
   .input(
     z.object({
       collectionName: z.string().describe('Name of the collection to search'),
+      api: z
+        .enum(['graphql', 'rest'])
+        .optional()
+        .describe(
+          'Search API. Defaults to graphql. Use rest on clusters with GraphQL disabled; REST search is experimental and requires Weaviate 1.39 or newer (enabled by default from 1.39.7).'
+        ),
+      targetVector: z
+        .string()
+        .optional()
+        .describe(
+          'Named vector to search. Required for collections with multiple named vectors.'
+        ),
       properties: z
         .array(z.string())
-        .describe('Properties to return in results (e.g. ["title", "content"])'),
+        .describe(
+          'Properties to return. GraphQL accepts field selections such as "address { city }" or "author { ... on Author { name } }"; REST accepts non-reference property names.'
+        ),
       nearText: z
         .object({
           concepts: z.array(z.string()).describe('Natural language concepts to search for'),
           distance: z.number().optional().describe('Maximum distance threshold'),
           certainty: z
             .number()
+            .min(0)
+            .max(1)
             .optional()
             .describe('Minimum certainty threshold (0-1, cosine only)')
         })
@@ -90,7 +107,12 @@ Exactly one search method must be provided. Results can be filtered with a where
         .object({
           vector: z.array(z.number()).describe('Query vector for similarity search'),
           distance: z.number().optional().describe('Maximum distance threshold'),
-          certainty: z.number().optional().describe('Minimum certainty threshold')
+          certainty: z
+            .number()
+            .min(0)
+            .max(1)
+            .optional()
+            .describe('Minimum certainty threshold')
         })
         .optional()
         .describe('Raw vector similarity search'),
@@ -106,6 +128,8 @@ Exactly one search method must be provided. Results can be filtered with a where
           query: z.string().describe('Search query string'),
           alpha: z
             .number()
+            .min(0)
+            .max(1)
             .optional()
             .describe('Balance between keyword (0) and vector (1) search. Default: 0.75'),
           vector: z
@@ -141,8 +165,13 @@ Exactly one search method must be provided. Results can be filtered with a where
         .describe(
           'Where filter object for scalar conditions (e.g. { path: ["price"], operator: "GreaterThan", valueNumber: 10 })'
         ),
-      limit: z.number().optional().describe('Maximum number of results to return'),
-      offset: z.number().optional().describe('Number of results to skip'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum number of results to return'),
+      offset: z.number().int().nonnegative().optional().describe('Number of results to skip'),
       tenant: z.string().optional().describe('Tenant name for multi-tenant collections'),
       includeVector: z.boolean().optional().describe('Include vector embeddings in results'),
       autocut: z
@@ -174,6 +203,98 @@ Exactly one search method must be provided. Results can be filtered with a where
       ctx.input;
 
     let searchOp = buildSearchOperator(ctx.input);
+    let methods = ['nearText', 'nearVector', 'nearObject', 'hybrid', 'bm25'] as const;
+    let selected = methods.filter(method => ctx.input[method] !== undefined);
+    if (selected.length !== 1) {
+      throw createApiServiceError(
+        'Provide exactly one search method: nearText, nearVector, nearObject, hybrid, or bm25.'
+      );
+    }
+    for (let near of [ctx.input.nearText, ctx.input.nearVector, ctx.input.nearObject]) {
+      if (near) validateDistance(near);
+    }
+    if (ctx.input.api === 'rest') {
+      if (includeVector)
+        throw createApiServiceError(
+          'REST search does not return vectors. Use get_object with includeVector=true.'
+        );
+      let body: Record<string, unknown> = {
+        where: ctx.input.where,
+        limit,
+        offset,
+        tenant,
+        autoLimit: autocut,
+        returnProperties: properties,
+        targetVector: ctx.input.targetVector,
+        returnMetadata:
+          selected[0] === 'bm25' || selected[0] === 'hybrid' ? ['score'] : ['distance']
+      };
+      let method: string;
+      if (ctx.input.nearText) {
+        method = 'near-text';
+        body.query = ctx.input.nearText.concepts;
+        Object.assign(body, {
+          distance: ctx.input.nearText.distance,
+          certainty: ctx.input.nearText.certainty
+        });
+      } else if (ctx.input.nearVector) {
+        method = 'near-vector';
+        Object.assign(body, ctx.input.nearVector);
+      } else if (ctx.input.nearObject) {
+        method = 'near-object';
+        body.id = ctx.input.nearObject.objectId;
+        body.distance = ctx.input.nearObject.distance;
+      } else if (ctx.input.hybrid) {
+        method = 'hybrid';
+        if (ctx.input.hybrid.vector)
+          throw createApiServiceError(
+            'REST hybrid search does not accept a custom vector. Use graphql or nearVector.'
+          );
+        body.query = ctx.input.hybrid.query;
+        body.alpha = ctx.input.hybrid.alpha;
+        body.queryProperties = ctx.input.hybrid.properties;
+        body.fusionType =
+          ctx.input.hybrid.fusionType === 'rankedFusion'
+            ? 'ranked'
+            : ctx.input.hybrid.fusionType === 'relativeScoreFusion'
+              ? 'relativeScore'
+              : undefined;
+      } else {
+        method = 'bm25';
+        body.query = ctx.input.bm25?.query;
+        body.queryProperties = ctx.input.bm25?.properties;
+      }
+      let result = await client.search(collectionName, method, body);
+      let objects = result.results.map(
+        (object: {
+          id: string;
+          properties: Record<string, unknown>;
+          metadata?: { distance?: number; certainty?: number; score?: number };
+        }) => ({
+          objectId: object.id,
+          properties: object.properties,
+          distance: object.metadata?.distance,
+          certainty: object.metadata?.certainty,
+          score:
+            object.metadata?.score === undefined ? undefined : String(object.metadata.score)
+        })
+      );
+      return {
+        output: { objects, totalResults: objects.length },
+        message: `Found **${objects.length}** result(s) in **${collectionName}**.`
+      };
+    }
+    validateCollectionName(collectionName);
+    if (ctx.input.targetVector && includeVector) {
+      throw createApiServiceError(
+        'Use get_object with includeVector=true to retrieve named vector embeddings.'
+      );
+    }
+    if (ctx.input.targetVector && selected[0] !== 'bm25')
+      searchOp = searchOp.replace(
+        /}$/,
+        `, targetVectors: ${JSON.stringify([ctx.input.targetVector])} }`
+      );
 
     // Build arguments list
     let args: string[] = [];
@@ -182,7 +303,7 @@ Exactly one search method must be provided. Results can be filtered with a where
     if (limit !== undefined) args.push(`limit: ${limit}`);
     if (offset !== undefined) args.push(`offset: ${offset}`);
     if (autocut !== undefined) args.push(`autocut: ${autocut}`);
-    if (tenant) args.push(`tenant: "${tenant}"`);
+    if (tenant) args.push(`tenant: ${JSON.stringify(tenant)}`);
 
     let argsStr = args.length > 0 ? `(${args.join(', ')})` : '';
 
@@ -190,7 +311,12 @@ Exactly one search method must be provided. Results can be filtered with a where
     let additionalFields: string[] = ['id'];
     if (includeVector) additionalFields.push('vector');
     if (ctx.input.nearText || ctx.input.nearVector || ctx.input.nearObject) {
-      additionalFields.push('distance', 'certainty');
+      additionalFields.push('distance');
+      if (
+        ctx.input.nearText?.certainty !== undefined ||
+        ctx.input.nearVector?.certainty !== undefined
+      )
+        additionalFields.push('certainty');
     }
     if (ctx.input.hybrid || ctx.input.bm25) {
       additionalFields.push('score');
@@ -210,10 +336,6 @@ Exactly one search method must be provided. Results can be filtered with a where
     }`;
 
     let result = await client.graphql(query);
-
-    if (result.errors && result.errors.length > 0) {
-      throw new Error(`GraphQL error: ${result.errors.map((e: any) => e.message).join(', ')}`);
-    }
 
     let objects = (result.data?.Get?.[collectionName] || []).map((obj: any) => {
       let { _additional, ...props } = obj;

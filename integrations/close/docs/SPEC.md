@@ -1,158 +1,54 @@
-# Slates Specification for Close
+# Close integration specification
 
-## Overview
+The integration provides 20 tools using Close's REST API at `https://api.close.com/api/v1`. It covers CRM records, task lifecycles, activity reads, note and email-template management, email submission, saved searches and identity/configuration discovery. Reporting, exports, call/SMS sending, sequences, bulk actions and administration are outside this tool surface.
 
-Close is a sales CRM platform designed for small and medium-sized businesses. It helps teams build relationships, track communications, and manage their sales pipeline. The API provides full access to CRM data including leads, contacts, opportunities, activities, and reporting.
+## Authentication and errors
 
-## Authentication
+API keys use HTTP Basic authentication with the key as username and an empty password. OAuth uses `https://app.close.com/oauth2/authorize/` and form-encoded `https://api.close.com/oauth2/token/`, with `all.full_access` and `offline_access`. Token responses determine expiry; refresh must return a newly rotated refresh token. User and organization identity are saved when supplied and verified during profile reads.
 
-Close supports two authentication methods:
+The current-user tool reads `/me/`. It projects user, organization, membership and safe email-account identity metadata. It does not return connected-account credentials. Requests stay on the fixed API host with redirects disabled. Service failures expose safe HTTP status and remediation without echoing upstream bodies or credentials. HTTP 429 exposes a numeric Retry-After delay; mutations are never retried automatically.
 
-### API Key (HTTP Basic Auth)
+Sources: [API keys](https://developer.close.com/api/overview/api-key-authentication), [OAuth](https://developer.close.com/api/overview/oauth-authentication), [current user](https://developer.close.com/api/resources/users/get-me), [rate limits](https://developer.close.com/api/overview/rate-limits).
 
-Send HTTP requests with an Authorization header containing the word `Basic` followed by a space and a base64-encoded string composed of the API key followed by a colon. The API key acts as the username and the password is always empty.
+## Resources and contracts
 
-API keys are per-organization and can read and modify all of your CRM data.
+| Tools | API resources and behavior |
+| --- | --- |
+| Get Current User | `GET /me/`; selected organization, accessible memberships and sender identity discovery |
+| List/Get/Manage/Delete Lead | `GET/POST /lead/`, `GET/PUT/DELETE /lead/{id}/`; nested contacts are creation-only |
+| List/Manage Contact | `GET/POST /contact/`, `PUT /contact/{id}/`; require explicit parent lead on creation |
+| List/Manage Opportunity | `GET/POST /opportunity/`, `PUT /opportunity/{id}/`; integer confidence and monetary cents |
+| Get/Manage/Delete Task | `GET/POST /task/`, `GET/PUT/DELETE /task/{id}/`; assignment, completion, documented `date` mapping |
+| List Activities | `GET /activity/` or documented subtype list; user/contact/multiple-type filters require a lead |
+| Manage Note | `POST /activity/note/`, `PUT /activity/note/{id}/`; plaintext notes |
+| Send Email | `POST /activity/email/`; `draft` saves, `outbox` sends, `sent` logs an already sent message |
+| Manage Email Template | `POST /email_template/`, `PUT /email_template/{id}/` |
+| List Users/Smart Views | `GET /user/`, `GET /saved_search/`; structured `s_query` and legacy textual query kept separately |
+| List Pipelines and Statuses | `GET /pipeline/`, `/status/lead/`, `/status/opportunity/`; no invented lead-status type or incomplete-list success |
+| Search Leads | `POST /data/search/`; advanced lead query, per-object fields, counts, sorting and cursors |
 
-To create an API key: go to Settings > Developer > API Keys and click + New API Key. Give it an informative name. Once created, copy and store the key securely — it will not be displayed again.
+All 17 prior tool keys and fields remain registered. Documented nullable or omitted non-null output fields become optional while retaining their existing value type. Nullable fields retain nullability. Response-derived IDs, counts and values are never synthesized. Contact/lead expansion fields remain omitted if Close does not return them; lead child collections are retrieved through their individual list APIs when needed.
 
-### OAuth 2.0 (Authorization Code Flow)
+Lead names are optional at the provider; a name is recommended. Updates reject empty changes. Existing nested contacts on a lead update fail with guidance to Manage Contact. Custom fields are flattened under `custom.FIELD_ID`; current documentation deprecates field-name syntax, which remains accepted for legacy callers. No default sender or recipient is guessed, and unsupported `sendAs` fails before submission. Subject/body retain their established requiredness.
 
-To start integrating with Close using OAuth 2.0, a developer must have a Close account and acquire a client ID and client secret. Those can be obtained by accessing the Settings page, navigating to Developer → OAuth Apps, and clicking Create App.
+Lead tasks use text and `date`; `dueDate` is the public input mapped to `date` and represents when the task becomes actionable. Outgoing-call reminders use a contact and support optional text during creation. Task text may include line breaks. Updating text on another task type fails with guidance instead of ignoring it. Creating a reminder does not place a call. The current public OpenAPI specification confirms both creation variants and the template read/delete routes: [Close OpenAPI](https://api.close.com/api/openapi.json).
 
-**Authorization endpoint:** `https://app.close.com/oauth2/authorize/`
+Sources: [lead create](https://developer.close.com/api/resources/leads/create), [lead update](https://developer.close.com/api/resources/leads/update), [contact update](https://developer.close.com/api/resources/contacts/update), [opportunities](https://developer.close.com/api/resources/opportunities), [tasks](https://developer.close.com/api/resources/tasks), [task update](https://developer.close.com/api/resources/tasks/update), [activities](https://developer.close.com/api/resources/activities/list), [email creation](https://developer.close.com/api/resources/activities/emails/create), [Smart Views](https://developer.close.com/api/resources/smart-views/list), [lead statuses](https://developer.close.com/api/resources/lead-statuses/list).
 
-- Parameters: `client_id`, `response_type=code`, `redirect_uri`
+## Pagination and files
 
-**Token endpoint:** `https://api.close.com/oauth2/token/`
+Offset lists expose actual `has_more` and optional totals. A next offset advances by the returned page length. Provider-specific maximum limits and offsets remain enforced by Close. Configuration discovery rejects an incomplete response rather than claiming a complete list.
 
-- The Authorization Code can be exchanged for an Access Token by performing a POST request with form-encoded parameters. Parameters: `client_id`, `client_secret`, `grant_type=authorization_code`, `code`.
-- The Access Token has a limited lifetime and expires in `expires_in` seconds (default 3600).
+Advanced search maps `fields` to `_fields: { lead: [...] }`, requests counts and combines the caller's query with a lead object-type condition. It supports current nested sorts and normalizes legacy flat field-name sorts. Cursors expire after 30 seconds. A legacy skip is implemented by walking and discarding cursor pages with non-advancement protection; provider pagination has a 10,000-object limit. List Leads retains its legacy GET `query` for compatibility, although the current generated parameter table does not list it; live verification is required for that legacy filter.
 
-**Refresh tokens:** If your application has `offline_access` scope, a `refresh_token` will be present in the response and you can refresh the Access Token. Refresh via POST to `https://api.close.com/oauth2/token/` with `grant_type=refresh_token`. Note that the authorization server issues a new Refresh Token each time and revokes the old one.
+No tool in this surface exports or downloads files. Task/activity projections omit recording, voicemail and message-file URLs. The common response boundary removes credential keys and redacts connected access/refresh tokens from string values; credential-bearing dynamic keys are omitted. Search preserves the remaining caller-selected CRM object shape.
 
-**Revoke endpoint:** `https://api.close.com/oauth2/revoke/`
+Sources: [pagination](https://developer.close.com/api/overview/pagination), [advanced filtering](https://developer.close.com/api/resources/advanced-filtering), [lead listing](https://developer.close.com/api/resources/leads/list).
 
-**Scopes:** The default scope is `all.full_access offline_access`, granting full access to the organization's data.
+## Effects and verification
 
-Send authenticated requests with an Authorization header containing the word `Bearer` followed by the Access Token.
+CRM writes may trigger existing workflows or external integrations. Email delivery cannot be undone after sending. Task reminders change a sales rep's inbox; template changes may affect outreach. Private live verification requires an independently verified dedicated synthetic organization and explicitly authorized, disposable records, with separate template/reminder/sending gates and controlled inbox observation. Existing customer records, workflows, bulk sends, campaigns, merges, real calls and billing configuration are not changed by the suite.
 
-## Features
+Lead deletion removes active CRM records and cascades to child records. Provider recovery copies and audit history may remain; deletion is not a promise of permanent erasure. See [Close's restoration tools](https://help.close.com/technical-support/close-support-tools) and [30-day Event Log](https://developer.close.com/api/resources/events).
 
-### Lead Management
-
-Leads represent a company or organization and can contain contacts, tasks, opportunities, and activities. These other objects must be children of a Lead. A Lead in Close is like both a "lead" and "account" in other CRM terminology. You can create, read, update, delete, and merge leads. Contacts, addresses, and custom fields can all be nested in the lead.
-
-### Contact Management
-
-Contacts belong to exactly one Lead. You can create, list, fetch, and update contacts with details like name, title, phone numbers, emails, and URLs.
-
-### Opportunity Management
-
-Opportunities represent potential deals and are associated with leads. They have configurable statuses (active, won, lost), values, confidence levels, and can be organized into pipelines.
-
-### Activity Tracking
-
-Activities include calls, emails, email threads, meetings, notes, SMS messages, WhatsApp messages, lead status changes, opportunity status changes, task completions, lead merges, and form submissions. Activities are always associated with a lead and can be created, read, and managed via the API.
-
-### Task Management
-
-Create, assign, and manage tasks associated with leads. Tasks can be marked as completed and tracked across the organization.
-
-### Email Communication
-
-Send and receive emails directly through the API. Emails are organized into threads. Email templates can be managed for reuse in outreach.
-
-### Sequences (Email Automation)
-
-Manage email sequences for automated outreach. You can create templates and enroll leads/contacts into multi-step email sequences.
-
-### Calling and SMS
-
-Log and manage call activities and SMS messages. Includes dialer functionality for managing phone-based outreach.
-
-### Smart Views
-
-Create and manage saved search filters (Smart Views) that define criteria for dynamically grouping leads.
-
-### Advanced Filtering
-
-Find leads that match specific conditions using the Advanced Filtering API. Supports complex query syntax for searching across leads, contacts, opportunities, and activities.
-
-### Reporting
-
-Returns data that allows graphing of arbitrary metrics, powering the "Explorer" in the UI. Supports overview and comparison report types, filterable by date range, query, or Smart View. Reports can be returned in JSON or CSV format.
-
-### Custom Fields
-
-Define custom fields on leads, contacts, opportunities, activities, and custom objects. Custom fields support multiple value types and can accept multiple values.
-
-### Custom Activities and Custom Objects
-
-Define custom activity types and custom object types with their own custom fields, enabling extensible data models beyond the built-in CRM objects.
-
-### Organization and User Management
-
-Manage organization settings, users, roles, groups, and memberships. Control access and team structure.
-
-### Connected Accounts and Send As
-
-Manage email accounts connected to Close and configure send-as identities for email communication.
-
-### Scheduling Links
-
-Manage scheduling links for booking meetings, including user-specific and shared scheduling links.
-
-### Bulk Actions
-
-Perform bulk operations on leads and other objects for large-scale data management.
-
-### Exports
-
-Generate and download data exports from the CRM.
-
-### Field Enrichment
-
-Access enrichment data for leads and contacts to enhance CRM records.
-
-## Events
-
-Close supports webhooks that allow a subscription URL to be configured to receive POSTed event data as it is added to the Event Log. Each subscription is configured to trigger when an event matches a set of object types and actions.
-
-Each webhook event is defined by an `object_type` and an `action` from the event log. You can also use Webhook Filters to ensure an event only fires when certain conditions are met. Filters support operators like equals, not_equals, is_null, non_null, and contains on event fields.
-
-The maximum number of webhook subscriptions per organization is 40.
-
-Each subscription includes a `signature_key` used to sign webhooks for verification.
-
-### Event Categories
-
-The following object types can be subscribed to with actions such as `created`, `updated`, and `deleted`:
-
-- **Lead** — Lead created, updated, deleted, or merged.
-- **Contact** — Contact created, updated, or deleted.
-- **Opportunity** — Opportunity created, updated, or deleted.
-- **Activities** — Covers multiple activity types:
-  - **Email** — Email created, updated, deleted, or sent.
-  - **Email Thread** — Email thread created, updated, or deleted.
-  - **Call** — Call created, updated, or deleted.
-  - **SMS** — SMS created, updated, or deleted.
-  - **Meeting** — Meeting created, updated, or deleted.
-  - **Note** — Note created, updated, or deleted.
-  - **WhatsApp Message** — WhatsApp message events.
-  - **Lead Status Change** — Logged when a lead's status changes.
-  - **Opportunity Status Change** — Logged when an opportunity's status changes.
-  - **Task Completed** — Logged when a task is completed.
-  - **Lead Merge** — Logged when leads are merged.
-  - **Form Submission** — Logged when a form is submitted.
-- **Task** — Task created, updated, or deleted.
-- **Custom Activity Instances** — Events on custom activity records.
-- **Custom Object Instances** — Events on custom object records.
-- **Custom Fields** — Changes to lead, contact, opportunity, activity, and custom object custom field definitions.
-- **Custom Activity Types / Custom Object Types** — Schema-level changes to custom types.
-- **Shared Custom Fields** — Updates to shared custom field definitions.
-- **Memberships** — User membership changes.
-- **Roles** — Role changes.
-- **Lead Statuses / Opportunity Statuses / Pipelines** — Configuration changes to statuses and pipelines.
-
-Close also provides an **Event Log API** that allows you to access events up to 30 days back in history, useful for reprocessing missed webhook events or auditing changes.
+No trigger or replacement webhook group is registered.

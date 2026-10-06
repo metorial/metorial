@@ -42,13 +42,6 @@ import {
   stopPageInteractionTool,
   updateMonitorTool
 } from './tools';
-import {
-  agentEventsTrigger,
-  batchScrapeEventsTrigger,
-  crawlEventsTrigger,
-  extractEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -93,10 +86,5 @@ export let provider = Slate.create({
     getQueueStatusTool.build(),
     listActivityTool.build()
   ],
-  triggers: [
-    crawlEventsTrigger.build(),
-    batchScrapeEventsTrigger.build(),
-    extractEventsTrigger.build(),
-    agentEventsTrigger.build()
-  ]
+  triggers: []
 });

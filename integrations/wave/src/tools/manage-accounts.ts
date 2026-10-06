@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { anyOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WaveClient } from '../lib/client';
+import type { Account } from '../lib/contracts';
+import { decimalNumber } from '../lib/validation';
 import { spec } from '../spec';
 
 let accountOutputSchema = z.object({
@@ -38,7 +40,10 @@ let accountOutputSchema = z.object({
     .optional()
     .describe('Account currency'),
   isArchived: z.boolean().optional().describe('Whether the account is archived'),
-  sequence: z.number().optional().describe('Sort order sequence'),
+  sequence: z
+    .number()
+    .optional()
+    .describe('Account revision sequence used for concurrency control'),
   balance: z.number().optional().describe('Current balance'),
   balanceInBusinessCurrency: z
     .number()
@@ -48,7 +53,7 @@ let accountOutputSchema = z.object({
   modifiedAt: z.string().optional().describe('Last modification timestamp')
 });
 
-let mapAccount = (a: any) => ({
+let mapAccount = (a: Account) => ({
   accountId: a.id,
   name: a.name,
   description: a.description,
@@ -58,10 +63,10 @@ let mapAccount = (a: any) => ({
   currency: a.currency,
   isArchived: a.isArchived,
   sequence: a.sequence,
-  balance: a.balance,
-  balanceInBusinessCurrency: a.balanceInBusinessCurrency,
-  createdAt: a.createdAt,
-  modifiedAt: a.modifiedAt
+  balance: decimalNumber(a.balance),
+  balanceInBusinessCurrency: decimalNumber(a.balanceInBusinessCurrency),
+  createdAt: undefined,
+  modifiedAt: undefined
 });
 
 // --- List Accounts ---
@@ -74,9 +79,14 @@ export let listAccounts = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('account:read'))
   .input(
     z.object({
-      businessId: z.string().describe('ID of the business to list accounts for'),
+      businessId: z
+        .string()
+        .describe(
+          'ID of the business to list accounts for. Call list_businesses to discover a permitted business ID.'
+        ),
       page: z.number().optional().describe('Page number (starts at 1, default: 1)'),
       pageSize: z.number().optional().describe('Number of results per page (default: 20)')
     })
@@ -93,8 +103,8 @@ export let listAccounts = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.listAccounts(
       ctx.input.businessId,
-      ctx.input.page || 1,
-      ctx.input.pageSize || 20
+      ctx.input.page ?? 1,
+      ctx.input.pageSize ?? 20
     );
 
     return {
@@ -114,14 +124,20 @@ export let listAccounts = SlateTool.create(spec, {
 export let createAccount = SlateTool.create(spec, {
   name: 'Create Account',
   key: 'create_account',
+  tags: { readOnly: false },
   description: `Create a new account in a business's chart of accounts. Specify the account name and subtype. Account subtypes determine the account's type (Asset, Liability, Equity, Income, Expense).`,
   instructions: [
-    'Common subtype values include: CASH_AND_BANK, ACCOUNTS_RECEIVABLE, OTHER_SHORT_TERM_ASSETS, INVENTORY, PROPERTY_PLANT_EQUIPMENT, DEPRECIATION_AND_AMORTIZATION, OTHER_LONG_TERM_ASSETS, CREDIT_CARD, ACCOUNTS_PAYABLE, OTHER_SHORT_TERM_LIABILITY, LONG_TERM_LIABILITY, OWNERS_EQUITY, RETAINED_EARNINGS, INCOME, COST_OF_GOODS_SOLD, OPERATING_EXPENSE, PAYMENT_PROCESSING_FEE, PAYROLL_EXPENSE, UNCATEGORIZED_INCOME, UNCATEGORIZED_EXPENSE.'
+    'Common supported subtype values include CASH_AND_BANK, CREDIT_CARD, INCOME, OTHER_INCOME, COST_OF_GOODS_SOLD, EXPENSE and RECEIVABLE. Refer to Wave AccountSubtypeValueCreateInput for the full list.'
   ]
 })
+  .scopes(anyOf('account:write'))
   .input(
     z.object({
-      businessId: z.string().describe('ID of the business to create the account for'),
+      businessId: z
+        .string()
+        .describe(
+          'ID of the business to create the account for. Call list_businesses to discover a permitted business ID.'
+        ),
       name: z.string().describe('Account name'),
       subtype: z.string().describe('Account subtype value (determines the account type)'),
       description: z.string().optional().describe('Account description'),
@@ -133,12 +149,6 @@ export let createAccount = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new WaveClient(ctx.auth.token);
     let result = await client.createAccount(ctx.input);
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to create account: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
 
     return {
       output: mapAccount(result.data),
@@ -152,16 +162,36 @@ export let createAccount = SlateTool.create(spec, {
 export let updateAccount = SlateTool.create(spec, {
   name: 'Update Account',
   key: 'update_account',
+  tags: { readOnly: false },
   description: `Update an existing account's details. Only the fields you provide will be updated; omitted fields remain unchanged.`
 })
+  .scopes(anyOf('account:write'))
   .input(
     z.object({
       accountId: z.string().describe('ID of the account to update'),
+      businessId: z
+        .string()
+        .optional()
+        .describe(
+          'Business ID used to read the current revision when sequence is omitted. Call list_businesses.'
+        ),
+      sequence: z
+        .number()
+        .optional()
+        .describe(
+          'Current revision from list_accounts or get_resource. Supply this or businessId; stale revisions are not retried.'
+        ),
       name: z.string().optional().describe('Updated account name'),
       description: z.string().optional().describe('Updated description'),
-      currency: z.string().optional().describe('Updated ISO 4217 currency code'),
+      currency: z
+        .string()
+        .optional()
+        .describe('Legacy field unsupported by account updates; omit it.'),
       displayId: z.string().optional().describe('Updated display identifier'),
-      subtype: z.string().optional().describe('Updated account subtype value')
+      subtype: z
+        .string()
+        .optional()
+        .describe('Legacy field unsupported by account updates; omit it.')
     })
   )
   .output(accountOutputSchema)
@@ -169,12 +199,6 @@ export let updateAccount = SlateTool.create(spec, {
     let client = new WaveClient(ctx.auth.token);
     let { accountId, ...rest } = ctx.input;
     let result = await client.patchAccount({ id: accountId, ...rest });
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to update account: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
 
     return {
       output: mapAccount(result.data),
@@ -188,11 +212,10 @@ export let updateAccount = SlateTool.create(spec, {
 export let archiveAccount = SlateTool.create(spec, {
   name: 'Archive Account',
   key: 'archive_account',
-  description: `Archive an account in the chart of accounts. Archived accounts are hidden from the active chart of accounts but are not deleted. Accounts cannot be permanently deleted in Wave.`,
-  tags: {
-    destructive: true
-  }
+  tags: { readOnly: false, destructive: true },
+  description: `Archive an account in the chart of accounts. Archived accounts are hidden from the active chart of accounts but are not deleted. Accounts cannot be permanently deleted in Wave.`
 })
+  .scopes(anyOf('account:write'))
   .input(
     z.object({
       accountId: z.string().describe('ID of the account to archive')
@@ -205,13 +228,7 @@ export let archiveAccount = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new WaveClient(ctx.auth.token);
-    let result = await client.archiveAccount(ctx.input.accountId);
-
-    if (!result.didSucceed) {
-      throw new Error(
-        `Failed to archive account: ${result.inputErrors.map(e => e.message).join(', ')}`
-      );
-    }
+    await client.archiveAccount(ctx.input.accountId);
 
     return {
       output: { success: true },

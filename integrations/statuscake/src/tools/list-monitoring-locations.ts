@@ -20,7 +20,7 @@ export let listMonitoringLocations = SlateTool.create(spec, {
       regionCode: z
         .string()
         .optional()
-        .describe('Filter by region code (for uptime locations)')
+        .describe('Uptime region code or page-speed country code')
     })
   )
   .output(
@@ -33,7 +33,7 @@ export let listMonitoringLocations = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result: any;
+    let result: Awaited<ReturnType<Client['listUptimeLocations']>>;
     if (ctx.input.locationType === 'uptime') {
       result = await client.listUptimeLocations({
         region_code: ctx.input.regionCode
@@ -44,7 +44,7 @@ export let listMonitoringLocations = SlateTool.create(spec, {
       });
     }
 
-    let locations = result?.data ?? [];
+    let locations = result.data;
 
     return {
       output: { locations },

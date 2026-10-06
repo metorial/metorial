@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'dialpad',
   name: 'Dialpad',
   description:
-    'Cloud-based business communications platform offering voice calling, messaging, video meetings, and contact center capabilities.',
+    'Read and manage Dialpad users, contacts, completed calls, SMS, call centers and number assignments.',
   metadata: {},
   config,
   auth

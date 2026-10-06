@@ -2,7 +2,10 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   deleteLead,
+  deleteTask,
+  getCurrentUser,
   getLeadTool,
+  getTasks,
   listActivities,
   listContacts,
   listLeadsTool,
@@ -19,14 +22,6 @@ import {
   searchLeads,
   sendEmail
 } from './tools';
-import {
-  activityEventsTrigger,
-  contactEventsTrigger,
-  leadEventsTrigger,
-  opportunityEventsTrigger,
-  taskEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,13 +41,10 @@ export let provider = Slate.create({
     searchLeads,
     listSmartViews,
     listPipelinesAndStatuses,
-    listUsers
+    listUsers,
+    getCurrentUser,
+    getTasks,
+    deleteTask
   ],
-  triggers: [
-    leadEventsTrigger,
-    contactEventsTrigger,
-    opportunityEventsTrigger,
-    activityEventsTrigger,
-    taskEventsTrigger
-  ]
+  triggers: []
 });

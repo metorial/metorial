@@ -23,8 +23,6 @@ import {
   updateFolder,
   updateTemplate
 } from './tools';
-import { documentGenerated, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     cancelEnvelope,
     sendEnvelopeReminder
   ],
-  triggers: [inboundWebhook, documentGenerated]
+  triggers: []
 });

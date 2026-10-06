@@ -36,8 +36,6 @@ import {
   updateVectorStore,
   uploadFile
 } from './tools';
-import { openaiEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -76,5 +74,5 @@ export let provider = Slate.create({
     transcribeAudio,
     translateAudio
   ],
-  triggers: [openaiEvents]
+  triggers: []
 });

@@ -1,11 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageComponent = SlateTool.create(spec, {
   name: 'Manage Component',
   key: 'manage_component',
+  tags: { readOnly: false, destructive: true },
   description: `Create, update, or delete a component on the status page. Components represent infrastructure pieces like APIs, apps, and services.
 - To **create**: omit \`componentId\` and provide \`name\` at minimum.
 - To **update**: provide \`componentId\` and the fields to change (e.g. \`status\`, \`name\`, \`description\`).
@@ -16,6 +18,7 @@ export let manageComponent = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageId: pageIdSchema,
       componentId: z
         .string()
         .optional()
@@ -63,8 +66,13 @@ export let manageComponent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, pageId: ctx.config.pageId });
+    let client = new Client({
+      token: ctx.auth.token,
+      pageId: ctx.input.pageId ?? ctx.config.pageId
+    });
 
+    if (ctx.input.delete && !ctx.input.componentId)
+      throw createApiServiceError('componentId is required to delete a component.');
     if (ctx.input.delete && ctx.input.componentId) {
       await client.deleteComponent(ctx.input.componentId);
       return {
@@ -73,7 +81,7 @@ export let manageComponent = SlateTool.create(spec, {
       };
     }
 
-    let data: Record<string, any> = {};
+    let data: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) data.name = ctx.input.name;
     if (ctx.input.description !== undefined) data.description = ctx.input.description;
     if (ctx.input.status !== undefined) data.status = ctx.input.status;
@@ -82,12 +90,9 @@ export let manageComponent = SlateTool.create(spec, {
       data.only_show_if_degraded = ctx.input.onlyShowIfDegraded;
     if (ctx.input.groupId !== undefined) data.group_id = ctx.input.groupId;
 
-    let component: any;
-    if (ctx.input.componentId) {
-      component = await client.updateComponent(ctx.input.componentId, data);
-    } else {
-      component = await client.createComponent(data);
-    }
+    const component = ctx.input.componentId
+      ? await client.updateComponent(ctx.input.componentId, data)
+      : await client.createComponent(data);
 
     let output = {
       componentId: component.id,

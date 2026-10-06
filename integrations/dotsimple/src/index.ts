@@ -17,13 +17,6 @@ import {
   schedulePost,
   updatePost
 } from './tools';
-import {
-  inboundWebhook,
-  newAccountConnected,
-  newFileUploaded,
-  newPostCreated
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -43,5 +36,5 @@ export let provider = Slate.create({
     listReports,
     listAutoresponders
   ],
-  triggers: [inboundWebhook, newPostCreated, newFileUploaded, newAccountConnected]
+  triggers: []
 });

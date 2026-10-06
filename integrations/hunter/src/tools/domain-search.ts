@@ -1,6 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import {
+  Client,
+  optionalNumber,
+  optionalRow,
+  optionalText,
+  row,
+  rows,
+  text
+} from '../lib/client';
 import { spec } from '../spec';
 
 let emailSchema = z.object({
@@ -62,14 +70,23 @@ export let domainSearch = SlateTool.create(spec, {
         .enum(['valid', 'invalid', 'accept_all', 'unknown'])
         .optional()
         .describe('Filter by verification status'),
-      location: z.string().optional().describe('Filter by location of the contacts')
+      location: z
+        .string()
+        .optional()
+        .describe(
+          'Comma-separated ISO two-letter country codes, mapped to nested location include filters (for example US,FR). Free-text locations are unsupported.'
+        )
     })
   )
   .output(
     z.object({
       domain: z.string().describe('The domain searched'),
       organization: z.string().nullable().describe('Organization name'),
-      emailCount: z.number().describe('Total number of emails found'),
+      emailCount: z
+        .number()
+        .optional()
+        .describe('Provider-reported total matching email addresses, when supplied'),
+      returnedCount: z.number().describe('Email addresses returned in this page'),
       emails: z.array(emailSchema).describe('List of email addresses found'),
       pattern: z
         .string()
@@ -79,9 +96,7 @@ export let domainSearch = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.domainSearch({
+    const result = await new Client({ token: ctx.auth.token }).domainSearch({
       domain: ctx.input.domain,
       company: ctx.input.companyName,
       limit: ctx.input.limit,
@@ -92,32 +107,31 @@ export let domainSearch = SlateTool.create(spec, {
       verificationStatus: ctx.input.verificationStatus,
       location: ctx.input.location
     });
-
-    let data = result.data;
-    let emails = (data.emails || []).map((e: any) => ({
-      value: e.value,
-      type: e.type ?? null,
-      confidence: e.confidence ?? null,
-      firstName: e.first_name ?? null,
-      lastName: e.last_name ?? null,
-      position: e.position ?? null,
-      seniority: e.seniority ?? null,
-      department: e.department ?? null,
-      linkedin: e.linkedin ?? null,
-      twitter: e.twitter ?? null,
-      phoneNumber: e.phone_number ?? null,
-      verificationStatus: e.verification?.status ?? null
+    const data = row(result.data);
+    const emails = rows(data.emails).map(e => ({
+      value: text(e.value, 'returned email'),
+      type: optionalText(e.type) ?? null,
+      confidence: optionalNumber(e.confidence) ?? null,
+      firstName: optionalText(e.first_name) ?? null,
+      lastName: optionalText(e.last_name) ?? null,
+      position: optionalText(e.position) ?? null,
+      seniority: optionalText(e.seniority) ?? null,
+      department: optionalText(e.department) ?? null,
+      linkedin: optionalText(e.linkedin) ?? null,
+      twitter: optionalText(e.twitter) ?? null,
+      phoneNumber: optionalText(e.phone_number) ?? null,
+      verificationStatus: optionalText(optionalRow(e.verification).status) ?? null
     }));
-
     return {
       output: {
-        domain: data.domain ?? ctx.input.domain ?? '',
-        organization: data.organization ?? null,
-        emailCount: data.emails?.length ?? 0,
+        domain: text(data.domain, 'returned domain'),
+        organization: optionalText(data.organization) ?? null,
+        emailCount: optionalNumber(result.meta.results),
+        returnedCount: emails.length,
         emails,
-        pattern: data.pattern ?? null
+        pattern: optionalText(data.pattern) ?? null
       },
-      message: `Found **${emails.length}** email addresses for **${data.domain || ctx.input.companyName}**.`
+      message: `Retrieved **${emails.length}** email addresses for **${text(data.domain)}**.`
     };
   })
   .build();

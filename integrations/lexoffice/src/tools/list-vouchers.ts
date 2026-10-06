@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let voucherListItemSchema = z.object({
@@ -17,22 +18,6 @@ let voucherListItemSchema = z.object({
   currency: z.string().optional().describe('Currency code'),
   createdDate: z.string().optional().describe('Creation date'),
   updatedDate: z.string().optional().describe('Last updated date')
-});
-
-let mapVoucherListItem = (item: any) => ({
-  id: item.id,
-  voucherType: item.voucherType,
-  voucherStatus: item.voucherStatus,
-  voucherNumber: item.voucherNumber,
-  voucherDate: item.voucherDate,
-  dueDate: item.dueDate,
-  contactId: item.contactId,
-  contactName: item.contactName,
-  totalAmount: item.totalAmount,
-  openAmount: item.openAmount,
-  currency: item.currency,
-  createdDate: item.createdDate,
-  updatedDate: item.updatedDate
 });
 
 export let listVouchers = SlateTool.create(spec, {
@@ -56,13 +41,13 @@ export let listVouchers = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Filter by voucher type (e.g. salesinvoice, purchaseinvoice, salescreditnote, purchasecreditnote)'
+          'Required filter; use any for all types, or comma-separated types (e.g. salesinvoice, purchaseinvoice, salescreditnote, purchasecreditnote)'
         ),
       voucherStatus: z
         .string()
         .optional()
         .describe(
-          'Filter by voucher status (e.g. open, paid, paidoff, voided, transferred, sepadebit)'
+          'Required filter; use any for all statuses, or comma-separated statuses (e.g. open, paid, paidoff, voided, transferred, sepadebit)'
         ),
       voucherDateFrom: z
         .string()
@@ -98,6 +83,18 @@ export let listVouchers = SlateTool.create(spec, {
   .output(
     z.object({
       vouchers: z.array(voucherListItemSchema).describe('List of vouchers'),
+      currentPage: z.number().optional().describe('Actual zero-based page index'),
+      first: z.boolean().optional().describe('Whether this is the first page'),
+      last: z
+        .boolean()
+        .optional()
+        .describe('Whether this is the last page in the search window'),
+      nextPage: z.number().optional().describe('Next page index, when available'),
+      searchWindowLimit: z.number().optional().describe('Maximum searchable results'),
+      windowMayBeTruncated: z
+        .boolean()
+        .optional()
+        .describe('Whether narrower filters may be needed beyond the search window'),
       count: z.number().describe('Number of vouchers returned on this page'),
       totalPages: z.number().optional().describe('Total number of pages available'),
       totalElements: z
@@ -107,34 +104,14 @@ export let listVouchers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.listVouchers({
-      voucherType: ctx.input.voucherType,
-      voucherStatus: ctx.input.voucherStatus,
-      voucherDateFrom: ctx.input.voucherDateFrom,
-      voucherDateTo: ctx.input.voucherDateTo,
-      createdDateFrom: ctx.input.createdDateFrom,
-      createdDateTo: ctx.input.createdDateTo,
-      updatedDateFrom: ctx.input.updatedDateFrom,
-      updatedDateTo: ctx.input.updatedDateTo,
-      contactId: ctx.input.contactId,
-      voucherNumber: ctx.input.voucherNumber,
-      page: ctx.input.page,
-      size: ctx.input.size,
-      sort: ctx.input.sort
-    });
-
-    let vouchers = (result.content || []).map(mapVoucherListItem);
-
+    const result = await new Client({ token: ctx.auth.token }).listVouchers(ctx.input);
     return {
       output: {
-        vouchers,
-        count: vouchers.length,
-        totalPages: result.totalPages,
-        totalElements: result.totalElements
+        vouchers: result.content,
+        count: result.content.length,
+        ...pageOutput(result)
       },
-      message: `Found **${vouchers.length}** voucher(s)${result.totalElements !== undefined ? ` of ${result.totalElements} total` : ''}${ctx.input.page !== undefined ? ` on page ${ctx.input.page}` : ''}.`
+      message: `Retrieved ${result.content.length} voucher(s) on page ${result.number}.`
     };
   })
   .build();

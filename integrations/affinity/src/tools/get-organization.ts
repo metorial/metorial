@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AffinityClient } from '../lib/client';
+import { interactionDatesOutput, mapInteractionDates } from '../lib/interaction-dates';
 import { spec } from '../spec';
 
 export let getOrganization = SlateTool.create(spec, {
@@ -28,6 +29,7 @@ export let getOrganization = SlateTool.create(spec, {
       domains: z.array(z.string()).describe('All associated domains'),
       global: z.boolean().describe('Whether this is a global organization'),
       personIds: z.array(z.number()).describe('IDs of associated persons'),
+      interactionDates: interactionDatesOutput.optional(),
       listEntries: z
         .array(
           z.object({
@@ -48,7 +50,7 @@ export let getOrganization = SlateTool.create(spec, {
       withInteractionDates: ctx.input.withInteractionDates
     });
 
-    let listEntries = (o.list_entries ?? []).map((e: any) => ({
+    let listEntries = (o.list_entries ?? []).map(e => ({
       listEntryId: e.id,
       listId: e.list_id,
       creatorId: e.creator_id ?? null,
@@ -63,6 +65,9 @@ export let getOrganization = SlateTool.create(spec, {
         domains: o.domains ?? [],
         global: o.global ?? false,
         personIds: o.person_ids ?? [],
+        interactionDates: ctx.input.withInteractionDates
+          ? mapInteractionDates(o.interaction_dates)
+          : undefined,
         listEntries
       },
       message: `Retrieved organization **${o.name}** (ID: ${o.id}).`

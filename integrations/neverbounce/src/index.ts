@@ -10,8 +10,6 @@ import {
   searchJobsTool,
   verifyEmailTool
 } from './tools';
-import { jobStatusChangedTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     getAccountInfoTool,
     confirmPoeTool
   ],
-  triggers: [jobStatusChangedTrigger]
+  triggers: []
 });

@@ -1,3 +1,4 @@
+export * from './delete-resource';
 export * from './manage-destination';
 export * from './manage-model';
 export * from './manage-source';

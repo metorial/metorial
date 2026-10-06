@@ -1,95 +1,70 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createAxios, isApiErrorRecord, normalizeOAuthTokenResponse, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { authScheme, invalid, upstream } from './lib/helpers';
 
 export let auth = SlateAuth.create()
   .output(
-    z.object({
-      token: z.string()
-    })
+    z.object({ token: z.string(), tokenType: z.enum(['ShippoToken', 'Bearer']).optional() })
   )
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Token',
     key: 'api_token',
-
     inputSchema: z.object({
-      token: z.string().describe('Shippo API token (starts with shippo_live_ or shippo_test_)')
+      token: z
+        .string()
+        .describe(
+          'Shippo API test or live token. OAuth credentials use the separate OAuth connection.'
+        )
     }),
-
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.goshippo.com'
-      });
-
-      let _response = await axios.get('/addresses', {
-        headers: {
-          Authorization: `ShippoToken ${ctx.output.token}`,
-          'Content-Type': 'application/json'
-        },
-        params: { results: 1 }
-      });
-
-      return {
-        profile: {
-          id: 'shippo-user',
-          name: 'Shippo Account'
-        }
-      };
+      authScheme({ token: ctx.input.token, tokenType: 'ShippoToken' });
+      return { output: { token: ctx.input.token, tokenType: 'ShippoToken' as const } };
     }
   })
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth',
     key: 'oauth',
-
     scopes: [
       {
         title: 'Full Access',
-        description: 'Full read and write access to all Shippo resources',
+        description:
+          'Shippo’s only supported OAuth scope, for shipping on behalf of the connected account.',
         scope: '*'
       }
     ],
-
-    getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
-        response_type: 'code',
-        client_id: ctx.clientId,
-        scope: ctx.scopes.join(' '),
-        state: ctx.state,
-        redirect_uri: ctx.redirectUri
-      });
-
-      return {
-        url: `https://goshippo.com/oauth/authorize?${params.toString()}`
-      };
-    },
-
+    getAuthorizationUrl: async ctx => ({
+      url: `https://goshippo.com/oauth/authorize?${new URLSearchParams({ response_type: 'code', client_id: ctx.clientId, scope: ctx.scopes.join(' '), state: ctx.state, redirect_uri: ctx.redirectUri }).toString()}`
+    }),
     handleCallback: async ctx => {
-      let axios = createAxios({
-        baseURL: 'https://goshippo.com'
+      const axios = createAxios({
+        baseURL: 'https://goshippo.com',
+        timeout: 30_000,
+        maxRedirects: 0
       });
-
-      let response = await axios.post('/oauth/access_token', {
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        code: ctx.code,
-        grant_type: 'authorization_code'
-      });
-
-      let data = response.data as { access_token: string };
-
-      return {
-        output: {
-          token: data.access_token
-        }
-      };
+      let data: unknown;
+      try {
+        const response = await axios.post(
+          '/oauth/access_token',
+          new URLSearchParams({
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret,
+            code: ctx.code,
+            grant_type: 'authorization_code'
+          }).toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+        data = response.data;
+      } catch (error) {
+        throw upstream(error, 'OAuth token exchange', true);
+      }
+      if (!isApiErrorRecord(data) || data.token_type !== 'bearer' || data.scope !== '*')
+        throw invalid(
+          'Shippo did not return its documented Bearer token and scope. Reconnect through the registered partner application.'
+        );
+      const token = normalizeOAuthTokenResponse(data, { providerLabel: 'Shippo' }).token;
+      authScheme({ token, tokenType: 'Bearer' });
+      return { output: { token, tokenType: 'Bearer' as const } };
     }
   });

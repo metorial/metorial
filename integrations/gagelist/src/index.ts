@@ -23,8 +23,6 @@ import {
   updateGage,
   updateManufacturer
 } from './tools';
-import { inboundWebhook, newCalibration, newGage, newManufacturer } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     getCustomFieldValues,
     updateCustomFieldValues
   ],
-  triggers: [inboundWebhook, newGage, newCalibration, newManufacturer]
+  triggers: []
 });

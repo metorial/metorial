@@ -8,7 +8,7 @@ let fieldValueChangeSchema = z.object({
   fieldId: z.number().describe('ID of the field'),
   entityId: z.number().describe('ID of the entity'),
   listEntryId: z.number().nullable().describe('List entry ID'),
-  actionType: z.number().describe('Type of change (0=created, 1=updated, 2=deleted)'),
+  actionType: z.number().describe('Type of change (0=created, 1=deleted, 2=updated)'),
   changedAt: z.string().nullable().describe('When the change occurred'),
   changer: z
     .object({
@@ -18,7 +18,11 @@ let fieldValueChangeSchema = z.object({
     .optional()
     .describe('Who made the change'),
   valueBefore: z.any().optional().describe('Value before the change'),
-  valueAfter: z.any().optional().describe('Value after the change')
+  valueAfter: z.any().optional().describe('Value after the change'),
+  value: z
+    .any()
+    .optional()
+    .describe('Documented value: old value for a deletion, otherwise the new value.')
 });
 
 export let getFieldValueChanges = SlateTool.create(spec, {
@@ -33,11 +37,47 @@ export let getFieldValueChanges = SlateTool.create(spec, {
     z.object({
       fieldId: z.number().describe('ID of the field to get changes for'),
       listEntryId: z.number().optional().describe('Filter changes for a specific list entry'),
-      entityId: z.number().optional().describe('Filter changes for a specific entity'),
+      entityId: z
+        .number()
+        .optional()
+        .describe(
+          'Entity ID; also provide entityType to resolve the appropriate provider filter.'
+        ),
+      entityType: z
+        .number()
+        .optional()
+        .describe('For entityId: 0=person, 1=organization, 8=opportunity.'),
+      personId: z
+        .number()
+        .optional()
+        .describe('Filter this person; mutually exclusive with other entity filters.'),
+      organizationId: z
+        .number()
+        .optional()
+        .describe('Filter this organization; mutually exclusive with other entity filters.'),
+      opportunityId: z
+        .number()
+        .optional()
+        .describe('Filter this opportunity; mutually exclusive with other entity filters.'),
+      changedAfter: z
+        .string()
+        .optional()
+        .describe(
+          'ISO 8601 timestamp. For pagination pass the last changedAt string exactly, including microseconds.'
+        ),
+      orderBy: z
+        .enum(['asc', 'desc'])
+        .optional()
+        .describe('Sort direction; forward pagination requires asc.'),
+      afterId: z
+        .number()
+        .optional()
+        .describe('Last change ID. Requires changedAfter and orderBy=asc.'),
+      limit: z.number().optional().describe('Positive maximum number of changes to retrieve.'),
       actionType: z
         .number()
         .optional()
-        .describe('Filter by change type (0=created, 1=updated, 2=deleted)')
+        .describe('Filter by change type (0=created, 1=deleted, 2=updated)')
     })
   )
   .output(
@@ -52,10 +92,18 @@ export let getFieldValueChanges = SlateTool.create(spec, {
       fieldId: ctx.input.fieldId,
       listEntryId: ctx.input.listEntryId,
       entityId: ctx.input.entityId,
+      entityType: ctx.input.entityType,
+      personId: ctx.input.personId,
+      organizationId: ctx.input.organizationId,
+      opportunityId: ctx.input.opportunityId,
+      changedAfter: ctx.input.changedAfter,
+      orderBy: ctx.input.orderBy,
+      afterId: ctx.input.afterId,
+      limit: ctx.input.limit,
       action_type: ctx.input.actionType
     });
 
-    let changes = (Array.isArray(result) ? result : []).map((c: any) => ({
+    let changes = (Array.isArray(result) ? result : []).map(c => ({
       fieldValueChangeId: c.id,
       fieldId: c.field_id,
       entityId: c.entity_id,
@@ -65,11 +113,22 @@ export let getFieldValueChanges = SlateTool.create(spec, {
       changer: c.changer
         ? {
             changerId: c.changer.id ?? null,
-            changerType: c.changer.type ?? null
+            changerType: c.changer.type == null ? null : String(c.changer.type)
           }
         : undefined,
-      valueBefore: c.value_before,
-      valueAfter: c.value_after
+      valueBefore:
+        c.value_before !== undefined
+          ? c.value_before
+          : c.action_type === 1
+            ? c.value
+            : undefined,
+      valueAfter:
+        c.value_after !== undefined
+          ? c.value_after
+          : c.action_type !== 1
+            ? c.value
+            : undefined,
+      value: c.value
     }));
 
     return {

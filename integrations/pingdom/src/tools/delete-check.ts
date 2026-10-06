@@ -31,7 +31,10 @@ export let deleteCheck = SlateTool.create(spec, {
 
     return {
       output: {
-        message: result.message || 'Check deleted successfully'
+        message:
+          ('message' in result && typeof result.message === 'string'
+            ? result.message
+            : undefined) || 'Check deleted successfully'
       },
       message: `Deleted uptime check **${ctx.input.checkId}**.`
     };

@@ -1,48 +1,32 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+export const auth = SlateAuth.create()
+  .output(z.object({ token: z.string() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Token',
     key: 'api_token',
-
     inputSchema: z.object({
       token: z
         .string()
         .describe(
-          'Your Turso Platform API token. Create one using the Turso CLI or the Platform API.'
+          'Turso Platform API token. Prefer an organization-scoped token; database SQL tokens cannot manage the Platform API.'
         )
     }),
-
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
+      await new Client({ token: ctx.input.token }).validateApiToken();
+      return { output: { token: ctx.input.token } };
     },
-
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.turso.tech',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/v1/auth/api-tokens/validate');
-      let data = response.data as { exp: number };
-
+    getProfile: async (ctx: { output: { token: string } }) => {
+      const { user } = await new Client({ token: ctx.output.token }).getCurrentUser();
       return {
         profile: {
-          id: 'turso-user',
-          name: `Token expires: ${data.exp === -1 ? 'never' : new Date(data.exp * 1000).toISOString()}`
+          id: user.username,
+          name: user.name || user.username,
+          email: user.email,
+          image: user.avatarUrl
         }
       };
     }

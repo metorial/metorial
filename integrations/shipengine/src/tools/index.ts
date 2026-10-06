@@ -10,6 +10,7 @@ export * from './manage-shipment';
 export * from './manage-warehouse';
 export * from './recognize-address';
 export * from './schedule-pickup';
+export * from './shipping-resources';
 export * from './track-package';
 export * from './validate-address';
 export * from './void-label';

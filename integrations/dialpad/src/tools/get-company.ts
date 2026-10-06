@@ -1,43 +1,31 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DialpadClient } from '../lib/client';
+import { malformed } from '../lib/contracts';
+import { invoke } from '../lib/operations';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  companyId: z.string().describe('Company ID'),
+  name: z.string().optional().describe('Company name'),
+  country: z.string().optional(),
+  timezone: z.string().optional(),
+  domain: z.string().optional()
+});
 
 export let getCompanyTool = SlateTool.create(spec, {
   name: 'Get Company Info',
   key: 'get_company',
-  description: `Retrieve information about your Dialpad company, including name, settings, and plan details.`,
+  description: `Retrieve information about your Dialpad company, including native company ID, name, country and domain when available.`,
   tags: {
     readOnly: true
   }
 })
   .input(z.object({}))
-  .output(
-    z.object({
-      companyId: z.string().describe('Company ID'),
-      name: z.string().optional().describe('Company name'),
-      country: z.string().optional(),
-      timezone: z.string().optional(),
-      domain: z.string().optional()
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new DialpadClient({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment
-    });
-
-    let company = await client.getCompany();
-
-    return {
-      output: {
-        companyId: String(company.id),
-        name: company.name,
-        country: company.country,
-        timezone: company.timezone,
-        domain: company.domain
-      },
-      message: `Retrieved company info for **${company.name || company.id}**`
-    };
+    const result = await invoke(ctx, 'get_company');
+    const output = outputSchema.safeParse(result.output);
+    if (!output.success) malformed();
+    return { output: output.data, message: result.message };
   })
   .build();

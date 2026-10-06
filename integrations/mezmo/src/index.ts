@@ -11,6 +11,7 @@ import {
   deleteExclusionRule,
   deletePresetAlert,
   deleteView,
+  exportLogs,
   getArchiveConfig,
   getIngestionStatus,
   getUsage,
@@ -26,13 +27,12 @@ import {
   updatePresetAlert,
   updateView
 } from './tools';
-import { logAlert } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     ingestLogs,
     searchLogs,
+    exportLogs,
     listViews,
     createView,
     updateView,
@@ -56,5 +56,5 @@ export let provider = Slate.create({
     configureArchiving,
     deleteArchiveConfig
   ],
-  triggers: [logAlert]
+  triggers: []
 });

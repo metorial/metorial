@@ -8,3 +8,4 @@ export * from './manage-entities';
 export * from './manage-intents';
 export * from './manage-traits';
 export * from './manage-utterances';
+export * from './synthesize-speech';

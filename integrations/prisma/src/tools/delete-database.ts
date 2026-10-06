@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PrismaClient } from '../lib/client';
+import { databaseIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteDatabase = SlateTool.create(spec, {
@@ -16,7 +17,7 @@ export let deleteDatabase = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      databaseId: z.string().describe('ID of the database to delete')
+      databaseId: databaseIdInput
     })
   )
   .output(

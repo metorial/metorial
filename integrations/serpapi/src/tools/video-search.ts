@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SerpApiClient } from '../lib/client';
+import { receiptMessage, receiptOutput, SerpApiClient } from '../lib/client';
+import { number, searchMetadataSchema, text } from '../lib/contracts';
+import { searchParams } from '../lib/params';
 import { spec } from '../spec';
 
 let videoResultSchema = z.object({
@@ -10,6 +12,10 @@ let videoResultSchema = z.object({
   channelName: z.string().optional().describe('Channel or uploader name'),
   channelLink: z.string().optional().describe('Channel URL'),
   publishedDate: z.string().optional().describe('Publication date'),
+  viewsDisplay: z
+    .string()
+    .optional()
+    .describe('Native displayed view count when not numeric.'),
   views: z.number().optional().describe('Number of views'),
   length: z.string().optional().describe('Video duration'),
   description: z.string().optional().describe('Video description snippet'),
@@ -38,11 +44,39 @@ export let videoSearchTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('YouTube sort/filter token (e.g., "CAI=" for upload date)'),
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Exact YouTube next_page_token; sent as native sp. Mutually exclusive with sortBy.'
+        ),
+      startOffset: z
+        .number()
+        .optional()
+        .describe('Native Google Videos result offset, starting at 0.'),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Submit asynchronously and return the native search ID/status. Not compatible with noCache or Ludicrous Speed accounts.'
+        ),
       noCache: z.boolean().optional().describe('Force fresh results')
     })
   )
   .output(
     z.object({
+      isComplete: z
+        .boolean()
+        .describe(
+          'Whether native search status is Success; queued/processing receipts are incomplete.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Native pagination metadata; follow native offsets/tokens without inferring a total.'
+        ),
+      searchMetadata: searchMetadataSchema.optional(),
       videoResults: z.array(videoResultSchema).describe('Video search results'),
       nextPageToken: z
         .string()
@@ -51,37 +85,25 @@ export let videoSearchTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SerpApiClient({ apiKey: ctx.auth.token });
+    let client = new SerpApiClient({ apiKey: ctx.auth.token, accountId: ctx.auth.accountId });
 
-    let params: Record<string, any> = {
-      engine: ctx.input.engine
-    };
-
-    if (ctx.input.engine === 'youtube') {
-      params.search_query = ctx.input.query;
-    } else {
-      params.q = ctx.input.query;
-    }
-
-    if (ctx.input.language) params.hl = ctx.input.language;
-    if (ctx.input.country) params.gl = ctx.input.country;
-    if (ctx.input.sortBy) params.sp = ctx.input.sortBy;
-    if (ctx.input.noCache) params.no_cache = ctx.input.noCache;
+    let params = searchParams('video_search', ctx.input);
 
     let data = await client.search(params);
 
     let results = data.video_results || data.movie_results || [];
     let videoResults = results.map((r: any) => ({
-      position: r.position || r.position_on_page,
+      position: r.position ?? r.position_on_page,
       title: r.title,
       link: r.link,
       channelName: r.channel?.name,
       channelLink: r.channel?.link,
       publishedDate: r.published_date,
-      views: r.views,
+      views: number(r.views),
+      viewsDisplay: text(r.views),
       length: r.length,
       description: r.description,
-      thumbnailUrl: r.thumbnail?.static || r.thumbnail,
+      thumbnailUrl: text(r.thumbnail?.static) ?? text(r.thumbnail),
       isLive: r.live
     }));
 
@@ -89,10 +111,14 @@ export let videoSearchTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...receiptOutput(data),
         videoResults,
         nextPageToken
       },
-      message: `Video search for "${ctx.input.query}" on ${ctx.input.engine} returned **${videoResults.length}** results.`
+      message: receiptMessage(
+        data,
+        `Video search for "${ctx.input.query}" on ${ctx.input.engine} returned **${videoResults.length}** results.`
+      )
     };
   })
   .build();

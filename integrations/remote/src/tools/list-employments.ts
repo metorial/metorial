@@ -1,56 +1,47 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { spec } from '../spec';
-
-export let listEmployments = SlateTool.create(spec, {
-  name: 'List Employments',
-  key: 'list_employments',
-  description: `List all employments (employees and contractors) managed through Remote. Filter by status or company to find specific records. Returns employment details including status, country, job title, and personal information.`,
-  tags: {
-    readOnly: true
-  }
-})
-  .input(
-    z.object({
-      companyId: z.string().optional().describe('Filter by company ID'),
-      status: z
-        .string()
-        .optional()
-        .describe('Filter by employment status (e.g., active, onboarding, offboarding)'),
-      page: z.number().optional().describe('Page number for pagination'),
-      pageSize: z.number().optional().describe('Number of results per page')
-    })
-  )
-  .output(
-    z.object({
-      employments: z
-        .array(z.record(z.string(), z.any()))
-        .describe('List of employment records'),
-      totalCount: z.number().optional().describe('Total number of matching employments')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment ?? 'production'
+import { collection, pageOutput, pageParams } from '../lib/client';
+import { remoteTool } from '../lib/tool';
+import {
+  id,
+  pageSchema,
+  pageSizeSchema,
+  paginationOutput,
+  recordSchema
+} from '../lib/validation';
+export let listEmployments = remoteTool(
+  {
+    name: 'List Employments',
+    key: 'list_employments',
+    description:
+      'List accessible employments with documented company, status, name, email, and employment-type filters. Returns provider pagination metadata; deleted employments are excluded.',
+    tags: { readOnly: true }
+  },
+  z.object({
+    companyId: z.string().optional(),
+    status: z.string().optional(),
+    page: pageSchema,
+    pageSize: pageSizeSchema,
+    email: z.string().optional(),
+    name: z.string().optional(),
+    employmentType: z.string().optional(),
+    employmentModel: z.string().optional(),
+    partnerExternalId: z.string().optional()
+  }),
+  z.object({ employments: z.array(recordSchema), ...paginationOutput }),
+  async (client, input) => {
+    let value = await client.get('/employments', {
+      ...pageParams(input),
+      company_id: input.companyId === undefined ? undefined : id(input.companyId),
+      status: input.status,
+      email: input.email,
+      name: input.name,
+      employment_type: input.employmentType,
+      employment_model: input.employmentModel,
+      partner_external_id: input.partnerExternalId
     });
-
-    let result = await client.listEmployments({
-      companyId: ctx.input.companyId,
-      status: ctx.input.status,
-      page: ctx.input.page,
-      pageSize: ctx.input.pageSize
-    });
-
-    let employments = result?.data ?? result?.employments ?? [];
-    let totalCount = result?.total_count ?? employments.length;
-
     return {
-      output: {
-        employments,
-        totalCount
-      },
-      message: `Found **${totalCount}** employment(s).`
+      output: { employments: collection(value, 'employments'), ...pageOutput(value) },
+      message: 'Retrieved an employment page.'
     };
-  });
+  }
+);

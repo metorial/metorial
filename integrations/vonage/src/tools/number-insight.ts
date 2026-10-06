@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { VonageRestClient } from '../lib/client';
+import { protect } from '../lib/validation';
 import { spec } from '../spec';
 
 export let numberInsight = SlateTool.create(spec, {
@@ -10,10 +11,11 @@ export let numberInsight = SlateTool.create(spec, {
 Three tiers are available:
 - **Basic**: Country, international/national format
 - **Standard**: Adds carrier name, type (mobile/landline/VoIP), ported status
-- **Advanced**: Adds reachability, roaming status, SIM swap detection, valid/reachable flags`,
+- **Advanced**: Adds reachability, roaming status and validity flags. Statuses 43–45 are partial results.`,
   constraints: [
     'Advanced insight may take longer as it queries live network data.',
-    'Pricing varies by insight level.'
+    'Pricing varies by insight level.',
+    'Number Insight is scheduled to sunset February 4, 2027. Migrate to Identity Insights before that date.'
   ],
   tags: {
     destructive: false,
@@ -75,6 +77,7 @@ Three tiers are available:
     })
   )
   .handleInvocation(async ctx => {
+    protect(ctx.input, [ctx.auth.apiSecret, ctx.auth.privateKey ?? '']);
     let client = new VonageRestClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret
@@ -86,7 +89,7 @@ Three tiers are available:
       ctx.input.country
     );
 
-    let output: Record<string, unknown> = {
+    let output = {
       status: result.status,
       statusMessage: result.status_message,
       requestId: result.request_id,
@@ -98,25 +101,39 @@ Three tiers are available:
       countryPrefix: result.country_prefix
     };
 
-    if (ctx.input.level !== 'basic') {
-      output.currentCarrier = result.current_carrier;
-      output.originalCarrier = result.original_carrier;
-      output.ported = result.ported;
-      output.callerType = result.caller_type;
-      output.callerIdentity = result.caller_identity;
-    }
-
-    if (ctx.input.level === 'advanced') {
-      output.roaming = result.roaming;
-      output.validNumber = result.valid_number;
-      output.reachable = result.reachable;
-      output.lookupOutcome = result.lookup_outcome;
-      output.lookupOutcomeMessage = result.lookup_outcome_message;
-    }
-
     return {
-      output: output as any,
-      message: `**${ctx.input.level}** insight for **${result.international_format_number || ctx.input.number}**: ${result.country_name || 'Unknown country'}${result.current_carrier ? `, Carrier: ${(result.current_carrier as any)?.name || 'Unknown'}` : ''}`
+      output: {
+        ...output,
+        currentCarrier: ctx.input.level !== 'basic' ? result.current_carrier : undefined,
+        originalCarrier: ctx.input.level !== 'basic' ? result.original_carrier : undefined,
+        ported:
+          ctx.input.level !== 'basic' && typeof result.ported === 'string'
+            ? result.ported
+            : undefined,
+        callerType:
+          ctx.input.level !== 'basic' && typeof result.caller_type === 'string'
+            ? result.caller_type
+            : undefined,
+        callerIdentity: ctx.input.level !== 'basic' ? result.caller_identity : undefined,
+        roaming: ctx.input.level === 'advanced' ? result.roaming : undefined,
+        validNumber:
+          ctx.input.level === 'advanced' && typeof result.valid_number === 'string'
+            ? result.valid_number
+            : undefined,
+        reachable:
+          ctx.input.level === 'advanced' && typeof result.reachable === 'string'
+            ? result.reachable
+            : undefined,
+        lookupOutcome:
+          ctx.input.level === 'advanced' && typeof result.lookup_outcome === 'number'
+            ? result.lookup_outcome
+            : undefined,
+        lookupOutcomeMessage:
+          ctx.input.level === 'advanced' && typeof result.lookup_outcome_message === 'string'
+            ? result.lookup_outcome_message
+            : undefined
+      },
+      message: `**${ctx.input.level}** insight for **${result.international_format_number || ctx.input.number}**: ${result.country_name || 'Unknown country'}; native status ${result.status}, fields may be incomplete`
     };
   })
   .build();

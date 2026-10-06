@@ -7,6 +7,7 @@ export * from './email-verifier';
 export * from './enrich-company';
 export * from './enrich-person';
 export * from './get-account';
+export * from './get-lead';
 export * from './list-leads';
 export * from './manage-lead';
 export * from './manage-leads-list';

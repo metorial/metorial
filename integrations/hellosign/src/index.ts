@@ -17,8 +17,6 @@ import {
   sendSignatureRequest,
   sendTemplateRequest
 } from './tools';
-import { signatureRequestEvents, templateEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     manageTeam,
     createReport
   ],
-  triggers: [signatureRequestEvents, templateEvents]
+  triggers: []
 });

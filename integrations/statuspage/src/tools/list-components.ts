@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageIdSchema, paginationFields } from '../lib/validation';
 import { spec } from '../spec';
 
 let componentSchema = z.object({
@@ -32,22 +33,25 @@ let componentSchema = z.object({
 export let listComponents = SlateTool.create(spec, {
   name: 'List Components',
   key: 'list_components',
-  description: `List all components on the status page. Returns each component's name, status, group, and configuration. Use this to get an overview of all infrastructure pieces being tracked.`,
+  description: `List a page of components on the status page. Returns each component's name, status, group, and configuration. Use this to get an overview of all infrastructure pieces being tracked.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ pageId: pageIdSchema, ...paginationFields }))
   .output(
     z.object({
       components: z.array(componentSchema).describe('List of components')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, pageId: ctx.config.pageId });
-    let raw = await client.listComponents();
+    let client = new Client({
+      token: ctx.auth.token,
+      pageId: ctx.input.pageId ?? ctx.config.pageId
+    });
+    let raw = await client.listComponents(ctx.input);
 
-    let components = raw.map((c: any) => ({
+    let components = raw.map(c => ({
       componentId: c.id,
       name: c.name,
       status: c.status,

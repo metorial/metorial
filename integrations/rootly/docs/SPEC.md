@@ -1,154 +1,39 @@
-Now let me get more details on the API key scopes and the full API features:Now let me look at the API reference to understand the full feature set:Now I have comprehensive information to write the specification.
+# Rootly API capabilities
 
-# Slates Specification for Rootly
+The integration exposes 27 tools through Rootly's HTTPS JSON:API service at `https://api.rootly.com/v1`. Requests use Bearer API-key authentication and `application/vnd.api+json`.
 
-## Overview
+## Authentication and access
 
-Rootly is an incident management platform for engineering teams that provides on-call scheduling, incident response orchestration, retrospectives, status pages, and workflow automation. It integrates deeply with Slack and Microsoft Teams and connects to monitoring, ticketing, and communication tools to manage the full incident lifecycle.
+Create an API key under Organization Settings > API Keys. Global keys use their assigned Incident Response and On-Call roles; Team keys are restricted to their team's scope; Personal keys inherit their user's permissions. A key does not guarantee organization-wide visibility or write access. Connecting reads `/users/me` to establish the current user's identity.
 
-## Authentication
+## Available operations
 
-Rootly uses API key-based authentication via Bearer tokens over HTTPS.
+| Capability | Tools | Provider routes |
+| --- | --- | --- |
+| Incidents | list, get, create, update, delete | `/incidents`, `/incidents/{id}` |
+| Alerts | list, get, create, acknowledge, resolve | `/alerts`, `/alerts/{id}`, POST `/alerts/{id}/acknowledge`, POST `/alerts/{id}/resolve` |
+| Action items | list across incidents or within one incident, get, create, update, delete | `/action_items`, `/action_items/{id}`, `/incidents/{id}/action_items` |
+| Heartbeats | list, create, get/update/delete through `manage_heartbeat` | `/heartbeats`, `/heartbeats/{id}` |
+| Identity | current user, users | `/users/me`, `/users` |
+| Response configuration | current on-call coverage, schedules, escalation policies, services, teams, workflows, severities, environments | `/oncalls`, `/schedules`, `/escalation_policies`, `/services`, `/teams`, `/workflows`, `/severities`, `/environments` |
 
-**Generating an API Key:**
-Navigate to: Organization dropdown > Organization Settings > API Keys > Generate New API Key.
+Configuration collections are read-only. The integration does not expose schedule edits, workflow execution, routing changes, dashboards, playbooks, status-page management or webhook registration.
 
-**Authentication Header:**
-Include the API key as a Bearer token in the `Authorization` header:
+## Contracts and effects
 
-```
-Authorization: Bearer YOUR-TOKEN
-Content-Type: application/vnd.api+json
-```
+Ordinary lists use `page[number]` and `page[size]` and require the documented metadata and links envelope. Outputs report the number returned, optional totals/page fields, and requested related resources. Current on-call coverage is unpaginated upstream; the existing page inputs slice its complete response locally. Alert search and sorting and action-item search apply within the fetched page. The incident-scoped action-item endpoint also lacks provider status filtering and sorting: these apply within the returned page, and filtered totals are omitted. Organization-wide action-item status filtering and sorting remain provider operations.
 
-**API Base URL:** `https://api.rootly.com/v1/`
+Incident creation defaults to a normal public incident unless specified. Test and scheduled incident kinds remain available, with scheduled start/end fields and additional scheduled lifecycle statuses. Updating an incident first reads its current kind and privacy, preserves omitted settings, and rejects conversion from private to public. Action-item assignee inputs retain their string form and are sent as numeric provider user IDs. Updates verify that the action item belongs to the supplied incident before using the current global update route.
 
-**API Key Types (Scopes):**
+Alerts can trigger notifications and incident automation. Open alerts cannot be acknowledged. Acknowledgement and resolution require confirmed provider states, and resolution explicitly sets `resolve_related_incidents=false`. Heartbeat creation requires a notification target and alert summary even when disabled; `enabled=false` disables missed-ping alerts. Returned heartbeat details omit the ping bearer secret. Incident, action-item and heartbeat deletion permanently removes the selected record. Writes require their documented HTTP status and resource type/identity; provider errors retain safe status and retry/rate-limit metadata without credential-bearing payloads.
 
-Rootly supports three types of API keys:
+## Official references
 
-| Type                 | Description                                                                                                                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Global API Key**   | Full access to all entities across your Rootly instance. Required for organization-wide visibility across teams, schedules, and incidents. These keys are assigned On-Call and Incident Response roles at generation time, and the role's permissions control the key's access. |
-| **Team API Key**     | Team Admin permissions with full read/edit access to entities owned by that team. Suitable for team-specific workflows. Scoped to resources like schedules and escalation policies owned by the specific team.                                                                  |
-| **Personal API Key** | Inherits the permissions of the user who created it. Works for individual use cases but may have limited visibility.                                                                                                                                                            |
-
-API keys follow the pattern `rootly_` followed by a 64-character hex string (e.g., `rootly_abc123...`).
-
-**Role-Based Permissions:** Global API Keys can be configured with custom permission sets (roles) that control read/write access to specific resource types (e.g., Teams, Schedules, Incidents, Secrets). These roles are assigned at key creation time. If you edit a Rootly role used on an API key, the existing key will not receive changes to the role permissions. You must generate a new API key.
-
-## Features
-
-### Incident Management
-
-Create, update, and manage incidents through their full lifecycle. Incidents can be triaged, mitigated, resolved, cancelled, restarted, or marked as duplicates. Users can be assigned to incidents with specific roles, and subscribers can be added or removed. Alerts are incoming signals from monitoring tools. Incidents are the structured record Rootly creates to track and manage an issue. Multiple alerts can attach to the same incident.
-
-- Supports incident types, severities, sub-statuses, and custom form field selections.
-- Incidents can be linked to services, environments, functionalities, and teams.
-
-### Alerts and Alert Routing
-
-Ingest alerts from monitoring and observability tools, manage alert sources, and configure routing rules. Alerts can be created, acknowledged, resolved, and grouped. You can connect sources like Datadog, Grafana, Sentry, cloud provider alerts, or any system capable of sending webhooks. Once connected, alerts flow into Rootly and can create incidents automatically based on your rules.
-
-- Configure alert sources, alert fields, urgencies, and routing rules.
-- Alerts can be attached to incidents.
-
-### On-Call Scheduling
-
-Rootly On-Call is the decision engine that determines who should respond, how urgently, and through which channels when something requires immediate attention. It brings together schedules, escalation policies, notification rules, live call routing, and health checks.
-
-- Manage schedules, schedule rotations, rotation users, active days, and override shifts.
-- Configure on-call roles and shadow assignments for training purposes.
-- Query current on-call status and shifts.
-
-### Escalation Policies and Paths
-
-Define how alerts escalate when responders don't acknowledge. Supports multi-level escalation with configurable targets (users, schedules, channels) and conditions based on alert urgency or content. Escalation paths allow dynamic routing based on business hours or alert properties.
-
-### Workflows and Automation
-
-Create automated workflows triggered by incident or alert events. Workflows consist of configurable tasks and can be conditioned on incident properties (severity, type, services). Workflow runs can be listed and created. Supports workflow groups for organization and form field conditions for dynamic behavior.
-
-### Retrospectives
-
-Manage post-incident retrospectives including templates, processes, process groups, and steps. Retrospective configurations control how the review process is structured. Incident-level retrospective data can be retrieved and updated.
-
-### Action Items
-
-Track follow-up tasks from incidents. Action items can be created, updated, and listed per incident or across the entire organization.
-
-### Service Catalog
-
-Manage a catalog of services, functionalities, and environments with custom properties. Services and functionalities support incident and uptime chart data. The catalog also supports generic catalog entities and custom properties for extended metadata.
-
-### Teams and Users
-
-Manage teams, users, user email addresses, phone numbers, and notification rules. Users can be assigned roles, and teams can own resources like schedules and escalation policies.
-
-### Dashboards and Metrics
-
-Create and manage custom dashboards with panels. Panels can display incident data using various chart types, filtered and grouped by properties like severity, status, or service.
-
-### Status Pages
-
-Create and manage public or internal status pages with templates. Status page events can be linked to incidents to communicate outage information externally.
-
-### Playbooks
-
-Define reusable incident response playbooks with ordered tasks that guide responders through standardized procedures.
-
-### Communications
-
-Manage stakeholder communication templates, types, stages, and groups for structured incident communications.
-
-### Heartbeats
-
-Monitor system health by sending periodic heartbeat pings. If a heartbeat is missed, it can trigger alerts or incidents.
-
-### Live Call Routing
-
-Configure phone-based live call routers that allow callers to reach on-call responders via phone, with support for custom greetings and automated routing.
-
-### Audit Logs
-
-Retrieve audit logs for compliance and tracking purposes.
-
-### Webhooks Management
-
-Programmatically manage outbound webhook endpoints and review webhook delivery history, including retrying failed deliveries.
-
-## Events
-
-Rootly supports webhooks to receive real-time event notifications from Rootly for incidents, alerts, and other system events in external applications. Webhook endpoints can be configured via the API or the Rootly UI (Configuration > Webhooks).
-
-The event object holds the event, and the data property holds a representation of the resource at the time the event was issued. Each request includes a `X-Rootly-Signature` header for verifying authenticity using HMAC SHA256 with a shared secret.
-
-### Incident Events
-
-Notifications for incident lifecycle changes:
-
-- `incident.created`, `incident.updated`, `incident.mitigated`, `incident.resolved`, `incident.cancelled`, `incident.deleted`
-
-### Scheduled Incident Events
-
-Notifications for scheduled maintenance incidents:
-
-- `incident.scheduled.created`, `incident.scheduled.updated`, `incident.scheduled.in_progress`, `incident.scheduled.completed`, `incident.scheduled.deleted`
-
-### Retrospective Events
-
-Notifications for post-mortem/retrospective lifecycle changes:
-
-- `incident_post_mortem.created`, `incident_post_mortem.updated`, `incident_post_mortem.published`, `incident_post_mortem.deleted`
-
-### Alert Events
-
-Notifications when new alerts are ingested:
-
-- `alert.created`
-
-### Pulse Events
-
-Notifications for status update pulses:
-
-- `pulse.created`
+- [API overview and key scopes](https://docs.rootly.com/api-reference/overview)
+- [Incident creation](https://docs.rootly.com/api-reference/incidents/creates-an-incident)
+- [Alert acknowledgement](https://docs.rootly.com/api-reference/alerts/acknowledges-an-alert)
+- [Alert resolution](https://docs.rootly.com/api-reference/alerts/resolves-an-alert)
+- [Action-item creation](https://docs.rootly.com/api-reference/incidentactionitems/creates-an-incident-action-item)
+- [Heartbeat creation](https://docs.rootly.com/api-reference/heartbeats/creates-a-heartbeat)
+- [Current user](https://docs.rootly.com/api-reference/users/get-current-user)
+- [Official TypeScript SDK](https://docs.rootly.com/integrations/typescript-sdk) and [generated endpoint contracts](https://github.com/rootlyhq/rootly-ts/blob/master/src/generated/schema.d.ts)

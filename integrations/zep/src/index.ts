@@ -14,8 +14,6 @@ import {
   searchGraph,
   setUserSummaryInstructions
 } from './tools';
-import { byomEvent, graphEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     setUserSummaryInstructions,
     getUserThreads
   ],
-  triggers: [graphEvent, byomEvent]
+  triggers: []
 });

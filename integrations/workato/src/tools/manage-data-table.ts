@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import * as map from '../lib/mappers';
+import { field, invalid, malformed, records, required } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageDataTableTool = SlateTool.create(spec, {
@@ -41,7 +43,12 @@ export let manageDataTableTool = SlateTool.create(spec, {
                 'Column type (string, boolean, date, date_time, integer, number, file, relation)'
               ),
             name: z.string().describe('Column name'),
-            optional: z.boolean().optional().describe('Whether the column is optional'),
+            optional: z
+              .boolean()
+              .optional()
+              .describe(
+                'Required for each native column: true allows missing values; false requires a value.'
+              ),
             hint: z.string().optional().describe('Column description/hint')
           })
         )
@@ -62,6 +69,10 @@ export let manageDataTableTool = SlateTool.create(spec, {
         .describe('Filter conditions (for query_records)'),
       orderBy: z.string().optional().describe('Sort by column name (for query_records)'),
       limit: z.number().optional().describe('Max records to return (for query_records)'),
+      timezoneOffsetSecs: z
+        .number()
+        .optional()
+        .describe('Required by the native API when comparing a datetime field to a date.'),
       continuationToken: z
         .string()
         .optional()
@@ -72,7 +83,7 @@ export let manageDataTableTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
+      success: z.boolean().optional().describe('Whether the operation succeeded'),
       tables: z
         .array(z.record(z.string(), z.unknown()))
         .optional()
@@ -88,105 +99,72 @@ export let manageDataTableTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let { action, tableId, tableName, folderId, columns, recordId, recordData } = ctx.input;
-
+    const client = createClient(ctx);
+    const { action, tableId, tableName, folderId, columns, recordId, recordData } = ctx.input;
     if (action === 'list_tables') {
-      let result = await client.listDataTables({
-        page: ctx.input.page,
-        perPage: ctx.input.perPage
-      });
-      let items = result.data ?? (Array.isArray(result) ? result : (result.items ?? []));
+      const result = await client.listDataTables(ctx.input);
+      const tables = records(result.items);
       return {
-        output: { success: true, tables: items },
-        message: `Found **${items.length}** data tables.`
+        output: { success: true, tables },
+        message: `Returned ${tables.length} data tables from this page.`
       };
     }
-
-    if (action === 'get_table') {
-      if (!tableId) throw new Error('Table ID is required');
-      let result = await client.getDataTable(tableId);
-      let table = result.data ?? result;
-      return {
-        output: { success: true, table },
-        message: `Retrieved data table **${tableId}**.`
-      };
-    }
-
     if (action === 'create_table') {
-      if (!tableName || !columns)
-        throw new Error('Table name and columns are required for create_table');
-      let result = await client.createDataTable({
-        name: tableName,
+      if (!columns) invalid('Columns are required.');
+      const table = await client.createDataTable({
+        name: required(tableName, 'Table name'),
         folderId,
         schema: columns
       });
-      let created = result.data ?? result;
-      return {
-        output: { success: true, table: created },
-        message: `Created data table **${tableName}**.`
-      };
+      field(table, 'id', z.string().min(1));
+      return { output: { success: true, table }, message: 'Created data table.' };
     }
-
+    const id = required(tableId, 'Table ID');
+    if (action === 'get_table') {
+      const table = await client.getDataTable(id);
+      if (field(table, 'id', z.string()) !== id) malformed();
+      return { output: { success: true, table }, message: 'Retrieved data table.' };
+    }
     if (action === 'delete_table') {
-      if (!tableId) throw new Error('Table ID is required');
-      await client.deleteDataTable(tableId);
-      return {
-        output: { success: true },
-        message: `Deleted data table **${tableId}**.`
-      };
+      await client.deleteDataTable(id);
+      return { output: { success: true }, message: 'Deleted data table and its records.' };
     }
-
-    if (!tableId) throw new Error('Table ID is required for record operations');
-
     if (action === 'query_records') {
-      let result = await client.queryDataTableRecords(tableId, {
+      const result = await client.queryDataTableRecords(id, {
         select: ctx.input.selectColumns,
         where: ctx.input.where,
         order: ctx.input.orderBy,
         limit: ctx.input.limit,
-        continuationToken: ctx.input.continuationToken
+        continuationToken: ctx.input.continuationToken,
+        timezoneOffsetSecs: ctx.input.timezoneOffsetSecs
       });
-      let records = result.data ?? result.items ?? result.records ?? [];
+      const records = map.queryRecords(result);
       return {
         output: {
           success: true,
-          records: Array.isArray(records) ? records : [],
-          nextContinuationToken: result.continuation_token ?? null
+          records,
+          nextContinuationToken: field(
+            result,
+            'continuation_token',
+            z.string().nullable().optional()
+          )
         },
-        message: `Retrieved **${Array.isArray(records) ? records.length : 0}** records from table ${tableId}.`
+        message: `Returned ${records.length} records from this page. Keep the query unchanged when continuing.`
       };
     }
-
-    if (action === 'create_record') {
-      if (!recordData) throw new Error('Record data is required for create_record');
-      let result = await client.createDataTableRecord(tableId, recordData);
-      let record = result.data ?? result;
-      return {
-        output: { success: true, record },
-        message: `Created record in data table ${tableId}.`
-      };
-    }
-
-    if (action === 'update_record') {
-      if (!recordId || !recordData)
-        throw new Error('Record ID and data are required for update_record');
-      let result = await client.updateDataTableRecord(tableId, recordId, recordData);
-      let record = result.data ?? result;
-      return {
-        output: { success: true, record },
-        message: `Updated record **${recordId}** in data table ${tableId}.`
-      };
-    }
-
     if (action === 'delete_record') {
-      if (!recordId) throw new Error('Record ID is required for delete_record');
-      await client.deleteDataTableRecord(tableId, recordId);
-      return {
-        output: { success: true },
-        message: `Deleted record **${recordId}** from data table ${tableId}.`
-      };
+      await client.deleteDataTableRecord(id, required(recordId, 'Record ID'));
+      return { output: { success: true }, message: 'Record deletion accepted.' };
     }
-
-    throw new Error(`Unknown action: ${action}`);
+    if (!recordData) invalid('Record data is required.');
+    const record =
+      action === 'create_record'
+        ? await client.createDataTableRecord(id, recordData)
+        : await client.updateDataTableRecord(id, required(recordId, 'Record ID'), recordData);
+    const returnedId = field(record, 'record_id', z.string().min(1));
+    if (action === 'update_record' && returnedId !== recordId) malformed();
+    return {
+      output: { success: true, record },
+      message: `Record ${action} accepted. Provider fields outside the schema may be ignored; read back intended values.`
+    };
   });

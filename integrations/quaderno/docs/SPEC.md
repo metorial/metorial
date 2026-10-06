@@ -1,153 +1,31 @@
-Now I have enough information to write the specification. Let me also check for OAuth scopes.# Slates Specification for Quaderno
+# Quaderno integration specification
 
-## Overview
+The integration exposes 44 tools: 43 retained action keys and current account discovery. It uses the [current API reference](https://developers.quaderno.io/api/), version `20241028`, for documented operations. Historical compatibility routes remain separate and require account-specific confirmation.
 
-Quaderno is a tax compliance platform that automates sales tax, VAT, and GST calculations, invoicing, and reporting for businesses selling online. Its API provides accurate tax calculation on every sale worldwide, billing with automatic invoices and credit notes, alerts for new tax obligations and registrations, and tax reports by country or state.
+## Connection
 
-## Authentication
+API keys use HTTP Basic authentication with the key as username and an empty password. Quaderno Connect uses Bearer access tokens after the documented Basic-authenticated, form-encoded OAuth exchange. Production and sandbox have distinct connection methods and hosts. New OAuth connections request `read_write`; existing read-only grants remain usable for reads and cannot authorize writes. The [Connect guide](https://developers.quaderno.io/guides/connect/standard-accounts/) documents the default read-only grant, read-write grant, and 25-day access-token lifetime when the token response omits expiry.
 
-Quaderno supports two authentication methods:
+The authorization identity supplies the account endpoint and an internal profile identifier. That identifier is not a resource ID. New connections retain the discovered account subdomain and environment; older connections can discover and configure their account name. Refresh and profile verification must preserve the stored account. Account tools require the discovered account name. Configuration cannot switch a connected account or environment.
 
-### 1. API Key (HTTP Basic Auth)
+## Operations and amounts
 
-Quaderno uses an API key to authorize all requests, allowing access to the API in combination with the account name in the endpoint URL. You can find your API keys at `quadernoapp.com/users/api-keys`. The API key is included via HTTP Basic Auth in all API requests.
+Tools cover tax calculation and tax-ID validation, contacts, products, invoices, credit notes, expenses, proformas, recurring invoice templates, recorded payments, checkout sessions, asynchronous reports, jurisdiction catalog reads, and transaction records. Current document bodies reference a contact with `{id: ...}` and use priced line items. Inputs representing money use major currency units; response fields ending in `Cents` preserve the provider's integer minor units. No differently named legacy amount is inferred from cents. Decimal strings are checked before numeric serialization, and product prices remain strings.
 
-- The API key is sent as the username in HTTP Basic Auth, with `x` as the password placeholder (the password is ignored).
-- Example: `curl https://ACCOUNT_NAME.quadernoapp.com/api/invoices.json -u <YOUR_API_KEY>:x`
-- To learn the `ACCOUNT_NAME` for your target account, you can get it with the `/authorization` API call.
-- The base URL is `https://ACCOUNT_NAME.quadernoapp.com/api/`.
+Finalized invoices accept only documented administrative changes through the update tool. Financial corrections use the provider correction workflow. Recurring creation can generate future invoices; supported frequency values map to the current period and frequency. Recording transactions, credits, or payments changes accounting history without promising a money transfer or reversal. Delivery initiates an email workflow without proving receipt. Checkout creation returns a customer checkout link without completing payment.
 
-### 2. OAuth 2.0 (Authorization Code Flow)
+Every list invocation returns one bounded cursor page. Continue with `createdBefore` or the previous result's `nextPage`; legacy `page: 1` remains accepted. Continuation URLs must preserve the account, environment, list route, and allowed parameters and contain no authentication secret.
 
-Used for Quaderno Connect (multi-account platforms). This process is based on OAuth, allowing you to securely obtain an access token for a Quaderno account without having to have your user's password or do any manual setup.
+Ready reports provide a downloadable CSV. Report state and actual provider amounts remain provider observations, not independent tax or legal conclusions.
 
-- **Authorization URL:** `https://quadernoapp.com/oauth/authorize`
-- **Token URL:** `https://quadernoapp.com/oauth/token`
-- **Revoke URL:** `https://quadernoapp.com/oauth/revoke`
-- **Required parameters:** `client_id`, `redirect_uri`, `response_type=code`
-- **Scopes:** `read_only` (default), `read_write`
-- You'll be issued with a client ID and secret, which you'll use to identify yourself when sending users to the OAuth flow and swapping codes for access tokens.
-- Access tokens expire every 25 days. Refresh tokens do not expire.
-- API calls use `Authorization: Bearer {{access_token}}` header.
+## Historical limitations
 
-## Features
+The current reference does not document historical jurisdiction POST/DELETE, estimate DELETE, payment DELETE, expense payment POST, or arbitrary contact/line credit creation. Retained keys and historical routes do not establish present support. Catalog jurisdiction IDs cannot establish ownership of legacy registrations. Compatibility requests use the account's default API version, so account-specific route and version behavior requires controlled verification. The integration does not expose tax registration administration or event triggers.
 
-### Tax Calculation
+## Verification and cleanup
 
-Calculate the correct tax rate at checkout based on customer location, product type, and tax jurisdiction. Supports parameters like destination country, postal code, and tax code (e.g., `eservice`, `saas`, `ebook`, `standard`). Covers 12,000+ jurisdictions worldwide. Tax calculations depend on which jurisdictions the account is registered in.
+The private suite requires a dedicated synthetic sandbox account, exact controlled identity/contact/product fixtures, no concurrent fixture writes, and no live payment processors. Metadata, financial/retained records, delivery, checkout, and historical routes have separate explicit gates. Independent reads use the same account and version plane as the operation being verified. Ownership discovery must be complete and bounded; missing or contradictory pagination evidence blocks cleanup.
 
-### Transaction Recording
+Temporary contact/product/expense/future recurring cleanup requires exact ownership and independent absence confirmation. Cleanup is registered before creation and reconciles ambiguous creation with bounded discovery. An unresolved creation is reported for manual inspection, never treated as successful cleanup. Invoices, credits, proformas, payments, transaction documents, report jobs, checkout sessions, and delivered messages retain history; the suite tracks evidence without claiming deletion or reversal. Historical jurisdiction mutation cases remain gated because safe registration ownership is not established.
 
-Send sales data directly from your backend to Quaderno with the Transactions API. Quaderno uses the data for invoices, reports, and tax alerts. Transactions can be of type `sale` or `refund`, and can include customer details, line items with tax information, payment details, and location evidence.
-
-### Invoicing & Credit Notes
-
-Billing with automatic invoices and credit notes. Create, retrieve, update, and deliver invoices and credit notes. Send tax-compliant invoices to customers automatically in HTML or PDF format. Invoices cannot be deleted (for tax compliance); instead, credit notes should be used. Invoices support partial refunds.
-
-### Contact Management
-
-Create contacts representing customers or vendors who appear on invoices, credit notes, and expenses. Contacts can be listed, retrieved, updated, and deleted. Contacts with associated documents cannot be deleted.
-
-### Product Management
-
-Create products which can be used as line items on invoices, credit notes, and expenses.
-
-### Expense Tracking
-
-Create and manage business expenses (purchases). Expenses can include payment records and be associated with contacts.
-
-### Estimates / Proformas
-
-Create and manage estimates (quotes/proformas) that can be sent to clients. Estimates can later be converted to invoices.
-
-### Recurring Documents
-
-Recurring documents automatically create an invoice, expense, or estimate each month, week, or any other time interval. Configurable start date, frequency, and action on scheduled date.
-
-### Tax ID Validation
-
-Tax ID validation allows verifying VAT numbers and other tax identifiers against official registries (e.g., EU VIES).
-
-### Tax Jurisdiction Management
-
-Manage the jurisdictions where a business is registered for tax collection. Track tax registration thresholds and permanent establishments.
-
-### Tax Reporting
-
-Download reports that simplify your tax filing process. The Reporting API works asynchronously — you create a Request object, and then get the report when it's ready. Reports include tax summaries by country or state.
-
-### Checkout Sessions
-
-A Checkout Session represents your customer's session as they pay for one-time purchases or subscriptions through Quaderno Checkout. Sessions can be created and managed programmatically. Abandoned checkout sessions are automatically removed after seven days of inactivity.
-
-### E-Invoicing
-
-E-invoicing compliance with multiple countries, just with one API call. Supports delivery to external systems like TicketBAI and Verifactu (Spain).
-
-### Quaderno Connect
-
-Build platforms or marketplaces where you manage tax compliance on behalf of connected accounts. Supports both Standard (OAuth-based) and Custom account types.
-
-## Events
-
-Quaderno supports webhooks for real-time event notifications. Quaderno uses HTTPS to send real-time notifications to your app as a JSON payload. You can use these notifications to execute actions in your backend systems. Webhooks are created via the API or dashboard, and require an HTTPS endpoint that responds with `200 OK`. Quaderno signs all webhook events with an `X-Quaderno-Signature` header using HMAC-SHA1 for verification.
-
-### Account Events
-
-- `account.updated` – Account status or property changes.
-- `account.application.deauthorized` – A user deauthorizes an application.
-
-### Checkout Events
-
-- `checkout.succeeded` – Checkout session completed successfully.
-- `checkout.failed` – Checkout session fails.
-- `checkout.abandoned` – Checkout session abandoned by customer.
-
-### Contact Events
-
-- `contact.created` – New contact created.
-- `contact.updated` – Contact property changes.
-- `contact.deleted` – Contact deleted.
-
-### Invoice Events
-
-- `invoice.created` – New invoice created (sent before payments are recorded).
-- `invoice.updated` – Invoice changes.
-
-### Receipt Events
-
-- `receipt.created` – New receipt created (sent before payments are recorded).
-- `receipt.updated` – Receipt changes.
-
-### Credit Note Events
-
-- `credit.created` – New credit note created.
-- `credit.updated` – Credit note changes.
-
-### Expense Events
-
-- `expense.created` – New expense created.
-- `expense.updated` – Expense changes.
-- `expense.deleted` – Expense deleted.
-
-### Payment Events
-
-- `payment.created` – New payment recorded.
-- `payment.deleted` – Payment deleted.
-
-### Delivery Events
-
-- `delivery.succeeded` – Document successfully delivered (e.g., e-invoice).
-- `delivery.failed` – Document delivery fails.
-- `delivery.rejected` – Document delivery rejected.
-
-### Reporting Events
-
-- `reporting.request.succeeded` – Requested report completed successfully.
-- `reporting.request.failed` – Requested report failed.
-
-### Tax Threshold Events
-
-- `threshold.warning` – A tax threshold is about to be reached in a jurisdiction.
-- `threshold.exceeded` – A tax threshold has been reached.
-- `threshold.eu.100k` – EU digital services sales reach €100,000 (EU-based sellers only).
+Local mocked transport checks and suite collection do not prove deployed credentials, actual financial operations, email delivery, file contents, or provider cleanup. Those require separately authorized controlled live verification.

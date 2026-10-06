@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FivetranClient } from '../lib/client';
+import { userId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let userOutputSchema = z.object({
-  userId: z.string().describe('Unique identifier of the user'),
+  userId: userId,
   email: z.string().describe('Email address of the user'),
   givenName: z.string().optional().describe('First name'),
   familyName: z.string().optional().describe('Last name'),
@@ -73,7 +74,9 @@ export let getUser = SlateTool.create(spec, {
       userId: z
         .string()
         .optional()
-        .describe('ID of the user to retrieve. If omitted, returns the current user.')
+        .describe(
+          'ID of the user to retrieve. If omitted, resolves the API-key user through get_account. System keys require an explicit ID from list_users.'
+        )
     })
   )
   .output(userOutputSchema)
@@ -116,10 +119,10 @@ export let inviteUser = SlateTool.create(spec, {
     let body: Record<string, any> = {
       email: ctx.input.email
     };
-    if (ctx.input.givenName) body.given_name = ctx.input.givenName;
-    if (ctx.input.familyName) body.family_name = ctx.input.familyName;
-    if (ctx.input.phone) body.phone = ctx.input.phone;
-    if (ctx.input.role) body.role = ctx.input.role;
+    if (ctx.input.givenName !== undefined) body.given_name = ctx.input.givenName;
+    if (ctx.input.familyName !== undefined) body.family_name = ctx.input.familyName;
+    if (ctx.input.phone !== undefined) body.phone = ctx.input.phone;
+    if (ctx.input.role !== undefined) body.role = ctx.input.role;
 
     let u = await client.inviteUser(body);
 
@@ -137,7 +140,7 @@ export let updateUser = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      userId: z.string().describe('ID of the user to update'),
+      userId: userId,
       givenName: z.string().optional().describe('Updated first name'),
       familyName: z.string().optional().describe('Updated last name'),
       phone: z.string().optional().describe('Updated phone number'),
@@ -149,10 +152,10 @@ export let updateUser = SlateTool.create(spec, {
     let client = new FivetranClient(ctx.auth.token);
 
     let body: Record<string, any> = {};
-    if (ctx.input.givenName) body.given_name = ctx.input.givenName;
-    if (ctx.input.familyName) body.family_name = ctx.input.familyName;
-    if (ctx.input.phone) body.phone = ctx.input.phone;
-    if (ctx.input.role) body.role = ctx.input.role;
+    if (ctx.input.givenName !== undefined) body.given_name = ctx.input.givenName;
+    if (ctx.input.familyName !== undefined) body.family_name = ctx.input.familyName;
+    if (ctx.input.phone !== undefined) body.phone = ctx.input.phone;
+    if (ctx.input.role !== undefined) body.role = ctx.input.role;
 
     let u = await client.updateUser(ctx.input.userId, body);
 
@@ -173,7 +176,7 @@ export let deleteUser = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      userId: z.string().describe('ID of the user to delete')
+      userId: userId
     })
   )
   .output(

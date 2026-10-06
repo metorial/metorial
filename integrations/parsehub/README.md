@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Parsehub
 
-Manage web scraping projects, start and monitor scraping runs, and retrieve extracted data. List projects, launch scraping jobs with custom start URLs and parameters, cancel or delete runs, and download structured data in JSON format. Receive webhook notifications when run statuses change or extracted data becomes available.
+Manage web scraping projects, start and monitor scraping runs, and retrieve extracted data. List projects, launch scraping jobs with custom start URLs and parameters, cancel or delete runs, and download structured data in JSON format.
 
 ## License
 

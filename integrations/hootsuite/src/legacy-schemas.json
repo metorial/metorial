@@ -1,0 +1,693 @@
+{
+  "schedule_message": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Message text to post"
+        },
+        "socialProfileIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Social profile IDs to post to"
+        },
+        "scheduledSendTime": {
+          "type": "string",
+          "description": "UTC ISO-8601 datetime to publish (e.g. 2025-03-01T14:00:00Z)"
+        },
+        "mediaUrls": {
+          "description": "Media URLs to attach",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "Public URL of the media file"
+              }
+            },
+            "required": ["url"],
+            "additionalProperties": false
+          }
+        },
+        "mediaIds": {
+          "description": "Media IDs from previous uploads to attach",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags": {
+          "description": "Tags to apply to the message",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "location": {
+          "description": "Location to tag in the post",
+          "type": "object",
+          "properties": {
+            "latitude": {
+              "type": "number",
+              "description": "Latitude coordinate"
+            },
+            "longitude": {
+              "type": "number",
+              "description": "Longitude coordinate"
+            }
+          },
+          "required": ["latitude", "longitude"],
+          "additionalProperties": false
+        },
+        "emailNotification": {
+          "description": "Send email notification when published",
+          "type": "boolean"
+        },
+        "webhookUrls": {
+          "description": "Webhook URLs for status change notifications",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["text", "socialProfileIds", "scheduledSendTime"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "messageId": {
+                "type": "string",
+                "description": "Hootsuite message ID"
+              },
+              "state": {
+                "type": "string",
+                "description": "Message state (e.g. SCHEDULED)"
+              },
+              "socialProfileId": {
+                "type": "string",
+                "description": "Social profile this message targets"
+              },
+              "scheduledSendTime": {
+                "type": "string",
+                "description": "Scheduled send time"
+              },
+              "text": {
+                "description": "Message text",
+                "type": "string"
+              }
+            },
+            "required": ["messageId", "state", "socialProfileId", "scheduledSendTime"],
+            "additionalProperties": false
+          },
+          "description": "Created messages, one per social profile"
+        }
+      },
+      "required": ["messages"],
+      "additionalProperties": false
+    }
+  },
+  "list_messages": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "description": "Fetch a single message by its ID (overrides time range filters)",
+          "type": "string"
+        },
+        "startTime": {
+          "description": "Start of time range in UTC ISO-8601 (required if no messageId)",
+          "type": "string"
+        },
+        "endTime": {
+          "description": "End of time range in UTC ISO-8601 (required if no messageId)",
+          "type": "string"
+        },
+        "socialProfileIds": {
+          "description": "Filter by social profile IDs",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "state": {
+          "description": "Filter by message state",
+          "type": "string",
+          "enum": ["SCHEDULED", "SENT", "SEND_FAILED", "PENDING_APPROVAL", "REJECTED"]
+        },
+        "limit": {
+          "description": "Maximum number of messages to return",
+          "type": "number"
+        },
+        "cursor": {
+          "description": "Pagination cursor from a previous response",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "messageId": {
+                "type": "string",
+                "description": "Message ID"
+              },
+              "state": {
+                "type": "string",
+                "description": "Message state"
+              },
+              "text": {
+                "description": "Message text",
+                "type": "string"
+              },
+              "socialProfileId": {
+                "description": "Target social profile ID",
+                "type": "string"
+              },
+              "scheduledSendTime": {
+                "description": "When the message is/was scheduled",
+                "type": "string"
+              },
+              "postUrl": {
+                "description": "URL of published post",
+                "type": "string"
+              },
+              "sequenceNumber": {
+                "description": "Sequence number for approve/reject",
+                "type": "number"
+              },
+              "tags": {
+                "description": "Tags applied",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["messageId", "state"],
+            "additionalProperties": false
+          }
+        },
+        "cursor": {
+          "description": "Cursor for next page",
+          "type": "string"
+        }
+      },
+      "required": ["messages"],
+      "additionalProperties": false
+    }
+  },
+  "manage_message": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "ID of the message to manage"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["approve", "reject", "delete"],
+          "description": "Action to perform on the message"
+        },
+        "sequenceNumber": {
+          "description": "Sequence number (required for approve/reject)",
+          "type": "number"
+        },
+        "reason": {
+          "description": "Reason for rejection (only used with reject action)",
+          "type": "string"
+        }
+      },
+      "required": ["messageId", "action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "ID of the managed message"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action that was performed"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action succeeded"
+        }
+      },
+      "required": ["messageId", "action", "success"],
+      "additionalProperties": false
+    }
+  },
+  "list_social_profiles": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "socialProfileId": {
+          "description": "Fetch a specific social profile by ID",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "socialProfiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "socialProfileId": {
+                "type": "string",
+                "description": "Social profile ID"
+              },
+              "type": {
+                "description": "Social network type (e.g. TWITTER, FACEBOOK, INSTAGRAM)",
+                "type": "string"
+              },
+              "socialNetworkId": {
+                "description": "ID on the social network",
+                "type": "string"
+              },
+              "socialNetworkUsername": {
+                "description": "Username on the social network",
+                "type": "string"
+              },
+              "avatarUrl": {
+                "description": "Profile avatar URL",
+                "type": "string"
+              },
+              "ownerId": {
+                "description": "Hootsuite member ID who owns this profile",
+                "type": "string"
+              }
+            },
+            "required": ["socialProfileId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["socialProfiles"],
+      "additionalProperties": false
+    }
+  },
+  "upload_media": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "status"],
+          "description": "Whether to create an upload URL or check upload status"
+        },
+        "sizeBytes": {
+          "description": "File size in bytes (required for create)",
+          "type": "number"
+        },
+        "mimeType": {
+          "description": "MIME type of the file (required for create, e.g. image/jpeg, video/mp4)",
+          "type": "string"
+        },
+        "mediaId": {
+          "description": "Media ID to check status for (required for status)",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mediaId": {
+          "type": "string",
+          "description": "Media ID"
+        },
+        "uploadUrl": {
+          "description": "Pre-signed S3 upload URL (only for create action)",
+          "type": "string"
+        },
+        "uploadUrlDurationSeconds": {
+          "description": "How long the upload URL is valid",
+          "type": "number"
+        },
+        "state": {
+          "description": "Upload processing state (e.g. READY, PROCESSING, FAILED)",
+          "type": "string"
+        },
+        "mimeType": {
+          "description": "MIME type of the uploaded file",
+          "type": "string"
+        },
+        "thumbnailUrl": {
+          "description": "Thumbnail URL if available",
+          "type": "string"
+        }
+      },
+      "required": ["mediaId"],
+      "additionalProperties": false
+    }
+  },
+  "get_user_info": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "memberId": {
+          "type": "string",
+          "description": "Hootsuite member ID"
+        },
+        "fullName": {
+          "description": "Full name",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address",
+          "type": "string"
+        },
+        "language": {
+          "description": "Preferred language",
+          "type": "string"
+        },
+        "timezone": {
+          "description": "Timezone",
+          "type": "string"
+        },
+        "companyName": {
+          "description": "Company name",
+          "type": "string"
+        },
+        "organizations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "organizationId": {
+                "type": "string",
+                "description": "Organization ID"
+              },
+              "name": {
+                "description": "Organization name",
+                "type": "string"
+              }
+            },
+            "required": ["organizationId"],
+            "additionalProperties": false
+          },
+          "description": "Organizations the user belongs to"
+        }
+      },
+      "required": ["memberId", "organizations"],
+      "additionalProperties": false
+    }
+  },
+  "manage_organization_members": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "description": "Organization ID"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["list", "get", "invite", "remove"],
+          "description": "Action to perform"
+        },
+        "memberId": {
+          "description": "Member ID (required for get/remove)",
+          "type": "string"
+        },
+        "fullName": {
+          "description": "Full name of the new member (required for invite)",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email of the new member (required for invite)",
+          "type": "string"
+        },
+        "companyName": {
+          "description": "Company name (for invite)",
+          "type": "string"
+        },
+        "bio": {
+          "description": "Bio (for invite)",
+          "type": "string"
+        },
+        "timezone": {
+          "description": "Timezone (for invite)",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Pagination cursor for list",
+          "type": "string"
+        }
+      },
+      "required": ["organizationId", "action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "members": {
+          "description": "List of members",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "memberId": {
+                "type": "string",
+                "description": "Member ID"
+              },
+              "fullName": {
+                "description": "Full name",
+                "type": "string"
+              },
+              "email": {
+                "description": "Email",
+                "type": "string"
+              },
+              "companyName": {
+                "description": "Company name",
+                "type": "string"
+              },
+              "bio": {
+                "description": "Bio",
+                "type": "string"
+              },
+              "timezone": {
+                "description": "Timezone",
+                "type": "string"
+              },
+              "permissions": {
+                "description": "Member permissions"
+              }
+            },
+            "required": ["memberId"],
+            "additionalProperties": false
+          }
+        },
+        "cursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        },
+        "success": {
+          "description": "Whether the action succeeded (for invite/remove)",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_teams": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "get",
+            "create",
+            "list_members",
+            "add_member",
+            "remove_member",
+            "list_social_profiles"
+          ],
+          "description": "Action to perform"
+        },
+        "organizationId": {
+          "description": "Organization ID (required for list, create)",
+          "type": "string"
+        },
+        "teamId": {
+          "description": "Team ID (required for get, list_members, add_member, remove_member, list_social_profiles)",
+          "type": "string"
+        },
+        "teamName": {
+          "description": "Name for the new team (required for create)",
+          "type": "string"
+        },
+        "memberId": {
+          "description": "Member ID (required for add_member, remove_member)",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "teams": {
+          "description": "List of teams",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "teamId": {
+                "type": "string",
+                "description": "Team ID"
+              },
+              "teamName": {
+                "description": "Team name",
+                "type": "string"
+              },
+              "organizationId": {
+                "description": "Organization ID",
+                "type": "string"
+              }
+            },
+            "required": ["teamId"],
+            "additionalProperties": false
+          }
+        },
+        "members": {
+          "description": "List of team members",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "memberId": {
+                "type": "string",
+                "description": "Member ID"
+              },
+              "fullName": {
+                "description": "Member full name",
+                "type": "string"
+              },
+              "email": {
+                "description": "Member email",
+                "type": "string"
+              }
+            },
+            "required": ["memberId"],
+            "additionalProperties": false
+          }
+        },
+        "socialProfiles": {
+          "description": "Social profiles accessible to the team",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "socialProfileId": {
+                "type": "string",
+                "description": "Social profile ID"
+              },
+              "type": {
+                "description": "Social network type",
+                "type": "string"
+              }
+            },
+            "required": ["socialProfileId"],
+            "additionalProperties": false
+          }
+        },
+        "cursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        },
+        "success": {
+          "description": "Whether the action succeeded",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "shorten_link": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "The URL to shorten"
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "shortenedUrl": {
+          "type": "string",
+          "description": "The shortened Ow.ly URL"
+        },
+        "originalUrl": {
+          "type": "string",
+          "description": "The original URL"
+        }
+      },
+      "required": ["shortenedUrl", "originalUrl"],
+      "additionalProperties": false
+    }
+  }
+}

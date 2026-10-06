@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugsnagClient } from '../lib/client';
+import { pageInput, pageOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let releaseSchema = z.object({
@@ -45,55 +46,64 @@ export let listReleases = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...pageInput,
       projectId: z.string().describe('Project ID to list releases for'),
       releaseStage: z
         .string()
         .optional()
         .describe('Filter by release stage (e.g., production, staging)'),
-      perPage: z.number().optional().describe('Number of results per page (max 100)')
+      perPage: z.number().optional().describe('Number of releases per page (1–10; default 5)')
     })
   )
   .output(
     z.object({
+      ...pageOutput,
       releases: z.array(releaseSchema).describe('List of releases')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
+    let client = new BugsnagClient(ctx.auth);
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('Project ID is required.');
+    if (!projectId) throw createApiServiceError('Project ID is required.');
 
     let releases = await client.listReleases(projectId, {
       perPage: ctx.input.perPage,
+      pageUrl: ctx.input.pageUrl,
       releaseStage: ctx.input.releaseStage
     });
 
-    let mapped = releases.map((r: any) => ({
-      releaseId: r.id,
-      version: r.release_name || r.version || r.app_version,
-      versionCode: r.version_code,
-      bundleVersion: r.bundle_version,
-      releaseStage: r.release_stage,
-      releaseSource: r.release_source,
-      builderName: r.builder_name,
-      buildTool: r.build_tool,
-      releaseTime: r.release_time || r.created_at,
-      totalSessionsCount: r.total_sessions_count,
-      unhandledSessionsCount: r.unhandled_sessions_count,
-      sessionStabilityPercentage: r.sessions_count_in_last_24h != null ? undefined : undefined,
-      crashFreeSessionsPercentage: r.crash_free_sessions,
+    let mapped = releases.map(r => ({
+      releaseId: r.id ?? undefined,
+      version: r.app_version ?? r.build_label,
+      versionCode: r.app_version_code ?? undefined,
+      bundleVersion: r.app_bundle_version ?? undefined,
+      releaseStage: r.release_stage?.name ?? undefined,
+      releaseSource: r.release_source ?? undefined,
+      builderName: r.builder_name ?? undefined,
+      buildTool: r.build_tool ?? undefined,
+      releaseTime: r.release_time ?? undefined,
+      totalSessionsCount: r.total_sessions_count ?? undefined,
+      unhandledSessionsCount: r.unhandled_sessions_count ?? undefined,
+      sessionStabilityPercentage:
+        r.total_sessions_count && r.unhandled_sessions_count !== undefined
+          ? (1 - r.unhandled_sessions_count / r.total_sessions_count) * 100
+          : undefined,
+      crashFreeSessionsPercentage:
+        r.total_sessions_count && r.unhandled_sessions_count !== undefined
+          ? (1 - r.unhandled_sessions_count / r.total_sessions_count) * 100
+          : undefined,
       sourceControl: r.source_control
         ? {
-            provider: r.source_control.provider,
-            repository: r.source_control.repository,
-            revision: r.source_control.revision,
-            diffUrl: r.source_control.diff_url
+            provider: r.source_control.provider ?? undefined,
+            repository: r.source_control.repository ?? undefined,
+            revision: r.source_control.revision ?? undefined,
+            diffUrl: r.source_control.diff_url ?? undefined
           }
         : undefined
     }));
 
     return {
-      output: { releases: mapped },
+      output: { releases: mapped, ...client.pageInfo },
       message: `Found **${mapped.length}** release(s).`
     };
   })

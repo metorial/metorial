@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,8 @@ export let getAgent = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      agentId: z.string().describe('The model ID of the agent to retrieve')
+      agentId: z.string().min(1).describe('Agent model ID from list_agents'),
+      includeActions: z.boolean().optional().describe('Include action IDs and input variables')
     })
   )
   .output(
@@ -22,9 +23,14 @@ export let getAgent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.getAgent(ctx.input.agentId);
-    let agent = result.response?.assistants || result.response || {};
+    let client = new Client(ctx.auth);
+    let result = await client.getAgent(ctx.input.agentId, ctx.input.includeActions);
+    let agents = result.response?.assistants;
+    let agent = Array.isArray(agents)
+      ? agents.find(item => item?.model_id === ctx.input.agentId)
+      : agents;
+    if (!agent || typeof agent !== 'object' || agent.model_id !== ctx.input.agentId)
+      throw createApiServiceError('Synthflow did not return the requested agent.');
 
     return {
       output: {

@@ -17,8 +17,6 @@ import {
   manageTableSettings,
   updateRow
 } from './tools';
-import { inboundWebhook, tableRowChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     manageTableSettings,
     exportCsv
   ],
-  triggers: [inboundWebhook, tableRowChanges]
+  triggers: []
 });

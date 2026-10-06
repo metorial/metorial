@@ -1,0 +1,4603 @@
+{
+  "search_purchase_orders": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Filter by status (e.g. \"draft\", \"pending_approval\", \"ordered\", \"soft_closed\", \"closed\")",
+          "type": "string"
+        },
+        "supplierId": {
+          "description": "Filter by supplier ID",
+          "type": "number"
+        },
+        "poNumber": {
+          "description": "Filter by PO number",
+          "type": "string"
+        },
+        "exportedFlag": {
+          "description": "Filter by exported status",
+          "type": "boolean"
+        },
+        "createdAfter": {
+          "description": "Filter POs created after this date (ISO 8601)",
+          "type": "string"
+        },
+        "updatedAfter": {
+          "description": "Filter POs updated after this date (ISO 8601)",
+          "type": "string"
+        },
+        "filters": {
+          "description": "Additional Coupa query filters as key-value pairs, e.g. {\"order_lines.description[contains]\": \"laptop\"}",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "orderBy": {
+          "description": "Field to sort by (e.g. \"created_at\", \"updated_at\", \"po_number\")",
+          "type": "string"
+        },
+        "sortDirection": {
+          "description": "Sort direction",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "limit": {
+          "description": "Maximum number of results (default 50, max 50)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "purchaseOrders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "purchaseOrderId": {
+                "type": "number",
+                "description": "Coupa internal purchase order ID"
+              },
+              "poNumber": {
+                "description": "PO number",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "description": "PO status (e.g. draft, pending_approval, ordered, soft_closed, closed)",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "version": {
+                "description": "PO version number",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "shipToAddress": {
+                "description": "Ship-to address object",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "supplier": {
+                "description": "Supplier object with id and name",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currency": {
+                "description": "Currency object",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "paymentTerms": {
+                "description": "Payment terms",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "orderLines": {
+                "description": "Array of order line items",
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "totalAmount": {
+                "description": "Total amount of the purchase order",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdBy": {
+                "description": "User who created the PO",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "exportedFlag": {
+                "description": "Whether the PO has been exported",
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rawData": {
+                "description": "Complete raw PO data from API"
+              }
+            },
+            "required": ["purchaseOrderId"],
+            "additionalProperties": false
+          },
+          "description": "List of matching purchase orders"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of purchase orders returned"
+        }
+      },
+      "required": ["purchaseOrders", "count"],
+      "additionalProperties": false
+    }
+  },
+  "get_purchase_order": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "purchaseOrderId": {
+          "type": "number",
+          "description": "Coupa purchase order ID"
+        }
+      },
+      "required": ["purchaseOrderId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "purchaseOrderId": {
+          "type": "number",
+          "description": "Coupa internal purchase order ID"
+        },
+        "poNumber": {
+          "description": "PO number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "PO status",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "version": {
+          "description": "Version number",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "supplier": {
+          "description": "Supplier object",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "shipToAddress": {
+          "description": "Ship-to address",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "description": "Currency object",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paymentTerms": {
+          "description": "Payment terms",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "orderLines": {
+          "description": "Order line items",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalAmount": {
+          "description": "Total PO amount",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdBy": {
+          "description": "Creator user object",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw PO data"
+        }
+      },
+      "required": ["purchaseOrderId"],
+      "additionalProperties": false
+    }
+  },
+  "create_purchase_order": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "supplier": {
+          "type": "object",
+          "properties": {
+            "supplierId": {
+              "description": "Supplier ID",
+              "type": "number"
+            },
+            "supplierNumber": {
+              "description": "Supplier number",
+              "type": "string"
+            }
+          },
+          "description": "Supplier reference — provide either supplierId or supplierNumber"
+        },
+        "shipToAddress": {
+          "description": "Ship-to address reference",
+          "type": "object",
+          "properties": {
+            "addressId": {
+              "description": "Address ID",
+              "type": "number"
+            }
+          }
+        },
+        "currency": {
+          "description": "Currency for the PO",
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": ["code"]
+        },
+        "paymentTermCode": {
+          "description": "Payment term code",
+          "type": "string"
+        },
+        "poNumber": {
+          "description": "Custom PO number (if not auto-generated)",
+          "type": "string"
+        },
+        "orderLines": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "Description of the line item"
+              },
+              "lineNumber": {
+                "description": "Line number",
+                "type": "number"
+              },
+              "quantity": {
+                "type": "number",
+                "description": "Quantity to order"
+              },
+              "price": {
+                "type": "number",
+                "description": "Unit price"
+              },
+              "currency": {
+                "description": "Currency for this line",
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": ["code"]
+              },
+              "needByDate": {
+                "description": "Need-by date (ISO 8601)",
+                "type": "string"
+              },
+              "accountingTotal": {
+                "description": "Total accounting amount",
+                "type": "number"
+              },
+              "uom": {
+                "description": "Unit of measure",
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": ["code"]
+              },
+              "commodity": {
+                "description": "Commodity",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": ["name"]
+              },
+              "account": {
+                "description": "Account object for this line"
+              }
+            },
+            "required": ["description", "quantity", "price"],
+            "description": "Order line item"
+          },
+          "description": "Order lines (at least one required)"
+        },
+        "customFields": {
+          "description": "Custom field values",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["supplier", "orderLines"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "purchaseOrderId": {
+          "type": "number",
+          "description": "Created PO ID"
+        },
+        "poNumber": {
+          "description": "PO number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "PO status after creation",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw PO data"
+        }
+      },
+      "required": ["purchaseOrderId"],
+      "additionalProperties": false
+    }
+  },
+  "update_purchase_order": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "purchaseOrderId": {
+          "type": "number",
+          "description": "ID of the purchase order to update"
+        },
+        "shipToAddress": {
+          "description": "New ship-to address reference",
+          "type": "object",
+          "properties": {
+            "addressId": {
+              "type": "number"
+            }
+          },
+          "required": ["addressId"]
+        },
+        "currency": {
+          "description": "Updated currency",
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": ["code"]
+        },
+        "paymentTermCode": {
+          "description": "Updated payment term code",
+          "type": "string"
+        },
+        "orderLines": {
+          "description": "Order lines to update — include line ID for existing lines",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "orderLineId": {
+                "description": "Existing line ID (for updates)",
+                "type": "number"
+              },
+              "description": {
+                "description": "Line description",
+                "type": "string"
+              },
+              "quantity": {
+                "description": "Updated quantity",
+                "type": "number"
+              },
+              "price": {
+                "description": "Updated price",
+                "type": "number"
+              },
+              "needByDate": {
+                "description": "Updated need-by date",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "customFields": {
+          "description": "Custom field values to update",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["purchaseOrderId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "purchaseOrderId": {
+          "type": "number",
+          "description": "Updated PO ID"
+        },
+        "poNumber": {
+          "description": "PO number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "Current PO status",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw PO data"
+        }
+      },
+      "required": ["purchaseOrderId"],
+      "additionalProperties": false
+    }
+  },
+  "search_invoices": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Filter by status (e.g. \"draft\", \"pending_approval\", \"approved\", \"disputed\", \"voided\", \"paid\")",
+          "type": "string"
+        },
+        "supplierId": {
+          "description": "Filter by supplier ID",
+          "type": "number"
+        },
+        "invoiceNumber": {
+          "description": "Filter by invoice number",
+          "type": "string"
+        },
+        "exportedFlag": {
+          "description": "Filter by exported status",
+          "type": "boolean"
+        },
+        "createdAfter": {
+          "description": "Filter invoices created after this date (ISO 8601)",
+          "type": "string"
+        },
+        "updatedAfter": {
+          "description": "Filter invoices updated after this date (ISO 8601)",
+          "type": "string"
+        },
+        "filters": {
+          "description": "Additional Coupa query filters",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "orderBy": {
+          "description": "Field to sort by",
+          "type": "string"
+        },
+        "sortDirection": {
+          "description": "Sort direction",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "limit": {
+          "description": "Maximum number of results (default 50)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "invoices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "invoiceId": {
+                "type": "number",
+                "description": "Coupa internal invoice ID"
+              },
+              "invoiceNumber": {
+                "description": "Invoice number",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "description": "Invoice status",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "invoiceDate": {
+                "description": "Invoice date",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "supplier": {
+                "description": "Supplier object",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currency": {
+                "description": "Currency object",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "totalAmount": {
+                "description": "Total invoice amount",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lineCount": {
+                "description": "Number of invoice lines",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "paymentTerm": {
+                "description": "Payment terms",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rawData": {
+                "description": "Complete raw invoice data"
+              }
+            },
+            "required": ["invoiceId"],
+            "additionalProperties": false
+          },
+          "description": "List of matching invoices"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of invoices returned"
+        }
+      },
+      "required": ["invoices", "count"],
+      "additionalProperties": false
+    }
+  },
+  "get_invoice": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "invoiceId": {
+          "type": "number",
+          "description": "Coupa invoice ID"
+        }
+      },
+      "required": ["invoiceId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "invoiceId": {
+          "type": "number",
+          "description": "Coupa internal invoice ID"
+        },
+        "invoiceNumber": {
+          "description": "Invoice number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "Invoice status",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "invoiceDate": {
+          "description": "Invoice date",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dueDate": {
+          "description": "Payment due date",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "supplier": {
+          "description": "Supplier object",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "description": "Currency object",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalAmount": {
+          "description": "Total invoice amount",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "invoiceLines": {
+          "description": "Invoice line items",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paymentTerm": {
+          "description": "Payment terms",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "documentType": {
+          "description": "Document type (Invoice, Credit Note, etc.)",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw invoice data"
+        }
+      },
+      "required": ["invoiceId"],
+      "additionalProperties": false
+    }
+  },
+  "create_invoice": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "invoiceNumber": {
+          "type": "string",
+          "description": "Unique invoice number"
+        },
+        "invoiceDate": {
+          "type": "string",
+          "description": "Invoice date (ISO 8601)"
+        },
+        "supplier": {
+          "type": "object",
+          "properties": {
+            "supplierId": {
+              "description": "Supplier ID",
+              "type": "number"
+            },
+            "supplierNumber": {
+              "description": "Supplier number",
+              "type": "string"
+            }
+          },
+          "description": "Supplier reference"
+        },
+        "currency": {
+          "description": "Invoice currency",
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": ["code"]
+        },
+        "paymentTermCode": {
+          "description": "Payment term code",
+          "type": "string"
+        },
+        "shipToAddress": {
+          "description": "Ship-to address reference",
+          "type": "object",
+          "properties": {
+            "addressId": {
+              "type": "number"
+            }
+          },
+          "required": ["addressId"]
+        },
+        "invoiceLines": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "Line item description"
+              },
+              "quantity": {
+                "type": "number",
+                "description": "Quantity"
+              },
+              "price": {
+                "type": "number",
+                "description": "Unit price"
+              },
+              "lineNumber": {
+                "description": "Line number",
+                "type": "number"
+              },
+              "purchaseOrderLineId": {
+                "description": "PO line ID for PO-backed invoices",
+                "type": "number"
+              },
+              "account": {
+                "description": "Account object for this line"
+              },
+              "commodity": {
+                "description": "Commodity",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": ["name"]
+              },
+              "tax": {
+                "description": "Tax details"
+              }
+            },
+            "required": ["description", "quantity", "price"],
+            "description": "Invoice line item"
+          },
+          "description": "Invoice line items (at least one required)"
+        },
+        "isCredit": {
+          "description": "Set to true to create a credit note",
+          "type": "boolean"
+        },
+        "customFields": {
+          "description": "Custom field values",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["invoiceNumber", "invoiceDate", "supplier", "invoiceLines"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "invoiceId": {
+          "type": "number",
+          "description": "Created invoice ID"
+        },
+        "invoiceNumber": {
+          "description": "Invoice number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "Invoice status after creation",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw invoice data"
+        }
+      },
+      "required": ["invoiceId"],
+      "additionalProperties": false
+    }
+  },
+  "search_suppliers": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Filter by supplier name (exact match or use filters for contains/starts_with)",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter by status (e.g. \"active\", \"inactive\")",
+          "type": "string"
+        },
+        "supplierNumber": {
+          "description": "Filter by supplier number",
+          "type": "string"
+        },
+        "updatedAfter": {
+          "description": "Filter suppliers updated after this date (ISO 8601)",
+          "type": "string"
+        },
+        "filters": {
+          "description": "Additional Coupa query filters",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "orderBy": {
+          "description": "Field to sort by",
+          "type": "string"
+        },
+        "sortDirection": {
+          "description": "Sort direction",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "limit": {
+          "description": "Maximum number of results",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "suppliers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "supplierId": {
+                "type": "number",
+                "description": "Coupa internal supplier ID"
+              },
+              "name": {
+                "description": "Supplier name",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "supplierNumber": {
+                "description": "Supplier number",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "description": "Supplier status (active, inactive)",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "displayName": {
+                "description": "Supplier display name",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "primaryContact": {
+                "description": "Primary contact",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "primaryAddress": {
+                "description": "Primary address",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "paymentMethod": {
+                "description": "Payment method",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "paymentTerm": {
+                "description": "Payment terms",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "website": {
+                "description": "Supplier website",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "taxId": {
+                "description": "Tax ID / VAT number",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rawData": {
+                "description": "Complete raw supplier data"
+              }
+            },
+            "required": ["supplierId"],
+            "additionalProperties": false
+          },
+          "description": "List of matching suppliers"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of suppliers returned"
+        }
+      },
+      "required": ["suppliers", "count"],
+      "additionalProperties": false
+    }
+  },
+  "create_supplier": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Supplier name"
+        },
+        "supplierNumber": {
+          "description": "Supplier number",
+          "type": "string"
+        },
+        "displayName": {
+          "description": "Display name",
+          "type": "string"
+        },
+        "status": {
+          "description": "Supplier status",
+          "type": "string",
+          "enum": ["active", "inactive"]
+        },
+        "website": {
+          "description": "Supplier website URL",
+          "type": "string"
+        },
+        "taxId": {
+          "description": "Tax ID / VAT number",
+          "type": "string"
+        },
+        "primaryAddress": {
+          "description": "Primary address",
+          "type": "object",
+          "properties": {
+            "street1": {
+              "type": "string"
+            },
+            "street2": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "postalCode": {
+              "type": "string"
+            },
+            "countryCode": {
+              "description": "ISO 3166-1 alpha-2 country code",
+              "type": "string"
+            }
+          }
+        },
+        "primaryContact": {
+          "description": "Primary contact",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            }
+          }
+        },
+        "paymentTermCode": {
+          "description": "Payment term code",
+          "type": "string"
+        },
+        "customFields": {
+          "description": "Custom field values",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["name"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "supplierId": {
+          "type": "number",
+          "description": "Coupa internal supplier ID"
+        },
+        "name": {
+          "description": "Supplier name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "supplierNumber": {
+          "description": "Supplier number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "Supplier status (active, inactive)",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "displayName": {
+          "description": "Supplier display name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "primaryContact": {
+          "description": "Primary contact",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "primaryAddress": {
+          "description": "Primary address",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paymentMethod": {
+          "description": "Payment method",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paymentTerm": {
+          "description": "Payment terms",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "website": {
+          "description": "Supplier website",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "taxId": {
+          "description": "Tax ID / VAT number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw supplier data"
+        }
+      },
+      "required": ["supplierId"],
+      "additionalProperties": false
+    }
+  },
+  "update_supplier": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "supplierId": {
+          "type": "number",
+          "description": "Coupa supplier ID to update"
+        },
+        "name": {
+          "description": "Updated supplier name",
+          "type": "string"
+        },
+        "displayName": {
+          "description": "Updated display name",
+          "type": "string"
+        },
+        "status": {
+          "description": "Updated status",
+          "type": "string",
+          "enum": ["active", "inactive"]
+        },
+        "website": {
+          "description": "Updated website URL",
+          "type": "string"
+        },
+        "taxId": {
+          "description": "Updated Tax ID / VAT number",
+          "type": "string"
+        },
+        "primaryAddress": {
+          "description": "Updated primary address attributes",
+          "type": "object",
+          "properties": {
+            "street1": {
+              "type": "string"
+            },
+            "street2": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "postalCode": {
+              "type": "string"
+            },
+            "countryCode": {
+              "type": "string"
+            }
+          }
+        },
+        "primaryContact": {
+          "description": "Updated primary contact",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            }
+          }
+        },
+        "paymentTermCode": {
+          "description": "Updated payment term code",
+          "type": "string"
+        },
+        "customFields": {
+          "description": "Custom field values to update",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["supplierId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "supplierId": {
+          "type": "number",
+          "description": "Coupa internal supplier ID"
+        },
+        "name": {
+          "description": "Supplier name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "supplierNumber": {
+          "description": "Supplier number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "Supplier status (active, inactive)",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "displayName": {
+          "description": "Supplier display name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "primaryContact": {
+          "description": "Primary contact",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "primaryAddress": {
+          "description": "Primary address",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paymentMethod": {
+          "description": "Payment method",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paymentTerm": {
+          "description": "Payment terms",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "website": {
+          "description": "Supplier website",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "taxId": {
+          "description": "Tax ID / VAT number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw supplier data"
+        }
+      },
+      "required": ["supplierId"],
+      "additionalProperties": false
+    }
+  },
+  "search_requisitions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Filter by status",
+          "type": "string"
+        },
+        "requestedById": {
+          "description": "Filter by requesting user ID",
+          "type": "number"
+        },
+        "createdAfter": {
+          "description": "Filter requisitions created after this date (ISO 8601)",
+          "type": "string"
+        },
+        "updatedAfter": {
+          "description": "Filter requisitions updated after this date (ISO 8601)",
+          "type": "string"
+        },
+        "filters": {
+          "description": "Additional Coupa query filters",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "orderBy": {
+          "description": "Field to sort by",
+          "type": "string"
+        },
+        "sortDirection": {
+          "description": "Sort direction",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "limit": {
+          "description": "Maximum number of results",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requisitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requisitionId": {
+                "type": "number",
+                "description": "Coupa internal requisition ID"
+              },
+              "requisitionNumber": {
+                "description": "Requisition number",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "description": "Requisition status",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "requestedBy": {
+                "description": "Requesting user",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "department": {
+                "description": "Department",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currency": {
+                "description": "Currency",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "requisitionLines": {
+                "description": "Requisition line items",
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "totalAmount": {
+                "description": "Total amount",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "justification": {
+                "description": "Requisition justification",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rawData": {
+                "description": "Complete raw requisition data"
+              }
+            },
+            "required": ["requisitionId"],
+            "additionalProperties": false
+          },
+          "description": "List of matching requisitions"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of requisitions returned"
+        }
+      },
+      "required": ["requisitions", "count"],
+      "additionalProperties": false
+    }
+  },
+  "create_requisition": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestedById": {
+          "description": "ID of the user making the request",
+          "type": "number"
+        },
+        "justification": {
+          "description": "Justification for the requisition",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Currency",
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": ["code"]
+        },
+        "department": {
+          "description": "Department",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": ["name"]
+        },
+        "shipToAddress": {
+          "description": "Ship-to address reference",
+          "type": "object",
+          "properties": {
+            "addressId": {
+              "type": "number"
+            }
+          },
+          "required": ["addressId"]
+        },
+        "requisitionLines": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "Line item description"
+              },
+              "quantity": {
+                "type": "number",
+                "description": "Quantity"
+              },
+              "unitPrice": {
+                "type": "number",
+                "description": "Unit price"
+              },
+              "needByDate": {
+                "description": "Need-by date (ISO 8601)",
+                "type": "string"
+              },
+              "supplierId": {
+                "description": "Preferred supplier ID",
+                "type": "number"
+              },
+              "commodity": {
+                "description": "Commodity",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": ["name"]
+              },
+              "account": {
+                "description": "Account for this line"
+              }
+            },
+            "required": ["description", "quantity", "unitPrice"]
+          },
+          "description": "Requisition lines"
+        },
+        "customFields": {
+          "description": "Custom field values",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["requisitionLines"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requisitionId": {
+          "type": "number",
+          "description": "Coupa internal requisition ID"
+        },
+        "requisitionNumber": {
+          "description": "Requisition number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "Requisition status",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requestedBy": {
+          "description": "Requesting user",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "department": {
+          "description": "Department",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "description": "Currency",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requisitionLines": {
+          "description": "Requisition line items",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalAmount": {
+          "description": "Total amount",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "justification": {
+          "description": "Requisition justification",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw requisition data"
+        }
+      },
+      "required": ["requisitionId"],
+      "additionalProperties": false
+    }
+  },
+  "search_expense_reports": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Filter by status (e.g. \"draft\", \"pending_approval\", \"approved\", \"rejected\")",
+          "type": "string"
+        },
+        "submittedById": {
+          "description": "Filter by submitting user ID",
+          "type": "number"
+        },
+        "createdAfter": {
+          "description": "Filter reports created after this date (ISO 8601)",
+          "type": "string"
+        },
+        "updatedAfter": {
+          "description": "Filter reports updated after this date (ISO 8601)",
+          "type": "string"
+        },
+        "exportedFlag": {
+          "description": "Filter by exported status",
+          "type": "boolean"
+        },
+        "filters": {
+          "description": "Additional Coupa query filters",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "orderBy": {
+          "description": "Field to sort by",
+          "type": "string"
+        },
+        "sortDirection": {
+          "description": "Sort direction",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "limit": {
+          "description": "Maximum number of results",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "expenseReports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "expenseReportId": {
+                "type": "number",
+                "description": "Coupa internal expense report ID"
+              },
+              "title": {
+                "description": "Expense report title",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "description": "Expense report status",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "expenseReportNumber": {
+                "description": "Expense report number",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "submittedBy": {
+                "description": "Submitting user",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "totalAmount": {
+                "description": "Total amount",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currency": {
+                "description": "Currency",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "expenseLines": {
+                "description": "Expense line items",
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "department": {
+                "description": "Department",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rawData": {
+                "description": "Complete raw expense report data"
+              }
+            },
+            "required": ["expenseReportId"],
+            "additionalProperties": false
+          },
+          "description": "List of matching expense reports"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of expense reports returned"
+        }
+      },
+      "required": ["expenseReports", "count"],
+      "additionalProperties": false
+    }
+  },
+  "create_expense_report": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Expense report title"
+        },
+        "submittedById": {
+          "description": "ID of the submitting user",
+          "type": "number"
+        },
+        "currency": {
+          "description": "Currency",
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": ["code"]
+        },
+        "department": {
+          "description": "Department",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": ["name"]
+        },
+        "expenseLines": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "Expense description"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Expense amount"
+              },
+              "expenseDate": {
+                "type": "string",
+                "description": "Date of expense (ISO 8601)"
+              },
+              "expenseCategory": {
+                "description": "Expense category",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": ["name"]
+              },
+              "merchant": {
+                "description": "Merchant name",
+                "type": "string"
+              },
+              "account": {
+                "description": "Account for this line"
+              }
+            },
+            "required": ["description", "amount", "expenseDate"]
+          },
+          "description": "Expense line items"
+        },
+        "customFields": {
+          "description": "Custom field values",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["title", "expenseLines"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "expenseReportId": {
+          "type": "number",
+          "description": "Coupa internal expense report ID"
+        },
+        "title": {
+          "description": "Expense report title",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "Expense report status",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expenseReportNumber": {
+          "description": "Expense report number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "submittedBy": {
+          "description": "Submitting user",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalAmount": {
+          "description": "Total amount",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "description": "Currency",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expenseLines": {
+          "description": "Expense line items",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "department": {
+          "description": "Department",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw expense report data"
+        }
+      },
+      "required": ["expenseReportId"],
+      "additionalProperties": false
+    }
+  },
+  "search_contracts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Filter by status (e.g. \"draft\", \"pending_approval\", \"published\", \"expired\", \"closed\")",
+          "type": "string"
+        },
+        "supplierId": {
+          "description": "Filter by supplier ID",
+          "type": "number"
+        },
+        "type": {
+          "description": "Filter by contract type",
+          "type": "string"
+        },
+        "createdAfter": {
+          "description": "Filter contracts created after this date (ISO 8601)",
+          "type": "string"
+        },
+        "updatedAfter": {
+          "description": "Filter contracts updated after this date (ISO 8601)",
+          "type": "string"
+        },
+        "filters": {
+          "description": "Additional Coupa query filters",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "orderBy": {
+          "description": "Field to sort by",
+          "type": "string"
+        },
+        "sortDirection": {
+          "description": "Sort direction",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "limit": {
+          "description": "Maximum number of results",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contracts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contractId": {
+                "type": "number",
+                "description": "Coupa internal contract ID"
+              },
+              "contractNumber": {
+                "description": "Contract number",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "description": "Contract name",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "description": "Contract status",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": {
+                "description": "Contract type",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "supplier": {
+                "description": "Supplier object",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "startDate": {
+                "description": "Contract start date",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "endDate": {
+                "description": "Contract end date",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maxValue": {
+                "description": "Maximum contract value",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "minValue": {
+                "description": "Minimum contract value",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "currency": {
+                "description": "Currency",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "terms": {
+                "description": "Contract terms",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rawData": {
+                "description": "Complete raw contract data"
+              }
+            },
+            "required": ["contractId"],
+            "additionalProperties": false
+          },
+          "description": "List of matching contracts"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of contracts returned"
+        }
+      },
+      "required": ["contracts", "count"],
+      "additionalProperties": false
+    }
+  },
+  "create_contract": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Contract name"
+        },
+        "type": {
+          "description": "Contract type",
+          "type": "string"
+        },
+        "supplierId": {
+          "description": "Supplier ID to associate with the contract",
+          "type": "number"
+        },
+        "startDate": {
+          "description": "Contract start date (ISO 8601)",
+          "type": "string"
+        },
+        "endDate": {
+          "description": "Contract end date (ISO 8601)",
+          "type": "string"
+        },
+        "maxValue": {
+          "description": "Maximum contract value",
+          "type": "number"
+        },
+        "minValue": {
+          "description": "Minimum contract value",
+          "type": "number"
+        },
+        "currency": {
+          "description": "Contract currency",
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": ["code"]
+        },
+        "terms": {
+          "description": "Contract terms text",
+          "type": "string"
+        },
+        "customFields": {
+          "description": "Custom field values",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["name"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contractId": {
+          "type": "number",
+          "description": "Coupa internal contract ID"
+        },
+        "contractNumber": {
+          "description": "Contract number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "description": "Contract name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "Contract status",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "description": "Contract type",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "supplier": {
+          "description": "Supplier object",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "startDate": {
+          "description": "Contract start date",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "endDate": {
+          "description": "Contract end date",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxValue": {
+          "description": "Maximum contract value",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "minValue": {
+          "description": "Minimum contract value",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "description": "Currency",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "terms": {
+          "description": "Contract terms",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw contract data"
+        }
+      },
+      "required": ["contractId"],
+      "additionalProperties": false
+    }
+  },
+  "search_approvals": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Filter by approval status (e.g. \"pending_approval\", \"approved\", \"rejected\")",
+          "type": "string"
+        },
+        "approverId": {
+          "description": "Filter by approver user ID",
+          "type": "number"
+        },
+        "approvableType": {
+          "description": "Filter by document type (e.g. \"RequisitionHeader\", \"OrderHeader\", \"InvoiceHeader\")",
+          "type": "string"
+        },
+        "updatedAfter": {
+          "description": "Filter approvals updated after this date (ISO 8601)",
+          "type": "string"
+        },
+        "filters": {
+          "description": "Additional Coupa query filters",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "orderBy": {
+          "description": "Field to sort by",
+          "type": "string"
+        },
+        "sortDirection": {
+          "description": "Sort direction",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "limit": {
+          "description": "Maximum number of results",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "approvalId": {
+                "type": "number",
+                "description": "Coupa approval ID"
+              },
+              "status": {
+                "description": "Approval status",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "approvalType": {
+                "description": "Type of approvable document",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "approvableId": {
+                "description": "ID of the approvable document",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "approver": {
+                "description": "Approver user object",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "approvalDate": {
+                "description": "Approval date",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "note": {
+                "description": "Approval note or reason",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rawData": {
+                "description": "Complete raw approval data"
+              }
+            },
+            "required": ["approvalId"],
+            "additionalProperties": false
+          },
+          "description": "List of matching approvals"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of approvals returned"
+        }
+      },
+      "required": ["approvals", "count"],
+      "additionalProperties": false
+    }
+  },
+  "process_approval": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "approvalId": {
+          "type": "number",
+          "description": "ID of the approval to process"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["approve", "reject"],
+          "description": "Action to take on the approval"
+        },
+        "reason": {
+          "description": "Reason for the approval/rejection (required for rejection)",
+          "type": "string"
+        }
+      },
+      "required": ["approvalId", "action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "approvalId": {
+          "type": "number",
+          "description": "Coupa approval ID"
+        },
+        "status": {
+          "description": "Approval status",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approvalType": {
+          "description": "Type of approvable document",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approvableId": {
+          "description": "ID of the approvable document",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approver": {
+          "description": "Approver user object",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "approvalDate": {
+          "description": "Approval date",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "note": {
+          "description": "Approval note or reason",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw approval data"
+        }
+      },
+      "required": ["approvalId"],
+      "additionalProperties": false
+    }
+  },
+  "search_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "login": {
+          "description": "Filter by login name",
+          "type": "string"
+        },
+        "email": {
+          "description": "Filter by email",
+          "type": "string"
+        },
+        "active": {
+          "description": "Filter by active status",
+          "type": "boolean"
+        },
+        "employeeNumber": {
+          "description": "Filter by employee number",
+          "type": "string"
+        },
+        "updatedAfter": {
+          "description": "Filter users updated after this date (ISO 8601)",
+          "type": "string"
+        },
+        "filters": {
+          "description": "Additional Coupa query filters",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "orderBy": {
+          "description": "Field to sort by",
+          "type": "string"
+        },
+        "sortDirection": {
+          "description": "Sort direction",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "limit": {
+          "description": "Maximum number of results",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "number",
+                "description": "Coupa internal user ID"
+              },
+              "login": {
+                "description": "User login name",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "email": {
+                "description": "User email",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "firstName": {
+                "description": "First name",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "lastName": {
+                "description": "Last name",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "fullName": {
+                "description": "Full name",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "employeeNumber": {
+                "description": "Employee number",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "active": {
+                "description": "Whether user is active",
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "department": {
+                "description": "Department",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "roles": {
+                "description": "User roles",
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "defaultAddress": {
+                "description": "Default address",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rawData": {
+                "description": "Complete raw user data"
+              }
+            },
+            "required": ["userId"],
+            "additionalProperties": false
+          },
+          "description": "List of matching users"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of users returned"
+        }
+      },
+      "required": ["users", "count"],
+      "additionalProperties": false
+    }
+  },
+  "create_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "login": {
+          "type": "string",
+          "description": "User login name"
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name"
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name"
+        },
+        "employeeNumber": {
+          "description": "Employee number",
+          "type": "string"
+        },
+        "active": {
+          "description": "Whether user should be active (default true)",
+          "type": "boolean"
+        },
+        "department": {
+          "description": "Department",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": ["name"]
+        },
+        "roles": {
+          "description": "User roles to assign",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["name"]
+          }
+        },
+        "defaultAddress": {
+          "description": "Default address reference",
+          "type": "object",
+          "properties": {
+            "addressId": {
+              "type": "number"
+            }
+          },
+          "required": ["addressId"]
+        },
+        "customFields": {
+          "description": "Custom field values",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["login", "email", "firstName", "lastName"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "Coupa internal user ID"
+        },
+        "login": {
+          "description": "User login name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "description": "User email",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "firstName": {
+          "description": "First name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastName": {
+          "description": "Last name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fullName": {
+          "description": "Full name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "employeeNumber": {
+          "description": "Employee number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "active": {
+          "description": "Whether user is active",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "department": {
+          "description": "Department",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "roles": {
+          "description": "User roles",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "defaultAddress": {
+          "description": "Default address",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw user data"
+        }
+      },
+      "required": ["userId"],
+      "additionalProperties": false
+    }
+  },
+  "update_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "Coupa user ID to update"
+        },
+        "email": {
+          "description": "Updated email",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "Updated first name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Updated last name",
+          "type": "string"
+        },
+        "employeeNumber": {
+          "description": "Updated employee number",
+          "type": "string"
+        },
+        "active": {
+          "description": "Updated active status",
+          "type": "boolean"
+        },
+        "department": {
+          "description": "Updated department",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": ["name"]
+        },
+        "roles": {
+          "description": "Updated role assignments",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["name"]
+          }
+        },
+        "customFields": {
+          "description": "Custom field values to update",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["userId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "Coupa internal user ID"
+        },
+        "login": {
+          "description": "User login name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "description": "User email",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "firstName": {
+          "description": "First name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastName": {
+          "description": "Last name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fullName": {
+          "description": "Full name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "employeeNumber": {
+          "description": "Employee number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "active": {
+          "description": "Whether user is active",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "department": {
+          "description": "Department",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "roles": {
+          "description": "User roles",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "defaultAddress": {
+          "description": "Default address",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw user data"
+        }
+      },
+      "required": ["userId"],
+      "additionalProperties": false
+    }
+  },
+  "search_accounts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "Filter by account code",
+          "type": "string"
+        },
+        "name": {
+          "description": "Filter by account name",
+          "type": "string"
+        },
+        "active": {
+          "description": "Filter by active status",
+          "type": "boolean"
+        },
+        "updatedAfter": {
+          "description": "Filter accounts updated after this date (ISO 8601)",
+          "type": "string"
+        },
+        "filters": {
+          "description": "Additional Coupa query filters",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "orderBy": {
+          "description": "Field to sort by",
+          "type": "string"
+        },
+        "sortDirection": {
+          "description": "Sort direction",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "limit": {
+          "description": "Maximum number of results",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "number",
+                "description": "Coupa internal account ID"
+              },
+              "code": {
+                "description": "Account code",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "description": "Account name",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "segmentOne": {
+                "description": "Segment 1 value",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "segmentTwo": {
+                "description": "Segment 2 value",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "segmentThree": {
+                "description": "Segment 3 value",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "accountType": {
+                "description": "Account type",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "active": {
+                "description": "Whether account is active",
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rawData": {
+                "description": "Complete raw account data"
+              }
+            },
+            "required": ["accountId"],
+            "additionalProperties": false
+          },
+          "description": "List of matching accounts"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of accounts returned"
+        }
+      },
+      "required": ["accounts", "count"],
+      "additionalProperties": false
+    }
+  },
+  "create_account": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Account code"
+        },
+        "name": {
+          "type": "string",
+          "description": "Account name"
+        },
+        "segmentOne": {
+          "description": "Segment 1 value",
+          "type": "string"
+        },
+        "segmentTwo": {
+          "description": "Segment 2 value",
+          "type": "string"
+        },
+        "segmentThree": {
+          "description": "Segment 3 value",
+          "type": "string"
+        },
+        "accountType": {
+          "description": "Account type",
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": ["name"]
+        },
+        "active": {
+          "description": "Whether account is active",
+          "type": "boolean"
+        },
+        "customFields": {
+          "description": "Custom field values",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["code", "name"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "number",
+          "description": "Coupa internal account ID"
+        },
+        "code": {
+          "description": "Account code",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "description": "Account name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "segmentOne": {
+          "description": "Segment 1 value",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "segmentTwo": {
+          "description": "Segment 2 value",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "segmentThree": {
+          "description": "Segment 3 value",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accountType": {
+          "description": "Account type",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "active": {
+          "description": "Whether account is active",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw account data"
+        }
+      },
+      "required": ["accountId"],
+      "additionalProperties": false
+    }
+  },
+  "search_receipts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Filter by receipt status",
+          "type": "string"
+        },
+        "purchaseOrderId": {
+          "description": "Filter by purchase order ID",
+          "type": "number"
+        },
+        "createdAfter": {
+          "description": "Filter receipts created after this date (ISO 8601)",
+          "type": "string"
+        },
+        "updatedAfter": {
+          "description": "Filter receipts updated after this date (ISO 8601)",
+          "type": "string"
+        },
+        "exportedFlag": {
+          "description": "Filter by exported status",
+          "type": "boolean"
+        },
+        "filters": {
+          "description": "Additional Coupa query filters",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "orderBy": {
+          "description": "Field to sort by",
+          "type": "string"
+        },
+        "sortDirection": {
+          "description": "Sort direction",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "limit": {
+          "description": "Maximum number of results",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Offset for pagination",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "receipts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "receiptId": {
+                "type": "number",
+                "description": "Coupa internal receipt ID"
+              },
+              "receiptNumber": {
+                "description": "Receipt number",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "description": "Receipt status",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "purchaseOrderId": {
+                "description": "Associated purchase order ID",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "receivedBy": {
+                "description": "User who received the goods",
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "receiptDate": {
+                "description": "Receipt date",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "receiptLines": {
+                "description": "Receipt line items",
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {}
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rawData": {
+                "description": "Complete raw receipt data"
+              }
+            },
+            "required": ["receiptId"],
+            "additionalProperties": false
+          },
+          "description": "List of matching receipts"
+        },
+        "count": {
+          "type": "number",
+          "description": "Number of receipts returned"
+        }
+      },
+      "required": ["receipts", "count"],
+      "additionalProperties": false
+    }
+  },
+  "create_receipt": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "purchaseOrderLineId": {
+          "type": "number",
+          "description": "ID of the purchase order line being received"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity received"
+        },
+        "receivedById": {
+          "description": "ID of the user receiving the goods",
+          "type": "number"
+        },
+        "receiptDate": {
+          "description": "Date of receipt (ISO 8601)",
+          "type": "string"
+        },
+        "customFields": {
+          "description": "Custom field values",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["purchaseOrderLineId", "quantity"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "receiptId": {
+          "type": "number",
+          "description": "Coupa internal receipt ID"
+        },
+        "receiptNumber": {
+          "description": "Receipt number",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "description": "Receipt status",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "purchaseOrderId": {
+          "description": "Associated purchase order ID",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receivedBy": {
+          "description": "User who received the goods",
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receiptDate": {
+          "description": "Receipt date",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receiptLines": {
+          "description": "Receipt line items",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawData": {
+          "description": "Complete raw receipt data"
+        }
+      },
+      "required": ["receiptId"],
+      "additionalProperties": false
+    }
+  }
+}

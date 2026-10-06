@@ -19,14 +19,6 @@ import {
   sendDirectMessage,
   uploadMedia
 } from './tools';
-import {
-  inboundWebhook,
-  newDirectMessage,
-  newFollower,
-  newMention,
-  newPostFromSearch
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +40,5 @@ export let provider = Slate.create({
     manageReplyVisibility,
     uploadMedia
   ],
-  triggers: [inboundWebhook, newMention, newPostFromSearch, newFollower, newDirectMessage]
+  triggers: []
 });

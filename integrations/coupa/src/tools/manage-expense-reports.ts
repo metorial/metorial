@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoupaClient } from '../lib/client';
+import { customFields, decimal, page, pageFields, requireValue } from '../lib/contracts';
 import { spec } from '../spec';
 
 let expenseReportOutputSchema = z.object({
@@ -15,7 +16,7 @@ let expenseReportOutputSchema = z.object({
   department: z.any().nullable().optional().describe('Department'),
   createdAt: z.string().nullable().optional().describe('Creation timestamp'),
   updatedAt: z.string().nullable().optional().describe('Last update timestamp'),
-  rawData: z.any().optional().describe('Complete raw expense report data')
+  rawData: z.any().optional().describe('Native data with documented credential fields omitted')
 });
 
 export let searchExpenseReports = SlateTool.create(spec, {
@@ -59,14 +60,12 @@ export let searchExpenseReports = SlateTool.create(spec, {
       expenseReports: z
         .array(expenseReportOutputSchema)
         .describe('List of matching expense reports'),
-      count: z.number().describe('Number of expense reports returned')
+      count: z.number().describe('Number of expense reports returned'),
+      ...pageFields
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let filters: Record<string, string> = {};
     if (ctx.input.filters) {
@@ -88,13 +87,13 @@ export let searchExpenseReports = SlateTool.create(spec, {
       exportedFlag: ctx.input.exportedFlag
     });
 
-    let expenseReports = (Array.isArray(results) ? results : []).map((er: any) => ({
+    let expenseReports = results.map((er: any) => ({
       expenseReportId: er.id,
       title: er.title ?? null,
       status: er.status ?? null,
       expenseReportNumber: er['expense-report-number'] ?? er.expense_report_number ?? null,
       submittedBy: er['submitted-by'] ?? er.submitted_by ?? null,
-      totalAmount: er.total ?? er.total ?? null,
+      totalAmount: er.total ?? null,
       currency: er.currency ?? null,
       expenseLines: er['expense-lines'] ?? er.expense_lines ?? null,
       department: er.department ?? null,
@@ -106,7 +105,8 @@ export let searchExpenseReports = SlateTool.create(spec, {
     return {
       output: {
         expenseReports,
-        count: expenseReports.length
+        count: expenseReports.length,
+        ...page(expenseReports.length, ctx.input)
       },
       message: `Found **${expenseReports.length}** expense report(s).`
     };
@@ -124,14 +124,24 @@ export let createExpenseReport = SlateTool.create(spec, {
   .input(
     z.object({
       title: z.string().describe('Expense report title'),
-      submittedById: z.number().optional().describe('ID of the submitting user'),
+      submittedById: z
+        .number()
+        .optional()
+        .describe('Legacy submitter input; submitted-by is read-only, use expensedById'),
+      expensedById: z.number().optional().describe('Native expensed-by user ID'),
       currency: z.object({ code: z.string() }).optional().describe('Currency'),
       department: z.object({ name: z.string() }).optional().describe('Department'),
       expenseLines: z
         .array(
           z.object({
             description: z.string().describe('Expense description'),
-            amount: z.number().describe('Expense amount'),
+            amount: z.number().optional().describe('Expense amount'),
+            amountDecimal: z
+              .string()
+              .optional()
+              .describe(
+                'Exact plain decimal amount; omit the numeric alias for high precision'
+              ),
             expenseDate: z.string().describe('Date of expense (ISO 8601)'),
             expenseCategory: z
               .object({ name: z.string() })
@@ -143,24 +153,39 @@ export let createExpenseReport = SlateTool.create(spec, {
         )
         .min(1)
         .describe('Expense line items'),
+      customFieldsGlobalNamespace: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use true for existing global custom fields (legacy default); false places fields under the modern custom-fields namespace'
+        ),
       customFields: z.record(z.string(), z.any()).optional().describe('Custom field values')
     })
   )
   .output(expenseReportOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
+    requireValue(
+      ctx.input.submittedById === undefined && ctx.input.department === undefined,
+      'submittedById and department are not documented writable expense-report fields. Use expensedById and line accounts; no report was created.'
+    );
+    requireValue(
+      ctx.input.expenseLines.every(line => line.expenseCategory),
+      'Every expense line requires a native expenseCategory.'
+    );
     let payload: any = {
       title: ctx.input.title,
       'expense-lines': ctx.input.expenseLines.map(line => {
         let el: any = {
           description: line.description,
-          amount: String(line.amount),
+          amount: decimal(line.amount, line.amountDecimal, 'expense amount', 32, 4),
           'expense-date': line.expenseDate
         };
+        if (ctx.input.currency) {
+          el.currency = ctx.input.currency;
+          el['foreign-currency'] = ctx.input.currency;
+        }
         if (line.expenseCategory) el['expense-category'] = line.expenseCategory;
         if (line.merchant) el.merchant = line.merchant;
         if (line.account) el.account = line.account;
@@ -168,15 +193,13 @@ export let createExpenseReport = SlateTool.create(spec, {
       })
     };
 
-    if (ctx.input.submittedById) payload['submitted-by'] = { id: ctx.input.submittedById };
-    if (ctx.input.currency) payload.currency = ctx.input.currency;
-    if (ctx.input.department) payload.department = ctx.input.department;
+    if (ctx.input.expensedById) payload['expensed-by'] = { id: ctx.input.expensedById };
 
-    if (ctx.input.customFields) {
-      for (let [key, value] of Object.entries(ctx.input.customFields)) {
-        payload[key] = value;
-      }
-    }
+    customFields(
+      payload,
+      ctx.input.customFields,
+      ctx.input.customFieldsGlobalNamespace ?? true
+    );
 
     let result = await client.createExpenseReport(payload);
 
@@ -188,7 +211,7 @@ export let createExpenseReport = SlateTool.create(spec, {
         expenseReportNumber:
           result['expense-report-number'] ?? result.expense_report_number ?? null,
         submittedBy: result['submitted-by'] ?? result.submitted_by ?? null,
-        totalAmount: result.total ?? result.total ?? null,
+        totalAmount: result.total ?? null,
         currency: result.currency ?? null,
         expenseLines: result['expense-lines'] ?? result.expense_lines ?? null,
         department: result.department ?? null,

@@ -1,6 +1,6 @@
-# Lead Iq
+# LeadIQ
 
-Search and retrieve B2B contact and company data for sales prospecting and data enrichment. Look up verified email addresses, phone numbers, and job positions for individual contacts by name, LinkedIn profile, or email. Search for companies by name or domain to get firmographics, technographics, funding data, and industry details. Perform advanced people searches filtered by job title, seniority, role, company size, location, and more, with results grouped by company or returned as a flat list. Check API credit usage and account plan details. Submit data corrections to report emails or phone numbers as valid or invalid.
+Search and retrieve B2B contact and company data for sales prospecting and data enrichment. Look up verified email addresses, phone numbers, and job positions for individual contacts by name, LinkedIn profile, or email. Search for companies by name or domain to get firmographics, technographics, funding data, and industry details. Perform advanced people searches filtered by job title, seniority, role, company size, location, and more, with results grouped by company or returned as a flat list. Check API credit usage and account plan details. Submit authorized data corrections and receive the provider submission ID. Discover saved company lists, read their entries, and create, rename, delete, add or remove manually supplied companies without enrichment.
 
 ## License
 

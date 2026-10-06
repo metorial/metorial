@@ -1,24 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { StoryblokClient } from '../lib/client';
+import { pagingOutput, resolveSpace, spaceIdInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listStories = SlateTool.create(spec, {
   name: 'List Stories',
   key: 'list_stories',
-  description: `Search and list content stories in the space. Filter by slug, tag, component type, publication status, workflow stage, or language. Supports pagination.`,
+  description: `Search and list content stories in the space. Filter by slug, tag, component type, publication status, or language. Supports pagination.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      spaceId: spaceIdInput,
       page: z.number().optional().describe('Page number for pagination (default: 1)'),
       perPage: z
         .number()
         .optional()
-        .describe('Number of stories per page (default: 25, max: 100)'),
-      searchTerm: z.string().optional().describe('Search term to filter stories by name'),
+        .describe('Number of stories per page (default: 25, max: 1000)'),
+      searchTerm: z.string().optional().describe('Text to search names, slugs and content'),
       sortBy: z
         .string()
         .optional()
@@ -42,6 +44,7 @@ export let listStories = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pagingOutput,
       stories: z
         .array(
           z.object({
@@ -63,9 +66,12 @@ export let listStories = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new StoryblokClient({
-      token: ctx.auth.token,
-      region: ctx.auth.region,
-      spaceId: ctx.config.spaceId
+      ...ctx.auth,
+      spaceId: resolveSpace(
+        ctx.input.spaceId,
+        ctx.config.spaceId,
+        ctx.auth.mode === 'oauth' ? ctx.auth.spaceId : undefined
+      )
     });
 
     let result = await client.listStories({
@@ -95,7 +101,13 @@ export let listStories = SlateTool.create(spec, {
     }));
 
     return {
-      output: { stories, total: result.total },
+      output: {
+        stories,
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+        nextPage: result.nextPage
+      },
       message: `Found **${result.total}** stories (showing ${stories.length}).`
     };
   })

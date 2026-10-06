@@ -1,118 +1,39 @@
-Now I have comprehensive information about Affinity's API. Let me compile the specification.
+# Affinity API scope
 
-# Slates Specification for Affinity
+The integration exposes 38 tools using the supported [Affinity V1 API](https://api-docs.affinity.co/). V2 has a separate versioned API and does not provide V1 feature parity. V1 IDs and write operations remain V1 operations; no V2 version header is applied to them.
 
-## Overview
+## Authentication and permissions
 
-Affinity is a relationship intelligence CRM designed primarily for private capital firms (venture capital, private equity, etc.). It automatically captures and organizes relationship data from emails, meetings, and other interactions, and allows teams to manage deal pipelines, track people and organizations, and leverage relationship strength scoring.
+Use an API key from Settings > Manage Apps. Requests use `Authorization: Bearer <key>`, which V1 supports alongside Basic authentication. The key owner's product permissions, list sharing, account API entitlement, IP allowlist and user/account quotas apply. Current-user discovery uses `/auth/whoami` and reports the authenticated user and tenant. No OAuth authorization flow is configured.
 
-## Authentication
+Current [V2 authentication](https://developer.affinity.co/pages/external-api-v2/authentication), [permissions](https://developer.affinity.co/pages/external-api-v2/permissions) and [versioning](https://developer.affinity.co/pages/external-api-v2/versioning) documentation describe a separate API. V2's current version is 2026-09-17; this integration retains the existing V1 contracts.
 
-Affinity supports API key-based authentication. Each user can generate one API key from the Settings panel in the Affinity web app (Settings → API). The API key can be used with two methods:
+## Tools
 
-- **HTTP Basic Auth**: Pass the API key as the password with no username.
-  ```
-  curl "https://api.affinity.co/api_endpoint" -u :YOUR_API_KEY
-  ```
-- **HTTP Bearer Auth**: Pass the API key as a Bearer token in the Authorization header.
-  ```
-  curl "https://api.affinity.co/api_endpoint" -H "Authorization: Bearer YOUR_API_KEY"
-  ```
+| Capability | Operations |
+| --- | --- |
+| People, organizations and opportunities | Search, get, create, update and delete each entity |
+| Lists and entries | Read lists and paginated entries; add people/organizations and remove entries |
+| Fields and values | Read definitions and values; create, update and delete values; read tracked history |
+| Notes and reminders | List, create, update and delete |
+| Relationship intelligence | Read interaction metadata and relationship strength scores |
+| Entity files | List metadata and download an existing file |
+| Identity | Read the current user, tenant and grant type |
 
-**Important details:**
+No list/field creation, file upload, contact merge, interaction write or event subscription tool is exposed.
 
-- The v1 API (base URL: `https://api.affinity.co/`) supports both Basic and Bearer auth.
-- The v2 API (base URL: `https://api.affinity.co/v2/`) uses Bearer auth.
-- One API key per user is supported. All changes made via the API are attributed to the key owner.
-- API access is only available on certain Affinity plan tiers (Scale, Advanced, Enterprise). Essentials and legacy Professional plans have no or limited API access.
-- There are no OAuth flows or scopes; permissions map to the in-product permissions of the user who generated the API key and are managed by the Affinity admin.
+## Request and response constraints
 
-## Features
+- IDs must be positive safe integers. Page sizes are 1–500, except interactions (1–100). Forward opaque page tokens with unchanged filters. A token can precede an empty final page.
+- Person creation sends an empty email array when none is provided. Search results that omit association IDs are hydrated from entity detail reads; this consumes additional quota. Requested interaction dates are returned as optional metadata.
+- Global organizations cannot be renamed or deleted. Association arrays in updates replace existing values, so supply the complete desired set.
+- An opportunity belongs to one accessible opportunity list, resolved from its list entries. Legacy opportunity `listId` search filtering is applied to each returned page locally; an empty filtered page can still have a next token.
+- Add-list-entry accepts people and organizations. Create an opportunity with `create_opportunity`. Removing an opportunity entry deletes the opportunity. List mutations can activate configured automations.
+- Field values require exactly one entity/list-entry selector. Optional `fieldId` filtering is local. The field definition determines value shape. History actions are 0=create, 1=delete and 2=update. Legacy `entityId` requires `entityType`; explicit typed selectors are also available. For ascending history pagination, preserve the exact returned `changedAt` string and use it with `afterId`; timestamp precision is never rounded.
+- Notes require at least one associated entity. Note deletion is limited by creator permissions.
+- Interaction queries require one external entity, one type (0=meeting, 1=call, 2=chat, 3=email), and ordered timestamps no more than one year apart. Email results use the provider's email envelope; meeting/call titles and nested participants are mapped. A body or creation timestamp may be unavailable.
+- Reminders use 0=one-time and 1=recurring. Recurring reminders require a reset type and positive reminder days. Reset types are 0=any interaction, 1=email and 2=meeting. Status is 0=completed, 1=active, 2=overdue; overdue is calculated, not writable. Completion writes use `is_completed`. Reminders may notify their owners.
+- Relationship strength is an estimate generally recalculated daily; an unconnected pair can return no score.
+- File downloads use the stable authenticated `/entity-files/download/{id}` endpoint, which obtains a fresh provider download redirect. The tool returns file metadata and a downloadable file without exposing signed storage URLs or file bytes inline. File deletion is not documented in the public V1 API, so the private suite uses an explicitly authorized pre-uploaded synthetic file rather than uploading files it cannot clean up.
 
-### People Management
-
-Create, search, update, and delete person records in your team's shared contact book. Persons include anyone your team has communicated with via email, meetings, or manual entry. Each person has a computed primary email and automatic associations with organizations. You can search by name or email, and filter by interaction dates.
-
-### Organization Management
-
-Create, search, update, and delete organization records. Organizations are linked to people via email domains. Affinity maintains a proprietary global database of organizations to minimize data entry. Global organizations cannot be renamed or deleted. You can search by name or domain.
-
-### Opportunity Management
-
-Create, search, update, and delete opportunities (deals). Each opportunity belongs to a single list and can be associated with people and organizations. Opportunities are used to track deal pipeline progress and revenue.
-
-### List Management
-
-Create and retrieve lists, which function as customizable spreadsheets for organizing people, organizations, or opportunities. Each list can have custom fields (columns), permissions, and public/private visibility. You can add and remove entities from lists via list entries.
-
-### Fields and Field Values
-
-Define custom fields (columns) on lists or globally, supporting types such as text, number, date, location, person, organization, dropdowns, and ranked dropdowns. Read and write individual cell values for any entity on a list. Track historical changes to field values for auditing status transitions (e.g., deal pipeline stages).
-
-### Interactions
-
-Retrieve and create interaction records including emails, meetings, calls, and chat messages associated with people, organizations, or opportunities. Interactions can be filtered by type, date range, direction (sent/received), and participants.
-
-### Relationship Strengths
-
-Query computed relationship strength scores between internal team members and external contacts. Scores are based on email, call, and meeting activity and recalculated daily. Useful for identifying the strongest connection path to a given person or organization.
-
-### Notes
-
-Create, read, update, and delete notes associated with people, organizations, or opportunities. Notes support plain text and HTML formatting, threaded replies, and associations with interactions (e.g., meeting notes). Notes can be authored on behalf of other users.
-
-### Entity Files
-
-Upload, list, download, and retrieve files attached to people, organizations, or opportunities (e.g., pitch decks, contracts).
-
-### Reminders
-
-Create, read, update, and delete reminders. Supports one-time and recurring reminders, which can be tagged to a person, organization, or opportunity. Recurring reminders can auto-reset based on email, meeting, or any interaction activity.
-
-### Enrichment Data
-
-Access enriched data from Affinity's proprietary database and select third-party partners (e.g., Dealroom). Some partner data may not be accessible via the API due to licensing agreements. Smart fields (e.g., first/last email date, next meeting) are available on person and organization records.
-
-## Events
-
-Affinity supports webhooks via the v1 API. You can subscribe to events by registering a webhook URL, optionally specifying which event types to listen to. If no specific events are listed, all events are delivered. There is a maximum of three webhook subscriptions per Affinity instance. Webhooks fire immediately after the corresponding action and include retry logic with exponential backoff for up to 10 hours on delivery failure.
-
-### List Events
-
-Notifications when a list is created, updated, or deleted (`list.created`, `list.updated`, `list.deleted`).
-
-### List Entry Events
-
-Notifications when an entity is added to or removed from a list (`list_entry.created`, `list_entry.deleted`).
-
-### Person Events
-
-Notifications when a person record is created, updated, or deleted (`person.created`, `person.updated`, `person.deleted`).
-
-### Organization Events
-
-Notifications when an organization is created, updated, deleted, or merged (`organization.created`, `organization.updated`, `organization.deleted`, `organization.merged`).
-
-### Opportunity Events
-
-Notifications when an opportunity is created, updated, or deleted (`opportunity.created`, `opportunity.updated`, `opportunity.deleted`).
-
-### Field Events
-
-Notifications when a field (column definition) is created, updated, or deleted (`field.created`, `field.updated`, `field.deleted`). Does not fire for Crunchbase fields.
-
-### Field Value Events
-
-Notifications when a field value (cell data) is created, updated, or deleted (`field_value.created`, `field_value.updated`, `field_value.deleted`). Does not include enrichment field value updates.
-
-### Note Events
-
-Notifications when a note is created, updated, or deleted (`note.created`, `note.updated`, `note.deleted`).
-
-### File Events
-
-Notifications when a file is uploaded or deleted (`file.created`, `file.deleted`).
-
-### Reminder Events
-
-Notifications when a reminder is created, updated, or deleted (`reminder.created`, `reminder.updated`, `reminder.deleted`).
+Provider failures and invalid inputs produce safe service errors without raw contact payloads, API keys or transport objects.

@@ -1,13 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectUnavailableDelighted, unavailableMessage } from '../lib/unavailable';
 import { spec } from '../spec';
 
 export let cancelPendingSurveys = SlateTool.create(spec, {
   name: 'Cancel Pending Surveys',
   key: 'cancel_pending_surveys',
-  description: `Cancel all pending (not yet sent) survey requests for a specific person. Useful for preventing scheduled surveys from being dispatched.`,
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: true,
     readOnly: false
   }
@@ -24,13 +27,5 @@ export let cancelPendingSurveys = SlateTool.create(spec, {
       ok: z.boolean().describe('Whether the cancellation was successful')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.deletePendingSurveyRequests(ctx.input.email);
-
-    return {
-      output: { ok: result.ok },
-      message: `Pending survey requests for **${ctx.input.email}** cancelled.`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();

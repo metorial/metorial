@@ -13,6 +13,10 @@ export let listEvents = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      afterCursor: z
+        .string()
+        .optional()
+        .describe('Native next cursor; repeat all filters for the next page'),
       eventTypeId: z
         .number()
         .optional()
@@ -71,25 +75,24 @@ export let listEvents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
-    let params: Record<string, string | number | undefined> = {};
-    if (ctx.input.eventTypeId) params.event_type_id = ctx.input.eventTypeId;
-    if (ctx.input.userId) params.user_id = ctx.input.userId;
-    if (ctx.input.since) params.since = ctx.input.since;
-    if (ctx.input.until) params.until = ctx.input.until;
-    if (ctx.input.clientId) params.client_id = ctx.input.clientId;
-    if (ctx.input.directoryId) params.directory_id = ctx.input.directoryId;
-    if (ctx.input.resolution) params.resolution = ctx.input.resolution;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
+    let params: Record<string, string | number | undefined> = {
+      after_cursor: ctx.input.afterCursor
+    };
+    if (ctx.input.eventTypeId !== undefined) params.event_type_id = ctx.input.eventTypeId;
+    if (ctx.input.userId !== undefined) params.user_id = ctx.input.userId;
+    if (ctx.input.since !== undefined) params.since = ctx.input.since;
+    if (ctx.input.until !== undefined) params.until = ctx.input.until;
+    if (ctx.input.clientId !== undefined) params.client_id = ctx.input.clientId;
+    if (ctx.input.directoryId !== undefined) params.directory_id = ctx.input.directoryId;
+    if (ctx.input.resolution !== undefined) params.resolution = ctx.input.resolution;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
 
     let response = await client.listEvents(params);
-    let events = response.data || [];
+    let events = response.data;
 
-    let mapped = events.map((e: any) => ({
+    let mapped = events.map(e => ({
       eventId: e.id,
       eventTypeId: e.event_type_id,
       createdAt: e.created_at,

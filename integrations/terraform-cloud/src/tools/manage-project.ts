@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { organizationNameSchema } from '../lib/contracts';
 import { createClient } from '../lib/helpers';
 import { mapPagination, mapProject } from '../lib/mappers';
 import { spec } from '../spec';
@@ -15,13 +16,14 @@ let projectSchema = z.object({
 export let listProjectsTool = SlateTool.create(spec, {
   name: 'List Projects',
   key: 'list_projects',
-  description: `List all projects in the organization. Projects are used to organize and group workspaces.`,
+  description: `Call list_organizations to select an organization or use the optional configured default. List all projects in the organization. Projects are used to organize and group workspaces.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       name: z.string().optional().describe('Filter projects by name'),
       pageNumber: z.number().optional().describe('Page number for pagination'),
       pageSize: z.number().optional().describe('Number of results per page')
@@ -59,10 +61,11 @@ export let listProjectsTool = SlateTool.create(spec, {
 export let createProjectTool = SlateTool.create(spec, {
   name: 'Create Project',
   key: 'create_project',
-  description: `Create a new project to organize workspaces. Workspaces can be assigned to a project during creation or moved later.`
+  description: `Call list_organizations to select an organization or use the optional configured default. Create a new project to organize workspaces. Workspaces can be assigned to a project during creation or moved later.`
 })
   .input(
     z.object({
+      organizationName: organizationNameSchema,
       name: z.string().describe('Name of the project'),
       description: z.string().optional().describe('Description of the project')
     })

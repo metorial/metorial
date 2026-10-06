@@ -1,6 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client, flattenResource, type JsonApiResource } from '../lib/client';
+import {
+  Client,
+  flattenResource,
+  flattenResources,
+  type JsonApiResource
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let getIncident = SlateTool.create(spec, {
@@ -25,7 +30,11 @@ Returns full incident details including status, severity, assigned services, tim
   )
   .output(
     z.object({
-      incident: z.record(z.string(), z.any()).describe('Full incident details')
+      incident: z.record(z.string(), z.any()).describe('Full incident details'),
+      included: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Requested related resources')
     })
   )
   .handleInvocation(async ctx => {
@@ -36,7 +45,8 @@ Returns full incident details including status, severity, assigned services, tim
 
     return {
       output: {
-        incident
+        incident,
+        included: result.included ? flattenResources(result.included) : undefined
       },
       message: `Retrieved incident **${incident.title}** (status: ${incident.status}).`
     };

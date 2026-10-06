@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listStaticPages = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listStaticPages = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...selection,
       slug: z
         .string()
         .optional()
@@ -21,6 +23,9 @@ export let listStaticPages = SlateTool.create(spec, {
         ),
       first: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
         .default(10)
         .describe('Number of pages to return when listing'),
@@ -62,12 +67,15 @@ export let listStaticPages = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      publicationHost: ctx.config.publicationHost
+      publicationHost:
+        ctx.input.publicationHost ??
+        (ctx.input.publicationId === undefined ? ctx.config.publicationHost : undefined),
+      publicationId: ctx.input.publicationId
     });
 
     if (ctx.input.slug) {
       let page = await client.getStaticPageBySlug(ctx.input.slug);
-      if (!page) throw new Error('Static page not found');
+      if (!page) throw createApiServiceError('Static page not found');
 
       return {
         output: {
@@ -85,11 +93,11 @@ export let listStaticPages = SlateTool.create(spec, {
     }
 
     let result = await client.listStaticPages({
-      first: Math.min(ctx.input.first, 20),
+      first: ctx.input.first,
       after: ctx.input.after
     });
 
-    let staticPages = result.staticPages.map((p: any) => ({
+    let staticPages = result.staticPages.map(p => ({
       pageId: p.id,
       title: p.title,
       slug: p.slug,

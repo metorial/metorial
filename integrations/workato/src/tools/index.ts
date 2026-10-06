@@ -1,5 +1,6 @@
 export * from './deploy-project';
 export * from './export-package';
+export * from './get-job';
 export * from './get-recipe';
 export * from './get-recipe-versions';
 export * from './get-workspace-info';

@@ -27,8 +27,6 @@ import {
   manageUser,
   updateAlert
 } from './tools';
-import { alertActivityTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,5 +56,5 @@ export let provider = Slate.create({
     manageService,
     listServices
   ],
-  triggers: [alertActivityTrigger]
+  triggers: []
 });

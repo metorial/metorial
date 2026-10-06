@@ -3,8 +3,12 @@ import { spec } from './spec';
 import {
   calculateEorCost,
   createContract,
+  downloadInvoice,
   getContract,
+  getCurrentOrganization,
+  getCurrentUser,
   getEorCountryGuide,
+  getFileUrl,
   getPerson,
   listContracts,
   listInvoices,
@@ -16,18 +20,13 @@ import {
   manageTimeOff,
   manageTimesheets
 } from './tools';
-import {
-  contractEvents,
-  invoiceAdjustmentEvents,
-  paymentEvents,
-  timeOffEvents,
-  timesheetEvents,
-  workerEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    getCurrentOrganization,
+    downloadInvoice,
+    getFileUrl,
     listContracts,
     getContract,
     createContract,
@@ -43,12 +42,5 @@ export let provider = Slate.create({
     getEorCountryGuide,
     calculateEorCost
   ],
-  triggers: [
-    contractEvents,
-    workerEvents,
-    timesheetEvents,
-    timeOffEvents,
-    paymentEvents,
-    invoiceAdjustmentEvents
-  ]
+  triggers: []
 });

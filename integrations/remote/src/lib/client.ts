@@ -1,516 +1,185 @@
-import { createAxios } from 'slates';
-
-let getBaseUrl = (environment: string) =>
-  environment === 'sandbox'
+import { createAxios, pickDefined } from 'slates';
+import { parseRemoteResponse } from './money';
+import {
+  apiError,
+  fail,
+  id,
+  integer,
+  isRecord,
+  publicData,
+  type RecordData,
+  record,
+  required
+} from './validation';
+export type Environment = 'production' | 'sandbox';
+export type AuthOutput = {
+  token: string;
+  environment: Environment;
+  refreshToken?: string;
+  expiresAt?: string;
+  companyId?: string;
+  userId?: string;
+};
+export function baseUrl(environment: unknown): string {
+  if (environment !== 'production' && environment !== 'sandbox')
+    fail(
+      'Remote environment must be production or sandbox. Reconnect with the correct authentication method.'
+    );
+  return environment === 'sandbox'
     ? 'https://gateway.remote-sandbox.com'
     : 'https://gateway.remote.com';
-
+}
 export class Client {
   private http: ReturnType<typeof createAxios>;
-
-  constructor(params: { token: string; environment: string }) {
+  readonly url: string;
+  private secrets: string[];
+  constructor(auth: AuthOutput) {
+    let token = required(auth.token, 'Remote bearer token');
+    this.url = baseUrl(auth.environment ?? 'production');
+    if (
+      (token.startsWith('ra_test_') && auth.environment !== 'sandbox') ||
+      (token.startsWith('ra_live_') && auth.environment !== 'production')
+    )
+      fail(
+        'Remote API token prefix does not match the selected environment. Reconnect using the matching token method.'
+      );
+    this.secrets = [token, auth.refreshToken ?? ''];
     this.http = createAxios({
-      baseURL: `${getBaseUrl(params.environment)}/v1`,
+      baseURL: `${this.url}/v1`,
+      timeout: 30000,
+      maxRedirects: 0,
+      transformResponse: [body => body],
       headers: {
-        Authorization: `Bearer ${params.token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json'
       }
     });
   }
-
-  // ===== Companies =====
-
-  async listCompanies(page?: number, pageSize?: number) {
-    let params: Record<string, any> = {};
-    if (page) params.page = page;
-    if (pageSize) params.page_size = pageSize;
-    let response = await this.http.get('/companies', { params });
-    return response.data;
+  async request(
+    method: 'get' | 'post' | 'patch' | 'delete',
+    path: string,
+    data?: RecordData,
+    params?: RecordData
+  ): Promise<unknown> {
+    if (!/^\/[a-z][a-z0-9_/-]*$/i.test(path)) fail('The Remote API route is invalid.');
+    let value: unknown;
+    try {
+      value = (
+        await this.http.request({
+          method,
+          url: path,
+          data: data ? pickDefined(data) : undefined,
+          params: params ? pickDefined(params) : undefined
+        })
+      ).data;
+    } catch (error) {
+      apiError(error, `${method.toUpperCase()} ${path}`, this.secrets);
+    }
+    // Validate raw monetary tokens after transport error adaptation so precision
+    // failures remain actionable ServiceErrors instead of generic HTTP failures.
+    return publicData(parseRemoteResponse(value), this.secrets);
   }
-
-  async getCompany(companyId: string) {
-    let response = await this.http.get(`/companies/${companyId}`);
-    return response.data;
+  async get(path: string, params?: RecordData) {
+    return this.request('get', path, undefined, params);
   }
-
-  async updateCompany(companyId: string, data: Record<string, any>) {
-    let response = await this.http.patch(`/companies/${companyId}`, data);
-    return response.data;
+  async post(path: string, data?: RecordData) {
+    return this.request('post', path, data);
   }
-
-  // ===== Employments =====
-
-  async listEmployments(params?: {
-    companyId?: string;
-    status?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    let query: Record<string, any> = {};
-    if (params?.companyId) query.company_id = params.companyId;
-    if (params?.status) query.status = params.status;
-    if (params?.page) query.page = params.page;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    let response = await this.http.get('/employments', { params: query });
-    return response.data;
+  async patch(path: string, data: RecordData) {
+    return this.request('patch', path, data);
   }
-
-  async getEmployment(employmentId: string) {
-    let response = await this.http.get(`/employments/${employmentId}`);
-    return response.data;
+  async remove(path: string) {
+    return this.request('delete', path);
   }
-
-  async createEmployment(data: Record<string, any>) {
-    let response = await this.http.post('/employments', data);
-    return response.data;
+  async getIdentity() {
+    let result = record(await this.get('/identity/current'), 'identity response');
+    let identity = record(result.data, 'identity');
+    if (isRecord(identity.company)) {
+      id(identity.company.id, 'Authenticated company ID');
+      required(identity.company.name, 'Authenticated company name');
+      let user = record(identity.user, 'authorizing user');
+      id(user.id, 'Authenticated user ID');
+      if (identity.client_id !== undefined || identity.integration !== undefined) {
+        required(identity.client_id, 'OAuth client ID');
+        let integration = record(identity.integration, 'OAuth integration');
+        required(integration.name, 'OAuth integration name');
+        required(integration.display_name, 'OAuth integration display name');
+        return { identity, mode: 'company_oauth' as const };
+      }
+      return { identity, mode: 'customer_token' as const };
+    }
+    if (
+      typeof identity.client_id === 'string' &&
+      identity.client_id &&
+      isRecord(identity.integration) &&
+      typeof identity.integration.name === 'string' &&
+      typeof identity.integration.display_name === 'string'
+    )
+      return { identity, mode: 'partner_client_credentials' as const };
+    fail(
+      'Remote returned an unknown token identity. Reconnect with a documented company token or customer API token.'
+    );
   }
-
-  async updateEmployment(employmentId: string, data: Record<string, any>) {
-    let response = await this.http.patch(`/employments/${employmentId}`, data);
-    return response.data;
+  async employment(value: unknown) {
+    let employmentId = id(value, 'Employment ID');
+    return single(await this.get(`/employments/${employmentId}`), 'employment', employmentId);
   }
-
-  async inviteEmployment(employmentId: string) {
-    let response = await this.http.post(`/employments/${employmentId}/invite`);
-    return response.data;
+  async entity(path: string, key: string, value: unknown) {
+    let resourceId = id(value);
+    return single(await this.get(`${path}/${resourceId}`), key, resourceId);
   }
-
-  // ===== Time Off =====
-
-  async listTimeOff(params?: {
-    employmentId?: string;
-    status?: string;
-    timeoffType?: string;
-    page?: number;
-    pageSize?: number;
-    order?: string;
-    orderDirection?: string;
-  }) {
-    let query: Record<string, any> = {};
-    if (params?.employmentId) query.employment_id = params.employmentId;
-    if (params?.status) query.status = params.status;
-    if (params?.timeoffType) query.timeoff_type = params.timeoffType;
-    if (params?.page) query.page = params.page;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    if (params?.order) query.order = params.order;
-    if (params?.orderDirection) query.order_direction = params.orderDirection;
-    let response = await this.http.get('/timeoff', { params: query });
-    return response.data;
-  }
-
-  async getTimeOff(timeoffId: string) {
-    let response = await this.http.get(`/timeoff/${timeoffId}`);
-    return response.data;
-  }
-
-  async createTimeOff(data: {
-    employmentId: string;
-    timeoffType: string;
-    startDate: string;
-    endDate: string;
-    timezone: string;
-    notes?: string;
-    startDateIsHalfDay?: boolean;
-    endDateIsHalfDay?: boolean;
-    document?: string;
-  }) {
-    let response = await this.http.post('/timeoff', {
-      employment_id: data.employmentId,
-      timeoff_type: data.timeoffType,
-      start_date: data.startDate,
-      end_date: data.endDate,
-      timezone: data.timezone,
-      notes: data.notes,
-      start_date_is_half_day: data.startDateIsHalfDay,
-      end_date_is_half_day: data.endDateIsHalfDay,
-      document: data.document
-    });
-    return response.data;
-  }
-
-  async approveTimeOff(timeoffId: string) {
-    let response = await this.http.post(`/timeoff/${timeoffId}/approve`);
-    return response.data;
-  }
-
-  async declineTimeOff(timeoffId: string, reason?: string) {
-    let data: Record<string, any> = {};
-    if (reason) data.reason = reason;
-    let response = await this.http.post(`/timeoff/${timeoffId}/decline`, data);
-    return response.data;
-  }
-
-  async cancelTimeOff(timeoffId: string) {
-    let response = await this.http.post(`/timeoff/${timeoffId}/cancel`);
-    return response.data;
-  }
-
-  // ===== Leave Policies =====
-
-  async listLeavePoliciesSummary(employmentId: string) {
-    let response = await this.http.get(`/employments/${employmentId}/leave-policies-summary`);
-    return response.data;
-  }
-
-  // ===== Expenses =====
-
-  async listExpenses(params?: {
-    employmentId?: string;
-    status?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    let query: Record<string, any> = {};
-    if (params?.employmentId) query.employment_id = params.employmentId;
-    if (params?.status) query.status = params.status;
-    if (params?.page) query.page = params.page;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    let response = await this.http.get('/expenses', { params: query });
-    return response.data;
-  }
-
-  async getExpense(expenseId: string) {
-    let response = await this.http.get(`/expenses/${expenseId}`);
-    return response.data;
-  }
-
-  async createExpense(data: Record<string, any>) {
-    let response = await this.http.post('/expenses', data);
-    return response.data;
-  }
-
-  async updateExpense(expenseId: string, data: Record<string, any>) {
-    let response = await this.http.patch(`/expenses/${expenseId}`, data);
-    return response.data;
-  }
-
-  async listExpenseCategories(params?: { employmentId?: string; expenseId?: string }) {
-    let query: Record<string, any> = {};
-    if (params?.employmentId) query.employment_id = params.employmentId;
-    if (params?.expenseId) query.expense_id = params.expenseId;
-    let response = await this.http.get('/expense-categories', { params: query });
-    return response.data;
-  }
-
-  // ===== Incentives =====
-
-  async listIncentives(params?: {
-    employmentId?: string;
-    status?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    let query: Record<string, any> = {};
-    if (params?.employmentId) query.employment_id = params.employmentId;
-    if (params?.status) query.status = params.status;
-    if (params?.page) query.page = params.page;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    let response = await this.http.get('/incentives', { params: query });
-    return response.data;
-  }
-
-  async getIncentive(incentiveId: string) {
-    let response = await this.http.get(`/incentives/${incentiveId}`);
-    return response.data;
-  }
-
-  async createIncentive(data: {
-    employmentId: string;
-    amount: number;
-    amountTaxType: string;
-    type: string;
-    effectiveDate: string;
-    note?: string;
-    currency?: string;
-  }) {
-    let response = await this.http.post('/incentives', {
-      employment_id: data.employmentId,
-      amount: data.amount,
-      amount_tax_type: data.amountTaxType,
-      type: data.type,
-      effective_date: data.effectiveDate,
-      note: data.note,
-      currency: data.currency
-    });
-    return response.data;
-  }
-
-  async updateIncentive(incentiveId: string, data: Record<string, any>) {
-    let response = await this.http.patch(`/incentives/${incentiveId}`, data);
-    return response.data;
-  }
-
-  async deleteIncentive(incentiveId: string) {
-    let response = await this.http.delete(`/incentives/${incentiveId}`);
-    return response.data;
-  }
-
-  async createRecurringIncentive(data: {
-    employmentId: string;
-    amount: number;
-    amountTaxType: string;
-    type: string;
-    startDate: string;
-    note?: string;
-    currency?: string;
-    endDate?: string;
-  }) {
-    let response = await this.http.post('/incentives/recurring', {
-      employment_id: data.employmentId,
-      amount: data.amount,
-      amount_tax_type: data.amountTaxType,
-      type: data.type,
-      start_date: data.startDate,
-      note: data.note,
-      currency: data.currency,
-      end_date: data.endDate
-    });
-    return response.data;
-  }
-
-  async listRecurringIncentives(params?: {
-    employmentId?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    let query: Record<string, any> = {};
-    if (params?.employmentId) query.employment_id = params.employmentId;
-    if (params?.page) query.page = params.page;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    let response = await this.http.get('/incentives/recurring', { params: query });
-    return response.data;
-  }
-
-  async deleteRecurringIncentive(recurringIncentiveId: string) {
-    let response = await this.http.delete(`/incentives/recurring/${recurringIncentiveId}`);
-    return response.data;
-  }
-
-  // ===== Offboarding =====
-
-  async listOffboardings(params?: {
-    employmentId?: string;
-    status?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    let query: Record<string, any> = {};
-    if (params?.employmentId) query.employment_id = params.employmentId;
-    if (params?.status) query.status = params.status;
-    if (params?.page) query.page = params.page;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    let response = await this.http.get('/offboardings', { params: query });
-    return response.data;
-  }
-
-  async getOffboarding(offboardingId: string) {
-    let response = await this.http.get(`/offboardings/${offboardingId}`);
-    return response.data;
-  }
-
-  async createOffboarding(data: {
-    employmentId: string;
-    terminationDate: string;
-    terminationReason?: string;
-    additionalComments?: string;
-    confidential?: boolean;
-    type?: string;
-    proposedLastWorkingDate?: string;
-    riskAssessment?: Record<string, any>;
-  }) {
-    let response = await this.http.post('/offboardings', {
-      employment_id: data.employmentId,
-      termination_date: data.terminationDate,
-      termination_reason: data.terminationReason,
-      additional_comments: data.additionalComments,
-      confidential: data.confidential,
-      type: data.type,
-      proposed_last_working_date: data.proposedLastWorkingDate,
-      risk_assessment: data.riskAssessment
-    });
-    return response.data;
-  }
-
-  // ===== Timesheets =====
-
-  async listTimesheets(params?: {
-    employmentId?: string;
-    status?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    let query: Record<string, any> = {};
-    if (params?.employmentId) query.employment_id = params.employmentId;
-    if (params?.status) query.status = params.status;
-    if (params?.page) query.page = params.page;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    let response = await this.http.get('/timesheets', { params: query });
-    return response.data;
-  }
-
-  async getTimesheet(timesheetId: string) {
-    let response = await this.http.get(`/timesheets/${timesheetId}`);
-    return response.data;
-  }
-
-  async approveTimesheet(timesheetId: string) {
-    let response = await this.http.post(`/timesheets/${timesheetId}/approve`);
-    return response.data;
-  }
-
-  // ===== Countries =====
-
-  async listCountries() {
-    let response = await this.http.get('/countries');
-    return response.data;
-  }
-
-  async getCountryFormSchema(countryCode: string, form: string) {
-    let response = await this.http.get(`/countries/${countryCode}/${form}`);
-    return response.data;
-  }
-
-  // ===== Contract Amendments =====
-
-  async listContractAmendments(params?: {
-    employmentId?: string;
-    status?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    let query: Record<string, any> = {};
-    if (params?.employmentId) query.employment_id = params.employmentId;
-    if (params?.status) query.status = params.status;
-    if (params?.page) query.page = params.page;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    let response = await this.http.get('/contract-amendments', { params: query });
-    return response.data;
-  }
-
-  async createContractAmendment(data: Record<string, any>) {
-    let response = await this.http.post('/contract-amendments', data);
-    return response.data;
-  }
-
-  // ===== Payslips =====
-
-  async listPayslips(params?: {
-    employmentId?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    let query: Record<string, any> = {};
-    if (params?.employmentId) query.employment_id = params.employmentId;
-    if (params?.startDate) query.start_date = params.startDate;
-    if (params?.endDate) query.end_date = params.endDate;
-    if (params?.page) query.page = params.page;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    let response = await this.http.get('/payslips', { params: query });
-    return response.data;
-  }
-
-  // ===== Company Managers =====
-
-  async listCompanyManagers(params?: { page?: number; pageSize?: number }) {
-    let query: Record<string, any> = {};
-    if (params?.page) query.page = params.page;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    let response = await this.http.get('/company-managers', { params: query });
-    return response.data;
-  }
-
-  // ===== Webhook Callbacks =====
-
-  async listWebhookCallbacks() {
-    let response = await this.http.get('/webhook-callbacks');
-    return response.data;
-  }
-
-  async createWebhookCallback(url: string, subscribedEvents: string[]) {
-    let response = await this.http.post('/webhook-callbacks', {
-      url,
-      subscribed_events: subscribedEvents
-    });
-    return response.data;
-  }
-
-  async updateWebhookCallback(
-    callbackId: string,
-    data: { url?: string; subscribedEvents?: string[] }
-  ) {
-    let body: Record<string, any> = {};
-    if (data.url) body.url = data.url;
-    if (data.subscribedEvents) body.subscribed_events = data.subscribedEvents;
-    let response = await this.http.patch(`/webhook-callbacks/${callbackId}`, body);
-    return response.data;
-  }
-
-  async deleteWebhookCallback(callbackId: string) {
-    let response = await this.http.delete(`/webhook-callbacks/${callbackId}`);
-    return response.data;
-  }
-
-  // ===== Webhook Events =====
-
-  async listWebhookEvents(params?: {
-    eventType?: string;
-    companyId?: string;
-    startDate?: string;
-    endDate?: string;
-    deliveryStatus?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    let query: Record<string, any> = {};
-    if (params?.eventType) query.event_type = params.eventType;
-    if (params?.companyId) query.company_id = params.companyId;
-    if (params?.startDate) query.start_date = params.startDate;
-    if (params?.endDate) query.end_date = params.endDate;
-    if (params?.deliveryStatus) query.delivery_status = params.deliveryStatus;
-    if (params?.page) query.page = params.page;
-    if (params?.pageSize) query.page_size = params.pageSize;
-    let response = await this.http.get('/webhook-events', { params: query });
-    return response.data;
-  }
-
-  // ===== Cost Calculator =====
-
-  async estimateEmploymentCost(data: {
-    employmentId?: string;
-    countryCode?: string;
-    currency?: string;
-    salary?: number;
-    employerCurrencySlug?: string;
-    age?: number;
-    region?: string;
-  }) {
-    let response = await this.http.post('/cost-calculator/estimation', {
-      employment_id: data.employmentId,
-      country_code: data.countryCode,
-      currency: data.currency,
-      salary: data.salary,
-      employer_currency_slug: data.employerCurrencySlug,
-      age: data.age,
-      region: data.region
-    });
-    return response.data;
-  }
-
-  // ===== Files / Documents =====
-
-  async listEmploymentFiles(employmentId: string) {
-    let response = await this.http.get(`/employments/${employmentId}/files`);
-    return response.data;
-  }
-
-  async uploadEmploymentFile(
-    employmentId: string,
-    data: { name: string; type: string; content: string }
-  ) {
-    let response = await this.http.post(`/employments/${employmentId}/files`, data);
-    return response.data;
-  }
+}
+export function single(value: unknown, key: string, expectedId?: string): RecordData {
+  let root = record(value, `${key} response`);
+  let data = isRecord(root.data) ? root.data : root;
+  let candidate = isRecord(data[key]) ? data[key] : data;
+  let result = record(candidate, key);
+  if (typeof result.id !== 'string' && typeof result.offboarding_id !== 'string')
+    fail(`Remote did not return a ${key} resource ID.`);
+  if (expectedId && result.id !== expectedId && result.offboarding_id !== expectedId)
+    fail(`Remote returned a different ${key} ID. Refresh the resource before continuing.`);
+  return result;
+}
+export function collection(value: unknown, key: string): RecordData[] {
+  let root = record(value, `${key} response`);
+  let data = isRecord(root.data) ? root.data : root;
+  let candidate = Array.isArray(root.data) ? root.data : data[key];
+  if (!Array.isArray(candidate))
+    fail(
+      `Remote did not return a ${key} list. The response format or endpoint permissions may have changed.`
+    );
+  return candidate.map(item => record(item, `${key} entry`));
+}
+export function pageParams(input: { page?: number; pageSize?: number }): RecordData {
+  return pickDefined({
+    page: input.page === undefined ? undefined : integer(input.page, 'Page', 1),
+    page_size:
+      input.pageSize === undefined ? undefined : integer(input.pageSize, 'Page size', 1, 100)
+  });
+}
+export function pageOutput(value: unknown) {
+  let root = record(value, 'list response');
+  let data = isRecord(root.data) ? root.data : root;
+  let currentPage =
+    data.current_page === undefined
+      ? undefined
+      : integer(data.current_page, 'Remote current page', 1);
+  let totalPages =
+    data.total_pages === undefined
+      ? undefined
+      : integer(data.total_pages, 'Remote total pages');
+  let totalCount =
+    data.total_count === undefined
+      ? undefined
+      : integer(data.total_count, 'Remote total count');
+  return pickDefined({
+    currentPage,
+    totalPages,
+    totalCount,
+    hasMore:
+      currentPage !== undefined && totalPages !== undefined
+        ? currentPage < totalPages
+        : undefined
+  });
 }

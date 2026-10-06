@@ -1,6 +1,6 @@
 {
   "name": "@metorial/mezmo",
-  "description": "Ingest, search, and export log data. Create and manage views, categories, alerts, and dashboards for log analysis. Configure exclusion rules to control log storage. Monitor usage by application, host, and tag. Set up archiving to cold storage destinations like Amazon S3. Manage organization members, groups, and API keys. Build telemetry pipelines with configurable sources, processors, and destinations to route, transform, filter, and enrich data streams. Control ingestion status programmatically. Configure webhook alerts triggered by log-based conditions on views.",
+  "description": "Use Mezmo Log Analysis to ingest and search logs, download filtered JSONL exports, manage views, preset alerts, boards and exclusion rules, inspect usage, and configure account-wide ingestion and archiving. Alert channels may notify recipients, active exclusions may discard logs, and ingestion and archiving controls affect the whole account.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "ingest log data",
@@ -9,8 +9,6 @@
     "create exclusion rules",
     "monitor usage metrics",
     "configure log archiving",
-    "build telemetry pipelines",
-    "manage organization members",
     "control ingestion status",
     "configure webhook alerts"
   ],

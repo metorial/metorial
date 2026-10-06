@@ -6,6 +6,8 @@ export let config = SlateConfig.create(
     projectId: z
       .string()
       .optional()
-      .describe('Optional project ID for tracking API usage across multiple projects')
+      .describe(
+        'Optional native project ID to scope the usage query. This header is not applied to searches or content requests.'
+      )
   })
 );

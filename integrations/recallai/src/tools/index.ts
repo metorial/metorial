@@ -1,3 +1,4 @@
+export * from './calendar-workflow';
 export * from './create-bot';
 export * from './delete-bot';
 export * from './get-bot';
@@ -6,6 +7,7 @@ export * from './list-bots';
 export * from './list-calendar-events';
 export * from './list-calendars';
 export * from './output-media';
+export * from './recordings';
 export * from './remove-bot-from-call';
 export * from './schedule-bot-for-event';
 export * from './send-chat-message';

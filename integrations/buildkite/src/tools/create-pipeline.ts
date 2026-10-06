@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createPipeline = SlateTool.create(spec, {
   name: 'Create Pipeline',
   key: 'create_pipeline',
-  description: `Create a new CI/CD pipeline in your Buildkite organization. Specify a name, repository URL, and optionally provide YAML step configuration, branch settings, team assignments, and tags.`,
+  description: `Create a new CI/CD pipeline in your Buildkite organization. Specify a name, repository URL, nonempty YAML configuration and a cluster UUID from list_clusters. Branch settings, team assignments and tags are optional.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      ...organizationInput,
       name: z.string().describe('Name of the pipeline'),
       repository: z
         .string()
@@ -20,7 +22,7 @@ export let createPipeline = SlateTool.create(spec, {
       configuration: z
         .string()
         .optional()
-        .describe('Pipeline step configuration in YAML format'),
+        .describe('Required nonempty pipeline step configuration in YAML format'),
       description: z.string().optional().describe('Description of the pipeline'),
       defaultBranch: z.string().optional().describe('Default branch (defaults to "main")'),
       branchConfiguration: z
@@ -38,11 +40,19 @@ export let createPipeline = SlateTool.create(spec, {
       teamUuids: z
         .array(z.string())
         .optional()
-        .describe('UUIDs of teams to assign the pipeline to'),
+        .describe(
+          'Legacy team UUIDs from list_teams. Prefer teams with explicit access levels; do not supply both.'
+        ),
       clusterUuid: z
         .string()
         .optional()
-        .describe('UUID of the cluster to assign the pipeline to'),
+        .describe('Required cluster UUID. Call list_clusters to discover clusters.'),
+      teams: z
+        .record(z.string(), z.enum(['read_only', 'build_and_read', 'manage_build_and_read']))
+        .optional()
+        .describe(
+          'Team UUIDs from list_teams mapped to pipeline access levels. Do not combine with teamUuids.'
+        ),
       tags: z.array(z.string()).optional().describe('Tags to assign to the pipeline'),
       visibility: z.enum(['private', 'public']).optional().describe('Pipeline visibility')
     })
@@ -57,10 +67,7 @@ export let createPipeline = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     let p = await client.createPipeline(ctx.input);
 

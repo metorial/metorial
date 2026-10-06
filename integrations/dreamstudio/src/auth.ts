@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,21 +25,13 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.stability.ai'
-      });
-
-      let response = await axios.get('/v1/user/account', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let account = await new Client(ctx.output.token).getAccount();
 
       return {
         profile: {
-          id: response.data.id,
-          email: response.data.email,
-          imageUrl: response.data.profile_picture
+          id: account.userId,
+          email: account.email,
+          imageUrl: account.profilePicture
         }
       };
     }

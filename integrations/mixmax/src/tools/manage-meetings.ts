@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -35,23 +35,33 @@ let meetingInviteSchema = z.object({
 export let listMeetingTypes = SlateTool.create(spec, {
   name: 'List Meeting Types',
   key: 'list_meeting_types',
-  description: `List all meeting types configured for your account. Meeting types define scheduling rules like duration, availability windows, and default meeting details.`,
+  description: `List a page of meeting types configured for your account. Meeting types define scheduling rules like duration, availability windows, and default meeting details. Use nextCursor while hasNext is true to read more results.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      limit: z.number().optional().describe('Maximum results in one page, from 1 to 300.'),
+      cursor: z.string().optional().describe('Cursor returned as nextCursor on a prior page.')
+    })
+  )
   .output(
     z.object({
-      meetingTypes: z.array(meetingTypeSchema).describe('List of meeting types')
+      meetingTypes: z.array(meetingTypeSchema).describe('List of meeting types'),
+      nextCursor: z.string().optional().describe('Provider cursor for the next page'),
+      hasNext: z.boolean().optional().describe('Whether another page currently exists')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let data = await client.listMeetingTypes();
-    let results = data.results || data || [];
-    let meetingTypes = results.map((mt: any) => ({
+    let data = await client.listMeetingTypes({
+      limit: ctx.input.limit,
+      next: ctx.input.cursor
+    });
+    let results = data.results;
+    let meetingTypes = results.map(mt => ({
       meetingTypeId: mt._id,
       name: mt.name,
       userId: mt.userId,
@@ -63,7 +73,7 @@ export let listMeetingTypes = SlateTool.create(spec, {
     }));
 
     return {
-      output: { meetingTypes },
+      output: { meetingTypes, nextCursor: data.next, hasNext: data.hasNext },
       message: `Found ${meetingTypes.length} meeting type(s).`
     };
   })
@@ -72,7 +82,7 @@ export let listMeetingTypes = SlateTool.create(spec, {
 export let manageMeetingType = SlateTool.create(spec, {
   name: 'Manage Meeting Type',
   key: 'manage_meeting_type',
-  description: `Create, update, or delete a meeting type. Meeting types configure scheduling parameters like duration, buffer time, and default event details (title, location, description).`,
+  description: `Create, update, or delete a meeting type. Scheduling settings affect appointment links; the last remaining meeting type cannot be deleted.`,
   tags: {
     destructive: true
   }
@@ -107,9 +117,9 @@ export let manageMeetingType = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      let data: Record<string, any> = {};
-      if (ctx.input.name) data.name = ctx.input.name;
-      if (ctx.input.durationMin) data.durationMin = ctx.input.durationMin;
+      let data: Record<string, unknown> = {};
+      if (ctx.input.name !== undefined) data.name = ctx.input.name;
+      if (ctx.input.durationMin !== undefined) data.durationMin = ctx.input.durationMin;
       if (ctx.input.buffer !== undefined) data.buffer = ctx.input.buffer;
       if (ctx.input.defaults) data.defaults = ctx.input.defaults;
 
@@ -121,10 +131,11 @@ export let manageMeetingType = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.meetingTypeId) throw new Error('meetingTypeId is required for update');
-      let updates: Record<string, any> = {};
-      if (ctx.input.name) updates.name = ctx.input.name;
-      if (ctx.input.durationMin) updates.durationMin = ctx.input.durationMin;
+      if (!ctx.input.meetingTypeId)
+        throw createApiServiceError('meetingTypeId is required for update');
+      let updates: Record<string, unknown> = {};
+      if (ctx.input.name !== undefined) updates.name = ctx.input.name;
+      if (ctx.input.durationMin !== undefined) updates.durationMin = ctx.input.durationMin;
       if (ctx.input.buffer !== undefined) updates.buffer = ctx.input.buffer;
       if (ctx.input.defaults) updates.defaults = ctx.input.defaults;
 
@@ -136,7 +147,8 @@ export let manageMeetingType = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.meetingTypeId) throw new Error('meetingTypeId is required for delete');
+      if (!ctx.input.meetingTypeId)
+        throw createApiServiceError('meetingTypeId is required for delete');
       await client.deleteMeetingType(ctx.input.meetingTypeId);
       return {
         output: { meetingTypeId: ctx.input.meetingTypeId, success: true },
@@ -144,7 +156,7 @@ export let manageMeetingType = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();
 
@@ -177,15 +189,15 @@ export let listMeetingInvites = SlateTool.create(spec, {
       next: ctx.input.cursor
     });
 
-    let results = data.results || data || [];
-    let invites = results.map((i: any) => ({
+    let results = data.results;
+    let invites = results.map(i => ({
       inviteId: i._id,
-      title: i.title || i.invite?.title,
+      title: i.title,
       organizerEmail: i.organizer?.email,
       organizerName: i.organizer?.name,
       guestEmail: i.guest?.email,
       guestName: i.guest?.name,
-      timezone: i.timezone || i.invite?.timezone,
+      timezone: i.timezone,
       createdAt: i.createdAt
     }));
 

@@ -14,8 +14,6 @@ import {
   reserveServiceOption,
   sandboxAdvanceOrder
 } from './tools';
-import { deliveryEvents, itemEvents, orderEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     cancelOrder,
     sandboxAdvanceOrder
   ],
-  triggers: [orderEvents, itemEvents, deliveryEvents]
+  triggers: []
 });

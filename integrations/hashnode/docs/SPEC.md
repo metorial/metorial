@@ -1,94 +1,19 @@
-Now let me get more details on the specific webhook event types:Now I have comprehensive information. Let me compile the specification.
+# Hashnode API contract
 
-# Slates Specification for Hashnode
+Audited on 2026-10-06 against Hashnode’s [official API skill schema](https://raw.githubusercontent.com/Hashnode/gql-skill/main/skills/gql-api/references/schema.graphql), [query reference](https://raw.githubusercontent.com/Hashnode/gql-skill/main/skills/gql-api/references/queries.md), [mutation reference](https://raw.githubusercontent.com/Hashnode/gql-skill/main/skills/gql-api/references/mutations.md), [authentication and roles](https://raw.githubusercontent.com/Hashnode/gql-skill/main/skills/gql-api/references/auth-and-roles.md), and [errors and limits](https://raw.githubusercontent.com/Hashnode/gql-skill/main/skills/gql-api/references/errors-and-limits.md). Captured schema SHA256: `22440b228d6c127c4429265d4bb14f6d2daf3599577e02f434b8c51bf91f6185`. These versioned audit captures describe the checked contract; future provider changes require another audit.
 
-## Overview
+All requests use POST to `https://gql.hashnode.com`. Personal access tokens use the supported Authorization header; a saved token with an optional Bearer prefix is normalized. Invalid header characters and malformed Unicode refuse locally. Pro/role access and hidden-resource behavior apply separately from authentication; an unavailable resource is not proof that it was deleted. The live API explorer requires JavaScript, so the official published SDL and references supplied the executable contract.
 
-Hashnode is a developer blogging platform that can also serve as a headless CMS for blogs and documentation. The Hashnode Public API is a GraphQL API that allows you to interact with Hashnode. You can query user details, publication information, posts within publications, drafts, and more. Mutations are available for actions such as publishing posts, subscribing to newsletters, and following users.
+## Public tools
 
-## Authentication
+The retained keys are `get_post`, `list_posts`, `publish_post`, `update_post`, `delete_post`, `manage_draft`, `get_publication`, `manage_series`, `manage_comments`, `get_user`, `search_posts`, `list_static_pages`, and `subscribe_newsletter`. The sole added key is `list_publications`, using `me.publications` and explicitly limited to owned publications. Existing `get_user` already supplies real authenticated identity; public-user follower fields are not requested from `MyUser`.
 
-Hashnode uses **Personal Access Tokens (PAT)** for authentication.
+Exact publication ID/hostname selectors are optional per scoped tool, with the parsed legacy hostname preserved as a fallback. Supplying both refuses. Exact reads and mutation receipts validate native identities; selected publication mismatches refuse. Root `searchPostsOfPublication` performs search. Native totals come from `pageInfo`; cursors cannot repeat or report an empty advancing page. Series and comment nested lists remain bounded and expose incomplete-list metadata.
 
-- Almost all queries can be accessed without any authentication mechanism. Some sensitive fields need authentication. All mutations need an authentication header.
-- The value of the Authorization header needs to be your Personal Access Token (PAT).
-- To generate the token, go to https://hashnode.com/settings/developer and click on "Generate New Token". Once the token is generated, simply pass it as the `Authorization` header.
+Post inputs use native `coverImage`, `enableToc`, and tag slug/name objects. Draft inputs use `coverImageOptions.coverImageURL`, draft settings, and `draftId` for updates/deletion/publication. The existing draft key supports native update and soft-delete actions. Unsupported legacy tag IDs and newsletter flags fail with actionable guidance. Current SDL does not expose series/comment/reply writes or newsletter subscription: their existing action/input contracts remain, with explicit local refusal rather than invented routes. No publication administration, following, analytics, upload, scheduling or trigger replacement is added.
 
-**How to authenticate:**
+## Outcomes and verification limits
 
-1. Log into your Hashnode account.
-2. Navigate to https://hashnode.com/settings/developer.
-3. Click "Generate New Token" to create a PAT.
-4. Include the token in the `Authorization` header of your GraphQL requests.
+Publishing is immediate; backdating is not scheduling. Native GraphQL errors and partial data refuse completion, and uncertain writes require exact resource inspection before retry. Native post/draft deletion is soft; direct post reads, caches, feeds, history and external delivery can remain. The private suite requires an independently bound credential/publication, owned isolated Pro test publication, complete native inventories, original fixture consent and unchanged synthetic state before cleanup. Public publication additionally requires acceptance of retained public/delivery effects; created post IDs are retained for manual reconciliation. Uncertain or hidden resources are preserved.
 
-**Endpoint:** All Hashnode Public API queries are made through a single GraphQL endpoint, which only accepts POST requests. The endpoint is `https://gql.hashnode.com`.
-
-An example of a restricted query is getting drafts inside any blog — it can only be queried by the respective owner. Similarly, anyone can request user details but certain fields like `unsubscribeCode` and `email` require an authorization header to be present.
-
-## Features
-
-### Post Management
-
-Create, read, update, and delete blog posts within a publication. The API uses a two-step publish flow: you create a draft first, then publish it. Posts support Markdown content, cover images, tags, canonical URLs, and SEO metadata. You can also publish posts directly using the `publishPost` mutation.
-
-### Draft Management
-
-Create and manage drafts before publishing. Drafts can only be queried by the publication owner with valid authentication. Drafts can be scheduled for future publication, and scheduled drafts can be cancelled.
-
-### Publication Management
-
-Query publication details including title, description, domain configuration, authors, and integrations. Publications are identified by their host (e.g., `yourblog.hashnode.dev`) or by ID. You can also manage publication members and their roles (e.g., changing roles or privacy states).
-
-### Series Management
-
-A "Series" allows you to group related articles on Hashnode, enabling your readers to view them in chronological order. You can create, update, and delete series, and query posts belonging to a specific series.
-
-### Static Pages
-
-You can create static pages in Hashnode from your admin dashboard. This feature is ideal for creating pages like an About page, a collaboration page, etc. Static pages can be queried via the API by their slug, returning title and content in Markdown or HTML.
-
-### Comments and Replies
-
-The GraphQL API lets you CRUD all aspects of your Hashnode blog, such as posts and their metadata, comments, or static pages. You can add comments to posts and add replies to existing comments.
-
-### User Profiles
-
-Query user details including username, bio, profile picture, social media links, followers/following counts, tags followed, and published posts. Some user fields (like email) require authentication.
-
-### Newsletter Subscriptions
-
-With the newsletter feature, you can allow readers to subscribe to your blog, and it also sends an email automatically each time you publish a new blog article. The API supports subscribing to newsletters programmatically.
-
-### Analytics
-
-Analytics data is integrated into the GraphQL API. The system offers filtering by individual posts, series, or page IDs. Enhanced grouping options let you sort by factors like country, device, host, and region.
-
-### Headless CMS Usage
-
-The APIs are the starting point for using Hashnode as a Content Management System (CMS). You can use Hashnode to create your content. However, how it is displayed and shown is completely up to you. This enables building custom blog frontends with frameworks like Next.js or Astro.
-
-## Events
-
-The webhooks feature in Hashnode provides a powerful way to receive notifications for specific events related to your publication. By configuring webhooks, you can integrate Hashnode with other services and automate various actions based on the events you receive.
-
-Webhooks are configured per publication through the blog dashboard. Each webhook is configured with a destination URL and a selection of event types. Hashnode sends a signature with each request that can be used to verify the sender and prevent replay attacks. The signature is sent in the `x-hashnode-signature` header.
-
-### Post Events
-
-Triggered when blog posts are published, updated, or deleted within a publication. Event types:
-
-- `post_published` — A new post is published.
-- `post_updated` — An existing post is updated.
-- `post_deleted` — A post is deleted.
-
-The payload includes the publication ID, post ID, and event type. Full post content is not included in the webhook payload; use the GraphQL API to fetch post details.
-
-### Static Page Events
-
-Triggered when static pages are published, edited, or deleted. Event types:
-
-- `static_page_published` — A new static page is created.
-- `static_page_edited` — A static page is updated.
-- `static_page_deleted` — A static page is deleted.
-
-The payload includes the publication ID, static page ID, and event type.
+Offline schema, installed SDK and private callback proofs do not establish live entitlement, roles, authentication or provider cleanup. Public failures refuse raw/encoded credential reflection. Earlier internal HTTP trace capture can still retain encoded upstream text before local validation; this audit does not claim to erase it. No live provider operation was performed.

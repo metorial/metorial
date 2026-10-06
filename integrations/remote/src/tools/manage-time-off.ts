@@ -1,141 +1,231 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { spec } from '../spec';
-
-export let manageTimeOff = SlateTool.create(spec, {
-  name: 'Manage Time Off',
-  key: 'manage_time_off',
-  description: `Create, approve, decline, or cancel time off requests. Also supports listing time off records with filters and retrieving leave policy summaries for an employee.`,
-  instructions: [
-    'Use action "create" to submit a new time off request.',
-    'Use action "approve", "decline", or "cancel" to act on an existing time off by providing timeoffId.',
-    'Use action "list" to browse time off records with optional filters.',
-    'Use action "get_leave_policies" to see available leave types and balances for an employee.'
-  ],
-  tags: {
-    destructive: false
-  }
-})
-  .input(
-    z.object({
-      action: z
-        .enum(['create', 'approve', 'decline', 'cancel', 'list', 'get_leave_policies'])
-        .describe('Action to perform'),
-      timeoffId: z
-        .string()
-        .optional()
-        .describe('Time off ID (required for approve, decline, cancel)'),
-      employmentId: z
-        .string()
-        .optional()
-        .describe('Employment ID (required for create, list, get_leave_policies)'),
-      timeoffType: z
-        .string()
-        .optional()
-        .describe('Type of time off (e.g., sick_leave, vacation) for create action'),
-      startDate: z.string().optional().describe('Start date (YYYY-MM-DD) for create action'),
-      endDate: z.string().optional().describe('End date (YYYY-MM-DD) for create action'),
-      timezone: z
-        .string()
-        .optional()
-        .describe('Timezone (e.g., Europe/London) for create action'),
-      notes: z.string().optional().describe('Optional notes for create or decline actions'),
-      startDateIsHalfDay: z.boolean().optional().describe('Whether start date is a half day'),
-      endDateIsHalfDay: z.boolean().optional().describe('Whether end date is a half day'),
-      status: z.string().optional().describe('Filter by status when listing'),
-      page: z.number().optional().describe('Page number for list action'),
-      pageSize: z.number().optional().describe('Page size for list action')
-    })
-  )
-  .output(
-    z.object({
-      timeoff: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe('Time off record (for create, approve, decline, cancel, get)'),
-      timeoffs: z
-        .array(z.record(z.string(), z.any()))
-        .optional()
-        .describe('List of time off records (for list action)'),
-      leavePolicies: z
-        .array(z.record(z.string(), z.any()))
-        .optional()
-        .describe('Leave policy summaries (for get_leave_policies action)'),
-      totalCount: z.number().optional().describe('Total count of records (for list action)')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment ?? 'production'
-    });
-
-    if (ctx.input.action === 'create') {
-      let result = await client.createTimeOff({
-        employmentId: ctx.input.employmentId!,
-        timeoffType: ctx.input.timeoffType!,
-        startDate: ctx.input.startDate!,
-        endDate: ctx.input.endDate!,
-        timezone: ctx.input.timezone!,
-        notes: ctx.input.notes,
-        startDateIsHalfDay: ctx.input.startDateIsHalfDay,
-        endDateIsHalfDay: ctx.input.endDateIsHalfDay
+import { collection, pageOutput, pageParams, single } from '../lib/client';
+import { remoteTool } from '../lib/tool';
+import {
+  date,
+  fail,
+  id,
+  integer,
+  isRecord,
+  pageSchema,
+  pageSizeSchema,
+  paginationOutput,
+  recordSchema,
+  rejectFields,
+  required,
+  timestamp
+} from '../lib/validation';
+export let manageTimeOff = remoteTool(
+  {
+    name: 'Manage Time Off',
+    key: 'manage_time_off',
+    description:
+      'Read time off and leave policies, create already-approved leave with explicit daily hours, or approve, decline, and cancel supported requests. Creation changes leave balances; cancellation retains the history.',
+    tags: { destructive: true }
+  },
+  z.object({
+    action: z.enum([
+      'create',
+      'approve',
+      'decline',
+      'cancel',
+      'list',
+      'get_leave_policies',
+      'get',
+      'list_types',
+      'get_leave_policy_details'
+    ]),
+    timeoffId: z.string().optional(),
+    employmentId: z.string().optional(),
+    timeoffType: z.string().optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    timezone: z.string().optional(),
+    notes: z.string().optional(),
+    startDateIsHalfDay: z
+      .boolean()
+      .optional()
+      .describe('Legacy flag; use explicit timeoffDays hours instead.'),
+    endDateIsHalfDay: z
+      .boolean()
+      .optional()
+      .describe('Legacy flag; use explicit timeoffDays hours instead.'),
+    status: z.string().optional(),
+    page: pageSchema,
+    pageSize: pageSizeSchema,
+    timeoffDays: z
+      .array(z.object({ day: z.string(), hours: z.number() }))
+      .optional()
+      .describe(
+        'Required for create: one entry per calendar day, with integer hours 0–8; include zero-hour non-working days.'
+      ),
+    approverId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe(
+        'Remote approver user ID, or null for external approval. Defaults to the current authorizing user.'
+      ),
+    approvedAt: z
+      .string()
+      .optional()
+      .describe('Approval timestamp for create, defaulting to the current time.'),
+    leavePolicyVariantId: z.string().optional(),
+    employmentType: z.enum(['contractor', 'full_time']).optional(),
+    document: z.object({ name: z.string(), content: z.string() }).optional()
+  }),
+  z.object({
+    timeoff: recordSchema.optional(),
+    timeoffs: z.array(recordSchema).optional(),
+    leavePolicies: z.array(recordSchema).optional(),
+    timeoffTypes: z.array(recordSchema).optional(),
+    ...paginationOutput
+  }),
+  async (client, input) => {
+    if (input.action === 'list') {
+      let value = await client.get('/timeoff', {
+        ...pageParams(input),
+        employment_id: input.employmentId === undefined ? undefined : id(input.employmentId),
+        timeoff_type: input.timeoffType,
+        status: input.status
       });
-      let timeoff = result?.data ?? result?.timeoff ?? result;
       return {
-        output: { timeoff },
-        message: `Created time off request from **${ctx.input.startDate}** to **${ctx.input.endDate}**.`
+        output: { timeoffs: collection(value, 'timeoffs'), ...pageOutput(value) },
+        message: 'Retrieved a time-off page.'
       };
     }
-
-    if (ctx.input.action === 'approve') {
-      let result = await client.approveTimeOff(ctx.input.timeoffId!);
-      let timeoff = result?.data ?? result?.timeoff ?? result;
+    if (input.action === 'list_types') {
+      let value = await client.get('/timeoff/types', { type: input.employmentType });
       return {
-        output: { timeoff },
-        message: `Approved time off **${ctx.input.timeoffId}**.`
+        output: { timeoffTypes: collection(value, 'timeoff_types') },
+        message: 'Retrieved available time-off types.'
       };
     }
-
-    if (ctx.input.action === 'decline') {
-      let result = await client.declineTimeOff(ctx.input.timeoffId!, ctx.input.notes);
-      let timeoff = result?.data ?? result?.timeoff ?? result;
+    if (input.action === 'get_leave_policies' || input.action === 'get_leave_policy_details') {
+      let path = input.action === 'get_leave_policies' ? 'summary' : 'details';
       return {
-        output: { timeoff },
-        message: `Declined time off **${ctx.input.timeoffId}**.`
+        output: {
+          leavePolicies: collection(
+            await client.get(
+              `/leave-policies/${path}/${id(input.employmentId, 'Employment ID')}`
+            ),
+            'leave_policies'
+          )
+        },
+        message: `Retrieved leave-policy ${path}.`
       };
     }
-
-    if (ctx.input.action === 'cancel') {
-      let result = await client.cancelTimeOff(ctx.input.timeoffId!);
-      let timeoff = result?.data ?? result?.timeoff ?? result;
+    if (input.action === 'get')
       return {
-        output: { timeoff },
-        message: `Cancelled time off **${ctx.input.timeoffId}**.`
+        output: { timeoff: await client.entity('/timeoff', 'timeoff', input.timeoffId) },
+        message: 'Retrieved the time-off record.'
+      };
+    if (input.action === 'create') {
+      rejectFields(
+        input,
+        ['startDateIsHalfDay', 'endDateIsHalfDay'],
+        'The current create API requires explicit timeoffDays. Remove legacy half-day flags and specify each calendar day with hours 0–8.'
+      );
+      let employmentId = id(input.employmentId, 'Employment ID');
+      let start = date(input.startDate, 'Start date');
+      let end = date(input.endDate, 'End date');
+      if (start > end) fail('Start date must be before or equal to end date.');
+      let timezone = required(input.timezone, 'Timezone');
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: timezone });
+      } catch {
+        fail('Timezone must be a valid IANA timezone.');
+      }
+      if (!input.timeoffType && !input.leavePolicyVariantId)
+        fail(
+          'Provide timeoffType from list_types or leavePolicyVariantId from get_leave_policy_details.'
+        );
+      if (!input.timeoffDays?.length)
+        fail(
+          'timeoffDays is required. Supply one explicit entry for every calendar day, including zero-hour non-working days.'
+        );
+      let days = input.timeoffDays.map(day => ({
+        day: date(day.day, 'Time-off day'),
+        hours: integer(day.hours, 'Time-off hours', 0, 8)
+      }));
+      let expectedCount = Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1;
+      if (
+        days.length !== expectedCount ||
+        new Set(days.map(day => day.day)).size !== expectedCount ||
+        days.some(day => day.day < start || day.day > end)
+      )
+        fail(
+          'timeoffDays must contain each calendar day in the requested interval exactly once.'
+        );
+      await client.employment(employmentId);
+      let approver: string | null = input.approverId ?? null;
+      if (input.approverId === undefined) {
+        let identity = (await client.getIdentity()).identity;
+        approver = id(
+          isRecord(identity.user) ? identity.user.id : undefined,
+          'Authorizing approver ID'
+        );
+      } else if (input.approverId !== null) approver = id(input.approverId, 'Approver ID');
+      let value = await client.post('/timeoff', {
+        employment_id: employmentId,
+        start_date: start,
+        end_date: end,
+        timezone,
+        timeoff_type: input.timeoffType,
+        leave_policy_variant_id:
+          input.leavePolicyVariantId === undefined
+            ? undefined
+            : id(input.leavePolicyVariantId),
+        notes: input.notes,
+        timeoff_days: days,
+        status: 'approved',
+        approver_id: approver,
+        approved_at:
+          input.approvedAt === undefined
+            ? new Date().toISOString()
+            : timestamp(input.approvedAt, 'Approval timestamp'),
+        document: input.document
+      });
+      return {
+        output: { timeoff: single(value, 'timeoff') },
+        message:
+          'Remote created already-approved time off. This was not a pending leave request.'
       };
     }
-
-    if (ctx.input.action === 'get_leave_policies') {
-      let result = await client.listLeavePoliciesSummary(ctx.input.employmentId!);
-      let leavePolicies = result?.data ?? result?.leave_policies ?? [];
-      return {
-        output: { leavePolicies },
-        message: `Retrieved **${leavePolicies.length}** leave policy/policies for employment **${ctx.input.employmentId}**.`
-      };
+    let timeoffId = id(input.timeoffId, 'Time-off ID');
+    let current = await client.entity('/timeoff', 'timeoff', timeoffId);
+    let target = input.action === 'cancel' ? 'approved' : 'requested';
+    if (current.status !== target)
+      fail(
+        `${input.action} requires time off currently in ${target} status. Read the current record and use the appropriate lifecycle action.`
+      );
+    let body: {
+      approver_id?: string | null;
+      decline_reason?: string | null;
+      cancel_reason?: string;
+    } = {};
+    if (input.action === 'approve') {
+      if (input.approverId === undefined) {
+        let identity = (await client.getIdentity()).identity;
+        body.approver_id = id(
+          isRecord(identity.user) ? identity.user.id : undefined,
+          'Authorizing approver ID'
+        );
+      } else
+        body.approver_id =
+          input.approverId === null ? null : id(input.approverId, 'Approver ID');
     }
-
-    // list
-    let result = await client.listTimeOff({
-      employmentId: ctx.input.employmentId,
-      status: ctx.input.status,
-      page: ctx.input.page,
-      pageSize: ctx.input.pageSize
-    });
-    let timeoffs = result?.data ?? result?.timeoffs ?? [];
-    let totalCount = result?.total_count ?? timeoffs.length;
+    if (input.action === 'decline') body.decline_reason = input.notes ?? null;
+    if (input.action === 'cancel')
+      body.cancel_reason = required(input.notes, 'Cancellation reason in notes');
+    let timeoff = single(
+      await client.post(`/timeoff/${timeoffId}/${input.action}`, body),
+      'timeoff',
+      timeoffId
+    );
     return {
-      output: { timeoffs, totalCount },
-      message: `Found **${totalCount}** time off record(s).`
+      output: { timeoff },
+      message: `Remote accepted the time-off ${input.action} operation. The returned record contains its current status.`
     };
-  });
+  }
+);

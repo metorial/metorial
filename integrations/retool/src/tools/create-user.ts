@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let createUser = SlateTool.create(spec, {
   name: 'Create User',
   key: 'create_user',
-  description: `Create a new user in the Retool organization. Use this for programmatic user onboarding. The user will receive an invitation to set up their account.`,
+  description: `Create a new user in the Retool organization. Use this for programmatic user onboarding. This changes organization membership and may affect seat usage; it does not prove invitation delivery.`,
   tags: {
     destructive: false
   }
@@ -31,13 +31,13 @@ export let createUser = SlateTool.create(spec, {
     z.object({
       userId: z.string(),
       email: z.string(),
-      firstName: z.string(),
-      lastName: z.string(),
+      firstName: z.string().nullable(),
+      lastName: z.string().nullable(),
       active: z.boolean()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.createUser({
       email: ctx.input.email,

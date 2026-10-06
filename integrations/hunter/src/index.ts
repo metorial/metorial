@@ -10,13 +10,12 @@ import {
   enrichCompany,
   enrichPerson,
   getAccount,
+  getLead,
   listLeads,
   manageLead,
   manageLeadsList,
   manageSequence
 } from './tools';
-import { sequenceEmailEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,7 +31,8 @@ export let provider = Slate.create({
     deleteLead,
     manageLeadsList,
     manageSequence,
-    getAccount
+    getAccount,
+    getLead
   ],
-  triggers: [sequenceEmailEvent]
+  triggers: []
 });

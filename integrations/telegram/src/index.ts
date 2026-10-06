@@ -17,17 +17,6 @@ import {
   stopPollTool,
   updateChatTool
 } from './tools';
-import {
-  callbackQueryReceivedTrigger,
-  chatBoostUpdatedTrigger,
-  chatMemberUpdatedTrigger,
-  inlineQueryReceivedTrigger,
-  messageReceivedTrigger,
-  paymentReceivedTrigger,
-  pollUpdatedTrigger,
-  reactionUpdatedTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -47,14 +36,5 @@ export let provider = Slate.create({
     answerInlineQueryTool,
     getFileTool
   ],
-  triggers: [
-    messageReceivedTrigger,
-    callbackQueryReceivedTrigger,
-    inlineQueryReceivedTrigger,
-    chatMemberUpdatedTrigger,
-    pollUpdatedTrigger,
-    paymentReceivedTrigger,
-    chatBoostUpdatedTrigger,
-    reactionUpdatedTrigger
-  ]
+  triggers: []
 });

@@ -5,6 +5,8 @@ import {
   createModel,
   createSource,
   createSync,
+  deleteModel,
+  deleteSync,
   getDestination,
   getModel,
   getSource,
@@ -22,8 +24,6 @@ import {
   updateSource,
   updateSync
 } from './tools';
-import { inboundWebhook, syncRunCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,7 +46,9 @@ export let provider = Slate.create({
     triggerSync,
     triggerSyncSequence,
     listSyncRuns,
-    getSyncSequenceRun
+    getSyncSequenceRun,
+    deleteModel,
+    deleteSync
   ],
-  triggers: [inboundWebhook, syncRunCompleted]
+  triggers: []
 });

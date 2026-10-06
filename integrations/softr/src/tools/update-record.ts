@@ -1,62 +1,63 @@
 import { SlateTool } from 'slates';
-import { z } from 'zod';
 import { DatabaseClient } from '../lib/client';
+import {
+  dbId,
+  exactRecord,
+  mappedRecord,
+  nativeRecord,
+  recordOutput,
+  single,
+  tblId
+} from '../lib/schemas';
+import { bytes, connection, fail, z } from '../lib/validation';
 import { spec } from '../spec';
-
-export let updateRecord = SlateTool.create(spec, {
+export const updateRecord = SlateTool.create(spec, {
   name: 'Update Record',
   key: 'update_record',
-  description: `Partially update a record in a Softr table. Only the fields provided will be updated; other fields remain unchanged.`,
-  instructions: [
-    'Set `fieldNames` to true to use human-readable field names as keys instead of field IDs.'
-  ],
-  tags: {
-    destructive: false,
-    readOnly: false
-  }
+  description:
+    'Partially update an exact record using native PATCH. Only supplied fields are changed. Discover field IDs/types with list_tables; computed/system fields cannot be written. Reconcile uncertain writes before retrying.',
+  tags: { readOnly: false }
 })
   .input(
     z.object({
-      databaseId: z.string().describe('ID of the database'),
-      tableId: z.string().describe('ID of the table'),
-      recordId: z.string().describe('ID of the record to update'),
-      fields: z
-        .record(z.string(), z.unknown())
-        .describe('Map of field IDs (or names) to new values'),
-      fieldNames: z.boolean().optional().describe('Use field names instead of IDs as keys')
+      databaseId: dbId,
+      tableId: tblId,
+      recordId: z.string(),
+      fields: z.record(z.string(), z.unknown()),
+      fieldNames: z.boolean().optional()
     })
   )
-  .output(
-    z.object({
-      recordId: z.string().describe('ID of the updated record'),
-      tableId: z.string().describe('Table the record belongs to'),
-      fields: z.record(z.string(), z.unknown()).describe('Updated field values'),
-      createdAt: z.string().describe('Creation timestamp'),
-      updatedAt: z.string().describe('Last update timestamp')
-    })
-  )
+  .output(recordOutput)
   .handleInvocation(async ctx => {
-    let client = new DatabaseClient({ token: ctx.auth.token });
-
-    let result = await client.updateRecord(
-      ctx.input.databaseId,
+    if (!Object.keys(ctx.input.fields).length)
+      fail('Provide at least one field value to update.');
+    bytes(ctx.input.fields);
+    const c = new DatabaseClient(connection(ctx.auth, ctx.config));
+    exactRecord(
+      single(
+        nativeRecord,
+        await c.getRecord(ctx.input.databaseId, ctx.input.tableId, ctx.input.recordId)
+      ),
       ctx.input.tableId,
-      ctx.input.recordId,
-      ctx.input.fields,
-      { fieldNames: ctx.input.fieldNames }
+      ctx.input.recordId
     );
-
-    let record = result.data;
-
+    const v = exactRecord(
+      single(
+        nativeRecord,
+        await c.updateRecord(
+          ctx.input.databaseId,
+          ctx.input.tableId,
+          ctx.input.recordId,
+          ctx.input.fields,
+          { fieldNames: ctx.input.fieldNames }
+        )
+      ),
+      ctx.input.tableId,
+      ctx.input.recordId
+    );
     return {
-      output: {
-        recordId: record.id,
-        tableId: record.tableId,
-        fields: record.fields || {},
-        createdAt: record.createdAt,
-        updatedAt: record.updatedAt
-      },
-      message: `Record \`${record.id}\` updated successfully.`
+      output: mappedRecord(v),
+      message: 'Softr returned the exact record after partial update.'
     };
   })
   .build();

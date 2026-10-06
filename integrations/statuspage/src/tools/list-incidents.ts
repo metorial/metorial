@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 let incidentUpdateSchema = z.object({
@@ -49,11 +50,15 @@ export let listIncidents = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageId: pageIdSchema,
       filter: z
         .enum(['all', 'unresolved', 'scheduled'])
         .optional()
         .describe('Filter incidents by category. Defaults to "all".'),
-      query: z.string().optional().describe('Search query to filter incidents by name'),
+      query: z
+        .string()
+        .optional()
+        .describe('Search incident name, status and text. Supported only with filter=all.'),
       limit: z.number().optional().describe('Maximum number of incidents to return per page'),
       page: z.number().optional().describe('Page number for pagination')
     })
@@ -64,24 +69,15 @@ export let listIncidents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, pageId: ctx.config.pageId });
+    let client = new Client({
+      token: ctx.auth.token,
+      pageId: ctx.input.pageId ?? ctx.config.pageId
+    });
 
-    let raw: any[];
-    let filter = ctx.input.filter || 'all';
+    let filter = ctx.input.filter ?? 'all';
+    let raw = await client.listIncidents(ctx.input);
 
-    if (filter === 'unresolved') {
-      raw = await client.listUnresolvedIncidents();
-    } else if (filter === 'scheduled') {
-      raw = await client.listScheduledIncidents();
-    } else {
-      raw = await client.listIncidents({
-        query: ctx.input.query,
-        limit: ctx.input.limit,
-        page: ctx.input.page
-      });
-    }
-
-    let incidents = raw.map((i: any) => ({
+    let incidents = raw.map(i => ({
       incidentId: i.id,
       name: i.name,
       status: i.status,
@@ -92,7 +88,7 @@ export let listIncidents = SlateTool.create(spec, {
       createdAt: i.created_at,
       updatedAt: i.updated_at,
       resolvedAt: i.resolved_at,
-      incidentUpdates: (i.incident_updates || []).map((u: any) => ({
+      incidentUpdates: (i.incident_updates || []).map(u => ({
         updateId: u.id,
         status: u.status,
         body: u.body,

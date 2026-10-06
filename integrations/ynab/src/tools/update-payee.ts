@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { budgetInput, idInput, required } from '../lib/validation';
 import { spec } from '../spec';
 
 export let updatePayee = SlateTool.create(spec, {
@@ -13,12 +14,9 @@ export let updatePayee = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      budgetId: z
-        .string()
-        .optional()
-        .describe('Budget ID. Defaults to the configured budget.'),
-      payeeId: z.string().describe('Payee ID to update'),
-      name: z.string().describe('New payee name')
+      budgetId: budgetInput,
+      payeeId: idInput.describe('Payee ID to update'),
+      name: z.string().trim().min(1).max(500).describe('New payee name')
     })
   )
   .output(
@@ -28,19 +26,18 @@ export let updatePayee = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let budgetId = ctx.input.budgetId ?? ctx.config.budgetId;
-
-    let payee = await client.updatePayee(budgetId, ctx.input.payeeId, {
-      name: ctx.input.name
-    });
-
+    const payee = await new Client({ token: ctx.auth.token }).updatePayee(
+      ctx.input.budgetId ?? ctx.config.budgetId,
+      ctx.input.payeeId,
+      { name: required(ctx.input.name, 'Payee name') }
+    );
+    if (payee.id !== ctx.input.payeeId || payee.deleted || payee.name !== ctx.input.name)
+      throw createApiServiceError('YNAB did not confirm the requested payee name.', {
+        reason: 'ynab_response'
+      });
     return {
-      output: {
-        payeeId: payee.id,
-        name: payee.name
-      },
-      message: `Renamed payee to **${payee.name}**`
+      output: { payeeId: payee.id, name: payee.name },
+      message: `Updated payee ${payee.id}.`
     };
   })
   .build();

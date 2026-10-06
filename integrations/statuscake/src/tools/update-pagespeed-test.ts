@@ -15,6 +15,7 @@ export let updatePagespeedTest = SlateTool.create(spec, {
   .input(
     z.object({
       testId: z.string().describe('ID of the page speed test to update'),
+      websiteUrl: z.string().optional().describe('New URL, host or IP address to monitor'),
       name: z.string().optional().describe('New name for the test'),
       checkRate: z.number().optional().describe('Check frequency in seconds'),
       locationIso: z.string().optional().describe('Monitoring region ISO code'),
@@ -25,7 +26,9 @@ export let updatePagespeedTest = SlateTool.create(spec, {
       alertBigger: z
         .number()
         .optional()
-        .describe('Alert if page size exceeds this value in bytes'),
+        .describe(
+          'Alert if page size exceeds this value in provider kilobytes (KB); zero disables the alert'
+        ),
       alertSlower: z
         .number()
         .optional()
@@ -33,8 +36,13 @@ export let updatePagespeedTest = SlateTool.create(spec, {
       alertSmaller: z
         .number()
         .optional()
-        .describe('Alert if page size is smaller than this value in bytes'),
-      tags: z.array(z.string()).optional().describe('Tags for the test'),
+        .describe(
+          'Alert if page size is smaller than this value in provider kilobytes (KB); zero disables the alert'
+        ),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Legacy field; tags are not supported by the current page-speed API'),
       paused: z.boolean().optional().describe('Whether the test is paused')
     })
   )
@@ -47,6 +55,7 @@ export let updatePagespeedTest = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let {
       testId,
+      websiteUrl,
       checkRate,
       locationIso,
       contactGroups,
@@ -56,10 +65,11 @@ export let updatePagespeedTest = SlateTool.create(spec, {
       ...rest
     } = ctx.input;
 
-    let data: Record<string, any> = { ...rest };
+    let data: Record<string, unknown> = { ...rest };
 
+    if (websiteUrl !== undefined) data.website_url = websiteUrl;
     if (checkRate !== undefined) data.check_rate = checkRate;
-    if (locationIso !== undefined) data.location_iso = locationIso;
+    if (locationIso !== undefined) data.region = locationIso;
     if (contactGroups) data.contact_groups = contactGroups;
     if (alertBigger !== undefined) data.alert_bigger = alertBigger;
     if (alertSlower !== undefined) data.alert_slower = alertSlower;

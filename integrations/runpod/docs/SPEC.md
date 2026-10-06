@@ -1,78 +1,85 @@
-# Slates Specification for RunPod
-
-## Overview
-
-RunPod is a cloud computing platform that provides on-demand GPU and CPU infrastructure for AI/ML workloads. It is built for AI, machine learning, and general compute needs, offering scalable, high-performance GPU and CPU resources for training, fine-tuning, and deploying models. The platform offers two primary compute models: persistent GPU Pods and auto-scaling Serverless endpoints.
+# Runpod Integration Specification
 
 ## Authentication
 
-RunPod uses **API Key** (Bearer token) authentication for all API requests.
+Connect with a Runpod API key from **Credentials > API Keys**. Requests use an
+`Authorization: Bearer` header. Read-only or restricted keys may permit only
+some tools; use a key with the resource permissions needed for the workflow.
+There is no required workspace or account configuration.
 
-- All requests require a RunPod API key in the request headers.
-- The API key is passed as a Bearer token in the `Authorization` header: `Authorization: Bearer <RUNPOD_API_KEY>`.
-- Keys can be created with permissions set to All, Restricted, or Read Only. If you choose Restricted, you can customize access for each RunPod API, including per-endpoint access for Serverless endpoints.
-- New keys are created with an `rpa_` prefix.
-- API keys are generated in the RunPod console under **Settings > API Keys**.
-- RunPod does not store your API key, so it must be saved at creation time.
+## API contracts
 
-**Base URLs:**
+Resource management uses `https://api.runpod.io/v2`. The former REST v1 API is
+deprecated and scheduled to retire on November 15, 2026. Tool field names remain
+compatible with existing calls; request payloads translate to the nested v2
+container, compute, storage, worker, and scaling objects.
 
-- REST API: `https://rest.runpod.io/v1/`
-- Serverless Endpoints: `https://api.runpod.ai/v2/{endpoint_id}/`
-- GraphQL API (legacy): `https://api.runpod.io/graphql?api_key={YOUR_API_KEY}`
+Serverless job operations use `https://api.runpod.ai/v2/{endpointId}`. Account
+identity uses the documented GraphQL `myself` query at
+`https://api.runpod.io/graphql`, because REST v2 has no current-user endpoint.
 
-## Features
+## Capabilities
 
-### Pod Management
+- **Discovery:** `list_compute_types` returns GPU model IDs and Serverless GPU
+  pool IDs, CPU flavor IDs, memory, and prices. `list_data_centers` returns
+  location IDs, storage tiers, region, and compliance information.
+- **Pods:** List, get, create, update, start, stop, restart, and terminate.
+  Pod creation selects exactly one GPU model or CPU flavor. CPU Pods require a
+  vCPU count and cannot use host-local persistent storage. Pod mount kind cannot
+  change after creation. Network volumes and persistent mounts are mutually
+  exclusive.
+- **Queue-based Serverless endpoints:** Create from a Serverless template,
+  list, get, update, and delete. List and get distinguish queue-based and
+  load-balancing endpoints; job operations and queue health apply only to
+  queue-based endpoints. Read optional worker details. CPU
+  endpoints accept CPU flavor IDs; GPU endpoints accept GPU model IDs (translated to eligible pools and model exclusions) or explicit GPU pool IDs. Compute
+  family cannot change after creation. Scaling uses queue delay or request
+  count; minimum workers cannot exceed maximum workers.
+  Model selection excludes other models currently listed in the selected
+  pools; later provider additions to those pools can become eligible.
+- **Jobs:** Submit asynchronously or synchronously, read status and incremental
+  stream chunks, cancel, retry failed/timed-out jobs, and purge queued jobs.
+  A streaming handler is required for incremental output. Sync submission waits
+  up to 90 seconds and may return a still-running job ID. Results expire after
+  one minute for sync jobs and thirty minutes for async jobs. Custom execution
+  timeouts range from five seconds to seven days; job TTL ranges from ten
+  seconds to seven days. Handler inputs and results are model-specific JSON.
+- **Templates:** Create, list owned and public catalog templates, get, update,
+  and delete. Templates resolve into deployment configuration when creating a
+  Pod or endpoint; later template edits do not update existing deployments.
+- **Network volumes:** Create, list, get, rename, increase storage, and delete.
+  Volume capacity is 10–4096 GB and cannot be reduced. Volumes must share a data
+  center with their compute resources.
+- **Private registries:** Create, list, inspect, and delete saved credentials.
+  Passwords and usernames are write-only and are never returned by the tools.
+- **Account and billing:** Identify the connected user or team and read account
+  balance/hourly spend. Retrieve Pod, Serverless, and network-volume billing by
+  resource and time range. Billing amounts are in USD.
 
-Create and manage persistent GPU/CPU instances (Pods) for development, training, and long-running workloads. You can create, list, get, start, stop, resume, and terminate Pods, specifying GPU type, container image, disk size, and environment variables. Pods support both on-demand and spot (interruptable) instances with configurable bid pricing.
+## Compatibility limitations
 
-### Serverless Endpoints
+The current REST API has no Pod `reset` action, spot/interruptible Pod create
+field, or template `readme` field. Existing input fields remain declared, but
+unsupported calls return an actionable error. GPU billing filters and custom
+billing grouping are likewise unsupported; billing groups by resource ID.
 
-Deploy and manage serverless endpoints for AI inference. You can invoke jobs, get job status, purge job queues, and more. Key operations include:
+The API resolves endpoint templates at creation and does not retain the source
+template ID. Endpoint reads therefore return `templateId: null`; creation
+returns the requested source template ID. Existing include-template and
+include-endpoint-bound-template options remain compatible because v2 returns
+resolved configuration and all owned templates directly.
 
-- **Synchronous execution** (`/runsync`): Waits for job completion before returning the result. Works best for quick operations (under 30 seconds).
-- **Asynchronous execution** (`/run`): Designed for long-running tasks. Returns a Job ID that can be used to check status later.
-- **Streaming** (`/stream`): For jobs that generate output incrementally, receive partial results as they become available.
-- **Job status**: Check the state of a job (IN_QUEUE, IN_PROGRESS, COMPLETED, FAILED, CANCELLED, TIMED_OUT).
-- **Job cancellation**: Cancel a specific job in progress.
-- **Queue purge**: Clear all pending jobs from the queue without affecting jobs already in progress.
-- **Health monitoring**: The health endpoint provides insights into the operational status, including the number of workers available and job statistics.
+Paginated Pod, endpoint, and owned-template lists follow provider cursors.
+Worker details come from the provider's complete active-worker snapshot.
+Pod filters apply to the complete fetched account list because v2 no longer
+provides the v1 filter query parameters. The public template catalog is a
+provider-curated, capped list rather than a complete search of all templates.
 
-Endpoints can be configured with autoscaling parameters including min/max workers, GPU type, idle timeout, and execution timeout.
+## Official references
 
-### Network Volumes
-
-Create persistent storage volumes that can be attached to Pods and Serverless endpoints. Volumes persist across Pod restarts and can be shared between compute instances. Volumes are region-specific.
-
-### Templates
-
-Save and reuse Pod and endpoint configurations as templates to standardize deployments across projects and teams. Templates define container images, environment variables, ports, and resource requirements.
-
-### Container Registry Authentication
-
-Connect to private Docker registries by storing credentials (username/password) in RunPod. These credentials are used when pulling private container images for Pods and Serverless workers.
-
-### Billing and Usage
-
-Access detailed billing history for Pods, Serverless endpoints, and Network Volumes to monitor spending and optimize costs.
-
-### Public Model Endpoints
-
-RunPod offers Public Endpoints for instant API access to pre-deployed AI models for image, video, audio, and text generation. These can be called directly with an API key without deploying your own infrastructure.
-
-## Events
-
-RunPod supports **per-job webhook notifications** for Serverless endpoints. You can receive notifications when jobs complete by specifying a webhook URL in the job request payload.
-
-### Serverless Job Completion Webhooks
-
-Webhooks allow the RunPod serverless system to make HTTP callbacks to your specified URL when a job completes processing, pushing results to your application rather than requiring polling.
-
-- The webhook URL is specified per-request as a top-level `webhook` field in the job submission payload.
-- When a request completes processing, RunPod sends an HTTP POST to the webhook URL. The payload contains the same data structure returned from the `/status` endpoint, including job ID, status, execution time, and output.
-- The webhook endpoint should return a 200 status code. If the call fails, RunPod retries up to 2 more times with a 10-second delay.
-- Webhooks are triggered for completed and failed jobs.
-- There is no built-in webhook authentication mechanism; verification must be handled by the receiving application.
-
-RunPod does not offer platform-level webhooks for resource lifecycle events (e.g., Pod state changes, endpoint scaling events, or billing alerts).
+- [REST v2 overview](https://docs.runpod.io/api-reference-v2/overview)
+- [REST v1 migration](https://docs.runpod.io/api-reference-v2/migrate-from-v1)
+- [REST v2 OpenAPI](https://api.runpod.io/v2/openapi.json)
+- [Serverless requests](https://docs.runpod.io/serverless/endpoints/send-requests)
+- [Serverless operation reference](https://docs.runpod.io/serverless/endpoints/operation-reference)
+- [GraphQL schema](https://graphql-spec.runpod.io/)

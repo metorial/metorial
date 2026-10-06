@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageUserRoles = SlateTool.create(spec, {
   name: 'Manage User Roles',
   key: 'manage_user_roles',
-  description: `Assign or remove roles from a OneLogin user. Roles control which applications a user can access. You can assign multiple roles at once or remove specific roles.`,
+  description: `Assign or remove roles from a OneLogin user. Roles control which applications a user can access. You can assign multiple roles at once or remove specific roles. Removal does not remove roles assigned through mapping or provisioning. Successful acknowledgment does not prove all indirect access is removed.`,
   tags: {
     destructive: false
   }
@@ -24,10 +24,7 @@ export let manageUserRoles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
     if (ctx.input.action === 'assign') {
       await client.assignRolesToUser(ctx.input.userId, ctx.input.roleIds);

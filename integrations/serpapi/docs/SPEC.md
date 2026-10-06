@@ -1,103 +1,22 @@
-Now let me get the full list of supported engines from their search engines page:# Slates Specification for SerpApi
+# SerpApi API coverage
 
-## Overview
+Fourteen tools cover web search (Google, Bing, DuckDuckGo, Yahoo, Yandex, Baidu, Naver), images (including Google Lens), news, videos, shopping, Maps, Flights, Scholar, Trends, Jobs, autocomplete, locations, account information and exact search archives. Each engine receives its documented native parameters.
 
-SerpApi is a real-time search engine results page (SERP) scraping API that extracts structured JSON data from 100+ search engines and platforms, including Google, Bing, DuckDuckGo, Yahoo, Yandex, Baidu, Amazon, YouTube, and more. It handles proxies, CAPTCHA solving, and HTML parsing, returning clean, structured search result data.
+Connect using your API key from https://serpapi.com/manage-api-key. Authentication verifies the free native Account API and binds its account ID to the key. Existing token-only connections remain usable; reconnect to store the additional account binding. Account information and locations are free. Searches may consume credits; cached requests are free only when all parameters match and the native cache is valid. This integration does not enforce a spending cap.
 
-## Authentication
+`async: true` returns native queued/processing status and the search ID. It cannot be combined with `noCache: true` or a Ludicrous Speed account. Use `get_search` to read the exact ID once rather than resubmitting a query. Native failure, pending status and missing metadata never imply completed results. Network failures may leave a search or charge; inspect native account history before retrying.
 
-SerpApi uses **API key** authentication. Each account is assigned a private API key, accessible from the account dashboard under **Your Account > API key**.
+`get_search` can provide completed JSON/HTML files through the authenticated archive. The provider documents retention for up to 31 days after completion. No renewal or guaranteed expiry timestamp is invented. There is no search-history deletion, credit refund or cleanup tool.
 
-The API key is passed as a query parameter (`api_key`) on each GET request:
+Compatibility guidance:
 
-```
-https://serpapi.com/search?engine=google&q=coffee&api_key=YOUR_API_KEY
-```
+- Google web `numResults` is retained in the schema but refused locally because Google no longer supports `num`. Page offsets advance by 10; `startOffset` permits an exact offset.
+- Bing/Yahoo pages begin at 1. DuckDuckGo and Bing Images have variable page sizes: use `startOffset` after the first page. All offsets are native, not inferred completeness claims.
+- Bing uses `mkt`/`cc`; DuckDuckGo uses `kl`. Supply country with language to form these native regional codes. Yandex uses a native `regionId` rather than an ISO country.
+- Google Shopping's current layout ignores offset pagination; only page 1 is supported. Google Jobs discontinued `startIndex` and deprecated `chips`; use `nextPageToken` and native `filterToken` (`uds`).
+- Fields without a documented meaning for the selected engine fail before a paid request with actionable guidance. No generic Google parameters are silently forwarded to other engines.
+- Flight `stops` retains the native values: 0 any, 1 nonstop, 2 up to one stop, 3 up to two stops. Prices use only native currency information or the documented Flights default USD.
+- Location IDs are native text in `nativeLocationId`; the historical numeric `locationId` remains optional and is never populated by lossy coercion. GPS uses native longitude, latitude order.
+- Price ranges, native offer currency, Trends display strings/comparison values and both rising/top groups are preserved additively. No missing quota, price, stop count or total is invented.
 
-There are no OAuth flows, scopes, or additional credentials required. A single API key is sufficient for accessing all SerpApi endpoints.
-
-## Features
-
-### Web Search
-
-Query search engines (Google, Bing, DuckDuckGo, Yahoo, Yandex, Baidu, Naver) and receive structured results including organic results, answer boxes, knowledge graphs, featured snippets, related questions, and related searches.
-
-- **Parameters**: query (`q`), search engine (`engine`), location, language (`hl`), country (`gl`), device type (desktop/tablet/mobile), Google domain.
-- Results include rich structured data such as links, addresses, ratings, reviews, thumbnails, prices, and rich snippets.
-
-### Image Search
-
-Search for images across Google Images, Bing Images, Yahoo Images, and Yandex Images. Returns image titles, thumbnails, source URLs, and related content.
-
-- Supports Google Lens and Google Reverse Image search for visual lookups.
-
-### News Search
-
-Retrieve news results from Google News, Bing News, DuckDuckGo News, Baidu News, and Naver News.
-
-### Video Search
-
-Search for videos via Google Videos, YouTube Search, Bing Videos, DuckDuckGo, and Yahoo Videos. YouTube-specific features include channel results, playlist results, shorts, and video transcript retrieval.
-
-### Shopping and E-commerce
-
-Search product listings across Google Shopping, Amazon, Walmart, eBay, and The Home Depot. Returns product details, pricing, ratings, reviews, and seller information. Supports individual product detail and product review lookups for Amazon, Walmart, eBay, and Home Depot.
-
-### Maps and Local
-
-Query Google Maps for local business data, place details, directions, photos, posts, and reviews. Also supports Google Local results, Google Local Services, and Yelp search (including place details and reviews).
-
-### Travel
-
-Search Google Flights for flight options, booking details, and price insights. Search Google Hotels for property listings, details, reviews, and photos. Access Google Travel Explore for destination and flight discovery. Retrieve Tripadvisor search results and place details. Access OpenTable restaurant reviews.
-
-### Scholarly and Patent Research
-
-Query Google Scholar for academic papers, citations, author profiles, and citation data. Search Google Patents for patent filings and details.
-
-### AI and Generative Search
-
-Access Google AI Mode and Google AI Overview results for AI-generated search answers. Query Bing Copilot and Naver AI Overview for AI-assisted search results.
-
-### Trends, Finance, and Autocomplete
-
-Retrieve Google Trends data including interest over time, interest by region, related queries, and trending topics. Access Google Finance for stock and market data. Use Google Autocomplete for search query suggestions.
-
-### Jobs and Events
-
-Search Google Jobs for job listings and individual job details. Query Google Events for events, concerts, and performances.
-
-### App Stores
-
-Search Google Play Store (apps, games, books, movies) and Apple App Store for app listings, product details, and reviews.
-
-### Social and Profile Data
-
-Retrieve Facebook profile data via the Facebook Profile API.
-
-### Google Ads Transparency
-
-Access the Google Ads Transparency Center to view advertiser ad creatives and details.
-
-### Account Management
-
-Check account information including current plan, monthly usage, remaining searches, and hourly throughput via the Account API. This is free and does not count toward search quota.
-
-### Search Archive
-
-Retrieve previously executed search results from the SerpApi search archive using the search ID, without consuming additional search credits.
-
-### Locations API
-
-Query a list of supported Google locations for use with the `location` parameter to simulate geographically targeted searches.
-
-### Output Customization
-
-- Results can be returned as structured JSON or raw HTML.
-- The **JSON Restrictor** feature allows limiting response fields for smaller, faster payloads.
-- Device emulation supports desktop, tablet, and mobile results.
-- A `no_cache` parameter forces fresh results instead of serving cached ones.
-
-## Events
-
-The provider does not support events. SerpApi is a synchronous, request-response API with no webhooks, callbacks, or event subscription mechanisms.
+Provider documentation: [Search](https://serpapi.com/search-api), [Account](https://serpapi.com/account-api), [Archive](https://serpapi.com/search-archive-api), [Locations](https://serpapi.com/locations-api), [Jobs](https://serpapi.com/google-jobs-api), [Shopping](https://serpapi.com/google-shopping-api).

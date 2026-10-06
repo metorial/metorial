@@ -16,8 +16,6 @@ import {
   updateSecurity,
   updateSettings
 } from './tools';
-import { dnsQueryLog, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     clearLogs,
     getSetup
   ],
-  triggers: [inboundWebhook, dnsQueryLog]
+  triggers: []
 });

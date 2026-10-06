@@ -23,8 +23,6 @@ import {
   manageTask,
   sendMessage
 } from './tools';
-import { contactChanges, eventChanges, messageChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     createTask,
     manageTask
   ],
-  triggers: [messageChanges, eventChanges, contactChanges]
+  triggers: []
 });

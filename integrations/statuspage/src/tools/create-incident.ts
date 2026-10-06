@@ -1,11 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let createIncident = SlateTool.create(spec, {
   name: 'Create Incident',
   key: 'create_incident',
+  tags: { readOnly: false, destructive: false },
   description: `Create a new incident on the status page. Supports realtime, scheduled, and backfilled (historical) incident types.
 - **Realtime**: Set \`status\` to investigating/identified/monitoring/resolved. Notifications are sent to subscribers.
 - **Scheduled**: Provide \`scheduledFor\` and \`scheduledUntil\` for planned maintenance.
@@ -19,6 +21,33 @@ Optionally associate affected components and their statuses.`,
 })
   .input(
     z.object({
+      pageId: pageIdSchema,
+      reminderIntervals: z
+        .string()
+        .optional()
+        .describe(
+          'Serialized reminder intervals; use "[]" to disable unresolved-incident reminders.'
+        ),
+      autoTweetOnCreation: z
+        .boolean()
+        .optional()
+        .describe('Tweet when creating scheduled maintenance.'),
+      autoTweetOnCompletion: z
+        .boolean()
+        .optional()
+        .describe('Tweet when scheduled maintenance completes.'),
+      autoTweetOneHourBefore: z
+        .boolean()
+        .optional()
+        .describe('Tweet one hour before maintenance.'),
+      autoTransitionNotifyAtStart: z
+        .boolean()
+        .optional()
+        .describe('Notify subscribers when maintenance automatically starts.'),
+      autoTransitionNotifyAtEnd: z
+        .boolean()
+        .optional()
+        .describe('Notify subscribers when maintenance automatically ends.'),
       name: z.string().describe('Title of the incident'),
       status: z
         .enum(['investigating', 'identified', 'monitoring', 'resolved'])
@@ -88,12 +117,67 @@ Optionally associate affected components and their statuses.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, pageId: ctx.config.pageId });
+    let client = new Client({
+      token: ctx.auth.token,
+      pageId: ctx.input.pageId ?? ctx.config.pageId
+    });
 
-    let data: Record<string, any> = {
+    const scheduled =
+      ctx.input.scheduledFor !== undefined || ctx.input.scheduledUntil !== undefined;
+    if (
+      scheduled &&
+      (!ctx.input.scheduledFor ||
+        !ctx.input.scheduledUntil ||
+        ctx.input.status ||
+        ctx.input.backfilled)
+    )
+      throw createApiServiceError(
+        'Provide both scheduled timestamps without a realtime status or backfilled flag for planned maintenance.'
+      );
+    if (
+      scheduled &&
+      (!z.iso.datetime({ offset: true }).safeParse(ctx.input.scheduledFor).success ||
+        !z.iso.datetime({ offset: true }).safeParse(ctx.input.scheduledUntil).success ||
+        Date.parse(ctx.input.scheduledFor ?? '') >= Date.parse(ctx.input.scheduledUntil ?? ''))
+    )
+      throw createApiServiceError(
+        'Scheduled timestamps must be valid ISO 8601 dates with the end after the start.'
+      );
+    if (ctx.input.backfilled && (!ctx.input.backfillDate || ctx.input.componentIds))
+      throw createApiServiceError(
+        'Historical incidents require backfillDate and cannot change components.'
+      );
+    if (!ctx.input.backfilled && ctx.input.backfillDate !== undefined)
+      throw createApiServiceError('backfillDate requires backfilled=true.');
+    if (
+      !scheduled &&
+      [
+        ctx.input.scheduledRemindPrior,
+        ctx.input.scheduledAutoInProgress,
+        ctx.input.scheduledAutoCompleted
+      ].some(value => value !== undefined)
+    )
+      throw createApiServiceError(
+        'Scheduled options require scheduledFor and scheduledUntil.'
+      );
+    let data: Record<string, unknown> = {
       name: ctx.input.name
     };
 
+    if (scheduled) data.status = 'scheduled';
+    if (ctx.input.reminderIntervals !== undefined)
+      data.reminder_intervals = ctx.input.reminderIntervals;
+    if (ctx.input.autoTweetOnCreation !== undefined)
+      data.auto_tweet_on_creation = ctx.input.autoTweetOnCreation;
+    if (ctx.input.autoTweetOnCompletion !== undefined)
+      data.auto_tweet_on_completion = ctx.input.autoTweetOnCompletion;
+    if (ctx.input.autoTweetOneHourBefore !== undefined)
+      data.auto_tweet_one_hour_before = ctx.input.autoTweetOneHourBefore;
+    if (ctx.input.autoTransitionNotifyAtStart !== undefined)
+      data.auto_transition_deliver_notifications_at_start =
+        ctx.input.autoTransitionNotifyAtStart;
+    if (ctx.input.autoTransitionNotifyAtEnd !== undefined)
+      data.auto_transition_deliver_notifications_at_end = ctx.input.autoTransitionNotifyAtEnd;
     if (ctx.input.status !== undefined) data.status = ctx.input.status;
     if (ctx.input.message !== undefined) data.body = ctx.input.message;
     if (ctx.input.impactOverride !== undefined)

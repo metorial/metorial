@@ -24,8 +24,6 @@ import {
   searchConversations,
   sendMessage
 } from './tools';
-import { companyEvents, contactEvents, conversationEvents, ticketEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -52,5 +50,5 @@ export let provider = Slate.create({
     manageSubscriptions,
     getNotes
   ],
-  triggers: [contactEvents, conversationEvents, ticketEvents, companyEvents]
+  triggers: []
 });

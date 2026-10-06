@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listKnowledgeBases = SlateTool.create(spec, {
@@ -14,8 +15,8 @@ export let listKnowledgeBases = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number to retrieve'),
-      pageSize: z.number().optional().describe('Number of items per page')
+      page: z.number().int().min(1).optional().describe('Page number to retrieve'),
+      pageSize: z.number().int().min(1).optional().describe('Number of items per page')
     })
   )
   .output(
@@ -32,6 +33,7 @@ export let listKnowledgeBases = SlateTool.create(spec, {
           })
         )
         .describe('List of knowledge bases'),
+      pagination: paginationSchema.optional().describe('Page navigation metadata'),
       totalCount: z.number().describe('Total number of knowledge bases'),
       totalPages: z.number().describe('Total number of pages')
     })
@@ -55,6 +57,7 @@ export let listKnowledgeBases = SlateTool.create(spec, {
     return {
       output: {
         knowledgeBases,
+        pagination: result.pagination,
         totalCount: result.pagination.totalCount,
         totalPages: result.pagination.totalPages
       },

@@ -45,7 +45,11 @@ export let createVolume = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('Name for the new volume.')
+      name: z
+        .string()
+        .min(1)
+        .regex(/^[a-zA-Z0-9_-]+$/)
+        .describe('Name for the new volume. Use letters, numbers, underscores, or hyphens.')
     })
   )
   .output(volumeSchema)

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TelnyxClient } from '../lib/client';
+import { invalid } from '../lib/native';
 import { spec } from '../spec';
 
 export let callAction = SlateTool.create(spec, {
@@ -22,6 +23,7 @@ export let callAction = SlateTool.create(spec, {
       callControlId: z.string().describe('The call control ID of the active call'),
       action: z
         .enum([
+          'get',
           'answer',
           'hangup',
           'transfer',
@@ -74,13 +76,51 @@ export let callAction = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the action was performed successfully'),
+      success: z
+        .boolean()
+        .describe(
+          'Whether Telnyx accepted the command or returned exact call state; command completion is asynchronous'
+        ),
       callControlId: z.string().describe('Call control ID of the call'),
-      action: z.string().describe('Action that was performed')
+      action: z.string().describe('Requested action'),
+      nativeAction: z.string().optional(),
+      isAlive: z.boolean().optional(),
+      callLegId: z.string().optional(),
+      callSessionId: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new TelnyxClient({ token: ctx.auth.token });
+
+    for (const [field, actions] of Object.entries({
+      speakText: ['speak', 'gather_using_speak'],
+      speakLanguage: ['speak', 'gather_using_speak'],
+      speakVoice: ['speak', 'gather_using_speak'],
+      transferTo: ['transfer'],
+      audioUrl: ['play_audio', 'gather_using_audio'],
+      dtmfDigits: ['send_dtmf'],
+      callControlIdToBridge: ['bridge']
+    })) {
+      const value = ctx.input[field as keyof typeof ctx.input];
+      if (value !== undefined && !actions.includes(ctx.input.action))
+        invalid(
+          `${field} is not supported by the selected action. Use only that action's documented parameters.`
+        );
+    }
+    if (ctx.input.action === 'get') {
+      const call = await client.getCall(ctx.input.callControlId);
+      return {
+        output: {
+          success: true,
+          action: 'get',
+          callControlId: call.call_control_id,
+          isAlive: call.is_alive,
+          callLegId: call.call_leg_id,
+          callSessionId: call.call_session_id
+        },
+        message: `Read exact native state for call ${call.call_control_id}.`
+      };
+    }
 
     let params: Record<string, unknown> = { ...ctx.input.actionParams };
 
@@ -99,9 +139,10 @@ export let callAction = SlateTool.create(spec, {
       output: {
         success: true,
         callControlId: ctx.input.callControlId,
-        action: ctx.input.action
+        action: ctx.input.action,
+        nativeAction: ctx.input.action === 'play_audio' ? 'playback_start' : ctx.input.action
       },
-      message: `Action **${ctx.input.action}** performed on call **${ctx.input.callControlId}**.`
+      message: `Action **${ctx.input.action}** accepted for call **${ctx.input.callControlId}**. Completion is asynchronous.`
     };
   })
   .build();

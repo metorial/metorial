@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Upload } from '../lib/client';
 import { spec } from '../spec';
 
 export let uploadFile = SlateTool.create(spec, {
@@ -38,7 +38,7 @@ export let uploadFile = SlateTool.create(spec, {
         .optional()
         .describe('Custom focus area coordinates in format "x,y,width,height"'),
       customMetadata: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Custom metadata key-value pairs to attach to the file'),
       overwriteFile: z
@@ -66,7 +66,14 @@ export let uploadFile = SlateTool.create(spec, {
         .array(
           z.object({
             type: z.string().describe('Transformation type, e.g. "transformation"'),
-            value: z.string().describe('Transformation string, e.g. "rt-90"')
+            value: z
+              .string()
+              .optional()
+              .describe('Transformation string; required for transformation and abs'),
+            protocol: z
+              .enum(['hls', 'dash'])
+              .optional()
+              .describe('Streaming protocol for abs only')
           })
         )
         .optional()
@@ -79,20 +86,27 @@ export let uploadFile = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      fileId: z.string().describe('Unique identifier for the uploaded file'),
-      name: z.string().describe('Name of the uploaded file'),
-      url: z.string().describe('CDN URL of the uploaded file'),
+      status: z
+        .enum(['uploaded', 'queued'])
+        .optional()
+        .describe('Uploaded with a file ID, or pre-processing queued without one'),
+      fileId: z.string().optional().describe('Unique identifier for the uploaded file'),
+      name: z.string().optional().describe('Name of the uploaded file'),
+      url: z.string().optional().describe('CDN URL of the uploaded file'),
       thumbnailUrl: z.string().optional().describe('URL of the auto-generated thumbnail'),
-      filePath: z.string().describe('Path of the file in the Media Library'),
-      fileType: z.string().describe('Type of file: "image", "non-image", or "video"'),
-      size: z.number().describe('File size in bytes'),
+      filePath: z.string().optional().describe('Path of the file in the Media Library'),
+      fileType: z
+        .string()
+        .optional()
+        .describe('Type of file: "image", "non-image", or "video"'),
+      size: z.number().optional().describe('File size in bytes'),
       height: z.number().optional().describe('Height in pixels (images/videos only)'),
       width: z.number().optional().describe('Width in pixels (images/videos only)'),
       tags: z.array(z.string()).optional().nullable().describe('Tags assigned to the file'),
-      aiTags: z.array(z.any()).optional().nullable().describe('AI-generated tags'),
+      aiTags: z.array(z.unknown()).optional().nullable().describe('AI-generated tags'),
       isPrivateFile: z.boolean().optional().describe('Whether the file is private'),
       customMetadata: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .nullable()
         .describe('Custom metadata attached to the file'),
@@ -108,9 +122,7 @@ export let uploadFile = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let transformation:
-      | { pre?: string; post?: Array<{ type: string; value: string }> }
-      | undefined;
+    let transformation: Upload['transformation'] | undefined;
     if (ctx.input.preTransformation || ctx.input.postTransformations) {
       transformation = {};
       if (ctx.input.preTransformation) transformation.pre = ctx.input.preTransformation;
@@ -135,17 +147,24 @@ export let uploadFile = SlateTool.create(spec, {
       checks: ctx.input.checks
     });
 
+    if (result.status === 'queued')
+      return {
+        output: { status: result.status },
+        message:
+          'ImageKit queued upload pre-processing without returning a file ID. Check the configured webhook and Media Library before retrying; another upload can create another file.'
+      };
     return {
       output: {
+        status: result.status,
         fileId: result.fileId,
         name: result.name,
         url: result.url,
-        thumbnailUrl: result.thumbnailUrl,
+        thumbnailUrl: result.thumbnailUrl ?? undefined,
         filePath: result.filePath,
         fileType: result.fileType,
         size: result.size,
-        height: result.height,
-        width: result.width,
+        height: result.height ?? undefined,
+        width: result.width ?? undefined,
         tags: result.tags,
         aiTags: result.AITags,
         isPrivateFile: result.isPrivateFile,

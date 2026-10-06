@@ -1,5 +1,7 @@
+export * from './cancel-sync-run';
 export * from './create-sync';
 export * from './delete-sync';
+export * from './discovery';
 export * from './get-dataset-record';
 export * from './get-sync';
 export * from './get-sync-runs';
@@ -9,3 +11,4 @@ export * from './list-webhooks';
 export * from './manage-webhook';
 export * from './trigger-sync';
 export * from './update-sync';
+export * from './workspaces';

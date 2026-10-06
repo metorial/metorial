@@ -50,7 +50,7 @@ export interface JumpCloudUser {
     exclusion?: boolean;
     exclusionUntil?: string;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface JumpCloudSystem {
@@ -73,9 +73,9 @@ export interface JumpCloudSystem {
   serialNumber?: string;
   systemTimezone?: number;
   organization?: string;
-  connectionHistory?: any[];
+  connectionHistory?: unknown[];
   tags?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface JumpCloudGroup {
@@ -84,12 +84,12 @@ export interface JumpCloudGroup {
   description?: string;
   type?: string;
   email?: string;
-  attributes?: Record<string, any>;
-  memberQuery?: any;
-  memberQueryExemptions?: any[];
+  attributes?: Record<string, unknown>;
+  memberQuery?: unknown;
+  memberQueryExemptions?: unknown[];
   memberSuggestionsNotify?: boolean;
   membershipMethod?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface JumpCloudCommand {
@@ -108,7 +108,7 @@ export interface JumpCloudCommand {
   files?: string[];
   organization?: string;
   systems?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface JumpCloudCommandResult {
@@ -120,9 +120,10 @@ export interface JumpCloudCommandResult {
   organization: string;
   workflowId?: string;
   workflowInstanceId?: string;
-  requestTime: string;
-  responseTime?: string;
+  requestTime?: string | null;
+  responseTime?: string | null;
   response?: {
+    error?: string;
     data?: {
       exitCode?: number;
       output?: string;
@@ -130,7 +131,7 @@ export interface JumpCloudCommandResult {
     };
   };
   exitCode?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface JumpCloudApplication {
@@ -144,8 +145,8 @@ export interface JumpCloudApplication {
   beta?: boolean;
   created?: string;
   learnMore?: string;
-  config?: Record<string, any>;
-  [key: string]: any;
+  config?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export interface JumpCloudEvent {
@@ -163,8 +164,8 @@ export interface JumpCloudEvent {
     type?: string;
   };
   organization?: string;
-  changes?: any[];
-  [key: string]: any;
+  changes?: unknown[];
+  [key: string]: unknown;
 }
 
 export interface PaginatedResponse<T> {
@@ -176,17 +177,17 @@ export interface AssociationRequest {
   op: 'add' | 'remove' | 'update';
   type: string;
   id: string;
-  attributes?: Record<string, any>;
+  attributes?: Record<string, unknown>;
 }
 
 export interface Association {
   to: {
     id: string;
     type: string;
-    attributes?: Record<string, any>;
+    attributes?: Record<string, unknown>;
   };
   paths?: {
     to: { id: string; type: string };
-    attributes?: Record<string, any>;
+    attributes?: Record<string, unknown>;
   }[][];
 }

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import type { IPPolicy, IPPolicyRule } from '../lib/models';
 import { spec } from '../spec';
 
 let policyOutputSchema = z.object({
@@ -11,7 +12,7 @@ let policyOutputSchema = z.object({
   metadata: z.string().describe('Metadata')
 });
 
-let mapPolicy = (p: any) => ({
+let mapPolicy = (p: IPPolicy) => ({
   policyId: p.id,
   uri: p.uri || '',
   createdAt: p.created_at || '',
@@ -30,7 +31,7 @@ let ruleOutputSchema = z.object({
   ipPolicyId: z.string().describe('Parent IP policy ID')
 });
 
-let mapRule = (r: any) => ({
+let mapRule = (r: IPPolicyRule) => ({
   ruleId: r.id,
   uri: r.uri || '',
   createdAt: r.created_at || '',
@@ -49,8 +50,17 @@ export let listIpPolicies = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -62,6 +72,7 @@ export let listIpPolicies = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listIpPolicies({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -182,8 +193,17 @@ export let listIpPolicyRules = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -195,6 +215,7 @@ export let listIpPolicyRules = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listIpPolicyRules({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });

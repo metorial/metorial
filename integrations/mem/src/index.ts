@@ -9,12 +9,13 @@ import {
   getNote,
   listCollections,
   listNotes,
+  manageCollectionMembership,
   memIt,
   searchCollections,
-  searchNotes
+  searchNotes,
+  updateCollection,
+  updateNote
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -29,7 +30,10 @@ export let provider = Slate.create({
     listCollections,
     searchCollections,
     deleteCollection,
-    memIt
+    memIt,
+    updateNote,
+    updateCollection,
+    manageCollectionMembership
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

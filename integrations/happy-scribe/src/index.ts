@@ -13,8 +13,6 @@ import {
   listStyleGuides,
   listTranscriptions
 } from './tools';
-import { inboundWebhook, transcriptionUpdated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     listGlossaries,
     listStyleGuides
   ],
-  triggers: [inboundWebhook, transcriptionUpdated]
+  triggers: []
 });

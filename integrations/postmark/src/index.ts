@@ -17,8 +17,6 @@ import {
   sendEmail,
   sendTemplateEmail
 } from './tools';
-import { inboundEmail, outboundEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     getServer.build(),
     manageWebhooks.build()
   ],
-  triggers: [outboundEvents.build(), inboundEmail.build()]
+  triggers: []
 });

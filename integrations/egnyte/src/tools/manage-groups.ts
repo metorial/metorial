@@ -49,10 +49,7 @@ export let listGroupsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let result = (await client.listGroups({
       filter: ctx.input.filter,
@@ -90,10 +87,7 @@ export let createGroupTool = SlateTool.create(spec, {
   )
   .output(groupOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let members = ctx.input.memberIds?.map(id => ({ value: id }));
     let result = (await client.createGroup(ctx.input.displayName, members)) as Record<
@@ -111,7 +105,7 @@ export let createGroupTool = SlateTool.create(spec, {
 export let updateGroupTool = SlateTool.create(spec, {
   name: 'Update Group',
   key: 'update_group',
-  description: `Update a group in Egnyte. Rename the group and/or replace its member list. When updating members, the provided list replaces the existing membership.`
+  description: `Update a group in Egnyte. Rename the group and/or replace its member list. When updating members, the provided list replaces the existing membership. This requires a read followed by a full update; avoid concurrent group name changes.`
 })
   .input(
     z.object({
@@ -125,10 +119,7 @@ export let updateGroupTool = SlateTool.create(spec, {
   )
   .output(groupOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     let body: { displayName?: string; members?: Array<{ value: number }> } = {};
     if (ctx.input.displayName) body.displayName = ctx.input.displayName;
@@ -166,10 +157,7 @@ export let deleteGroupTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     await client.deleteGroup(ctx.input.groupId);
 

@@ -9,7 +9,7 @@ export let makePhoneCall = SlateTool.create(spec, {
   description: `Initiate an outbound phone call. Specify the source number (must be owned/imported in Retell) and destination number. Optionally override the agent, inject dynamic variables, or attach metadata.`,
   constraints: [
     'Source number must be purchased from or imported to Retell in E.164 format.',
-    'Destination US numbers supported for Retell-purchased numbers.'
+    'Destination country must be enabled for the source number and supported by its telephony provider.'
   ]
 })
   .input(
@@ -20,6 +20,10 @@ export let makePhoneCall = SlateTool.create(spec, {
       toNumber: z
         .string()
         .describe('Destination phone number in E.164 format (e.g. +12137774445)'),
+      overrideAgentVersion: z
+        .union([z.number().int().min(0), z.string().min(1)])
+        .optional()
+        .describe('Agent version or environment tag for this call'),
       overrideAgentId: z
         .string()
         .optional()
@@ -52,6 +56,8 @@ export let makePhoneCall = SlateTool.create(spec, {
       to_number: ctx.input.toNumber
     };
 
+    if (ctx.input.overrideAgentVersion !== undefined)
+      body.override_agent_version = ctx.input.overrideAgentVersion;
     if (ctx.input.overrideAgentId) body.override_agent_id = ctx.input.overrideAgentId;
     if (ctx.input.dynamicVariables)
       body.retell_llm_dynamic_variables = ctx.input.dynamicVariables;

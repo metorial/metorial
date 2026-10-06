@@ -5,7 +5,8 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'outreach',
   name: 'Outreach',
-  description: undefined,
+  description:
+    'Manage sales records, sequences and enrollment transitions, reusable content, and external call history in Outreach.',
   metadata: {},
   config,
   auth

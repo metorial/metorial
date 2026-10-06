@@ -1,11 +1,17 @@
-# <img src="logo.jpeg" height="20"> Sourcegraph
+# Sourcegraph
 
-Search code across all repositories, branches, and code hosts using literal, regex, structural, and natural language queries. Perform AI-powered deep search to ask natural language questions and get detailed answers with code citations. Stream search results in real-time via Server-Sent Events. Manage batch changes to create, update, and track pull requests across many repositories and code hosts at scale. Create and manage code insights to track code patterns over time with line charts and dashboards. Set up code monitors to get notified about changes like potential secrets, anti-patterns, or typos via email, Slack, or webhooks. Query and manage repositories, branches, commit history, users, organizations, and permissions. Connect AI agents to Sourcegraph's code intelligence via the MCP Server for natural language search, file reading, and repository listing.
+Search indexed code and read repository files, repository metadata and the current user. Enterprise deployments with the matching GraphQL schema also support listing/getting/closing batch changes, listing/creating/deleting line-chart insights and listing/creating/deleting code monitors. There are 14 public tools; no repository administration, AI chat, batch execution or new triggers are provided.
 
-## License
+Use a personal or service-account access token for the intended instance. Sudo authentication requires the native `site-admin:sudo` scope and reports the effective user through `get_current_user`. New connections save the instance URL with the credentials. Existing unbound stored connections retain their validated configured URL; reconnect to bind that URL to credentials. Editing configuration cannot redirect a newly bound connection. HTTPS self-hosted instances are supported; HTTP is restricted to localhost development. Credentials are never forwarded across redirects.
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
+Search uses `/.api/search/stream`, version V3. The native query is sent unchanged: `maxResults` limits displayed objects rather than inserting a `count:` filter. Final native match counts can exceed returned objects; skipped work, alerts and limits must be considered before treating a search as exhaustive. Line numbers are zero-based. Current stream documentation lists keyword, standard and regexp; the preserved literal and structural choices require a deployment supporting those historical native modes. Query `patternType:` filters retain native precedence.
 
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Other tools use `/.api/graphql`. Sourcegraph currently describes this as a debug API without compatibility guarantees. The retained operations match its publicly documented 6.x schema and current feature documentation; confirm your deployment's `/debug/console` (older deployments: `/api/console`) and edition permissions. These tools do not silently migrate to the newer versioned external API or promise that every deployment retains these fields.
+
+Lists use native cursors, with page sizes from 1 to 100. Repository reads expose at most 100 branches and tags with native truncation flags. Batch-change reads support independent changeset paging. Directory reads expose up to 1000 entries with an explicit truncation flag; file reads are bounded to 1 MiB and expose their resolved revision. A binary file is identified without returning its content. Reads return native caller-requested code and metadata; they cannot guarantee detection of unknown secrets in repository content.
+
+Insight creation can schedule persistent historical searches. Omitted or empty repository scopes mean all visible repositories. Monitor creation can activate notifications immediately; actions omit code snippets and email uses NORMAL priority without a moderation header. A close receipt confirms the batch-change state, while requested code-host closures can still be processing. Deletion cannot reverse prior notifications, completed backfills or code-host effects. Uncertain write receipts require native inspection before retrying.
+
+The private suite remains active with controlled read fixtures and explicit pre-effect gates for mutations that need independently verifiable ownership and retained-effect prerequisites. This refresh was verified offline, with no authenticated provider acceptance or real resources inspected.
+
+Official references: [API compatibility](https://sourcegraph.com/docs/api), [GraphQL/auth](https://sourcegraph.com/docs/api/graphql), [stream search](https://sourcegraph.com/docs/api/stream-api), [insight API](https://6.4.sourcegraph.com/api/graphql/managing-code-insights-with-api), [code monitors](https://sourcegraph.com/docs/code-monitoring).

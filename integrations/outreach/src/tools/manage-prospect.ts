@@ -1,11 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import {
   buildRelationship,
   cleanAttributes,
+  customAttributes,
   flattenResource,
-  mergeRelationships
+  mergeRelationships,
+  validateInput
 } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -28,12 +30,32 @@ Prospects can be associated with accounts and include contact details, engagemen
       prospectId: z.string().optional().describe('Prospect ID (required for update/delete)'),
       firstName: z.string().optional().describe('First name'),
       lastName: z.string().optional().describe('Last name'),
-      email: z.string().optional().describe('Primary email address'),
+      email: z
+        .string()
+        .optional()
+        .describe(
+          'Replace the email list with this one address; an empty string clears the list, omission leaves it unchanged.'
+        ),
       title: z.string().optional().describe('Job title'),
       company: z.string().optional().describe('Company name (if not linking to an account)'),
-      phone: z.string().optional().describe('Work phone number'),
-      mobilePhone: z.string().optional().describe('Mobile phone number'),
-      homePhone: z.string().optional().describe('Home phone number'),
+      phone: z
+        .string()
+        .optional()
+        .describe(
+          'Replace the work phone list with this one number; an empty string clears it.'
+        ),
+      mobilePhone: z
+        .string()
+        .optional()
+        .describe(
+          'Replace the mobile phone list with this one number; an empty string clears it.'
+        ),
+      homePhone: z
+        .string()
+        .optional()
+        .describe(
+          'Replace the home phone list with this one number; an empty string clears it.'
+        ),
       addressStreet: z.string().optional().describe('Street address'),
       addressCity: z.string().optional().describe('City'),
       addressState: z.string().optional().describe('State'),
@@ -45,7 +67,7 @@ Prospects can be associated with accounts and include contact details, engagemen
       accountId: z.string().optional().describe('Account ID to associate with'),
       ownerId: z.string().optional().describe('User ID of the prospect owner'),
       customFields: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Custom field values as key-value pairs (e.g. custom1, custom2, ...)')
     })
@@ -62,10 +84,12 @@ Prospects can be associated with accounts and include contact details, engagemen
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.prospectId) throw new Error('prospectId is required for delete');
+      if (!ctx.input.prospectId)
+        throw createApiServiceError('prospectId is required for delete');
       await client.deleteProspect(ctx.input.prospectId);
       return {
         output: { prospectId: ctx.input.prospectId, deleted: true },
@@ -76,12 +100,24 @@ Prospects can be associated with accounts and include contact details, engagemen
     let attributes = cleanAttributes({
       firstName: ctx.input.firstName,
       lastName: ctx.input.lastName,
-      emails: ctx.input.email ? [ctx.input.email] : undefined,
+      emails:
+        ctx.input.email === undefined ? undefined : ctx.input.email ? [ctx.input.email] : [],
       title: ctx.input.title,
       company: ctx.input.company,
-      workPhones: ctx.input.phone ? [ctx.input.phone] : undefined,
-      mobilePhones: ctx.input.mobilePhone ? [ctx.input.mobilePhone] : undefined,
-      homePhones: ctx.input.homePhone ? [ctx.input.homePhone] : undefined,
+      workPhones:
+        ctx.input.phone === undefined ? undefined : ctx.input.phone ? [ctx.input.phone] : [],
+      mobilePhones:
+        ctx.input.mobilePhone === undefined
+          ? undefined
+          : ctx.input.mobilePhone
+            ? [ctx.input.mobilePhone]
+            : [],
+      homePhones:
+        ctx.input.homePhone === undefined
+          ? undefined
+          : ctx.input.homePhone
+            ? [ctx.input.homePhone]
+            : [],
       addressStreet: ctx.input.addressStreet,
       addressCity: ctx.input.addressCity,
       addressState: ctx.input.addressState,
@@ -90,7 +126,7 @@ Prospects can be associated with accounts and include contact details, engagemen
       linkedInUrl: ctx.input.linkedInUrl,
       twitterUsername: ctx.input.twitterUsername,
       tags: ctx.input.tags,
-      ...ctx.input.customFields
+      ...customAttributes(ctx.input.customFields)
     });
 
     let relationships = mergeRelationships(
@@ -110,12 +146,13 @@ Prospects can be associated with accounts and include contact details, engagemen
           title: flat.title,
           company: flat.company
         },
-        message: `Prospect **${flat.firstName} ${flat.lastName}** created with ID ${flat.id}.`
+        message: `Prospect **${[flat.firstName, flat.lastName].filter(Boolean).join(' ') || flat.id}** created with ID ${flat.id}.`
       };
     }
 
     // update
-    if (!ctx.input.prospectId) throw new Error('prospectId is required for update');
+    if (!ctx.input.prospectId)
+      throw createApiServiceError('prospectId is required for update');
     let resource = await client.updateProspect(
       ctx.input.prospectId,
       attributes,
@@ -131,7 +168,7 @@ Prospects can be associated with accounts and include contact details, engagemen
         title: flat.title,
         company: flat.company
       },
-      message: `Prospect **${flat.firstName} ${flat.lastName}** (${flat.id}) updated successfully.`
+      message: `Prospect **${[flat.firstName, flat.lastName].filter(Boolean).join(' ') || flat.id}** (${flat.id}) updated successfully.`
     };
   })
   .build();

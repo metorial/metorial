@@ -4,7 +4,10 @@ import {
   callAction,
   dialCall,
   getBalance,
+  getFax,
+  getFileUrl,
   getMessage,
+  listConnections,
   listPhoneNumbers,
   manageMessagingProfile,
   managePhoneNumber,
@@ -18,8 +21,6 @@ import {
   sendVerification,
   verifyCode
 } from './tools';
-import { callEvents, faxEvents, messagingEvents, verifyEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,7 +39,10 @@ export let provider = Slate.create({
     callAction,
     manageMessagingProfile,
     manageSimCard,
-    getBalance
+    getBalance,
+    listConnections,
+    getFax,
+    getFileUrl
   ],
-  triggers: [messagingEvents, callEvents, faxEvents, verifyEvents]
+  triggers: []
 });

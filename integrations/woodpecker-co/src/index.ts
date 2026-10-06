@@ -22,8 +22,6 @@ import {
   updateCampaign,
   updateProspectStatus
 } from './tools';
-import { campaignEvents, linkedinEvents, prospectEvents, taskEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     getReport,
     listUsers
   ],
-  triggers: [prospectEvents, campaignEvents, taskEvents, linkedinEvents]
+  triggers: []
 });

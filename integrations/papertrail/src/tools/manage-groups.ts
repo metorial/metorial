@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapGroup } from '../lib/schemas';
 import { spec } from '../spec';
 
 let groupSystemSchema = z.object({
@@ -36,15 +37,7 @@ export let listGroups = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let data = await client.listGroups();
 
-    let groups = (Array.isArray(data) ? data : []).map((g: any) => ({
-      groupId: g.id,
-      name: g.name || '',
-      systemWildcard: g.system_wildcard ?? null,
-      systems: (g.systems || []).map((s: any) => ({
-        systemId: s.id,
-        name: s.name || ''
-      }))
-    }));
+    let groups = data.map(mapGroup);
 
     return {
       output: { groups },
@@ -72,16 +65,8 @@ export let getGroup = SlateTool.create(spec, {
     let g = await client.getGroup(ctx.input.groupId);
 
     return {
-      output: {
-        groupId: g.id,
-        name: g.name || '',
-        systemWildcard: g.system_wildcard ?? null,
-        systems: (g.systems || []).map((s: any) => ({
-          systemId: s.id,
-          name: s.name || ''
-        }))
-      },
-      message: `Retrieved group **${g.name}** with **${(g.systems || []).length}** system(s).`
+      output: mapGroup(g),
+      message: `Retrieved group **${g.name}** with **${g.systems.length}** system(s).`
     };
   })
   .build();
@@ -118,15 +103,7 @@ export let createGroup = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        groupId: g.id,
-        name: g.name || '',
-        systemWildcard: g.system_wildcard ?? null,
-        systems: (g.systems || []).map((s: any) => ({
-          systemId: s.id,
-          name: s.name || ''
-        }))
-      },
+      output: mapGroup(g),
       message: `Created group **${g.name}** (ID: ${g.id}).`
     };
   })
@@ -160,15 +137,7 @@ export let updateGroup = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        groupId: g.id,
-        name: g.name || '',
-        systemWildcard: g.system_wildcard ?? null,
-        systems: (g.systems || []).map((s: any) => ({
-          systemId: s.id,
-          name: s.name || ''
-        }))
-      },
+      output: mapGroup(g),
       message: `Updated group **${g.name}** (ID: ${g.id}).`
     };
   })

@@ -12,8 +12,6 @@ import {
   unsubscribeContact,
   updateContact
 } from './tools';
-import { inboundWebhook, newContact, newEmail } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     listForms,
     getForm
   ],
-  triggers: [inboundWebhook, newContact, newEmail]
+  triggers: []
 });

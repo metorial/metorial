@@ -1,12 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RoamClient, type WriteAction } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 let createBlockActionSchema = z.object({
   action: z.literal('create-block'),
   parentUid: z.string().describe('UID of the parent page or block'),
-  order: z.union([z.number(), z.enum(['first', 'last'])]).describe('Position among siblings'),
+  order: z
+    .union([z.number().nonnegative().max(Number.MAX_SAFE_INTEGER), z.enum(['first', 'last'])])
+    .describe('Position among siblings'),
   content: z.string().describe('Block text content'),
   blockUid: z.string().optional().describe('Optional custom UID for the new block')
 });
@@ -16,14 +19,16 @@ let updateBlockActionSchema = z.object({
   blockUid: z.string().describe('UID of the block to update'),
   content: z.string().optional().describe('New text content'),
   open: z.boolean().optional().describe('Expanded or collapsed state'),
-  heading: z.number().optional().describe('Heading level (1, 2, or 3)')
+  heading: z.number().min(0).max(3).optional().describe('Heading level (0, 1, 2, or 3)')
 });
 
 let moveBlockActionSchema = z.object({
   action: z.literal('move-block'),
   blockUid: z.string().describe('UID of the block to move'),
   parentUid: z.string().describe('UID of the new parent'),
-  order: z.union([z.number(), z.enum(['first', 'last'])]).describe('Position among siblings')
+  order: z
+    .union([z.number().nonnegative().max(Number.MAX_SAFE_INTEGER), z.enum(['first', 'last'])])
+    .describe('Position among siblings')
 });
 
 let deleteBlockActionSchema = z.object({
@@ -42,12 +47,19 @@ let deletePageActionSchema = z.object({
   pageUid: z.string().describe('UID of the page to delete')
 });
 
+let updatePageActionSchema = z.object({
+  action: z.literal('update-page'),
+  pageUid: z.string().describe('UID of the page to rename'),
+  title: z.string().describe('New page title')
+});
+
 let batchActionSchema = z.discriminatedUnion('action', [
   createBlockActionSchema,
   updateBlockActionSchema,
   moveBlockActionSchema,
   deleteBlockActionSchema,
   createPageActionSchema,
+  updatePageActionSchema,
   deletePageActionSchema
 ]);
 
@@ -59,7 +71,7 @@ export let batchActions = SlateTool.create(spec, {
 Actions are executed in the provided order. For creating nested blocks, assign a custom UID to a parent block and reference it in child blocks within the same batch.`,
   instructions: [
     'Actions execute in order. You can reference a custom blockUid from an earlier create-block action in a later action.',
-    'The batch is non-transactional: if one action fails, others may still succeed.'
+    'A failed or lost batch may leave earlier actions changed. Read the original target UIDs and reconcile before retrying; never blindly resend the whole batch. The local limit is 100 actions.'
   ],
   tags: {
     destructive: true
@@ -67,12 +79,19 @@ Actions are executed in the provided order. For creating nested blocks, assign a
 })
   .input(
     z.object({
-      actions: z.array(batchActionSchema).describe('Array of actions to execute in order')
+      actions: z
+        .array(batchActionSchema)
+        .min(1)
+        .max(100)
+        .describe('Array of actions to execute in order')
     })
   )
   .output(
     z.object({
       success: z.boolean().describe('Whether the batch was executed successfully'),
+      targetUids: z
+        .array(z.string())
+        .describe('Exact target UIDs, including assigned create UIDs, for recovery'),
       actionCount: z.number().describe('Number of actions in the batch')
     })
   )
@@ -90,7 +109,7 @@ Actions are executed in the provided order. For creating nested blocks, assign a
             location: { 'parent-uid': a.parentUid, order: a.order },
             block: {
               string: a.content,
-              ...(a.blockUid ? { uid: a.blockUid } : {})
+              ...(a.blockUid !== undefined ? { uid: a.blockUid } : {})
             }
           };
         case 'update-block':
@@ -119,18 +138,18 @@ Actions are executed in the provided order. For creating nested blocks, assign a
             action: 'create-page',
             page: {
               title: a.title,
-              ...(a.pageUid ? { uid: a.pageUid } : {})
+              ...(a.pageUid !== undefined ? { uid: a.pageUid } : {})
             }
           };
+        case 'update-page':
+          return { action: 'update-page', page: { uid: a.pageUid, title: a.title } };
         case 'delete-page':
           return {
             action: 'delete-page',
             page: { uid: a.pageUid }
           };
         default:
-          throw new Error(
-            `Unsupported Roam batch action: ${(a as { action: string }).action}`
-          );
+          return fail('Unsupported Roam batch action.');
       }
     });
 
@@ -139,9 +158,10 @@ Actions are executed in the provided order. For creating nested blocks, assign a
     return {
       output: {
         success: result.success,
-        actionCount: writeActions.length
+        actionCount: writeActions.length,
+        targetUids: result.targetUids
       },
-      message: `Batch of **${writeActions.length}** action(s) executed in graph **${ctx.config.graphName}**.`
+      message: 'The batch was accepted and final target readbacks were checked.'
     };
   })
   .build();

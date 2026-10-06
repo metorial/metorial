@@ -1,11 +1,13 @@
 # Salesflare
 
-Manage CRM data for B2B sales including accounts, contacts, opportunities, and pipelines. Create, read, update, and delete accounts (companies) and contacts with details like emails, phone numbers, addresses, tags, and custom fields. Manage sales opportunities with filtering by stage, owner, value, and close date. Create and track tasks, log meetings and calls, and write internal notes on account timelines. Configure and manage email workflows with scheduling and audience control. Manage tags, custom fields, users, teams, and email data sources. Access reference data such as currencies, pipeline stages, and filter fields.
+Discover and maintain CRM accounts, contacts, sales opportunities, tasks, internal notes and tags. Read pipeline/stage, user, currency, workflow and custom-field metadata before using resource IDs or custom values.
 
-## License
+Authentication uses a Salesflare API key from **Settings > API keys**. The API operates at `https://api.salesflare.com` and inherits the key owner's access. Current user/team discovery verifies the connection; saved token-only connections remain supported.
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
+Lists use limits and offsets, with `count` describing the returned page. Internal note listing uses account and date bounds. Mutations may affect assigned users, workflow automation or linked records. Account deletion cascades to opportunities/tasks; tag deletion removes assignments. Upsert and duplicate-handling options should only be used after checking the intended target.
 
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+The current public API does not document changing opportunity currency or deleting calls. Choose currency at opportunity creation. Call logging creates retained activity; cancellation/deletion is not promised. Meeting logging has documented meeting read/delete endpoints. Note mentions and task reminders can notify team members.
+
+Contact deletion removes the active CRM contact but may retain history and permit restoration. It does not promise permanent erasure. Date filters and activity timestamps must contain valid ISO 8601 calendar dates. Credential values and credential-bearing metadata are omitted from returned records.
+
+API reference: [Salesflare API documentation](https://api.salesflare.com/docs) and [OpenAPI specification](https://api.salesflare.com/openapi.json).

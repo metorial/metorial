@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, matchedCount, records } from '../lib/client';
 import { spec } from '../spec';
 
 export let enrichCompanies = SlateTool.create(spec, {
@@ -16,7 +16,7 @@ export let enrichCompanies = SlateTool.create(spec, {
     'Maximum 25 companies per request.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -49,18 +49,19 @@ export let enrichCompanies = SlateTool.create(spec, {
   .output(
     z.object({
       companies: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .describe('Enriched company records with full profile data'),
-      matchCount: z.number().describe('Number of successfully matched companies')
+      matchCount: z.number().describe('Number of successfully matched companies'),
+      returnedCount: z
+        .number()
+        .optional()
+        .describe('Number of response records, including NoMatch records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiVersion: ctx.config.apiVersion
-    });
+    const client = Client.fromContext(ctx);
 
-    let params: Record<string, any> = {};
+    let params: Record<string, unknown> = {};
 
     if (ctx.input.matchBy === 'companyId' && ctx.input.companyIds) {
       params.companyId = ctx.input.companyIds;
@@ -72,14 +73,15 @@ export let enrichCompanies = SlateTool.create(spec, {
 
     let result = await client.enrichCompanies(params, ctx.input.outputFields);
 
-    let companies = result.data || result.result || [];
+    const companies = records(result);
 
     return {
       output: {
         companies,
-        matchCount: companies.length
+        matchCount: matchedCount(result),
+        returnedCount: companies.length
       },
-      message: `Enriched **${companies.length}** company/companies successfully.`
+      message: `Matched **${matchedCount(result)}** company/companies; returned ${companies.length} response record(s).`
     };
   })
   .build();

@@ -26,14 +26,6 @@ import {
   runTransformationTool,
   terminateChatbotSessionTool
 } from './tools';
-import {
-  chatbotChangesTrigger,
-  inboundWebhook,
-  knowledgeBaseChangesTrigger,
-  pipelineChangesTrigger,
-  transformationChangesTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,11 +54,5 @@ export let provider = Slate.create({
     createTransformationTool,
     deleteTransformationTool
   ],
-  triggers: [
-    inboundWebhook,
-    pipelineChangesTrigger,
-    knowledgeBaseChangesTrigger,
-    chatbotChangesTrigger,
-    transformationChangesTrigger
-  ]
+  triggers: []
 });

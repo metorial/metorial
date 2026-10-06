@@ -1,6 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import * as map from '../lib/mappers';
+import {
+  field,
+  invalid,
+  malformed,
+  numericId,
+  object,
+  records,
+  required
+} from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageEventTopicTool = SlateTool.create(spec, {
@@ -16,6 +26,12 @@ export let manageEventTopicTool = SlateTool.create(spec, {
       action: z
         .enum(['list', 'create', 'get', 'update', 'delete', 'publish', 'consume'])
         .describe('Action to perform'),
+      folderId: z
+        .number()
+        .optional()
+        .describe(
+          'Folder/project for a new topic; omission may create the default Event Streams project.'
+        ),
       topicId: z
         .string()
         .optional()
@@ -44,25 +60,30 @@ export let manageEventTopicTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
+      success: z.boolean().optional().describe('Whether the operation succeeded'),
       topics: z
         .array(
           z.object({
-            topicId: z.number().describe('Topic ID'),
-            name: z.string().describe('Topic name'),
-            description: z.string().nullable().describe('Topic description'),
-            retention: z.number().nullable().describe('Retention period in seconds'),
-            createdAt: z.string().describe('Creation timestamp')
+            topicId: z.number().optional().describe('Topic ID'),
+            name: z.string().optional().describe('Topic name'),
+            description: z.string().nullable().optional().describe('Topic description'),
+            folderId: z.number().nullable().optional().describe('Native folder ID'),
+            retention: z
+              .number()
+              .nullable()
+              .optional()
+              .describe('Retention period in seconds'),
+            createdAt: z.string().optional().describe('Creation timestamp')
           })
         )
         .optional()
         .describe('List of topics'),
       topic: z
         .object({
-          topicId: z.number().describe('Topic ID'),
-          name: z.string().describe('Topic name'),
-          description: z.string().nullable().describe('Topic description'),
-          retention: z.number().nullable().describe('Retention period in seconds')
+          topicId: z.number().optional().describe('Topic ID'),
+          name: z.string().optional().describe('Topic name'),
+          description: z.string().nullable().optional().describe('Topic description'),
+          retention: z.number().nullable().optional().describe('Retention period in seconds')
         })
         .optional()
         .describe('Single topic details'),
@@ -70,8 +91,8 @@ export let manageEventTopicTool = SlateTool.create(spec, {
       messages: z
         .array(
           z.object({
-            messageId: z.string().describe('Message ID'),
-            time: z.string().describe('Message timestamp'),
+            messageId: z.string().optional().describe('Message ID'),
+            time: z.string().optional().describe('Message timestamp'),
             content: z.record(z.string(), z.unknown()).describe('Message payload')
           })
         )
@@ -80,112 +101,68 @@ export let manageEventTopicTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let { action, topicId, name, description, retentionSeconds, schema } = ctx.input;
-
+    const client = createClient(ctx);
+    const { action, topicId, name, description, retentionSeconds, schema } = ctx.input;
     if (action === 'list') {
-      let result = await client.listTopics({ name });
-      let items = result.data ?? (Array.isArray(result) ? result : []);
-      let topics = items.map((t: any) => ({
-        topicId: t.id,
-        name: t.name,
-        description: t.description ?? null,
-        retention: t.retention ?? null,
-        createdAt: t.created_at
-      }));
+      const result = await client.listTopics({ name });
+      const topics = records(result.items).map(map.topic);
       return {
         output: { success: true, topics },
-        message: `Found **${topics.length}** event topics.`
+        message: `Returned ${topics.length} topics.`
       };
     }
-
     if (action === 'create') {
-      if (!name) throw new Error('Name is required for create');
-      let result = await client.createTopic({
-        name,
+      const result = await client.createTopic({
+        name: required(name, 'Topic name'),
         description,
         retention: retentionSeconds,
-        schema
+        schema,
+        folderId: ctx.input.folderId
       });
-      let created = result.data ?? result;
       return {
-        output: {
-          success: true,
-          topic: {
-            topicId: created.id,
-            name: created.name,
-            description: created.description ?? null,
-            retention: created.retention ?? null
-          }
-        },
-        message: `Created topic **${name}** with ID ${created.id}.`
+        output: { success: true, topic: map.topic(result) },
+        message:
+          'Created topic. Omitting a folder can create a retained Event Streams project.'
       };
     }
-
-    if (!topicId) throw new Error('Topic ID is required for this action');
-
+    const id = numericId(topicId, 'topicId');
     if (action === 'get') {
-      let result = await client.getTopic(topicId);
-      let t = result.data ?? result;
-      return {
-        output: {
-          success: true,
-          topic: {
-            topicId: t.id,
-            name: t.name,
-            description: t.description ?? null,
-            retention: t.retention ?? null
-          }
-        },
-        message: `Topic **${t.name}** (ID: ${t.id}).`
-      };
+      const topic = map.topic(await client.getTopic(id));
+      if (String(topic.topicId) !== id) malformed();
+      return { output: { success: true, topic }, message: 'Retrieved topic.' };
     }
-
     if (action === 'update') {
-      await client.updateTopic(topicId, {
-        name,
-        description,
-        retention: retentionSeconds
-      });
-      return {
-        output: { success: true },
-        message: `Updated topic **${topicId}**.`
-      };
+      const topic = map.topic(
+        await client.updateTopic(id, { name, description, retention: retentionSeconds })
+      );
+      if (String(topic.topicId) !== id) malformed();
+      return { output: { success: true, topic }, message: 'Updated topic.' };
     }
-
     if (action === 'delete') {
-      await client.deleteTopic(topicId);
+      await client.deleteTopic(id);
       return {
         output: { success: true },
-        message: `Deleted topic **${topicId}**.`
+        message:
+          'Deleted topic and its retained messages. This does not undo downstream processing.'
       };
     }
-
     if (action === 'publish') {
-      if (!ctx.input.message) throw new Error('Message payload is required for publish');
-      let result = await client.publishMessage(topicId, ctx.input.message);
+      if (!ctx.input.message) invalid('Message is required.');
+      const result = await client.publishMessage(id, ctx.input.message);
       return {
-        output: { success: true, messageId: result.message_id },
-        message: `Published message to topic ${topicId}. Message ID: **${result.message_id}**.`
+        output: { success: true, messageId: field(result, 'message_id', z.string().min(1)) },
+        message:
+          'Published message; downstream effects cannot be reversed by deleting the topic.'
       };
     }
-
-    if (action === 'consume') {
-      let result = await client.consumeMessages(topicId, {
-        afterMessageId: ctx.input.afterMessageId,
-        sinceTime: ctx.input.sinceTime,
-        batchSize: ctx.input.batchSize
-      });
-      let messages = (result.messages ?? []).map((m: any) => ({
-        messageId: m.message_id,
-        time: m.time,
-        content: m.payload ?? m
-      }));
-      return {
-        output: { success: true, messages },
-        message: `Consumed **${messages.length}** messages from topic ${topicId}.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
+    const result = await client.consumeMessages(id, ctx.input);
+    const messages = records(result.messages).map(m => ({
+      messageId: field(m, 'message_id', z.string()),
+      time: field(m, 'time', z.string()),
+      content: object(m.payload)
+    }));
+    return {
+      output: { success: true, messages },
+      message: `Returned ${messages.length} messages; batch size is a maximum, not a completeness guarantee.`
+    };
   });

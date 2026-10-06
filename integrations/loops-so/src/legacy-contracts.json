@@ -1,0 +1,628 @@
+{
+  "create_contact": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address of the contact to create"
+        },
+        "firstName": {
+          "description": "First name of the contact",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Last name of the contact",
+          "type": "string"
+        },
+        "source": {
+          "description": "Source of the contact (defaults to \"API\")",
+          "type": "string"
+        },
+        "subscribed": {
+          "description": "Whether the contact is subscribed to campaigns (defaults to true)",
+          "type": "boolean"
+        },
+        "userGroup": {
+          "description": "User group for segmenting contacts",
+          "type": "string"
+        },
+        "userId": {
+          "description": "External user ID from your application",
+          "type": "string"
+        },
+        "mailingLists": {
+          "description": "Map of mailing list IDs to subscription status (true to subscribe, false to unsubscribe)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "customProperties": {
+          "description": "Custom contact properties as key-value pairs. Keys must be camelCase and match existing custom property names.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["email"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "description": "ID of the newly created contact"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the contact was created successfully"
+        }
+      },
+      "required": ["contactId", "success"],
+      "additionalProperties": false
+    }
+  },
+  "update_contact": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "description": "Email address of the contact",
+          "type": "string"
+        },
+        "userId": {
+          "description": "External user ID of the contact",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "Updated first name",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Updated last name",
+          "type": "string"
+        },
+        "source": {
+          "description": "Updated source",
+          "type": "string"
+        },
+        "subscribed": {
+          "description": "Updated subscription status. Setting to true will re-subscribe previously unsubscribed contacts.",
+          "type": "boolean"
+        },
+        "userGroup": {
+          "description": "Updated user group",
+          "type": "string"
+        },
+        "mailingLists": {
+          "description": "Map of mailing list IDs to subscription status (true to subscribe, false to unsubscribe)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "customProperties": {
+          "description": "Custom contact properties to update as key-value pairs. Send null to reset a property.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "description": "ID of the updated or created contact"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the update was successful"
+        }
+      },
+      "required": ["contactId", "success"],
+      "additionalProperties": false
+    }
+  },
+  "find_contact": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "description": "Email address to search for",
+          "type": "string"
+        },
+        "userId": {
+          "description": "External user ID to search for",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string",
+                "description": "Unique ID of the contact"
+              },
+              "email": {
+                "type": "string",
+                "description": "Email address"
+              },
+              "firstName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "First name"
+              },
+              "lastName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Last name"
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "How the contact was added"
+              },
+              "subscribed": {
+                "type": "boolean",
+                "description": "Whether the contact is subscribed to campaigns"
+              },
+              "userGroup": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User group for segmentation"
+              },
+              "userId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "External user ID"
+              },
+              "mailingLists": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "description": "Mailing list subscription status"
+              },
+              "optInStatus": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Double opt-in status: pending, accepted, rejected, or null"
+              },
+              "customProperties": {
+                "description": "Any custom properties on the contact",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "required": [
+              "contactId",
+              "email",
+              "firstName",
+              "lastName",
+              "source",
+              "subscribed",
+              "userGroup",
+              "userId",
+              "mailingLists",
+              "optInStatus"
+            ],
+            "additionalProperties": false
+          },
+          "description": "List of matching contacts (empty if none found)"
+        }
+      },
+      "required": ["contacts"],
+      "additionalProperties": false
+    }
+  },
+  "delete_contact": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "description": "Email address of the contact to delete",
+          "type": "string"
+        },
+        "userId": {
+          "description": "External user ID of the contact to delete",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        },
+        "statusMessage": {
+          "type": "string",
+          "description": "Confirmation message from the API"
+        }
+      },
+      "required": ["success", "statusMessage"],
+      "additionalProperties": false
+    }
+  },
+  "send_event": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "eventName": {
+          "type": "string",
+          "description": "Name of the event to send (must match a configured event in Loops)"
+        },
+        "email": {
+          "description": "Email address of the contact",
+          "type": "string"
+        },
+        "userId": {
+          "description": "External user ID of the contact",
+          "type": "string"
+        },
+        "eventProperties": {
+          "description": "Custom event properties as key-value pairs",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          }
+        },
+        "mailingLists": {
+          "description": "Map of mailing list IDs to subscription status",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "contactProperties": {
+          "description": "Contact properties to update alongside the event",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["eventName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the event was sent successfully"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "send_transactional_email": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Recipient email address"
+        },
+        "transactionalId": {
+          "type": "string",
+          "description": "ID of the transactional email template to send"
+        },
+        "dataVariables": {
+          "description": "Template data variables as key-value pairs for dynamic content",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          }
+        },
+        "addToAudience": {
+          "description": "If true, creates a contact in your audience for this recipient (defaults to false)",
+          "type": "boolean"
+        },
+        "attachments": {
+          "description": "File attachments to include with the email",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "filename": {
+                "type": "string",
+                "description": "Name of the attached file"
+              },
+              "contentType": {
+                "type": "string",
+                "description": "MIME type of the file (e.g., \"application/pdf\")"
+              },
+              "content": {
+                "type": "string",
+                "description": "Base64-encoded file content"
+              }
+            },
+            "required": ["filename", "contentType", "content"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["email", "transactionalId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the email was sent successfully"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "list_mailing_lists": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "mailingLists": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "mailingListId": {
+                "type": "string",
+                "description": "Unique ID of the mailing list"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the mailing list"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Description of the mailing list"
+              },
+              "isPublic": {
+                "type": "boolean",
+                "description": "Whether the list is publicly visible"
+              }
+            },
+            "required": ["mailingListId", "name", "description", "isPublic"],
+            "additionalProperties": false
+          },
+          "description": "All mailing lists on the account"
+        }
+      },
+      "required": ["mailingLists"],
+      "additionalProperties": false
+    }
+  },
+  "list_contact_properties": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "filter": {
+          "description": "Filter properties: \"all\" returns default and custom, \"custom\" returns only custom properties (defaults to \"all\")",
+          "type": "string",
+          "enum": ["all", "custom"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "properties": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Property key used in API requests (camelCase)"
+              },
+              "label": {
+                "type": "string",
+                "description": "Human-readable label for the property"
+              },
+              "type": {
+                "type": "string",
+                "description": "Property data type (e.g., string, number, boolean, date)"
+              }
+            },
+            "required": ["key", "label", "type"],
+            "additionalProperties": false
+          },
+          "description": "List of contact properties"
+        }
+      },
+      "required": ["properties"],
+      "additionalProperties": false
+    }
+  },
+  "list_transactional_emails": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "perPage": {
+          "description": "Number of results per page (10-50, defaults to 20)",
+          "type": "number"
+        },
+        "cursor": {
+          "description": "Pagination cursor for fetching the next page of results",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "transactionalId": {
+                "type": "string",
+                "description": "Unique ID of the transactional email template"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the template"
+              },
+              "dataVariables": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "List of data variable names required by the template"
+              }
+            },
+            "required": ["transactionalId", "name", "dataVariables"],
+            "additionalProperties": false
+          },
+          "description": "Published transactional email templates"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether more results are available"
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cursor to use for fetching the next page"
+        }
+      },
+      "required": ["templates", "hasMore", "nextCursor"],
+      "additionalProperties": false
+    }
+  }
+}

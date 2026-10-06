@@ -19,7 +19,9 @@ export let queryRetriever = SlateTool.create(spec, {
       queryArgs: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Additional query arguments')
+        .describe(
+          'Query arguments keyed by retriever component ID. Call get_resource with resourceType retriever to discover component IDs and their input schemas.'
+        )
     })
   )
   .output(

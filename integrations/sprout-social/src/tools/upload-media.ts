@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { customerIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let uploadMedia = SlateTool.create(spec, {
@@ -24,6 +25,7 @@ export let uploadMedia = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      customerId: customerIdSchema,
       mediaUrl: z
         .string()
         .describe('Publicly accessible HTTP/HTTPS URL of the media file to upload.')
@@ -40,21 +42,18 @@ export let uploadMedia = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      customerId: ctx.config.customerId
+      customerId: ctx.input.customerId ?? ctx.config.customerId
     });
 
     let result = await client.uploadMediaFromUrl(ctx.input.mediaUrl);
-    let media = result?.data?.[0];
-
-    if (!media) {
-      throw new Error('Media upload failed: no media data returned.');
-    }
+    let media = result.data[0]!;
 
     return {
       output: {
         mediaId: media.media_id,
         expirationTime: media.expiration_time
       },
-      message: `Uploaded media successfully. Media ID: \`${media.media_id}\`. Expires at ${media.expiration_time}.`
+      message:
+        'Uploaded media successfully. Use the returned media ID before its expiration time.'
     };
   });

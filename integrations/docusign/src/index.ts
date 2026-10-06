@@ -15,8 +15,6 @@ import {
   sendEnvelopeFromTemplate,
   voidEnvelope
 } from './tools';
-import { envelopeEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     createSenderView,
     getEnvelopeRecipients
   ],
-  triggers: [envelopeEvents]
+  triggers: []
 });

@@ -21,7 +21,9 @@ export let listActionClasses = SlateTool.create(spec, {
           type: z.string().optional().describe('Action class type'),
           description: z.string().optional().describe('Action class description'),
           environmentId: z.string().optional().describe('Environment ID'),
-          createdAt: z.string().optional().describe('Creation timestamp')
+          createdAt: z.string().optional().describe('Creation timestamp'),
+          workspaceId: z.string().optional().describe('Current workspace ID'),
+          key: z.string().optional().describe('Code action key')
         })
       )
     })
@@ -29,18 +31,21 @@ export let listActionClasses = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     let classes = await client.listActionClasses();
 
-    let mapped = classes.map((ac: any) => ({
+    let mapped = classes.map(ac => ({
       actionClassId: ac.id,
-      name: ac.name ?? '',
+      name: ac.name,
       type: ac.type,
-      description: ac.description,
+      description: ac.description ?? undefined,
       environmentId: ac.environmentId,
-      createdAt: ac.createdAt ?? ''
+      workspaceId: ac.workspaceId,
+      key: ac.key ?? undefined,
+      createdAt: ac.createdAt
     }));
 
     return {
@@ -64,9 +69,40 @@ export let createActionClass = SlateTool.create(spec, {
       type: z
         .enum(['code', 'noCode', 'automatic'])
         .describe(
-          'Type of action: "code" for custom events, "noCode" for UI-tracked actions, "automatic" for built-in actions'
+          'Type of action: "code" for custom events, "noCode" for UI-tracked actions, "automatic" retained for compatibility but cannot be created by the current API'
         ),
-      description: z.string().optional().describe('Description of the action class')
+      description: z.string().optional().describe('Description of the action class'),
+      key: z
+        .string()
+        .optional()
+        .describe('Required for code actions; unique action identifier'),
+      noCodeConfig: z
+        .object({
+          type: z.enum(['click', 'pageView', 'exitIntent', 'fiftyPercentScroll', 'pageDwell']),
+          urlFilters: z.array(
+            z.object({
+              value: z.string(),
+              rule: z.enum([
+                'exactMatch',
+                'contains',
+                'startsWith',
+                'endsWith',
+                'notMatch',
+                'notContains',
+                'matchesRegex'
+              ])
+            })
+          ),
+          urlFiltersConnector: z.enum(['or', 'and']).optional(),
+          elementSelector: z
+            .object({ cssSelector: z.string().optional(), innerHtml: z.string().optional() })
+            .optional(),
+          timeInSeconds: z.number().optional()
+        })
+        .optional()
+        .describe(
+          'Required for noCode; click needs elementSelector, pageDwell needs timeInSeconds'
+        )
     })
   )
   .output(
@@ -78,22 +114,25 @@ export let createActionClass = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     let actionClass = await client.createActionClass({
       environmentId: ctx.input.environmentId,
       name: ctx.input.name,
       type: ctx.input.type,
-      ...(ctx.input.description ? { description: ctx.input.description } : {})
+      description: ctx.input.description,
+      key: ctx.input.key,
+      noCodeConfig: ctx.input.noCodeConfig
     });
 
     return {
       output: {
         actionClassId: actionClass.id,
-        name: actionClass.name ?? ctx.input.name
+        name: actionClass.name
       },
-      message: `Created action class **${actionClass.name ?? ctx.input.name}** with ID \`${actionClass.id}\`.`
+      message: `Created action class **${actionClass.name}** with ID \`${actionClass.id}\`.`
     };
   })
   .build();
@@ -119,7 +158,8 @@ export let deleteActionClass = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     await client.deleteActionClass(ctx.input.actionClassId);

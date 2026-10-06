@@ -10,8 +10,6 @@ import {
   trackDelivery,
   updateDeliveryOrder
 } from './tools';
-import { orderStatusUpdate } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     trackDelivery,
     onDemandDelivery
   ],
-  triggers: [orderStatusUpdate]
+  triggers: []
 });

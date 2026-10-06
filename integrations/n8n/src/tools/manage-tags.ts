@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid } from '../lib/connection';
 import { spec } from '../spec';
 
 export let manageTags = SlateTool.create(spec, {
@@ -8,13 +9,13 @@ export let manageTags = SlateTool.create(spec, {
   key: 'manage_tags',
   description: `Create, update, delete, or list tags used to organize workflows and credentials. Specify an **action** to determine the operation.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
       action: z
-        .enum(['list', 'create', 'update', 'delete'])
+        .enum(['list', 'get', 'create', 'update', 'delete'])
         .describe('The tag operation to perform'),
       tagId: z.string().optional().describe('Tag ID (required for update and delete actions)'),
       name: z
@@ -55,12 +56,9 @@ export let manageTags = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
-    let mapTag = (t: any) => ({
+    let mapTag = (t: Awaited<ReturnType<typeof client.getTag>>) => ({
       tagId: String(t.id),
       name: t.name || '',
       createdAt: t.createdAt,
@@ -79,8 +77,15 @@ export let manageTags = SlateTool.create(spec, {
           message: `Found **${tags.length}** tag(s).`
         };
       }
+      case 'get': {
+        if (!ctx.input.tagId) throw invalid('tagId is required for reading a tag');
+        return {
+          output: { tag: mapTag(await client.getTag(ctx.input.tagId)) },
+          message: 'Retrieved the exact native tag.'
+        };
+      }
       case 'create': {
-        if (!ctx.input.name) throw new Error('Name is required for creating a tag');
+        if (!ctx.input.name) throw invalid('Name is required for creating a tag');
         let tag = await client.createTag(ctx.input.name);
         return {
           output: { tag: mapTag(tag) },
@@ -88,8 +93,8 @@ export let manageTags = SlateTool.create(spec, {
         };
       }
       case 'update': {
-        if (!ctx.input.tagId) throw new Error('tagId is required for updating a tag');
-        if (!ctx.input.name) throw new Error('Name is required for updating a tag');
+        if (!ctx.input.tagId) throw invalid('tagId is required for updating a tag');
+        if (!ctx.input.name) throw invalid('Name is required for updating a tag');
         let tag = await client.updateTag(ctx.input.tagId, ctx.input.name);
         return {
           output: { tag: mapTag(tag) },
@@ -97,7 +102,7 @@ export let manageTags = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!ctx.input.tagId) throw new Error('tagId is required for deleting a tag');
+        if (!ctx.input.tagId) throw invalid('tagId is required for deleting a tag');
         await client.deleteTag(ctx.input.tagId);
         return {
           output: { deleted: true },

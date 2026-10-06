@@ -8,6 +8,7 @@ export let verifyEmail = SlateTool.create(spec, {
   key: 'verify_email',
   description: `Verify an email address to check its deliverability before adding it to a campaign. Returns the verification status (valid, invalid, risky, catch_all, pending). If the result is pending, use the same tool with checkOnly to poll for the result.`,
   instructions: [
+    'Submitting a verification can consume credits; checkOnly reads an existing result without starting a new verification.',
     'Set checkOnly to true to poll the verification status for an email that was previously submitted.',
     'If the initial verification returns "pending", poll again after a few seconds.'
   ]
@@ -47,9 +48,9 @@ export let verifyEmail = SlateTool.create(spec, {
       output: {
         email: result.email,
         verificationStatus: result.verification_status,
-        catchAll: result.catch_all,
-        creditsUsed: result.credits_used,
-        creditsRemaining: result.credits
+        catchAll: typeof result.catch_all === 'boolean' ? result.catch_all : undefined,
+        creditsUsed: result.credits_used ?? undefined,
+        creditsRemaining: result.credits ?? undefined
       },
       message: `Email **${result.email}** verification status: **${result.verification_status}**.`
     };

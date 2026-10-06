@@ -44,7 +44,7 @@ export let getListEntries = SlateTool.create(spec, {
       pageToken: ctx.input.pageToken
     });
 
-    let entries = (result.list_entries ?? result ?? []).map((e: any) => ({
+    let entries = (result.list_entries ?? result ?? []).map(e => ({
       listEntryId: e.id,
       listId: e.list_id,
       entityId: e.entity_id,

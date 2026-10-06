@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createLead = SlateTool.create(spec, {
   name: 'Create Lead',
   key: 'create_lead',
-  description: `Create a new lead (sales opportunity) in Nutshell CRM. Leads can be associated with contacts, accounts, products, sources, and competitors. Supports setting value, confidence, and custom fields.`,
+  description: `Create a new lead (sales opportunity) in Nutshell CRM. Leads can be associated with contacts and accounts. The default sales process may start automations. Supports setting value, confidence, and custom fields.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -58,21 +58,21 @@ export let createLead = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let leadData: Record<string, any> = {};
+    let leadData: Record<string, unknown> = {};
 
-    if (ctx.input.description) leadData.description = ctx.input.description;
+    if (ctx.input.description !== undefined) leadData.description = ctx.input.description;
     if (ctx.input.contactIds) {
       leadData.contacts = ctx.input.contactIds.map(id => ({ entityType: 'Contacts', id }));
     }
     if (ctx.input.accountIds) {
       leadData.accounts = ctx.input.accountIds.map(id => ({ entityType: 'Accounts', id }));
     }
-    if (ctx.input.note) leadData.note = ctx.input.note;
+    if (ctx.input.note !== undefined) leadData.note = ctx.input.note;
     if (ctx.input.value) leadData.value = ctx.input.value;
     if (ctx.input.confidence !== undefined) leadData.confidence = ctx.input.confidence;
-    if (ctx.input.assigneeId)
+    if (ctx.input.assigneeId !== undefined)
       leadData.assignee = { entityType: 'Users', id: ctx.input.assigneeId };
-    if (ctx.input.dueTime) leadData.dueTime = ctx.input.dueTime;
+    if (ctx.input.dueTime !== undefined) leadData.dueTime = ctx.input.dueTime;
     if (ctx.input.customFields) leadData.customFields = ctx.input.customFields;
 
     let result = await client.newLead(leadData);

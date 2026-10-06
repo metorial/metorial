@@ -6,12 +6,14 @@ import { spec } from '../spec';
 export let generate3D = SlateTool.create(spec, {
   name: 'Generate 3D Asset',
   key: 'generate_3d',
-  description: `Convert a single 2D image into a textured, UV-unwrapped 3D mesh (GLB format) using Stable Fast 3D. Generates in approximately 0.5 seconds. The output includes mesh, textures, and material properties.`,
+  description: `DEPRECATED — use \`generate_3d_file\` instead. Convert a single 2D image into a textured, UV-unwrapped 3D mesh (GLB format) using Stable Fast 3D. Generates in approximately 0.5 seconds. The output includes mesh, textures, and material properties.`,
   instructions: [
+    'Use generate_3d_file to receive a downloadable file with current generation controls.',
     'Provide a clear image with a well-defined subject for best 3D results.',
     'Use foregroundRatio to control how much of the image is treated as the subject.'
   ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }

@@ -35,14 +35,6 @@ import {
   listTaxes,
   updateInventory
 } from './tools';
-import {
-  customerEvents,
-  inventoryEvents,
-  itemEvents,
-  receiptEvents,
-  shiftEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -80,5 +72,5 @@ export let provider = Slate.create({
     listPaymentTypes,
     getMerchant
   ],
-  triggers: [receiptEvents, itemEvents, inventoryEvents, customerEvents, shiftEvents]
+  triggers: []
 });

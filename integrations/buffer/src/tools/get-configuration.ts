@@ -6,30 +6,39 @@ import { spec } from '../spec';
 export let getConfigurationTool = SlateTool.create(spec, {
   name: 'Get Service Configuration',
   key: 'get_configuration',
-  description: `Retrieve Buffer's current service configuration. Returns supported social networks, character limits, schedule limits, supported interaction types, and analytics filters per network.`,
+  description: `Read the current experimental service capability catalog for an organization, grouped by service and channel type. Includes supported content types and properties. Legacy connections retain the older configuration response when available.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      organizationId: z
+        .string()
+        .optional()
+        .describe(
+          'Current API organization ID. Required when more than one organization is accessible; discover it with Get Organizations.'
+        )
+    })
+  )
   .output(
     z.object({
       services: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .describe(
-          'Configuration for each supported social network service, including character limits, schedule limits, icons, and URLs'
+          'Actual provider service configuration; current API returns types with content capabilities, legacy API may include limits and URLs'
         )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let config = await client.getConfiguration();
+    let client = new Client(ctx.auth);
+    let config = await client.getConfiguration(ctx.input.organizationId);
 
-    let serviceNames = Object.keys(config.services || config);
+    let serviceNames = Object.keys(config.services);
 
     return {
       output: {
-        services: config.services || config
+        services: config.services
       },
       message: `Retrieved configuration for **${serviceNames.length}** service(s): ${serviceNames.join(', ')}.`
     };

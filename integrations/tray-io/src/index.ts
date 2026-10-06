@@ -10,6 +10,8 @@ import {
   deleteUser,
   generateUserToken,
   getConnectorOperations,
+  getCurrentContext,
+  getResource,
   getSolutionInstance,
   listAuthentications,
   listConnectors,
@@ -19,12 +21,12 @@ import {
   updateSolutionInstance,
   upgradeSolutionInstance
 } from './tools';
-import { solutionInstanceChanges, workflowWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     listConnectors,
+    getCurrentContext,
+    getResource,
     getConnectorOperations,
     callConnector,
     listUsers,
@@ -42,5 +44,5 @@ export let provider = Slate.create({
     createAuthentication,
     deleteAuthentication
   ],
-  triggers: [workflowWebhook, solutionInstanceChanges]
+  triggers: []
 });

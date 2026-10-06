@@ -11,17 +11,6 @@ import {
   sendGroupMessage,
   sendWhatsAppMessage
 } from './tools';
-import {
-  phoneCallTrigger,
-  whatsappCallTrigger,
-  whatsappConversationTrigger,
-  whatsappGroupEventTrigger,
-  whatsappMessageReceiptTrigger,
-  whatsappMessageTrigger,
-  whatsappNumberStatusTrigger,
-  whatsappOrderTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -35,14 +24,5 @@ export let provider = Slate.create({
     manageContacts,
     deleteWhatsAppMessage
   ],
-  triggers: [
-    whatsappMessageTrigger,
-    whatsappMessageReceiptTrigger,
-    whatsappGroupEventTrigger,
-    whatsappConversationTrigger,
-    whatsappCallTrigger,
-    whatsappNumberStatusTrigger,
-    whatsappOrderTrigger,
-    phoneCallTrigger
-  ]
+  triggers: []
 });

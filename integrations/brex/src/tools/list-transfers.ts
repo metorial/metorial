@@ -1,11 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTransfer } from '../lib/schemas';
 import { spec } from '../spec';
 
 let transferSchema = z.object({
   transferId: z.string().describe('Unique identifier of the transfer'),
-  status: z.string().optional().describe('Transfer status'),
+  status: z.string().nullish().describe('Transfer status'),
   amount: z
     .object({
       amount: z.number().describe('Amount in cents'),
@@ -40,29 +41,14 @@ export let listTransfers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.listTransfers({
+    const result = await new Client({ token: ctx.auth.token }).listTransfers({
       cursor: ctx.input.cursor,
       limit: ctx.input.limit
     });
-
-    let transfers = result.items.map((t: any) => ({
-      transferId: t.id,
-      status: t.status,
-      amount: t.amount ? { amount: t.amount.amount, currency: t.amount.currency } : undefined,
-      description: t.description,
-      externalMemo: t.external_memo,
-      counterpartyType: t.counterparty?.type,
-      createdAt: t.created_at
-    }));
-
+    const transfers = result.items.map(mapTransfer);
     return {
-      output: {
-        transfers,
-        nextCursor: result.next_cursor
-      },
-      message: `Found **${transfers.length}** transfer(s).${result.next_cursor ? ' More results available.' : ''}`
+      output: { transfers, nextCursor: result.next_cursor },
+      message: `Returned ${transfers.length} transfers.`
     };
   })
   .build();

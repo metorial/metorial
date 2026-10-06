@@ -1,18 +1,17 @@
 {
   "name": "@metorial/lexoffice",
-  "description": "Manage accounting and bookkeeping data for German businesses. Create, retrieve, update, and filter contacts (customers and vendors). Create and manage sales documents including invoices, quotations, order confirmations, credit notes, delivery notes, and dunnings, with support for document chains and German e-invoicing formats (XRechnung, ZUGFeRD). Create and update bookkeeping vouchers with file attachments. Manage articles (products and services) for use in sales documents. Upload and download files such as receipts, PDFs, and e-invoice XML. Read payment status and history for vouchers and invoices. Access recurring invoice templates, organization profile, posting categories, payment conditions, and print layouts. Query across all voucher types with filtering by type, status, date, contact, and number. Subscribe to webhooks for real-time notifications on changes to contacts, invoices, quotations, vouchers, payments, and more.",
+  "description": "Manage Lexware Office contacts, articles, invoices, quotations, credit notes, order confirmations and bookkeeping vouchers. Discover exact resource IDs and reference data, read payment and organization status, and download finalized PDFs or supported XRechnung XML documents.",
   "categories": ["crm-and-sales-tools", "financial-data-and-stock-market"],
   "skills": [
-    "create and manage invoices",
+    "create invoices and quotations",
     "manage contacts and vendors",
-    "create sales quotations",
     "manage bookkeeping vouchers",
-    "upload receipt files",
     "track payment status",
     "manage articles and products",
-    "generate credit notes",
+    "create credit notes and order confirmations",
     "query voucher lists",
-    "subscribe to webhooks"
+    "discover reference data",
+    "download finalized documents"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/lexoffice.png"
 }

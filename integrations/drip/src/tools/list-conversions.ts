@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema, paging, pagingShape } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listConversions = SlateTool.create(spec, {
@@ -13,8 +14,18 @@ export let listConversions = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination.'),
-      perPage: z.number().optional().describe('Results per page.')
+      accountId: accountIdSchema,
+      status: z.enum(['all', 'active', 'disabled']).optional().describe('Conversion status.'),
+      sortBy: z.enum(['created_at', 'name']).optional().describe('Sort field.'),
+      sortDirection: z.enum(['asc', 'desc']).optional().describe('Sort direction.'),
+      page: z
+        .number()
+        .optional()
+        .describe('Legacy page selector; this endpoint does not document pagination.'),
+      perPage: z
+        .number()
+        .optional()
+        .describe('Legacy page-size selector; this endpoint does not document pagination.')
     })
   )
   .output(
@@ -30,17 +41,21 @@ export let listConversions = SlateTool.create(spec, {
             createdAt: z.string().optional()
           })
         )
-        .describe('List of conversion goals.')
+        .describe('List of conversion goals.'),
+      ...pagingShape
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 
     let result = await client.listConversions({
+      status: ctx.input.status,
+      sortBy: ctx.input.sortBy,
+      sortDirection: ctx.input.sortDirection,
       page: ctx.input.page,
       perPage: ctx.input.perPage
     });
@@ -55,7 +70,7 @@ export let listConversions = SlateTool.create(spec, {
     }));
 
     return {
-      output: { conversions },
+      output: { conversions, ...paging(result) },
       message: `Found **${conversions.length}** conversion goals.`
     };
   })

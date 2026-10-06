@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getTelephonyLogs = SlateTool.create(spec, {
@@ -36,10 +37,12 @@ export let getTelephonyLogs = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('get_telephony_logs', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.getTelephonyLogs({

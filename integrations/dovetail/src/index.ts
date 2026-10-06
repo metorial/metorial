@@ -29,8 +29,6 @@ import {
   search,
   summarize
 } from './tools';
-import { inboundWebhook, newInsights, newNotes, newProjects } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,5 +60,5 @@ export let provider = Slate.create({
     importFile,
     getFile
   ],
-  triggers: [inboundWebhook, newNotes, newInsights, newProjects]
+  triggers: []
 });

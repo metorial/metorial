@@ -1,44 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MezmoClient } from '../lib/client';
+import { MezmoClient, type PresetAlertRequest } from '../lib/client';
+import { channelSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
-let channelSchema = z
-  .object({
-    integration: z
-      .enum(['email', 'webhook', 'pagerduty', 'slack'])
-      .describe('Alert channel type'),
-    emails: z.array(z.string()).optional().describe('Email addresses for email alerts'),
-    url: z.string().optional().describe('Webhook URL'),
-    key: z.string().optional().describe('PagerDuty or Slack integration key'),
-    method: z.string().optional().describe('HTTP method for webhook'),
-    headers: z
-      .record(z.string(), z.string())
-      .optional()
-      .describe('Custom headers for webhook'),
-    bodyTemplate: z
-      .record(z.string(), z.unknown())
-      .optional()
-      .describe('Custom body template for webhook'),
-    triggerlimit: z.number().optional().describe('Number of matching lines to trigger alert'),
-    triggerinterval: z.string().optional().describe('Time interval for the trigger'),
-    operator: z.string().optional().describe('Alert condition operator (presence, absence)'),
-    immediate: z.string().optional().describe('Send alert immediately ("true" or "false")'),
-    terminal: z.string().optional().describe('Include terminal output ("true" or "false")'),
-    timezone: z.string().optional().describe('Timezone for alert schedule')
-  })
-  .describe('Alert channel configuration');
-
 let alertOutputSchema = z.object({
-  presetAlertId: z.string().describe('Unique preset alert identifier'),
-  name: z.string().describe('Alert name'),
+  presetAlertId: z.string().min(1).describe('Unique preset alert identifier'),
+  name: z.string().min(1).describe('Alert name'),
   channels: z
     .array(
       z.object({
         integration: z.string().describe('Channel type'),
         url: z.string().optional().describe('Webhook URL'),
         emails: z.unknown().optional().describe('Email addresses'),
-        key: z.string().optional().describe('Integration key'),
+        key: z
+          .string()
+          .optional()
+          .describe('Legacy field; integration credentials are not returned'),
         triggerlimit: z.number().optional().describe('Trigger limit'),
         triggerinterval: z.unknown().optional().describe('Trigger interval'),
         operator: z.string().optional().describe('Alert operator')
@@ -56,6 +34,7 @@ export let listPresetAlerts = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of items returned'),
       alerts: z.array(alertOutputSchema).describe('List of preset alerts')
     })
   )
@@ -63,14 +42,13 @@ export let listPresetAlerts = SlateTool.create(spec, {
     let client = new MezmoClient({ token: ctx.auth.token });
     let alerts = await client.listPresetAlerts();
 
-    let mapped = (Array.isArray(alerts) ? alerts : []).map(a => ({
-      presetAlertId: a.presetid || '',
-      name: a.name || '',
-      channels: (a.channels || []).map(c => ({
-        integration: c.integration || '',
+    let mapped = alerts.map(a => ({
+      presetAlertId: a.presetid,
+      name: a.name,
+      channels: a.channels.map(c => ({
+        integration: c.integration,
         url: c.url,
         emails: c.emails,
-        key: c.key,
         triggerlimit: c.triggerlimit,
         triggerinterval: c.triggerinterval,
         operator: c.operator
@@ -78,7 +56,7 @@ export let listPresetAlerts = SlateTool.create(spec, {
     }));
 
     return {
-      output: { alerts: mapped },
+      output: { alerts: mapped, returnedCount: mapped.length },
       message: `Found **${mapped.length}** preset alert(s).`
     };
   })
@@ -88,11 +66,11 @@ export let createPresetAlert = SlateTool.create(spec, {
   name: 'Create Preset Alert',
   key: 'create_preset_alert',
   description: `Create a reusable preset alert that can be attached to multiple views. Supports email, webhook, PagerDuty, and Slack notification channels.`,
-  tags: { readOnly: false, destructive: false }
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
-      name: z.string().describe('Name of the preset alert'),
+      name: z.string().min(1).describe('Name of the preset alert'),
       channels: z.array(channelSchema).min(1).describe('Alert notification channels')
     })
   )
@@ -102,18 +80,17 @@ export let createPresetAlert = SlateTool.create(spec, {
 
     let result = await client.createPresetAlert({
       name: ctx.input.name,
-      channels: ctx.input.channels as any
+      channels: ctx.input.channels
     });
 
     return {
       output: {
-        presetAlertId: result.presetid || '',
-        name: result.name || '',
-        channels: (result.channels || []).map(c => ({
-          integration: c.integration || '',
+        presetAlertId: result.presetid,
+        name: result.name,
+        channels: result.channels.map(c => ({
+          integration: c.integration,
           url: c.url,
           emails: c.emails,
-          key: c.key,
           triggerlimit: c.triggerlimit,
           triggerinterval: c.triggerinterval,
           operator: c.operator
@@ -128,12 +105,12 @@ export let updatePresetAlert = SlateTool.create(spec, {
   name: 'Update Preset Alert',
   key: 'update_preset_alert',
   description: `Update an existing preset alert's name or notification channels.`,
-  tags: { readOnly: false, destructive: false }
+  tags: { readOnly: false, destructive: true }
 })
   .input(
     z.object({
-      presetAlertId: z.string().describe('ID of the preset alert to update'),
-      name: z.string().optional().describe('New name for the alert'),
+      presetAlertId: z.string().min(1).describe('ID of the preset alert to update'),
+      name: z.string().min(1).optional().describe('New name for the alert'),
       channels: z.array(channelSchema).optional().describe('Updated alert channels')
     })
   )
@@ -141,21 +118,20 @@ export let updatePresetAlert = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new MezmoClient({ token: ctx.auth.token });
 
-    let params: Record<string, unknown> = {};
-    if (ctx.input.name) params.name = ctx.input.name;
+    let params: Partial<PresetAlertRequest> = {};
+    if (ctx.input.name !== undefined) params.name = ctx.input.name;
     if (ctx.input.channels) params.channels = ctx.input.channels;
 
-    let result = await client.updatePresetAlert(ctx.input.presetAlertId, params as any);
+    let result = await client.updatePresetAlert(ctx.input.presetAlertId, params);
 
     return {
       output: {
-        presetAlertId: result.presetid || '',
-        name: result.name || '',
-        channels: (result.channels || []).map(c => ({
-          integration: c.integration || '',
+        presetAlertId: result.presetid,
+        name: result.name,
+        channels: result.channels.map(c => ({
+          integration: c.integration,
           url: c.url,
           emails: c.emails,
-          key: c.key,
           triggerlimit: c.triggerlimit,
           triggerinterval: c.triggerinterval,
           operator: c.operator
@@ -174,7 +150,7 @@ export let deletePresetAlert = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      presetAlertId: z.string().describe('ID of the preset alert to delete')
+      presetAlertId: z.string().min(1).describe('ID of the preset alert to delete')
     })
   )
   .output(

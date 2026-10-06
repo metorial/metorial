@@ -16,8 +16,6 @@ import {
   updateToken,
   updateTokenTemplate
 } from './tools';
-import { inboundWebhook, newContracts, newUsers } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     updateContractMetadata,
     listContracts
   ],
-  triggers: [inboundWebhook, newContracts, newUsers]
+  triggers: []
 });

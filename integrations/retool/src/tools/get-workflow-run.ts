@@ -1,13 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let getWorkflowRun = SlateTool.create(spec, {
   name: 'Get Workflow Run',
   key: 'get_workflow_run',
-  description: `Retrieve details of a specific workflow run, including its status, duration, and output. Useful for monitoring and debugging workflow executions.`,
-  constraints: ['Available on Enterprise Base plan and above.'],
+  description: `Read an existing workflow run's status, workflow and trigger IDs, creation timestamp, and documented user-task details. This does not execute a workflow.`,
+  constraints: ['Requires the relevant API token scope and support in this deployment.'],
   tags: {
     readOnly: true
   }
@@ -25,7 +25,7 @@ export let getWorkflowRun = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.getWorkflowRun(ctx.input.runId);
 

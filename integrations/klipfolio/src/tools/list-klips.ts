@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listKlips = SlateTool.create(spec, {
@@ -31,10 +32,13 @@ export let listKlips = SlateTool.create(spec, {
           lastUpdated: z.string().optional()
         })
       ),
-      total: z.number().optional()
+      total: z.number().optional(),
+      nextOffset: z.number().optional(),
+      hasMore: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listKlips({
@@ -53,10 +57,18 @@ export let listKlips = SlateTool.create(spec, {
       lastUpdated: klip.last_updated
     }));
 
+    const offset = ctx.input.offset ?? 0;
+    const hasMore =
+      result.data.length > 0 &&
+      (typeof result.meta?.total === 'number'
+        ? offset + klips.length < result.meta.total
+        : klips.length === (ctx.input.limit ?? 25));
     return {
       output: {
         klips,
-        total: result?.meta?.total
+        total: result?.meta?.total,
+        hasMore,
+        nextOffset: hasMore ? offset + klips.length : undefined
       },
       message: `Found **${klips.length}** klip(s)${result?.meta?.total ? ` out of ${result.meta.total} total` : ''}.`
     };

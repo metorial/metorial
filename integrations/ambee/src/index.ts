@@ -20,8 +20,6 @@ import {
   getWildfire,
   getWildfireRisk
 } from './tools';
-import { airQualityChange, inboundWebhook, naturalDisasterAlert } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     getElevation,
     geocode
   ],
-  triggers: [inboundWebhook, airQualityChange, naturalDisasterAlert]
+  triggers: []
 });

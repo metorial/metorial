@@ -30,11 +30,7 @@ export let listMembers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let data = await client.listMembers();
     let members = getEmbedded(data, 'memberships').map(normalizeMember);

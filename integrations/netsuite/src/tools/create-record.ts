@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { connection } from '../lib/client';
 import { spec } from '../spec';
 
 export let createRecord = SlateTool.create(spec, {
   name: 'Create Record',
   key: 'create_record',
-  description: `Create a new NetSuite record of any supported type. Supports all standard record types (customer, vendor, salesOrder, invoice, purchaseOrder, inventoryItem, journalEntry, employee, contact, etc.) and custom record types.
+  description: `Create a NetSuite record using a type discovered with list_record_types and a creation operation supported by get_record_metadata for your role.
 Pass the record's field values as key-value pairs in the fieldValues parameter.`,
   instructions: [
-    'Use the exact NetSuite record type name in camelCase (e.g., "salesOrder", "inventoryItem").',
+    'Discover exact native names with list_record_types, then inspect get_record_metadata for supported operations and required fields.',
     'Sublists (like line items) should be nested under their sublist key in fieldValues (e.g., { "item": { "items": [...] } }).',
     'Required fields vary by record type — refer to NetSuite metadata for field requirements.'
   ],
   tags: {
+    readOnly: false,
     destructive: false
   }
 })
@@ -22,7 +23,7 @@ Pass the record's field values as key-value pairs in the fieldValues parameter.`
       recordType: z
         .string()
         .describe(
-          'NetSuite record type in camelCase (e.g., "customer", "salesOrder", "invoice")'
+          'Exact native record type from list_record_types; inspect get_record_metadata before creation'
         ),
       fieldValues: z
         .record(z.string(), z.any())
@@ -36,19 +37,16 @@ Pass the record's field values as key-value pairs in the fieldValues parameter.`
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      ...ctx.auth,
-      accountId: ctx.config.accountId
-    });
+    const client = connection(ctx.auth, ctx.config);
 
     let result = await client.createRecord(ctx.input.recordType, ctx.input.fieldValues);
 
     return {
       output: {
-        recordId: result.recordId || result.id || '',
+        recordId: result.recordId,
         location: result.location
       },
-      message: `Created **${ctx.input.recordType}** record with ID \`${result.recordId || result.id}\`.`
+      message: `Created **${ctx.input.recordType}** record with ID \`${result.recordId}\`.`
     };
   })
   .build();

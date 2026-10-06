@@ -1,16 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let managePermissions = SlateTool.create(spec, {
   name: 'Manage Permissions',
   key: 'manage_permissions',
-  description: `Grant or revoke access permissions for users or groups on Retool objects (apps, folders, resources, workflows, agents). Supports access levels: **use**, **edit**, and **own**.`,
+  description: `Grant or revoke access permissions for users or groups on Retool objects (apps, folders, resources, resource configurations). Supports access levels: **use**, **edit**, and **own**.`,
   instructions: [
     'Granting/revoking folder permissions also applies to all objects directly under the folder, but NOT to subfolders and their nested objects.'
   ],
-  constraints: ['Available on Enterprise Premium plan only.']
+  constraints: [
+    'Requires the relevant read or write API token scope and support in this deployment.'
+  ]
 })
   .input(
     z.object({
@@ -27,7 +29,9 @@ export let managePermissions = SlateTool.create(spec, {
       objectId: z.string().describe('ID of the object'),
       accessLevel: z
         .enum(['use', 'edit', 'own'])
-        .describe('The access level to grant or revoke')
+        .describe(
+          'The access level to grant. For revoke, retained for compatibility; the native operation removes all access to the object.'
+        )
     })
   )
   .output(
@@ -38,11 +42,12 @@ export let managePermissions = SlateTool.create(spec, {
       objectType: z.string(),
       objectId: z.string(),
       accessLevel: z.string(),
+      revokesAllAccess: z.boolean().optional(),
       success: z.boolean()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let permData = {
       subjectType: ctx.input.subjectType,
@@ -66,9 +71,13 @@ export let managePermissions = SlateTool.create(spec, {
         objectType: ctx.input.objectType,
         objectId: ctx.input.objectId,
         accessLevel: ctx.input.accessLevel,
-        success: true
+        success: true,
+        revokesAllAccess: ctx.input.action === 'revoke'
       },
-      message: `${ctx.input.action === 'grant' ? 'Granted' : 'Revoked'} **${ctx.input.accessLevel}** access for ${ctx.input.subjectType} \`${ctx.input.subjectId}\` on ${ctx.input.objectType} \`${ctx.input.objectId}\`.`
+      message:
+        ctx.input.action === 'grant'
+          ? `Granted **${ctx.input.accessLevel}** access on the requested object.`
+          : 'Revoked all direct access on the requested object and its direct children where applicable.'
     };
   })
   .build();

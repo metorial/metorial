@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema, paging, pagingShape } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listForms = SlateTool.create(spec, {
@@ -13,6 +14,17 @@ export let listForms = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy selector; this endpoint does not document pagination and returns the full form collection.'
+        ),
+      perPage: z
+        .number()
+        .optional()
+        .describe('Legacy selector; this endpoint does not document a page size.'),
       formId: z
         .string()
         .optional()
@@ -30,13 +42,14 @@ export let listForms = SlateTool.create(spec, {
             createdAt: z.string().optional()
           })
         )
-        .describe('List of forms.')
+        .describe('List of forms.'),
+      ...pagingShape
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 
@@ -49,12 +62,12 @@ export let listForms = SlateTool.create(spec, {
             {
               formId: f.id ?? '',
               name: f.name,
-              headlineText: f.headline_text,
+              headlineText: f.headline,
               createdAt: f.created_at
             }
           ]
         },
-        message: `Fetched form **${f.name}**.`
+        message: 'Fetched the selected form.'
       };
     }
 
@@ -62,12 +75,12 @@ export let listForms = SlateTool.create(spec, {
     let forms = (result.forms ?? []).map((f: any) => ({
       formId: f.id ?? '',
       name: f.name,
-      headlineText: f.headline_text,
+      headlineText: f.headline,
       createdAt: f.created_at
     }));
 
     return {
-      output: { forms },
+      output: { forms, ...paging(result) },
       message: `Found **${forms.length}** forms.`
     };
   })

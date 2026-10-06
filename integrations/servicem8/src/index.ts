@@ -18,8 +18,6 @@ import {
   updateClient,
   updateJob
 } from './tools';
-import { clientEvents, jobEvents, staffEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     recordPayment,
     listJobActivities
   ],
-  triggers: [jobEvents, clientEvents, staffEvents]
+  triggers: []
 });

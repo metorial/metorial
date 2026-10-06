@@ -28,12 +28,7 @@ describe('firebase provider contract', () => {
         'manage_storage',
         'get_firebase_apps'
       ],
-      triggerIds: [
-        'inbound_webhook',
-        'firestore_document_changes',
-        'realtime_db_changes',
-        'user_changes'
-      ],
+      triggerIds: [],
       authMethodIds: ['google_oauth', 'service_account'],
       tools: [
         { id: 'manage_firestore_document', readOnly: false, destructive: true },
@@ -49,15 +44,10 @@ describe('firebase provider contract', () => {
         { id: 'manage_storage', readOnly: false, destructive: true },
         { id: 'get_firebase_apps', readOnly: true, destructive: false }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'firestore_document_changes', invocationType: 'polling' },
-        { id: 'realtime_db_changes', invocationType: 'polling' },
-        { id: 'user_changes', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(16);
+    expect(contract.actions).toHaveLength(12);
     expect(Object.keys(contract.configSchema.properties ?? {}).sort()).toEqual([
       'databaseUrl',
       'projectId',
@@ -77,11 +67,7 @@ describe('firebase provider contract', () => {
       get_remote_config: firebaseActionScopes.getRemoteConfig,
       update_remote_config: firebaseActionScopes.updateRemoteConfig,
       manage_storage: firebaseActionScopes.manageStorage,
-      get_firebase_apps: firebaseActionScopes.getFirebaseApps,
-      firestore_document_changes: firebaseActionScopes.firestoreDocumentChanges,
-      realtime_db_changes: firebaseActionScopes.realtimeDbChanges,
-      user_changes: firebaseActionScopes.userChanges,
-      inbound_webhook: firebaseActionScopes.inboundWebhook
+      get_firebase_apps: firebaseActionScopes.getFirebaseApps
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

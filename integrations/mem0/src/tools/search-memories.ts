@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, mapMemory } from '../lib/client';
 import { spec } from '../spec';
 
 export let searchMemories = SlateTool.create(spec, {
   name: 'Search Memories',
   key: 'search_memories',
-  description: `Search memories using natural language queries with semantic similarity matching. Uses the v2 search API with support for advanced filtering using AND, OR, IN, comparison operators, and field-level filters.
+  description: `Search memories using natural language queries with hybrid semantic, keyword, and entity matching. Uses the V3 search API with support for advanced filtering using AND, OR, NOT, comparison operators, and field-level filters.
 Returns ranked results based on relevance to the query.`,
   instructions: [
     'Provide a natural language query describing what you want to find.',
@@ -19,19 +19,26 @@ Returns ranked results based on relevance to the query.`,
 })
   .input(
     z.object({
-      query: z.string().describe('Natural language search query'),
-      userId: z.string().optional().describe('Filter memories by user ID'),
-      agentId: z.string().optional().describe('Filter memories by agent ID'),
-      appId: z.string().optional().describe('Filter memories by app ID'),
-      runId: z.string().optional().describe('Filter memories by run/session ID'),
+      query: z.string().trim().min(1).describe('Natural language search query'),
+      userId: z.string().trim().min(1).optional().describe('Filter memories by user ID'),
+      agentId: z.string().trim().min(1).optional().describe('Filter memories by agent ID'),
+      appId: z.string().trim().min(1).optional().describe('Filter memories by app ID'),
+      runId: z.string().trim().min(1).optional().describe('Filter memories by run/session ID'),
       topK: z
         .number()
+        .int()
+        .min(1)
+        .max(1000)
         .optional()
         .describe('Maximum number of results to return (default: 10)'),
       threshold: z
         .number()
+        .min(0)
+        .max(1)
         .optional()
-        .describe('Minimum similarity score threshold (default: 0.3)'),
+        .describe(
+          'Minimum relevance score threshold (default: 0.1). Set 0 to disable filtering.'
+        ),
       rerank: z
         .boolean()
         .optional()
@@ -45,7 +52,10 @@ Returns ranked results based on relevance to the query.`,
       fields: z
         .array(z.string())
         .optional()
-        .describe('Specific fields to include in the response')
+        .describe(
+          'Specific fields to include in the response; id and memory are always retained'
+        ),
+      showExpired: z.boolean().optional().describe('Include expired memories (default: false)')
     })
   )
   .output(
@@ -53,17 +63,17 @@ Returns ranked results based on relevance to the query.`,
       memories: z
         .array(
           z.object({
-            memoryId: z.string().describe('Unique memory identifier'),
+            memoryId: z.string().trim().min(1).describe('Unique memory identifier'),
             memory: z.string().describe('Memory content text'),
-            userId: z.string().optional().describe('Associated user ID'),
-            agentId: z.string().optional().describe('Associated agent ID'),
-            appId: z.string().optional().describe('Associated app ID'),
-            runId: z.string().optional().describe('Associated run ID'),
+            userId: z.string().trim().min(1).optional().describe('Associated user ID'),
+            agentId: z.string().trim().min(1).optional().describe('Associated agent ID'),
+            appId: z.string().trim().min(1).optional().describe('Associated app ID'),
+            runId: z.string().trim().min(1).optional().describe('Associated run ID'),
             score: z.number().optional().describe('Similarity score'),
             metadata: z.record(z.string(), z.unknown()).optional().describe('Memory metadata'),
             categories: z.array(z.string()).optional().describe('Memory categories'),
-            createdAt: z.string().optional().describe('Creation timestamp'),
-            updatedAt: z.string().optional().describe('Last update timestamp')
+            createdAt: z.string().trim().min(1).optional().describe('Creation timestamp'),
+            updatedAt: z.string().trim().min(1).optional().describe('Last update timestamp')
           })
         )
         .describe('Search results ranked by relevance')
@@ -72,8 +82,7 @@ Returns ranked results based on relevance to the query.`,
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      orgId: ctx.config.orgId,
-      projectId: ctx.config.projectId
+      legacyScope: ctx.config
     });
 
     let results = await client.searchMemories({
@@ -86,23 +95,11 @@ Returns ranked results based on relevance to the query.`,
       threshold: ctx.input.threshold,
       rerank: ctx.input.rerank,
       filters: ctx.input.filters,
-      fields: ctx.input.fields
+      fields: ctx.input.fields,
+      showExpired: ctx.input.showExpired
     });
 
-    let resultArray = Array.isArray(results) ? results : [];
-    let memories = resultArray.map((m: Record<string, unknown>) => ({
-      memoryId: String(m.id || ''),
-      memory: String(m.memory || ''),
-      userId: m.user_id ? String(m.user_id) : undefined,
-      agentId: m.agent_id ? String(m.agent_id) : undefined,
-      appId: m.app_id ? String(m.app_id) : undefined,
-      runId: m.run_id ? String(m.run_id) : undefined,
-      score: typeof m.score === 'number' ? m.score : undefined,
-      metadata: m.metadata as Record<string, unknown> | undefined,
-      categories: Array.isArray(m.categories) ? m.categories.map(String) : undefined,
-      createdAt: m.created_at ? String(m.created_at) : undefined,
-      updatedAt: m.updated_at ? String(m.updated_at) : undefined
-    }));
+    let memories = results.map(mapMemory);
 
     return {
       output: { memories },

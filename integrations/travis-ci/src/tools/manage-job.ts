@@ -1,14 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, TravisCIClient } from '../lib/client';
+import type { Job } from '../lib/types';
 import { spec } from '../spec';
 
 export let manageJob = SlateTool.create(spec, {
   name: 'Manage Job',
   key: 'manage_job',
   description: `Get details about a specific job, or cancel, restart, or debug it. Debug mode restarts the job with SSH access enabled for troubleshooting.`,
+  tags: { destructive: true },
   instructions: [
-    'Debug mode is only available on travis-ci.com and select travis-ci.org repositories.'
+    'Debug restarts require repository debug permissions and available build credits. Hosted Travis CI uses .com; .org is retired.'
   ]
 })
   .input(
@@ -36,31 +38,31 @@ export let manageJob = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
-    let result: any;
+    let result: Job;
     let actionLabel = 'Retrieved';
 
     switch (ctx.input.action) {
       case 'cancel':
         result = await client.cancelJob(ctx.input.jobId);
-        actionLabel = 'Cancelled';
+        actionLabel = 'Accepted cancellation for';
         break;
       case 'restart':
         result = await client.restartJob(ctx.input.jobId);
-        actionLabel = 'Restarted';
+        actionLabel = 'Accepted restart for';
         break;
       case 'debug':
         result = await client.debugJob(ctx.input.jobId);
-        actionLabel = 'Started debug session for';
+        actionLabel = 'Accepted debug restart for';
         break;
       default:
         result = await client.getJob(ctx.input.jobId);
         break;
     }
 
-    let job = result.job || result;
+    let job = result;
 
     return {
       output: {

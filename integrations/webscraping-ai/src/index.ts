@@ -9,10 +9,8 @@ import {
   selectElements
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [scrapeHtml, extractText, askQuestion, extractFields, selectElements, getAccountInfo],
-  triggers: [inboundWebhook]
+  triggers: []
 });

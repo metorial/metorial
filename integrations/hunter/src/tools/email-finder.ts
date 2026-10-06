@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, optionalNumber, optionalRow, optionalText, row } from '../lib/client';
 import { spec } from '../spec';
 
 export let emailFinder = SlateTool.create(spec, {
@@ -11,8 +11,11 @@ export let emailFinder = SlateTool.create(spec, {
     "Provide either a domain or company name along with the person's name (first+last or full name).",
     'Alternatively, provide a LinkedIn handle to find the email.'
   ],
+  constraints: [
+    'This lookup uses account credits and can save the found address as a lead unless auto-save is disabled in the account settings.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -53,9 +56,7 @@ export let emailFinder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.findEmail({
+    const result = await new Client({ token: ctx.auth.token }).findEmail({
       domain: ctx.input.domain,
       company: ctx.input.companyName,
       firstName: ctx.input.firstName,
@@ -64,26 +65,25 @@ export let emailFinder = SlateTool.create(spec, {
       linkedinHandle: ctx.input.linkedinHandle,
       maxDuration: ctx.input.maxDuration
     });
-
-    let data = result.data;
-
+    const data = row(result.data),
+      verification = optionalRow(data.verification);
     return {
       output: {
-        email: data.email ?? null,
-        score: data.score ?? null,
-        firstName: data.first_name ?? null,
-        lastName: data.last_name ?? null,
-        position: data.position ?? null,
-        company: data.company ?? null,
-        domain: data.domain ?? null,
-        linkedin: data.linkedin ?? null,
-        twitter: data.twitter ?? null,
-        phoneNumber: data.phone_number ?? null,
-        verificationStatus: data.verification?.status ?? null
+        email: optionalText(data.email) ?? null,
+        score: optionalNumber(data.score) ?? null,
+        firstName: optionalText(data.first_name) ?? null,
+        lastName: optionalText(data.last_name) ?? null,
+        position: optionalText(data.position) ?? null,
+        company: optionalText(data.company) ?? null,
+        domain: optionalText(data.domain) ?? null,
+        linkedin: optionalText(data.linkedin_url ?? data.linkedin) ?? null,
+        twitter: optionalText(data.twitter) ?? null,
+        phoneNumber: optionalText(data.phone_number) ?? null,
+        verificationStatus: optionalText(verification.status) ?? null
       },
-      message: data.email
-        ? `Found email **${data.email}** with confidence score **${data.score}** (${data.verification?.status ?? 'unknown'}).`
-        : `No email found for the given criteria.`
+      message: optionalText(data.email)
+        ? `Found professional email **${optionalText(data.email)}**.`
+        : 'No email found for the given criteria.'
     };
   })
   .build();

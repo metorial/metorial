@@ -1,23 +1,22 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, connectionApiBaseUrl, organization } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageEnvironment = SlateTool.create(spec, {
   name: 'Manage Environment',
   key: 'manage_environment',
+  tags: { destructive: true },
   description: `Create, read, update, or delete a Pulumi ESC (Environments, Secrets, and Configuration) environment. Environments store secrets, config, and credentials as versioned YAML definitions.`,
   instructions: [
-    'When reading, returns the YAML definition of the environment.',
+    'Reading provides the environment definition as a downloadable YAML file. Stored secrets remain encrypted.',
     'When updating, provide the full YAML content for the environment definition.'
   ]
 })
   .input(
     z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe('Organization name (uses default from config if not set)'),
+      organization: organizationInput,
       projectName: z.string().describe('ESC project name'),
       environmentName: z.string().describe('Environment name'),
       action: z.enum(['create', 'read', 'update', 'delete']).describe('Action to perform'),
@@ -32,35 +31,48 @@ export let manageEnvironment = SlateTool.create(spec, {
       action: z.string(),
       environmentName: z.string(),
       projectName: z.string(),
-      yamlContent: z.string().optional()
+      yamlContent: z
+        .string()
+        .optional()
+        .describe(
+          'Deprecated output; the definition is provided as a downloadable YAML file.'
+        ),
+      fileName: z.string().optional(),
+      mimeType: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: connectionApiBaseUrl(ctx.auth, ctx.config)
     });
 
-    let org = ctx.input.organization || ctx.config.organization;
-    if (!org)
-      throw new Error('Organization is required. Set it in config or provide it as input.');
+    let org = organization(ctx.input.organization, ctx.config.organization);
 
-    let yamlContent: string | undefined;
+    let fileName: string | undefined;
 
     switch (ctx.input.action) {
       case 'create':
         await client.createEnvironment(org, ctx.input.projectName, ctx.input.environmentName);
         break;
       case 'read':
-        yamlContent = await client.getEnvironment(
-          org,
-          ctx.input.projectName,
-          ctx.input.environmentName
-        );
+        await client.getEnvironment(org, ctx.input.projectName, ctx.input.environmentName);
+        fileName = `${ctx.input.environmentName.replace(/[^a-zA-Z0-9._-]/g, '_')}.yaml`;
+        await ctx.addAttachment({
+          type: 'url',
+          url: client.environmentUrl(org, ctx.input.projectName, ctx.input.environmentName),
+          filename: fileName,
+          mimeType: 'application/x-yaml',
+          headers: {
+            Authorization: `token ${ctx.auth.token}`,
+            Accept: 'application/x-yaml',
+            'Content-Type': 'application/json'
+          }
+        });
         break;
       case 'update':
         if (!ctx.input.yamlContent)
-          throw new Error('yamlContent is required when updating an environment');
+          throw createApiServiceError('yamlContent is required when updating an environment');
         await client.updateEnvironment(
           org,
           ctx.input.projectName,
@@ -78,7 +90,8 @@ export let manageEnvironment = SlateTool.create(spec, {
         action: ctx.input.action,
         environmentName: ctx.input.environmentName,
         projectName: ctx.input.projectName,
-        yamlContent: typeof yamlContent === 'string' ? yamlContent : undefined
+        fileName,
+        mimeType: fileName ? 'application/x-yaml' : undefined
       },
       message: `**${ctx.input.action}** environment **${org}/${ctx.input.projectName}/${ctx.input.environmentName}** succeeded`
     };

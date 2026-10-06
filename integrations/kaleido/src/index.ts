@@ -13,8 +13,6 @@ import {
   manageNode,
   manageService
 } from './tools';
-import { auditLogChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     getAuditLogs,
     manageInvitation
   ],
-  triggers: [inboundWebhook, auditLogChanges]
+  triggers: []
 });

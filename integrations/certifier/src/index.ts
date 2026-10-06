@@ -17,8 +17,6 @@ import {
   updateCredential,
   updateGroup
 } from './tools';
-import { credentialEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     listCredentialInteractions,
     createCredentialInteraction
   ],
-  triggers: [credentialEvent]
+  triggers: []
 });

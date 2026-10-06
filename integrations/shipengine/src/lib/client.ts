@@ -1,844 +1,821 @@
-import { createAxios } from 'slates';
+import { ServiceError } from '@lowerdeck/error';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  getApiErrorStatus,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
+import * as response from './response';
+import type {
+  AddressInput,
+  CreateLabelRequest,
+  CreateManifestRequest,
+  CreateShipmentRequest,
+  CreateWarehouseRequest,
+  EstimateRatesRequest,
+  GetRatesRequest,
+  ListLabelsParams,
+  ListManifestsParams,
+  ListPickupsParams,
+  ListServicePointsRequest,
+  ListShipmentsParams,
+  SchedulePickupRequest
+} from './types';
+
+export type * from './types';
+export type LabelResponse = z.output<typeof response.label>;
+export type ShipmentResponse = z.output<typeof response.shipment>;
+export type WarehouseResponse = z.output<typeof response.warehouse>;
+export type ManifestResponse = z.output<typeof response.manifest>;
+export type PickupResponse = z.output<typeof response.pickup>;
+export type TrackingInfo = z.output<typeof response.tracking>;
+export const baseUrls = [
+  'https://api.shipengine.com',
+  'https://api.eu.shipengine.com'
+] as const;
+export const baseUrlSchema = z.enum(baseUrls);
+const pageSchema = z.object({
+  total: response.count,
+  page: response.count,
+  pages: response.count
+});
+
+const safeText = (value: string) =>
+  value.trim().length > 0 &&
+  ![...value].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127);
+export const validateToken = (token: string) => {
+  if (typeof token !== 'string' || !safeText(token) || token !== token.trim())
+    throw createApiServiceError(
+      'Enter a valid ShipEngine API key without surrounding whitespace or control characters.'
+    );
+};
+const idPath = (id: string, kind: 'resource' | 'pickup' = 'resource') => {
+  if (!(kind === 'pickup' ? response.pickupId : response.resourceId).safeParse(id).success)
+    throw createApiServiceError(
+      `Enter an exact ${kind === 'pickup' ? 'pickup' : 'ShipEngine resource'} ID from the provider.`
+    );
+  return encodeURIComponent(id);
+};
+export const apiFailure = (status?: number, uncertain = false) => {
+  const error = buildApiServiceError(
+    {},
+    {
+      providerLabel: 'ShipEngine',
+      reason: 'shipengine_api_error',
+      operation: 'request',
+      parent: {},
+      extractStatus: () => status,
+      extractMessage: () => '',
+      formatMessage: () =>
+        `ShipEngine request failed${status ? ` (HTTP ${status})` : ''}. ${status === 401 ? 'Check the API key.' : status === 403 ? 'Check API key permissions and account access.' : status === 429 ? 'Wait before retrying.' : 'Check the provider record.'}${uncertain ? ' The change may have reached the provider; verify its state before retrying a purchase or change.' : ''}`
+    }
+  );
+  if (uncertain) error.data.writeMayHaveOccurred = true;
+  return error;
+};
+const upstreamStatus = (error: unknown): number | undefined => {
+  const data = error && typeof error === 'object' ? Reflect.get(error, 'data') : undefined;
+  const baggage = data && typeof data === 'object' ? Reflect.get(data, 'baggage') : undefined;
+  const mapped =
+    baggage && typeof baggage === 'object'
+      ? Reflect.get(baggage, 'serviceErrorData')
+      : undefined;
+  const status = Number(
+    (data && typeof data === 'object' ? Reflect.get(data, 'upstreamStatus') : undefined) ??
+      (mapped && typeof mapped === 'object'
+        ? Reflect.get(mapped, 'upstreamStatus')
+        : undefined) ??
+      getApiErrorStatus(error)
+  );
+  return Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined;
+};
+const validateRequest = (value: unknown, field = ''): void => {
+  if (
+    typeof value === 'number' &&
+    (!Number.isFinite(value) ||
+      (['value', 'length', 'width', 'height', 'quantity', 'amount'].includes(field) &&
+        value < 0))
+  )
+    throw createApiServiceError(
+      'Provide finite, non-negative package dimensions, weight, quantity and money.'
+    );
+  if (typeof value === 'string') {
+    if (value.trim().length === 0) throw createApiServiceError('Provide non-empty values.');
+    if (
+      [
+        'carrier_id',
+        'warehouse_id',
+        'shipment_id',
+        'label_id',
+        'excluded_label_id',
+        'manifest_id',
+        'manifest_request_id',
+        'form_id',
+        'batch_id',
+        'shipping_rule_id',
+        'pickup_id'
+      ].includes(field)
+    )
+      idPath(value, field === 'pickup_id' ? 'pickup' : 'resource');
+    if (
+      (field.endsWith('_at_start') ||
+        field.endsWith('_at_end') ||
+        ['ship_date', 'ship_date_start', 'ship_date_end', 'start_at', 'end_at'].includes(
+          field
+        )) &&
+      !Number.isFinite(Date.parse(value))
+    )
+      throw createApiServiceError('Provide valid ISO dates and times.');
+    if (field === 'country_code' && !/^[A-Z]{2}$/.test(value))
+      throw createApiServiceError('Use a two-letter uppercase country code.');
+  }
+  if (Array.isArray(value)) {
+    for (const item of value)
+      validateRequest(item, field.endsWith('_ids') ? field.slice(0, -1) : field);
+  } else if (value && typeof value === 'object') {
+    for (const [key, item] of Object.entries(value))
+      if (item !== undefined) validateRequest(item, key);
+  }
+};
+
+export const containsCredential = (value: string, token: string): boolean => {
+  const forms = [
+    token,
+    Buffer.from(token).toString('base64'),
+    Buffer.from(token).toString('base64url'),
+    Buffer.from(token).toString('hex'),
+    Buffer.from(token).toString('hex').toUpperCase()
+  ];
+  let decoded = value;
+  for (let i = 0; i <= 4; i++) {
+    if (forms.some(form => decoded.includes(form))) return true;
+    for (const match of decoded.matchAll(/[A-Za-z0-9+/_-]{8,}={0,2}/g)) {
+      const encoded = match[0];
+      const bytes = Buffer.from(encoded, 'base64');
+      if (
+        bytes.toString('base64url') ===
+          encoded.replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '') &&
+        bytes.toString().includes(token)
+      )
+        return true;
+    }
+    let next: string;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      next = decoded.replace(/(?:%[0-9a-f]{2})+/gi, part =>
+        Buffer.from(part.replaceAll('%', ''), 'hex').toString()
+      );
+    }
+    if (next === decoded) break;
+    decoded = next;
+  }
+  return false;
+};
+const scrubCredential = (value: unknown, token: string): unknown => {
+  if (typeof value === 'string')
+    return containsCredential(value, token) ? '[redacted]' : value;
+  if (Array.isArray(value)) return value.map(item => scrubCredential(item, token));
+  if (value && typeof value === 'object')
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => !containsCredential(key, token))
+        .map(([key, item]) => [key, scrubCredential(item, token)])
+    );
+  return value;
+};
 
 export class Client {
   private axios;
-
-  constructor(config: { token: string; baseUrl: string }) {
+  private token: string;
+  private redactedRecords = new WeakSet<object>();
+  readonly baseUrl: z.infer<typeof baseUrlSchema>;
+  constructor(config: { token: string; baseUrl?: string }) {
+    validateToken(config.token);
+    this.token = config.token;
+    const base = baseUrlSchema.safeParse(config.baseUrl ?? baseUrls[0]);
+    if (!base.success)
+      throw createApiServiceError('Select the supported US or EU ShipEngine API host.');
+    this.baseUrl = base.data;
     this.axios = createAxios({
-      baseURL: config.baseUrl,
-      headers: {
-        'API-Key': config.token,
-        'Content-Type': 'application/json'
+      baseURL: this.baseUrl,
+      headers: { 'API-Key': config.token, 'Content-Type': 'application/json' },
+      timeout: 30_000,
+      maxRedirects: 0,
+      validateStatus: () => true,
+      transformResponse: [response.parseResponse]
+    });
+  }
+  private async request<S extends z.ZodType>(
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    path: string,
+    schema: S,
+    data?: unknown,
+    params?: object
+  ): Promise<z.output<S>> {
+    validateRequest(data);
+    validateRequest(params);
+    if (params)
+      for (const key of ['page', 'page_size']) {
+        const value = Reflect.get(params, key);
+        if (value !== undefined && (!Number.isSafeInteger(value) || value < 1))
+          throw createApiServiceError('Page and page size must be positive safe integers.');
       }
-    });
+    let res: { status: number; data: unknown };
+    try {
+      res = await this.axios.request({
+        method,
+        url: path,
+        data,
+        params: params ? pickDefined(params) : undefined
+      });
+    } catch (error) {
+      throw apiFailure(upstreamStatus(error), method !== 'GET');
+    }
+    if (res.status < 200 || res.status >= 300)
+      throw apiFailure(res.status, method !== 'GET' && res.status >= 500);
+    const scrubbed = scrubCredential(res.data, this.token);
+    const parsed = schema.safeParse(scrubbed);
+    if (!parsed.success) {
+      const error = createApiServiceError(
+        `ShipEngine returned an unexpected response.${method !== 'GET' ? ' The change may have succeeded; check its state before retrying a purchase or change.' : ' Check the provider record before continuing.'}`
+      );
+      if (method !== 'GET') {
+        error.data.writeMayHaveOccurred = true;
+        if (scrubbed && typeof scrubbed === 'object')
+          for (const [native, receipt, validator] of [
+            ['label_id', 'labelId', response.resourceId],
+            ['shipment_id', 'shipmentId', response.resourceId],
+            ['warehouse_id', 'warehouseId', response.resourceId],
+            ['pickup_id', 'pickupId', response.pickupId],
+            ['manifest_id', 'manifestId', response.resourceId]
+          ] as const) {
+            const value = validator.safeParse(Reflect.get(scrubbed, native));
+            if (value.success) error.data[receipt] = value.data;
+          }
+      }
+      throw error;
+    }
+    if (
+      parsed.data &&
+      typeof parsed.data === 'object' &&
+      JSON.stringify(scrubbed) !== JSON.stringify(res.data)
+    )
+      this.redactedRecords.add(parsed.data);
+    return parsed.data;
   }
-
-  // ── Addresses ──────────────────────────────────────────────
-
+  private async exact<S extends z.ZodType>(
+    path: string,
+    schema: S,
+    key: string,
+    id: string
+  ): Promise<z.output<S>> {
+    const result = await this.request('GET', path, schema);
+    if (!result || typeof result !== 'object' || Reflect.get(result, key) !== id)
+      throw createApiServiceError(
+        'ShipEngine returned a different resource. Check the exact provider ID before continuing.'
+      );
+    return result;
+  }
+  async settings() {
+    return this.request(
+      'GET',
+      '/v1/account/settings',
+      z.object({ default_label_layout: z.string().optional() })
+    );
+  }
   async validateAddresses(addresses: AddressInput[]) {
-    let res = await this.axios.post('/v1/addresses/validate', addresses);
-    return res.data as AddressValidationResult[];
+    return this.request(
+      'POST',
+      '/v1/addresses/validate',
+      z.array(
+        z.object({
+          status: z.enum(['verified', 'unverified', 'warning', 'error']),
+          original_address: response.address,
+          matched_address: response.address.nullable(),
+          messages: z.array(
+            z.object({
+              code: z.string(),
+              message: z.string(),
+              type: z.enum(['info', 'warning', 'error']),
+              detail_code: response.optionalText
+            })
+          )
+        })
+      ),
+      addresses
+    );
   }
-
   async recognizeAddress(text: string) {
-    let res = await this.axios.put('/v1/addresses/recognize', { text });
-    return res.data as AddressRecognitionResult;
+    return this.request(
+      'PUT',
+      '/v1/addresses/recognize',
+      z.object({
+        score: z.number().min(0).max(1),
+        address: response.partialAddress,
+        entities: z.array(
+          z.object({
+            type: z.string(),
+            score: z.number().min(0).max(1),
+            text: z.string(),
+            start_index: response.count,
+            end_index: response.count
+          })
+        )
+      }),
+      { text }
+    );
   }
-
-  // ── Rates ──────────────────────────────────────────────────
-
+  private async carrierIds(ids?: string[]) {
+    if (ids) {
+      if (ids.length === 0) throw createApiServiceError('Select at least one carrier.');
+      return ids;
+    }
+    const result = await this.listCarriers();
+    if (!result.carriers.length)
+      throw createApiServiceError('Connect a supported carrier before requesting rates.');
+    return result.carriers.map(c => c.carrier_id);
+  }
   async getRates(params: GetRatesRequest) {
-    let res = await this.axios.post('/v1/rates', params);
-    return res.data as GetRatesResponse;
+    validateRequest(params);
+    params.rate_options = {
+      ...params.rate_options,
+      carrier_ids: await this.carrierIds(params.rate_options?.carrier_ids)
+    };
+    return this.request(
+      'POST',
+      '/v1/rates',
+      z.object({
+        shipment_id: response.resourceId,
+        rate_response: z.object({
+          rates: z.array(response.rate),
+          errors: z
+            .array(
+              z.object({
+                error_source: response.optionalText,
+                error_type: response.optionalText,
+                error_code: response.optionalText
+              })
+            )
+            .optional()
+        })
+      }),
+      params
+    );
   }
-
   async estimateRates(params: EstimateRatesRequest) {
-    let res = await this.axios.post('/v1/rates/estimate', params);
-    return res.data as RateEstimate[];
+    validateRequest(params);
+    return this.request('POST', '/v1/rates/estimate', z.array(response.rate), {
+      ...params,
+      carrier_ids: await this.carrierIds(params.carrier_ids)
+    });
   }
-
-  async getRateById(rateId: string) {
-    let res = await this.axios.get(`/v1/rates/${rateId}`);
-    return res.data as RateEstimate;
-  }
-
-  // ── Labels ─────────────────────────────────────────────────
-
   async createLabel(params: CreateLabelRequest) {
-    let res = await this.axios.post('/v1/labels', params);
-    return res.data as LabelResponse;
+    const result = await this.request('POST', '/v1/labels', response.label, params);
+    if (
+      (result.carrier_id !== undefined && result.carrier_id !== params.shipment.carrier_id) ||
+      (result.service_code !== undefined &&
+        result.service_code !== params.shipment.service_code) ||
+      (params.shipment.external_shipment_id !== undefined &&
+        result.external_shipment_id !== undefined &&
+        result.external_shipment_id !== params.shipment.external_shipment_id)
+    ) {
+      const error = createApiServiceError(
+        'The label purchase returned different shipment details. Check the existing label before purchasing again.'
+      );
+      Object.assign(error.data, {
+        writeMayHaveOccurred: true,
+        labelId: result.label_id,
+        shipmentId: result.shipment_id
+      });
+      throw error;
+    }
+    return result;
   }
-
-  async createLabelFromRate(rateId: string, params?: Partial<CreateLabelRequest>) {
-    let res = await this.axios.post(`/v1/labels/rates/${rateId}`, params || {});
-    return res.data as LabelResponse;
+  async createLabelFromRate(id: string, params?: Partial<CreateLabelRequest>) {
+    const rates = await this.request(
+      'GET',
+      `/v1/rates/${idPath(id)}`,
+      z.object({ shipment_id: response.resourceId, rates: z.array(response.rate) })
+    );
+    const matches = rates.rates.filter(rate => rate.rate_id === id);
+    if (matches.length !== 1)
+      throw createApiServiceError(
+        'The rate lookup did not identify this exact rate and shipment. Retrieve current rates before purchasing a label.'
+      );
+    const result = await this.request(
+      'POST',
+      `/v1/labels/rates/${idPath(id)}`,
+      response.label,
+      params ?? {}
+    );
+    if (result.shipment_id !== rates.shipment_id) {
+      const error = createApiServiceError(
+        'The label purchase returned a different rate shipment. Check the existing label before purchasing again.'
+      );
+      Object.assign(error.data, {
+        writeMayHaveOccurred: true,
+        labelId: result.label_id,
+        shipmentId: result.shipment_id,
+        rateId: id
+      });
+      throw error;
+    }
+    return result;
   }
-
-  async createLabelFromShipment(shipmentId: string, params?: Partial<CreateLabelRequest>) {
-    let res = await this.axios.post(`/v1/labels/shipment/${shipmentId}`, params || {});
-    return res.data as LabelResponse;
+  async createLabelFromShipment(id: string, params?: Partial<CreateLabelRequest>) {
+    const result = await this.request(
+      'POST',
+      `/v1/labels/shipment/${idPath(id)}`,
+      response.label,
+      params ?? {}
+    );
+    if (result.shipment_id !== id) {
+      const error = createApiServiceError(
+        'The label purchase returned a different shipment. Check the existing label before purchasing again.'
+      );
+      error.data.writeMayHaveOccurred = true;
+      error.data.labelId = result.label_id;
+      error.data.shipmentId = result.shipment_id;
+      throw error;
+    }
+    return result;
   }
-
-  async getLabel(labelId: string) {
-    let res = await this.axios.get(`/v1/labels/${labelId}`);
-    return res.data as LabelResponse;
+  async getLabel(id: string, downloadType: 'url' | 'inline' = 'url') {
+    const result = await this.request(
+      'GET',
+      `/v1/labels/${idPath(id)}`,
+      response.label,
+      undefined,
+      { label_download_type: downloadType }
+    );
+    if (result.label_id !== id)
+      throw createApiServiceError(
+        'ShipEngine returned a different label. Check the exact ID before continuing.'
+      );
+    return result;
   }
-
   async listLabels(params?: ListLabelsParams) {
-    let res = await this.axios.get('/v1/labels', { params });
-    return res.data as PaginatedResponse<LabelResponse>;
+    if (params?.sort_by === 'ship_date')
+      throw createApiServiceError(
+        'Sorting labels by ship_date is unsupported. Use created_at, modified_at or voided_at.'
+      );
+    return this.request(
+      'GET',
+      '/v1/labels',
+      pageSchema.extend({ labels: z.array(response.label) }),
+      undefined,
+      params
+    );
   }
-
-  async voidLabel(labelId: string) {
-    let res = await this.axios.put(`/v1/labels/${labelId}/void`);
-    return res.data as VoidLabelResponse;
+  async voidLabel(id: string) {
+    return this.request(
+      'PUT',
+      `/v1/labels/${idPath(id)}/void`,
+      z.object({ approved: z.boolean(), message: z.string() })
+    );
   }
-
-  async createReturnLabel(labelId: string) {
-    let res = await this.axios.post(`/v1/labels/${labelId}/return`);
-    return res.data as LabelResponse;
-  }
-
-  // ── Shipments ──────────────────────────────────────────────
-
   async createShipments(shipments: CreateShipmentRequest[]) {
-    let res = await this.axios.post('/v1/shipments', { shipments });
-    return res.data as CreateShipmentsResponse;
+    const result = await this.request(
+      'POST',
+      '/v1/shipments',
+      z.object({ shipments: z.array(response.shipment), has_errors: z.boolean() }),
+      { shipments }
+    );
+    if (
+      result.has_errors ||
+      result.shipments.length !== shipments.length ||
+      result.shipments.some(s => s.errors?.length)
+    ) {
+      const error = createApiServiceError(
+        'ShipEngine reported an incomplete shipment creation. Check the provider for any created shipment before retrying.'
+      );
+      Object.assign(error.data, {
+        writeMayHaveOccurred: true,
+        shipmentIds: result.shipments.map(s => s.shipment_id)
+      });
+      throw error;
+    }
+    return result;
   }
-
-  async getShipment(shipmentId: string) {
-    let res = await this.axios.get(`/v1/shipments/${shipmentId}`);
-    return res.data as ShipmentResponse;
+  async getShipment(id: string) {
+    return this.exact(`/v1/shipments/${idPath(id)}`, response.shipment, 'shipment_id', id);
   }
-
-  async updateShipment(shipmentId: string, params: Partial<CreateShipmentRequest>) {
-    let res = await this.axios.put(`/v1/shipments/${shipmentId}`, params);
-    return res.data as ShipmentResponse;
+  async updateShipment(id: string, params: Partial<CreateShipmentRequest>) {
+    if (!Object.keys(params).length)
+      throw createApiServiceError('Provide at least one shipment field to update.');
+    validateRequest(params);
+    const before = await this.getShipment(id);
+    if (this.redactedRecords.has(before))
+      throw createApiServiceError(
+        'The existing shipment contains sensitive values that cannot be safely reused for an update. Review the provider record before changing it.'
+      );
+    const result = await this.request(
+      'PUT',
+      `/v1/shipments/${idPath(id)}`,
+      response.shipment,
+      {
+        carrier_id: before.carrier_id,
+        service_code: before.service_code,
+        shipping_rule_id: before.shipping_rule_id,
+        external_order_id: before.external_order_id,
+        items: before.items,
+        tax_identifiers: before.tax_identifiers,
+        shipment_number: before.shipment_number,
+        is_return: before.is_return,
+        order_source_code: before.order_source_code,
+        comparison_rate_type: before.comparison_rate_type,
+        ship_date: before.ship_date,
+        packages: before.packages,
+        tags: before.tags,
+        confirmation: before.confirmation,
+        external_shipment_id: before.external_shipment_id,
+        warehouse_id: before.warehouse_id,
+        return_to: before.return_to,
+        customs: before.customs,
+        advanced_options: before.advanced_options,
+        insurance_provider: before.insurance_provider,
+        ...params,
+        ship_from: params.ship_from ?? before.ship_from,
+        ship_to: params.ship_to ?? before.ship_to
+      }
+    );
+    if (result.errors?.length)
+      throw createApiServiceError(
+        'ShipEngine reported shipment update errors. Check the provider state before retrying.'
+      );
+    if (result.shipment_id !== id)
+      throw createApiServiceError(
+        'ShipEngine returned a different shipment. Check the provider state before continuing.'
+      );
+    return result;
   }
-
   async listShipments(params?: ListShipmentsParams) {
-    let res = await this.axios.get('/v1/shipments', { params });
-    return res.data as PaginatedResponse<ShipmentResponse>;
+    return this.request(
+      'GET',
+      '/v1/shipments',
+      pageSchema.extend({ shipments: z.array(response.shipment) }),
+      undefined,
+      params
+    );
   }
-
-  async cancelShipment(shipmentId: string) {
-    await this.axios.delete(`/v1/shipments/${shipmentId}`);
+  async cancelShipment(id: string) {
+    await this.getShipment(id);
+    await this.request('PUT', `/v1/shipments/${idPath(id)}/cancel`, z.unknown());
+    const result = await this.getShipment(id);
+    if (result.shipment_status !== 'cancelled')
+      throw createApiServiceError(
+        'Shipment cancellation is not yet confirmed. The record is retained; check its status before retrying.'
+      );
+    return result;
   }
-
-  // ── Tracking ───────────────────────────────────────────────
-
   async getTrackingInfo(carrierCode: string, trackingNumber: string) {
-    let res = await this.axios.get('/v1/tracking', {
-      params: { carrier_code: carrierCode, tracking_number: trackingNumber }
+    const result = await this.request('GET', '/v1/tracking', response.tracking, undefined, {
+      carrier_code: carrierCode,
+      tracking_number: trackingNumber
     });
-    return res.data as TrackingInfo;
+    if (
+      result.tracking_number !== trackingNumber ||
+      (result.carrier_code !== undefined && result.carrier_code !== carrierCode)
+    )
+      throw createApiServiceError(
+        'ShipEngine returned tracking for a different package or carrier. Check the exact tracking number and carrier code.'
+      );
+    return result;
   }
-
-  async getLabelTrackingInfo(labelId: string) {
-    let res = await this.axios.get(`/v1/labels/${labelId}/track`);
-    return res.data as TrackingInfo;
+  async getLabelTrackingInfo(id: string) {
+    const label = await this.getLabel(id);
+    if (!label.tracking_number)
+      throw createApiServiceError(
+        'This label has no tracking number yet. Check its existing status before continuing.'
+      );
+    const result = await this.request(
+      'GET',
+      `/v1/labels/${idPath(id)}/track`,
+      response.tracking
+    );
+    if (
+      result.tracking_number !== label.tracking_number ||
+      (label.carrier_code !== undefined &&
+        result.carrier_code !== undefined &&
+        result.carrier_code !== label.carrier_code)
+    )
+      throw createApiServiceError(
+        'ShipEngine returned tracking for a different label package. Check the existing label before continuing.'
+      );
+    return result;
   }
-
-  async startTracking(carrierCode: string, trackingNumber: string) {
-    await this.axios.post('/v1/tracking/start', null, {
-      params: { carrier_code: carrierCode, tracking_number: trackingNumber }
-    });
-  }
-
-  async stopTracking(carrierCode: string, trackingNumber: string) {
-    await this.axios.post('/v1/tracking/stop', null, {
-      params: { carrier_code: carrierCode, tracking_number: trackingNumber }
-    });
-  }
-
-  // ── Carriers ───────────────────────────────────────────────
-
   async listCarriers() {
-    let res = await this.axios.get('/v1/carriers');
-    return res.data as ListCarriersResponse;
+    return this.request(
+      'GET',
+      '/v1/carriers',
+      z.object({ carriers: z.array(response.carrier) })
+    );
   }
-
-  async getCarrier(carrierId: string) {
-    let res = await this.axios.get(`/v1/carriers/${carrierId}`);
-    return res.data as CarrierResponse;
+  async listCarrierServices(id: string) {
+    const result = await this.request(
+      'GET',
+      `/v1/carriers/${idPath(id)}/services`,
+      z.object({
+        services: z.array(
+          z.object({
+            carrier_id: response.resourceId,
+            carrier_code: z.string(),
+            service_code: z.string(),
+            name: z.string(),
+            domestic: z.boolean(),
+            international: z.boolean()
+          })
+        )
+      })
+    );
+    if (result.services.some(service => service.carrier_id !== id))
+      throw createApiServiceError(
+        'ShipEngine returned services for a different carrier. Check the exact carrier ID.'
+      );
+    return result;
   }
-
-  async listCarrierServices(carrierId: string) {
-    let res = await this.axios.get(`/v1/carriers/${carrierId}/services`);
-    return res.data as ListCarrierServicesResponse;
+  async listCarrierPackageTypes(id: string) {
+    return this.request(
+      'GET',
+      `/v1/carriers/${idPath(id)}/packages`,
+      z.object({
+        packages: z.array(
+          z.object({
+            package_code: z.string(),
+            name: z.string(),
+            description: response.optionalText
+          })
+        )
+      })
+    );
   }
-
-  async listCarrierPackageTypes(carrierId: string) {
-    let res = await this.axios.get(`/v1/carriers/${carrierId}/packages`);
-    return res.data as ListCarrierPackagesResponse;
-  }
-
-  async listCarrierOptions(carrierId: string) {
-    let res = await this.axios.get(`/v1/carriers/${carrierId}/options`);
-    return res.data as ListCarrierOptionsResponse;
-  }
-
-  // ── Warehouses ─────────────────────────────────────────────
-
   async createWarehouse(params: CreateWarehouseRequest) {
-    let res = await this.axios.post('/v1/warehouses', params);
-    return res.data as WarehouseResponse;
+    return this.request('POST', '/v1/warehouses', response.warehouse, params);
   }
-
   async listWarehouses() {
-    let res = await this.axios.get('/v1/warehouses');
-    return res.data as ListWarehousesResponse;
+    return this.request(
+      'GET',
+      '/v1/warehouses',
+      z.object({ warehouses: z.array(response.warehouse) })
+    );
   }
-
-  async getWarehouse(warehouseId: string) {
-    let res = await this.axios.get(`/v1/warehouses/${warehouseId}`);
-    return res.data as WarehouseResponse;
+  async getWarehouse(id: string) {
+    return this.exact(`/v1/warehouses/${idPath(id)}`, response.warehouse, 'warehouse_id', id);
   }
-
-  async updateWarehouse(warehouseId: string, params: Partial<CreateWarehouseRequest>) {
-    let res = await this.axios.put(`/v1/warehouses/${warehouseId}`, params);
-    return res.data as WarehouseResponse;
+  async updateWarehouse(id: string, params: Partial<CreateWarehouseRequest>) {
+    if (!Object.keys(params).length)
+      throw createApiServiceError('Provide at least one warehouse field to update.');
+    validateRequest(params);
+    const before = await this.getWarehouse(id);
+    if (this.redactedRecords.has(before))
+      throw createApiServiceError(
+        'The existing warehouse contains sensitive values that cannot be safely reused for an update. Review the provider record before changing it.'
+      );
+    await this.request('PUT', `/v1/warehouses/${idPath(id)}`, z.unknown(), {
+      name: params.name ?? before.name,
+      origin_address: params.origin_address ?? before.origin_address,
+      return_address: params.return_address ?? before.return_address
+    });
+    return this.getWarehouse(id);
   }
-
-  async deleteWarehouse(warehouseId: string) {
-    await this.axios.delete(`/v1/warehouses/${warehouseId}`);
+  async deleteWarehouse(id: string) {
+    await this.getWarehouse(id);
+    await this.request('DELETE', `/v1/warehouses/${idPath(id)}`, z.unknown());
+    try {
+      await this.getWarehouse(id);
+    } catch (error) {
+      if (error instanceof ServiceError && Number(error.data.upstreamStatus) === 404) return;
+      throw error;
+    }
+    throw createApiServiceError(
+      'Warehouse deletion is not confirmed. Check the provider record before retrying.'
+    );
   }
-
-  // ── Webhooks ───────────────────────────────────────────────
-
-  async createWebhook(params: CreateWebhookRequest) {
-    let res = await this.axios.post('/v1/environment/webhooks', params);
-    return res.data as WebhookResponse;
-  }
-
-  async listWebhooks() {
-    let res = await this.axios.get('/v1/environment/webhooks');
-    return res.data as WebhookResponse[];
-  }
-
-  async getWebhook(webhookId: string) {
-    let res = await this.axios.get(`/v1/environment/webhooks/${webhookId}`);
-    return res.data as WebhookResponse;
-  }
-
-  async updateWebhook(webhookId: string, params: Partial<CreateWebhookRequest>) {
-    let res = await this.axios.put(`/v1/environment/webhooks/${webhookId}`, params);
-    return res.data as WebhookResponse;
-  }
-
-  async deleteWebhook(webhookId: string) {
-    await this.axios.delete(`/v1/environment/webhooks/${webhookId}`);
-  }
-
-  // ── Batches ────────────────────────────────────────────────
-
-  async listBatches(params?: ListBatchesParams) {
-    let res = await this.axios.get('/v1/batches', { params });
-    return res.data as PaginatedResponse<BatchResponse>;
-  }
-
-  async getBatch(batchId: string) {
-    let res = await this.axios.get(`/v1/batches/${batchId}`);
-    return res.data as BatchResponse;
-  }
-
-  // ── Manifests ──────────────────────────────────────────────
-
   async createManifest(params: CreateManifestRequest) {
-    let res = await this.axios.post('/v1/manifests', params);
-    return res.data as ManifestResponse;
+    return this.request('POST', '/v1/manifests', response.manifestsResponse, params);
   }
-
+  async getManifest(id: string) {
+    return this.exact(`/v1/manifests/${idPath(id)}`, response.manifest, 'manifest_id', id);
+  }
+  async getManifestRequest(id: string) {
+    const result = await this.request(
+      'GET',
+      `/v1/manifests/requests/${idPath(id)}`,
+      response.manifestsResponse
+    );
+    if (!result.manifests?.length && !result.manifest_requests?.length)
+      throw createApiServiceError(
+        'Manifest request state is unavailable. Check the exact provider request before submitting another manifest.'
+      );
+    if (
+      result.manifest_requests?.length &&
+      !result.manifest_requests.some(request => request.manifest_request_id === id)
+    )
+      throw createApiServiceError(
+        'ShipEngine returned a different manifest request. Check the exact ID before continuing.'
+      );
+    return result;
+  }
   async listManifests(params?: ListManifestsParams) {
-    let res = await this.axios.get('/v1/manifests', { params });
-    return res.data as PaginatedResponse<ManifestResponse>;
+    return this.request(
+      'GET',
+      '/v1/manifests',
+      pageSchema.extend({ manifests: z.array(response.manifest) }),
+      undefined,
+      params
+    );
   }
-
-  // ── Tags ───────────────────────────────────────────────────
-
-  async listTags() {
-    let res = await this.axios.get('/v1/tags');
-    return res.data as ListTagsResponse;
-  }
-
-  // ── Service Points ─────────────────────────────────────────
-
   async listServicePoints(params: ListServicePointsRequest) {
-    let res = await this.axios.post('/v1/service_points/list', params);
-    return res.data as ListServicePointsResponse;
+    return this.request(
+      'POST',
+      '/v1/service_points/list',
+      z.object({
+        service_points: z.array(
+          z.object({
+            service_point_id: z.string(),
+            carrier_code: z.string(),
+            service_codes: z.array(z.string()),
+            company_name: response.optionalText,
+            address_line1: z.string(),
+            country_code: z.string(),
+            city_locality: response.optionalText,
+            state_province: response.optionalText,
+            postal_code: response.optionalText,
+            lat: z.number().finite(),
+            long: z.number().finite(),
+            distance_in_meters: z.number().finite().optional(),
+            features: z.array(z.string()).optional()
+          })
+        )
+      }),
+      params
+    );
   }
-
-  // ── Pickups ────────────────────────────────────────────────
-
   async schedulePickup(params: SchedulePickupRequest) {
-    let res = await this.axios.post('/v1/pickups', params);
-    return res.data as PickupResponse;
+    if (new Set(params.label_ids).size !== params.label_ids.length)
+      throw createApiServiceError('Provide each pickup label ID only once.');
+    const result = await this.request('POST', '/v1/pickups', response.pickup, params);
+    if (
+      result.label_ids.length !== params.label_ids.length ||
+      new Set(result.label_ids).size !== result.label_ids.length ||
+      result.label_ids.some(id => !params.label_ids.includes(id))
+    ) {
+      const error = createApiServiceError(
+        'The pickup response identifies different labels. Check the existing pickup before scheduling another.'
+      );
+      error.data.writeMayHaveOccurred = true;
+      error.data.pickupId = result.pickup_id;
+      throw error;
+    }
+    return result;
   }
-
+  async getPickup(id: string) {
+    return this.exact(`/v1/pickups/${idPath(id, 'pickup')}`, response.pickup, 'pickup_id', id);
+  }
   async listPickups(params?: ListPickupsParams) {
-    let res = await this.axios.get('/v1/pickups', { params });
-    return res.data as PaginatedResponse<PickupResponse>;
+    return this.request(
+      'GET',
+      '/v1/pickups',
+      pageSchema.extend({ pickups: z.array(response.pickup) }),
+      undefined,
+      params
+    );
   }
-
-  async deletePickup(pickupId: string) {
-    await this.axios.delete(`/v1/pickups/${pickupId}`);
+  async deletePickup(id: string) {
+    await this.getPickup(id);
+    const result = await this.request(
+      'DELETE',
+      `/v1/pickups/${idPath(id, 'pickup')}`,
+      z.object({ pickup_id: response.pickupId })
+    );
+    if (result.pickup_id !== id)
+      throw createApiServiceError(
+        'ShipEngine returned a different pickup. Check the provider before continuing.'
+      );
+    const after = await this.getPickup(id);
+    if (!after.cancelled_at && !after.canceled_at)
+      throw createApiServiceError(
+        'Pickup cancellation is not confirmed. Carrier history is retained; check its status before retrying.'
+      );
   }
 }
-
-// ── Types ──────────────────────────────────────────────────
-
-export interface AddressInput {
-  name?: string;
-  company_name?: string;
-  phone?: string;
-  address_line1: string;
-  address_line2?: string;
-  address_line3?: string;
-  city_locality?: string;
-  state_province?: string;
-  postal_code?: string;
-  country_code: string;
-  address_residential_indicator?: 'unknown' | 'yes' | 'no';
-}
-
-export interface AddressValidationResult {
-  status: 'verified' | 'unverified' | 'warning' | 'error';
-  original_address: AddressInput;
-  matched_address: AddressInput | null;
-  messages: Array<{
-    code: string;
-    message: string;
-    type: 'info' | 'warning' | 'error';
-    detail_code: string;
-  }>;
-}
-
-export interface AddressRecognitionResult {
-  score: number;
-  address: AddressInput;
-  entities: Array<{
-    type: string;
-    score: number;
-    text: string;
-    start_index: number;
-    end_index: number;
-    result: Record<string, any>;
-  }>;
-}
-
-export interface Weight {
-  value: number;
-  unit: 'pound' | 'ounce' | 'gram' | 'kilogram';
-}
-
-export interface Dimensions {
-  length: number;
-  width: number;
-  height: number;
-  unit: 'inch' | 'centimeter';
-}
-
-export interface Package {
-  weight: Weight;
-  dimensions?: Dimensions;
-  insured_value?: { amount: number; currency: string };
-  package_code?: string;
-  content_description?: string;
-}
-
-export interface GetRatesRequest {
-  shipment_id?: string;
-  shipment?: {
-    ship_from: AddressInput;
-    ship_to: AddressInput;
-    packages: Package[];
-    carrier_ids?: string[];
-    service_code?: string;
-    confirmation?: string;
-    customs?: CustomsInfo;
-  };
-  rate_options?: {
-    carrier_ids?: string[];
-    service_codes?: string[];
-    package_types?: string[];
-    calculate_tax_amount?: boolean;
-    preferred_currency?: string;
-  };
-}
-
-export interface GetRatesResponse {
-  shipment_id: string;
-  carrier_id: string;
-  status: string;
-  rate_response: {
-    rates: RateEstimate[];
-    invalid_rates: any[];
-    rate_request_id: string;
-    shipment_id: string;
-    created_at: string;
-    status: string;
-    errors: any[];
-  };
-}
-
-export interface RateEstimate {
-  rate_id: string;
-  rate_type: string;
-  carrier_id: string;
-  shipping_amount: MoneyAmount;
-  insurance_amount: MoneyAmount;
-  confirmation_amount: MoneyAmount;
-  other_amount: MoneyAmount;
-  tax_amount?: MoneyAmount;
-  zone?: number;
-  package_type: string;
-  delivery_days?: number;
-  guaranteed_service: boolean;
-  estimated_delivery_date?: string;
-  carrier_delivery_days?: string;
-  ship_date?: string;
-  negotiated_rate: boolean;
-  service_type: string;
-  service_code: string;
-  trackable: boolean;
-  carrier_code: string;
-  carrier_nickname: string;
-  carrier_friendly_name: string;
-  validation_status: string;
-  warning_messages: string[];
-  error_messages: string[];
-}
-
-export interface MoneyAmount {
-  currency: string;
-  amount: number;
-}
-
-export interface EstimateRatesRequest {
-  carrier_id?: string;
-  carrier_ids?: string[];
-  from_country_code?: string;
-  from_postal_code?: string;
-  from_city_locality?: string;
-  from_state_province?: string;
-  to_country_code: string;
-  to_postal_code?: string;
-  to_city_locality?: string;
-  to_state_province?: string;
-  weight: Weight;
-  dimensions?: Dimensions;
-  confirmation?: string;
-  address_residential_indicator?: string;
-  ship_date?: string;
-}
-
-export interface CustomsInfo {
-  contents: 'merchandise' | 'gift' | 'returned_goods' | 'documents' | 'sample';
-  non_delivery: 'treat_as_abandoned' | 'return_to_sender';
-  customs_items: Array<{
-    description: string;
-    quantity: number;
-    value: { amount: number; currency: string };
-    harmonized_tariff_code?: string;
-    country_of_origin?: string;
-    sku?: string;
-  }>;
-}
-
-export interface CreateLabelRequest {
-  shipment: {
-    carrier_id: string;
-    service_code: string;
-    ship_from: AddressInput;
-    ship_to: AddressInput;
-    packages: Package[];
-    confirmation?: string;
-    customs?: CustomsInfo;
-    external_shipment_id?: string;
-    warehouse_id?: string;
-  };
-  label_format?: 'pdf' | 'png' | 'zpl';
-  label_layout?: '4x6' | 'letter';
-  label_download_type?: 'url' | 'inline';
-  display_scheme?: string;
-  is_return_label?: boolean;
-}
-
-export interface LabelResponse {
-  label_id: string;
-  status: string;
-  shipment_id: string;
-  ship_date: string;
-  created_at: string;
-  shipment_cost: MoneyAmount;
-  insurance_cost: MoneyAmount;
-  tracking_number: string;
-  is_return_label: boolean;
-  rma_number?: string;
-  is_international: boolean;
-  batch_id?: string;
-  carrier_id: string;
-  service_code: string;
-  package_code: string;
-  voided: boolean;
-  voided_at?: string;
-  label_format: string;
-  display_scheme: string;
-  label_layout: string;
-  trackable: boolean;
-  label_image_id?: string;
-  carrier_code: string;
-  tracking_status: string;
-  label_download: {
-    pdf?: string;
-    png?: string;
-    zpl?: string;
-    href: string;
-  };
-  form_download?: { href: string };
-  insurance_claim?: { href: string };
-  packages: any[];
-  charge_event?: string;
-}
-
-export interface VoidLabelResponse {
-  approved: boolean;
-  message: string;
-}
-
-export interface ListLabelsParams {
-  label_status?: string;
-  carrier_id?: string;
-  service_code?: string;
-  tracking_number?: string;
-  batch_id?: string;
-  warehouse_id?: string;
-  created_at_start?: string;
-  created_at_end?: string;
-  page?: number;
-  page_size?: number;
-  sort_dir?: 'asc' | 'desc';
-  sort_by?: string;
-}
-
-export interface CreateShipmentRequest {
-  carrier_id?: string;
-  service_code?: string;
-  ship_from: AddressInput;
-  ship_to: AddressInput;
-  ship_date?: string;
-  packages: Package[];
-  confirmation?: string;
-  customs?: CustomsInfo;
-  external_shipment_id?: string;
-  warehouse_id?: string;
-  return_to?: AddressInput;
-  advanced_options?: Record<string, any>;
-  insurance_provider?: string;
-  tags?: Array<{ name: string }>;
-}
-
-export interface ShipmentResponse {
-  shipment_id: string;
-  carrier_id: string;
-  service_code: string;
-  external_shipment_id?: string;
-  ship_date: string;
-  created_at: string;
-  modified_at: string;
-  shipment_status: string;
-  ship_to: AddressInput;
-  ship_from: AddressInput;
-  warehouse_id?: string;
-  return_to?: AddressInput;
-  confirmation?: string;
-  customs?: CustomsInfo;
-  advanced_options?: Record<string, any>;
-  insurance_provider?: string;
-  tags: Array<{ name: string }>;
-  packages: any[];
-  total_weight: Weight;
-  items?: any[];
-}
-
-export interface CreateShipmentsResponse {
-  shipments: ShipmentResponse[];
-  has_errors: boolean;
-}
-
-export interface ListShipmentsParams {
-  shipment_status?: string;
-  batch_id?: string;
-  tag?: string;
-  created_at_start?: string;
-  created_at_end?: string;
-  modified_at_start?: string;
-  modified_at_end?: string;
-  page?: number;
-  page_size?: number;
-  sort_dir?: 'asc' | 'desc';
-  sort_by?: string;
-  sales_order_id?: string;
-}
-
-export interface TrackingInfo {
-  tracking_number: string;
-  tracking_url?: string;
-  status_code: string;
-  carrier_code?: string;
-  carrier_id?: number;
-  status_description: string;
-  carrier_status_code?: string;
-  carrier_detail_code?: string;
-  carrier_status_description?: string;
-  ship_date?: string;
-  estimated_delivery_date?: string;
-  actual_delivery_date?: string;
-  exception_description?: string;
-  events: TrackingEvent[];
-}
-
-export interface TrackingEvent {
-  occurred_at: string;
-  carrier_occurred_at?: string;
-  description: string;
-  city_locality?: string;
-  state_province?: string;
-  postal_code?: string;
-  country_code?: string;
-  company_name?: string;
-  signer?: string;
-  event_code?: string;
-  carrier_detail_code?: string;
-  status_code?: string;
-  status_description?: string;
-  carrier_status_code?: string;
-  latitude?: number;
-  longitude?: number;
-}
-
-export interface CarrierResponse {
-  carrier_id: string;
-  carrier_code: string;
-  account_number: string;
-  requires_funded_amount: boolean;
-  balance: number;
-  nickname: string;
-  friendly_name: string;
-  primary: boolean;
-  has_multi_package_supporting_services: boolean;
-  supports_label_messages: boolean;
-  services: any[];
-  packages: any[];
-  options: any[];
-}
-
-export interface ListCarriersResponse {
-  carriers: CarrierResponse[];
-}
-
-export interface CarrierServiceResponse {
-  carrier_id: string;
-  carrier_code: string;
-  service_code: string;
-  name: string;
-  domestic: boolean;
-  international: boolean;
-  is_multi_package_supported: boolean;
-}
-
-export interface ListCarrierServicesResponse {
-  services: CarrierServiceResponse[];
-}
-
-export interface CarrierPackageResponse {
-  package_id?: string;
-  package_code: string;
-  name: string;
-  description?: string;
-  dimensions?: Dimensions;
-}
-
-export interface ListCarrierPackagesResponse {
-  packages: CarrierPackageResponse[];
-}
-
-export interface CarrierOptionResponse {
-  name: string;
-  default_value: string;
-  description: string;
-}
-
-export interface ListCarrierOptionsResponse {
-  options: CarrierOptionResponse[];
-}
-
-export interface CreateWarehouseRequest {
-  name: string;
-  origin_address: AddressInput;
-  return_address?: AddressInput;
-}
-
-export interface WarehouseResponse {
-  warehouse_id: string;
-  name: string;
-  created_at: string;
-  origin_address: AddressInput;
-  return_address: AddressInput;
-  is_default: boolean;
-}
-
-export interface ListWarehousesResponse {
-  warehouses: WarehouseResponse[];
-}
-
-export interface CreateWebhookRequest {
-  event: string;
-  url: string;
-  headers?: Record<string, string>;
-}
-
-export interface WebhookResponse {
-  webhook_id: string;
-  event: string;
-  url: string;
-  headers: Record<string, string>;
-}
-
-export interface BatchResponse {
-  batch_id: string;
-  external_batch_id?: string;
-  batch_number: string;
-  created_at: string;
-  processed_at?: string;
-  errors: number;
-  warnings: number;
-  completed: number;
-  forms: number;
-  count: number;
-  batch_shipments_url?: { href: string };
-  batch_labels_url?: { href: string };
-  batch_errors_url?: { href: string };
-  label_download?: { href: string };
-  form_download?: { href: string };
-  status: string;
-  label_layout?: string;
-  label_format?: string;
-}
-
-export interface ListBatchesParams {
-  status?: string;
-  page?: number;
-  page_size?: number;
-  sort_dir?: 'asc' | 'desc';
-  sort_by?: string;
-}
-
-export interface ManifestResponse {
-  manifest_id: string;
-  form_id: string;
-  created_at: string;
-  ship_date: string;
-  shipments: number;
-  warehouse_id: string;
-  submission_id: string;
-  carrier_id: string;
-  manifest_download: { href: string };
-}
-
-export interface CreateManifestRequest {
-  carrier_id: string;
-  excluded_label_ids?: string[];
-  label_ids?: string[];
-  warehouse_id?: string;
-  ship_date?: string;
-}
-
-export interface ListManifestsParams {
-  warehouse_id?: string;
-  carrier_id?: string;
-  ship_date_start?: string;
-  ship_date_end?: string;
-  created_at_start?: string;
-  created_at_end?: string;
-  page?: number;
-  page_size?: number;
-}
-
-export interface ListTagsResponse {
-  tags: Array<{ name: string }>;
-}
-
-export interface ListServicePointsRequest {
-  address_query?: string;
-  address?: {
-    address_line1?: string;
-    city_locality?: string;
-    state_province?: string;
-    postal_code?: string;
-    country_code: string;
-  };
-  providers: Array<{
-    carrier_id: string;
-    service_code?: string;
-  }>;
-  lat?: number;
-  long?: number;
-  radius?: number;
-  radius_unit?: 'km' | 'mi';
-  max_results?: number;
-}
-
-export interface ServicePointResponse {
-  carrier_code: string;
-  service_codes: string[];
-  service_point_id: string;
-  name: string;
-  address: AddressInput;
-  lat: number;
-  long: number;
-  distance_in_km?: number;
-  distance_in_miles?: number;
-  hours_of_operation?: any;
-  features?: string[];
-}
-
-export interface ListServicePointsResponse {
-  service_points: ServicePointResponse[];
-}
-
-export interface SchedulePickupRequest {
-  label_ids: string[];
-  contact_details: {
-    name: string;
-    email?: string;
-    phone: string;
-  };
-  pickup_notes?: string;
-  pickup_window: {
-    start_at: string;
-    end_at: string;
-  };
-}
-
-export interface PickupResponse {
-  pickup_id: string;
-  label_ids: string[];
-  created_at: string;
-  cancelled_at?: string;
-  carrier_id: string;
-  confirmation_number: string;
-  warehouse_id?: string;
-  contact_details: {
-    name: string;
-    email?: string;
-    phone: string;
-  };
-  pickup_notes?: string;
-  pickup_window: {
-    start_at: string;
-    end_at: string;
-  };
-}
-
-export interface ListPickupsParams {
-  carrier_id?: string;
-  warehouse_id?: string;
-  created_at_start?: string;
-  created_at_end?: string;
-  page?: number;
-  page_size?: number;
-}
-
-export interface PaginatedResponse<_T> {
-  total: number;
-  page: number;
-  pages: number;
-  links: {
-    first: { href: string };
-    last: { href: string };
-    prev: { href: string };
-    next: { href: string };
-  };
-  [key: string]: any;
-}
+export const createClient = (ctx: {
+  auth: { token: string; baseUrl?: string };
+  config?: unknown;
+}) => {
+  const legacyBase =
+    ctx.config && typeof ctx.config === 'object'
+      ? Reflect.get(ctx.config, 'baseUrl')
+      : undefined;
+  if (ctx.auth.baseUrl && legacyBase && ctx.auth.baseUrl !== legacyBase)
+    throw createApiServiceError(
+      'The saved API host conflicts with the connection. Reconnect with the intended host.'
+    );
+  return new Client({
+    token: ctx.auth.token,
+    baseUrl: ctx.auth.baseUrl ?? (typeof legacyBase === 'string' ? legacyBase : undefined)
+  });
+};

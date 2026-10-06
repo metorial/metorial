@@ -1,7 +1,23 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DialpadClient } from '../lib/client';
+import { malformed } from '../lib/contracts';
+import { invoke } from '../lib/operations';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  blockedNumbers: z
+    .array(
+      z.object({
+        blockedNumberId: z.string().optional(),
+        phoneNumber: z.string().optional()
+      })
+    )
+    .optional()
+    .describe('List of blocked numbers (for list action)'),
+  nextCursor: z.string().optional(),
+  success: z.boolean().optional(),
+  actionPerformed: z.string()
+});
 
 export let manageBlockedNumberTool = SlateTool.create(spec, {
   name: 'Manage Blocked Number',
@@ -15,75 +31,22 @@ export let manageBlockedNumberTool = SlateTool.create(spec, {
       blockedNumberId: z
         .string()
         .optional()
-        .describe('Blocked number ID to remove (for unblock action)'),
-      cursor: z.string().optional().describe('Pagination cursor (for list action)')
-    })
-  )
-  .output(
-    z.object({
-      blockedNumbers: z
-        .array(
-          z.object({
-            blockedNumberId: z.string().optional(),
-            phoneNumber: z.string().optional()
-          })
-        )
+        .describe(
+          'Exact E.164 phone number returned as blockedNumberId by list; the API has no opaque block ID.'
+        ),
+      cursor: z
+        .string()
         .optional()
-        .describe('List of blocked numbers (for list action)'),
-      nextCursor: z.string().optional(),
-      success: z.boolean().optional(),
-      actionPerformed: z.string()
+        .describe(
+          'Exact native pagination cursor for list; number target filters apply only to the returned page'
+        )
     })
   )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new DialpadClient({
-      token: ctx.auth.token,
-      environment: ctx.auth.environment
-    });
-
-    let { action } = ctx.input;
-
-    if (action === 'list') {
-      let result = await client.listBlockedNumbers({ cursor: ctx.input.cursor });
-
-      let blockedNumbers = (result.items || []).map((n: any) => ({
-        blockedNumberId: String(n.id),
-        phoneNumber: n.phone_number || n.number
-      }));
-
-      return {
-        output: {
-          blockedNumbers,
-          nextCursor: result.cursor || undefined,
-          actionPerformed: 'list'
-        },
-        message: `Found **${blockedNumbers.length}** blocked number(s)`
-      };
-    }
-
-    if (action === 'block') {
-      if (!ctx.input.phoneNumber) throw new Error('Phone number is required to block');
-
-      await client.blockNumber({ phone_number: ctx.input.phoneNumber });
-
-      return {
-        output: { success: true, actionPerformed: 'block' },
-        message: `Blocked number **${ctx.input.phoneNumber}**`
-      };
-    }
-
-    if (action === 'unblock') {
-      if (!ctx.input.blockedNumberId)
-        throw new Error('Blocked number ID is required to unblock');
-
-      await client.unblockNumber(ctx.input.blockedNumberId);
-
-      return {
-        output: { success: true, actionPerformed: 'unblock' },
-        message: `Unblocked number **${ctx.input.blockedNumberId}**`
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
+    const result = await invoke(ctx, 'manage_blocked_number');
+    const output = outputSchema.safeParse(result.output);
+    if (!output.success) malformed();
+    return { output: output.data, message: result.message };
   })
   .build();

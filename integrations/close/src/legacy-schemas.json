@@ -1,0 +1,2061 @@
+[
+  {
+    "key": "manage_lead",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "description": "Lead ID to update. Omit to create a new lead.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Lead/company name",
+          "type": "string"
+        },
+        "statusId": {
+          "description": "Lead status ID",
+          "type": "string"
+        },
+        "description": {
+          "description": "Lead description or notes",
+          "type": "string"
+        },
+        "url": {
+          "description": "Company website URL",
+          "type": "string"
+        },
+        "contacts": {
+          "description": "Contacts to associate with the lead",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "description": "Contact full name",
+                "type": "string"
+              },
+              "title": {
+                "description": "Contact job title",
+                "type": "string"
+              },
+              "emails": {
+                "description": "Contact email addresses",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string",
+                      "description": "Email address"
+                    },
+                    "type": {
+                      "description": "Email type (e.g. office, home, direct, other)",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["email"],
+                  "additionalProperties": false
+                }
+              },
+              "phones": {
+                "description": "Contact phone numbers",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "phone": {
+                      "type": "string",
+                      "description": "Phone number"
+                    },
+                    "type": {
+                      "description": "Phone type (e.g. office, mobile, home, direct, fax)",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["phone"],
+                  "additionalProperties": false
+                }
+              },
+              "urls": {
+                "description": "Contact URLs",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "URL"
+                    },
+                    "type": {
+                      "description": "URL type (e.g. url, linkedin, twitter, facebook)",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["url"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "addresses": {
+          "description": "Physical addresses for the lead",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "address1": {
+                "description": "Street address line 1",
+                "type": "string"
+              },
+              "address2": {
+                "description": "Street address line 2",
+                "type": "string"
+              },
+              "city": {
+                "description": "City",
+                "type": "string"
+              },
+              "state": {
+                "description": "State or province",
+                "type": "string"
+              },
+              "zipcode": {
+                "description": "ZIP or postal code",
+                "type": "string"
+              },
+              "country": {
+                "description": "Country code (e.g. US, GB)",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "customFields": {
+          "description": "Custom field values as key-value pairs (keys with or without \"custom.\" prefix)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "type": "string",
+          "description": "Unique lead ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Lead/company name"
+        },
+        "statusId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lead status ID"
+        },
+        "statusLabel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lead status label"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lead company URL"
+        },
+        "dateCreated": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "dateUpdated": {
+          "type": "string",
+          "description": "Last updated timestamp"
+        },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["email", "type"],
+                  "additionalProperties": false
+                }
+              },
+              "phones": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "phone": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["phone", "type"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["contactId", "name", "title", "emails", "phones"],
+            "additionalProperties": false
+          },
+          "description": "Contacts associated with the lead"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Lead display name"
+        }
+      },
+      "required": [
+        "leadId",
+        "name",
+        "statusId",
+        "statusLabel",
+        "url",
+        "dateCreated",
+        "dateUpdated",
+        "contacts",
+        "displayName"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "get_lead",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "type": "string",
+          "description": "The unique ID of the lead to retrieve"
+        }
+      },
+      "required": ["leadId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "type": "string",
+          "description": "Unique lead ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Lead/company name"
+        },
+        "statusId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lead status ID"
+        },
+        "statusLabel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lead status label"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Company website URL"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Lead description or notes"
+        },
+        "dateCreated": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "dateUpdated": {
+          "type": "string",
+          "description": "Last updated timestamp"
+        },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string",
+                "description": "Contact ID"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact full name"
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Contact job title"
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["email", "type"],
+                  "additionalProperties": false
+                },
+                "description": "Contact email addresses"
+              },
+              "phones": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "phone": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["phone", "type"],
+                  "additionalProperties": false
+                },
+                "description": "Contact phone numbers"
+              }
+            },
+            "required": ["contactId", "name", "title", "emails", "phones"],
+            "additionalProperties": false
+          },
+          "description": "Contacts associated with the lead"
+        },
+        "opportunities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "opportunityId": {
+                "type": "string",
+                "description": "Opportunity ID"
+              },
+              "statusLabel": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Opportunity status label"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Opportunity monetary value in cents"
+              },
+              "confidence": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Confidence percentage (0-100)"
+              }
+            },
+            "required": ["opportunityId", "statusLabel", "value", "confidence"],
+            "additionalProperties": false
+          },
+          "description": "Opportunities associated with the lead"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Lead display name"
+        },
+        "addresses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "address1": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "address2": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "city": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "zipcode": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["address1", "address2", "city", "state", "zipcode", "country"],
+            "additionalProperties": false
+          },
+          "description": "Physical addresses for the lead"
+        }
+      },
+      "required": [
+        "leadId",
+        "name",
+        "statusId",
+        "statusLabel",
+        "url",
+        "description",
+        "dateCreated",
+        "dateUpdated",
+        "contacts",
+        "opportunities",
+        "displayName",
+        "addresses"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_leads",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Text search query to filter leads (searches across names, emails, phones, etc.)",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of leads to return (default: 100)",
+          "type": "number"
+        },
+        "skip": {
+          "description": "Number of leads to skip for pagination",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "leadId": {
+                "type": "string",
+                "description": "Unique lead ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Lead/company name"
+              },
+              "statusId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Lead status ID"
+              },
+              "statusLabel": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Lead status label"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Lead display name"
+              },
+              "dateCreated": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "dateUpdated": {
+                "type": "string",
+                "description": "Last updated timestamp"
+              }
+            },
+            "required": [
+              "leadId",
+              "name",
+              "statusId",
+              "statusLabel",
+              "displayName",
+              "dateCreated",
+              "dateUpdated"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalResults": {
+          "type": "number",
+          "description": "Total number of leads matching the query"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether more results are available beyond the current page"
+        }
+      },
+      "required": ["leads", "totalResults", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "delete_lead",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "type": "string",
+          "description": "ID of the lead to delete"
+        }
+      },
+      "required": ["leadId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the lead was successfully deleted"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_contact",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "description": "Contact ID to update. Omit to create a new contact.",
+          "type": "string"
+        },
+        "leadId": {
+          "description": "Lead ID to associate the contact with (required when creating)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Full name of the contact",
+          "type": "string"
+        },
+        "title": {
+          "description": "Job title of the contact",
+          "type": "string"
+        },
+        "emails": {
+          "description": "Email addresses for the contact",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "Email address"
+              },
+              "type": {
+                "type": "string",
+                "description": "Email type (e.g., \"office\", \"direct\", \"home\")"
+              }
+            },
+            "required": ["email", "type"],
+            "additionalProperties": false
+          }
+        },
+        "phones": {
+          "description": "Phone numbers for the contact",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "phone": {
+                "type": "string",
+                "description": "Phone number"
+              },
+              "type": {
+                "type": "string",
+                "description": "Phone type (e.g., \"office\", \"mobile\", \"home\")"
+              }
+            },
+            "required": ["phone", "type"],
+            "additionalProperties": false
+          }
+        },
+        "urls": {
+          "description": "URLs for the contact",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "URL"
+              },
+              "type": {
+                "type": "string",
+                "description": "URL type (e.g., \"url\")"
+              }
+            },
+            "required": ["url", "type"],
+            "additionalProperties": false
+          }
+        },
+        "customFields": {
+          "description": "Custom field values keyed by custom field ID (e.g., \"custom.cf_xxx\")",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "description": "Unique contact ID"
+        },
+        "leadId": {
+          "type": "string",
+          "description": "Associated lead ID"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Full name of the contact"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Job title of the contact"
+        },
+        "emails": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "description": "Email address"
+              },
+              "type": {
+                "type": "string",
+                "description": "Email type"
+              }
+            },
+            "required": ["email", "type"],
+            "additionalProperties": false
+          },
+          "description": "Email addresses"
+        },
+        "phones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "phone": {
+                "type": "string",
+                "description": "Phone number"
+              },
+              "type": {
+                "type": "string",
+                "description": "Phone type"
+              }
+            },
+            "required": ["phone", "type"],
+            "additionalProperties": false
+          },
+          "description": "Phone numbers"
+        },
+        "urls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "URL"
+              },
+              "type": {
+                "type": "string",
+                "description": "URL type"
+              }
+            },
+            "required": ["url", "type"],
+            "additionalProperties": false
+          },
+          "description": "URLs"
+        },
+        "dateCreated": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "dateUpdated": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": [
+        "contactId",
+        "leadId",
+        "name",
+        "title",
+        "emails",
+        "phones",
+        "urls",
+        "dateCreated",
+        "dateUpdated"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_contacts",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "description": "Filter contacts by lead ID",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of contacts to return (default: 100)",
+          "type": "number"
+        },
+        "skip": {
+          "description": "Number of contacts to skip for pagination",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string",
+                "description": "Unique contact ID"
+              },
+              "leadId": {
+                "type": "string",
+                "description": "Associated lead ID"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Full name of the contact"
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Job title of the contact"
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "email": {
+                      "type": "string",
+                      "description": "Email address"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Email type"
+                    }
+                  },
+                  "required": ["email", "type"],
+                  "additionalProperties": false
+                },
+                "description": "Email addresses"
+              },
+              "phones": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "phone": {
+                      "type": "string",
+                      "description": "Phone number"
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "Phone type"
+                    }
+                  },
+                  "required": ["phone", "type"],
+                  "additionalProperties": false
+                },
+                "description": "Phone numbers"
+              },
+              "dateCreated": {
+                "type": "string",
+                "description": "Creation timestamp"
+              }
+            },
+            "required": [
+              "contactId",
+              "leadId",
+              "name",
+              "title",
+              "emails",
+              "phones",
+              "dateCreated"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalResults": {
+          "type": "number",
+          "description": "Total number of contacts matching the query"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether more results are available beyond the current page"
+        }
+      },
+      "required": ["contacts", "totalResults", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_opportunity",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "description": "Opportunity ID to update. Omit to create a new opportunity.",
+          "type": "string"
+        },
+        "leadId": {
+          "description": "Lead ID to associate the opportunity with (required when creating)",
+          "type": "string"
+        },
+        "statusId": {
+          "description": "Status ID for the opportunity",
+          "type": "string"
+        },
+        "confidence": {
+          "description": "Confidence percentage (0-100)",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "value": {
+          "description": "Monetary value in cents",
+          "type": "number"
+        },
+        "valuePeriod": {
+          "description": "Value period for recurring deals",
+          "type": "string",
+          "enum": ["one_time", "monthly", "annual"]
+        },
+        "pipelineId": {
+          "description": "Pipeline ID to place the opportunity in",
+          "type": "string"
+        },
+        "note": {
+          "description": "Note or description for the opportunity",
+          "type": "string"
+        },
+        "dateWon": {
+          "description": "Date the opportunity was won (ISO 8601 date string)",
+          "type": "string"
+        },
+        "customFields": {
+          "description": "Custom field values as key-value pairs",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunityId": {
+          "type": "string",
+          "description": "Opportunity ID"
+        },
+        "leadId": {
+          "type": "string",
+          "description": "Associated lead ID"
+        },
+        "statusId": {
+          "type": "string",
+          "description": "Status ID"
+        },
+        "statusLabel": {
+          "type": "string",
+          "description": "Human-readable status label"
+        },
+        "statusType": {
+          "type": "string",
+          "description": "Status type (active, won, or lost)"
+        },
+        "confidence": {
+          "type": "number",
+          "description": "Confidence percentage"
+        },
+        "value": {
+          "type": "number",
+          "description": "Monetary value in cents"
+        },
+        "valuePeriod": {
+          "type": "string",
+          "description": "Value period (one_time, monthly, or annual)"
+        },
+        "pipelineId": {
+          "type": "string",
+          "description": "Pipeline ID"
+        },
+        "note": {
+          "type": "string",
+          "description": "Opportunity note"
+        },
+        "dateCreated": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "dateUpdated": {
+          "type": "string",
+          "description": "Last update timestamp"
+        },
+        "dateWon": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Date the opportunity was won"
+        },
+        "userId": {
+          "type": "string",
+          "description": "ID of the user who owns the opportunity"
+        }
+      },
+      "required": [
+        "opportunityId",
+        "leadId",
+        "statusId",
+        "statusLabel",
+        "statusType",
+        "confidence",
+        "value",
+        "valuePeriod",
+        "pipelineId",
+        "note",
+        "dateCreated",
+        "dateUpdated",
+        "dateWon",
+        "userId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_opportunities",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "description": "Filter opportunities by lead ID",
+          "type": "string"
+        },
+        "userId": {
+          "description": "Filter opportunities by user (owner) ID",
+          "type": "string"
+        },
+        "statusId": {
+          "description": "Filter opportunities by status ID",
+          "type": "string"
+        },
+        "statusType": {
+          "description": "Filter opportunities by status type",
+          "type": "string",
+          "enum": ["active", "won", "lost"]
+        },
+        "query": {
+          "description": "Search query to filter opportunities",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of results to return (default: 100)",
+          "type": "number"
+        },
+        "skip": {
+          "description": "Number of results to skip for pagination",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "opportunities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "opportunityId": {
+                "type": "string",
+                "description": "Opportunity ID"
+              },
+              "leadId": {
+                "type": "string",
+                "description": "Associated lead ID"
+              },
+              "statusId": {
+                "type": "string",
+                "description": "Status ID"
+              },
+              "statusLabel": {
+                "type": "string",
+                "description": "Human-readable status label"
+              },
+              "statusType": {
+                "type": "string",
+                "description": "Status type (active, won, or lost)"
+              },
+              "confidence": {
+                "type": "number",
+                "description": "Confidence percentage"
+              },
+              "value": {
+                "type": "number",
+                "description": "Monetary value in cents"
+              },
+              "valuePeriod": {
+                "type": "string",
+                "description": "Value period (one_time, monthly, or annual)"
+              },
+              "dateCreated": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "dateUpdated": {
+                "type": "string",
+                "description": "Last update timestamp"
+              }
+            },
+            "required": [
+              "opportunityId",
+              "leadId",
+              "statusId",
+              "statusLabel",
+              "statusType",
+              "confidence",
+              "value",
+              "valuePeriod",
+              "dateCreated",
+              "dateUpdated"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalResults": {
+          "type": "number",
+          "description": "Total number of matching opportunities"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether more results are available beyond the current page"
+        }
+      },
+      "required": ["opportunities", "totalResults", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_task",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "description": "Task ID to update. Omit to create a new task.",
+          "type": "string"
+        },
+        "leadId": {
+          "description": "Lead ID to associate the task with (required when creating)",
+          "type": "string"
+        },
+        "text": {
+          "description": "Task description text",
+          "type": "string"
+        },
+        "assignedTo": {
+          "description": "User ID to assign the task to",
+          "type": "string"
+        },
+        "isComplete": {
+          "description": "Whether the task is complete",
+          "type": "boolean"
+        },
+        "dueDate": {
+          "description": "Due date in ISO 8601 format (date or datetime)",
+          "type": "string"
+        },
+        "type": {
+          "description": "Task type (only settable when creating)",
+          "type": "string",
+          "enum": ["lead", "outgoing_call"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task ID"
+        },
+        "leadId": {
+          "type": "string",
+          "description": "Associated lead ID"
+        },
+        "text": {
+          "type": "string",
+          "description": "Task description text"
+        },
+        "assignedTo": {
+          "type": "string",
+          "description": "User ID the task is assigned to"
+        },
+        "isComplete": {
+          "type": "boolean",
+          "description": "Whether the task is complete"
+        },
+        "dueDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Due date in ISO 8601 format"
+        },
+        "type": {
+          "type": "string",
+          "description": "Task type"
+        },
+        "dateCreated": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "dateUpdated": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": [
+        "taskId",
+        "leadId",
+        "text",
+        "assignedTo",
+        "isComplete",
+        "dueDate",
+        "type",
+        "dateCreated",
+        "dateUpdated"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_activities",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "description": "Filter activities by lead ID",
+          "type": "string"
+        },
+        "userId": {
+          "description": "Filter activities by the user who performed them",
+          "type": "string"
+        },
+        "contactId": {
+          "description": "Filter activities by contact ID",
+          "type": "string"
+        },
+        "activityType": {
+          "description": "Filter by a single activity type",
+          "type": "string",
+          "enum": ["Call", "Email", "Meeting", "Note", "SMS"]
+        },
+        "activityTypes": {
+          "description": "Filter by multiple activity types (e.g. [\"Call\", \"Email\"])",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dateCreatedAfter": {
+          "description": "Return activities created after this ISO 8601 timestamp",
+          "type": "string"
+        },
+        "dateCreatedBefore": {
+          "description": "Return activities created before this ISO 8601 timestamp",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of results to return (default 100)",
+          "type": "number"
+        },
+        "skip": {
+          "description": "Number of results to skip for pagination",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "activities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "activityId": {
+                "type": "string",
+                "description": "Unique identifier for the activity"
+              },
+              "type": {
+                "type": "string",
+                "description": "Activity type (e.g. Call, Email, Meeting, Note, SMS)"
+              },
+              "leadId": {
+                "type": "string",
+                "description": "Lead ID associated with this activity"
+              },
+              "userId": {
+                "description": "User ID who performed the activity",
+                "type": "string"
+              },
+              "contactId": {
+                "description": "Contact ID associated with this activity",
+                "type": "string"
+              },
+              "dateCreated": {
+                "type": "string",
+                "description": "ISO 8601 timestamp when the activity was created"
+              },
+              "activityAt": {
+                "description": "ISO 8601 timestamp when the activity occurred",
+                "type": "string"
+              },
+              "subject": {
+                "description": "Subject line (for emails and meetings)",
+                "type": "string"
+              },
+              "bodyPreview": {
+                "description": "Truncated preview of the activity body",
+                "type": "string"
+              }
+            },
+            "required": ["activityId", "type", "leadId", "dateCreated"],
+            "additionalProperties": false
+          },
+          "description": "List of activities matching the filters"
+        },
+        "totalResults": {
+          "type": "number",
+          "description": "Total number of activities matching the filters"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether there are more results available beyond this page"
+        }
+      },
+      "required": ["activities", "totalResults", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_note",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "description": "Note ID to update. If omitted, a new note is created.",
+          "type": "string"
+        },
+        "leadId": {
+          "description": "Lead ID to attach the note to (required when creating a new note)",
+          "type": "string"
+        },
+        "note": {
+          "type": "string",
+          "description": "The note content/body text"
+        },
+        "contactId": {
+          "description": "Contact ID to associate with the note",
+          "type": "string"
+        }
+      },
+      "required": ["note"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "noteId": {
+          "type": "string",
+          "description": "Unique identifier of the note"
+        },
+        "leadId": {
+          "type": "string",
+          "description": "Lead ID the note is attached to"
+        },
+        "note": {
+          "type": "string",
+          "description": "The note content/body text"
+        },
+        "userId": {
+          "description": "User ID who created/updated the note",
+          "type": "string"
+        },
+        "contactId": {
+          "description": "Contact ID associated with the note",
+          "type": "string"
+        },
+        "dateCreated": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the note was created"
+        },
+        "dateUpdated": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the note was last updated"
+        }
+      },
+      "required": ["noteId", "leadId", "note", "dateCreated", "dateUpdated"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "send_email",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadId": {
+          "type": "string",
+          "description": "Lead ID to associate the email with"
+        },
+        "contactId": {
+          "description": "Contact ID to associate the email with",
+          "type": "string"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Email subject line"
+        },
+        "body": {
+          "type": "string",
+          "description": "Email body in HTML format"
+        },
+        "status": {
+          "description": "Email status: \"draft\" to save, \"outbox\" to queue for sending (default), \"sent\" to log as already sent",
+          "type": "string",
+          "enum": ["draft", "outbox", "sent"]
+        },
+        "templateId": {
+          "description": "Email template ID to apply",
+          "type": "string"
+        },
+        "to": {
+          "description": "Array of recipient email addresses",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cc": {
+          "description": "Array of CC email addresses",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "bcc": {
+          "description": "Array of BCC email addresses",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sendAs": {
+          "description": "Connected account ID to send the email from",
+          "type": "string"
+        }
+      },
+      "required": ["leadId", "subject", "body"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "emailId": {
+          "type": "string",
+          "description": "Unique identifier for the email activity"
+        },
+        "leadId": {
+          "type": "string",
+          "description": "Lead ID the email is associated with"
+        },
+        "contactId": {
+          "description": "Contact ID the email is associated with",
+          "type": "string"
+        },
+        "subject": {
+          "description": "Email subject line",
+          "type": "string"
+        },
+        "body": {
+          "description": "Email body in HTML",
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "description": "Email status (draft, outbox, sent, inbox, etc.)"
+        },
+        "sender": {
+          "description": "Sender email address",
+          "type": "string"
+        },
+        "to": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of recipient email addresses"
+        },
+        "cc": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of CC email addresses"
+        },
+        "bcc": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of BCC email addresses"
+        },
+        "dateCreated": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the email was created"
+        },
+        "threadId": {
+          "description": "Email thread ID",
+          "type": "string"
+        }
+      },
+      "required": ["emailId", "leadId", "status", "to", "cc", "bcc", "dateCreated"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "manage_email_template",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templateId": {
+          "description": "Template ID to update. If omitted, a new template is created.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Template name (required when creating a new template)",
+          "type": "string"
+        },
+        "subject": {
+          "description": "Email subject line for the template",
+          "type": "string"
+        },
+        "body": {
+          "description": "Email body in HTML format for the template",
+          "type": "string"
+        },
+        "isArchived": {
+          "description": "Whether the template is archived",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "templateId": {
+          "type": "string",
+          "description": "Unique identifier of the email template"
+        },
+        "name": {
+          "type": "string",
+          "description": "Template name"
+        },
+        "subject": {
+          "description": "Email subject line",
+          "type": "string"
+        },
+        "body": {
+          "description": "Email body in HTML format",
+          "type": "string"
+        },
+        "isArchived": {
+          "type": "boolean",
+          "description": "Whether the template is archived"
+        },
+        "dateCreated": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the template was created"
+        },
+        "dateUpdated": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the template was last updated"
+        }
+      },
+      "required": ["templateId", "name", "isArchived", "dateCreated", "dateUpdated"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "search_leads",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Advanced search query object (e.g., { \"type\": \"and\", \"queries\": [{ \"type\": \"field_condition\", \"field\": { \"type\": \"regular_field\", \"field_name\": \"lead_name\" }, \"condition\": { \"type\": \"text\", \"mode\": \"full_words\", \"value\": \"Acme\" } }] })"
+        },
+        "limit": {
+          "description": "Maximum number of results to return (default 100)",
+          "type": "number"
+        },
+        "skip": {
+          "description": "Number of results to skip for pagination",
+          "type": "number"
+        },
+        "fields": {
+          "description": "Array of field names to include in the response (e.g., [\"id\", \"display_name\", \"status_label\"])",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sort": {
+          "description": "Array of sort objects (e.g., [{ \"field_name\": \"date_created\", \"direction\": \"desc\" }])",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Array of lead objects matching the search query"
+        },
+        "totalResults": {
+          "type": "number",
+          "description": "Total number of leads matching the query"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether there are more results beyond the current page"
+        }
+      },
+      "required": ["leads", "totalResults", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_smart_views",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "viewType": {
+          "description": "Filter by Smart View type. Omit to list all types.",
+          "type": "string",
+          "enum": ["lead", "contact"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "smartViews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "smartViewId": {
+                "type": "string",
+                "description": "Unique identifier for the Smart View"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the Smart View"
+              },
+              "query": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {},
+                "description": "The saved search query object"
+              },
+              "type": {
+                "description": "Type of Smart View (e.g., \"lead\", \"contact\")",
+                "type": "string"
+              },
+              "isShared": {
+                "description": "Whether the Smart View is shared with the organization",
+                "type": "boolean"
+              },
+              "userId": {
+                "description": "User ID of the Smart View creator",
+                "type": "string"
+              },
+              "dateCreated": {
+                "description": "ISO 8601 timestamp when the Smart View was created",
+                "type": "string"
+              }
+            },
+            "required": ["smartViewId", "name", "query"],
+            "additionalProperties": false
+          },
+          "description": "List of Smart Views"
+        }
+      },
+      "required": ["smartViews"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_pipelines_and_statuses",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "include": {
+          "description": "Which resource types to include. Defaults to all three if omitted.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["pipelines", "leadStatuses", "opportunityStatuses"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pipelines": {
+          "description": "List of pipelines",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pipelineId": {
+                "type": "string",
+                "description": "Unique identifier for the pipeline"
+              },
+              "name": {
+                "type": "string",
+                "description": "Pipeline name"
+              }
+            },
+            "required": ["pipelineId", "name"],
+            "additionalProperties": false
+          }
+        },
+        "leadStatuses": {
+          "description": "List of lead statuses",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "statusId": {
+                "type": "string",
+                "description": "Unique identifier for the lead status"
+              },
+              "label": {
+                "type": "string",
+                "description": "Display label for the status"
+              },
+              "type": {
+                "type": "string",
+                "description": "Status type (e.g., \"active\", \"archived\")"
+              }
+            },
+            "required": ["statusId", "label", "type"],
+            "additionalProperties": false
+          }
+        },
+        "opportunityStatuses": {
+          "description": "List of opportunity statuses",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "statusId": {
+                "type": "string",
+                "description": "Unique identifier for the opportunity status"
+              },
+              "label": {
+                "type": "string",
+                "description": "Display label for the status"
+              },
+              "type": {
+                "type": "string",
+                "description": "Status type (e.g., \"active\", \"won\", \"lost\")"
+              },
+              "pipelineId": {
+                "type": "string",
+                "description": "ID of the pipeline this status belongs to"
+              },
+              "pipelineName": {
+                "description": "Name of the pipeline this status belongs to",
+                "type": "string"
+              }
+            },
+            "required": ["statusId", "label", "type", "pipelineId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "key": "list_users",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Maximum number of users to return",
+          "type": "number"
+        },
+        "skip": {
+          "description": "Number of users to skip for pagination",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "description": "Unique identifier for the user"
+              },
+              "email": {
+                "type": "string",
+                "description": "User email address"
+              },
+              "firstName": {
+                "description": "User first name",
+                "type": "string"
+              },
+              "lastName": {
+                "description": "User last name",
+                "type": "string"
+              },
+              "image": {
+                "description": "URL to the user avatar image",
+                "type": "string"
+              },
+              "dateCreated": {
+                "description": "ISO 8601 timestamp when the user was created",
+                "type": "string"
+              }
+            },
+            "required": ["userId", "email"],
+            "additionalProperties": false
+          },
+          "description": "List of users in the organization"
+        },
+        "totalResults": {
+          "type": "number",
+          "description": "Total number of users in the organization"
+        }
+      },
+      "required": ["users", "totalResults"],
+      "additionalProperties": false
+    }
+  }
+]

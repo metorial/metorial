@@ -1,0 +1,858 @@
+{
+  "create_company": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "Company name",
+        "type": "string"
+      },
+      "description": {
+        "description": "Short description of the company",
+        "type": "string"
+      },
+      "industry": {
+        "description": "Industry sector",
+        "type": "string"
+      },
+      "fundingRaised": {
+        "description": "Total funding raised (USD)",
+        "type": "string"
+      },
+      "lastFundingDate": {
+        "description": "Most recent funding date (YYYY-MM-DD)",
+        "type": "string"
+      },
+      "foundationYear": {
+        "description": "Year the company was founded (YYYY)",
+        "type": "string"
+      },
+      "employeeRange": {
+        "description": "Employee count range",
+        "type": "string",
+        "enum": [
+          "1-10",
+          "11-50",
+          "51-200",
+          "201-500",
+          "501-1000",
+          "1001-5000",
+          "5001-10000",
+          "10000+"
+        ]
+      },
+      "groupIds": {
+        "description": "Group IDs to add the company to",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "emails": {
+        "description": "Email addresses (first is primary)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "phones": {
+        "description": "Phone numbers (first is primary)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "addresses": {
+        "description": "Addresses (first is primary)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "urls": {
+        "description": "URLs (first is primary)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "customFieldValues": {
+        "description": "Custom field values keyed by group ID",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "additionalProperties": false
+  },
+  "create_deal": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "groupId": {
+        "type": "string",
+        "description": "ID of the group to create the deal in"
+      },
+      "objectType": {
+        "type": "string",
+        "description": "Deal object type name (e.g. \"Deals\")"
+      },
+      "name": {
+        "description": "Deal name",
+        "type": "string"
+      },
+      "companyIds": {
+        "description": "IDs of companies to associate",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "personIds": {
+        "description": "IDs of people to associate",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "customFieldValues": {
+        "description": "Custom field values for the deal",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": ["groupId", "objectType"],
+    "additionalProperties": false
+  },
+  "create_note": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "entityId": {
+        "type": "string",
+        "description": "ID of the person, company, or deal to attach the note to"
+      },
+      "content": {
+        "type": "string",
+        "description": "Note content (plain text or markdown)"
+      },
+      "visibility": {
+        "type": "string",
+        "enum": ["public", "private"],
+        "description": "Note visibility"
+      },
+      "parentNoteId": {
+        "description": "Parent note ID for creating a reply thread",
+        "type": "string"
+      }
+    },
+    "required": ["entityId", "content", "visibility"],
+    "additionalProperties": false
+  },
+  "create_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "firstName": {
+        "description": "First name of the person",
+        "type": "string"
+      },
+      "lastName": {
+        "description": "Last name of the person",
+        "type": "string"
+      },
+      "fullName": {
+        "description": "Full name (used if first/last not provided)",
+        "type": "string"
+      },
+      "description": {
+        "description": "Short description or bio",
+        "type": "string"
+      },
+      "birthday": {
+        "description": "Birthday in YYYY-MM-DD format",
+        "type": "string"
+      },
+      "jobTitle": {
+        "description": "Job title or role",
+        "type": "string"
+      },
+      "groupIds": {
+        "description": "Group IDs to add the person to",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "companies": {
+        "description": "Companies to associate (first is primary)",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "companyId": {
+              "description": "Existing company ID",
+              "type": "string"
+            },
+            "companyName": {
+              "description": "Company name (creates or links)",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "emails": {
+        "description": "Email addresses (first is primary)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "phones": {
+        "description": "Phone numbers (first is primary)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "addresses": {
+        "description": "Addresses (first is primary)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "urls": {
+        "description": "URLs (first is primary)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "customFieldValues": {
+        "description": "Custom field values keyed by group ID",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "additionalProperties": false
+  },
+  "create_reminder": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "entityId": {
+        "type": "string",
+        "description": "ID of the person, company, or deal"
+      },
+      "name": {
+        "type": "string",
+        "description": "Reminder title"
+      },
+      "recurrenceRule": {
+        "type": "string",
+        "description": "iCalendar recurrence rule (DTSTART + RRULE)"
+      },
+      "visibility": {
+        "type": "string",
+        "enum": ["public", "private"],
+        "description": "Reminder visibility"
+      },
+      "assignedUsers": {
+        "description": "Users to assign (required for public reminders)",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "userId": {
+              "description": "User ID",
+              "type": "string"
+            },
+            "userEmail": {
+              "description": "User email",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["entityId", "name", "recurrenceRule", "visibility"],
+    "additionalProperties": false
+  },
+  "delete_company": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "type": "string",
+        "description": "ID of the company to delete"
+      }
+    },
+    "required": ["companyId"],
+    "additionalProperties": false
+  },
+  "delete_deal": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "groupId": {
+        "type": "string",
+        "description": "ID of the group the deal belongs to"
+      },
+      "objectType": {
+        "type": "string",
+        "description": "Deal object type name (e.g. \"Deals\")"
+      },
+      "dealId": {
+        "type": "string",
+        "description": "ID of the deal to delete"
+      }
+    },
+    "required": ["groupId", "objectType", "dealId"],
+    "additionalProperties": false
+  },
+  "delete_note": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "noteId": {
+        "type": "string",
+        "description": "ID of the note to delete"
+      }
+    },
+    "required": ["noteId"],
+    "additionalProperties": false
+  },
+  "delete_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "personId": {
+        "type": "string",
+        "description": "ID of the person to delete"
+      }
+    },
+    "required": ["personId"],
+    "additionalProperties": false
+  },
+  "delete_reminder": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "reminderId": {
+        "type": "string",
+        "description": "ID of the reminder to delete"
+      }
+    },
+    "required": ["reminderId"],
+    "additionalProperties": false
+  },
+  "get_company": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "type": "string",
+        "description": "ID of the company to retrieve"
+      }
+    },
+    "required": ["companyId"],
+    "additionalProperties": false
+  },
+  "get_deal": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "groupId": {
+        "type": "string",
+        "description": "ID of the group the deal belongs to"
+      },
+      "objectType": {
+        "type": "string",
+        "description": "Deal object type name (e.g. \"Deals\")"
+      },
+      "dealId": {
+        "type": "string",
+        "description": "ID of the deal to retrieve"
+      }
+    },
+    "required": ["groupId", "objectType", "dealId"],
+    "additionalProperties": false
+  },
+  "get_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "personId": {
+        "type": "string",
+        "description": "ID of the person to retrieve"
+      }
+    },
+    "required": ["personId"],
+    "additionalProperties": false
+  },
+  "list_companies": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of results per page (1-100, default 20)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "list_custom_fields": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "groupId": {
+        "type": "string",
+        "description": "ID of the group"
+      },
+      "entityType": {
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": ["person", "company"]
+          },
+          {
+            "type": "string"
+          }
+        ],
+        "description": "Entity type: \"person\", \"company\", or a custom deal object type name"
+      },
+      "limit": {
+        "description": "Number of results per page (1-100, default 20)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": ["groupId", "entityType"],
+    "additionalProperties": false
+  },
+  "list_deals": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "groupId": {
+        "type": "string",
+        "description": "ID of the group to list deals from"
+      },
+      "objectType": {
+        "type": "string",
+        "description": "Deal object type name (e.g. \"Deals\")"
+      },
+      "limit": {
+        "description": "Number of results per page (1-100, default 20)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": ["groupId", "objectType"],
+    "additionalProperties": false
+  },
+  "list_groups": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of results per page (1-100, default 20)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "list_notes": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "entityId": {
+        "type": "string",
+        "description": "ID of the person, company, or deal to list notes for"
+      },
+      "limit": {
+        "description": "Number of results per page (1-100, default 20)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": ["entityId"],
+    "additionalProperties": false
+  },
+  "list_people": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of results per page (1-100, default 20)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "list_reminders": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "entityId": {
+        "type": "string",
+        "description": "ID of the person, company, or deal to list reminders for"
+      },
+      "limit": {
+        "description": "Number of results per page (1-100, default 20)",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "cursor": {
+        "description": "Pagination cursor from a previous response",
+        "type": "string"
+      }
+    },
+    "required": ["entityId"],
+    "additionalProperties": false
+  },
+  "update_company": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "companyId": {
+        "type": "string",
+        "description": "ID of the company to update"
+      },
+      "name": {
+        "description": "Updated company name",
+        "type": "string"
+      },
+      "description": {
+        "description": "Updated description",
+        "type": "string"
+      },
+      "industry": {
+        "description": "Updated industry or null to clear",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "fundingRaised": {
+        "description": "Updated funding raised or null to clear",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "lastFundingDate": {
+        "description": "Updated last funding date (YYYY-MM-DD) or null to clear",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "foundationYear": {
+        "description": "Updated foundation year (YYYY) or null to clear",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "employeeRange": {
+        "description": "Updated employee range or null to clear",
+        "anyOf": [
+          {
+            "type": "string",
+            "enum": [
+              "1-10",
+              "11-50",
+              "51-200",
+              "201-500",
+              "501-1000",
+              "1001-5000",
+              "5001-10000",
+              "10000+"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "groupIds": {
+        "description": "Updated group IDs (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "emails": {
+        "description": "Updated emails (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "phones": {
+        "description": "Updated phones (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "addresses": {
+        "description": "Updated addresses (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "urls": {
+        "description": "Updated URLs (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "customFieldValues": {
+        "description": "Updated custom field values keyed by group ID",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": ["companyId"],
+    "additionalProperties": false
+  },
+  "update_deal": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "groupId": {
+        "type": "string",
+        "description": "ID of the group the deal belongs to"
+      },
+      "objectType": {
+        "type": "string",
+        "description": "Deal object type name (e.g. \"Deals\")"
+      },
+      "dealId": {
+        "type": "string",
+        "description": "ID of the deal to update"
+      },
+      "name": {
+        "description": "Updated deal name",
+        "type": "string"
+      },
+      "companyIds": {
+        "description": "Updated company IDs (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "personIds": {
+        "description": "Updated people IDs (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "customFieldValues": {
+        "description": "Updated custom field values",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": ["groupId", "objectType", "dealId"],
+    "additionalProperties": false
+  },
+  "update_note": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "noteId": {
+        "type": "string",
+        "description": "ID of the note to update"
+      },
+      "content": {
+        "description": "Updated note content",
+        "type": "string"
+      },
+      "visibility": {
+        "description": "Updated visibility",
+        "type": "string",
+        "enum": ["public", "private"]
+      }
+    },
+    "required": ["noteId"],
+    "additionalProperties": false
+  },
+  "update_person": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "personId": {
+        "type": "string",
+        "description": "ID of the person to update"
+      },
+      "firstName": {
+        "description": "Updated first name",
+        "type": "string"
+      },
+      "lastName": {
+        "description": "Updated last name",
+        "type": "string"
+      },
+      "fullName": {
+        "description": "Updated full name",
+        "type": "string"
+      },
+      "description": {
+        "description": "Updated description",
+        "type": "string"
+      },
+      "birthday": {
+        "description": "Updated birthday (YYYY-MM-DD) or null to clear",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "jobTitle": {
+        "description": "Updated job title",
+        "type": "string"
+      },
+      "groupIds": {
+        "description": "Updated group IDs (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "companies": {
+        "description": "Updated companies (replaces all, first is primary)",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "companyId": {
+              "description": "Existing company ID",
+              "type": "string"
+            },
+            "companyName": {
+              "description": "Company name",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "emails": {
+        "description": "Updated emails (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "phones": {
+        "description": "Updated phones (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "addresses": {
+        "description": "Updated addresses (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "urls": {
+        "description": "Updated URLs (replaces all)",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "customFieldValues": {
+        "description": "Updated custom field values keyed by group ID",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": ["personId"],
+    "additionalProperties": false
+  }
+}

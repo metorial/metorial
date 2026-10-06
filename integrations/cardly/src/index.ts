@@ -30,8 +30,6 @@ import {
   syncContact,
   updateWebhook
 } from './tools';
-import { cardlyEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -64,5 +62,5 @@ export let provider = Slate.create({
     sendInvitation,
     manageInvitation
   ],
-  triggers: [cardlyEvents]
+  triggers: []
 });

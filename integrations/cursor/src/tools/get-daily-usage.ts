@@ -16,18 +16,43 @@ export let getDailyUsage = SlateTool.create(spec, {
     z.object({
       startDate: z.number().describe('Start date as epoch milliseconds'),
       endDate: z.number().describe('End date as epoch milliseconds'),
-      page: z.number().optional().describe('Page number for pagination'),
-      pageSize: z.number().optional().describe('Number of results per page')
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe(
+          'Page number starting at 1. Provide together with pageSize to include inactive members.'
+        ),
+      pageSize: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Users per page. Provide together with page.')
     })
   )
   .output(
     z.object({
+      pagination: z
+        .object({
+          page: z.number(),
+          pageSize: z.number(),
+          totalUsers: z.number(),
+          totalPages: z.number(),
+          hasNextPage: z.boolean(),
+          hasPreviousPage: z.boolean()
+        })
+        .optional(),
       entries: z.array(
         z.object({
           userId: z.number().describe('User ID'),
           day: z.string().describe('ISO date string (YYYY-MM-DD)'),
           email: z.string().describe('User email'),
-          isActive: z.boolean().describe('Whether the user was active'),
+          isActive: z
+            .boolean()
+            .optional()
+            .describe('Whether the user was active, provided with pagination'),
           totalLinesAdded: z.number().describe('Total lines added'),
           totalLinesDeleted: z.number().describe('Total lines deleted'),
           acceptedLinesAdded: z.number().describe('Accepted lines added'),
@@ -73,7 +98,7 @@ export let getDailyUsage = SlateTool.create(spec, {
     }));
 
     return {
-      output: { entries },
+      output: { entries, pagination: result.pagination },
       message: `Retrieved **${entries.length}** daily usage entries.`
     };
   })

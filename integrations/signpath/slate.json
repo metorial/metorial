@@ -1,6 +1,6 @@
 {
   "name": "@metorial/signpath",
-  "description": "Submit, manage, and track code signing requests for software artifacts (e.g., Authenticode, Java, macOS, Docker, Office macros). Approve or deny signing requests, resubmit requests with different signing policies, and retrieve signed artifacts. Manage projects, signing policies, artifact configurations, and certificates. Download X.509 certificates and GPG public keys. Query audit logs for signing and administrative changes. Receive webhook notifications on signing request status changes (completed, failed, denied, canceled).",
+  "description": "Submit, manage, and track code signing requests for software artifacts (e.g., Authenticode, Java, macOS, Docker, Office macros). Approve or deny signing requests, resubmit requests with different signing policies, and retrieve signed artifacts. Manage projects, signing policies, artifact configurations, and certificates. Download X.509 certificates and GPG public keys. Query audit logs for signing and administrative changes.",
   "categories": ["apis-and-http-requests", "security"],
   "skills": [
     "submit signing requests",

@@ -15,8 +15,18 @@ export let manageSimCard = SlateTool.create(spec, {
   .input(
     z.object({
       action: z
-        .enum(['list', 'get', 'update', 'enable', 'disable', 'set_standby', 'delete'])
+        .enum([
+          'list',
+          'get',
+          'get_action',
+          'update',
+          'enable',
+          'disable',
+          'set_standby',
+          'delete'
+        ])
         .describe('Action to perform'),
+      actionId: z.string().optional().describe('Native SIM action ID required for get_action'),
       simCardId: z
         .string()
         .optional()
@@ -39,11 +49,11 @@ export let manageSimCard = SlateTool.create(spec, {
         .array(
           z.object({
             simCardId: z.string().describe('SIM card ID'),
-            iccid: z.string().optional().describe('ICCID of the SIM card'),
-            status: z.string().optional().describe('SIM card status'),
-            simCardGroupId: z.string().optional().describe('Group ID'),
+            iccid: z.string().nullish().describe('ICCID of the SIM card'),
+            status: z.string().nullish().describe('SIM card status'),
+            simCardGroupId: z.string().nullish().describe('Group ID'),
             tags: z.array(z.string()).optional().describe('Tags'),
-            createdAt: z.string().optional().describe('Created timestamp')
+            createdAt: z.string().nullish().describe('Created timestamp')
           })
         )
         .optional()
@@ -51,28 +61,65 @@ export let manageSimCard = SlateTool.create(spec, {
       simCard: z
         .object({
           simCardId: z.string().describe('SIM card ID'),
-          iccid: z.string().optional().describe('ICCID'),
-          status: z.string().optional().describe('Status'),
-          simCardGroupId: z.string().optional().describe('Group ID'),
+          iccid: z.string().nullish().describe('ICCID'),
+          status: z.string().nullish().describe('Status'),
+          simCardGroupId: z.string().nullish().describe('Group ID'),
           tags: z.array(z.string()).optional().describe('Tags'),
-          ipv4: z.string().optional().describe('IPv4 address'),
-          imsi: z.string().optional().describe('IMSI'),
+          ipv4: z.string().nullish().describe('IPv4 address'),
+          imsi: z.string().nullish().describe('IMSI'),
+          currentBillingPeriodConsumedDataAmount: z
+            .string()
+            .optional()
+            .describe('Native decimal consumption amount; no inferred byte conversion'),
+          currentBillingPeriodConsumedDataUnit: z
+            .string()
+            .optional()
+            .describe('Native consumption unit, normally MB'),
           currentBillingPeriodConsumedDataBytes: z
             .number()
             .optional()
-            .describe('Data consumed in current billing period (bytes)'),
-          createdAt: z.string().optional().describe('Created timestamp')
+            .describe(
+              'Legacy bytes field; omitted because native amount/unit do not establish a byte conversion'
+            ),
+          createdAt: z.string().nullish().describe('Created timestamp')
         })
         .optional()
         .describe('Single SIM card details'),
       deleted: z.boolean().optional().describe('Whether the SIM card was deleted'),
-      actionPerformed: z.string().optional().describe('Action that was performed'),
+      actionPerformed: z
+        .string()
+        .nullish()
+        .describe('Requested action; SIM transitions are asynchronous'),
+      action: z
+        .object({
+          actionId: z.string(),
+          simCardId: z.string(),
+          type: z.string(),
+          status: z.string(),
+          reason: z.string().nullish()
+        })
+        .optional(),
       totalResults: z.number().optional().describe('Total results (for list)')
     })
   )
   .handleInvocation(async ctx => {
     let client = new TelnyxClient({ token: ctx.auth.token });
 
+    if (ctx.input.action === 'get_action') {
+      const result = await client.getSimCardAction(ctx.input.actionId!);
+      return {
+        output: {
+          action: {
+            actionId: result.id,
+            simCardId: result.sim_card_id,
+            type: result.action_type,
+            status: result.status.value,
+            reason: result.status.reason
+          }
+        },
+        message: `SIM action ${result.id}: ${result.status.value}.`
+      };
+    }
     if (ctx.input.action === 'list') {
       let result = await client.listSimCards({
         pageNumber: ctx.input.pageNumber,
@@ -80,10 +127,10 @@ export let manageSimCard = SlateTool.create(spec, {
         status: ctx.input.status,
         simCardGroupId: ctx.input.simCardGroupId
       });
-      let simCards = (result.data ?? []).map((s: any) => ({
+      let simCards = (result.data ?? []).map(s => ({
         simCardId: s.id,
         iccid: s.iccid,
-        status: s.status,
+        status: s.status.value,
         simCardGroupId: s.sim_card_group_id,
         tags: s.tags,
         createdAt: s.created_at
@@ -111,12 +158,19 @@ export let manageSimCard = SlateTool.create(spec, {
       return {
         output: {
           simCard: {
-            simCardId: result?.id ?? ctx.input.simCardId!,
-            status: result?.status
+            simCardId: result.sim_card_id,
+            status: undefined
           },
-          actionPerformed: ctx.input.action
+          actionPerformed: ctx.input.action,
+          action: {
+            actionId: result.id,
+            simCardId: result.sim_card_id,
+            type: result.action_type,
+            status: result.status.value,
+            reason: result.status.reason
+          }
         },
-        message: `SIM card **${ctx.input.simCardId}** action **${ctx.input.action}** performed.`
+        message: `SIM card **${ctx.input.simCardId}** action **${ctx.input.action}** accepted; action ID ${result.id}, native action status ${result.status.value}.`
       };
     }
 
@@ -130,7 +184,7 @@ export let manageSimCard = SlateTool.create(spec, {
           simCard: {
             simCardId: result.id,
             iccid: result.iccid,
-            status: result.status,
+            status: result.status.value,
             simCardGroupId: result.sim_card_group_id,
             tags: result.tags,
             createdAt: result.created_at
@@ -147,17 +201,19 @@ export let manageSimCard = SlateTool.create(spec, {
         simCard: {
           simCardId: result.id,
           iccid: result.iccid,
-          status: result.status,
+          status: result.status.value,
           simCardGroupId: result.sim_card_group_id,
           tags: result.tags,
           ipv4: result.ipv4,
           imsi: result.imsi,
-          currentBillingPeriodConsumedDataBytes:
+          currentBillingPeriodConsumedDataAmount:
             result.current_billing_period_consumed_data?.amount,
+          currentBillingPeriodConsumedDataUnit:
+            result.current_billing_period_consumed_data?.unit,
           createdAt: result.created_at
         }
       },
-      message: `SIM card **${result.iccid ?? result.id}** — Status: ${result.status}.`
+      message: `SIM card **${result.iccid ?? result.id}** — Status: ${result.status.value}.`
     };
   })
   .build();

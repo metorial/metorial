@@ -18,7 +18,7 @@ export let deleteJob = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      jobId: z.string().describe('ID of the job to delete'),
+      jobId: z.string().min(1).describe('ID of the job to delete'),
       jobType: z
         .enum([
           'transcription',

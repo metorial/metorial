@@ -6,7 +6,6 @@
     "fetch available test languages",
     "send placement test invitations",
     "configure test skill sections",
-    "receive test results via webhook",
     "retrieve CEFR proficiency levels",
     "generate kiosk test codes",
     "map candidates to external IDs",

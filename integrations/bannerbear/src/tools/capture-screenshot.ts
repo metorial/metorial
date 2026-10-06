@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { stateMessage } from '../lib/contracts';
+import { deliverGeneratedFiles, screenshotOutput } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let captureScreenshot = SlateTool.create(spec, {
@@ -14,6 +17,7 @@ export let captureScreenshot = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       url: z.string().describe('Full URL of the web page to screenshot'),
       width: z.number().optional().describe('Browser viewport width in pixels'),
       height: z.number().optional().describe('Browser viewport height in pixels'),
@@ -41,9 +45,8 @@ export let captureScreenshot = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.createScreenshot({
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const result = await client.createScreenshot({
       url: ctx.input.url,
       width: ctx.input.width,
       height: ctx.input.height,
@@ -52,15 +55,11 @@ export let captureScreenshot = SlateTool.create(spec, {
       metadata: ctx.input.metadata,
       webhook_url: ctx.input.webhookUrl
     });
-
+    const output = screenshotOutput(result);
+    await deliverGeneratedFiles(ctx, 'screenshot', result);
     return {
-      output: {
-        screenshotUid: result.uid,
-        status: result.status,
-        screenshotImageUrl: result.screenshot_image_url || null,
-        createdAt: result.created_at
-      },
-      message: `Screenshot ${result.status === 'completed' ? 'captured' : 'capture initiated'} for ${ctx.input.url} (UID: ${result.uid}). ${result.screenshot_image_url ? `[View screenshot](${result.screenshot_image_url})` : 'Screenshot is still rendering.'}`
+      output,
+      message: `Screenshot capture ${stateMessage(result.status)} (UID: ${output.screenshotUid}). Read its status with get_resource.`
     };
   })
   .build();

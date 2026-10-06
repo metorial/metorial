@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, getBase64ByteLength, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let uploadImageTool = SlateTool.create(spec, {
@@ -13,16 +14,14 @@ export let uploadImageTool = SlateTool.create(spec, {
   ],
   constraints: [
     'Maximum image dimensions: 16,400 x 10,900 pixels.',
-    'Supported formats: JPG, PNG, BMP.'
+    'Maximum image size: 20 MB.',
+    'Supported formats: JPG, PNG, WEBP, AVIF, BMP.'
   ]
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project URL slug to upload the image to'),
-      imageUrl: z
-        .string()
-        .optional()
-        .describe('Publicly accessible URL of the image to upload'),
+      projectId: projectIdSchema,
+      imageUrl: z.url().optional().describe('Publicly accessible URL of the image to upload'),
       base64Data: z.string().optional().describe('Base64-encoded image data'),
       fileName: z.string().optional().describe('Filename for the uploaded image'),
       batch: z.string().optional().describe('Batch name to group the image under'),
@@ -36,6 +35,10 @@ export let uploadImageTool = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean().describe('Whether the upload succeeded'),
+      imageId: z
+        .string()
+        .optional()
+        .describe('Uploaded image ID for get_image, upload_annotation, and delete_images'),
       duplicate: z
         .boolean()
         .optional()
@@ -43,6 +46,12 @@ export let uploadImageTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!!ctx.input.imageUrl === !!ctx.input.base64Data) {
+      throw createApiServiceError('Provide exactly one of imageUrl or base64Data.');
+    }
+    if (ctx.input.base64Data && getBase64ByteLength(ctx.input.base64Data) > 20 * 1024 * 1024) {
+      throw createApiServiceError('Image data exceeds the 20 MB upload limit.');
+    }
     let client = createClient(ctx.auth, ctx.config);
     let options = {
       name: ctx.input.fileName,
@@ -61,14 +70,18 @@ export let uploadImageTool = SlateTool.create(spec, {
         options
       );
     } else {
-      throw new Error('Either imageUrl or base64Data must be provided.');
+      throw createApiServiceError('Provide exactly one of imageUrl or base64Data.');
     }
 
     let isDuplicate = result.duplicate === true;
+    if (result.success !== true && !isDuplicate) {
+      throw createApiServiceError('Roboflow did not confirm the image upload.');
+    }
 
     return {
       output: {
-        success: result.success !== false,
+        success: result.success === true || isDuplicate,
+        imageId: result.id,
         duplicate: isDuplicate
       },
       message: isDuplicate

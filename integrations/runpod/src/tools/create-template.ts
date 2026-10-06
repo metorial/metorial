@@ -9,7 +9,7 @@ export let createTemplate = SlateTool.create(spec, {
   description: `Create a reusable template for Pods or Serverless endpoints. Templates define the container image, environment variables, ports, disk sizes, and other configuration that can be shared across deployments.`,
   instructions: [
     'Set isServerless to true for templates intended for Serverless endpoints.',
-    'Template names must be unique.'
+    'Later template edits do not change existing Pods or endpoints.'
   ]
 })
   .input(
@@ -17,8 +17,18 @@ export let createTemplate = SlateTool.create(spec, {
       name: z.string().describe('Unique template name'),
       imageName: z.string().describe('Container image tag'),
       category: z.enum(['NVIDIA', 'AMD', 'CPU']).optional().describe('Hardware category'),
-      containerDiskInGb: z.number().optional().describe('Container disk in GB (default: 50)'),
-      volumeInGb: z.number().optional().describe('Volume size in GB (default: 20)'),
+      containerDiskInGb: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(1)
+        .optional()
+        .describe('Container disk in GB'),
+      volumeInGb: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(10)
+        .optional()
+        .describe('Host-local persistent volume size in GB'),
       volumeMountPath: z.string().optional().describe('Mount path (default: /workspace)'),
       env: z.record(z.string(), z.string()).optional().describe('Environment variables'),
       ports: z
@@ -29,11 +39,18 @@ export let createTemplate = SlateTool.create(spec, {
       dockerStartCmd: z.array(z.string()).optional().describe('Override Docker CMD'),
       isPublic: z.boolean().optional().describe('Make the template public'),
       isServerless: z.boolean().optional().describe('Template for Serverless endpoints'),
-      readme: z.string().optional().describe('Markdown description/documentation'),
+      readme: z
+        .string()
+        .optional()
+        .describe(
+          'Retained for compatibility. The current REST API does not support readme; omit this field.'
+        ),
       containerRegistryAuthId: z
         .string()
         .optional()
-        .describe('Private registry credentials ID')
+        .describe(
+          'Private registry credentials ID. Call list_container_registry_auths to discover IDs.'
+        )
     })
   )
   .output(

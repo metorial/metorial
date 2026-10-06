@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OmnisendClient } from '../lib/client';
+import { invalid, type JsonRecord } from '../lib/contracts';
 import { spec } from '../spec';
 
 let lineItemSchema = z.object({
@@ -51,11 +52,13 @@ export let sendEvent = SlateTool.create(spec, {
 
 **Predefined event names:** "placed order", "paid for order", "order fulfilled", "order refunded", "order canceled", "added product to cart", "started checkout", "viewed product", "ordered product"`,
   instructions: [
-    'Contact must be identified by email or phone. Anonymous visitors will return a 400 error.',
+    'Contact must be identified by contact ID, email or phone; anonymous events are unsupported.',
     'For order events, use eventVersion "v2" and include order properties like totalPrice, lineItems, etc.',
-    'Custom event names can be anything (e.g., "trial started", "subscription renewed").'
+    'Custom event names can be anything (e.g., "trial started", "subscription renewed").',
+    'Events are append-only and can create or update contact data and trigger messaging. Acceptance does not confirm completed processing. Do not automatically retry after uncertain completion.',
+    'Event ID plus time deduplicates historical events only; real-time automation events can be processed repeatedly. Monetary amounts remain currency units with no cents conversion.'
   ],
-  tags: { destructive: false, readOnly: false }
+  tags: { destructive: true, readOnly: false }
 })
   .input(
     z.object({
@@ -68,7 +71,12 @@ export let sendEvent = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Event version (use "v2" for order events)'),
-      eventId: z.string().optional().describe('UUID for event deduplication'),
+      eventId: z
+        .string()
+        .optional()
+        .describe(
+          'Event UUID; with eventTime deduplicates historical events only, not real-time automation events'
+        ),
       eventTime: z
         .string()
         .optional()
@@ -78,16 +86,26 @@ export let sendEvent = SlateTool.create(spec, {
         .object({
           email: z.string().optional().describe('Contact email'),
           phone: z.string().optional().describe('Contact phone with country code'),
-          contactId: z.string().optional().describe('Omnisend contact ID'),
+          contactId: z
+            .string()
+            .optional()
+            .describe(
+              'Omnisend contact ID; read and verify its identity before sending an irreversible event'
+            ),
           firstName: z.string().optional().describe('First name'),
           lastName: z.string().optional().describe('Last name'),
-          tags: z.array(z.string()).optional().describe('Contact tags'),
+          tags: z
+            .array(z.string())
+            .optional()
+            .describe(
+              'Contact tags included with an irreversible event; review version-specific contact effects before sending'
+            ),
           customProperties: z
             .record(z.string(), z.any())
             .optional()
             .describe('Custom contact properties')
         })
-        .describe('Contact identification (email or phone required)'),
+        .describe('Contact identification (contact ID, email or phone required)'),
       properties: z
         .object({
           orderId: z.string().optional().describe('Order ID'),
@@ -140,19 +158,20 @@ export let sendEvent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OmnisendClient(ctx.auth.token);
+    let client = new OmnisendClient(ctx.auth, ctx.config.apiVersion);
 
-    let contactPayload: Record<string, any> = {};
+    let contactPayload: JsonRecord = {};
     if (ctx.input.contact.email) contactPayload.email = ctx.input.contact.email;
     if (ctx.input.contact.phone) contactPayload.phone = ctx.input.contact.phone;
-    if (ctx.input.contact.contactId) contactPayload.id = ctx.input.contact.contactId;
+    if (ctx.input.contact.contactId !== undefined)
+      contactPayload.id = ctx.input.contact.contactId;
     if (ctx.input.contact.firstName) contactPayload.firstName = ctx.input.contact.firstName;
     if (ctx.input.contact.lastName) contactPayload.lastName = ctx.input.contact.lastName;
     if (ctx.input.contact.tags) contactPayload.tags = ctx.input.contact.tags;
     if (ctx.input.contact.customProperties)
       contactPayload.customProperties = ctx.input.contact.customProperties;
 
-    let eventProperties: Record<string, any> = {};
+    let eventProperties: JsonRecord = {};
     if (ctx.input.properties) {
       let p = ctx.input.properties;
       if (p.orderId) eventProperties.orderID = p.orderId;
@@ -172,9 +191,13 @@ export let sendEvent = SlateTool.create(spec, {
       if (p.shippingAddress) eventProperties.shippingAddress = p.shippingAddress;
       if (p.tags) eventProperties.tags = p.tags;
       if (p.note) eventProperties.note = p.note;
-      if (p.tracking) eventProperties.tracking = p.tracking;
+      if (p.tracking)
+        eventProperties.tracking = {
+          courierTitle: p.tracking.courierTitle,
+          courierURL: p.tracking.courierUrl
+        };
       if (p.cartId) eventProperties.cartID = p.cartId;
-      if (p.cartUrl) eventProperties.cartUrl = p.cartUrl;
+      if (p.cartUrl) eventProperties.abandonedCheckoutURL = p.cartUrl;
       if (p.productId) eventProperties.productID = p.productId;
       if (p.productTitle) eventProperties.productTitle = p.productTitle;
       if (p.productUrl) eventProperties.productURL = p.productUrl;
@@ -183,7 +206,7 @@ export let sendEvent = SlateTool.create(spec, {
 
       if (p.lineItems) {
         eventProperties.lineItems = p.lineItems.map(item => {
-          let mapped: Record<string, any> = {};
+          let mapped: JsonRecord = {};
           if (item.productId) mapped.productID = item.productId;
           if (item.productTitle) mapped.productTitle = item.productTitle;
           if (item.productDescription) mapped.productDescription = item.productDescription;
@@ -211,6 +234,12 @@ export let sendEvent = SlateTool.create(spec, {
     }
 
     if (ctx.input.customProperties) {
+      for (let key of Object.keys(ctx.input.customProperties)) {
+        if (Object.hasOwn(eventProperties, key))
+          invalid(
+            'Custom event properties cannot overwrite explicitly supplied standard properties.'
+          );
+      }
       Object.assign(eventProperties, ctx.input.customProperties);
     }
 
@@ -228,7 +257,8 @@ export let sendEvent = SlateTool.create(spec, {
 
     return {
       output: { accepted: true },
-      message: `Event **"${ctx.input.eventName}"** sent for contact ${ctx.input.contact.email || ctx.input.contact.phone || 'unknown'}.`
+      message:
+        'Event accepted for asynchronous processing. Contact data may be created or updated and automations can run; processing and historical retention are not reversible here.'
     };
   })
   .build();

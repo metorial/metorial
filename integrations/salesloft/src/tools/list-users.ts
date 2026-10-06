@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import type { userSchema } from '../lib/api-schemas';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -14,7 +15,7 @@ let userOutputSchema = z.object({
   role: z.string().nullable().optional().describe('User role (Admin, User, or custom)')
 });
 
-let mapUser = (raw: any) => ({
+let mapUser = (raw: z.output<typeof userSchema>) => ({
   userId: raw.id,
   guid: raw.guid,
   name: raw.name,

@@ -15,8 +15,6 @@ import {
   updateDocument,
   updateTemplate
 } from './tools';
-import { documentGenerated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     listEngines,
     getAccountInfo
   ],
-  triggers: [documentGenerated]
+  triggers: []
 });

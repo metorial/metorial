@@ -16,8 +16,18 @@ export let updateMaintenanceWindow = SlateTool.create(spec, {
     z.object({
       windowId: z.string().describe('ID of the maintenance window to update'),
       name: z.string().optional().describe('New name for the maintenance window'),
-      startAt: z.string().optional().describe('Start time in ISO 8601 format'),
-      endAt: z.string().optional().describe('End time in ISO 8601 format'),
+      startAt: z
+        .string()
+        .optional()
+        .describe(
+          'Start local clock time in RFC3339 format; timezone determines the actual zone and the UTC offset is ignored'
+        ),
+      endAt: z
+        .string()
+        .optional()
+        .describe(
+          'End local clock time in RFC3339 format; timezone determines the actual zone and the UTC offset is ignored'
+        ),
       timezone: z.string().optional().describe('Timezone for the schedule'),
       repeatInterval: z
         .enum(['never', '1d', '1w', '2w', '1m'])
@@ -42,7 +52,7 @@ export let updateMaintenanceWindow = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { windowId, startAt, endAt, repeatInterval, ...rest } = ctx.input;
 
-    let data: Record<string, any> = { ...rest };
+    let data: Record<string, unknown> = { ...rest };
 
     if (startAt !== undefined) data.start_at = startAt;
     if (endAt !== undefined) data.end_at = endAt;

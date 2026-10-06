@@ -24,11 +24,26 @@ Returns model metadata including name, description, category, and status.`,
         .optional()
         .describe('Filter models by category, e.g. "text-to-image", "image-to-video"'),
       endpointId: z
-        .union([z.string(), z.array(z.string())])
+        .union([z.string().min(1), z.array(z.string().min(1)).min(1).max(50)])
         .optional()
         .describe('Specific endpoint ID(s) to look up, e.g. "fal-ai/flux/dev"'),
-      limit: z.number().optional().describe('Maximum number of models to return'),
-      cursor: z.string().optional().describe('Pagination cursor from a previous response')
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum number of models to return'),
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      status: z
+        .enum(['active', 'deprecated'])
+        .optional()
+        .describe('Filter by endpoint status'),
+      includeSchema: z
+        .boolean()
+        .optional()
+        .describe(
+          'Include full OpenAPI schemas. Use endpointId to inspect model-specific inputs and outputs before inference'
+        )
     })
   )
   .output(
@@ -44,7 +59,11 @@ Returns model metadata including name, description, category, and status.`,
               .describe('Model category such as text-to-image, image-to-video'),
             description: z.string().optional().describe('Model description'),
             status: z.string().optional().describe('Model status (e.g. active)'),
-            thumbnailUrl: z.string().optional().describe('URL of the model thumbnail image')
+            thumbnailUrl: z.string().optional().describe('URL of the model thumbnail image'),
+            openapi: z
+              .record(z.string(), z.any())
+              .optional()
+              .describe('Model OpenAPI schema when includeSchema=true')
           })
         )
         .describe('List of matching models'),
@@ -64,16 +83,19 @@ Returns model metadata including name, description, category, and status.`,
       category: ctx.input.category,
       endpointId: ctx.input.endpointId,
       limit: ctx.input.limit,
-      cursor: ctx.input.cursor
+      cursor: ctx.input.cursor,
+      status: ctx.input.status,
+      includeSchema: ctx.input.includeSchema
     });
 
     let models = result.models.map(m => ({
       endpointId: m.endpointId,
-      displayName: m.metadata.display_name,
-      category: m.metadata.category,
-      description: m.metadata.description,
-      status: m.metadata.status,
-      thumbnailUrl: m.metadata.thumbnail_url
+      displayName: m.metadata.display_name ?? undefined,
+      category: m.metadata.category ?? undefined,
+      description: m.metadata.description ?? undefined,
+      status: m.metadata.status ?? undefined,
+      thumbnailUrl: m.metadata.thumbnail_url ?? undefined,
+      openapi: m.openapi
     }));
 
     return {

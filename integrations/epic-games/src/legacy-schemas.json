@@ -1,0 +1,1037 @@
+{
+  "lookup_product_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "productUserIds": {
+          "description": "EOS Product User IDs to resolve to their linked external accounts",
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "externalAccountIds": {
+          "description": "External platform account IDs to look up",
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "identityProvider": {
+          "description": "Identity provider for external account lookup. Required when using externalAccountIds.",
+          "type": "string",
+          "enum": [
+            "amazon",
+            "apple",
+            "discord",
+            "epicgames",
+            "gog",
+            "google",
+            "itchio",
+            "nintendo",
+            "oculus",
+            "openid",
+            "psn",
+            "steam",
+            "xbl"
+          ]
+        },
+        "environment": {
+          "description": "Platform-specific environment (e.g. \"xbl_retail\" for Xbox retail)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "externalToProductUser": {
+          "description": "Map of external account IDs to Product User IDs",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "productUserAccounts": {
+          "description": "Map of Product User IDs to their linked external accounts",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "accountId": {
+                  "type": "string",
+                  "description": "External account ID"
+                },
+                "identityProviderId": {
+                  "type": "string",
+                  "description": "Identity provider (e.g. steam, psn, xbl)"
+                },
+                "displayName": {
+                  "description": "Display name from the identity provider",
+                  "type": "string"
+                },
+                "lastLogin": {
+                  "description": "Last login timestamp (ISO 8601)",
+                  "type": "string"
+                }
+              },
+              "required": ["accountId", "identityProviderId"],
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_account_info": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountIds": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Epic Games account IDs to look up"
+        }
+      },
+      "required": ["accountIds"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "string",
+                "description": "Epic Games account ID"
+              },
+              "displayName": {
+                "description": "Public display name",
+                "type": "string"
+              },
+              "preferredLanguage": {
+                "description": "User preferred language",
+                "type": "string"
+              },
+              "linkedAccounts": {
+                "description": "Linked external accounts",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "identityProviderId": {
+                      "type": "string"
+                    },
+                    "displayName": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["accountId"],
+            "additionalProperties": false
+          },
+          "description": "Account information for the requested IDs"
+        }
+      },
+      "required": ["accounts"],
+      "additionalProperties": false
+    }
+  },
+  "get_friends": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Epic Games account ID to query. Must match the authenticated user."
+        },
+        "include": {
+          "default": "all",
+          "description": "Which lists to include in the response",
+          "type": "string",
+          "enum": ["all", "friends", "blocklist"]
+        }
+      },
+      "required": ["accountId", "include"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "friends": {
+          "description": "List of friends",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "string",
+                "description": "Friend's Epic Games account ID"
+              },
+              "created": {
+                "type": "string",
+                "description": "When the friendship was created (ISO 8601)"
+              },
+              "favorite": {
+                "description": "Whether this friend is marked as a favorite",
+                "type": "boolean"
+              },
+              "nickname": {
+                "description": "Custom nickname set for this friend",
+                "type": "string"
+              }
+            },
+            "required": ["accountId", "created"],
+            "additionalProperties": false
+          }
+        },
+        "blockList": {
+          "description": "List of blocked users",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "string",
+                "description": "Blocked user's Epic Games account ID"
+              },
+              "created": {
+                "type": "string",
+                "description": "When the user was blocked (ISO 8601)"
+              }
+            },
+            "required": ["accountId", "created"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_sanctions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": ["create", "update", "remove"],
+          "description": "The operation to perform"
+        },
+        "sanctions": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productUserId": {
+                "description": "Product User ID to sanction (required for create)",
+                "type": "string"
+              },
+              "referenceId": {
+                "description": "Sanction reference ID (required for update and remove)",
+                "type": "string"
+              },
+              "action": {
+                "description": "Sanction action type, e.g. \"ban\", \"mute\" (required for create)",
+                "type": "string"
+              },
+              "justification": {
+                "description": "Reason for the sanction (required for create, optional for update)",
+                "type": "string"
+              },
+              "source": {
+                "description": "Source identifier, e.g. \"admin_panel\" (required for create)",
+                "type": "string"
+              },
+              "duration": {
+                "description": "Duration in seconds. Omit for permanent sanctions.",
+                "type": "number"
+              },
+              "tags": {
+                "description": "Tags for categorizing the sanction",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "pending": {
+                "description": "Whether the sanction is pending review",
+                "type": "boolean"
+              },
+              "metadata": {
+                "description": "Custom key-value metadata (max 25 pairs)",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "displayName": {
+                "description": "Display name of the player",
+                "type": "string"
+              },
+              "identityProvider": {
+                "description": "Identity provider of the player",
+                "type": "string"
+              },
+              "accountId": {
+                "description": "External account ID of the player",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Sanctions to create, update, or remove"
+        }
+      },
+      "required": ["operation", "sanctions"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sanctions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "referenceId": {
+                "type": "string",
+                "description": "Unique sanction reference ID"
+              },
+              "productUserId": {
+                "description": "Sanctioned player's Product User ID",
+                "type": "string"
+              },
+              "action": {
+                "type": "string",
+                "description": "Sanction action type (e.g. \"ban\", \"mute\")"
+              },
+              "justification": {
+                "description": "Reason for the sanction",
+                "type": "string"
+              },
+              "source": {
+                "description": "Source that created the sanction",
+                "type": "string"
+              },
+              "tags": {
+                "description": "Tags associated with the sanction",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "status": {
+                "description": "Sanction status (Active, Pending, Expired, Removed)",
+                "type": "string"
+              },
+              "pending": {
+                "description": "Whether the sanction is pending",
+                "type": "boolean"
+              },
+              "automated": {
+                "description": "Whether the sanction was automated",
+                "type": "boolean"
+              },
+              "timestamp": {
+                "description": "When the sanction was created (ISO 8601)",
+                "type": "string"
+              },
+              "expirationTimestamp": {
+                "description": "When the sanction expires, or null if permanent",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "metadata": {
+                "description": "Custom metadata key-value pairs",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "displayName": {
+                "description": "Display name of the sanctioned player",
+                "type": "string"
+              },
+              "deploymentId": {
+                "description": "Deployment ID",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["referenceId", "action"],
+            "additionalProperties": false
+          },
+          "description": "Resulting sanction records"
+        }
+      },
+      "required": ["sanctions"],
+      "additionalProperties": false
+    }
+  },
+  "query_sanctions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "productUserId": {
+          "description": "Filter sanctions for a specific Product User ID",
+          "type": "string"
+        },
+        "activeOnly": {
+          "default": false,
+          "description": "If true, only return currently active sanctions",
+          "type": "boolean"
+        },
+        "actions": {
+          "description": "Filter by sanction action types (e.g. [\"ban\", \"mute\"])",
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limit": {
+          "default": 100,
+          "description": "Maximum number of results to return",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "offset": {
+          "default": 0,
+          "description": "Offset for pagination",
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": ["activeOnly", "limit", "offset"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sanctions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "referenceId": {
+                "type": "string",
+                "description": "Unique sanction reference ID"
+              },
+              "productUserId": {
+                "description": "Sanctioned player's Product User ID",
+                "type": "string"
+              },
+              "action": {
+                "type": "string",
+                "description": "Sanction action type"
+              },
+              "justification": {
+                "description": "Reason for the sanction",
+                "type": "string"
+              },
+              "source": {
+                "description": "Source that created the sanction",
+                "type": "string"
+              },
+              "tags": {
+                "description": "Tags associated with the sanction",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "status": {
+                "description": "Sanction status",
+                "type": "string"
+              },
+              "pending": {
+                "description": "Whether the sanction is pending",
+                "type": "boolean"
+              },
+              "automated": {
+                "description": "Whether the sanction was automated",
+                "type": "boolean"
+              },
+              "timestamp": {
+                "description": "When the sanction was created",
+                "type": "string"
+              },
+              "expirationTimestamp": {
+                "description": "When the sanction expires, or null if permanent",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "metadata": {
+                "description": "Custom metadata",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "displayName": {
+                "description": "Player display name",
+                "type": "string"
+              },
+              "deploymentId": {
+                "description": "Deployment ID",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["referenceId", "action"],
+            "additionalProperties": false
+          },
+          "description": "Sanction records matching the query"
+        },
+        "total": {
+          "description": "Total number of matching sanctions (when pagination is available)",
+          "type": "number"
+        }
+      },
+      "required": ["sanctions"],
+      "additionalProperties": false
+    }
+  },
+  "send_player_report": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportingPlayerId": {
+          "type": "string",
+          "description": "Product User ID of the player making the report"
+        },
+        "reportedPlayerId": {
+          "type": "string",
+          "description": "Product User ID of the player being reported"
+        },
+        "reasonId": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7,
+          "description": "Report reason: 1=Cheating, 2=Exploiting, 3=Offensive Profile, 4=Verbal Abuse, 5=Scamming, 6=Spamming, 7=Other"
+        },
+        "message": {
+          "description": "Additional message/details from the reporter",
+          "type": "string",
+          "maxLength": 1024
+        },
+        "context": {
+          "description": "JSON string with additional context about the incident",
+          "type": "string",
+          "maxLength": 4096
+        },
+        "time": {
+          "description": "When the incident occurred (ISO 8601). Defaults to current time.",
+          "type": "string"
+        }
+      },
+      "required": ["reportingPlayerId", "reportedPlayerId", "reasonId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "submitted": {
+          "type": "boolean",
+          "description": "Whether the report was successfully submitted"
+        }
+      },
+      "required": ["submitted"],
+      "additionalProperties": false
+    }
+  },
+  "find_player_reports": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportingPlayerId": {
+          "description": "Filter by the player who submitted the report",
+          "type": "string"
+        },
+        "reportedPlayerId": {
+          "description": "Filter by the player who was reported",
+          "type": "string"
+        },
+        "reasonId": {
+          "description": "Filter by report reason ID",
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "startTime": {
+          "description": "Start of time range (ISO 8601)",
+          "type": "string"
+        },
+        "endTime": {
+          "description": "End of time range (ISO 8601)",
+          "type": "string"
+        },
+        "order": {
+          "default": "time:desc",
+          "description": "Sort order for results",
+          "type": "string",
+          "enum": ["time:desc", "time:asc", "reasonId:asc", "reasonId:desc"]
+        },
+        "limit": {
+          "default": 50,
+          "description": "Maximum number of results",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "offset": {
+          "default": 0,
+          "description": "Offset for pagination",
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": ["order", "limit", "offset"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": {
+                "description": "Product ID",
+                "type": "string"
+              },
+              "sandboxId": {
+                "description": "Sandbox ID",
+                "type": "string"
+              },
+              "deploymentId": {
+                "description": "Deployment ID",
+                "type": "string"
+              },
+              "time": {
+                "type": "string",
+                "description": "When the report was submitted (ISO 8601)"
+              },
+              "reportingPlayerId": {
+                "type": "string",
+                "description": "Product User ID of the reporter"
+              },
+              "reportedPlayerId": {
+                "type": "string",
+                "description": "Product User ID of the reported player"
+              },
+              "reasonId": {
+                "type": "number",
+                "description": "Report reason ID"
+              },
+              "message": {
+                "description": "Report message from the reporter",
+                "type": "string"
+              },
+              "context": {
+                "description": "Additional context JSON",
+                "type": "string"
+              }
+            },
+            "required": ["time", "reportingPlayerId", "reportedPlayerId", "reasonId"],
+            "additionalProperties": false
+          },
+          "description": "Matching player reports"
+        },
+        "total": {
+          "description": "Total number of matching reports",
+          "type": "number"
+        }
+      },
+      "required": ["reports"],
+      "additionalProperties": false
+    }
+  },
+  "check_ownership": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Epic Games account ID to check ownership for"
+        },
+        "catalogItemIds": {
+          "description": "Catalog item IDs to check, in format \"sandboxId:catalogItemId\"",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sandboxId": {
+          "description": "Sandbox ID to list all owned items in. Uses the configured sandboxId if not provided.",
+          "type": "string"
+        }
+      },
+      "required": ["accountId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "ownership": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "namespace": {
+                "type": "string",
+                "description": "Sandbox/namespace ID"
+              },
+              "itemId": {
+                "type": "string",
+                "description": "Catalog item ID"
+              },
+              "owned": {
+                "type": "boolean",
+                "description": "Whether the player owns this item"
+              }
+            },
+            "required": ["namespace", "itemId", "owned"],
+            "additionalProperties": false
+          },
+          "description": "Ownership status for each queried item"
+        }
+      },
+      "required": ["ownership"],
+      "additionalProperties": false
+    }
+  },
+  "get_entitlements": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Epic Games account ID"
+        },
+        "sandboxId": {
+          "description": "Sandbox ID. Uses the configured sandboxId if not provided.",
+          "type": "string"
+        },
+        "entitlementNames": {
+          "description": "Filter by specific entitlement names",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "includeRedeemed": {
+          "default": false,
+          "description": "Whether to include already redeemed/consumed entitlements",
+          "type": "boolean"
+        }
+      },
+      "required": ["accountId", "includeRedeemed"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "entitlements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "entitlementId": {
+                "type": "string",
+                "description": "Unique entitlement ID"
+              },
+              "entitlementName": {
+                "type": "string",
+                "description": "Entitlement name"
+              },
+              "namespace": {
+                "type": "string",
+                "description": "Sandbox/namespace"
+              },
+              "catalogItemId": {
+                "type": "string",
+                "description": "Associated catalog item ID"
+              },
+              "entitlementType": {
+                "type": "string",
+                "description": "Type of entitlement"
+              },
+              "grantDate": {
+                "type": "string",
+                "description": "When the entitlement was granted (ISO 8601)"
+              },
+              "consumable": {
+                "type": "boolean",
+                "description": "Whether the entitlement is consumable"
+              },
+              "status": {
+                "type": "string",
+                "description": "Entitlement status (e.g. ACTIVE)"
+              },
+              "useCount": {
+                "type": "number",
+                "description": "Number of times this entitlement has been used"
+              },
+              "entitlementSource": {
+                "description": "Source of the entitlement",
+                "type": "string"
+              }
+            },
+            "required": [
+              "entitlementId",
+              "entitlementName",
+              "namespace",
+              "catalogItemId",
+              "entitlementType",
+              "grantDate",
+              "consumable",
+              "status",
+              "useCount"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Player entitlement records"
+        }
+      },
+      "required": ["entitlements"],
+      "additionalProperties": false
+    }
+  },
+  "redeem_entitlements": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Epic Games account ID of the player"
+        },
+        "entitlementIds": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Entitlement IDs to redeem/consume"
+        },
+        "sandboxId": {
+          "description": "Sandbox ID. Uses the configured sandboxId if not provided.",
+          "type": "string"
+        }
+      },
+      "required": ["accountId", "entitlementIds"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "redeemed": {
+          "type": "boolean",
+          "description": "Whether the entitlements were successfully redeemed"
+        }
+      },
+      "required": ["redeemed"],
+      "additionalProperties": false
+    }
+  },
+  "manage_voice_room": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": ["join", "remove", "mute"],
+          "description": "The operation to perform"
+        },
+        "roomId": {
+          "type": "string",
+          "description": "Voice room identifier"
+        },
+        "participants": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productUserId": {
+                "type": "string",
+                "description": "Participant Product User ID"
+              },
+              "clientIp": {
+                "description": "Client IP address (for join)",
+                "type": "string"
+              },
+              "hardMuted": {
+                "description": "Whether to hard-mute (for join and mute)",
+                "type": "boolean"
+              }
+            },
+            "required": ["productUserId"],
+            "additionalProperties": false
+          },
+          "description": "Participants to manage"
+        }
+      },
+      "required": ["operation", "roomId", "participants"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "roomId": {
+          "description": "Voice room ID",
+          "type": "string"
+        },
+        "participantTokens": {
+          "description": "Generated room tokens for joined participants",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productUserId": {
+                "type": "string",
+                "description": "Participant Product User ID"
+              },
+              "token": {
+                "type": "string",
+                "description": "Voice room access token for this participant"
+              },
+              "hardMuted": {
+                "type": "boolean",
+                "description": "Whether the participant is hard-muted"
+              }
+            },
+            "required": ["productUserId", "token", "hardMuted"],
+            "additionalProperties": false
+          }
+        },
+        "clientBaseUrl": {
+          "description": "Media server base URL",
+          "type": "string"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the operation succeeded"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "get_anti_cheat_status": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "serverKick": {
+          "type": "boolean",
+          "description": "Whether anti-cheat server kicks are enabled for this deployment"
+        }
+      },
+      "required": ["serverKick"],
+      "additionalProperties": false
+    }
+  }
+}

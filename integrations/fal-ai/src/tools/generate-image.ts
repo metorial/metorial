@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FalClient } from '../lib/client';
+import { addModelFiles, type FalFile, publicFalFileUrl, requireFalFile } from '../lib/files';
 import { spec } from '../spec';
 
 let loraSchema = z.object({
@@ -13,7 +14,7 @@ export let generateImage = SlateTool.create(spec, {
   key: 'generate_image',
   description: `Generate images from text prompts or transform existing images using Fal.ai models such as FLUX, Stable Diffusion, Ideogram, Recraft, and more.
 Supports text-to-image and image-to-image generation with configurable parameters like image size, guidance scale, LoRA adapters, and safety settings.
-Runs synchronously and returns generated image URLs.`,
+Runs synchronously and provides downloadable generated images. Model parameters vary; use search_models with includeSchema=true to inspect the selected endpoint.`,
   instructions: [
     'Use the modelId parameter to select the model endpoint, e.g. "fal-ai/flux/schnell" or "fal-ai/flux/dev".',
     'For image-to-image, provide an imageUrl in the input.'
@@ -24,12 +25,22 @@ Runs synchronously and returns generated image URLs.`,
 })
   .input(
     z.object({
+      fileRetentionSeconds: z
+        .number()
+        .int()
+        .min(60)
+        .max(31536000)
+        .optional()
+        .describe(
+          'Generated file lifetime in seconds. Omit to use account defaults; expired files cannot be recovered'
+        ),
       modelId: z
         .string()
+        .min(1)
         .describe(
           'Model endpoint ID, e.g. "fal-ai/flux/schnell", "fal-ai/flux/dev", "fal-ai/stable-diffusion-v35-large"'
         ),
-      prompt: z.string().describe('Text prompt describing the desired image'),
+      prompt: z.string().min(1).describe('Text prompt describing the desired image'),
       negativePrompt: z
         .string()
         .optional()
@@ -49,22 +60,29 @@ Runs synchronously and returns generated image URLs.`,
             'landscape_16_9'
           ]),
           z.object({
-            width: z.number().describe('Image width in pixels'),
-            height: z.number().describe('Image height in pixels')
+            width: z.number().int().positive().describe('Image width in pixels'),
+            height: z.number().int().positive().describe('Image height in pixels')
           })
         ])
         .optional()
         .describe('Output image size as a preset or custom dimensions'),
       numInferenceSteps: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Number of inference steps (higher = more detail, slower)'),
       guidanceScale: z
         .number()
         .optional()
         .describe('Guidance scale for prompt adherence, typically 1.0-20.0'),
-      seed: z.number().optional().describe('Random seed for reproducible generation'),
-      numImages: z.number().optional().describe('Number of images to generate, defaults to 1'),
+      seed: z.number().int().optional().describe('Random seed for reproducible generation'),
+      numImages: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Number of images to generate, defaults to 1'),
       enableSafetyChecker: z
         .boolean()
         .optional()
@@ -76,7 +94,13 @@ Runs synchronously and returns generated image URLs.`,
       strength: z
         .number()
         .optional()
-        .describe('Strength for image-to-image transformation, 0.0-1.0')
+        .describe('Strength for image-to-image transformation, 0.0-1.0'),
+      additionalParams: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Model-specific parameters from search_models with includeSchema=true; these override translated optional fields'
+        )
     })
   )
   .output(
@@ -84,14 +108,14 @@ Runs synchronously and returns generated image URLs.`,
       images: z
         .array(
           z.object({
-            url: z.string().describe('URL of the generated image on fal CDN'),
+            url: z.string().optional().describe('Provider URL when the image is hosted'),
             contentType: z.string().optional().describe('MIME type of the generated image'),
             width: z.number().optional().describe('Width of the generated image in pixels'),
             height: z.number().optional().describe('Height of the generated image in pixels')
           })
         )
         .describe('Array of generated images'),
-      seed: z.number().optional().describe('Seed used for generation'),
+      seed: z.number().int().optional().describe('Seed used for generation'),
       timings: z
         .record(z.string(), z.any())
         .optional()
@@ -126,24 +150,38 @@ Runs synchronously and returns generated image URLs.`,
       }));
     }
 
+    Object.assign(input, ctx.input.additionalParams ?? {});
     ctx.progress('Generating image...');
-    let result = await client.runModel(ctx.input.modelId, input);
+    let result = await client.runModel(ctx.input.modelId, input, {
+      fileRetentionSeconds: ctx.input.fileRetentionSeconds
+    });
 
-    let images = (result.images || []).map((img: any) => ({
-      url: img.url,
-      contentType: img.content_type,
-      width: img.width,
-      height: img.height
-    }));
+    if (!Array.isArray(result.images) || result.images.length === 0) {
+      throw createApiServiceError(
+        'The selected model returned no images. Inspect its output schema and use run_model for other output shapes.'
+      );
+    }
+    const files: FalFile[] = result.images.map((value: unknown) =>
+      requireFalFile(value, 'image')
+    );
+    const images = files.map(image => {
+      return {
+        url: publicFalFileUrl(image),
+        contentType: image.content_type ?? undefined,
+        width: image.width ?? undefined,
+        height: image.height ?? undefined
+      };
+    });
+    await addModelFiles(ctx, { files, result });
 
     return {
       output: {
         images,
-        seed: result.seed,
-        timings: result.timings,
-        hasNsfwConcepts: result.has_nsfw_concepts
+        seed: result.seed ?? undefined,
+        timings: result.timings ?? undefined,
+        hasNsfwConcepts: result.has_nsfw_concepts ?? undefined
       },
-      message: `Generated ${images.length} image(s) using **${ctx.input.modelId}**.${images.map((img: any) => `\n- ${img.url}`).join('')}`
+      message: `Generated ${images.length} downloadable image(s) using **${ctx.input.modelId}**.`
     };
   })
   .build();

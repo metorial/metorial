@@ -1,91 +1,29 @@
-Let me fetch the webhook event details page for more information.# Slates Specification for Rippling
+# Rippling API coverage
 
-## Overview
+The 19 retained tools use `https://api.rippling.com/platform/api`. They do not map to the newer `https://rest.ripplingapis.com` API. V2 selection produces a validation error with instructions to select v1 and connect credentials authorized for that API.
 
-Rippling is a unified workforce management platform that combines HR, IT, and Finance operations. It enables businesses to manage HR and IT — from payroll and benefits, to employee computers and software — all in one platform. The API allows developers to read and write employee, company, organizational, and payroll data programmatically.
+| Tools | Documented v1 endpoint |
+| --- | --- |
+| `list_employees`, `get_employee` | `GET /employees`, `/employees/include_terminated`, `/employees/{employeeId}` |
+| `get_company`, `get_current_user` | `GET /companies/current`, `/me` |
+| Department, team, location and level lists | `GET /departments`, `/teams`, `/work_locations`, `/levels` |
+| `list_custom_fields` | `GET /custom_fields` |
+| Group create/read/update/delete (partner OAuth only) | `POST /groups`, `GET`, `PUT`, `DELETE /groups/{groupId}` |
+| `list_leave_requests`, `process_leave_request` | `GET /leave_requests`, `POST /leave_requests/{id}/process?action=approve\|decline` |
+| `list_leave_types`, `get_leave_balances` | `GET /company_leave_types`, `/leave_balances/{role}` |
+| `push_candidate` | `POST /ats_candidates/push_candidate`; v1 partner OAuth only |
+| `get_saml_metadata` | `GET /saml/idp_metadata`; SAML-enabled partner OAuth app installation only |
 
-## Authentication
+Group requests use `users` and an opaque string `version`. The public `userIds` field retains its name and maps to employee role IDs. `versionToken` preserves the exact concurrency value; numeric versions are returned only when losslessly representable. Partial group updates hydrate omitted fields from the exact resource before sending the documented PUT.
 
-Rippling supports two authentication methods:
+Candidate inputs preserve `firstName`, `lastName`, `title` and `phone` and map to `name`, `jobTitle` and `phoneNumber`. Optional `candidateId` is the caller's ATS identifier. This endpoint is not an idempotency guarantee or an employee creation API.
 
-### 1. API Tokens (Bearer Tokens)
+Leave actions preserve public `APPROVE` and `DECLINE` enum values and send the documented lowercase query values. Processing first verifies the exact pending request and checks the returned transition. Balance values map documented decimal strings in minutes to the existing numeric output, preserving zero and negative balances; unlimited balances may omit amounts.
 
-All API requests require authorization using an API token. API tokens can be generated in the API Tokens app. These tokens use the permissions of the owner, so treat them as if you would a password. Tokens expire after 30 days of inactivity.
+OAuth uses the app-specific installation authorize URL, Basic client authentication and form encoding at `/api/o/token/`, validates token lifetime and refresh rotation, and completes the documented `/mark_app_installed` acknowledgment. The documented `company` and `employee` scopes are prerequisites, not supersets; field and company-resource scopes are also declared for retained capabilities. Field read scopes include their documented `:read` suffix, alongside `company:read`, `employee:read`, `company:leave_requests:write`, `company:company_leave_types`, app group read/write scopes and `saml:idp_metadata`. Undocumented `employee:startDate` and unrelated OIDC scopes are excluded. Company identity comes from `/companies/current`; SSO scope and endpoint behavior is not mixed into the installation flow. App name belongs only to OAuth input and persisted auth state.
 
-Tokens are passed as a Bearer token in the Authorization header:
+SAML's retained `metadata` output contains filename/MIME metadata and a downloadable XML result instead of inline file contents. Transport errors are converted into bounded actionable errors without retaining raw request/response parents or reflecting personnel data.
 
-```
-Authorization: Bearer <API_TOKEN>
-```
+No triggers are registered. No payroll, compensation mutation, expanded administration, provisioning, deprovisioning, replacement trigger groups or undocumented reversal tools are added.
 
-Each token is tied to a single Rippling Company.
-
-**Base URL (REST API v2):** `https://rest.ripplingapis.com/`  
-**Base URL (Platform API v1):** `https://api.rippling.com/platform/api/`
-
-### 2. OAuth 2.0 (Authorization Code Flow)
-
-Rippling integrations rely on OAuth 2.0, in which Rippling is the server and your application is the client. Rippling sends the user to your redirect URL with a `?code=<xxx>` parameter when they install your application. This provides the authorization that your application will use to exchange for access and refresh tokens.
-
-- **Authorization:** User is redirected from Rippling to your configured redirect URL with an authorization `code` parameter.
-- **Token Endpoint:** `https://api.rippling.com/api/o/token/`
-- **Grant Types:** `authorization_code`, `refresh_token`
-- **Credentials:** Requires `client_id` and `client_secret`, sent as a Base64-encoded Basic Auth header (`Base64(client_id:client_secret)`).
-- The authorization code is valid for 300 seconds and must be used to redeem an access token within that time.
-- The token response includes `access_token`, `refresh_token`, `expires_in`, and `scope` (e.g., `"employee:workEmail employee:name"`).
-- Access tokens grant access to Rippling APIs for each company. One access token gives access to one Rippling Company. So if twelve Rippling companies have installed your app, twelve access tokens are needed.
-
-**Scopes:** Scopes are space-delimited and follow the format `resource:field` (e.g., `employee:workEmail`, `employee:name`). As part of the initial installation flow, the Rippling company admin grants authorization and consent to the scopes configured in your app. The `openid` scope must be included to use Rippling's OIDC functionality.
-
-Rippling also supports **OpenID Connect (OIDC)** for SSO use cases on top of OAuth 2.0, with an authorize endpoint at `https://app.rippling.com/oidc/v1/authorize`.
-
-## Features
-
-### Employee Management
-
-Retrieve a list of active employees with details such as unique role ID, user ID, name, employment type, title, gender, department, work location, role state, and more. You can also retrieve both active and terminated employees. Supports filtering employees by provisioning rules and access settings configured by the company admin.
-
-### Company Information
-
-Retrieve the current company's details including its ID, address, work locations, primary email, phone number, and name, with nested address and work location details.
-
-### Organizational Data
-
-Groups represent subsets of employees across departments or teams; employees can be in multiple groups. You can create groups associated with third-party applications, specifying a name, unique spoke ID, and an array of user IDs. Teams and locations can also be retrieved.
-
-### User Provisioning & Deprovisioning (User Management)
-
-User Management allows customers to automate creating, updating, and deleting users in third-party software when an action is taken in Rippling. The account provisioning setting allows customers to configure rules for which employees should automatically receive access, using groupings such as "all full-time employees in the sales department" or "all employees on the product team located in New York".
-
-### ATS Candidate Onboarding
-
-Push a candidate from an applicant tracking system directly into the Rippling onboarding flow. The request includes candidate details such as name, email, job title, phone number, and other employment-related information.
-
-### Leave Request Management
-
-Approve or decline pending leave requests. The request requires the leave request ID and an action parameter (approve or decline), and returns detailed information about the leave request including employee role, status, dates, and paid leave status.
-
-### SAML SSO Metadata
-
-Retrieve SAML IDP metadata for app integrations that have SAML enabled. The metadata is unique per customer app installation and changes with each new installation.
-
-### Custom Fields & Field Expansion
-
-Field expansion allows retrieval of related data inline — instead of making multiple API calls, you can expand specific referenced fields in a single request.
-
-## Events
-
-Rippling supports webhooks for partner applications (App Shop integrations).
-
-### Employee Lifecycle Events
-
-Customer-configured account provisioning and provision time settings determine which and when employee webhook events are emitted to the webhook URL configured in the app listing. The API supports webhooks allowing real-time notifications for specific events, such as employee onboarding or offboarding.
-
-The webhook event types include user management actions:
-
-- `EXTERNAL_ACCOUNT_CREATE`, `EXTERNAL_ACCOUNT_INVITE`, `EXTERNAL_ACCOUNT_DELETE`, `EXTERNAL_ACCOUNT_SUSPEND`, `EXTERNAL_ACCOUNT_PASSWORD_RESET`, and others related to external account management.
-
-These events are triggered based on the provisioning rules and timing settings configured by the Rippling company admin (e.g., on offer letter signing, on start date, or immediately upon hiring).
-
-- Webhooks are restricted to App Shop integrations. Partner applications provide a webhook URL in their app listing to receive event-triggered notifications.
-- Webhook URLs are configured at the app listing level, not programmatically per-subscription.
+Sources: [current v1 reference](https://developer.rippling.com/documentation/base-api/), [installation](https://developer.rippling.com/documentation/developer-portal/v1-guides/installation), [group management](https://developer.rippling.com/documentation/developer-portal/v1-guides/group-management), [new API quickstart](https://developer.rippling.com/documentation/rest-api/essentials/quickstart).

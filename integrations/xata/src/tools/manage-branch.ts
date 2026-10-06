@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let listBranches = SlateTool.create(spec, {
   name: 'List Branches',
   key: 'list_branches',
-  description: `List all branches of a Xata database. Returns branch names, creation times, and metadata.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: List all branches of a Xata database. Returns branch names, creation times, and metadata.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -53,8 +57,12 @@ export let listBranches = SlateTool.create(spec, {
 export let createBranch = SlateTool.create(spec, {
   name: 'Create Branch',
   key: 'create_branch',
-  description: `Create a new database branch using Xata's copy-on-write branching. The new branch shares storage with its parent and only stores differences. Dev branches can scale to zero when inactive.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Create a new database branch using Xata's copy-on-write branching. The new branch shares storage with its parent and only stores differences. Dev branches can scale to zero when inactive.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })
@@ -100,8 +108,12 @@ export let createBranch = SlateTool.create(spec, {
 export let deleteBranch = SlateTool.create(spec, {
   name: 'Delete Branch',
   key: 'delete_branch',
-  description: `Delete a database branch. This removes the branch and any data unique to it.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Delete a database branch. This removes the branch and any data unique to it.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     destructive: true
   }
 })
@@ -135,8 +147,12 @@ export let deleteBranch = SlateTool.create(spec, {
 export let getBranch = SlateTool.create(spec, {
   name: 'Get Branch Details',
   key: 'get_branch',
-  description: `Get detailed information about a specific database branch, including its schema, tables, and metadata.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Get detailed information about a specific database branch, including its schema, tables, and metadata.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

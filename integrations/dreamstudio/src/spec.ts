@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'dreamstudio',
   name: 'DreamStudio',
   description:
-    "AI-powered image generation, editing, upscaling, video, and 3D asset creation using Stability AI's Stable Diffusion models.",
+    'Generate and transform images, upscale photos, create 3D model files, and inspect your Stability AI account.',
   metadata: {},
   config,
   auth

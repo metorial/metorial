@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listSnapshots = SlateTool.create(spec, {
   name: 'List Snapshots',
   key: 'list_snapshots',
-  description: `List persistent snapshots. Optionally filter by sandbox ID or template ID. Snapshots capture the full state of a sandbox and can be used to create new sandboxes.`,
+  description: `List persistent snapshots. Optionally filter by source sandbox ID or snapshot name. Snapshots capture the full state of a sandbox and can be used to create new sandboxes.`,
   tags: {
     readOnly: true
   }
@@ -17,8 +17,22 @@ export let listSnapshots = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter snapshots by the sandbox they were created from.'),
-      templateId: z.string().optional().describe('Filter snapshots by template ID.'),
-      limit: z.number().optional().describe('Maximum number of snapshots to return.'),
+      templateId: z
+        .string()
+        .optional()
+        .describe('Unsupported legacy filter. Omit this field and use sandboxId or name.'),
+      name: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('Filter by snapshot name or ID, optionally including namespace and tag.'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum number of snapshots to return.'),
       nextToken: z.string().optional().describe('Pagination token from a previous response.')
     })
   )
@@ -27,12 +41,29 @@ export let listSnapshots = SlateTool.create(spec, {
       snapshots: z
         .array(
           z.object({
-            snapshotId: z.string().describe('Unique identifier of the snapshot.'),
-            sandboxId: z.string().describe('ID of the sandbox the snapshot was created from.'),
-            templateId: z.string().describe('Template ID associated with the snapshot.'),
+            snapshotId: z
+              .string()
+              .describe(
+                'Snapshot template identifier including its tag. Pass this as templateId to create_sandbox.'
+              ),
+            names: z
+              .array(z.string())
+              .describe('Names of the snapshot template including namespace and tag.'),
+            sandboxId: z
+              .string()
+              .describe(
+                'Source sandbox ID when supplied as a filter; otherwise empty because E2B does not return it.'
+              ),
+            templateId: z
+              .string()
+              .describe(
+                'Legacy field, empty because E2B does not return a separate template ID. Use snapshotId to create a sandbox.'
+              ),
             createdAt: z
               .string()
-              .describe('ISO 8601 timestamp when the snapshot was created.'),
+              .describe(
+                'Legacy field, empty because E2B does not return a creation timestamp.'
+              ),
             metadata: z
               .record(z.string(), z.string())
               .optional()
@@ -50,6 +81,7 @@ export let listSnapshots = SlateTool.create(spec, {
     let result = await client.listSnapshots({
       sandboxId: ctx.input.sandboxId,
       templateId: ctx.input.templateId,
+      name: ctx.input.name,
       limit: ctx.input.limit,
       nextToken: ctx.input.nextToken
     });

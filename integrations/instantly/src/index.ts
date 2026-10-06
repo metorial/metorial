@@ -5,8 +5,11 @@ import {
   createLead,
   deleteCampaign,
   deleteLead,
+  getBackgroundJob,
   getCampaign,
   getCampaignAnalytics,
+  getCurrentWorkspace,
+  getEmail,
   getEmailAccount,
   getLead,
   listCampaigns,
@@ -25,8 +28,6 @@ import {
   updateLead,
   verifyEmail
 } from './tools';
-import { campaignEvents, leadStatusEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -52,7 +53,10 @@ export let provider = Slate.create({
     manageCustomTags,
     manageLeadLabels,
     manageLeadLists,
-    manageAccountCampaignMappings
+    manageAccountCampaignMappings,
+    getCurrentWorkspace,
+    getEmail,
+    getBackgroundJob
   ],
-  triggers: [campaignEvents, leadStatusEvents]
+  triggers: []
 });

@@ -1,5 +1,7 @@
 export { deleteAssets } from './delete-assets';
+export { downloadAsset } from './download-asset';
 export { getAsset } from './get-asset';
+export { getEnvironmentContext } from './get-environment-context';
 export { getUsage } from './get-usage';
 export { listAssets } from './list-assets';
 export { manageFolders } from './manage-folders';

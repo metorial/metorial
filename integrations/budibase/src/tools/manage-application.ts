@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapApplication } from '../lib/models';
+import { invalid } from '../lib/validation';
 import { spec } from '../spec';
 
 let applicationOutputSchema = z.object({
@@ -27,7 +29,7 @@ For "create", provide a name. For "get", "update", or "delete", provide the appI
     'The appId typically starts with "app_" for published apps or "app_dev_" for development apps.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -61,40 +63,24 @@ For "create", provide a name. For "get", "update", or "delete", provide the appI
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = Client.fromContext(ctx);
     let { action, appId, name, url } = ctx.input;
 
     if (action === 'create') {
-      if (!name) throw new Error('Name is required to create an application');
+      if (!name) invalid('Name is required to create an application');
       let app = await client.createApplication({ name, url });
-      let mapped = {
-        appId: app._id,
-        name: app.name,
-        url: app.url,
-        status: app.status,
-        createdAt: app.createdAt,
-        updatedAt: app.updatedAt,
-        version: app.version
-      };
+      let mapped = mapApplication(app);
       return {
         output: { application: mapped },
         message: `Created application **${mapped.name}** (${mapped.appId}).`
       };
     }
 
-    if (!appId) throw new Error('appId is required for get, update, and delete actions');
+    if (!appId) invalid('appId is required for get, update, and delete actions');
 
     if (action === 'get') {
       let app = await client.getApplication(appId);
-      let mapped = {
-        appId: app._id,
-        name: app.name,
-        url: app.url,
-        status: app.status,
-        createdAt: app.createdAt,
-        updatedAt: app.updatedAt,
-        version: app.version
-      };
+      let mapped = mapApplication(app, appId);
       return {
         output: { application: mapped },
         message: `Retrieved application **${mapped.name}** (${mapped.appId}), status: ${mapped.status}.`
@@ -102,19 +88,11 @@ For "create", provide a name. For "get", "update", or "delete", provide the appI
     }
 
     if (action === 'update') {
-      let updateData: Record<string, any> = {};
+      let updateData: Record<string, unknown> = {};
       if (name !== undefined) updateData.name = name;
       if (url !== undefined) updateData.url = url;
       let app = await client.updateApplication(appId, updateData);
-      let mapped = {
-        appId: app._id,
-        name: app.name,
-        url: app.url,
-        status: app.status,
-        createdAt: app.createdAt,
-        updatedAt: app.updatedAt,
-        version: app.version
-      };
+      let mapped = mapApplication(app, appId);
       return {
         output: { application: mapped },
         message: `Updated application **${mapped.name}** (${mapped.appId}).`

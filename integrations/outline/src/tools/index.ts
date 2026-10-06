@@ -1,4 +1,6 @@
 export * from './create-document';
+export * from './export-document';
+export * from './get-current-user';
 export * from './get-document';
 export * from './list-collections';
 export * from './list-comments';

@@ -11,8 +11,6 @@ import {
   listNfts,
   refreshNftMetadata
 } from './tools';
-import { accountEvents, collectionEvents, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     getAccount,
     refreshNftMetadata
   ],
-  triggers: [inboundWebhook, collectionEvents, accountEvents]
+  triggers: []
 });

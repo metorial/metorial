@@ -104,6 +104,13 @@ export let crawlWebsite = SlateTool.create(spec, {
           })
         )
         .describe('Crawled pages with extracted content'),
+      requestId: z.string().optional().describe('Native request identifier when returned'),
+      usageCredits: z
+        .number()
+        .optional()
+        .describe(
+          'Native credits reported for this request; zero may reflect batched billing'
+        ),
       responseTime: z.number().describe('Time to complete the request in seconds')
     })
   )
@@ -137,6 +144,8 @@ export let crawlWebsite = SlateTool.create(spec, {
       output: {
         baseUrl: result.baseUrl,
         results: result.results,
+        requestId: result.requestId,
+        usageCredits: result.usageCredits,
         responseTime: result.responseTime
       },
       message: `Crawled **${pageCount} page${pageCount !== 1 ? 's' : ''}** starting from **${result.baseUrl}** in ${result.responseTime.toFixed(2)}s.`

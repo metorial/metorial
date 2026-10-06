@@ -21,8 +21,6 @@ import {
   sendConversions,
   updatePin
 } from './tools';
-import { inboundWebhook, newBoard, newPin } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     manageAudience,
     savePin
   ],
-  triggers: [inboundWebhook, newPin, newBoard]
+  triggers: []
 });

@@ -5,6 +5,8 @@ export * from './enrich-corporate-hierarchy';
 export * from './enrich-intent';
 export * from './enrich-technographics';
 export * from './get-usage';
+export * from './lookup-data';
+export * from './lookup-fields';
 export * from './search-companies';
 export * from './search-contacts';
 export * from './search-intent';

@@ -38,7 +38,7 @@ describe('google-admin provider contract', () => {
         'transfer_data',
         'get_customer_info'
       ],
-      triggerIds: ['user_changes', 'activity_events'],
+      triggerIds: [],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'list_users', readOnly: true, destructive: false },
@@ -64,13 +64,10 @@ describe('google-admin provider contract', () => {
         { id: 'transfer_data', readOnly: false, destructive: false },
         { id: 'get_customer_info', readOnly: true, destructive: false }
       ],
-      triggers: [
-        { id: 'user_changes', invocationType: 'webhook' },
-        { id: 'activity_events', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(24);
+    expect(contract.actions).toHaveLength(22);
     expect(Object.keys(contract.configSchema.properties ?? {}).sort()).toEqual([
       'customerId',
       'domain'
@@ -98,9 +95,7 @@ describe('google-admin provider contract', () => {
       manage_calendar_resources: googleAdminActionScopes.manageCalendarResources,
       manage_licenses: googleAdminActionScopes.manageLicenses,
       transfer_data: googleAdminActionScopes.transferData,
-      get_customer_info: googleAdminActionScopes.getCustomerInfo,
-      user_changes: googleAdminActionScopes.userChanges,
-      activity_events: googleAdminActionScopes.activityEvents
+      get_customer_info: googleAdminActionScopes.getCustomerInfo
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

@@ -1,7 +1,30 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PaystackClient } from '../lib/client';
+import { paymentPageUrl } from '../lib/mapping';
+import {
+  exactId,
+  observedFlag,
+  optionalNumericId,
+  pagination,
+  record,
+  records,
+  validateOutput
+} from '../lib/transport';
 import { spec } from '../spec';
+
+const createPaymentPageOutput = z.object({
+  pageId: z.number().optional().describe('Page ID'),
+  exactPageId: z
+    .string()
+    .describe(
+      'Exact provider resource ID; legacy numeric ID is omitted outside its safe range'
+    ),
+  slug: z.string().describe('Page URL slug'),
+  pageUrl: z.string().describe('Full URL for the payment page'),
+  name: z.string().describe('Page name'),
+  amount: z.number().nullable().describe('Fixed amount if set')
+});
 
 export let createPaymentPage = SlateTool.create(spec, {
   name: 'Create Payment Page',
@@ -34,42 +57,53 @@ Amount is in the **smallest currency unit**. Leave amount empty to let the custo
       metadata: z.record(z.string(), z.any()).optional().describe('Custom metadata')
     })
   )
-  .output(
-    z.object({
-      pageId: z.number().describe('Page ID'),
-      slug: z.string().describe('Page URL slug'),
-      pageUrl: z.string().describe('Full URL for the payment page'),
-      name: z.string().describe('Page name'),
-      amount: z.number().nullable().describe('Fixed amount if set')
-    })
-  )
+  .output(createPaymentPageOutput)
   .handleInvocation(async ctx => {
-    let client = new PaystackClient({ token: ctx.auth.token });
-
-    let result = await client.createPaymentPage({
-      name: ctx.input.name,
-      description: ctx.input.description,
-      amount: ctx.input.amount,
-      slug: ctx.input.slug,
-      redirectUrl: ctx.input.redirectUrl,
-      metadata: ctx.input.metadata
-    });
-
-    let page = result.data;
-    let pageUrl = `https://paystack.com/pay/${page.slug}`;
-
+    const client = new PaystackClient({ token: ctx.auth.token });
+    const result = await client.createPaymentPage(ctx.input);
+    const page = record(result.data);
+    const output = {
+      pageId: optionalNumericId(page.id),
+      exactPageId: exactId(page.id),
+      slug: page.slug,
+      pageUrl: paymentPageUrl(page.slug),
+      name: page.name,
+      amount: page.amount ?? null
+    };
     return {
-      output: {
-        pageId: page.id,
-        slug: page.slug,
-        pageUrl,
-        name: page.name,
-        amount: page.amount ?? null
-      },
-      message: `Payment page **${page.name}** created. URL: ${pageUrl}`
+      output: validateOutput(createPaymentPageOutput, output),
+      message:
+        'Hosted payment page created; it can expose a collection page. Deactivation retains its history.'
     };
   })
   .build();
+const listPaymentPagesOutput = z.object({
+  pages: z.array(
+    z.object({
+      pageId: z.number().optional().describe('Page ID'),
+      exactPageId: z
+        .string()
+        .describe(
+          'Exact provider resource ID; legacy numeric ID is omitted outside its safe range'
+        ),
+      name: z.string().describe('Page name'),
+      slug: z.string().describe('URL slug'),
+      pageUrl: z.string().describe('Full payment page URL'),
+      amount: z.number().nullable().describe('Fixed amount if set'),
+      active: z.boolean().describe('Whether the page is active')
+    })
+  ),
+  totalCount: z.number().optional().describe('Total pages'),
+  currentPage: z.number().optional().describe('Current page number'),
+  totalPages: z.number().optional().describe('Total page count'),
+  nextCursor: z.string().nullable().optional().describe('Provider next cursor, when returned'),
+  previousCursor: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Provider previous cursor, when returned'),
+  perPage: z.number().optional().describe('Observed provider page size')
+});
 
 export let listPaymentPages = SlateTool.create(spec, {
   name: 'List Payment Pages',
@@ -87,55 +121,32 @@ export let listPaymentPages = SlateTool.create(spec, {
       to: z.string().optional().describe('End date (ISO 8601)')
     })
   )
-  .output(
-    z.object({
-      pages: z.array(
-        z.object({
-          pageId: z.number().describe('Page ID'),
-          name: z.string().describe('Page name'),
-          slug: z.string().describe('URL slug'),
-          pageUrl: z.string().describe('Full payment page URL'),
-          amount: z.number().nullable().describe('Fixed amount if set'),
-          active: z.boolean().describe('Whether the page is active')
-        })
-      ),
-      totalCount: z.number().describe('Total pages'),
-      currentPage: z.number().describe('Current page number'),
-      totalPages: z.number().describe('Total page count')
-    })
-  )
+  .output(listPaymentPagesOutput)
   .handleInvocation(async ctx => {
-    let client = new PaystackClient({ token: ctx.auth.token });
-
-    let result = await client.listPaymentPages({
-      perPage: ctx.input.perPage,
-      page: ctx.input.page,
-      from: ctx.input.from,
-      to: ctx.input.to
-    });
-
-    let pages = (result.data ?? []).map((p: any) => ({
-      pageId: p.id,
-      name: p.name,
-      slug: p.slug,
-      pageUrl: `https://paystack.com/pay/${p.slug}`,
-      amount: p.amount ?? null,
-      active: p.active ?? true
-    }));
-
-    let meta = result.meta ?? {};
-
+    const client = new PaystackClient({ token: ctx.auth.token });
+    const result = await client.listPaymentPages(ctx.input);
+    const output = {
+      pages: records(result.data).map(item => ({
+        pageId: optionalNumericId(item.id),
+        exactPageId: exactId(item.id),
+        name: item.name,
+        slug: item.slug,
+        pageUrl: paymentPageUrl(item.slug),
+        amount: item.amount ?? null,
+        active: observedFlag(item.active)
+      })),
+      ...pagination(result.meta)
+    };
     return {
-      output: {
-        pages,
-        totalCount: meta.total ?? 0,
-        currentPage: meta.page ?? 1,
-        totalPages: meta.pageCount ?? 1
-      },
-      message: `Found **${meta.total ?? pages.length}** payment pages.`
+      output: validateOutput(listPaymentPagesOutput, output),
+      message:
+        'Retrieved the requested page; continuation and counts are included only when returned by Paystack.'
     };
   })
   .build();
+const updatePaymentPageOutput = z.object({
+  success: z.boolean().describe('Whether the update succeeded')
+});
 
 export let updatePaymentPage = SlateTool.create(spec, {
   name: 'Update Payment Page',
@@ -155,26 +166,14 @@ export let updatePaymentPage = SlateTool.create(spec, {
       active: z.boolean().optional().describe('Whether the page is active')
     })
   )
-  .output(
-    z.object({
-      success: z.boolean().describe('Whether the update succeeded')
-    })
-  )
+  .output(updatePaymentPageOutput)
   .handleInvocation(async ctx => {
-    let client = new PaystackClient({ token: ctx.auth.token });
-
-    await client.updatePaymentPage(ctx.input.pageIdOrSlug, {
-      name: ctx.input.name,
-      description: ctx.input.description,
-      amount: ctx.input.amount,
-      active: ctx.input.active
-    });
-
+    const client = new PaystackClient({ token: ctx.auth.token });
+    await client.updatePaymentPage(ctx.input.pageIdOrSlug, ctx.input);
+    const output = { success: true };
     return {
-      output: {
-        success: true
-      },
-      message: `Payment page **${ctx.input.pageIdOrSlug}** updated.`
+      output: validateOutput(updatePaymentPageOutput, output),
+      message: 'Payment page update confirmed.'
     };
   })
   .build();

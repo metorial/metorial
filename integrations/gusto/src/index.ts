@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getCompany,
+  getCurrentContext,
   getPayroll,
   listContractors,
   listEmployees,
@@ -21,20 +22,11 @@ import {
   manageTimeOff,
   processPayroll
 } from './tools';
-import {
-  benefitEvents,
-  companyEvents,
-  contractorEvents,
-  employeeEvents,
-  formEvents,
-  generalEvents,
-  payrollEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     getCompany,
+    getCurrentContext,
     listEmployees,
     manageEmployee,
     listContractors,
@@ -54,13 +46,5 @@ export let provider = Slate.create({
     listForms,
     manageJobCompensation
   ],
-  triggers: [
-    employeeEvents,
-    companyEvents,
-    payrollEvents,
-    contractorEvents,
-    benefitEvents,
-    formEvents,
-    generalEvents
-  ]
+  triggers: []
 });

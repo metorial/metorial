@@ -1,5 +1,6 @@
 export * from './create-incident';
 export * from './create-schedule-override';
+export * from './discovery';
 export * from './edit-incident';
 export * from './get-incident';
 export * from './get-schedule-entries';

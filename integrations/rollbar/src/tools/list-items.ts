@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, mapItem, validId } from '../lib/client';
 import { spec } from '../spec';
 
 export let listItems = SlateTool.create(spec, {
@@ -13,6 +13,10 @@ export let listItems = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: z
+        .number()
+        .optional()
+        .describe('Project ID from manage_project; required with an account token.'),
       status: z
         .enum(['active', 'resolved', 'muted', 'archived'])
         .optional()
@@ -22,7 +26,12 @@ export let listItems = SlateTool.create(spec, {
         .optional()
         .describe('Filter items by level'),
       environment: z.string().optional().describe('Filter items by environment name'),
-      page: z.number().optional().describe('Page number for pagination (starts at 1)')
+      page: z
+        .number()
+        .optional()
+        .describe('Page number for pagination (starts at 1; 100 items per page)'),
+      query: z.string().optional().describe('Search item titles'),
+      itemIds: z.array(z.number()).optional().describe('Restrict results to specific item IDs')
     })
   )
   .output(
@@ -51,38 +60,39 @@ export let listItems = SlateTool.create(spec, {
           })
         )
         .describe('List of items'),
-      page: z.number().describe('Current page number')
+      page: z.number().describe('Current page number'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe(
+          'Matching item count when available; omitted when the provider reports null'
+        ),
+      nextPage: z.number().optional().describe('Next page to try when this page has 100 items')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
     let result = await client.listItems({
       status: ctx.input.status,
       level: ctx.input.level,
       environment: ctx.input.environment,
-      page: ctx.input.page
+      page: ctx.input.page,
+      query: ctx.input.query,
+      ids: ctx.input.itemIds?.map(id => String(validId(id, 'itemIds'))).join(',')
     });
 
-    let items = (result?.result?.items || []).map((item: any) => ({
-      itemId: item.id,
-      counter: item.counter,
-      title: item.title,
-      status: item.status,
-      level: item.level_string || item.level,
-      environment: item.environment,
-      framework: item.framework,
-      totalOccurrences: item.total_occurrences,
-      lastOccurrenceTimestamp: item.last_occurrence_timestamp,
-      firstOccurrenceTimestamp: item.first_occurrence_timestamp,
-      uniqueOccurrences: item.unique_occurrences,
-      platform: item.platform
-    }));
+    let items = result.result.items.map(mapItem);
 
     return {
       output: {
         items,
-        page: ctx.input.page || 1
+        page: result.result.page ?? ctx.input.page ?? 1,
+        totalCount: result.result.total_count,
+        nextPage:
+          result.result.items.length === 100
+            ? (result.result.page ?? ctx.input.page ?? 1) + 1
+            : undefined
       },
       message: `Found **${items.length}** items${ctx.input.status ? ` with status "${ctx.input.status}"` : ''}${ctx.input.environment ? ` in environment "${ctx.input.environment}"` : ''}.`
     };

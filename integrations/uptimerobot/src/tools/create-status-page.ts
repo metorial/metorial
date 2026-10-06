@@ -1,13 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { invalidInput, positiveId } from '../lib/types';
 import { spec } from '../spec';
 
 export let createStatusPage = SlateTool.create(spec, {
   name: 'Create Status Page',
   key: 'create_status_page',
-  description: `Create a new public status page that displays the uptime status of selected monitors. Configure sort order, custom domain, and password protection.`,
+  description: `Use a Legacy API Key connection (API v2). Create a new public status page that displays the uptime status of selected monitors. Configure sort order, custom domain, and password protection.`,
   tags: {
+    readOnly: false,
     destructive: false
   }
 })
@@ -43,7 +45,7 @@ export let createStatusPage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let sortMap: Record<string, number> = {
       name_asc: 1,
@@ -52,8 +54,13 @@ export let createStatusPage = SlateTool.create(spec, {
       status_down_first: 4
     };
 
+    if (ctx.input.includeAllMonitors && ctx.input.monitorIds?.length)
+      invalidInput('Choose includeAllMonitors or monitorIds, not both.');
+    if (!ctx.input.includeAllMonitors && !ctx.input.monitorIds?.length)
+      invalidInput('Provide monitorIds, or explicitly set includeAllMonitors to true.');
+    for (let id of ctx.input.monitorIds ?? []) positiveId(id, 'monitorId');
     let type = ctx.input.includeAllMonitors ? 1 : 2;
-    let monitors = ctx.input.includeAllMonitors ? '0' : ctx.input.monitorIds?.join('-') || '0';
+    let monitors = ctx.input.includeAllMonitors ? '0' : ctx.input.monitorIds!.join('-');
 
     let result = await client.newPSP({
       friendlyName: ctx.input.friendlyName,

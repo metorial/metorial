@@ -1,3 +1,4 @@
+export * from './current-reporting';
 export * from './get-instance';
 export * from './get-performance-report';
 export * from './list-campaigns';

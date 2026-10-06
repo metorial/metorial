@@ -11,6 +11,7 @@ export { makeCall } from './make-call';
 export { manageAction } from './manage-action';
 export { manageContact } from './manage-contact';
 export { manageKnowledgeBase } from './manage-knowledge-base';
+export { manageKnowledgeBaseSource } from './manage-knowledge-base-source';
 export { manageSubaccount } from './manage-subaccount';
 export { runSimulation } from './run-simulation';
 export { updateAgent } from './update-agent';

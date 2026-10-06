@@ -4,6 +4,7 @@ export * from './manage-branch';
 export * from './manage-database';
 export * from './manage-record';
 export * from './manage-table';
+export * from './platform';
 export * from './query-records';
 export * from './search';
 export * from './summarize-table';

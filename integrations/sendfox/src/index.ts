@@ -24,8 +24,6 @@ import {
   updateCampaign,
   updateContact
 } from './tools';
-import { inboundWebhook, newCampaign, newContact } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -52,5 +50,5 @@ export let provider = Slate.create({
     listForms,
     getAccount
   ],
-  triggers: [inboundWebhook, newContact, newCampaign]
+  triggers: []
 });

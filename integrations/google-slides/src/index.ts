@@ -14,8 +14,6 @@ import {
   manageSpeakerNotes,
   replaceText
 } from './tools';
-import { inboundWebhook, presentationChanged } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     batchUpdate,
     deleteElement
   ],
-  triggers: [inboundWebhook, presentationChanged]
+  triggers: []
 });

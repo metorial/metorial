@@ -3,13 +3,13 @@ import { z } from 'zod';
 import { E2BClient } from '../lib/client';
 import { spec } from '../spec';
 
-let webhookSchema = z.object({
+export let webhookSchema = z.object({
   webhookId: z.string().describe('Unique identifier of the webhook.'),
   teamId: z.string().describe('Team ID that owns the webhook.'),
   name: z.string().describe('Name of the webhook.'),
   createdAt: z.string().describe('ISO 8601 timestamp when the webhook was created.'),
   enabled: z.boolean().describe('Whether the webhook is currently enabled.'),
-  url: z.string().describe('Target URL that receives webhook events.'),
+  url: z.string().url().describe('Target URL that receives webhook events.'),
   events: z.array(z.string()).describe('Event types the webhook is subscribed to.')
 });
 
@@ -50,8 +50,11 @@ export let createWebhook = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('A descriptive name for the webhook.'),
-      url: z.string().describe('The target URL that will receive webhook POST requests.'),
+      name: z.string().min(1).describe('A descriptive name for the webhook.'),
+      url: z
+        .string()
+        .url()
+        .describe('The target URL that will receive webhook POST requests.'),
       enabled: z
         .boolean()
         .optional()
@@ -67,12 +70,13 @@ export let createWebhook = SlateTool.create(spec, {
             'sandbox.lifecycle.checkpointed'
           ])
         )
+        .min(1)
         .describe('Event types to subscribe to.'),
       signatureSecret: z
         .string()
         .optional()
         .describe(
-          'Secret used to sign webhook payloads for verification. If not provided, one will be generated.'
+          'Secret used to sign webhook payloads for verification. Supply your own secret to verify deliveries; an automatically generated secret is not returned.'
         )
     })
   )
@@ -108,7 +112,7 @@ export let updateWebhook = SlateTool.create(spec, {
     z.object({
       webhookId: z.string().describe('The unique identifier of the webhook to update.'),
       name: z.string().optional().describe('New name for the webhook.'),
-      url: z.string().optional().describe('New target URL.'),
+      url: z.string().url().optional().describe('New target URL.'),
       enabled: z.boolean().optional().describe('Enable or disable the webhook.'),
       events: z
         .array(

@@ -6,7 +6,9 @@ import {
   enrollMfaFactor,
   getApp,
   getEventTypes,
+  getGroup,
   getMfaFactors,
+  getRole,
   getUser,
   listApps,
   listEvents,
@@ -19,13 +21,13 @@ import {
   updateUser,
   verifyMfaFactor
 } from './tools';
-import { accountEvents, eventWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     listUsers.build(),
     getUser.build(),
+    getRole.build(),
+    getGroup.build(),
     createUser.build(),
     updateUser.build(),
     deleteUser.build(),
@@ -42,5 +44,5 @@ export let provider = Slate.create({
     enrollMfaFactor.build(),
     verifyMfaFactor.build()
   ],
-  triggers: [accountEvents.build(), eventWebhook.build()]
+  triggers: []
 });

@@ -6,8 +6,10 @@ import { spec } from '../spec';
 export let verifySubscriber = SlateTool.create(spec, {
   name: 'Verify Subscriber',
   key: 'verify_subscriber',
-  description: `Check whether a subscriber currently has active access to a subscription storefront. Returns the subscriber's subscription status. Provide either the subscriber's email or ID.`,
-  instructions: ['Statuses indicating valid service access: ACTIVE, TRIAL, PAST_DUE.'],
+  description: `Retrieve a subscriber's current subscription status within an exact storefront. Provide exactly one subscriber email or ID. This status does not independently prove current content entitlement.`,
+  instructions: [
+    'Apply the storefront’s current access policy to the returned status; this tool does not grant or revoke access.'
+  ],
   tags: {
     readOnly: true
   }

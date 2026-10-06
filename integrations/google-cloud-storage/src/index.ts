@@ -14,8 +14,6 @@ import {
   updateObjectMetadata,
   uploadObject
 } from './tools';
-import { inboundWebhook, objectChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     manageLifecycle,
     manageNotifications
   ],
-  triggers: [inboundWebhook, objectChanges]
+  triggers: []
 });

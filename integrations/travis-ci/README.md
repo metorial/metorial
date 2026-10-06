@@ -1,69 +1,46 @@
-# <img src="https://provider-logos.metorial-cdn.com/travis-ci.png" height="20"> Travis Ci
+# Travis CI
 
-Manage CI/CD builds, jobs, and repositories on Travis CI. Trigger, restart, and cancel builds and jobs. View build logs and job statuses. Manage repository settings, environment variables, cron jobs, and build caches. Validate .travis.yml configuration files. Access branch build statuses, build request history, and security scan results. Receive webhook notifications for build events.
+Manage repositories, builds, jobs, CI settings, environment variables, cron schedules, and caches through Travis CI API V3. Discover the connected account and build-request status, validate `.travis.yml`, and download job logs.
+
+## Connection
+
+Use a Travis CI API token from Account Settings > API Token. Select `https://api.travis-ci.com` for hosted public or private repositories, or your Enterprise API root such as `https://YOUR-INSTANCE/api`. Identity checks and operations use the same endpoint. [Travis CI `.org` was retired in June 2021](https://docs.travis-ci.com/user/migrate/open-source-repository-migration/).
+
+The API endpoint now belongs to authentication. Existing saved tool configuration remains a fallback when older credentials have no endpoint. Reconnect an older Enterprise connection to persist its endpoint for correct account identification; changing tool configuration alone does not change authentication.
 
 ## Tools
 
-### Get Build
+| Tool key | Outcome |
+| --- | --- |
+| `get_current_user` | Identify the connected account |
+| `list_repositories` | Discover repositories with owner, active, starred, or privacy filters |
+| `get_repository` | Read, activate/deactivate, or star/unstar a repository |
+| `list_builds` | Discover builds with branch, state, and event filters |
+| `get_build` | Read build status, commit, branch, and job IDs |
+| `trigger_build` | Queue a build request with branch, commit SHA, message, and optional configuration |
+| `get_build_request` | Read request processing status and resulting build IDs |
+| `list_build_requests` | Inspect repository request history |
+| `manage_build` | Request build cancellation or restart and read current status |
+| `manage_job` | Read a job or request cancellation, restart, or debug mode |
+| `manage_job_log` | Download a text/JSON log or remove its contents |
+| `manage_env_vars` | List/read/create/update/delete repository environment variables |
+| `manage_repository_settings` | List/read/update CI and log settings |
+| `manage_crons` | List/read/create/delete daily, weekly, or monthly branch schedules |
+| `manage_caches` | List/delete repository caches by branch and name pattern |
+| `list_branches` | Read branches and latest build status |
+| `lint_travis_yml` | Report configuration warnings |
+| `get_job_log` | Deprecated legacy inline log read/delete; use `manage_job_log` |
 
-Retrieve detailed information about a specific build, including its state, duration, commit details, and associated jobs.
+Paginated tools retain `totalCount` and return optional `hasMore` and `nextOffset`. Pass `nextOffset` as the next call's `offset` with the same filters and limit.
 
-### Get Job Log
+## Build workflow
 
-Retrieve or delete the log output for a specific job. Use the text format for plain text output, or json for structured log data.
+Submit `trigger_build`, then read `get_build_request` until it reports build IDs. Use `get_build` and `manage_job` to inspect execution. Cancellation, restart, and debug requests are asynchronous; a successful response does not mean execution has finished. Build generation/restarts require account permissions and available build credits.
 
-### Get Repository
+For configuration overrides, [explicit merge modes](https://docs.travis-ci.com/user/triggering-builds/#merge-modes) control how the supplied config combines with `.travis.yml`. `replace` uses only the supplied configuration. Omitting `mergeMode` retains the provider default. Configure notifications and deployment steps intentionally before requesting a build.
 
-Retrieve detailed information about a Travis CI repository, including its build status, settings, and owner. Can also activate, deactivate, star, or unstar a repository.
-
-### Lint Travis CI Config
-
-Validate a .travis.yml configuration file for syntax errors and warnings. Provide the full YAML content and receive a list of warnings if any issues are found.
-
-### List Branches
-
-List branches for a repository with their latest build status. Useful for checking the CI status of each branch. Optionally retrieve detailed info for a specific branch.
-
-### List Build Requests
-
-List the history of build requests for a repository, including those triggered by commits, pull requests, API calls, or cron jobs. Useful for auditing build activity.
-
-### List Builds
-
-List builds for a repository or for the authenticated user. Supports filtering by branch, state, and event type. Results are paginated.
-
-### List Repositories
-
-List repositories accessible to the authenticated user or a specific owner. Supports filtering by active status, starred status, and privacy. Results are paginated.
-
-### Manage Build
-
-Cancel or restart a Travis CI build. Use this to stop a running build or re-run a completed/canceled build.
-
-### Manage Build Caches
-
-List or delete build caches for a repository. Caches store dependencies and artifacts to speed up builds. Can be filtered by branch or name pattern.
-
-### Manage Cron Jobs
-
-List, create, get, or delete scheduled cron builds for a repository. Crons can run daily, weekly, or monthly on a specific branch. Only one cron job is allowed per branch.
-
-### Manage Environment Variables
-
-List, create, update, or delete environment variables for a Travis CI repository. Environment variables can be marked as public or private (encrypted). Private variable values are not returned by the API.
-
-### Manage Job
-
-Get details about a specific job, or cancel, restart, or debug it. Debug mode restarts the job with SSH access enabled for troubleshooting.
-
-### Trigger Build
-
-Trigger a new build for a repository. Optionally specify a branch, custom commit message, and override build configuration. The build request is queued and processed asynchronously.
+Private environment values are returned as `null`. Job logs may contain sensitive build output. Log deletion replaces contents with a removal notice. Only one cron exists per repository branch; creating a cron replaces that branch's existing schedule. Permissions and feature availability depend on the selected Travis CI installation and plan.
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

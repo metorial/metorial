@@ -17,14 +17,6 @@ import {
   manageWebhooks,
   sendMessage
 } from './tools';
-import {
-  channelUpdate,
-  guildUpdate,
-  inboundWebhook,
-  memberUpdate,
-  newMessage
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +36,5 @@ export let provider = Slate.create({
     manageApplicationCommands,
     manageEmojis
   ],
-  triggers: [inboundWebhook, newMessage, memberUpdate, guildUpdate, channelUpdate]
+  triggers: []
 });

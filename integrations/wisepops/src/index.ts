@@ -8,8 +8,6 @@ import {
   listContacts,
   listWebhooks
 } from './tools';
-import { formSubmission } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -20,5 +18,5 @@ export let provider = Slate.create({
     deleteWebhook,
     deleteUserData
   ],
-  triggers: [formSubmission]
+  triggers: []
 });

@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fieldMap, recipientMap, summaryMap } from '../lib/schemas';
+import { clientConfig } from '../lib/validation';
 import { spec } from '../spec';
 
 let recipientSchema = z.object({
@@ -20,6 +22,28 @@ let envelopeDetailSchema = z.object({
   createdAt: z.string().describe('ISO timestamp when the envelope was created'),
   updatedAt: z.string().describe('ISO timestamp when the envelope was last updated'),
   recipients: z.array(recipientSchema).describe('List of recipients'),
+  fields: z
+    .array(
+      z.object({
+        fieldId: z.number(),
+        type: z.string(),
+        pageNumber: z.number(),
+        pageX: z.number(),
+        pageY: z.number(),
+        width: z.number(),
+        height: z.number(),
+        envelopeItemId: z.string(),
+        recipientId: z.number()
+      })
+    )
+    .describe('Fields and exact recipient/PDF item IDs'),
+  items: z
+    .array(z.object({ envelopeItemId: z.string(), title: z.string(), order: z.number() }))
+    .describe('PDF items available to download'),
+  teamId: z.number().optional(),
+  ownerId: z.number().optional(),
+  externalId: z.string().optional(),
+  folderId: z.string().optional(),
   subject: z.string().optional().describe('Email subject line'),
   message: z.string().optional().describe('Email message body')
 });
@@ -39,35 +63,21 @@ export let getEnvelopeTool = SlateTool.create(spec, {
   )
   .output(envelopeDetailSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let envelope = await client.getEnvelope(ctx.input.envelopeId);
-
-    let recipients = (envelope.recipients ?? []) as Record<string, unknown>[];
-
+    const e = await new Client(clientConfig(ctx)).getEnvelope(ctx.input.envelopeId);
     return {
       output: {
-        envelopeId: String(envelope.id ?? envelope.envelopeId ?? ''),
-        title: String(envelope.title ?? ''),
-        status: String(envelope.status ?? ''),
-        type: String(envelope.type ?? ''),
-        createdAt: String(envelope.createdAt ?? ''),
-        updatedAt: String(envelope.updatedAt ?? ''),
-        recipients: recipients.map((r: Record<string, unknown>) => ({
-          recipientId: Number(r.id ?? r.recipientId ?? 0),
-          email: String(r.email ?? ''),
-          name: String(r.name ?? ''),
-          role: String(r.role ?? ''),
-          signingStatus: String(r.signingStatus ?? r.status ?? ''),
-          signingOrder: r.signingOrder != null ? Number(r.signingOrder) : undefined
+        ...summaryMap(e),
+        recipients: e.recipients.map(recipientMap),
+        fields: e.fields.map(fieldMap),
+        items: e.envelopeItems.map(i => ({
+          envelopeItemId: i.id,
+          title: i.title,
+          order: i.order
         })),
-        subject: envelope.meta?.subject ? String(envelope.meta.subject) : undefined,
-        message: envelope.meta?.message ? String(envelope.meta.message) : undefined
+        subject: e.documentMeta?.subject ?? undefined,
+        message: e.documentMeta?.message ?? undefined
       },
-      message: `Retrieved envelope "${envelope.title}" (status: ${envelope.status}).`
+      message: `Retrieved envelope ${e.id} (${e.status}).`
     };
   })
   .build();

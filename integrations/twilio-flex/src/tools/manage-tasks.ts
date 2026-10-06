@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TaskRouterClient } from '../lib/taskrouter-client';
+import { fail, validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let taskSchema = z.object({
@@ -32,20 +33,31 @@ export let manageTasksTool = SlateTool.create(spec, {
     'Task attributes must be a valid JSON string.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque continuation from nextPageToken; retain the same resource and filters.'
+        ),
       action: z
         .enum(['create', 'get', 'update', 'delete', 'list'])
         .describe('Action to perform'),
-      workspaceSid: z.string().describe('Workspace SID'),
+      workspaceSid: z
+        .string()
+        .describe('Workspace SID. Call list_workspaces to discover authorized workspaces.'),
       taskSid: z.string().optional().describe('Task SID (required for get/update/delete)'),
       attributes: z.string().optional().describe('Task attributes as JSON string'),
       workflowSid: z.string().optional().describe('Workflow SID for routing (used in create)'),
-      taskQueueSid: z.string().optional().describe('Task Queue SID to filter or assign'),
+      taskQueueSid: z
+        .string()
+        .optional()
+        .describe('Task Queue SID for list/create; not a documented update field'),
       priority: z.number().optional().describe('Task priority (higher = more important)'),
       timeout: z.number().optional().describe('Task timeout in seconds'),
       assignmentStatus: z
@@ -60,17 +72,27 @@ export let manageTasksTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Native continuation; omitted when this page is exhausted.'),
+      hasMore: z.boolean().optional().describe('Whether a next page is available.'),
       tasks: z.array(taskSchema).describe('Task records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TaskRouterClient(ctx.auth.token, ctx.auth.accountSid);
+    validateInput('manage_tasks', ctx.input);
+    let client = new TaskRouterClient(
+      ctx.auth.token,
+      ctx.auth.accountSid,
+      ctx.input.pageToken
+    );
 
     if (ctx.input.action === 'list') {
       let params: Record<string, string | undefined> = {
-        PageSize: String(ctx.input.pageSize || 50)
+        PageSize: String(ctx.input.pageSize ?? 50)
       };
-      if (ctx.input.assignmentStatus) {
+      if (ctx.input.assignmentStatus !== undefined) {
         params.AssignmentStatus = ctx.input.assignmentStatus;
       }
       if (ctx.input.taskQueueSid) {
@@ -94,13 +116,13 @@ export let manageTasksTool = SlateTool.create(spec, {
         dateUpdated: t.date_updated
       }));
       return {
-        output: { tasks },
+        output: { tasks, nextPageToken: result.nextPageToken, hasMore: result.hasMore },
         message: `Found **${tasks.length}** tasks.`
       };
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.taskSid) throw new Error('taskSid is required');
+      if (!ctx.input.taskSid) throw fail('taskSid is required');
       let t = await client.getTask(ctx.input.workspaceSid, ctx.input.taskSid);
       return {
         output: {
@@ -153,13 +175,12 @@ export let manageTasksTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.taskSid) throw new Error('taskSid is required');
+      if (!ctx.input.taskSid) throw fail('taskSid is required');
       let params: Record<string, string | undefined> = {
         Attributes: ctx.input.attributes,
         Priority: ctx.input.priority?.toString(),
         AssignmentStatus: ctx.input.assignmentStatus,
-        Reason: ctx.input.reason,
-        TaskQueueSid: ctx.input.taskQueueSid
+        Reason: ctx.input.reason
       };
       let t = await client.updateTask(ctx.input.workspaceSid, ctx.input.taskSid, params);
       return {
@@ -185,7 +206,7 @@ export let manageTasksTool = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.taskSid) throw new Error('taskSid is required');
+    if (!ctx.input.taskSid) throw fail('taskSid is required');
     await client.deleteTask(ctx.input.workspaceSid, ctx.input.taskSid);
     return {
       output: {

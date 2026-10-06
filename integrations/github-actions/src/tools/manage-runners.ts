@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubActionsClient } from '../lib/client';
+import type { Runner, RunnerLabel, RunnerToken } from '../lib/types';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let runnerLabelSchema = z.object({
@@ -29,7 +31,8 @@ export let manageRunners = SlateTool.create(spec, {
     'Removal tokens are used to securely remove runners.'
   ],
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -75,40 +78,41 @@ export let manageRunners = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new GitHubActionsClient(ctx.auth.token);
     let { scope, owner, repo, org, action, runnerId } = ctx.input;
 
-    let mapRunner = (r: any) => ({
+    let mapRunner = (r: Runner) => ({
       runnerId: r.id,
       name: r.name,
       os: r.os,
       status: r.status,
       busy: r.busy,
-      labels: (r.labels ?? []).map((l: any) => ({
+      labels: (r.labels ?? []).map((l: RunnerLabel) => ({
         labelId: l.id,
         name: l.name,
         type: l.type
       }))
     });
 
-    let mapLabels = (data: any) =>
-      (data.labels ?? []).map((l: any) => ({
+    let mapLabels = (data: { labels: RunnerLabel[] }) =>
+      (data.labels ?? []).map((l: RunnerLabel) => ({
         labelId: l.id,
         name: l.name,
         type: l.type
       }));
 
     if (action === 'list') {
-      let data: any;
+      let data: { total_count: number; runners: Runner[] };
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         data = await client.listOrgRunners(org, {
           perPage: ctx.input.perPage,
           page: ctx.input.page,
           name: ctx.input.name
         });
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         data = await client.listRepoRunners(owner, repo, {
           perPage: ctx.input.perPage,
           page: ctx.input.page,
@@ -125,13 +129,13 @@ export let manageRunners = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!runnerId) throw new Error('runnerId is required.');
-      let runner: any;
+      if (!runnerId) throw createApiServiceError('runnerId is required.');
+      let runner: Runner;
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         runner = await client.getOrgRunner(org, runnerId);
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         runner = await client.getRepoRunner(owner, repo, runnerId);
       }
       return {
@@ -141,12 +145,12 @@ export let manageRunners = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      if (!runnerId) throw new Error('runnerId is required.');
+      if (!runnerId) throw createApiServiceError('runnerId is required.');
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         await client.removeOrgRunner(org, runnerId);
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         await client.removeRepoRunner(owner, repo, runnerId);
       }
       return {
@@ -156,12 +160,12 @@ export let manageRunners = SlateTool.create(spec, {
     }
 
     if (action === 'create_registration_token') {
-      let data: any;
+      let data: RunnerToken;
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         data = await client.createOrgRunnerRegistrationToken(org);
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         data = await client.createRepoRunnerRegistrationToken(owner, repo);
       }
       return {
@@ -171,12 +175,12 @@ export let manageRunners = SlateTool.create(spec, {
     }
 
     if (action === 'create_removal_token') {
-      let data: any;
+      let data: RunnerToken;
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         data = await client.createOrgRunnerRemovalToken(org);
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         data = await client.createRepoRunnerRemovalToken(owner, repo);
       }
       return {
@@ -186,9 +190,16 @@ export let manageRunners = SlateTool.create(spec, {
     }
 
     if (action === 'list_labels') {
-      if (!runnerId || !owner || !repo)
-        throw new Error('runnerId, owner, and repo are required.');
-      let data = await client.listRunnerLabels(owner, repo, runnerId);
+      if (!runnerId) throw createApiServiceError('runnerId is required for list_labels.');
+      let data: { labels: RunnerLabel[] };
+      if (scope === 'org') {
+        if (!org) throw createApiServiceError('org is required for org scope.');
+        data = await client.listOrgRunnerLabels(org, runnerId);
+      } else {
+        if (!owner || !repo)
+          throw createApiServiceError('owner and repo are required for repo scope.');
+        data = await client.listRunnerLabels(owner, repo, runnerId);
+      }
       return {
         output: { labels: mapLabels(data) },
         message: `Runner has **${data.labels?.length ?? 0}** labels.`
@@ -196,9 +207,17 @@ export let manageRunners = SlateTool.create(spec, {
     }
 
     if (action === 'add_labels') {
-      if (!runnerId || !ctx.input.labels || !owner || !repo)
-        throw new Error('runnerId, labels, owner, and repo are required.');
-      let data = await client.addRunnerLabels(owner, repo, runnerId, ctx.input.labels);
+      if (!runnerId || !ctx.input.labels)
+        throw createApiServiceError('runnerId, labels is required for add_labels.');
+      let data: { labels: RunnerLabel[] };
+      if (scope === 'org') {
+        if (!org) throw createApiServiceError('org is required for org scope.');
+        data = await client.addOrgRunnerLabels(org, runnerId, ctx.input.labels);
+      } else {
+        if (!owner || !repo)
+          throw createApiServiceError('owner and repo are required for repo scope.');
+        data = await client.addRunnerLabels(owner, repo, runnerId, ctx.input.labels);
+      }
       return {
         output: { labels: mapLabels(data) },
         message: `Added labels to runner **${runnerId}**.`
@@ -206,9 +225,17 @@ export let manageRunners = SlateTool.create(spec, {
     }
 
     if (action === 'set_labels') {
-      if (!runnerId || !ctx.input.labels || !owner || !repo)
-        throw new Error('runnerId, labels, owner, and repo are required.');
-      let data = await client.setRunnerLabels(owner, repo, runnerId, ctx.input.labels);
+      if (!runnerId || !ctx.input.labels)
+        throw createApiServiceError('runnerId, labels is required for set_labels.');
+      let data: { labels: RunnerLabel[] };
+      if (scope === 'org') {
+        if (!org) throw createApiServiceError('org is required for org scope.');
+        data = await client.setOrgRunnerLabels(org, runnerId, ctx.input.labels);
+      } else {
+        if (!owner || !repo)
+          throw createApiServiceError('owner and repo are required for repo scope.');
+        data = await client.setRunnerLabels(owner, repo, runnerId, ctx.input.labels);
+      }
       return {
         output: { labels: mapLabels(data) },
         message: `Set labels on runner **${runnerId}**.`
@@ -216,15 +243,23 @@ export let manageRunners = SlateTool.create(spec, {
     }
 
     if (action === 'remove_label') {
-      if (!runnerId || !ctx.input.labelName || !owner || !repo)
-        throw new Error('runnerId, labelName, owner, and repo are required.');
-      let data = await client.removeRunnerLabel(owner, repo, runnerId, ctx.input.labelName);
+      if (!runnerId || !ctx.input.labelName)
+        throw createApiServiceError('runnerId, labelName is required for remove_label.');
+      let data: { labels: RunnerLabel[] };
+      if (scope === 'org') {
+        if (!org) throw createApiServiceError('org is required for org scope.');
+        data = await client.removeOrgRunnerLabel(org, runnerId, ctx.input.labelName);
+      } else {
+        if (!owner || !repo)
+          throw createApiServiceError('owner and repo are required for repo scope.');
+        data = await client.removeRunnerLabel(owner, repo, runnerId, ctx.input.labelName);
+      }
       return {
         output: { labels: mapLabels(data) },
         message: `Removed label **${ctx.input.labelName}** from runner **${runnerId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { nativePath, optionalText, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getFileInfo = SlateTool.create(spec, {
   name: 'Get File Info',
   key: 'get_file_info',
-  description: `Retrieve detailed metadata for a specific file or folder, including size, checksums, timestamps, permissions, preview status, and download URI.`,
+  description: `Retrieve detailed metadata for a specific file or folder, including size, checksums, timestamps, permissions and preview status without logging a download. Use download_file for file content.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -37,35 +38,32 @@ export let getFileInfo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let file = await client.getFileInfo(ctx.input.path);
     let preview = file.preview as Record<string, unknown> | undefined;
 
     let output = {
-      path: String(file.path ?? ''),
-      displayName: String(file.display_name ?? ''),
-      type: String(file.type ?? ''),
+      path: nativePath(file.path),
+      displayName: nativePath(file.display_name),
+      type: text(file.type),
       size: typeof file.size === 'number' ? file.size : undefined,
-      mimeType: file.mime_type ? String(file.mime_type) : undefined,
-      mtime: file.mtime ? String(file.mtime) : undefined,
-      createdAt: file.created_at ? String(file.created_at) : undefined,
-      permissions: file.permissions ? String(file.permissions) : undefined,
-      crc32: file.crc32 ? String(file.crc32) : undefined,
-      md5: file.md5 ? String(file.md5) : undefined,
-      sha1: file.sha1 ? String(file.sha1) : undefined,
-      sha256: file.sha256 ? String(file.sha256) : undefined,
-      region: file.region ? String(file.region) : undefined,
-      downloadUri: file.download_uri ? String(file.download_uri) : undefined,
-      previewStatus: preview?.status ? String(preview.status) : undefined
+      mimeType: optionalText(file.mime_type),
+      mtime: optionalText(file.mtime),
+      createdAt: optionalText(file.created_at),
+      permissions: optionalText(file.permissions),
+      crc32: optionalText(file.crc32),
+      md5: optionalText(file.md5),
+      sha1: optionalText(file.sha1),
+      sha256: optionalText(file.sha256),
+      region: optionalText(file.region),
+      downloadUri: undefined,
+      previewStatus: optionalText(preview?.status)
     };
 
     return {
       output,
-      message: `Retrieved info for **${output.displayName}** (${output.type}, ${output.size ? formatBytes(output.size) : 'unknown size'})`
+      message: `Retrieved info for **${output.displayName}** (${output.type}, ${output.size !== undefined ? formatBytes(output.size) : 'unknown size'})`
     };
   })
   .build();

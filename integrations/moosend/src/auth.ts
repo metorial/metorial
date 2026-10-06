@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { text } from './lib/data';
 
 export let auth = SlateAuth.create()
   .output(
@@ -14,12 +15,14 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
-        .describe('Moosend API key. Found in Settings > API Key in the Moosend dashboard.')
+        .describe(
+          'Moosend API key. Found in More > Settings > API key in the Moosend dashboard.'
+        )
     }),
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: text(ctx.input.apiKey, 'Moosend API key')
         }
       };
     }

@@ -1,11 +1,47 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  isApiErrorRecord,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { WebexClient } from './lib/client';
+import { exchangeToken, required } from './lib/http';
 
-let api = createAxios({
-  baseURL: 'https://webexapis.com/v1'
-});
-
-export let auth = SlateAuth.create()
+export const scopes = [
+  'spark:messages_read',
+  'spark:messages_write',
+  'spark:rooms_read',
+  'spark:rooms_write',
+  'spark:memberships_read',
+  'spark:memberships_write',
+  'spark:people_read',
+  'meeting:schedules_read',
+  'meeting:schedules_write',
+  'meeting:recordings_read',
+  'spark:teams_read',
+  'spark:teams_write'
+];
+function tokens(data: unknown, previousRefreshToken?: string) {
+  if (
+    !isApiErrorRecord(data) ||
+    typeof data.expires_in !== 'number' ||
+    !Number.isFinite(data.expires_in) ||
+    data.expires_in <= 0 ||
+    !Number.isFinite(new Date(Date.now() + data.expires_in * 1000).getTime())
+  )
+    throw createApiServiceError('Webex returned an invalid token lifetime. Reconnect.');
+  const output = normalizeOAuthTokenResponse(data, {
+    providerLabel: 'Webex',
+    required: true,
+    expiresInType: 'number',
+    previousRefreshToken
+  });
+  required(output.token, 'access token');
+  if (output.refreshToken !== undefined) required(output.refreshToken, 'refresh token');
+  return output;
+}
+export const auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
@@ -21,189 +57,57 @@ export let auth = SlateAuth.create()
       {
         type: 'docs.auth.oauth',
         name: 'OAuth documentation',
-        url: 'https://developer.webex.com/docs/integrations'
+        url: 'https://developer.webex.com/docs/authentication'
       },
       {
         type: 'docs.auth.oauth_scopes',
         name: 'OAuth scopes',
-        url: 'https://developer.webex.com/docs/integrations#scopes'
+        url: 'https://developer.webex.com/docs/integration-scopes'
       }
     ],
-
-    scopes: [
-      {
-        title: 'Messages Read',
-        description: 'Read messages in spaces',
-        scope: 'spark:messages_read'
-      },
-      {
-        title: 'Messages Write',
-        description: 'Create, edit, and delete messages in spaces',
-        scope: 'spark:messages_write'
-      },
-      {
-        title: 'Rooms Read',
-        description: 'Read space/room details and list spaces',
-        scope: 'spark:rooms_read'
-      },
-      {
-        title: 'Rooms Write',
-        description: 'Create, update, and delete spaces/rooms',
-        scope: 'spark:rooms_write'
-      },
-      {
-        title: 'Memberships Read',
-        description: 'List and get membership details in spaces',
-        scope: 'spark:memberships_read'
-      },
-      {
-        title: 'Memberships Write',
-        description: 'Add and remove people from spaces',
-        scope: 'spark:memberships_write'
-      },
-      {
-        title: 'People Read',
-        description: 'Read user profiles and directory information',
-        scope: 'spark:people_read'
-      },
-      {
-        title: 'People Write',
-        description: 'Create and update user accounts (admin)',
-        scope: 'spark:people_write'
-      },
-      {
-        title: 'Meeting Schedules Read',
-        description: 'Read meeting schedules and details',
-        scope: 'meeting:schedules_read'
-      },
-      {
-        title: 'Meeting Schedules Write',
-        description: 'Create, update, and delete meetings',
-        scope: 'meeting:schedules_write'
-      },
-      {
-        title: 'Meeting Recordings Read',
-        description: 'Read meeting recordings',
-        scope: 'meeting:recordings_read'
-      },
-      {
-        title: 'Meeting Recordings Write',
-        description: 'Manage meeting recordings',
-        scope: 'meeting:recordings_write'
-      },
-      {
-        title: 'Meeting Transcripts Read',
-        description: 'Read meeting transcripts',
-        scope: 'meeting:transcripts_read'
-      },
-      {
-        title: 'Webhooks Read',
-        description: 'List and get webhook details',
-        scope: 'spark:webhooks_read'
-      },
-      {
-        title: 'Webhooks Write',
-        description: 'Create, update, and delete webhooks',
-        scope: 'spark:webhooks_write'
-      },
-      {
-        title: 'Teams Read',
-        description: 'Read team details',
-        scope: 'spark:teams_read'
-      },
-      {
-        title: 'Teams Write',
-        description: 'Create, update, and delete teams',
-        scope: 'spark:teams_write'
-      },
-      {
-        title: 'Spark All',
-        description:
-          'Full access to messaging, spaces, memberships, teams, and calling features',
-        scope: 'spark:all'
-      }
-    ],
-
-    getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
-        client_id: ctx.clientId,
-        response_type: 'code',
-        redirect_uri: ctx.redirectUri,
-        scope: ctx.scopes.join(' '),
-        state: ctx.state
-      });
-
-      return {
-        url: `https://webexapis.com/v1/authorize?${params.toString()}`
-      };
-    },
-
-    handleCallback: async ctx => {
-      let response = await api.post(
-        '/access_token',
-        {
+    scopes: scopes.map(scope => ({
+      title: scope,
+      description:
+        'Authorize the corresponding messaging, space, membership, directory, team or meeting capability. Webex roles and meeting licenses still apply.',
+      scope
+    })),
+    getAuthorizationUrl: async ctx => ({
+      url: `https://webexapis.com/v1/authorize?${new URLSearchParams({ client_id: required(ctx.clientId, 'client ID'), response_type: 'code', redirect_uri: ctx.redirectUri, scope: ctx.scopes.join(' '), state: ctx.state })}`
+    }),
+    handleCallback: async ctx => ({
+      output: tokens(
+        await exchangeToken({
           grant_type: 'authorization_code',
           client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          code: ctx.code,
+          client_secret: required(ctx.clientSecret, 'client secret'),
+          code: required(ctx.code, 'authorization code'),
           redirect_uri: ctx.redirectUri
-        },
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
+        })
+      )
+    }),
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      const refresh = required(
+        ctx.output.refreshToken,
+        'refresh token; reconnect this OAuth connection if missing'
       );
-
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: tokens(
+          await exchangeToken({
+            grant_type: 'refresh_token',
+            client_id: ctx.clientId,
+            client_secret: required(ctx.clientSecret, 'client secret'),
+            refresh_token: refresh
+          }),
+          refresh
+        )
       };
     },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let response = await api.post(
-        '/access_token',
-        {
-          grant_type: 'refresh_token',
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          refresh_token: ctx.output.refreshToken
-        },
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let response = await api.get('/people/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let person = response.data;
-
+    getProfile: async (ctx: { output: { token: string } }) => {
+      const person = await new WebexClient({ token: ctx.output.token }).getMe();
       return {
         profile: {
           id: person.id,
@@ -218,28 +122,18 @@ export let auth = SlateAuth.create()
     type: 'auth.token',
     name: 'Bot Token',
     key: 'bot_token',
-
     inputSchema: z.object({
-      token: z.string().describe('Bot access token from developer.webex.com')
+      token: z
+        .string()
+        .describe(
+          'Webex bot access token. Bot membership and mention restrictions apply; meeting APIs may require a licensed user OAuth connection.'
+        )
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let response = await api.get('/people/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let person = response.data;
-
+    getOutput: async ctx => ({
+      output: { token: required(ctx.input.token, 'bot access token') }
+    }),
+    getProfile: async (ctx: { output: { token: string } }) => {
+      const person = await new WebexClient({ token: ctx.output.token }).getMe();
       return {
         profile: {
           id: person.id,

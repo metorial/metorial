@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { id, invalid, type Row, row, stringList, unexpected } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let updateOpportunityTool = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let updateOpportunityTool = SlateTool.create(spec, {
   key: 'update_opportunity',
   description: `Update an opportunity in Lever. Supports changing pipeline stage, archiving/unarchiving, managing tags, links, and sources. Multiple updates can be performed in a single call.`,
   instructions: [
-    'To archive, set archived to true and optionally provide archiveReasonId.',
+    'To archive, set archived to true and provide archiveReasonId from get_pipeline_metadata.',
     'To unarchive, set archived to false.',
     'Tags, links, and sources support both adding and removing in the same call.'
   ]
@@ -37,61 +38,95 @@ export let updateOpportunityTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, environment: ctx.auth.environment });
-    let updatesApplied: string[] = [];
-
-    if (ctx.input.stageId) {
-      await client.updateOpportunityStage(ctx.input.opportunityId, ctx.input.stageId);
+    const opportunityId = id(ctx.input.opportunityId, 'Opportunity ID');
+    if (ctx.input.stageId !== undefined)
+      id(ctx.input.stageId, 'Stage ID; discover it with get_pipeline_metadata');
+    if (ctx.input.archived === true)
+      id(
+        ctx.input.archiveReasonId,
+        'Archive reason ID required when archiving; discover it with get_pipeline_metadata'
+      );
+    if (ctx.input.archiveReasonId !== undefined && ctx.input.archived !== true)
+      invalid('Archive reason may only be supplied when archived is true.');
+    const operations: {
+      kind: 'tags' | 'links' | 'sources';
+      add: string[];
+      remove: string[];
+    }[] = [];
+    for (const [kind, addKey, removeKey] of [
+      ['tags', 'addTags', 'removeTags'],
+      ['links', 'addLinks', 'removeLinks'],
+      ['sources', 'addSources', 'removeSources']
+    ] as const) {
+      const add = ctx.input[addKey] === undefined ? [] : stringList(ctx.input[addKey], addKey);
+      const remove =
+        ctx.input[removeKey] === undefined ? [] : stringList(ctx.input[removeKey], removeKey);
+      if (add.some(value => remove.includes(value)))
+        invalid('The same value cannot be added and removed in one update.');
+      operations.push({ kind, add, remove });
+    }
+    if (
+      ctx.input.stageId === undefined &&
+      ctx.input.archived === undefined &&
+      !operations.some(operation => operation.add.length || operation.remove.length)
+    )
+      invalid('Provide at least one opportunity change.');
+    const client = new Client(ctx.auth);
+    await client.getOpportunity(opportunityId);
+    const updatesApplied: string[] = [];
+    if (ctx.input.stageId !== undefined) {
+      await client.updateOpportunityStage(opportunityId, ctx.input.stageId);
       updatesApplied.push('stage changed');
     }
-
     if (ctx.input.archived === true) {
-      await client.updateOpportunityArchived(
-        ctx.input.opportunityId,
-        ctx.input.archiveReasonId
-      );
+      await client.updateOpportunityArchived(opportunityId, ctx.input.archiveReasonId);
       updatesApplied.push('archived');
     } else if (ctx.input.archived === false) {
-      await client.deleteOpportunityArchived(ctx.input.opportunityId);
+      await client.deleteOpportunityArchived(opportunityId);
       updatesApplied.push('unarchived');
     }
-
-    if (ctx.input.addTags && ctx.input.addTags.length > 0) {
-      await client.addOpportunityTags(ctx.input.opportunityId, ctx.input.addTags);
-      updatesApplied.push(`added ${ctx.input.addTags.length} tag(s)`);
+    for (const operation of operations) {
+      const add =
+        operation.kind === 'tags'
+          ? client.addOpportunityTags.bind(client)
+          : operation.kind === 'links'
+            ? client.addOpportunityLinks.bind(client)
+            : client.addOpportunitySources.bind(client);
+      const remove =
+        operation.kind === 'tags'
+          ? client.removeOpportunityTags.bind(client)
+          : operation.kind === 'links'
+            ? client.removeOpportunityLinks.bind(client)
+            : client.removeOpportunitySources.bind(client);
+      if (operation.add.length) {
+        await add(opportunityId, operation.add);
+        updatesApplied.push(`added ${operation.add.length} ${operation.kind}`);
+      }
+      if (operation.remove.length) {
+        await remove(opportunityId, operation.remove);
+        updatesApplied.push(`removed ${operation.remove.length} ${operation.kind}`);
+      }
     }
-
-    if (ctx.input.removeTags && ctx.input.removeTags.length > 0) {
-      await client.removeOpportunityTags(ctx.input.opportunityId, ctx.input.removeTags);
-      updatesApplied.push(`removed ${ctx.input.removeTags.length} tag(s)`);
-    }
-
-    if (ctx.input.addLinks && ctx.input.addLinks.length > 0) {
-      await client.addOpportunityLinks(ctx.input.opportunityId, ctx.input.addLinks);
-      updatesApplied.push(`added ${ctx.input.addLinks.length} link(s)`);
-    }
-
-    if (ctx.input.removeLinks && ctx.input.removeLinks.length > 0) {
-      await client.removeOpportunityLinks(ctx.input.opportunityId, ctx.input.removeLinks);
-      updatesApplied.push(`removed ${ctx.input.removeLinks.length} link(s)`);
-    }
-
-    if (ctx.input.addSources && ctx.input.addSources.length > 0) {
-      await client.addOpportunitySources(ctx.input.opportunityId, ctx.input.addSources);
-      updatesApplied.push(`added ${ctx.input.addSources.length} source(s)`);
-    }
-
-    if (ctx.input.removeSources && ctx.input.removeSources.length > 0) {
-      await client.removeOpportunitySources(ctx.input.opportunityId, ctx.input.removeSources);
-      updatesApplied.push(`removed ${ctx.input.removeSources.length} source(s)`);
-    }
-
+    const after: Row = (await client.getOpportunity(opportunityId)).data;
+    if (ctx.input.stageId !== undefined && after.stage !== ctx.input.stageId) unexpected();
+    if (
+      ctx.input.archived === true &&
+      (!after.archived || row(after.archived).reason !== ctx.input.archiveReasonId)
+    )
+      unexpected();
+    if (ctx.input.archived === false && after.archived !== null) unexpected();
+    for (const operation of operations)
+      if (operation.add.length || operation.remove.length) {
+        const values = stringList(after[operation.kind], `Returned ${operation.kind}`);
+        if (
+          operation.add.some(value => !values.includes(value)) ||
+          operation.remove.some(value => values.includes(value))
+        )
+          unexpected();
+      }
     return {
-      output: {
-        opportunityId: ctx.input.opportunityId,
-        updatesApplied
-      },
-      message: `Updated opportunity **${ctx.input.opportunityId}**: ${updatesApplied.join(', ') || 'no changes'}.`
+      output: { opportunityId, updatesApplied },
+      message: `Updated opportunity ${opportunityId}. Multiple changes are sequential; this operation is not atomic.`
     };
   })
   .build();

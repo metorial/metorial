@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { recordSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listReimbursements = SlateTool.create(spec, {
@@ -40,15 +41,12 @@ export let listReimbursements = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      reimbursements: z.array(z.any()).describe('List of reimbursement objects'),
+      reimbursements: z.array(recordSchema).describe('List of reimbursement objects'),
       nextCursor: z.string().optional().describe('Cursor for fetching the next page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = clientFor(ctx);
 
     let result = await client.listReimbursements({
       start: ctx.input.cursor,

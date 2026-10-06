@@ -18,8 +18,6 @@ import {
   searchRecords,
   updateRecords
 } from './tools';
-import { inboundWebhook, recordChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     completeActivity,
     executeMethod
   ],
-  triggers: [inboundWebhook, recordChanges]
+  triggers: []
 });

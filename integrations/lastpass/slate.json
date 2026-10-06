@@ -1,16 +1,15 @@
 {
   "name": "@metorial/lastpass",
-  "description": "Manage enterprise password management users, groups, and shared folders. Provision and deprovision user accounts, retrieve user data including security scores and login history, create and manage groups, view shared folder details and permissions, and query audit event logs for security monitoring. Supports batch user operations and event reporting filtered by date range and user.",
+  "description": "Manage LastPass Enterprise administrative users and group memberships, inspect user metadata and shared-folder permissions, and page audit events using the company ID and provisioning hash. Does not access vault contents or use early-access REST API keys.",
   "categories": ["security"],
   "skills": [
-    "provision and deprovision users",
-    "retrieve user account data",
-    "manage user groups",
-    "view shared folder details",
-    "query audit event logs",
-    "batch user operations",
-    "enforce password changes",
-    "retrieve security scores"
+    "retrieve enterprise user metadata",
+    "page audit events",
+    "inspect shared-folder permissions",
+    "provision enterprise users",
+    "deprovision enterprise users",
+    "manage group memberships",
+    "request administrative user actions"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/lastpass-logo.png"
 }

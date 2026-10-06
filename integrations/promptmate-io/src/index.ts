@@ -12,8 +12,6 @@ import {
   runJob,
   useTemplate
 } from './tools';
-import { jobCompleted, rowCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     listProjects,
     getUserInfo
   ],
-  triggers: [jobCompleted, rowCompleted]
+  triggers: []
 });

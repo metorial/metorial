@@ -1,3 +1,4 @@
+export * from './download-clip';
 export * from './get-channel-info';
 export * from './get-followers-subscribers';
 export * from './get-streams';

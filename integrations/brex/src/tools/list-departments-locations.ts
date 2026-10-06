@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 let departmentSchema = z.object({
@@ -29,6 +30,11 @@ export let listDepartmentsLocations = SlateTool.create(spec, {
         .enum(['departments', 'locations', 'both'])
         .optional()
         .describe('Which resources to list (defaults to both)'),
+      departmentCursor: z
+        .string()
+        .optional()
+        .describe('Department continuation for both mode.'),
+      locationCursor: z.string().optional().describe('Location continuation for both mode.'),
       cursor: z.string().optional().describe('Pagination cursor for fetching next page'),
       limit: z.number().optional().describe('Maximum number of results per page (max 1000)')
     })
@@ -37,53 +43,55 @@ export let listDepartmentsLocations = SlateTool.create(spec, {
     z.object({
       departments: z.array(departmentSchema).optional().describe('List of departments'),
       locations: z.array(locationSchema).optional().describe('List of locations'),
+      departmentNextCursor: z.string().nullable().optional(),
+      locationNextCursor: z.string().nullable().optional(),
       nextCursor: z.string().nullable().optional().describe('Cursor for the next page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let type = ctx.input.resourceType ?? 'both';
-    let departments: any[] | undefined;
-    let locations: any[] | undefined;
-    let nextCursor: string | null = null;
-
-    if (type === 'departments' || type === 'both') {
-      let result = await client.listDepartments({
-        cursor: ctx.input.cursor,
-        limit: ctx.input.limit
-      });
-      departments = result.items.map((d: any) => ({
-        departmentId: d.id,
-        name: d.name ?? null,
-        description: d.description ?? null
-      }));
-      nextCursor = result.next_cursor;
-    }
-
-    if (type === 'locations' || type === 'both') {
-      let result = await client.listLocations({
-        cursor: type === 'locations' ? ctx.input.cursor : undefined,
-        limit: ctx.input.limit
-      });
-      locations = result.items.map((l: any) => ({
-        locationId: l.id,
-        name: l.name ?? null,
-        description: l.description ?? null
-      }));
-      if (type === 'locations') nextCursor = result.next_cursor;
-    }
-
-    let parts: string[] = [];
-    if (departments) parts.push(`**${departments.length}** department(s)`);
-    if (locations) parts.push(`**${locations.length}** location(s)`);
-
+    const type = ctx.input.resourceType ?? 'both';
+    if (type === 'both' && ctx.input.cursor !== undefined)
+      fail(
+        'For both mode, use departmentCursor and locationCursor independently, or select one resourceType to use cursor.'
+      );
+    const client = new Client({ token: ctx.auth.token });
+    const departments =
+      type !== 'locations'
+        ? await client.listDepartments({
+            cursor: type === 'both' ? ctx.input.departmentCursor : ctx.input.cursor,
+            limit: ctx.input.limit
+          })
+        : undefined;
+    const locations =
+      type !== 'departments'
+        ? await client.listLocations({
+            cursor: type === 'both' ? ctx.input.locationCursor : ctx.input.cursor,
+            limit: ctx.input.limit
+          })
+        : undefined;
     return {
       output: {
-        departments,
-        locations,
-        nextCursor
+        departments: departments?.items.map(v => ({
+          departmentId: v.id,
+          name: v.name,
+          description: v.description
+        })),
+        locations: locations?.items.map(v => ({
+          locationId: v.id,
+          name: v.name,
+          description: v.description
+        })),
+        nextCursor:
+          type === 'departments'
+            ? departments!.next_cursor
+            : type === 'locations'
+              ? locations!.next_cursor
+              : null,
+        departmentNextCursor: departments?.next_cursor,
+        locationNextCursor: locations?.next_cursor
       },
-      message: `Found ${parts.join(' and ')}.`
+      message:
+        'Returned the requested organization pages. Continue each collection with its own cursor.'
     };
   })
   .build();

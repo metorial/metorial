@@ -1,130 +1,94 @@
 import { SlateTool } from 'slates';
-import { z } from 'zod';
-import { NangoClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { safePayload } from '../lib/http';
+import {
+  connectionId,
+  connectionOutput,
+  connectionView,
+  integrationId,
+  invalid,
+  jsonObject,
+  z
+} from '../lib/schemas';
 import { spec } from '../spec';
-
-export let manageConnection = SlateTool.create(spec, {
+export const manageConnection = SlateTool.create(spec, {
   name: 'Manage Connection',
   key: 'manage_connection',
-  description: `Create, retrieve, or delete a connection. A connection represents a per-user, per-integration authorization. Use **get** to retrieve full connection details including credentials (Nango auto-refreshes expired tokens). Use **create** to import existing credentials. Use **delete** to remove a connection.`,
-  instructions: [
-    'When getting a connection, the providerConfigKey is required to identify which integration the connection belongs to.',
-    'Fetching a connection automatically checks and refreshes expired access tokens.'
-  ]
+  description:
+    'Import existing credentials, retrieve metadata, or delete one exact connection/integration pair from list_connections. Credentials are never delivered. A full-access key may refresh credentials during a read; prefer read permissions without credential scopes. Import can replace existing authorization or cause connection hooks. Deletion does not guarantee upstream revocation or retained-history erasure.'
 })
   .input(
     z.object({
-      action: z.enum(['create', 'get', 'delete']).describe('Operation to perform'),
-      connectionId: z.string().describe('The connection identifier'),
-      providerConfigKey: z.string().describe('The integration ID (unique key)'),
+      action: z.enum(['create', 'get', 'delete']),
+      connectionId,
+      providerConfigKey: integrationId,
       forceRefresh: z
         .boolean()
         .optional()
-        .describe('Force token refresh regardless of expiry (for get action)'),
+        .describe(
+          'Explicit native refresh for get only; requires read_credentials scope. Results still contain metadata only.'
+        ),
       includeRefreshToken: z
         .boolean()
         .optional()
-        .describe('Include refresh token in response (for get action)'),
-      credentials: z
-        .record(z.string(), z.any())
+        .describe(
+          'Legacy token-delivery flag; true is refused before requesting credentials.'
+        ),
+      credentials: jsonObject
         .optional()
-        .describe('Auth credentials to import (for create action)'),
-      metadata: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe('Custom metadata (for create action)'),
-      connectionConfig: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe('OAuth connection config (for create action)'),
-      tags: z
-        .record(z.string(), z.string())
-        .optional()
-        .describe('Key-value tags (for create action)')
+        .describe('Native credential object to import, create only; never returned.'),
+      metadata: jsonObject.optional(),
+      connectionConfig: jsonObject.optional(),
+      tags: z.record(z.string(), z.string()).optional()
     })
   )
-  .output(
-    z.object({
-      success: z.boolean(),
-      connection: z
-        .object({
-          connectionId: z.string(),
-          provider: z.string(),
-          providerConfigKey: z.string(),
-          createdAt: z.string(),
-          updatedAt: z.string(),
-          metadata: z.record(z.string(), z.any()).nullable(),
-          credentials: z.record(z.string(), z.any())
-        })
-        .optional()
-        .describe('Connection details (not returned for delete)')
-    })
-  )
+  .output(z.object({ success: z.boolean(), connection: connectionOutput.optional() }))
   .handleInvocation(async ctx => {
-    let client = new NangoClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
-    });
-
-    let { action, connectionId, providerConfigKey } = ctx.input;
-
-    if (action === 'get') {
-      let result = await client.getConnection(connectionId, {
-        provider_config_key: providerConfigKey,
-        force_refresh: ctx.input.forceRefresh,
-        refresh_token: ctx.input.includeRefreshToken
-      });
+    const i = ctx.input;
+    if (i.includeRefreshToken)
+      throw invalid(
+        'Refresh-token delivery is unavailable. Omit includeRefreshToken and use a trusted Nango backend for credentials.'
+      );
+    if (i.action !== 'get' && i.forceRefresh !== undefined)
+      throw invalid('forceRefresh applies only to get.');
+    if (
+      i.action !== 'create' &&
+      [i.credentials, i.metadata, i.connectionConfig, i.tags].some(
+        value => value !== undefined
+      )
+    )
+      throw invalid('Import fields apply only to create.');
+    if (i.action === 'create' && (!i.credentials || !Object.keys(i.credentials).length))
+      throw invalid('A nonempty native credentials object is required for import.');
+    safePayload(i.metadata);
+    safePayload(i.connectionConfig);
+    const client = clientFor(ctx);
+    if (i.action === 'delete') {
+      const result = await client.deleteConnection(i.connectionId, i.providerConfigKey);
       return {
-        output: {
-          success: true,
-          connection: {
-            connectionId: result.connection_id,
-            provider: result.provider,
-            providerConfigKey: result.provider_config_key,
-            createdAt: result.created_at,
-            updatedAt: result.updated_at,
-            metadata: result.metadata,
-            credentials: result.credentials
-          }
-        },
-        message: `Retrieved connection **${connectionId}** for integration **${providerConfigKey}**.`
+        output: result,
+        message: result.success
+          ? 'Nango accepted connection deletion. Verify absence separately; upstream credentials or history may remain.'
+          : 'Nango did not confirm deletion.'
       };
     }
-
-    if (action === 'create') {
-      if (!ctx.input.credentials) {
-        throw new Error('Credentials are required when creating a connection');
-      }
-      let result = await client.createConnection({
-        provider_config_key: providerConfigKey,
-        connection_id: connectionId,
-        credentials: ctx.input.credentials,
-        metadata: ctx.input.metadata,
-        connection_config: ctx.input.connectionConfig,
-        tags: ctx.input.tags
-      });
-      return {
-        output: {
-          success: true,
-          connection: {
-            connectionId: result.connection_id,
-            provider: result.provider,
-            providerConfigKey: result.provider_config_key,
-            createdAt: result.created_at,
-            updatedAt: result.updated_at,
-            metadata: result.metadata,
-            credentials: result.credentials
-          }
-        },
-        message: `Created connection **${connectionId}** for integration **${providerConfigKey}**.`
-      };
-    }
-
-    // delete
-    await client.deleteConnection(connectionId, providerConfigKey);
+    const result =
+      i.action === 'get'
+        ? await client.getConnection(i.connectionId, {
+            provider_config_key: i.providerConfigKey,
+            force_refresh: i.forceRefresh
+          })
+        : await client.createConnection({
+            connection_id: i.connectionId,
+            provider_config_key: i.providerConfigKey,
+            credentials: i.credentials!,
+            metadata: i.metadata,
+            connection_config: i.connectionConfig,
+            tags: i.tags
+          });
     return {
-      output: { success: true },
-      message: `Deleted connection **${connectionId}** from integration **${providerConfigKey}**.`
+      output: { success: true, connection: connectionView(result) },
+      message: 'Retrieved the exact connection metadata. Credentials are not delivered.'
     };
   })
   .build();

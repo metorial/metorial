@@ -1,10 +1,12 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { apiEndpoints, type BugsnagAuth, BugsnagClient, requireId } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      apiEndpoint: z.enum(apiEndpoints).optional()
     })
   )
   .addTokenAuth({
@@ -17,33 +19,39 @@ export let auth = SlateAuth.create()
         .string()
         .describe(
           'Bugsnag Personal Auth Token. Generate one in the Bugsnag dashboard under My Account → Personal Auth Tokens.'
+        ),
+      apiEndpoint: z
+        .enum(apiEndpoints)
+        .optional()
+        .describe(
+          'Data Access endpoint matching your dashboard: api.bugsnag.com for app.bugsnag.com, or api.bugsnag.smartbear.com for app.bugsnag.smartbear.com.'
         )
     }),
 
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: requireId(ctx.input.token, 'Personal auth token'),
+          apiEndpoint: ctx.input.apiEndpoint
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.bugsnag.com',
-        headers: {
-          Authorization: `token ${ctx.output.token}`
-        }
+    getProfile: async (ctx: { output: BugsnagAuth }) => {
+      const organizations = await new BugsnagClient(ctx.output).listOrganizations({
+        perPage: 1
       });
-
-      let response = await axios.get('/user');
-      let user = response.data;
+      const organization = organizations[0];
+      if (!organization?.id)
+        throw createApiServiceError(
+          'The token has no accessible Bugsnag organization. Check the token and account endpoint.',
+          { reason: 'authentication_failed' }
+        );
 
       return {
         profile: {
-          id: user.id,
-          email: user.email,
-          name: user.name
+          id: organization.id,
+          name: organization.name
         }
       };
     }

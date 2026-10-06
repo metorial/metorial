@@ -11,7 +11,7 @@ export let importOrganization = SlateTool.create(spec, {
     'Set overwriteExisting to true to replace existing directory-synced data. Use with caution as this may remove existing members/groups.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -55,20 +55,27 @@ export let importOrganization = SlateTool.create(spec, {
   .output(
     z.object({
       imported: z.boolean().describe('Whether the import succeeded'),
-      groupCount: z.number().describe('Number of groups imported'),
-      memberCount: z.number().describe('Number of members imported')
+      groupCount: z
+        .number()
+        .describe(
+          'Number of group entries submitted; not an independent count of resulting groups'
+        ),
+      memberCount: z
+        .number()
+        .describe(
+          'Number of member entries submitted; not an independent count of resulting members'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.auth.serverUrl
+      ...ctx.auth
     });
 
     await client.importOrganization({
       groups: ctx.input.groups,
       members: ctx.input.members.map(member => ({
-        email: member.email ?? '',
+        email: member.email,
         externalId: member.externalId,
         deleted: member.deleted
       })),
@@ -81,7 +88,7 @@ export let importOrganization = SlateTool.create(spec, {
         groupCount: ctx.input.groups.length,
         memberCount: ctx.input.members.length
       },
-      message: `Imported **${ctx.input.groups.length}** group(s) and **${ctx.input.members.length}** member(s).`
+      message: `Bitwarden acknowledged the import of **${ctx.input.groups.length}** group entries and **${ctx.input.members.length}** member entries. Verify resulting state before repeating this operation.`
     };
   })
   .build();

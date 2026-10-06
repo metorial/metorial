@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let updateResponse = SlateTool.create(spec, {
   name: 'Update Response',
   key: 'update_response',
-  description: `Update an existing survey response. Add or modify answer data, or mark the response as finished. Triggers the response processing pipeline.`
+  description: `Answer keys merge with existing answers. Every update runs configured webhooks/integrations and may send follow-up emails when finished; deletion does not reverse these effects. Update an existing survey response. Add or modify answer data, or mark the response as finished. Triggers the response processing pipeline.`
 })
   .input(
     z.object({
@@ -28,7 +28,8 @@ export let updateResponse = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     let updateData: Record<string, any> = {};
@@ -40,10 +41,10 @@ export let updateResponse = SlateTool.create(spec, {
     return {
       output: {
         responseId: response.id,
-        finished: response.finished ?? false,
-        updatedAt: response.updatedAt ?? ''
+        finished: response.finished,
+        updatedAt: response.updatedAt
       },
-      message: `Updated response \`${response.id}\` (finished: ${response.finished ?? false}).`
+      message: `Updated response \`${response.id}\` (finished: ${response.finished}).`
     };
   })
   .build();

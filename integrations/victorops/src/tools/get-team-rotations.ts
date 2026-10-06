@@ -29,7 +29,7 @@ export let getTeamRotations = SlateTool.create(spec, {
     });
 
     let data = await client.getTeamRotations(ctx.input.teamSlug);
-    let rotations = data?.rotations ?? [];
+    let rotations = data.rotationGroups;
 
     return {
       output: { rotations },

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { budgetInput, idInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let deleteTransaction = SlateTool.create(spec, {
@@ -13,11 +14,8 @@ export let deleteTransaction = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      budgetId: z
-        .string()
-        .optional()
-        .describe('Budget ID. Defaults to the configured budget.'),
-      transactionId: z.string().describe('ID of the transaction to delete')
+      budgetId: budgetInput,
+      transactionId: idInput.describe('ID of the transaction to delete')
     })
   )
   .output(
@@ -27,17 +25,13 @@ export let deleteTransaction = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let budgetId = ctx.input.budgetId ?? ctx.config.budgetId;
-
-    let t = await client.deleteTransaction(budgetId, ctx.input.transactionId);
-
+    const t = await new Client({ token: ctx.auth.token }).deleteTransaction(
+      ctx.input.budgetId ?? ctx.config.budgetId,
+      ctx.input.transactionId
+    );
     return {
-      output: {
-        transactionId: t.id,
-        deleted: t.deleted
-      },
-      message: `Deleted transaction **${t.id}**`
+      output: { transactionId: t.id, deleted: t.deleted },
+      message: `Confirmed deletion of transaction ${t.id}.`
     };
   })
   .build();

@@ -15,8 +15,6 @@ import {
   searchApisAndDomains,
   updateApiSettings
 } from './tools';
-import { apiVersionEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     runStandardization,
     getCollaboration
   ],
-  triggers: [apiVersionEvent]
+  triggers: []
 });

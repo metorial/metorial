@@ -21,6 +21,7 @@ export let getAgent = SlateTool.create(spec, {
     z.object({
       agentId: z.string().describe('Agent ID'),
       agentName: z.string().describe('Agent name'),
+      welcomeMessage: z.string().optional().describe('Welcome message spoken on connection'),
       agentStatus: z.string().optional().describe('Agent processing status'),
       agentType: z.string().optional().describe('Agent type classification'),
       createdAt: z.string().optional().describe('Creation timestamp'),
@@ -36,15 +37,16 @@ export let getAgent = SlateTool.create(spec, {
 
     return {
       output: {
-        agentId: agent.id,
+        agentId: agent.id ?? undefined,
         agentName: agent.agent_name,
-        agentStatus: agent.agent_status,
-        agentType: agent.agent_type,
-        createdAt: agent.created_at,
-        updatedAt: agent.updated_at,
+        welcomeMessage: agent.agent_welcome_message ?? undefined,
+        agentStatus: agent.agent_status ?? undefined,
+        agentType: agent.agent_type ?? undefined,
+        createdAt: agent.created_at ?? undefined,
+        updatedAt: agent.updated_at ?? undefined,
         tasks: agent.tasks,
         agentPrompts: agent.agent_prompts,
-        webhookUrl: agent.webhook_url
+        webhookUrl: agent.webhook_url ?? undefined
       },
       message: `Retrieved agent **${agent.agent_name}** (ID: \`${agent.id}\`). Status: ${agent.agent_status || 'unknown'}.`
     };

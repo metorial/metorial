@@ -1,85 +1,50 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SanityClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { projectId } from '../lib/schemas';
 import { spec } from '../spec';
 
-export let listProjects = SlateTool.create(spec, {
+const outputProject = z
+  .object({
+    projectId: z.string(),
+    displayName: z.string(),
+    organizationId: z.string().nullable().optional(),
+    createdAt: z.string().optional(),
+    studioHost: z.string().nullable().optional(),
+    members: z
+      .array(z.object({ userId: z.string(), role: z.string().optional() }).passthrough())
+      .optional()
+  })
+  .passthrough();
+export const listProjects = SlateTool.create(spec, {
   name: 'List Projects',
   key: 'list_projects',
-  description: `List all Sanity projects you are a member of. Returns project metadata including name, ID, organization, members, and datasets. Optionally fetch detailed information for a specific project.`,
-  tags: {
-    readOnly: true
-  }
+  description:
+    'Discover accessible native project IDs and names, or read one project by projectId. Robot tokens are limited by their granted scope; no projects are inferred from token contents.',
+  tags: { readOnly: true }
 })
-  .input(
-    z.object({
-      projectId: z
-        .string()
-        .optional()
-        .describe(
-          'If provided, fetches detailed info for this specific project instead of listing all projects.'
-        )
-    })
-  )
+  .input(z.object({ projectId: projectId.optional() }))
   .output(
-    z.object({
-      projects: z
-        .array(
-          z
-            .object({
-              projectId: z.string().describe('The project ID.'),
-              displayName: z.string().describe('Human-readable project name.'),
-              organizationId: z
-                .string()
-                .optional()
-                .nullable()
-                .describe('ID of the organization this project belongs to.'),
-              createdAt: z.string().optional().describe('When the project was created.'),
-              studioHost: z
-                .string()
-                .optional()
-                .nullable()
-                .describe('The studio hostname if deployed.'),
-              members: z
-                .array(
-                  z.object({
-                    userId: z.string().describe('User ID of the member.'),
-                    role: z.string().describe('Role of the member in the project.')
-                  })
-                )
-                .optional()
-                .describe('List of project members.')
-            })
-            .passthrough()
-        )
-        .optional()
-        .describe('List of projects (when no specific projectId is provided).'),
-      project: z
-        .any()
-        .optional()
-        .describe('Detailed project information (when a specific projectId is provided).')
-    })
+    z.object({ projects: z.array(outputProject).optional(), project: z.unknown().optional() })
   )
   .handleInvocation(async ctx => {
-    let client = new SanityClient({
-      token: ctx.auth.token,
-      projectId: ctx.config.projectId,
-      dataset: ctx.config.dataset,
-      apiVersion: ctx.config.apiVersion
-    });
-
+    const client = clientFor(ctx);
     if (ctx.input.projectId) {
-      let project = await client.getProject(ctx.input.projectId);
+      const project = await client.getProject(ctx.input.projectId);
       return {
-        output: { project },
-        message: `Retrieved details for project **${project.displayName || ctx.input.projectId}**.`
+        output: { project: { ...project, projectId: project.id } },
+        message: 'Retrieved the exact project.'
       };
     }
-
-    let projects = await client.listProjects();
+    const native = await client.listProjects();
+    const projects = native.map(p => ({
+      ...p,
+      projectId: p.id,
+      members: p.members?.map(member => ({ ...member, userId: member.id }))
+    }));
     return {
       output: { projects },
-      message: `Found ${projects.length} project(s).`
+      message: `Found ${projects.length} accessible project(s).`
     };
   })
   .build();

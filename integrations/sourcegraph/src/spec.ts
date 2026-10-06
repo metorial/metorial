@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'sourcegraph',
   name: 'Sourcegraph',
   description:
-    'Code intelligence platform providing code search, navigation, batch changes, and AI-powered code understanding across repositories and code hosts.',
+    'Search code and read repositories, files and user identity; manage supported Enterprise batch changes, insights and monitors on compatible deployments.',
   metadata: {},
   config,
   auth

@@ -5,7 +5,10 @@ import {
   auditKnowledgeBase,
   createNote,
   deleteNote,
+  downloadNote,
   findUserOrGroup,
+  getAskThread,
+  getCurrentUser,
   getNote,
   listNotes,
   manageCustomContent,
@@ -14,8 +17,6 @@ import {
   updateNote,
   updateTile
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -31,7 +32,10 @@ export let provider = Slate.create({
     listNotes,
     findUserOrGroup,
     manageCustomContent,
-    auditKnowledgeBase
+    auditKnowledgeBase,
+    getCurrentUser,
+    downloadNote,
+    getAskThread
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

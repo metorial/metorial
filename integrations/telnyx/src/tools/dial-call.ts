@@ -28,8 +28,8 @@ export let dialCall = SlateTool.create(spec, {
   .output(
     z.object({
       callControlId: z.string().describe('Call control ID for managing this call'),
-      callLegId: z.string().optional().describe('Call leg ID'),
-      callSessionId: z.string().optional().describe('Call session ID'),
+      callLegId: z.string().nullish().describe('Call leg ID'),
+      callSessionId: z.string().nullish().describe('Call session ID'),
       isAlive: z.boolean().optional().describe('Whether the call is still active')
     })
   )

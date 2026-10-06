@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,7 @@ export let manageMaintenanceMode = SlateTool.create(spec, {
   ],
   constraints: ['Only one global maintenance mode can be active at a time.'],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -55,7 +55,7 @@ export let manageMaintenanceMode = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'status': {
         let data = await client.getMaintenanceMode();
-        let instances = data?.activeInstances ?? [];
+        let instances = data.activeInstances;
         return {
           output: {
             activeInstances: instances,
@@ -69,12 +69,16 @@ export let manageMaintenanceMode = SlateTool.create(spec, {
       }
 
       case 'start': {
+        if (ctx.input.routingKeys === undefined)
+          throw createApiServiceError(
+            'Provide routingKeys explicitly. An empty array mutes the entire organization.'
+          );
         let data = await client.startMaintenanceMode({
           names: ctx.input.routingKeys ?? [],
           purpose: ctx.input.purpose ?? '',
           type: 'RoutingKeys'
         });
-        let instances = data?.activeInstances ?? [];
+        let instances = data.activeInstances;
         return {
           output: {
             activeInstances: instances,

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -24,7 +24,11 @@ let phoneSchema = z
       .string()
       .optional()
       .describe('Phone type (e.g., WorkPhone, PersonalMobile, WorkHQ)'),
-    status: z.string().optional().describe('Verification status'),
+    status: z.string().optional().describe('Provider phone status'),
+    verificationStatus: z
+      .string()
+      .optional()
+      .describe('Provider phone accuracy/verification status'),
     updatedAt: z.string().optional().describe('Last updated timestamp')
   })
   .passthrough();
@@ -95,7 +99,7 @@ Returns current and past positions with associated work emails and phones, perso
   ],
   constraints: [
     'Each search call consumes API credits.',
-    'Rate limits: 10 requests/minute (free), 60 requests/minute (paid).'
+    'Standard rate limit is 60 requests per minute; account-specific limits and selected data-point charges apply.'
   ],
   tags: {
     readOnly: true
@@ -103,6 +107,15 @@ Returns current and past positions with associated work emails and phones, perso
 })
   .input(
     z.object({
+      personId: z
+        .string()
+        .optional()
+        .describe('LeadIQ person ID returned by this search or advanced_people_search.'),
+      skip: z.number().optional().describe('Non-negative integer result offset.'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Positive integer maximum number of matches to return.'),
       firstName: z.string().optional().describe('First name of the person'),
       lastName: z.string().optional().describe('Last name of the person'),
       fullName: z
@@ -135,7 +148,9 @@ Returns current and past positions with associated work emails and phones, perso
           ])
         )
         .optional()
-        .describe('Filter results by available contact info types'),
+        .describe(
+          'Filter results by available contact info. HasWorkPhone/HasVerifiedWorkPhone are explicitly unsupported by the provider; HasPersonalEmail is absent from the current enum. These legacy values remain in the schema but require supported-filter guidance.'
+        ),
       qualityFilter: z
         .enum(['AllPhones', 'HigherQualityPhones', 'HighestQualityPhones'])
         .optional()
@@ -145,7 +160,7 @@ Returns current and past positions with associated work emails and phones, perso
         .min(0)
         .max(100)
         .optional()
-        .describe('Minimum match confidence score (0-100)')
+        .describe('Minimum integer match confidence score (0-100)')
     })
   )
   .output(
@@ -158,7 +173,59 @@ Returns current and past positions with associated work emails and phones, perso
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (
+      ![
+        ctx.input.personId,
+        ctx.input.fullName,
+        ctx.input.firstName,
+        ctx.input.lastName,
+        ctx.input.linkedinUrl,
+        ctx.input.linkedinId,
+        ctx.input.email,
+        ctx.input.hashedEmail,
+        ctx.input.phone
+      ].some(value => value?.trim())
+    )
+      throw createApiServiceError(
+        'Provide a person identifier, name, LinkedIn profile, email or phone.',
+        { reason: 'invalid_input' }
+      );
+    for (let [name, value] of [
+      ['skip', ctx.input.skip],
+      ['limit', ctx.input.limit],
+      ['minConfidence', ctx.input.minConfidence]
+    ] as const)
+      if (
+        value !== undefined &&
+        (!Number.isSafeInteger(value) ||
+          value > 2147483647 ||
+          value < (name === 'limit' ? 1 : 0))
+      )
+        throw createApiServiceError(`${name} must be an integer in its documented range.`, {
+          reason: 'invalid_input'
+        });
+    if (
+      ctx.input.searchInPastCompanies !== undefined &&
+      !ctx.input.companyName &&
+      !ctx.input.companyDomain
+    )
+      throw createApiServiceError(
+        'searchInPastCompanies requires companyName or companyDomain.',
+        { reason: 'invalid_input' }
+      );
+    if (
+      ctx.input.profileFilter?.some(value =>
+        ['HasWorkPhone', 'HasVerifiedWorkPhone', 'HasPersonalEmail'].includes(value)
+      )
+    )
+      throw createApiServiceError(
+        'Use supported profile filters HasWorkEmail, HasVerifiedWorkEmail or HasPersonalPhone. The provider explicitly no longer supports work-phone profile filters, and HasPersonalEmail is not documented in the current enum. To inspect work phones, omit the unsupported filter and inspect returned positions.',
+        { reason: 'unsupported_input' }
+      );
     let input: Record<string, any> = {};
+    if (ctx.input.personId) input.id = ctx.input.personId;
+    if (ctx.input.skip !== undefined) input.skip = ctx.input.skip;
+    if (ctx.input.limit !== undefined) input.limit = ctx.input.limit;
 
     if (ctx.input.firstName) input.firstName = ctx.input.firstName;
     if (ctx.input.lastName) input.lastName = ctx.input.lastName;
@@ -169,33 +236,53 @@ Returns current and past positions with associated work emails and phones, perso
     if (ctx.input.hashedEmail) input.hashedEmail = ctx.input.hashedEmail;
     if (ctx.input.phone) input.phone = ctx.input.phone;
     if (ctx.input.profileFilter) input.profileFilter = ctx.input.profileFilter;
-    if (ctx.input.qualityFilter) input.qualityFilter = ctx.input.qualityFilter;
+    if (ctx.input.qualityFilter) input.qualityFilter = { phone: ctx.input.qualityFilter };
     if (ctx.input.minConfidence !== undefined) input.minConfidence = ctx.input.minConfidence;
 
     if (ctx.input.companyName || ctx.input.companyDomain) {
       input.company = {} as Record<string, any>;
       if (ctx.input.companyName) input.company.name = ctx.input.companyName;
       if (ctx.input.companyDomain) input.company.domain = ctx.input.companyDomain;
+      if (ctx.input.searchInPastCompanies !== undefined)
+        input.company.searchInPastCompanies = ctx.input.searchInPastCompanies;
     }
 
     let result = await client.searchPeople(input);
 
-    let results = (result.results ?? []).map((r: any) => ({
-      personId: r._id,
+    if (
+      !Array.isArray(result?.results) ||
+      typeof result.totalResults !== 'number' ||
+      typeof result.hasMore !== 'boolean'
+    )
+      throw createApiServiceError('LeadIQ returned an invalid contact-search page.', {
+        reason: 'invalid_api_response'
+      });
+    let results = result.results.map((r: any) => ({
+      personId: r.id,
       name: r.name,
       linkedin: r.linkedin,
       personalEmails: r.personalEmails,
       personalPhones: r.personalPhones,
-      currentPositions: r.currentPositions,
-      pastPositions: r.pastPositions
+      currentPositions: r.currentPositions.map((position: any) => ({
+        ...position,
+        companyInfo: position.companyInfo
+          ? { ...position.companyInfo, companyId: position.companyInfo.id }
+          : undefined
+      })),
+      pastPositions: r.pastPositions.map((position: any) => ({
+        ...position,
+        companyInfo: position.companyInfo
+          ? { ...position.companyInfo, companyId: position.companyInfo.id }
+          : undefined
+      }))
     }));
 
-    let totalResults = result.totalResults ?? 0;
+    let totalResults = result.totalResults;
 
     return {
       output: {
         totalResults,
-        hasMore: result.hasMore ?? false,
+        hasMore: result.hasMore,
         results
       },
       message:

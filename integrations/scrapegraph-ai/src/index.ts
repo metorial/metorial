@@ -11,8 +11,6 @@ import {
   smartScrape,
   webSearch
 } from './tools';
-import { crawlCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     getCredits,
     getRequestStatus
   ],
-  triggers: [crawlCompleted]
+  triggers: []
 });

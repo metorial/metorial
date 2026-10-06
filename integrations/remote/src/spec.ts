@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'remote',
   name: 'Remote',
   description:
-    'Global HR platform for hiring, managing, and paying employees and contractors worldwide. Provides Employer of Record (EOR) services, global payroll, contractor management, time off, expenses, incentives, and compliance handling.',
+    'Read Remote employment records, country forms, leave policies, expenses, incentives, offboarding requests, timesheets, contract amendments, and payslips. Create or update supported employment and review records, download payslip PDFs, and obtain indicative employment cost estimates.',
   metadata: {},
   config,
   auth

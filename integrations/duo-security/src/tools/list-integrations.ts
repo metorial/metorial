@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listIntegrations = SlateTool.create(spec, {
@@ -35,14 +36,17 @@ export let listIntegrations = SlateTool.create(spec, {
         })
       ),
       totalObjects: z.number().optional(),
-      hasMore: z.boolean()
+      hasMore: z.boolean(),
+      nextOffset: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('list_integrations', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.listIntegrations({
@@ -57,18 +61,23 @@ export let listIntegrations = SlateTool.create(spec, {
       adminApiAdmins: i.adminapi_admins,
       groupsAllowed: i.groups_allowed,
       notesHtml: i.notes || undefined,
-      selfServiceAllowed: i.self_service_allowed,
+      selfServiceAllowed:
+        i.self_service_allowed === undefined ? undefined : Boolean(i.self_service_allowed),
       usernameNormalizationPolicy: i.username_normalization_policy || undefined
     }));
 
     let totalObjects = result.metadata?.total_objects;
+    let nextOffset =
+      typeof result.metadata?.next_offset === 'number'
+        ? result.metadata.next_offset
+        : undefined;
     let hasMore =
-      totalObjects !== undefined
-        ? (ctx.input.offset ?? 0) + integrations.length < totalObjects
-        : false;
+      nextOffset !== undefined ||
+      (totalObjects !== undefined &&
+        (ctx.input.offset ?? 0) + result.response.length < totalObjects);
 
     return {
-      output: { integrations, totalObjects, hasMore },
+      output: { integrations, totalObjects, hasMore, nextOffset },
       message: `Found **${integrations.length}** integration(s).`
     };
   })

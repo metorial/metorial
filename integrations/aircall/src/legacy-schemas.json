@@ -1,0 +1,1737 @@
+{
+  "list_calls": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "description": "Filter calls by user ID",
+          "type": "number"
+        },
+        "phoneNumber": {
+          "description": "Filter calls by phone number (E.164 format)",
+          "type": "string"
+        },
+        "contactId": {
+          "description": "Filter calls by contact ID",
+          "type": "number"
+        },
+        "direction": {
+          "description": "Filter by call direction",
+          "type": "string",
+          "enum": ["inbound", "outbound"]
+        },
+        "tags": {
+          "description": "Filter by tag names (AND condition)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "from": {
+          "description": "Start of time range as UNIX timestamp",
+          "type": "number"
+        },
+        "to": {
+          "description": "End of time range as UNIX timestamp",
+          "type": "number"
+        },
+        "order": {
+          "description": "Sort order by start time",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "includeContacts": {
+          "description": "Include contact data in results",
+          "type": "boolean"
+        },
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (max: 50, default: 20)",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "callId": {
+                "type": "number",
+                "description": "Unique call identifier"
+              },
+              "direction": {
+                "type": "string",
+                "description": "Call direction (inbound or outbound)"
+              },
+              "status": {
+                "type": "string",
+                "description": "Call status"
+              },
+              "rawDigits": {
+                "type": "string",
+                "description": "Phone number in E.164 format or \"anonymous\""
+              },
+              "startedAt": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Call start time as UNIX timestamp"
+              },
+              "answeredAt": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Call answer time as UNIX timestamp"
+              },
+              "endedAt": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Call end time as UNIX timestamp"
+              },
+              "duration": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Call duration in seconds"
+              },
+              "recording": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Recording URL (valid for 10 minutes)"
+              },
+              "voicemail": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Voicemail URL (valid for 10 minutes)"
+              },
+              "archived": {
+                "type": "boolean",
+                "description": "Whether the call is archived"
+              },
+              "missedCallReason": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Reason the call was missed"
+              },
+              "userName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Name of the user who handled the call"
+              },
+              "numberDigits": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Aircall number used"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "tagId": {
+                      "type": "number"
+                    },
+                    "tagName": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["tagId", "tagName"],
+                  "additionalProperties": false
+                },
+                "description": "Tags applied to the call"
+              },
+              "commentsCount": {
+                "type": "number",
+                "description": "Number of comments on the call"
+              }
+            },
+            "required": [
+              "callId",
+              "direction",
+              "status",
+              "rawDigits",
+              "startedAt",
+              "answeredAt",
+              "endedAt",
+              "duration",
+              "recording",
+              "voicemail",
+              "archived",
+              "missedCallReason",
+              "userName",
+              "numberDigits",
+              "tags",
+              "commentsCount"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of matching calls"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page number"
+        },
+        "perPage": {
+          "type": "number",
+          "description": "Results per page"
+        }
+      },
+      "required": ["calls", "totalCount", "currentPage", "perPage"],
+      "additionalProperties": false
+    }
+  },
+  "get_call": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "callId": {
+          "type": "number",
+          "description": "The ID of the call to retrieve"
+        }
+      },
+      "required": ["callId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "callId": {
+          "type": "number",
+          "description": "Unique call identifier"
+        },
+        "directLink": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Direct link to the call in Aircall dashboard"
+        },
+        "direction": {
+          "type": "string",
+          "description": "Call direction (inbound or outbound)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Call status (initial, answered, done)"
+        },
+        "rawDigits": {
+          "type": "string",
+          "description": "Phone number in E.164 format or \"anonymous\""
+        },
+        "startedAt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Call start time as UNIX timestamp"
+        },
+        "answeredAt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Call answer time as UNIX timestamp"
+        },
+        "endedAt": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Call end time as UNIX timestamp"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Call duration in seconds"
+        },
+        "recording": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Recording URL (valid for 10 minutes)"
+        },
+        "voicemail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Voicemail URL (valid for 10 minutes)"
+        },
+        "archived": {
+          "type": "boolean",
+          "description": "Whether the call is archived"
+        },
+        "missedCallReason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Reason the call was missed"
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Call cost"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                }
+              },
+              "required": ["userId", "name", "email"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "User who handled the call"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "numberId": {
+                  "type": "number"
+                },
+                "digits": {
+                  "type": "string"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "country": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["numberId", "digits", "name", "country"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Aircall number used"
+        },
+        "contact": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "contactId": {
+                  "type": "number"
+                },
+                "name": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "companyName": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["contactId", "name", "companyName"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Associated contact"
+        },
+        "assignedTo": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": ["userId", "name"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "User the call is assigned to"
+        },
+        "transferredBy": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "description": "User who transferred the call"
+        },
+        "transferredTo": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "description": "User/team the call was transferred to"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tagId": {
+                "type": "number"
+              },
+              "tagName": {
+                "type": "string"
+              }
+            },
+            "required": ["tagId", "tagName"],
+            "additionalProperties": false
+          },
+          "description": "Tags applied to the call"
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "commentId": {
+                "type": "number"
+              },
+              "content": {
+                "type": "string"
+              },
+              "postedAt": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["commentId", "content", "postedAt"],
+            "additionalProperties": false
+          },
+          "description": "Comments on the call"
+        },
+        "participants": {
+          "type": "array",
+          "items": {},
+          "description": "Call participants"
+        }
+      },
+      "required": [
+        "callId",
+        "directLink",
+        "direction",
+        "status",
+        "rawDigits",
+        "startedAt",
+        "answeredAt",
+        "endedAt",
+        "duration",
+        "recording",
+        "voicemail",
+        "archived",
+        "missedCallReason",
+        "cost",
+        "user",
+        "number",
+        "contact",
+        "assignedTo",
+        "transferredBy",
+        "transferredTo",
+        "tags",
+        "comments",
+        "participants"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "manage_call": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "callId": {
+          "type": "number",
+          "description": "The ID of the call to manage"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "transfer",
+            "comment",
+            "tag",
+            "archive",
+            "unarchive",
+            "pause_recording",
+            "resume_recording",
+            "delete_recording",
+            "delete_voicemail"
+          ],
+          "description": "The action to perform on the call"
+        },
+        "transferToUserId": {
+          "description": "User ID to transfer the call to (for transfer action)",
+          "type": "number"
+        },
+        "transferToTeamId": {
+          "description": "Team ID to transfer the call to (for transfer action)",
+          "type": "number"
+        },
+        "transferToNumber": {
+          "description": "External phone number to transfer the call to in E.164 format (for transfer action)",
+          "type": "string"
+        },
+        "dispatchingStrategy": {
+          "description": "Strategy for team transfers (default: simultaneous)",
+          "type": "string",
+          "enum": ["simultaneous", "random", "longest_idle"]
+        },
+        "commentContent": {
+          "description": "Comment text to add to the call (for comment action)",
+          "type": "string"
+        },
+        "tagId": {
+          "description": "Tag ID to apply to the call (for tag action)",
+          "type": "number"
+        }
+      },
+      "required": ["callId", "action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action was successful"
+        },
+        "callId": {
+          "type": "number",
+          "description": "The call ID that was managed"
+        },
+        "action": {
+          "type": "string",
+          "description": "The action that was performed"
+        }
+      },
+      "required": ["success", "callId", "action"],
+      "additionalProperties": false
+    }
+  },
+  "list_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "Start of time range as UNIX timestamp",
+          "type": "number"
+        },
+        "to": {
+          "description": "End of time range as UNIX timestamp",
+          "type": "number"
+        },
+        "order": {
+          "description": "Sort order",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (max: 50, default: 20)",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "number",
+                "description": "Unique user identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Full name of the user"
+              },
+              "email": {
+                "type": "string",
+                "description": "Email address"
+              },
+              "available": {
+                "type": "boolean",
+                "description": "Whether the user is available"
+              },
+              "availabilityStatus": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Availability status (available, custom, unavailable)"
+              },
+              "timeZone": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User timezone"
+              },
+              "language": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "User language"
+              },
+              "wrapUpTime": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Wrap-up time in seconds"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation date as ISO string"
+              }
+            },
+            "required": [
+              "userId",
+              "name",
+              "email",
+              "available",
+              "availabilityStatus",
+              "timeZone",
+              "language",
+              "wrapUpTime",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of users"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page number"
+        }
+      },
+      "required": ["users", "totalCount", "currentPage"],
+      "additionalProperties": false
+    }
+  },
+  "get_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "The ID of the user to retrieve"
+        },
+        "checkAvailability": {
+          "description": "Also fetch real-time availability status (available, offline, do_not_disturb, in_call, after_call_work)",
+          "type": "boolean"
+        }
+      },
+      "required": ["userId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "Unique user identifier"
+        },
+        "directLink": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Direct link to the user in Aircall dashboard"
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address"
+        },
+        "available": {
+          "type": "boolean",
+          "description": "Whether the user is available"
+        },
+        "availabilityStatus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Availability status"
+        },
+        "substatus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Substatus (out_for_lunch, on_a_break, in_training, doing_back_office, other)"
+        },
+        "realtimeAvailability": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Real-time availability if requested (available, offline, do_not_disturb, in_call, after_call_work)"
+        },
+        "timeZone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "User timezone"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "User language"
+        },
+        "wrapUpTime": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Wrap-up time in seconds"
+        },
+        "extension": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "User extension number"
+        },
+        "numbers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "numberId": {
+                "type": "number"
+              },
+              "digits": {
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["numberId", "digits", "name"],
+            "additionalProperties": false
+          },
+          "description": "Assigned phone numbers"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation date as ISO string"
+        }
+      },
+      "required": [
+        "userId",
+        "directLink",
+        "name",
+        "email",
+        "available",
+        "availabilityStatus",
+        "substatus",
+        "realtimeAvailability",
+        "timeZone",
+        "language",
+        "wrapUpTime",
+        "extension",
+        "numbers",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "manage_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "The operation to perform"
+        },
+        "userId": {
+          "description": "User ID (required for update and delete)",
+          "type": "number"
+        },
+        "email": {
+          "description": "Email address (required for create)",
+          "type": "string"
+        },
+        "firstName": {
+          "description": "First name (required for create)",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Last name (required for create)",
+          "type": "string"
+        },
+        "availabilityStatus": {
+          "description": "Availability status",
+          "type": "string",
+          "enum": ["available", "custom", "unavailable"]
+        },
+        "substatus": {
+          "description": "Substatus when availabilityStatus is custom",
+          "type": "string",
+          "enum": ["out_for_lunch", "on_a_break", "in_training", "doing_back_office", "other"]
+        },
+        "roleIds": {
+          "description": "Role IDs: owner, supervisor, admin, agent",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "wrapUpTime": {
+          "description": "Wrap-up time in seconds after each call",
+          "type": "number"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "description": "User ID",
+          "type": "number"
+        },
+        "name": {
+          "description": "Full name of the user",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address",
+          "type": "string"
+        },
+        "deleted": {
+          "description": "Whether the user was deleted",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "start_call": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "ID of the user to initiate the call for"
+        },
+        "numberId": {
+          "type": "number",
+          "description": "ID of the Aircall number to call from"
+        },
+        "to": {
+          "type": "string",
+          "description": "Phone number to call in E.164 format (e.g., +18001234567)"
+        }
+      },
+      "required": ["userId", "numberId", "to"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "callId": {
+          "type": "number",
+          "description": "ID of the created call"
+        },
+        "direction": {
+          "type": "string",
+          "description": "Call direction"
+        },
+        "status": {
+          "type": "string",
+          "description": "Initial call status"
+        }
+      },
+      "required": ["callId", "direction", "status"],
+      "additionalProperties": false
+    }
+  },
+  "list_contacts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "phoneNumber": {
+          "description": "Search by phone number (E.164 format)",
+          "type": "string"
+        },
+        "email": {
+          "description": "Search by email address",
+          "type": "string"
+        },
+        "from": {
+          "description": "Start of time range as UNIX timestamp",
+          "type": "number"
+        },
+        "to": {
+          "description": "End of time range as UNIX timestamp",
+          "type": "number"
+        },
+        "order": {
+          "description": "Sort order",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (max: 50, default: 20)",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "number",
+                "description": "Unique contact identifier"
+              },
+              "firstName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "First name"
+              },
+              "lastName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Last name"
+              },
+              "fullName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Full name"
+              },
+              "companyName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Company name"
+              },
+              "information": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Additional information"
+              },
+              "phoneNumbers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "phoneNumberId": {
+                      "type": "number"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["phoneNumberId", "label", "value"],
+                  "additionalProperties": false
+                },
+                "description": "Phone numbers"
+              },
+              "emails": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "emailId": {
+                      "type": "number"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["emailId", "label", "value"],
+                  "additionalProperties": false
+                },
+                "description": "Email addresses"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation date as ISO string"
+              },
+              "updatedAt": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Last update date as ISO string"
+              }
+            },
+            "required": [
+              "contactId",
+              "firstName",
+              "lastName",
+              "fullName",
+              "companyName",
+              "information",
+              "phoneNumbers",
+              "emails",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of matching contacts"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page number"
+        }
+      },
+      "required": ["contacts", "totalCount", "currentPage"],
+      "additionalProperties": false
+    }
+  },
+  "manage_contact": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "create",
+            "update",
+            "delete",
+            "add_phone",
+            "update_phone",
+            "delete_phone",
+            "add_email",
+            "update_email",
+            "delete_email"
+          ],
+          "description": "The operation to perform"
+        },
+        "contactId": {
+          "description": "Contact ID (required for update, delete, and phone/email operations)",
+          "type": "number"
+        },
+        "firstName": {
+          "description": "First name (required for create)",
+          "type": "string"
+        },
+        "lastName": {
+          "description": "Last name (required for create)",
+          "type": "string"
+        },
+        "companyName": {
+          "description": "Company name",
+          "type": "string"
+        },
+        "information": {
+          "description": "Additional information or notes",
+          "type": "string"
+        },
+        "phoneNumbers": {
+          "description": "Phone numbers (required for create, at least one)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Label (e.g., Work, Mobile, Home)"
+              },
+              "value": {
+                "type": "string",
+                "description": "Phone number in E.164 format"
+              }
+            },
+            "required": ["label", "value"]
+          }
+        },
+        "emails": {
+          "description": "Email addresses",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Label (e.g., Work, Personal)"
+              },
+              "value": {
+                "type": "string",
+                "description": "Email address"
+              }
+            },
+            "required": ["label", "value"]
+          }
+        },
+        "phoneNumberId": {
+          "description": "Phone number ID (for update_phone/delete_phone)",
+          "type": "number"
+        },
+        "emailId": {
+          "description": "Email ID (for update_email/delete_email)",
+          "type": "number"
+        },
+        "label": {
+          "description": "Label for phone/email (for add/update phone/email)",
+          "type": "string"
+        },
+        "value": {
+          "description": "Value for phone/email (for add/update phone/email)",
+          "type": "string"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "description": "Contact ID",
+          "type": "number"
+        },
+        "fullName": {
+          "description": "Full name of the contact",
+          "type": "string"
+        },
+        "deleted": {
+          "description": "Whether the contact was deleted",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_numbers": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (max: 50, default: 20)",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "numbers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "numberId": {
+                "type": "number",
+                "description": "Unique number identifier"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Display name of the number"
+              },
+              "digits": {
+                "type": "string",
+                "description": "Phone number in E.164 format"
+              },
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Country code"
+              },
+              "timeZone": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Timezone"
+              },
+              "open": {
+                "type": "boolean",
+                "description": "Whether the number is currently open/active"
+              },
+              "liveRecordingActivated": {
+                "type": "boolean",
+                "description": "Whether live recording is enabled"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation date as ISO string"
+              }
+            },
+            "required": [
+              "numberId",
+              "name",
+              "digits",
+              "country",
+              "timeZone",
+              "open",
+              "liveRecordingActivated",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of phone numbers"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page number"
+        }
+      },
+      "required": ["numbers", "totalCount", "currentPage"],
+      "additionalProperties": false
+    }
+  },
+  "manage_team": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "delete", "get", "list", "add_user", "remove_user"],
+          "description": "The operation to perform"
+        },
+        "teamId": {
+          "description": "Team ID (required for delete, get, add_user, remove_user)",
+          "type": "number"
+        },
+        "teamName": {
+          "description": "Team name (required for create, max 64 chars, must be unique)",
+          "type": "string"
+        },
+        "userId": {
+          "description": "User ID (required for add_user and remove_user)",
+          "type": "number"
+        },
+        "page": {
+          "description": "Page number for list action (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page for list action (max: 50)",
+          "type": "number"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "teamId": {
+          "description": "Team ID",
+          "type": "number"
+        },
+        "teamName": {
+          "description": "Team name",
+          "type": "string"
+        },
+        "users": {
+          "description": "Team members",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["userId", "name"],
+            "additionalProperties": false
+          }
+        },
+        "teams": {
+          "description": "List of teams (for list action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "teamId": {
+                "type": "number"
+              },
+              "teamName": {
+                "type": "string"
+              },
+              "userCount": {
+                "type": "number"
+              }
+            },
+            "required": ["teamId", "teamName", "userCount"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "description": "Total teams count (for list action)",
+          "type": "number"
+        },
+        "deleted": {
+          "description": "Whether the team was deleted",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_tags": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "page": {
+          "description": "Page number (default: 1)",
+          "type": "number"
+        },
+        "perPage": {
+          "description": "Results per page (max: 50, default: 20)",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tagId": {
+                "type": "number",
+                "description": "Unique tag identifier"
+              },
+              "tagName": {
+                "type": "string",
+                "description": "Tag name"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation date as ISO string"
+              }
+            },
+            "required": ["tagId", "tagName", "createdAt"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of tags"
+        },
+        "currentPage": {
+          "type": "number",
+          "description": "Current page number"
+        }
+      },
+      "required": ["tags", "totalCount", "currentPage"],
+      "additionalProperties": false
+    }
+  },
+  "send_message": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "numberId": {
+          "type": "number",
+          "description": "ID of the Aircall number to send from (must be configured for API messaging)"
+        },
+        "to": {
+          "type": "string",
+          "description": "Recipient phone number in E.164 format"
+        },
+        "content": {
+          "type": "string",
+          "description": "Message text content"
+        }
+      },
+      "required": ["numberId", "to", "content"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the message was sent successfully"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "create_insight_card": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "callId": {
+          "type": "number",
+          "description": "ID of the ongoing call to display the insight card on"
+        },
+        "contents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["title", "shortText"],
+                "description": "Card line type: title for headings, shortText for label-value pairs"
+              },
+              "text": {
+                "type": "string",
+                "description": "The text content to display"
+              },
+              "label": {
+                "description": "Label shown before the text (only for shortText type)",
+                "type": "string"
+              },
+              "link": {
+                "description": "URL to open when the line is clicked",
+                "type": "string"
+              }
+            },
+            "required": ["type", "text"]
+          },
+          "description": "Lines of content to display in the insight card"
+        }
+      },
+      "required": ["callId", "contents"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether the insight card was created successfully"
+        },
+        "callId": {
+          "type": "number",
+          "description": "The call ID the insight card was pushed to"
+        }
+      },
+      "required": ["success", "callId"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { stateMessage } from '../lib/contracts';
+import { deliverGeneratedFiles, imageOutput } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let modificationSchema = z
@@ -10,13 +13,22 @@ let modificationSchema = z
     color: z.string().optional().describe('Color value (hex) for the layer'),
     background: z.string().optional().describe('Background color (hex) for the layer'),
     image_url: z.string().optional().describe('URL of an image to use for an image layer'),
-    star_rating: z.number().optional().describe('Star rating value (for star rating layers)'),
+    star_rating: z
+      .number()
+      .optional()
+      .describe('Legacy alias for the documented rating integer from 0 to 100'),
     chart_data: z.string().optional().describe('Comma-separated chart data values'),
     barcode_data: z.string().optional().describe('Data to encode in a barcode layer'),
     qr_data: z.string().optional().describe('Data to encode in a QR code layer'),
     font_family: z.string().optional().describe('Font family name to use for a text layer'),
-    font_size: z.number().optional().describe('Font size for a text layer'),
-    font_weight: z.string().optional().describe('Font weight (e.g. "bold") for a text layer'),
+    font_size: z
+      .number()
+      .optional()
+      .describe('Unsupported per-render V2 field; set font size in the template editor'),
+    font_weight: z
+      .string()
+      .optional()
+      .describe('Unsupported per-render V2 field; set font weight in the template editor'),
     effect: z.string().optional().describe('Effect to apply (e.g. "Grayscale", "Sepia")'),
     hide: z.boolean().optional().describe('Whether to hide this layer')
   })
@@ -27,7 +39,7 @@ export let generateImage = SlateTool.create(spec, {
   key: 'generate_image',
   description: `Generate an image from a Bannerbear design template by applying modifications to its layers. Supports text, images, colors, fonts, QR codes, bar codes, star ratings, and chart data. Returns the generated image URLs (JPG, PNG, and optionally PDF).`,
   instructions: [
-    'You must provide a valid template UID and at least one modification targeting a named layer.',
+    'You must provide a valid template UID and a modifications array targeting exact layer names.',
     'Layer names must match exactly as defined in the Bannerbear template editor.'
   ],
   constraints: [
@@ -41,6 +53,7 @@ export let generateImage = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       templateUid: z.string().describe('UID of the template to generate an image from'),
       modifications: z
         .array(modificationSchema)
@@ -70,9 +83,8 @@ export let generateImage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.createImage({
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const result = await client.createImage({
       template: ctx.input.templateUid,
       modifications: ctx.input.modifications,
       transparent: ctx.input.transparent,
@@ -81,18 +93,11 @@ export let generateImage = SlateTool.create(spec, {
       webhook_url: ctx.input.webhookUrl,
       template_version: ctx.input.templateVersion
     });
-
+    const output = imageOutput(result);
+    await deliverGeneratedFiles(ctx, 'image', result);
     return {
-      output: {
-        imageUid: result.uid,
-        status: result.status,
-        imageUrl: result.image_url || null,
-        imageUrlPng: result.image_url_png || null,
-        pdfUrl: result.pdf_url || null,
-        templateUid: result.template,
-        createdAt: result.created_at
-      },
-      message: `Image generation ${result.status === 'completed' ? 'completed' : 'initiated'} (UID: ${result.uid}). ${result.image_url ? `[View image](${result.image_url})` : 'Image is still rendering.'}`
+      output,
+      message: `Image generation ${stateMessage(result.status)} (UID: ${output.imageUid}). Read its status with get_resource.`
     };
   })
   .build();

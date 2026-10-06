@@ -15,6 +15,14 @@ The incident title is auto-generated if not provided.`,
   .input(
     z.object({
       title: z.string().optional().describe('Incident title (auto-generated if omitted)'),
+      scheduledFor: z
+        .string()
+        .optional()
+        .describe('Scheduled maintenance start in ISO 8601 format'),
+      scheduledUntil: z
+        .string()
+        .optional()
+        .describe('Scheduled maintenance end in ISO 8601 format'),
       summary: z.string().optional().describe('Summary of the incident'),
       status: z
         .enum([
@@ -25,7 +33,10 @@ The incident title is auto-generated if not provided.`,
           'mitigated',
           'resolved',
           'closed',
-          'cancelled'
+          'cancelled',
+          'scheduled',
+          'in_progress',
+          'completed'
         ])
         .optional()
         .describe('Initial status'),
@@ -54,6 +65,8 @@ The incident title is auto-generated if not provided.`,
     let result = await client.createIncident({
       title: ctx.input.title,
       summary: ctx.input.summary,
+      scheduledFor: ctx.input.scheduledFor,
+      scheduledUntil: ctx.input.scheduledUntil,
       status: ctx.input.status,
       kind: ctx.input.kind,
       severityId: ctx.input.severityId,

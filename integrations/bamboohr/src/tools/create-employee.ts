@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { inputData, invalid } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let createEmployee = SlateTool.create(spec, {
@@ -35,38 +36,37 @@ export let createEmployee = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      companyDomain: ctx.config.companyDomain
-    });
+    let client = clientFor(ctx);
 
-    let employeeData: Record<string, any> = {
+    let employeeData: Record<string, unknown> = {
       firstName: ctx.input.firstName,
       lastName: ctx.input.lastName
     };
 
-    if (ctx.input.workEmail) employeeData.workEmail = ctx.input.workEmail;
-    if (ctx.input.jobTitle) employeeData.jobTitle = ctx.input.jobTitle;
-    if (ctx.input.department) employeeData.department = ctx.input.department;
-    if (ctx.input.division) employeeData.division = ctx.input.division;
-    if (ctx.input.location) employeeData.location = ctx.input.location;
-    if (ctx.input.hireDate) employeeData.hireDate = ctx.input.hireDate;
+    if (ctx.input.workEmail !== undefined) employeeData.workEmail = ctx.input.workEmail;
+    if (ctx.input.jobTitle !== undefined) employeeData.jobTitle = ctx.input.jobTitle;
+    if (ctx.input.department !== undefined) employeeData.department = ctx.input.department;
+    if (ctx.input.division !== undefined) employeeData.division = ctx.input.division;
+    if (ctx.input.location !== undefined) employeeData.location = ctx.input.location;
+    if (ctx.input.hireDate !== undefined) employeeData.hireDate = ctx.input.hireDate;
 
-    if (ctx.input.additionalFields) {
+    if (ctx.input.additionalFields && Object.keys(ctx.input.additionalFields).length) {
+      inputData(ctx.input.additionalFields);
       for (let [key, value] of Object.entries(ctx.input.additionalFields)) {
+        if (key in employeeData)
+          invalid('additionalFields must not override explicitly supplied employee fields.');
         employeeData[key] = value;
       }
     }
 
     let result = await client.addEmployee(employeeData);
 
-    // BambooHR returns the location header with the new employee URL
-    let employeeId = result?.id || result?.headers?.location?.split('/').pop() || 'unknown';
+    let employeeId = result.id;
 
     return {
       output: {
         employeeId: String(employeeId),
-        location: result?.headers?.location
+        location: result.location
       },
       message: `Created employee **${ctx.input.firstName} ${ctx.input.lastName}** with ID **${employeeId}**.`
     };

@@ -1,18 +1,19 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import {
   buildRelationship,
   cleanAttributes,
   flattenResource,
-  mergeRelationships
+  mergeRelationships,
+  validateInput
 } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let createCall = SlateTool.create(spec, {
   name: 'Log Call',
   key: 'create_call',
-  description: `Log a phone call in Outreach. Records call details including direction, outcome (disposition), purpose, duration, and notes.`,
+  description: `Log a phone call in Outreach. Records call details including direction, outcome, purpose, timestamps and notes. This records an external call and does not dial a phone number.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -21,7 +22,18 @@ export let createCall = SlateTool.create(spec, {
   .input(
     z.object({
       direction: z.enum(['inbound', 'outbound']).optional().describe('Call direction'),
-      disposition: z.string().optional().describe('Call outcome/disposition'),
+      disposition: z
+        .string()
+        .optional()
+        .describe(
+          'Deprecated call attribute: do not supply. Use outcome and optionally callDispositionId.'
+        ),
+      outcome: z
+        .enum(['Answered', 'Not Answered'])
+        .optional()
+        .describe(
+          'External call outcome, required for logging. This logs a call; it does not dial.'
+        ),
       note: z.string().optional().describe('Call notes'),
       dialedAt: z.string().optional().describe('When the call was dialed (ISO 8601)'),
       answeredAt: z.string().optional().describe('When the call was answered (ISO 8601)'),
@@ -38,6 +50,7 @@ export let createCall = SlateTool.create(spec, {
       callId: z.string(),
       direction: z.string().optional(),
       disposition: z.string().optional(),
+      outcome: z.string().optional(),
       dialedAt: z.string().optional(),
       answeredAt: z.string().optional(),
       completedAt: z.string().optional(),
@@ -45,11 +58,25 @@ export let createCall = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
+    if (ctx.input.disposition !== undefined)
+      throw createApiServiceError(
+        'disposition is deprecated as a call attribute. Supply outcome and optionally callDispositionId.'
+      );
+    if (
+      !ctx.input.direction ||
+      !ctx.input.outcome ||
+      !ctx.input.prospectId ||
+      !ctx.input.userId
+    )
+      throw createApiServiceError(
+        'direction, outcome, prospectId and userId are required to log an external call.'
+      );
     let client = new Client({ token: ctx.auth.token });
 
     let attributes = cleanAttributes({
       direction: ctx.input.direction,
-      disposition: ctx.input.disposition,
+      outcome: ctx.input.outcome,
       note: ctx.input.note,
       dialedAt: ctx.input.dialedAt,
       answeredAt: ctx.input.answeredAt,
@@ -72,6 +99,7 @@ export let createCall = SlateTool.create(spec, {
         callId: flat.id,
         direction: flat.direction,
         disposition: flat.disposition,
+        outcome: flat.outcome,
         dialedAt: flat.dialedAt,
         answeredAt: flat.answeredAt,
         completedAt: flat.completedAt,

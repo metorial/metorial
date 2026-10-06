@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { StitchConnectClient } from '../lib/client';
+import { resolveRegion, StitchConnectClient } from '../lib/client';
 import { spec } from '../spec';
 
 let sourceSchema = z.object({
@@ -21,8 +21,9 @@ let sourceSchema = z.object({
     .nullable()
     .describe('ISO 8601 timestamp if system-paused, null otherwise'),
   stale: z.boolean().nullable().describe('Whether the source data is stale'),
+  stitchClientId: z.number().optional().describe('Stitch account ID returned by the provider'),
   reportCard: z
-    .any()
+    .unknown()
     .optional()
     .describe('Configuration status and report card for the source')
 });
@@ -44,13 +45,13 @@ export let listSources = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StitchConnectClient({
       token: ctx.auth.token,
-      region: ctx.config.region,
-      clientId: ctx.config.clientId
+      region: resolveRegion(ctx.auth.region, ctx.config),
+      clientId: ctx.auth.clientId ?? ctx.config.clientId
     });
 
     let rawSources = await client.listSources();
 
-    let sources = rawSources.map((s: any) => ({
+    let sources = rawSources.map(s => ({
       sourceId: s.id,
       type: s.type,
       name: s.display_name || s.name || null,
@@ -59,7 +60,8 @@ export let listSources = SlateTool.create(spec, {
       pausedAt: s.paused_at || null,
       systemPausedAt: s.system_paused_at || null,
       stale: s.stale ?? null,
-      reportCard: s.report_card
+      reportCard: s.report_card,
+      stitchClientId: s.stitch_client_id
     }));
 
     return {

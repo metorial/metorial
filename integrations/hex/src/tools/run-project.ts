@@ -6,8 +6,14 @@ import { spec } from '../spec';
 export let runProject = SlateTool.create(spec, {
   name: 'Run Project',
   key: 'run_project',
+  tags: { destructive: true },
   description: `Trigger a run of the latest published version of a Hex project. Supports custom input parameters, saved views, cache control, and notifications for run completion (via Slack, users, or groups).`,
-  constraints: ['Rate limited to 20 requests per minute and 60 per hour per project.']
+  constraints: [
+    'Project execution and API rate limits depend on the workspace and plan. Runs can execute SQL/Python and incur compute or warehouse charges.'
+  ],
+  instructions: [
+    'Only the latest published version can run. Request acceptance is not successful completion; use Get Run Status to observe it. Notifications send to the explicitly specified recipients.'
+  ]
 })
   .input(
     z.object({
@@ -24,7 +30,9 @@ export let runProject = SlateTool.create(spec, {
       updateCache: z
         .boolean()
         .optional()
-        .describe('If true, update the cache with the results of this run'),
+        .describe(
+          'Deprecated Hex option: true updates published results and disables SQL cache reuse; false preserves published results and permits cache reuse. Do not combine with the current cache/result options.'
+        ),
       updatePublishedResults: z
         .boolean()
         .optional()
@@ -38,8 +46,14 @@ export let runProject = SlateTool.create(spec, {
           z.object({
             type: z
               .string()
-              .describe('Notification type (e.g. "slack_channel", "hex_user", "hex_group")'),
-            target: z.any().describe('Notification target details')
+              .describe(
+                'SUCCESS, FAILURE or ALL; legacy slack_channel, hex_user and hex_group recipient types are also accepted.'
+              ),
+            target: z
+              .any()
+              .describe(
+                'For SUCCESS/FAILURE/ALL, an object with explicit userIds, groupIds or slackChannelIds and optional notification options. Legacy recipient types take one ID or an array of IDs.'
+              )
           })
         )
         .optional()
@@ -52,11 +66,15 @@ export let runProject = SlateTool.create(spec, {
       runId: z.string(),
       runUrl: z.string(),
       runStatusUrl: z.string().optional(),
-      status: z.string().optional()
+      status: z.string().optional(),
+      projectVersion: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
 
     let run = await client.runProject(ctx.input.projectId, {
       inputParams: ctx.input.inputParams,
@@ -73,10 +91,12 @@ export let runProject = SlateTool.create(spec, {
         projectId: run.projectId,
         runId: run.runId,
         runUrl: run.runUrl,
-        runStatusUrl: (run as any).runStatusUrl,
-        status: run.status
+        runStatusUrl: run.runStatusUrl,
+        projectVersion: run.projectVersion
       },
-      message: `Triggered run **${run.runId}** for project ${run.projectId}.${ctx.input.dryRun ? ' (dry run)' : ''}`
+      message: ctx.input.dryRun
+        ? `Hex validated the run request for project ${run.projectId} without starting execution.`
+        : `Hex accepted run **${run.runId}** for project ${run.projectId}. Use Get Run Status to check completion.`
     };
   })
   .build();

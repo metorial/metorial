@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let uploadAnnotationTool = SlateTool.create(spec, {
@@ -14,14 +15,20 @@ export let uploadAnnotationTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project URL slug'),
+      projectId: projectIdSchema,
       imageId: z.string().describe('Image ID to annotate'),
       annotationText: z.string().describe('Annotation content in the appropriate format'),
       annotationFileName: z
         .string()
         .optional()
         .describe('Filename for the annotation (e.g., "image.txt" for YOLO format)'),
-      overwrite: z.boolean().optional().describe('Whether to overwrite existing annotations')
+      overwrite: z.boolean().optional().describe('Whether to overwrite existing annotations'),
+      labelmap: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe(
+          'Maps numeric class IDs to class names for YOLO/Darknet annotations, for example {"0":"cat"}'
+        )
     })
   )
   .output(
@@ -32,15 +39,20 @@ export let uploadAnnotationTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth, ctx.config);
 
-    await client.uploadAnnotation(
+    const result = await client.uploadAnnotation(
       ctx.input.projectId,
       ctx.input.imageId,
       ctx.input.annotationText,
       {
         name: ctx.input.annotationFileName,
-        overwrite: ctx.input.overwrite
+        overwrite: ctx.input.overwrite,
+        labelmap: ctx.input.labelmap
       }
     );
+
+    if (result?.success !== true) {
+      throw createApiServiceError('Roboflow did not confirm the annotation upload.');
+    }
 
     return {
       output: { success: true },

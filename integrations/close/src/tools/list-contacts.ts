@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapContact } from '../lib/models';
 import { spec } from '../spec';
 
 export let listContacts = SlateTool.create(spec, {
@@ -24,10 +25,11 @@ Returns paginated results with contact details including name, title, emails, an
   )
   .output(
     z.object({
+      nextSkip: z.number().optional().describe('Offset for the next page, when available.'),
       contacts: z.array(
         z.object({
           contactId: z.string().describe('Unique contact ID'),
-          leadId: z.string().describe('Associated lead ID'),
+          leadId: z.string().optional().describe('Associated lead ID'),
           name: z.string().nullable().describe('Full name of the contact'),
           title: z.string().nullable().describe('Job title of the contact'),
           emails: z
@@ -37,7 +39,8 @@ Returns paginated results with contact details including name, title, emails, an
                 type: z.string().describe('Email type')
               })
             )
-            .describe('Email addresses'),
+            .optional()
+            .describe('Email addresses, when provided'),
           phones: z
             .array(
               z.object({
@@ -45,48 +48,31 @@ Returns paginated results with contact details including name, title, emails, an
                 type: z.string().describe('Phone type')
               })
             )
-            .describe('Phone numbers'),
+            .optional()
+            .describe('Phone numbers, when provided'),
           dateCreated: z.string().describe('Creation timestamp')
         })
       ),
-      totalResults: z.number().describe('Total number of contacts matching the query'),
+      totalResults: z
+        .number()
+        .optional()
+        .describe('Total number of contacts matching the query'),
       hasMore: z
         .boolean()
         .describe('Whether more results are available beyond the current page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-    let result = await client.listContacts({
-      leadId: ctx.input.leadId,
-      limit: ctx.input.limit ?? 100,
-      skip: ctx.input.skip
-    });
-
-    let contacts = (result.data ?? []).map((c: any) => ({
-      contactId: c.id,
-      leadId: c.lead_id,
-      name: c.name ?? null,
-      title: c.title ?? null,
-      emails: (c.emails ?? []).map((e: any) => ({
-        email: e.email,
-        type: e.type
-      })),
-      phones: (c.phones ?? []).map((p: any) => ({
-        phone: p.phone,
-        type: p.type
-      })),
-      dateCreated: c.date_created
-    }));
-
-    let totalResults = result.total_results ?? contacts.length;
-    let _limit = ctx.input.limit ?? 100;
-    let skip = ctx.input.skip ?? 0;
-    let hasMore = skip + contacts.length < totalResults;
-
+    const result = await new Client(ctx.auth).listContacts(ctx.input);
+    const contacts = result.data.map(mapContact);
     return {
-      output: { contacts, totalResults, hasMore },
-      message: `Found **${totalResults}** contact(s)${ctx.input.leadId ? ` for lead **${ctx.input.leadId}**` : ''}. Returning ${contacts.length} result(s).`
+      output: {
+        contacts,
+        totalResults: result.total_results ?? undefined,
+        hasMore: result.has_more,
+        nextSkip: result.has_more ? (ctx.input.skip ?? 0) + contacts.length : undefined
+      },
+      message: `Returned ${contacts.length} contact(s)${result.has_more ? '; more available' : ''}.`
     };
   })
   .build();

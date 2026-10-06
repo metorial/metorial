@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugsnagClient } from '../lib/client';
 import { spec } from '../spec';
@@ -18,7 +18,9 @@ export let getStability = SlateTool.create(spec, {
       releaseStage: z
         .string()
         .optional()
-        .describe('Filter by release stage (e.g., production)')
+        .describe(
+          'Legacy field: this endpoint reports only the project primary release stage; omit this field'
+        )
     })
   )
   .output(
@@ -29,13 +31,16 @@ export let getStability = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BugsnagClient({ token: ctx.auth.token });
+    let client = new BugsnagClient(ctx.auth);
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('Project ID is required.');
+    if (!projectId) throw createApiServiceError('Project ID is required.');
 
-    let stability = await client.getProjectStability(projectId, {
-      releaseStage: ctx.input.releaseStage
-    });
+    if (ctx.input.releaseStage !== undefined)
+      throw createApiServiceError(
+        'Bugsnag stability trend reports only the primary release stage and does not support a release-stage filter. Omit releaseStage.',
+        { reason: 'unsupported_parameter' }
+      );
+    let stability = await client.getProjectStability(projectId);
 
     return {
       output: { stabilityTrend: stability },

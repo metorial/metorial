@@ -2,8 +2,10 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createEmployment,
+  downloadPayslip,
   estimateEmploymentCost,
   getCountryFormSchema,
+  getCurrentIdentity,
   getEmployment,
   listCompanies,
   listContractAmendments,
@@ -17,19 +19,10 @@ import {
   manageTimesheets,
   updateEmployment
 } from './tools';
-import {
-  companyEvents,
-  employmentEvents,
-  expenseEvents,
-  incentiveEvents,
-  offboardingEvents,
-  payslipEvents,
-  timeoffEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentIdentity,
     listCompanies,
     listEmployments,
     getEmployment,
@@ -44,15 +37,8 @@ export let provider = Slate.create({
     getCountryFormSchema,
     estimateEmploymentCost,
     listPayslips,
+    downloadPayslip,
     listContractAmendments
-  ] as any,
-  triggers: [
-    employmentEvents,
-    timeoffEvents,
-    expenseEvents,
-    offboardingEvents,
-    payslipEvents,
-    incentiveEvents,
-    companyEvents
-  ] as any
+  ],
+  triggers: []
 });

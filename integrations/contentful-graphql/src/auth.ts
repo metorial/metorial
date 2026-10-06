@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { validateToken } from './lib/validation';
 
 export let auth = SlateAuth.create()
   .output(
@@ -30,16 +31,22 @@ export let auth = SlateAuth.create()
         .string()
         .optional()
         .describe(
-          'Content Management API (CMA) personal access token. Required for automatic webhook registration in triggers. Found under Settings > CMA tokens.'
+          'Optional Content Management API (CMA) personal access token for list_spaces account discovery. This does not establish which spaces the delivery or preview key authorizes.'
         )
     }),
 
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token,
-          previewToken: ctx.input.previewToken,
-          managementToken: ctx.input.managementToken
+          token: validateToken(ctx.input.token, 'Content Delivery API'),
+          previewToken:
+            ctx.input.previewToken === undefined
+              ? undefined
+              : validateToken(ctx.input.previewToken, 'Content Preview API'),
+          managementToken:
+            ctx.input.managementToken === undefined
+              ? undefined
+              : validateToken(ctx.input.managementToken, 'Content Management API')
         }
       };
     }

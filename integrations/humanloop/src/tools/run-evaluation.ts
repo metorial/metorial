@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectHumanloopOperation } from '../lib/retirement';
 import { spec } from '../spec';
 
 export let runEvaluation = SlateTool.create(spec, {
   name: 'Run Evaluation',
   key: 'run_evaluation',
-  description: `Create and run evaluations, or retrieve evaluation results. Evaluations benchmark different prompt/tool/flow versions against a dataset using specified evaluators. Use this to list evaluations for a file, get evaluation details, or kick off a new evaluation run.`,
+  description:
+    'DEPRECATED — Humanloop shut down on September 8, 2025. This operation is unavailable; the tool is retained only for compatibility.',
   instructions: [
-    'To create an evaluation, provide the fileId of the prompt/tool/flow and the evaluator version IDs.',
-    'Use the "list" action with a fileId to see past evaluations.'
+    'Humanloop is retired. Do not use this tool for new workflows; use data exported before September 8, 2025 with your chosen replacement platform.'
   ],
   tags: {
     destructive: false,
-    readOnly: false
+    readOnly: false,
+    deprecated: true
   }
 })
   .input(
@@ -42,51 +43,5 @@ export let runEvaluation = SlateTool.create(spec, {
       total: z.number().optional().describe('Total count')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    if (ctx.input.action === 'list') {
-      if (!ctx.input.fileId) throw new Error('fileId is required for list action');
-      let result = await client.listEvaluations(ctx.input.fileId, {
-        page: ctx.input.page,
-        size: ctx.input.size
-      });
-      return {
-        output: { evaluations: result.records, total: result.total },
-        message: `Found **${result.total}** evaluations for file **${ctx.input.fileId}**.`
-      };
-    }
-
-    if (ctx.input.action === 'get') {
-      if (!ctx.input.evaluationId) throw new Error('evaluationId is required for get action');
-      let evaluation = await client.getEvaluation(ctx.input.evaluationId);
-      return {
-        output: { evaluation },
-        message: `Retrieved evaluation **${evaluation.name || ctx.input.evaluationId}**.`
-      };
-    }
-
-    if (ctx.input.action === 'create') {
-      if (!ctx.input.fileId) throw new Error('fileId is required for create action');
-      if (!ctx.input.evaluatorVersionIds?.length)
-        throw new Error('evaluatorVersionIds is required for create action');
-
-      let body: Record<string, any> = {
-        file: { id: ctx.input.fileId },
-        evaluators: ctx.input.evaluatorVersionIds.map(versionId => ({
-          version_id: versionId,
-          orchestrated: true
-        }))
-      };
-      if (ctx.input.evaluationName) body.name = ctx.input.evaluationName;
-
-      let evaluation = await client.createEvaluation(body);
-      return {
-        output: { evaluation },
-        message: `Created evaluation **${evaluation.name || evaluation.id}** with ${ctx.input.evaluatorVersionIds.length} evaluator(s).`
-      };
-    }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
-  })
+  .handleInvocation(async () => rejectHumanloopOperation())
   .build();

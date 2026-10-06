@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TrayRestClient } from '../lib/client';
+import { clientConfig, TrayRestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getConnectorOperations = SlateTool.create(spec, {
@@ -44,7 +44,11 @@ export let getConnectorOperations = SlateTool.create(spec, {
             outputSchema: z.any().describe('JSON Schema defining the output structure'),
             hasDynamicOutput: z
               .boolean()
-              .describe('Whether the output schema varies based on input')
+              .describe('Whether the output schema varies based on input'),
+            authScopes: z
+              .array(z.string())
+              .optional()
+              .describe('Native operation permission scopes')
           })
         )
         .describe('List of available operations'),
@@ -55,7 +59,11 @@ export let getConnectorOperations = SlateTool.create(spec, {
             title: z.string().describe('Name of the service environment'),
             scopes: z.array(z.any()).describe('Available OAuth scopes'),
             userData: z.any().nullable().describe('User data schema for authentication'),
-            credentials: z.any().nullable().describe('Credentials schema for authentication')
+            credentials: z.any().nullable().describe('Credentials schema for authentication'),
+            serviceId: z.string().optional(),
+            serviceName: z.string().optional(),
+            serviceVersion: z.number().optional(),
+            authenticationType: z.string().optional()
           })
         )
         .optional()
@@ -63,17 +71,16 @@ export let getConnectorOperations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TrayRestClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = new TrayRestClient(clientConfig(ctx));
 
     let operations = await client.getConnectorOperations(
       ctx.input.connectorName,
       ctx.input.version
     );
 
-    let serviceEnvironments: any[] | undefined;
+    let serviceEnvironments:
+      | Awaited<ReturnType<TrayRestClient['getServiceEnvironments']>>
+      | undefined;
     if (ctx.input.includeServiceEnvironments) {
       serviceEnvironments = await client.getServiceEnvironments(
         ctx.input.connectorName,

@@ -1,19 +1,28 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
+import type { RuntimeParams } from './schemas';
 
-type HttpClient = ReturnType<typeof createAxios>;
+type HttpClient = ReturnType<typeof createAuthenticatedAxios>;
 
 export class AdminClient {
   private http: HttpClient;
 
   constructor(private params: { token: string; workspaceId?: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
+      authHeader: { value: `Bearer ${params.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Botpress',
+          reason: 'botpress_api_error'
+        }),
       baseURL: 'https://api.botpress.cloud/v1/admin'
     });
   }
 
   private headers(extra?: Record<string, string>) {
     let h: Record<string, string> = {
-      Authorization: `Bearer ${this.params.token}`
+      Authorization: `Bearer ${this.params.token}`,
+      'x-multiple-integrations': 'true'
     };
     if (this.params.workspaceId) {
       h['x-workspace-id'] = this.params.workspaceId;
@@ -32,13 +41,13 @@ export class AdminClient {
   }
 
   async getBot(botId: string) {
-    let response = await this.http.get(`/bots/${botId}`, {
+    let response = await this.http.get(`/bots/${encodeURIComponent(botId)}`, {
       headers: this.headers()
     });
     return response.data;
   }
 
-  async createBot(data: { name?: string; tags?: Record<string, string> }) {
+  async createBot(data: Record<string, unknown>) {
     let response = await this.http.post('/bots', data, {
       headers: this.headers()
     });
@@ -46,14 +55,14 @@ export class AdminClient {
   }
 
   async updateBot(botId: string, data: Record<string, unknown>) {
-    let response = await this.http.put(`/bots/${botId}`, data, {
+    let response = await this.http.put(`/bots/${encodeURIComponent(botId)}`, data, {
       headers: this.headers()
     });
     return response.data;
   }
 
   async deleteBot(botId: string) {
-    let response = await this.http.delete(`/bots/${botId}`, {
+    let response = await this.http.delete(`/bots/${encodeURIComponent(botId)}`, {
       headers: this.headers()
     });
     return response.data;
@@ -62,7 +71,7 @@ export class AdminClient {
   // === Bot Analytics ===
 
   async getBotAnalytics(botId: string, opts?: { startDate?: string; endDate?: string }) {
-    let response = await this.http.get(`/bots/${botId}/analytics`, {
+    let response = await this.http.get(`/bots/${encodeURIComponent(botId)}/analytics`, {
       headers: this.headers(),
       params: opts
     });
@@ -71,8 +80,20 @@ export class AdminClient {
 
   // === Bot Logs ===
 
-  async getBotLogs(botId: string, opts?: { nextToken?: string; sortOrder?: string }) {
-    let response = await this.http.get(`/bots/${botId}/logs`, {
+  async getBotLogs(
+    botId: string,
+    opts: {
+      timeStart: string;
+      timeEnd?: string;
+      level?: string;
+      userId?: string;
+      workflowId?: string;
+      conversationId?: string;
+      messageContains?: string;
+      nextToken?: string;
+    }
+  ) {
+    let response = await this.http.get(`/bots/${encodeURIComponent(botId)}/logs`, {
       headers: this.headers(),
       params: opts
     });
@@ -82,7 +103,7 @@ export class AdminClient {
   // === Bot Issues ===
 
   async listBotIssues(botId: string, opts?: { nextToken?: string }) {
-    let response = await this.http.get(`/bots/${botId}/issues`, {
+    let response = await this.http.get(`/bots/${encodeURIComponent(botId)}/issues`, {
       headers: this.headers(),
       params: opts
     });
@@ -90,30 +111,37 @@ export class AdminClient {
   }
 
   async getBotIssue(botId: string, issueId: string) {
-    let response = await this.http.get(`/bots/${botId}/issues/${issueId}`, {
-      headers: this.headers()
-    });
+    let response = await this.http.get(
+      `/bots/${encodeURIComponent(botId)}/issues/${encodeURIComponent(issueId)}`,
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
   }
 
   async deleteBotIssue(botId: string, issueId: string) {
-    let response = await this.http.delete(`/bots/${botId}/issues/${issueId}`, {
-      headers: this.headers()
-    });
+    let response = await this.http.delete(
+      `/bots/${encodeURIComponent(botId)}/issues/${encodeURIComponent(issueId)}`,
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
   }
 
   // === Workspaces ===
 
-  async listWorkspaces() {
+  async listWorkspaces(opts?: { nextToken?: string; handle?: string }) {
     let response = await this.http.get('/workspaces', {
+      params: opts,
       headers: this.headers()
     });
     return response.data;
   }
 
   async getWorkspace(workspaceId: string) {
-    let response = await this.http.get(`/workspaces/${workspaceId}`, {
+    let response = await this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}`, {
       headers: this.headers()
     });
     return response.data;
@@ -122,9 +150,12 @@ export class AdminClient {
   // === Workspace Members ===
 
   async listWorkspaceMembers(workspaceId: string) {
-    let response = await this.http.get(`/workspaces/${workspaceId}/members`, {
-      headers: this.headers()
-    });
+    let response = await this.http.get(
+      `/workspaces/${encodeURIComponent(workspaceId)}/members`,
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
   }
 
@@ -145,23 +176,26 @@ export class AdminClient {
   }
 
   async getIntegration(integrationId: string) {
-    let response = await this.http.get(`/integrations/${integrationId}`, {
+    let response = await this.http.get(`/integrations/${encodeURIComponent(integrationId)}`, {
       headers: this.headers()
     });
     return response.data;
   }
 
-  async getIntegrationByName(name: string) {
-    let response = await this.http.get(`/integrations/name/${name}`, {
-      headers: this.headers()
-    });
+  async getIntegrationByName(name: string, version = 'latest') {
+    let response = await this.http.get(
+      `/integrations/${encodeURIComponent(name)}/${encodeURIComponent(version)}`,
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
   }
 
   // === Account ===
 
   async getAccount() {
-    let response = await this.http.get('/account', {
+    let response = await this.http.get('/account/me', {
       headers: this.headers()
     });
     return response.data;
@@ -171,8 +205,15 @@ export class AdminClient {
 export class RuntimeClient {
   private http: HttpClient;
 
-  constructor(private params: { token: string; botId: string }) {
-    this.http = createAxios({
+  constructor(private params: { token: string } & RuntimeParams) {
+    this.http = createAuthenticatedAxios({
+      authHeader: { value: `Bearer ${params.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Botpress',
+          reason: 'botpress_api_error'
+        }),
       baseURL: 'https://api.botpress.cloud/v1/chat'
     });
   }
@@ -181,6 +222,10 @@ export class RuntimeClient {
     return {
       Authorization: `Bearer ${this.params.token}`,
       'x-bot-id': this.params.botId,
+      ...(this.params.integrationId ? { 'x-integration-id': this.params.integrationId } : {}),
+      ...(this.params.integrationAlias
+        ? { 'x-integration-alias': this.params.integrationAlias }
+        : {}),
       ...extra
     };
   }
@@ -196,24 +241,57 @@ export class RuntimeClient {
   }
 
   async getConversation(conversationId: string) {
-    let response = await this.http.get(`/conversations/${conversationId}`, {
-      headers: this.headers()
-    });
+    let response = await this.http.get(
+      `/conversations/${encodeURIComponent(conversationId)}`,
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
   }
 
   async createConversation(data: { channel: string; tags?: Record<string, string> }) {
-    let response = await this.http.post('/conversations', data, {
-      headers: this.headers()
-    });
+    let response = await this.http.post(
+      '/conversations',
+      { ...data, tags: data.tags ?? {} },
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
   }
 
-  async getOrCreateConversation(data: { channel: string; tags?: Record<string, string> }) {
-    let response = await this.http.post('/conversations/get-or-create', data, {
-      headers: this.headers()
-    });
+  async getOrCreateConversation(data: {
+    channel: string;
+    tags?: Record<string, string>;
+    discriminateByTags?: string[];
+  }) {
+    let response = await this.http.post(
+      '/conversations/get-or-create',
+      { ...data, tags: data.tags ?? {} },
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
+  }
+
+  async updateConversation(conversationId: string, tags: Record<string, string>) {
+    return (
+      await this.http.put(
+        `/conversations/${encodeURIComponent(conversationId)}`,
+        { tags },
+        { headers: this.headers() }
+      )
+    ).data;
+  }
+
+  async deleteConversation(conversationId: string) {
+    return (
+      await this.http.delete(`/conversations/${encodeURIComponent(conversationId)}`, {
+        headers: this.headers()
+      })
+    ).data;
   }
 
   // === Messages ===
@@ -227,7 +305,7 @@ export class RuntimeClient {
   }
 
   async getMessage(messageId: string) {
-    let response = await this.http.get(`/messages/${messageId}`, {
+    let response = await this.http.get(`/messages/${encodeURIComponent(messageId)}`, {
       headers: this.headers()
     });
     return response.data;
@@ -240,14 +318,18 @@ export class RuntimeClient {
     type: string;
     tags?: Record<string, string>;
   }) {
-    let response = await this.http.post('/messages', data, {
-      headers: this.headers()
-    });
+    let response = await this.http.post(
+      '/messages',
+      { ...data, tags: data.tags ?? {} },
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
   }
 
   async deleteMessage(messageId: string) {
-    let response = await this.http.delete(`/messages/${messageId}`, {
+    let response = await this.http.delete(`/messages/${encodeURIComponent(messageId)}`, {
       headers: this.headers()
     });
     return response.data;
@@ -264,7 +346,7 @@ export class RuntimeClient {
   }
 
   async getUser(userId: string) {
-    let response = await this.http.get(`/users/${userId}`, {
+    let response = await this.http.get(`/users/${encodeURIComponent(userId)}`, {
       headers: this.headers()
     });
     return response.data;
@@ -275,9 +357,13 @@ export class RuntimeClient {
     name?: string;
     pictureUrl?: string;
   }) {
-    let response = await this.http.post('/users', data, {
-      headers: this.headers()
-    });
+    let response = await this.http.post(
+      '/users',
+      { ...data, tags: data.tags ?? {} },
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
   }
 
@@ -285,14 +371,14 @@ export class RuntimeClient {
     userId: string,
     data: { tags?: Record<string, string>; name?: string; pictureUrl?: string }
   ) {
-    let response = await this.http.put(`/users/${userId}`, data, {
+    let response = await this.http.put(`/users/${encodeURIComponent(userId)}`, data, {
       headers: this.headers()
     });
     return response.data;
   }
 
   async deleteUser(userId: string) {
-    let response = await this.http.delete(`/users/${userId}`, {
+    let response = await this.http.delete(`/users/${encodeURIComponent(userId)}`, {
       headers: this.headers()
     });
     return response.data;
@@ -313,7 +399,7 @@ export class RuntimeClient {
   }
 
   async getEvent(eventId: string) {
-    let response = await this.http.get(`/events/${eventId}`, {
+    let response = await this.http.get(`/events/${encodeURIComponent(eventId)}`, {
       headers: this.headers()
     });
     return response.data;
@@ -330,9 +416,12 @@ export class RuntimeClient {
   // === State ===
 
   async getState(stateType: string, resourceId: string, stateName: string) {
-    let response = await this.http.get(`/states/${stateType}/${resourceId}/${stateName}`, {
-      headers: this.headers()
-    });
+    let response = await this.http.get(
+      `/states/${encodeURIComponent(stateType)}/${encodeURIComponent(resourceId)}/${encodeURIComponent(stateName)}`,
+      {
+        headers: this.headers()
+      }
+    );
     return response.data;
   }
 
@@ -343,7 +432,7 @@ export class RuntimeClient {
     payload: Record<string, unknown>
   ) {
     let response = await this.http.post(
-      `/states/${stateType}/${resourceId}/${stateName}`,
+      `/states/${encodeURIComponent(stateType)}/${encodeURIComponent(resourceId)}/${encodeURIComponent(stateName)}`,
       { payload },
       {
         headers: this.headers()
@@ -359,7 +448,7 @@ export class RuntimeClient {
     payload: Record<string, unknown>
   ) {
     let response = await this.http.patch(
-      `/states/${stateType}/${resourceId}/${stateName}`,
+      `/states/${encodeURIComponent(stateType)}/${encodeURIComponent(resourceId)}/${encodeURIComponent(stateName)}`,
       { payload },
       {
         headers: this.headers()
@@ -370,11 +459,34 @@ export class RuntimeClient {
 
   // === Participants ===
 
-  async listParticipants(conversationId: string) {
-    let response = await this.http.get(`/conversations/${conversationId}/participants`, {
-      headers: this.headers()
-    });
+  async listParticipants(conversationId: string, nextToken?: string) {
+    let response = await this.http.get(
+      `/conversations/${encodeURIComponent(conversationId)}/participants`,
+      {
+        params: { nextToken },
+        headers: this.headers()
+      }
+    );
     return response.data;
+  }
+
+  async addParticipant(conversationId: string, userId: string) {
+    return (
+      await this.http.post(
+        `/conversations/${encodeURIComponent(conversationId)}/participants`,
+        { userId },
+        { headers: this.headers() }
+      )
+    ).data;
+  }
+
+  async removeParticipant(conversationId: string, userId: string) {
+    return (
+      await this.http.delete(
+        `/conversations/${encodeURIComponent(conversationId)}/participants/${encodeURIComponent(userId)}`,
+        { headers: this.headers() }
+      )
+    ).data;
   }
 
   // === Actions ===
@@ -391,7 +503,14 @@ export class TablesClient {
   private http: HttpClient;
 
   constructor(private params: { token: string; botId: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
+      authHeader: { value: `Bearer ${params.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Botpress',
+          reason: 'botpress_api_error'
+        }),
       baseURL: 'https://api.botpress.cloud/v1/tables'
     });
   }
@@ -413,7 +532,7 @@ export class TablesClient {
   }
 
   async getTable(tableId: string) {
-    let response = await this.http.get(`/${tableId}`, {
+    let response = await this.http.get(`/${encodeURIComponent(tableId)}`, {
       headers: this.headers()
     });
     return response.data;
@@ -421,7 +540,10 @@ export class TablesClient {
 
   async createTable(data: {
     name: string;
-    schema?: Record<string, unknown>;
+    schema: Record<string, unknown>;
+    tags?: Record<string, string>;
+    frozen?: boolean;
+    keyColumn?: string;
     factor?: number;
   }) {
     let response = await this.http.post('', data, {
@@ -431,14 +553,14 @@ export class TablesClient {
   }
 
   async updateTable(tableId: string, data: Record<string, unknown>) {
-    let response = await this.http.put(`/${tableId}`, data, {
+    let response = await this.http.put(`/${encodeURIComponent(tableId)}`, data, {
       headers: this.headers()
     });
     return response.data;
   }
 
   async deleteTable(tableId: string) {
-    let response = await this.http.delete(`/${tableId}`, {
+    let response = await this.http.delete(`/${encodeURIComponent(tableId)}`, {
       headers: this.headers()
     });
     return response.data;
@@ -448,7 +570,7 @@ export class TablesClient {
 
   async createRows(tableId: string, rows: Record<string, unknown>[]) {
     let response = await this.http.post(
-      `/${tableId}/rows`,
+      `/${encodeURIComponent(tableId)}/rows`,
       { rows },
       {
         headers: this.headers()
@@ -469,14 +591,15 @@ export class TablesClient {
       orderDirection?: string;
     }
   ) {
-    let response = await this.http.post(`/${tableId}/rows/find`, query, {
+    let response = await this.http.post(`/${encodeURIComponent(tableId)}/rows/find`, query, {
       headers: this.headers()
     });
     return response.data;
   }
 
   async getRow(tableId: string, rowId: number) {
-    let response = await this.http.get(`/${tableId}/rows/${rowId}`, {
+    let response = await this.http.get(`/${encodeURIComponent(tableId)}/row`, {
+      params: { id: rowId },
       headers: this.headers()
     });
     return response.data;
@@ -484,7 +607,7 @@ export class TablesClient {
 
   async updateRows(tableId: string, rows: Record<string, unknown>[]) {
     let response = await this.http.put(
-      `/${tableId}/rows`,
+      `/${encodeURIComponent(tableId)}/rows`,
       { rows },
       {
         headers: this.headers()
@@ -497,7 +620,7 @@ export class TablesClient {
     tableId: string,
     opts: { ids?: number[]; filter?: Record<string, unknown>; deleteAllRows?: boolean }
   ) {
-    let response = await this.http.post(`/${tableId}/rows/delete`, opts, {
+    let response = await this.http.post(`/${encodeURIComponent(tableId)}/rows/delete`, opts, {
       headers: this.headers()
     });
     return response.data;
@@ -505,7 +628,7 @@ export class TablesClient {
 
   async upsertRows(tableId: string, rows: Record<string, unknown>[], keyColumn: string) {
     let response = await this.http.post(
-      `/${tableId}/rows/upsert`,
+      `/${encodeURIComponent(tableId)}/rows/upsert`,
       { rows, keyColumn },
       {
         headers: this.headers()
@@ -519,7 +642,14 @@ export class FilesClient {
   private http: HttpClient;
 
   constructor(private params: { token: string; botId: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
+      authHeader: { value: `Bearer ${params.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Botpress',
+          reason: 'botpress_api_error'
+        }),
       baseURL: 'https://api.botpress.cloud/v1/files'
     });
   }
@@ -545,7 +675,7 @@ export class FilesClient {
   }
 
   async getFile(fileId: string) {
-    let response = await this.http.get(`/${fileId}`, {
+    let response = await this.http.get(`/${encodeURIComponent(fileId)}`, {
       headers: this.headers()
     });
     return response.data;
@@ -557,6 +687,7 @@ export class FilesClient {
     index?: boolean;
     tags?: Record<string, string>;
     accessPolicies?: string[];
+    contentType?: string;
   }) {
     let response = await this.http.put('', data, {
       headers: this.headers()
@@ -564,8 +695,22 @@ export class FilesClient {
     return response.data;
   }
 
+  async uploadContent(url: string, content: string, contentType: string) {
+    const upload = createAuthenticatedAxios({
+      contentType,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'Botpress',
+          reason: 'botpress_file_upload_error',
+          operation: 'file upload'
+        })
+    });
+    await upload.put(url, Buffer.from(content, 'utf8'));
+  }
+
   async deleteFile(fileId: string) {
-    let response = await this.http.delete(`/${fileId}`, {
+    let response = await this.http.delete(`/${encodeURIComponent(fileId)}`, {
       headers: this.headers()
     });
     return response.data;
@@ -583,9 +728,11 @@ export class FilesClient {
   }
 
   async updateFileMetadata(fileId: string, metadata: Record<string, unknown>) {
-    let response = await this.http.put(`/${fileId}/metadata`, metadata, {
-      headers: this.headers()
-    });
+    let response = await this.http.put(
+      `/${encodeURIComponent(fileId)}`,
+      { metadata },
+      { headers: this.headers() }
+    );
     return response.data;
   }
 }

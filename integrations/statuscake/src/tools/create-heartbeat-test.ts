@@ -33,11 +33,11 @@ export let createHeartbeatTest = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { contactGroups, ...rest } = ctx.input;
 
-    let data: Record<string, any> = { ...rest };
+    let data: Record<string, unknown> = { ...rest };
     if (contactGroups) data.contact_groups = contactGroups;
 
     let result = await client.createHeartbeatTest(data);
-    let testId = String(result?.data?.new_id ?? result?.new_id ?? '');
+    let testId = result.data.new_id;
 
     return {
       output: { testId },

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoosendClient } from '../lib/client';
+import { mapCampaign, optionalNumber, record, records } from '../lib/data';
 import { spec } from '../spec';
 
 let campaignSchema = z.object({
@@ -69,37 +70,18 @@ export let getCampaigns = SlateTool.create(spec, {
     }
 
     let result = await client.getCampaigns(ctx.input.page, ctx.input.pageSize);
-    let campaignsList = (result?.Campaigns as Record<string, unknown>[]) ?? [];
-    let paging = result?.Paging as Record<string, unknown> | undefined;
+    let campaignsList = records(result.Campaigns, 'campaigns');
+    let paging = result.Paging == null ? undefined : record(result.Paging, 'paging');
 
     let campaigns = campaignsList.map(mapCampaign);
 
     return {
       output: {
         campaigns,
-        totalCount: paging?.TotalResults as number | undefined,
+        totalCount: optionalNumber(paging?.TotalResults),
         currentPage: ctx.input.page
       },
       message: `Retrieved **${campaigns.length}** campaign(s)${paging?.TotalResults ? ` of ${paging.TotalResults} total` : ''}.`
     };
   })
   .build();
-
-let mapCampaign = (c: Record<string, unknown>) => ({
-  campaignId: String(c?.ID ?? ''),
-  name: String(c?.Name ?? ''),
-  subject: String(c?.Subject ?? ''),
-  status: c?.Status as number | undefined,
-  isTransactional: c?.IsTransactional as boolean | undefined,
-  createdOn: c?.CreatedOn ? String(c.CreatedOn) : undefined,
-  deliveredOn: c?.DeliveredOn ? String(c.DeliveredOn) : undefined,
-  scheduledFor: c?.ScheduledFor ? String(c.ScheduledFor) : undefined,
-  scheduledForTimezone: c?.ScheduledForTimezone ? String(c.ScheduledForTimezone) : undefined,
-  totalSent: c?.TotalSent as number | undefined,
-  uniqueOpens: c?.UniqueOpens as number | undefined,
-  uniqueLinkClicks: c?.UniqueLinkClicks as number | undefined,
-  recipientsCount: c?.RecipientsCount as number | undefined,
-  totalBounces: c?.TotalBounces as number | undefined,
-  totalComplaints: c?.TotalComplaints as number | undefined,
-  totalUnsubscribes: c?.TotalUnsubscribes as number | undefined
-});

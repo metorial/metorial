@@ -1,20 +1,19 @@
 import { SlateConfig } from 'slates';
 import { z } from 'zod';
-
+import { resourceId } from './lib/schemas';
 export let config = SlateConfig.create(
-  z.object({
-    spaceId: z
-      .string()
-      .describe(
-        'The Contentful Space ID. Found in Settings > General in the Contentful web app.'
-      ),
-    environmentId: z
-      .string()
-      .default('master')
-      .describe('The environment ID to use within the space. Defaults to "master".'),
-    region: z
-      .enum(['us', 'eu'])
-      .default('us')
-      .describe('Data residency region. Use "eu" for European data residency.')
-  })
+  z
+    .object({
+      spaceId: resourceId
+        .optional()
+        .describe(
+          'Optional default space ID. Discover spaces with list_spaces, or supply spaceId on each tool.'
+        ),
+      environmentId: resourceId
+        .optional()
+        .describe(
+          'Optional default environment ID or alias; defaults to master. Discover environments with list_environments.'
+        )
+    })
+    .passthrough()
 );

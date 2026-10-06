@@ -29,6 +29,7 @@ export let listTeams = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of records returned in this response'),
       teams: z.array(teamOutputSchema).describe('List of teams')
     })
   )
@@ -39,10 +40,10 @@ export let listTeams = SlateTool.create(spec, {
     });
 
     let result = await client.listTeams();
-    let teams = (result.teams || []).map((t: any) => ({
+    let teams = result.teams.map(t => ({
       teamId: t.id,
       name: t.name,
-      members: t.members?.map((m: any) => ({
+      members: t.members?.map(m => ({
         memberId: m.id,
         name: m.name,
         type: m.type
@@ -50,7 +51,7 @@ export let listTeams = SlateTool.create(spec, {
     }));
 
     return {
-      output: { teams },
+      output: { teams, returnedCount: teams.length },
       message: `Found **${teams.length}** team(s).`
     };
   })
@@ -84,7 +85,7 @@ export let createTeam = SlateTool.create(spec, {
       accountEmail: ctx.auth.accountEmail
     });
 
-    let data: Record<string, any> = {
+    let data: Record<string, unknown> = {
       name: ctx.input.name
     };
     if (ctx.input.memberIds?.length) {
@@ -92,7 +93,7 @@ export let createTeam = SlateTool.create(spec, {
     }
 
     let result = await client.createTeam(data);
-    let team = result.team || result;
+    let team = result.team;
 
     return {
       output: { teamId: team.id },
@@ -127,14 +128,19 @@ export let updateTeam = SlateTool.create(spec, {
       accountEmail: ctx.auth.accountEmail
     });
 
-    let data: Record<string, any> = {};
+    let data: Record<string, unknown> = {};
     if (ctx.input.name !== undefined) data.name = ctx.input.name;
     if (ctx.input.memberIds !== undefined) data.member_ids = ctx.input.memberIds;
 
     let result = await client.updateTeam(ctx.input.teamId, data);
 
     return {
-      output: { message: result.message || 'Team updated successfully' },
+      output: {
+        message:
+          ('message' in result && typeof result.message === 'string'
+            ? result.message
+            : undefined) || 'Team updated successfully'
+      },
       message: `Updated team **${ctx.input.teamId}**.`
     };
   })
@@ -167,7 +173,12 @@ export let deleteTeam = SlateTool.create(spec, {
     let result = await client.deleteTeam(ctx.input.teamId);
 
     return {
-      output: { message: result.message || 'Team deleted successfully' },
+      output: {
+        message:
+          ('message' in result && typeof result.message === 'string'
+            ? result.message
+            : undefined) || 'Team deleted successfully'
+      },
       message: `Deleted team **${ctx.input.teamId}**.`
     };
   })

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, nextCursor } from '../lib/client';
 import { spec } from '../spec';
 
 let calendarSchema = z.object({
@@ -15,7 +15,7 @@ export let listCalendarsTool = SlateTool.create(spec, {
   name: 'List Calendars',
   key: 'list_calendars',
   description: `List all connected calendars. Returns calendar connections with their platform, email, and connection status.`,
-  constraints: ['Rate limit: 300 requests per minute per workspace.'],
+  constraints: ['Rate limit: 60 requests per minute per workspace.'],
   tags: {
     readOnly: true
   }
@@ -23,12 +23,28 @@ export let listCalendarsTool = SlateTool.create(spec, {
   .input(
     z.object({
       cursor: z.string().optional().describe('Pagination cursor for next page'),
-      pageSize: z.number().optional().describe('Number of results per page')
+      platform: z
+        .enum(['google_calendar', 'microsoft_outlook'])
+        .optional()
+        .describe('Calendar platform filter'),
+      status: z
+        .enum(['connecting', 'connected', 'disconnected'])
+        .optional()
+        .describe('Connection status filter'),
+      email: z.string().optional().describe('Calendar email filter'),
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Legacy page-size hint; Recall.ai chooses the page size')
     })
   )
   .output(
     z.object({
-      totalCount: z.number().describe('Total number of calendars'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Provider-wide total when supplied by Recall.ai; omitted when unavailable'),
+      returnedCount: z.number().optional().describe('Number of results on this page'),
       nextCursor: z.string().nullable().describe('Cursor for the next page'),
       calendars: z.array(calendarSchema).describe('List of connected calendars')
     })
@@ -41,23 +57,19 @@ export let listCalendarsTool = SlateTool.create(spec, {
 
     let result = await client.listCalendars({
       cursor: ctx.input.cursor,
+      platform: ctx.input.platform,
+      status: ctx.input.status,
+      email: ctx.input.email,
       pageSize: ctx.input.pageSize
     });
 
-    let nextCursor: string | null = null;
-    if (result.next) {
-      try {
-        let url = new URL(result.next);
-        nextCursor = url.searchParams.get('cursor');
-      } catch {
-        nextCursor = result.next;
-      }
-    }
+    let cursor = nextCursor(result.next);
 
     return {
       output: {
         totalCount: result.count,
-        nextCursor,
+        returnedCount: result.results.length,
+        nextCursor: cursor,
         calendars: result.results.map(cal => ({
           calendarId: cal.id,
           platform: cal.platform,
@@ -66,7 +78,7 @@ export let listCalendarsTool = SlateTool.create(spec, {
           createdAt: cal.createdAt
         }))
       },
-      message: `Found **${result.count}** connected calendars.`
+      message: `Retrieved ${result.results.length} results${cursor ? ' (more available)' : ''}.`
     };
   })
   .build();

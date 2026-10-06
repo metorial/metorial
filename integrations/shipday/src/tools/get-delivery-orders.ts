@@ -1,78 +1,80 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShipdayClient } from '../lib/client';
+import { fail, parse, type Row } from '../lib/validation';
 import { spec } from '../spec';
 
 let orderSchema = z
   .object({
-    orderId: z.number().optional().describe('Unique order identifier'),
-    orderNumber: z.string().optional().describe('Order reference number'),
-    companyId: z.number().optional().describe('Associated company ID'),
+    orderId: z.number().nullish().describe('Unique order identifier'),
+    orderNumber: z.string().nullish().describe('Order reference number'),
+    companyId: z.number().nullish().describe('Associated company ID'),
     customer: z
       .object({
-        name: z.string().optional(),
-        address: z.string().optional(),
-        phoneNumber: z.string().optional(),
-        emailAddress: z.string().optional(),
-        latitude: z.number().optional(),
-        longitude: z.number().optional()
+        name: z.string().nullish(),
+        address: z.string().nullish(),
+        phoneNumber: z.string().nullish(),
+        emailAddress: z.string().nullish(),
+        latitude: z.number().nullish(),
+        longitude: z.number().nullish()
       })
-      .optional()
+      .nullish()
       .describe('Customer details'),
     restaurant: z
       .object({
-        id: z.number().optional(),
-        name: z.string().optional(),
-        address: z.string().optional(),
-        phoneNumber: z.string().optional(),
-        latitude: z.number().optional(),
-        longitude: z.number().optional()
+        id: z.number().nullish(),
+        name: z.string().nullish(),
+        address: z.string().nullish(),
+        phoneNumber: z.string().nullish(),
+        latitude: z.number().nullish(),
+        longitude: z.number().nullish()
       })
-      .optional()
+      .nullish()
       .describe('Restaurant/pickup location details'),
     assignedCarrier: z
       .object({
-        id: z.number().optional(),
-        name: z.string().optional(),
-        phoneNumber: z.string().optional(),
-        email: z.string().optional(),
-        isOnShift: z.boolean().optional()
+        id: z.number().nullish(),
+        name: z.string().nullish(),
+        phoneNumber: z.string().nullish(),
+        email: z.string().nullish(),
+        isOnShift: z.boolean().nullish()
       })
-      .optional()
+      .nullish()
       .describe('Assigned driver details'),
-    distance: z.number().optional().describe('Delivery distance'),
+    distance: z.number().nullish().describe('Delivery distance'),
     costing: z
       .object({
-        totalCost: z.number().optional(),
-        deliveryFee: z.number().optional(),
-        tip: z.number().optional(),
-        discountAmount: z.number().optional(),
-        tax: z.number().optional()
+        totalCost: z.number().nullish(),
+        deliveryFee: z.number().nullish(),
+        tip: z.number().nullish(),
+        discountAmount: z.number().nullish(),
+        tax: z.number().nullish()
       })
-      .optional()
+      .nullish()
       .describe('Financial breakdown'),
     orderStatus: z
       .object({
-        orderState: z.string().optional(),
-        accepted: z.boolean().optional(),
-        imcpilete: z.boolean().optional()
+        orderState: z.string().nullish(),
+        accepted: z.boolean().nullish(),
+        imcpilete: z.boolean().nullish(),
+        incomplete: z.boolean().nullish()
       })
-      .optional()
+      .nullish()
       .describe('Current order status'),
-    paymentMethod: z.string().optional().describe('Payment method'),
-    deliveryInstruction: z.string().optional().describe('Delivery instructions'),
-    trackingLink: z.string().optional().describe('Public tracking link'),
+    paymentMethod: z.string().nullish().describe('Payment method'),
+    deliveryInstruction: z.string().nullish().describe('Delivery instructions'),
+    trackingLink: z.string().nullish().describe('Public tracking link'),
     orderItems: z
       .array(
         z.object({
-          name: z.string().optional(),
-          quantity: z.number().optional(),
-          unitPrice: z.number().optional()
+          name: z.string().nullish(),
+          quantity: z.number().nullish(),
+          unitPrice: z.number().nullish()
         })
       )
-      .optional()
+      .nullish()
       .describe('Order line items'),
-    activityLog: z.record(z.string(), z.unknown()).optional().describe('Activity timestamps')
+    activityLog: z.record(z.string(), z.unknown()).nullish().describe('Activity timestamps')
   })
   .passthrough();
 
@@ -83,7 +85,7 @@ export let getDeliveryOrders = SlateTool.create(spec, {
   instructions: [
     'To get all active orders, omit all optional filters.',
     'To get a specific order, provide the orderNumber.',
-    'To query by time range/status, provide startTime and/or endTime with optional orderStatus.'
+    'Any supplied filter or cursor selects the query endpoint. Its default status is ALREADY_DELIVERED; supply explicit UTC times/status for a current window. Cursors are inclusive one-based row positions, not opaque tokens.'
   ],
   tags: {
     destructive: false,
@@ -93,6 +95,10 @@ export let getDeliveryOrders = SlateTool.create(spec, {
   .input(
     z.object({
       orderNumber: z.string().optional().describe('Specific order number to look up'),
+      orderId: z
+        .number()
+        .optional()
+        .describe('Exact native order ID; use orderNumber too for inactive records'),
       startTime: z
         .string()
         .optional()
@@ -126,28 +132,34 @@ export let getDeliveryOrders = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ShipdayClient({ token: ctx.auth.token });
 
-    let orders: unknown[];
-
-    if (ctx.input.orderNumber) {
-      let result = await client.getOrderDetails(ctx.input.orderNumber);
-      orders = Array.isArray(result) ? result : [result];
-    } else if (ctx.input.startTime || ctx.input.endTime || ctx.input.orderStatus) {
-      let queryParams: Record<string, unknown> = {};
-      if (ctx.input.startTime) queryParams.startTime = ctx.input.startTime;
-      if (ctx.input.endTime) queryParams.endTime = ctx.input.endTime;
-      if (ctx.input.orderStatus) queryParams.orderStatus = ctx.input.orderStatus;
-      if (ctx.input.startCursor) queryParams.startCursor = ctx.input.startCursor;
-      if (ctx.input.endCursor) queryParams.endCursor = ctx.input.endCursor;
-      orders = await client.queryOrders(queryParams);
-      orders = Array.isArray(orders) ? orders : [];
-    } else {
-      orders = await client.getActiveOrders();
-      orders = Array.isArray(orders) ? orders : [];
-    }
+    const queryKeys = [
+      'startTime',
+      'endTime',
+      'orderStatus',
+      'startCursor',
+      'endCursor'
+    ] as const;
+    const querying = queryKeys.some(key => ctx.input[key] !== undefined);
+    if ((ctx.input.orderNumber !== undefined || ctx.input.orderId !== undefined) && querying)
+      fail('Exact order lookup cannot be combined with query filters or cursors.');
+    let orders: Row[];
+    if (ctx.input.orderId !== undefined)
+      orders = [await client.exactOrder(ctx.input.orderId, ctx.input.orderNumber)];
+    else if (ctx.input.orderNumber !== undefined)
+      orders = await client.getOrderDetails(ctx.input.orderNumber);
+    else if (querying)
+      orders = await client.queryOrders({
+        startTime: ctx.input.startTime,
+        endTime: ctx.input.endTime,
+        orderStatus: ctx.input.orderStatus,
+        startCursor: ctx.input.startCursor,
+        endCursor: ctx.input.endCursor
+      });
+    else orders = await client.getActiveOrders();
 
     return {
       output: {
-        orders: orders as z.infer<typeof orderSchema>[],
+        orders: orders.map(order => parse(orderSchema, order)),
         count: orders.length
       },
       message: `Retrieved **${orders.length}** delivery order(s).`

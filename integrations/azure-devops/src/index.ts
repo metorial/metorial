@@ -15,13 +15,6 @@ import {
   runPipelineTool,
   updateWorkItemTool
 } from './tools';
-import {
-  buildCompleteEventsTrigger,
-  codeEventsTrigger,
-  pullRequestEventsTrigger,
-  workItemEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -39,10 +32,5 @@ export let provider = Slate.create({
     listBuildsTool,
     manageWikiTool
   ],
-  triggers: [
-    workItemEventsTrigger,
-    codeEventsTrigger,
-    pullRequestEventsTrigger,
-    buildCompleteEventsTrigger
-  ]
+  triggers: []
 });

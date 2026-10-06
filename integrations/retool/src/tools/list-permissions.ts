@@ -1,13 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let listPermissions = SlateTool.create(spec, {
   name: 'List Permissions',
   key: 'list_permissions',
   description: `Query permissions in two ways: list all objects a user/group has access to, or list all users/groups that have access to a specific object.`,
-  constraints: ['Available on Enterprise Premium plan only.'],
+  constraints: [
+    'Requires the relevant read or write API token scope and support in this deployment.'
+  ],
   tags: {
     readOnly: true
   }
@@ -30,7 +32,9 @@ export let listPermissions = SlateTool.create(spec, {
       objectType: z
         .enum(['app', 'folder', 'resource', 'resource_configuration', 'workflow', 'agent'])
         .optional()
-        .describe('Type of the object (required for "subjects_for_object")'),
+        .describe(
+          'Type of the object (required for either direction; supported types differ by direction)'
+        ),
       objectId: z
         .string()
         .optional()
@@ -39,24 +43,29 @@ export let listPermissions = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      permissions: z.array(z.any())
+      permissions: z.array(z.any()),
+      coverageComplete: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result: any;
 
     if (ctx.input.direction === 'objects_for_subject') {
       if (!ctx.input.subjectType || !ctx.input.subjectId) {
-        throw new Error(
+        throw invalid(
           'subjectType and subjectId are required for "objects_for_subject" direction'
         );
       }
-      result = await client.listPermissionObjects(ctx.input.subjectType, ctx.input.subjectId);
+      result = await client.listPermissionObjects(
+        ctx.input.subjectType,
+        ctx.input.subjectId,
+        ctx.input.objectType
+      );
     } else {
       if (!ctx.input.objectType || !ctx.input.objectId) {
-        throw new Error(
+        throw invalid(
           'objectType and objectId are required for "subjects_for_object" direction'
         );
       }
@@ -67,9 +76,10 @@ export let listPermissions = SlateTool.create(spec, {
 
     return {
       output: {
-        permissions
+        permissions,
+        coverageComplete: result.complete ?? true
       },
-      message: `Found **${permissions.length}** permission entries.`
+      message: `Retool reported **${permissions.length}** permission entries${result.complete === false ? ' (some subject categories were omitted; completeness is unknown)' : ''}.`
     };
   })
   .build();

@@ -11,7 +11,7 @@ let emailRecipientSchema = z.object({
 export let sendEmail = SlateTool.create(spec, {
   name: 'Send Email',
   key: 'send_email',
-  description: `Compose and send an email through Mixmax. Supports HTML body, multiple recipients (to, cc, bcc), and optional tracking for opens, clicks, and file downloads.`,
+  description: `Compose and send an email through Mixmax. Supports HTML body and multiple recipients (to, cc, bcc). Direct sending does not support tracking; create and send a draft when tracking is needed.`,
   tags: {
     destructive: false
   }
@@ -26,11 +26,15 @@ export let sendEmail = SlateTool.create(spec, {
       trackingEnabled: z
         .boolean()
         .optional()
-        .describe('Enable open tracking (default: false)'),
+        .describe(
+          'Legacy field. Must be false or omitted; use a draft message for open tracking.'
+        ),
       linkTrackingEnabled: z
         .boolean()
         .optional()
-        .describe('Enable link click tracking (default: false)')
+        .describe(
+          'Legacy field. Must be false or omitted; use a draft message for click tracking.'
+        )
     })
   )
   .output(

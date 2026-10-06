@@ -1,29 +1,15 @@
-# <img src="https://provider-logos.metorial-cdn.com/later.png" height="20"> Later
+# Later Influence reporting
 
-Retrieve influencer campaign performance data from Later Influence (formerly Mavrck). List campaigns and reporting groups, pull detailed analytics including impressions, engagements, clicks, conversions, and conversion values broken down by social network (Facebook, Instagram, TikTok, Pinterest) and content type (posts, stories, reels, lives). Filter reports by date range and group data by day, week, month, quarter, or year. Retrieve instance metadata to confirm community credentials. Designed for integration with external reporting dashboards and BI tools. Note: this API covers only Later Influence reporting — Later's core social media scheduling product does not have a public API.
+Read Later Influence campaign and creator reporting through its documented Reporting API. This integration does not implement Later Social publishing, scheduling or account administration.
 
-## Tools
+Choose **Reporting API v2** for current reporting. An Account Manager must provision the client ID, client secret and authorized instance scope. The token exchange returns a JWT; renewal uses its actual expiry and repeats the credential exchange. No browser authorization or refresh token is involved.
 
-### Get Instance
+- `list_instances` discovers the authorized instance IDs, without inventing instance names or a user profile.
+- `list_campaigns_v2` lists campaign metadata with numeric IDs and nullable publication dates.
+- `get_analytics` reads instance summary, time series, campaign, creator, platform, ROI or post analytics. Select the requested metrics except for platform ROI, which has a fixed metric set.
 
-Retrieve metadata about the Later Influence community (instance) associated with your credentials. Use this to confirm which program your credentials are linked to before pulling campaign data.
+Current lists return one page and `nextCursor`. Keep the same filters, dates, sort and limit when continuing. Dates use UTC `YYYY-MM-DD`, with a two-year maximum reporting range. Platform and content-type filters are mutually exclusive. Unavailable metrics remain `null`; missing time buckets are not filled with zero. Weeks use ISO Monday–Sunday boundaries. Analytics can change as source data arrives.
 
-### Get Performance Report
+The original `client_credentials` method and four legacy tool keys remain for existing v1 connections. Connections without an API-version marker stay on v1. `get_instance`, `list_campaigns` and `get_performance_report` are deprecated in favor of current tools. `list_reporting_groups` remains v1-only because Later documents no direct v2 equivalent. Tokens and resource meanings are never translated between versions. Legacy availability must be confirmed with your Account Manager.
 
-Retrieve detailed campaign performance analytics from Later Influence. Returns metrics including content totals, impressions, engagements, affiliate clicks, conversions, and conversion value. Data is broken down by social network and content type. Can report on a single campaign or a reporting group, and can be filtered by date range and grouped by time period.
-
-### List Campaigns
-
-Retrieve campaigns associated with your Later Influence community. Optionally filter by a specific campaign ID to get details on a single campaign. Returns campaign details including status, dates, title, and description.
-
-### List Reporting Groups
-
-Retrieve reporting groups for your Later Influence community. Reporting groups allow you to aggregate data across related campaigns. Optionally filter by reporting group ID or campaign ID.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Official references: [current API](https://docs.reporting.api.later.com/api-reference), [authentication](https://docs.reporting.api.later.com/authentication), [querying](https://docs.reporting.api.later.com/querying), [migration](https://help-influence.later.com/hc/en-us/articles/20462385592087-Implement-the-Reporting-API-for-Later-Influence).

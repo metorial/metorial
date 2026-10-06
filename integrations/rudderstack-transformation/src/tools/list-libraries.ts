@@ -17,7 +17,7 @@ let librarySchema = z.object({
 export let listLibraries = SlateTool.create(spec, {
   name: 'List Libraries',
   key: 'list_libraries',
-  description: `List all reusable code libraries in the workspace. Returns each library's metadata including name, importName, language, and timestamps. Does not include the full code — use **Get Library** to retrieve the code for a specific library.`,
+  description: `List published reusable code libraries in the workspace. Draft revisions may not appear. Returns each library's metadata including name, importName, language, and timestamps. Does not include the full code — use **Get Library** to retrieve the code for a specific library.`,
   tags: {
     readOnly: true,
     destructive: false
@@ -36,8 +36,7 @@ export let listLibraries = SlateTool.create(spec, {
     });
 
     let result = await client.listLibraries();
-    let libraries = result.libraries ?? result ?? [];
-    let items = (Array.isArray(libraries) ? libraries : []).map((l: any) => ({
+    let items = result.map(l => ({
       libraryId: l.id,
       versionId: l.versionId,
       name: l.name,

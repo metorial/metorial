@@ -26,11 +26,27 @@ import {
   updateRecord,
   vectorSearch
 } from './tools';
-import { inboundWebhook, recordChanges } from './triggers';
-
+import {
+  createProjectBranch,
+  deleteProjectBranch,
+  getProject,
+  getProjectBranch,
+  listOrganizations,
+  listProjectBranches,
+  listProjects,
+  updateProjectBranch
+} from './tools/platform';
 export let provider = Slate.create({
   spec,
   tools: [
+    listOrganizations,
+    listProjects,
+    getProject,
+    listProjectBranches,
+    getProjectBranch,
+    createProjectBranch,
+    updateProjectBranch,
+    deleteProjectBranch,
     queryRecords,
     getRecord,
     createRecord,
@@ -56,5 +72,5 @@ export let provider = Slate.create({
     addTableColumn,
     executeTransaction
   ],
-  triggers: [inboundWebhook, recordChanges]
+  triggers: []
 });

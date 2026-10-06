@@ -31,7 +31,7 @@ describe('google-photos provider contract', () => {
         'list_picked_media',
         'delete_picker_session'
       ],
-      triggerIds: ['inbound_webhook'],
+      triggerIds: [],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'list_albums', readOnly: true },
@@ -43,10 +43,10 @@ describe('google-photos provider contract', () => {
         { id: 'list_picked_media', readOnly: true },
         { id: 'delete_picker_session', destructive: true }
       ],
-      triggers: [{ id: 'inbound_webhook', invocationType: 'webhook' }]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(16);
+    expect(contract.actions).toHaveLength(15);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -64,8 +64,7 @@ describe('google-photos provider contract', () => {
       create_picker_session: googlePhotosActionScopes.createPickerSession,
       get_picker_session: googlePhotosActionScopes.getPickerSession,
       list_picked_media: googlePhotosActionScopes.listPickedMedia,
-      delete_picker_session: googlePhotosActionScopes.deletePickerSession,
-      inbound_webhook: googlePhotosActionScopes.inboundWebhook
+      delete_picker_session: googlePhotosActionScopes.deletePickerSession
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

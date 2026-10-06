@@ -1,14 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubActionsClient } from '../lib/client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageWorkflowState = SlateTool.create(spec, {
   name: 'Manage Workflow State',
   key: 'manage_workflow_state',
-  description: `Enable or disable a GitHub Actions workflow. Disabled workflows will not be triggered by events. Also retrieves workflow details and usage statistics.`,
+  description: `Enable or disable a GitHub Actions workflow. Disabled workflows will not be triggered by events. Also retrieves workflow details. The legacy get_usage action calls a GitHub endpoint that is closing down and may be unavailable.`,
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -29,13 +31,14 @@ export let manageWorkflowState = SlateTool.create(spec, {
       path: z.string().optional().describe('Workflow file path'),
       htmlUrl: z.string().optional().describe('URL to the workflow'),
       billable: z
-        .any()
+        .unknown()
         .optional()
         .describe('Billable usage by runner OS (UBUNTU, MACOS, WINDOWS)'),
       actionPerformed: z.string().describe('The action that was performed')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new GitHubActionsClient(ctx.auth.token);
     let { owner, repo, workflowId, action } = ctx.input;
 

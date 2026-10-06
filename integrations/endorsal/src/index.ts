@@ -15,8 +15,6 @@ import {
   updateContact,
   updateTestimonial
 } from './tools';
-import { inboundWebhook, newTestimonial } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     listWidgets,
     createSuperLink
   ],
-  triggers: [inboundWebhook, newTestimonial]
+  triggers: []
 });

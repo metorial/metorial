@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let addRecipientsToSequence = SlateTool.create(spec, {
   name: 'Add Recipients to Sequence',
   key: 'add_recipients_to_sequence',
-  description: `Add one or more recipients to an automated email sequence. Each recipient can have custom personalization variables (e.g., first name, company) that will be substituted into the sequence's email templates.`,
+  description: `Add recipients to an email sequence. Omission of scheduledAt activates them immediately and can send email; false retains draft recipients. Partial failures are reported with the sequence ID and each reported recipient outcome.`,
   instructions: [
     'Variable names must match template placeholders exactly (e.g., "first name" for {{first name}}).'
   ],
@@ -30,7 +30,13 @@ export let addRecipientsToSequence = SlateTool.create(spec, {
           })
         )
         .min(1)
-        .describe('Recipients to add to the sequence')
+        .describe('Recipients to add to the sequence'),
+      scheduledAt: z
+        .union([z.number(), z.literal(false)])
+        .optional()
+        .describe(
+          'Unix activation time in milliseconds. Set false to retain recipients as drafts without sending; omission activates immediately.'
+        )
     })
   )
   .output(
@@ -41,7 +47,11 @@ export let addRecipientsToSequence = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    await client.addRecipientsToSequence(ctx.input.sequenceId, ctx.input.recipients);
+    await client.addRecipientsToSequence(
+      ctx.input.sequenceId,
+      ctx.input.recipients,
+      ctx.input.scheduledAt
+    );
 
     return {
       output: {
@@ -77,7 +87,9 @@ export let cancelSequence = SlateTool.create(spec, {
       sequenceIds: z
         .array(z.string())
         .optional()
-        .describe('Sequence IDs to cancel for all recipients (for bulk cancellation)')
+        .describe(
+          'Legacy field; bulk cancellation by sequence IDs is unsupported. Use sequenceId or emails.'
+        )
     })
   )
   .output(
@@ -88,7 +100,16 @@ export let cancelSequence = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    if (ctx.input.sequenceId) {
+    if (
+      ctx.input.sequenceId !== undefined &&
+      (ctx.input.emails !== undefined || ctx.input.sequenceIds !== undefined)
+    )
+      throw createApiServiceError(
+        'Choose a single sequenceId or bulk emails, without mixing cancellation modes.'
+      );
+    if (ctx.input.recipientEmail !== undefined && ctx.input.sequenceId === undefined)
+      throw createApiServiceError('recipientEmail requires sequenceId.');
+    if (ctx.input.sequenceId !== undefined) {
       await client.cancelSequence(ctx.input.sequenceId, ctx.input.recipientEmail);
     } else {
       await client.bulkCancelSequences({
@@ -122,8 +143,11 @@ export let listSequenceRecipients = SlateTool.create(spec, {
       limit: z
         .number()
         .optional()
-        .describe('Maximum number of results (default: 50, max: 300)'),
-      offset: z.number().optional().describe('Offset for pagination (default: 0)')
+        .describe('Maximum number of results (default: 50, max: 50)'),
+      offset: z
+        .number()
+        .optional()
+        .describe('Offset for pagination (default: 0; first 10,000 records only)')
     })
   )
   .output(
@@ -152,8 +176,8 @@ export let listSequenceRecipients = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let results = Array.isArray(data) ? data : data.results || [];
-    let recipients = results.map((r: any) => ({
+    let results = data;
+    let recipients = results.map(r => ({
       email: r.email,
       name: r.name,
       variables: r.variables,

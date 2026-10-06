@@ -23,6 +23,10 @@ export let batchCreateObjects = SlateTool.create(spec, {
             properties: z.record(z.string(), z.any()).describe('Object property values'),
             objectId: z.string().optional().describe('Optional UUID'),
             vector: z.array(z.number()).optional().describe('Optional pre-computed vector'),
+            vectors: z
+              .record(z.string(), z.any())
+              .optional()
+              .describe('Named vector embeddings keyed by vector name'),
             tenant: z.string().optional().describe('Tenant name for multi-tenant collections')
           })
         )
@@ -37,6 +41,8 @@ export let batchCreateObjects = SlateTool.create(spec, {
         .array(
           z.object({
             objectId: z.string().optional().describe('Object UUID'),
+            collectionName: z.string().optional().describe('Collection containing the object'),
+            tenant: z.string().optional().describe('Tenant containing the object'),
             status: z.string().describe('Creation status'),
             errors: z.array(z.string()).optional().describe('Error messages if any')
           })
@@ -52,6 +58,7 @@ export let batchCreateObjects = SlateTool.create(spec, {
       properties: obj.properties,
       id: obj.objectId,
       vector: obj.vector,
+      vectors: obj.vectors,
       tenant: obj.tenant
     }));
 
@@ -59,8 +66,11 @@ export let batchCreateObjects = SlateTool.create(spec, {
 
     let totalErrors = 0;
     let totalCreated = 0;
-    let resultSummary = (results || []).map((r: any) => {
-      let hasErrors = r.result?.errors?.error && r.result.errors.error.length > 0;
+    let resultSummary = (results || []).map((r: any, index: number) => {
+      let errors: string[] = (r.result?.errors?.error || []).map(
+        (error: { message: string }) => error.message
+      );
+      let hasErrors = errors.length > 0 || r.result?.status === 'FAILED';
       if (hasErrors) {
         totalErrors++;
       } else {
@@ -68,8 +78,10 @@ export let batchCreateObjects = SlateTool.create(spec, {
       }
       return {
         objectId: r.id,
+        collectionName: r.class || ctx.input.objects[index]?.collectionName,
+        tenant: r.tenant || ctx.input.objects[index]?.tenant,
         status: hasErrors ? 'failed' : 'success',
-        errors: hasErrors ? r.result.errors.error.map((e: any) => e.message) : undefined
+        errors: hasErrors ? errors : undefined
       };
     });
 

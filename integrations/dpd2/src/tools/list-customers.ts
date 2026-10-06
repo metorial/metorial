@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listCustomers = SlateTool.create(spec, {
@@ -39,7 +40,10 @@ export let listCustomers = SlateTool.create(spec, {
         .describe('Filter by newsletter subscription status'),
       dateMin: z.string().optional().describe('Minimum creation date (PHP strtotime format)'),
       dateMax: z.string().optional().describe('Maximum creation date (PHP strtotime format)'),
-      page: z.number().optional().describe('Page number for pagination (100 records per page)')
+      page: z
+        .number()
+        .optional()
+        .describe('1-based page; omitted means page 1. Continue until endOfResults is true.')
     })
   )
   .output(
@@ -47,9 +51,10 @@ export let listCustomers = SlateTool.create(spec, {
       customers: z.array(
         z.object({
           customerId: z.number().describe('Unique customer ID'),
-          status: z.string().describe('Customer status')
+          status: z.string().optional().describe('Customer status when supplied')
         })
-      )
+      ),
+      ...pageSchema
     })
   )
   .handleInvocation(async ctx => {
@@ -58,11 +63,16 @@ export let listCustomers = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let customers = await client.listCustomers(ctx.input);
+    let result = await client.listCustomers(ctx.input);
 
     return {
-      output: { customers },
-      message: `Found **${customers.length}** customer(s)${ctx.input.page ? ` on page ${ctx.input.page}` : ''}.`
+      output: {
+        customers: result.items,
+        page: result.page,
+        nextPage: result.nextPage,
+        endOfResults: result.endOfResults
+      },
+      message: `Retrieved ${result.items.length} customers on page ${result.page}${result.endOfResults ? '; end of results confirmed' : ''}.`
     };
   })
   .build();

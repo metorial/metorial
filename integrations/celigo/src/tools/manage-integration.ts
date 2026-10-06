@@ -1,7 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { invoke } from '../lib/invocation';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  integrationId: z.string().optional().describe('ID of the affected integration'),
+  name: z.string().optional().describe('Name of the integration'),
+  deleted: z.boolean().optional().describe('Whether the integration was deleted'),
+  rawResult: z.any().optional().describe('Credential-filtered native API response')
+});
 
 export let manageIntegration = SlateTool.create(spec, {
   name: 'Manage Integration',
@@ -11,6 +19,18 @@ Use **action** to specify the operation. For "create" and "update", provide the 
 })
   .input(
     z.object({
+      replaceAll: z
+        .boolean()
+        .optional()
+        .describe(
+          'Required true for full-replace updates. Provide the complete writable configuration; omitted settings may be cleared.'
+        ),
+      cloneOptions: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Documented clone request; flow clones require _integrationId and connectionMap. Integration clones require connectionMap.'
+        ),
       action: z
         .enum(['get', 'create', 'update', 'clone', 'delete'])
         .describe('The operation to perform'),
@@ -24,71 +44,14 @@ Use **action** to specify the operation. For "create" and "update", provide the 
         .describe('Integration configuration data (required for create and update)')
     })
   )
-  .output(
-    z.object({
-      integrationId: z.string().optional().describe('ID of the affected integration'),
-      name: z.string().optional().describe('Name of the integration'),
-      deleted: z.boolean().optional().describe('Whether the integration was deleted'),
-      rawResult: z.any().optional().describe('Full API response')
-    })
-  )
+  .output(outputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let { action, integrationId, integrationData } = ctx.input;
-
-    if (action !== 'create' && !integrationId) {
-      throw new Error('integrationId is required for this action');
-    }
-
-    let result: any;
-    let message: string;
-
-    switch (action) {
-      case 'get': {
-        result = await client.getIntegration(integrationId!);
-        message = `Retrieved integration **${result.name || result._id}**.`;
-        break;
-      }
-      case 'create': {
-        if (!integrationData) throw new Error('integrationData is required for create');
-        result = await client.createIntegration(integrationData);
-        message = `Created integration **${result.name || result._id}**.`;
-        break;
-      }
-      case 'update': {
-        if (!integrationData) throw new Error('integrationData is required for update');
-        result = await client.updateIntegration(integrationId!, integrationData);
-        message = `Updated integration **${result.name || result._id}**.`;
-        break;
-      }
-      case 'clone': {
-        result = await client.cloneIntegration(integrationId!);
-        message = `Cloned integration **${integrationId}** → new integration **${result._id}**.`;
-        break;
-      }
-      case 'delete': {
-        await client.deleteIntegration(integrationId!);
-        return {
-          output: {
-            integrationId: integrationId!,
-            deleted: true
-          },
-          message: `Deleted integration **${integrationId}**.`
-        };
-      }
-    }
-
-    return {
-      output: {
-        integrationId: result?._id || integrationId,
-        name: result?.name,
-        rawResult: result
-      },
-      message
-    };
+    const result = await invoke('manage_integration', ctx);
+    const parsed = outputSchema.safeParse(result.output);
+    if (!parsed.success)
+      throw fail(
+        'Celigo returned an invalid result. Reconcile any requested write before repeating it.'
+      );
+    return { ...result, output: parsed.data };
   })
   .build();

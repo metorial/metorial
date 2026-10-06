@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createProject = SlateTool.create(spec, {
   name: 'Create Project',
   key: 'create_project',
-  description: `Create a new Hex project in the workspace with a title and optional description.`,
+  description: `Create an empty draft Hex project with a title and optional description. This does not publish or execute code. The public API has no project deletion endpoint.`,
   tags: {
     destructive: false
   }
@@ -28,7 +28,10 @@ export let createProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
     let project = await client.createProject(ctx.input.title, ctx.input.description);
 
     return {

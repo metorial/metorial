@@ -14,8 +14,7 @@
     "discover inboxes and channels",
     "create message templates",
     "export analytics reports",
-    "manage knowledge base articles",
-    "receive webhook event notifications"
+    "manage knowledge base articles"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/front.svg"
 }

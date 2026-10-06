@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { budgetInput, deltaInput, milliunits } from '../lib/validation';
 import { spec } from '../spec';
 
 let payeeSchema = z.object({
@@ -24,31 +25,35 @@ export let listPayees = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      budgetId: z.string().optional().describe('Budget ID. Defaults to the configured budget.')
+      lastKnowledgeOfServer: deltaInput,
+      budgetId: budgetInput
     })
   )
   .output(
     z.object({
+      serverKnowledge: milliunits
+        .nonnegative()
+        .optional()
+        .describe('Knowledge returned by this endpoint for subsequent delta requests.'),
       payees: z.array(payeeSchema).describe('List of payees')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let budgetId = ctx.input.budgetId ?? ctx.config.budgetId;
-
-    let { payees } = await client.getPayees(budgetId);
-
-    let mapped = payees.map((p: any) => ({
-      payeeId: p.id,
-      name: p.name,
-      transferAccountId: p.transfer_account_id,
-      deleted: p.deleted
-    }));
-
-    let active = mapped.filter((p: any) => !p.deleted);
+    const data = await new Client({ token: ctx.auth.token }).getPayees(
+      ctx.input.budgetId ?? ctx.config.budgetId,
+      ctx.input.lastKnowledgeOfServer
+    );
     return {
-      output: { payees: mapped },
-      message: `Found **${active.length}** active payee(s)`
+      output: {
+        payees: data.payees.map(p => ({
+          payeeId: p.id,
+          name: p.name,
+          transferAccountId: p.transfer_account_id,
+          deleted: p.deleted
+        })),
+        serverKnowledge: data.serverKnowledge
+      },
+      message: `Returned ${data.payees.length} payee record(s).`
     };
   })
   .build();

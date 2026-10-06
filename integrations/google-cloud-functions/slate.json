@@ -6,7 +6,6 @@
     "create and deploy functions",
     "delete and update functions",
     "list and get function details",
-    "configure event triggers",
     "invoke HTTP functions",
     "upload and download source code",
     "manage function runtimes",

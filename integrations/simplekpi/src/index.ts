@@ -36,8 +36,6 @@ import {
   updateKpi,
   updateUser
 } from './tools';
-import { inboundWebhook, newKpiEntries } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -76,5 +74,5 @@ export let provider = Slate.create({
     createKpiUnit,
     deleteKpiUnit
   ],
-  triggers: [inboundWebhook, newKpiEntries]
+  triggers: []
 });

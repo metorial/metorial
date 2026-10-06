@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RipplingClient } from '../lib/client';
+import { mapEmployee } from '../lib/models';
+import { invalid } from '../lib/validation';
 import { spec } from '../spec';
 
 let employeeSchema = z.object({
@@ -32,7 +34,7 @@ export let listEmployees = SlateTool.create(spec, {
   instructions: [
     'Set includeTerminated to true to also retrieve employees who have left the company.',
     'Use limit and offset for pagination. Maximum limit is 100 per request.',
-    'The uniqueId field is the recommended identifier for mapping employees across systems.'
+    'Use employeeId for subsequent employee, membership and leave balance reads. uniqueId is returned only when the provider supplies it.'
   ],
   constraints: [
     'Maximum of 100 employees per request.',
@@ -66,41 +68,21 @@ export let listEmployees = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
 
-    let employees: any[];
-
-    if (ctx.input.includeTerminated) {
-      employees = await client.listAllEmployees({
-        limit: ctx.input.limit,
-        offset: ctx.input.offset,
-        sendAllRoles: ctx.input.sendAllRoles
-      });
-    } else {
-      employees = await client.listEmployees({
-        limit: ctx.input.limit,
-        offset: ctx.input.offset
-      });
-    }
-
-    let normalized = (Array.isArray(employees) ? employees : []).map((emp: any) => ({
-      employeeId: emp.id || emp.roleId || '',
-      name: emp.name,
-      firstName: emp.firstName,
-      lastName: emp.lastName,
-      workEmail: emp.workEmail,
-      personalEmail: emp.personalEmail,
-      employmentType: emp.employmentType,
-      title: emp.title,
-      department: emp.department,
-      roleState: emp.roleState,
-      startDate: emp.startDate,
-      endDate: emp.endDate,
-      phone: emp.phone || emp.phoneNumber,
-      workLocation: emp.workLocation,
-      isManager: emp.isManager,
-      uniqueId: emp.uniqueId
-    }));
+    if (ctx.input.sendAllRoles !== undefined && !ctx.input.includeTerminated)
+      throw invalid('sendAllRoles is supported only when includeTerminated is true.');
+    const employees = ctx.input.includeTerminated
+      ? await client.listAllEmployees({
+          limit: ctx.input.limit,
+          offset: ctx.input.offset,
+          sendAllRoles: ctx.input.sendAllRoles
+        })
+      : await client.listEmployees({ limit: ctx.input.limit, offset: ctx.input.offset });
+    const normalized = employees.map(mapEmployee);
 
     return {
       output: {

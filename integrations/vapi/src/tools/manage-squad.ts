@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,6 +7,10 @@ let memberSchema = z
   .object({
     assistantId: z.string().optional().describe('Assistant ID for this squad member'),
     assistant: z.any().optional().describe('Inline assistant configuration for this member'),
+    assistantOverrides: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe('Overrides for this member'),
     assistantDestinations: z
       .array(
         z.object({
@@ -55,11 +59,11 @@ export let manageSquad = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, ctx.auth.region);
     let { action, squadId } = ctx.input;
 
     if (action === 'get') {
-      if (!squadId) throw new Error('squadId is required for get action');
+      if (!squadId) throw createApiServiceError('squadId is required for get action');
       let squad = await client.getSquad(squadId);
       return {
         output: {
@@ -74,7 +78,7 @@ export let manageSquad = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!squadId) throw new Error('squadId is required for delete action');
+      if (!squadId) throw createApiServiceError('squadId is required for delete action');
       await client.deleteSquad(squadId);
       return {
         output: { squadId, deleted: true },
@@ -82,13 +86,22 @@ export let manageSquad = SlateTool.create(spec, {
       };
     }
 
+    if (
+      ctx.input.members?.some(
+        member => Boolean(member.assistantId) === Boolean(member.assistant)
+      )
+    ) {
+      throw createApiServiceError(
+        'Every squad member requires exactly one assistantId or inline assistant.'
+      );
+    }
     let body: Record<string, any> = {};
-    if (ctx.input.name) body.name = ctx.input.name;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.members) body.members = ctx.input.members;
 
     if (action === 'create') {
       if (!ctx.input.members || ctx.input.members.length === 0) {
-        throw new Error('members are required for creating a squad');
+        throw createApiServiceError('members are required for creating a squad');
       }
       let squad = await client.createSquad(body);
       return {
@@ -104,7 +117,7 @@ export let manageSquad = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!squadId) throw new Error('squadId is required for update action');
+      if (!squadId) throw createApiServiceError('squadId is required for update action');
       let squad = await client.updateSquad(squadId, body);
       return {
         output: {
@@ -118,6 +131,6 @@ export let manageSquad = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

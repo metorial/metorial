@@ -29,15 +29,6 @@ import {
   updateLabelTool,
   updateProjectTool
 } from './tools';
-import {
-  commentEventsTrigger,
-  cycleEventsTrigger,
-  documentEventsTrigger,
-  issueEventsTrigger,
-  labelEventsTrigger,
-  projectEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -69,12 +60,5 @@ export let provider = Slate.create({
     listUsersTool,
     listWorkflowStatesTool
   ],
-  triggers: [
-    issueEventsTrigger,
-    commentEventsTrigger,
-    projectEventsTrigger,
-    cycleEventsTrigger,
-    documentEventsTrigger,
-    labelEventsTrigger
-  ]
+  triggers: []
 });

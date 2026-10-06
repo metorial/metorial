@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { listIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateContact = SlateTool.create(spec, {
@@ -11,18 +12,25 @@ export let updateContact = SlateTool.create(spec, {
     'To add or remove tags, pass a tags object with tag names as keys and `true` (add) or `false` (remove) as values.'
   ],
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
     z.object({
-      listId: z.string().describe('ID of the list the contact belongs to'),
+      listId: listIdSchema,
       contactId: z.string().describe('ID of the contact to update'),
       emailAddress: z.string().optional().describe('New email address for the contact'),
       fields: z
         .record(z.string(), z.string())
         .optional()
         .describe('Custom field values to update'),
+      fieldValues: z
+        .record(z.string(), z.union([z.string(), z.number(), z.null()]))
+        .optional()
+        .describe(
+          'Typed custom field values; null clears a field. Do not conflict with fields.'
+        ),
       tags: z
         .record(z.string(), z.boolean())
         .optional()
@@ -30,16 +38,28 @@ export let updateContact = SlateTool.create(spec, {
       status: z
         .enum(['SUBSCRIBED', 'UNSUBSCRIBED', 'PENDING'])
         .optional()
-        .describe('New subscription status')
+        .describe(
+          'New subscription status; uppercase inputs are normalized to lowercase API values'
+        )
     })
   )
   .output(
     z.object({
       contactId: z.string().describe('Unique identifier of the updated contact'),
       emailAddress: z.string().describe('Email address of the contact'),
-      fields: z.record(z.string(), z.string()).describe('Custom field values'),
+      fields: z
+        .record(z.string(), z.string())
+        .describe('Custom field values as text; null is an empty string'),
+      fieldValues: z
+        .record(z.string(), z.union([z.string(), z.number(), z.null()]))
+        .optional()
+        .describe('Original typed custom field values'),
       tags: z.array(z.string()).describe('Tags assigned to the contact'),
-      status: z.string().describe('Subscription status'),
+      status: z
+        .string()
+        .describe(
+          'Subscription status; uppercase inputs are normalized to lowercase API values'
+        ),
       createdAt: z.string().describe('ISO 8601 creation timestamp'),
       lastUpdatedAt: z.string().describe('ISO 8601 last update timestamp')
     })
@@ -49,6 +69,7 @@ export let updateContact = SlateTool.create(spec, {
     let contact = await client.updateContact(ctx.input.listId, ctx.input.contactId, {
       emailAddress: ctx.input.emailAddress,
       fields: ctx.input.fields,
+      fieldValues: ctx.input.fieldValues,
       tags: ctx.input.tags,
       status: ctx.input.status
     });

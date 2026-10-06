@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/webflow.jpeg" height="20"> Webflow
 
-Manage Webflow sites, CMS content, ecommerce, and operational site data programmatically. List and inspect sites, custom domains, pages, CMS collections and items, form submissions, comments, components, custom code, ecommerce products and orders, inventory, membership users, assets, and webhooks. Create, update, delete, publish, or transition supported resources through the current Webflow Data API. Receive webhooks for form submissions, site publishes, page changes, ecommerce events, user account changes, and CMS item updates.
+Manage Webflow sites, CMS content, ecommerce, and operational site data programmatically. List and inspect sites, custom domains, pages, CMS collections and items, form submissions, comments, components, custom code, ecommerce products and orders, inventory, membership users, assets, and webhooks. Create, update, delete, publish, or transition supported resources through the current Webflow Data API.
 
 ## Tools
 

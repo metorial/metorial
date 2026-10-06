@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OneLoginClient } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageRole = SlateTool.create(spec, {
   name: 'Manage Role',
   key: 'manage_role',
-  description: `Create, update, or delete a role in OneLogin. Roles control which applications users have access to. When creating, provide a name and optionally associate apps, users, and admins. When updating, provide the role ID and fields to change. When deleting, provide the role ID and set action to "delete".`,
+  description: `Create, update, or delete a role in OneLogin. Roles control which applications users have access to. When creating, provide a name and optionally associate apps, users, and admins. Updates support name only; legacy apps/users/admins update inputs are refused before any change. Use the dedicated role association APIs or admin console for those changes. When deleting, provide the role ID and set action to "delete".`,
   tags: {
     destructive: true
   }
@@ -29,13 +30,10 @@ export let manageRole = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OneLoginClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = OneLoginClient.fromContext(ctx);
 
     if (ctx.input.action === 'create') {
-      let body: Record<string, any> = { name: ctx.input.name };
+      let body: Record<string, unknown> = { name: ctx.input.name };
       if (ctx.input.apps) body.apps = ctx.input.apps;
       if (ctx.input.users) body.users = ctx.input.users;
       if (ctx.input.admins) body.admins = ctx.input.admins;
@@ -48,8 +46,8 @@ export let manageRole = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.roleId) throw new Error('roleId is required for update');
-      let body: Record<string, any> = {};
+      if (!ctx.input.roleId) fail('roleId is required for update');
+      let body: Record<string, unknown> = {};
       if (ctx.input.name !== undefined) body.name = ctx.input.name;
       if (ctx.input.apps !== undefined) body.apps = ctx.input.apps;
       if (ctx.input.users !== undefined) body.users = ctx.input.users;
@@ -63,7 +61,7 @@ export let manageRole = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.roleId) throw new Error('roleId is required for delete');
+      if (!ctx.input.roleId) fail('roleId is required for delete');
       await client.deleteRole(ctx.input.roleId);
       return {
         output: { roleId: ctx.input.roleId, success: true },
@@ -71,5 +69,5 @@ export let manageRole = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    fail(`Unknown action: ${ctx.input.action}`);
   });

@@ -13,8 +13,6 @@ import {
   sendDocument,
   sendFromTemplate
 } from './tools';
-import { documentEvents, senderIdentityEvents, templateEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,5 +28,5 @@ export let provider = Slate.create({
     listUsers,
     listBrands
   ],
-  triggers: [documentEvents, templateEvents, senderIdentityEvents]
+  triggers: []
 });

@@ -1,4 +1,6 @@
+export * from './download-file';
 export * from './generate-upload-url';
+export * from './get-deployment-info';
 export * from './get-document-deltas';
 export * from './list-documents';
 export * from './manage-environment-variables';

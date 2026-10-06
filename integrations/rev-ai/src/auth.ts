@@ -4,7 +4,7 @@ import { z } from 'zod';
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string().min(1)
     })
   )
   .addTokenAuth({
@@ -15,6 +15,8 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .trim()
+        .min(1)
         .describe(
           'Rev AI access token. Generate one from the Rev AI dashboard under Access Token page.'
         )

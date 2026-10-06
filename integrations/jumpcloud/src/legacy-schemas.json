@@ -1,0 +1,1529 @@
+{
+  "list_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Maximum number of users to return (1-100, default 100)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "skip": {
+          "description": "Number of users to skip for pagination",
+          "type": "number",
+          "minimum": 0
+        },
+        "filter": {
+          "description": "Filter expression in JumpCloud format, e.g. \"email:$eq:user@example.com\", \"department:$eq:Engineering\"",
+          "type": "string"
+        },
+        "fields": {
+          "description": "Comma-separated list of fields to return, e.g. \"username,email,firstname,lastname\"",
+          "type": "string"
+        },
+        "sort": {
+          "description": "Field to sort by. Prefix with \"-\" for descending order, e.g. \"-created\"",
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "description": "Unique user ID"
+              },
+              "username": {
+                "type": "string",
+                "description": "Username"
+              },
+              "email": {
+                "type": "string",
+                "description": "Primary email address"
+              },
+              "firstname": {
+                "description": "First name",
+                "type": "string"
+              },
+              "lastname": {
+                "description": "Last name",
+                "type": "string"
+              },
+              "displayname": {
+                "description": "Display name",
+                "type": "string"
+              },
+              "state": {
+                "description": "Account state: ACTIVATED, STAGED, or SUSPENDED",
+                "type": "string"
+              },
+              "activated": {
+                "description": "Whether the account is activated",
+                "type": "boolean"
+              },
+              "company": {
+                "description": "Company name",
+                "type": "string"
+              },
+              "department": {
+                "description": "Department",
+                "type": "string"
+              },
+              "jobTitle": {
+                "description": "Job title",
+                "type": "string"
+              },
+              "employeeIdentifier": {
+                "description": "Employee ID",
+                "type": "string"
+              },
+              "created": {
+                "description": "Account creation timestamp",
+                "type": "string"
+              },
+              "suspended": {
+                "description": "Whether the account is suspended",
+                "type": "boolean"
+              }
+            },
+            "required": ["userId", "username", "email"],
+            "additionalProperties": false
+          },
+          "description": "List of users"
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of users matching the query"
+        }
+      },
+      "required": ["users", "totalCount"],
+      "additionalProperties": false
+    }
+  },
+  "get_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "JumpCloud user ID"
+        }
+      },
+      "required": ["userId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "User ID"
+        },
+        "username": {
+          "type": "string",
+          "description": "Username"
+        },
+        "email": {
+          "type": "string",
+          "description": "Primary email"
+        },
+        "firstname": {
+          "description": "First name",
+          "type": "string"
+        },
+        "lastname": {
+          "description": "Last name",
+          "type": "string"
+        },
+        "displayname": {
+          "description": "Display name",
+          "type": "string"
+        },
+        "state": {
+          "description": "Account state",
+          "type": "string"
+        },
+        "activated": {
+          "description": "Whether account is activated",
+          "type": "boolean"
+        },
+        "suspended": {
+          "description": "Whether account is suspended",
+          "type": "boolean"
+        },
+        "company": {
+          "description": "Company",
+          "type": "string"
+        },
+        "department": {
+          "description": "Department",
+          "type": "string"
+        },
+        "jobTitle": {
+          "description": "Job title",
+          "type": "string"
+        },
+        "employeeIdentifier": {
+          "description": "Employee ID",
+          "type": "string"
+        },
+        "employeeType": {
+          "description": "Employee type",
+          "type": "string"
+        },
+        "location": {
+          "description": "Location",
+          "type": "string"
+        },
+        "alternateEmail": {
+          "description": "Alternate email",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description",
+          "type": "string"
+        },
+        "created": {
+          "description": "Account creation date",
+          "type": "string"
+        },
+        "ldapBindingUser": {
+          "description": "Whether this is an LDAP binding user",
+          "type": "boolean"
+        },
+        "enableMfa": {
+          "description": "Whether MFA is enabled",
+          "type": "boolean"
+        },
+        "passwordNeverExpires": {
+          "description": "Whether password never expires",
+          "type": "boolean"
+        },
+        "passwordlessSudo": {
+          "description": "Whether passwordless sudo is allowed",
+          "type": "boolean"
+        },
+        "externallyManaged": {
+          "description": "Whether user is externally managed",
+          "type": "boolean"
+        },
+        "attributes": {
+          "description": "Custom attributes",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "value"],
+            "additionalProperties": false
+          }
+        },
+        "phoneNumbers": {
+          "description": "Phone numbers",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "addresses": {
+          "description": "Addresses",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "country": {
+                "type": "string"
+              },
+              "locality": {
+                "type": "string"
+              },
+              "region": {
+                "type": "string"
+              },
+              "postalCode": {
+                "type": "string"
+              },
+              "streetAddress": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "mfaConfigured": {
+          "description": "Whether MFA is configured",
+          "type": "boolean"
+        }
+      },
+      "required": ["userId", "username", "email"],
+      "additionalProperties": false
+    }
+  },
+  "manage_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "userId": {
+          "description": "User ID (required for update and delete)",
+          "type": "string"
+        },
+        "username": {
+          "description": "Username (required for create)",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email address (required for create)",
+          "type": "string"
+        },
+        "firstname": {
+          "description": "First name",
+          "type": "string"
+        },
+        "lastname": {
+          "description": "Last name",
+          "type": "string"
+        },
+        "displayname": {
+          "description": "Display name",
+          "type": "string"
+        },
+        "password": {
+          "description": "User password (only for create)",
+          "type": "string"
+        },
+        "state": {
+          "description": "Account state",
+          "type": "string",
+          "enum": ["ACTIVATED", "STAGED", "SUSPENDED"]
+        },
+        "company": {
+          "description": "Company name",
+          "type": "string"
+        },
+        "department": {
+          "description": "Department",
+          "type": "string"
+        },
+        "jobTitle": {
+          "description": "Job title",
+          "type": "string"
+        },
+        "employeeIdentifier": {
+          "description": "Employee ID",
+          "type": "string"
+        },
+        "employeeType": {
+          "description": "Employee type, e.g. \"Full-Time\", \"Contractor\"",
+          "type": "string"
+        },
+        "location": {
+          "description": "Location description",
+          "type": "string"
+        },
+        "alternateEmail": {
+          "description": "Alternate email address",
+          "type": "string"
+        },
+        "description": {
+          "description": "User description",
+          "type": "string"
+        },
+        "ldapBindingUser": {
+          "description": "Whether this is an LDAP binding user",
+          "type": "boolean"
+        },
+        "enableMfa": {
+          "description": "Enable user portal multi-factor authentication",
+          "type": "boolean"
+        },
+        "passwordNeverExpires": {
+          "description": "Whether the password never expires",
+          "type": "boolean"
+        },
+        "passwordlessSudo": {
+          "description": "Whether to allow passwordless sudo",
+          "type": "boolean"
+        },
+        "attributes": {
+          "description": "Custom attributes to set on the user",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Attribute name"
+              },
+              "value": {
+                "type": "string",
+                "description": "Attribute value"
+              }
+            },
+            "required": ["name", "value"]
+          }
+        },
+        "phoneNumbers": {
+          "description": "Phone numbers",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "string",
+                "description": "Phone number"
+              },
+              "type": {
+                "description": "Phone type: mobile, home, work, work_mobile, work_fax, other",
+                "type": "string"
+              }
+            },
+            "required": ["number"]
+          }
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "User ID"
+        },
+        "username": {
+          "type": "string",
+          "description": "Username"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address"
+        },
+        "firstname": {
+          "description": "First name",
+          "type": "string"
+        },
+        "lastname": {
+          "description": "Last name",
+          "type": "string"
+        },
+        "displayname": {
+          "description": "Display name",
+          "type": "string"
+        },
+        "state": {
+          "description": "Account state",
+          "type": "string"
+        },
+        "activated": {
+          "description": "Whether the account is activated",
+          "type": "boolean"
+        },
+        "company": {
+          "description": "Company",
+          "type": "string"
+        },
+        "department": {
+          "description": "Department",
+          "type": "string"
+        },
+        "jobTitle": {
+          "description": "Job title",
+          "type": "string"
+        }
+      },
+      "required": ["userId", "username", "email"],
+      "additionalProperties": false
+    }
+  },
+  "user_actions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "JumpCloud user ID"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["reset_mfa", "unlock"],
+          "description": "Action to perform: \"reset_mfa\" clears MFA enrollment, \"unlock\" unlocks a locked account"
+        }
+      },
+      "required": ["userId", "action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "User ID the action was performed on"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action that was performed"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action was successful"
+        }
+      },
+      "required": ["userId", "action", "success"],
+      "additionalProperties": false
+    }
+  },
+  "list_systems": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Maximum number of systems to return (1-100, default 100)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "skip": {
+          "description": "Number of systems to skip for pagination",
+          "type": "number",
+          "minimum": 0
+        },
+        "filter": {
+          "description": "Filter expression, e.g. \"os:$eq:Mac OS X\", \"hostname:$regex:dev\"",
+          "type": "string"
+        },
+        "fields": {
+          "description": "Comma-separated fields to return",
+          "type": "string"
+        },
+        "sort": {
+          "description": "Field to sort by. Prefix with \"-\" for descending",
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "systems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "systemId": {
+                "type": "string",
+                "description": "System ID"
+              },
+              "displayName": {
+                "description": "Display name",
+                "type": "string"
+              },
+              "hostname": {
+                "description": "Hostname",
+                "type": "string"
+              },
+              "os": {
+                "description": "Operating system",
+                "type": "string"
+              },
+              "osFamily": {
+                "description": "OS family (e.g. linux, darwin, windows)",
+                "type": "string"
+              },
+              "version": {
+                "description": "OS version",
+                "type": "string"
+              },
+              "arch": {
+                "description": "Architecture",
+                "type": "string"
+              },
+              "agentVersion": {
+                "description": "JumpCloud agent version",
+                "type": "string"
+              },
+              "active": {
+                "description": "Whether the system is active",
+                "type": "boolean"
+              },
+              "remoteIP": {
+                "description": "Last known remote IP",
+                "type": "string"
+              },
+              "serialNumber": {
+                "description": "Serial number",
+                "type": "string"
+              },
+              "lastContact": {
+                "description": "Last contact timestamp",
+                "type": "string"
+              },
+              "created": {
+                "description": "When the system was registered",
+                "type": "string"
+              }
+            },
+            "required": ["systemId"],
+            "additionalProperties": false
+          },
+          "description": "List of systems"
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of systems matching the query"
+        }
+      },
+      "required": ["systems", "totalCount"],
+      "additionalProperties": false
+    }
+  },
+  "get_system": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "systemId": {
+          "type": "string",
+          "description": "JumpCloud system ID"
+        }
+      },
+      "required": ["systemId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "systemId": {
+          "type": "string",
+          "description": "System ID"
+        },
+        "displayName": {
+          "description": "Display name",
+          "type": "string"
+        },
+        "hostname": {
+          "description": "Hostname",
+          "type": "string"
+        },
+        "os": {
+          "description": "Operating system",
+          "type": "string"
+        },
+        "osFamily": {
+          "description": "OS family",
+          "type": "string"
+        },
+        "version": {
+          "description": "OS version",
+          "type": "string"
+        },
+        "arch": {
+          "description": "Architecture",
+          "type": "string"
+        },
+        "agentVersion": {
+          "description": "JumpCloud agent version",
+          "type": "string"
+        },
+        "active": {
+          "description": "Whether active",
+          "type": "boolean"
+        },
+        "remoteIP": {
+          "description": "Last known remote IP",
+          "type": "string"
+        },
+        "serialNumber": {
+          "description": "Serial number",
+          "type": "string"
+        },
+        "lastContact": {
+          "description": "Last contact timestamp",
+          "type": "string"
+        },
+        "created": {
+          "description": "Registration date",
+          "type": "string"
+        },
+        "allowMultiFactorAuthentication": {
+          "description": "MFA allowed",
+          "type": "boolean"
+        },
+        "allowPublicKeyAuthentication": {
+          "description": "Public key auth allowed",
+          "type": "boolean"
+        },
+        "allowSshPasswordAuthentication": {
+          "description": "SSH password auth allowed",
+          "type": "boolean"
+        },
+        "allowSshRootLogin": {
+          "description": "SSH root login allowed",
+          "type": "boolean"
+        }
+      },
+      "required": ["systemId"],
+      "additionalProperties": false
+    }
+  },
+  "manage_system": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["update", "delete"],
+          "description": "Action to perform"
+        },
+        "systemId": {
+          "type": "string",
+          "description": "JumpCloud system ID"
+        },
+        "displayName": {
+          "description": "New display name for the system",
+          "type": "string"
+        },
+        "allowMultiFactorAuthentication": {
+          "description": "Allow MFA for this system",
+          "type": "boolean"
+        },
+        "allowPublicKeyAuthentication": {
+          "description": "Allow public key authentication",
+          "type": "boolean"
+        },
+        "allowSshPasswordAuthentication": {
+          "description": "Allow SSH password authentication",
+          "type": "boolean"
+        },
+        "allowSshRootLogin": {
+          "description": "Allow SSH root login",
+          "type": "boolean"
+        }
+      },
+      "required": ["action", "systemId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "systemId": {
+          "type": "string",
+          "description": "System ID"
+        },
+        "displayName": {
+          "description": "Display name",
+          "type": "string"
+        },
+        "hostname": {
+          "description": "Hostname",
+          "type": "string"
+        },
+        "os": {
+          "description": "Operating system",
+          "type": "string"
+        },
+        "active": {
+          "description": "Whether active",
+          "type": "boolean"
+        }
+      },
+      "required": ["systemId"],
+      "additionalProperties": false
+    }
+  },
+  "list_groups": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groupType": {
+          "type": "string",
+          "enum": ["user", "system"],
+          "description": "Type of groups to list"
+        },
+        "limit": {
+          "description": "Maximum number of groups to return (1-100, default 100)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "skip": {
+          "description": "Number of groups to skip for pagination",
+          "type": "number",
+          "minimum": 0
+        },
+        "filter": {
+          "description": "Filter expression, e.g. \"name:$eq:Engineering\"",
+          "type": "string"
+        },
+        "sort": {
+          "description": "Sort field",
+          "type": "string"
+        }
+      },
+      "required": ["groupType"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "groupId": {
+                "type": "string",
+                "description": "Group ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Group name"
+              },
+              "description": {
+                "description": "Group description",
+                "type": "string"
+              },
+              "type": {
+                "description": "Group type",
+                "type": "string"
+              },
+              "membershipMethod": {
+                "description": "Membership method (e.g. STATIC, DYNAMIC_AUTOMATED)",
+                "type": "string"
+              }
+            },
+            "required": ["groupId", "name"],
+            "additionalProperties": false
+          },
+          "description": "List of groups"
+        }
+      },
+      "required": ["groups"],
+      "additionalProperties": false
+    }
+  },
+  "manage_user_group": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "groupId": {
+          "description": "Group ID (required for update and delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Group name (required for create)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Group description",
+          "type": "string"
+        },
+        "email": {
+          "description": "Group email address",
+          "type": "string"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "description": "Group ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Group name"
+        },
+        "description": {
+          "description": "Group description",
+          "type": "string"
+        },
+        "type": {
+          "description": "Group type",
+          "type": "string"
+        }
+      },
+      "required": ["groupId", "name"],
+      "additionalProperties": false
+    }
+  },
+  "manage_system_group": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "groupId": {
+          "description": "Group ID (required for update and delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Group name (required for create)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Group description",
+          "type": "string"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "description": "Group ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Group name"
+        },
+        "description": {
+          "description": "Group description",
+          "type": "string"
+        },
+        "type": {
+          "description": "Group type",
+          "type": "string"
+        }
+      },
+      "required": ["groupId", "name"],
+      "additionalProperties": false
+    }
+  },
+  "manage_group_membership": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["add", "remove", "list"],
+          "description": "Action to perform"
+        },
+        "groupType": {
+          "type": "string",
+          "enum": ["user", "system"],
+          "description": "Type of group"
+        },
+        "groupId": {
+          "type": "string",
+          "description": "Group ID"
+        },
+        "memberId": {
+          "description": "User ID or system ID to add/remove (required for add/remove)",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Max members to return when listing (default 100)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "skip": {
+          "description": "Number of members to skip when listing",
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": ["action", "groupType", "groupId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "description": "Group ID"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action performed"
+        },
+        "members": {
+          "description": "Current group members (returned for list action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "memberId": {
+                "type": "string",
+                "description": "Member ID"
+              },
+              "memberType": {
+                "type": "string",
+                "description": "Member type (user or system)"
+              }
+            },
+            "required": ["memberId", "memberType"],
+            "additionalProperties": false
+          }
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action succeeded"
+        }
+      },
+      "required": ["groupId", "action", "success"],
+      "additionalProperties": false
+    }
+  },
+  "manage_associations": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["add", "remove", "list"],
+          "description": "Action to perform"
+        },
+        "sourceType": {
+          "type": "string",
+          "enum": ["user", "user_group", "system", "system_group"],
+          "description": "Source resource type"
+        },
+        "sourceId": {
+          "type": "string",
+          "description": "Source resource ID"
+        },
+        "targetType": {
+          "type": "string",
+          "description": "Target resource type (e.g. system_group, application, radius_server, ldap_server)"
+        },
+        "targetId": {
+          "description": "Target resource ID (required for add/remove)",
+          "type": "string"
+        },
+        "sudoEnabled": {
+          "description": "Enable sudo access (for user group → system group associations)",
+          "type": "boolean"
+        },
+        "sudoWithoutPassword": {
+          "description": "Enable passwordless sudo",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Max results for list (default 100)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "skip": {
+          "description": "Skip for pagination when listing",
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": ["action", "sourceType", "sourceId", "targetType"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "description": "Source resource ID"
+        },
+        "sourceType": {
+          "type": "string",
+          "description": "Source resource type"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action performed"
+        },
+        "associations": {
+          "description": "Current associations (returned for list action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "targetId": {
+                "type": "string",
+                "description": "Target resource ID"
+              },
+              "targetType": {
+                "type": "string",
+                "description": "Target resource type"
+              }
+            },
+            "required": ["targetId", "targetType"],
+            "additionalProperties": false
+          }
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the action succeeded"
+        }
+      },
+      "required": ["sourceId", "sourceType", "action", "success"],
+      "additionalProperties": false
+    }
+  },
+  "manage_command": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "delete"],
+          "description": "Action to perform"
+        },
+        "commandId": {
+          "description": "Command ID (required for update and delete)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Command name",
+          "type": "string"
+        },
+        "command": {
+          "description": "The command/script to execute",
+          "type": "string"
+        },
+        "commandType": {
+          "description": "Command type: \"linux\" (for Mac/Linux) or \"windows\"",
+          "type": "string",
+          "enum": ["linux", "windows"]
+        },
+        "user": {
+          "description": "User to run the command as (e.g. \"root\", \"000000000000\")",
+          "type": "string"
+        },
+        "sudo": {
+          "description": "Run with sudo privileges",
+          "type": "boolean"
+        },
+        "schedule": {
+          "description": "Cron schedule expression for scheduled commands",
+          "type": "string"
+        },
+        "scheduleRepeatType": {
+          "description": "Schedule repeat type",
+          "type": "string"
+        },
+        "launchType": {
+          "description": "How the command is launched",
+          "type": "string",
+          "enum": ["manual", "trigger", "repeated"]
+        },
+        "trigger": {
+          "description": "Trigger name for webhook-based execution",
+          "type": "string"
+        },
+        "timeout": {
+          "description": "Command timeout in seconds",
+          "type": "string"
+        },
+        "shell": {
+          "description": "Shell to use (e.g. /bin/bash, /bin/sh, powershell)",
+          "type": "string"
+        },
+        "systems": {
+          "description": "Array of system IDs to target",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "commandId": {
+          "type": "string",
+          "description": "Command ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Command name"
+        },
+        "command": {
+          "type": "string",
+          "description": "Command script"
+        },
+        "commandType": {
+          "type": "string",
+          "description": "Command type"
+        },
+        "launchType": {
+          "description": "Launch type",
+          "type": "string"
+        },
+        "trigger": {
+          "description": "Trigger name",
+          "type": "string"
+        }
+      },
+      "required": ["commandId", "name", "command", "commandType"],
+      "additionalProperties": false
+    }
+  },
+  "run_command": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "triggerName": {
+          "type": "string",
+          "description": "The trigger name configured on the command"
+        },
+        "environmentVars": {
+          "description": "Key-value pairs passed as environment variables to the command",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["triggerName"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "triggered": {
+          "type": "boolean",
+          "description": "Whether the command was triggered successfully"
+        },
+        "triggerName": {
+          "type": "string",
+          "description": "Trigger name used"
+        }
+      },
+      "required": ["triggered", "triggerName"],
+      "additionalProperties": false
+    }
+  },
+  "list_command_results": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Maximum number of results to return (default 50)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "skip": {
+          "description": "Number of results to skip for pagination",
+          "type": "number",
+          "minimum": 0
+        },
+        "filter": {
+          "description": "Filter expression, e.g. \"command:$eq:commandId\"",
+          "type": "string"
+        },
+        "sort": {
+          "description": "Sort field, e.g. \"-requestTime\" for most recent first",
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "resultId": {
+                "type": "string",
+                "description": "Command result ID"
+              },
+              "commandId": {
+                "type": "string",
+                "description": "Command ID"
+              },
+              "commandName": {
+                "type": "string",
+                "description": "Command name"
+              },
+              "systemId": {
+                "type": "string",
+                "description": "System ID that executed the command"
+              },
+              "systemName": {
+                "description": "System name",
+                "type": "string"
+              },
+              "exitCode": {
+                "description": "Exit code (0 = success)",
+                "type": "number"
+              },
+              "output": {
+                "description": "Command stdout output",
+                "type": "string"
+              },
+              "error": {
+                "description": "Command stderr output",
+                "type": "string"
+              },
+              "requestTime": {
+                "type": "string",
+                "description": "When the command was requested"
+              },
+              "responseTime": {
+                "description": "When the command completed",
+                "type": "string"
+              }
+            },
+            "required": ["resultId", "commandId", "commandName", "systemId", "requestTime"],
+            "additionalProperties": false
+          },
+          "description": "Command execution results"
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of results"
+        }
+      },
+      "required": ["results", "totalCount"],
+      "additionalProperties": false
+    }
+  },
+  "list_applications": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Maximum number of applications to return",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "skip": {
+          "description": "Number to skip for pagination",
+          "type": "number",
+          "minimum": 0
+        },
+        "filter": {
+          "description": "Filter expression, e.g. \"displayLabel:$eq:Slack\"",
+          "type": "string"
+        },
+        "sort": {
+          "description": "Sort field",
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "applications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "applicationId": {
+                "type": "string",
+                "description": "Application ID"
+              },
+              "name": {
+                "description": "Application name",
+                "type": "string"
+              },
+              "displayName": {
+                "description": "Display name",
+                "type": "string"
+              },
+              "displayLabel": {
+                "description": "Display label",
+                "type": "string"
+              },
+              "ssoUrl": {
+                "description": "SSO URL",
+                "type": "string"
+              },
+              "active": {
+                "description": "Whether the application is active",
+                "type": "boolean"
+              },
+              "created": {
+                "description": "Creation timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["applicationId"],
+            "additionalProperties": false
+          },
+          "description": "List of SSO applications"
+        },
+        "totalCount": {
+          "type": "number",
+          "description": "Total number of applications"
+        }
+      },
+      "required": ["applications", "totalCount"],
+      "additionalProperties": false
+    }
+  },
+  "query_events": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "service": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Event services to query, e.g. [\"directory\", \"sso\", \"radius\"]"
+        },
+        "startTime": {
+          "type": "string",
+          "description": "Start time in RFC3339 UTC format, e.g. \"2024-01-01T00:00:00Z\""
+        },
+        "endTime": {
+          "description": "End time in RFC3339 UTC format",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum events to return (default 100, max 10000)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "searchAfter": {
+          "description": "Cursor from previous response for pagination"
+        },
+        "searchQuery": {
+          "description": "Free-text search query",
+          "type": "string"
+        }
+      },
+      "required": ["service", "startTime"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "eventId": {
+                "description": "Event ID",
+                "type": "string"
+              },
+              "timestamp": {
+                "description": "Event timestamp",
+                "type": "string"
+              },
+              "eventType": {
+                "description": "Event type",
+                "type": "string"
+              },
+              "service": {
+                "description": "Service category",
+                "type": "string"
+              },
+              "initiatedById": {
+                "description": "ID of the initiating actor",
+                "type": "string"
+              },
+              "initiatedByType": {
+                "description": "Type of the initiating actor",
+                "type": "string"
+              },
+              "initiatedByEmail": {
+                "description": "Email of the initiating actor",
+                "type": "string"
+              },
+              "resourceId": {
+                "description": "Affected resource ID",
+                "type": "string"
+              },
+              "resourceType": {
+                "description": "Affected resource type",
+                "type": "string"
+              },
+              "organization": {
+                "description": "Organization ID",
+                "type": "string"
+              },
+              "rawEvent": {
+                "description": "Full raw event data"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Matching events"
+        },
+        "searchAfter": {
+          "description": "Cursor for fetching next page"
+        }
+      },
+      "required": ["events"],
+      "additionalProperties": false
+    }
+  }
+}

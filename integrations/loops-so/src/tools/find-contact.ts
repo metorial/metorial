@@ -83,13 +83,12 @@ export let findContact = SlateTool.create(spec, {
       };
     });
 
-    let identifier = ctx.input.email || ctx.input.userId || 'unknown';
     return {
       output: { contacts },
       message:
         contacts.length > 0
-          ? `Found **${contacts.length}** contact(s) matching **${identifier}**.`
-          : `No contacts found matching **${identifier}**.`
+          ? `Found **${contacts.length}** matching contact(s).`
+          : 'No matching contacts found.'
     };
   })
   .build();

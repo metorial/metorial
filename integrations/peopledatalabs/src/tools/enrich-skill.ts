@@ -1,13 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let enrichSkill = SlateTool.create(spec, {
   name: 'Enrich Skill',
   key: 'enrich_skill',
-  description: `Enrich and standardize a skill string by matching it against the PDL Skill Dataset. Returns the cleaned skill name. Useful for normalizing skills across different data sources.`,
+  description: `DEPRECATED — the Skill Enrichment API was removed in April 2025. Historical inputs remain accepted for compatibility; this operation returns a retirement error without making a request.`,
+  instructions: [
+    'The provider removed this endpoint in April 2025. Use Autocomplete for supported skill suggestions or Job Title Enrichment for relevant skills; neither is an equivalent skill enrichment replacement.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -22,26 +25,10 @@ export let enrichSkill = SlateTool.create(spec, {
       cleanedSkill: z.string().nullable().optional().describe('Standardized skill name')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      sandbox: ctx.config.sandbox
-    });
-
-    let params: Record<string, unknown> = {};
-    if (ctx.input.titlecase !== undefined) params.titlecase = ctx.input.titlecase;
-
-    let result = await client.enrichSkill(ctx.input.skill, params);
-    let data = result.data || result;
-
-    return {
-      output: {
-        cleanedSkill: data.cleaned_skill ?? data.skill ?? null
-      },
-      message:
-        data.cleaned_skill || data.skill
-          ? `"${ctx.input.skill}" → **${data.cleaned_skill || data.skill}**`
-          : `No standardized skill found for "${ctx.input.skill}".`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'Skill Enrichment was removed in April 2025. Use supported skill suggestions through Autocomplete or relevant skills through Job Title Enrichment; neither restores the retired endpoint.',
+      { reason: 'unsupported_operation' }
+    );
   })
   .build();

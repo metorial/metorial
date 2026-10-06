@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageParams, paginationSchema, readRows } from '../lib/response';
 import { spec } from '../spec';
 
 export let listTraining = SlateTool.create(spec, {
@@ -24,29 +25,18 @@ export let listTraining = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      records: z.array(z.record(z.string(), z.any())).describe('List of training records')
+      pagination: paginationSchema.optional(),
+      records: z.array(z.record(z.string(), z.unknown())).describe('List of training records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    const client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
 
-    let pagination = { page: ctx.input.page, perPage: ctx.input.perPage };
-    let result: any;
-
-    if (ctx.input.resourceType === 'company_training_types') {
-      result = await client.listCompanyTrainingTypes(pagination);
-    } else {
-      result = await client.listEmployeeTrainingCourses(pagination);
-    }
-
-    let records = result?.[ctx.input.resourceType] || [];
-
+    const result = await client.list(ctx.input.resourceType, pageParams(ctx.input));
+    const records = readRows(result, ctx.input.resourceType);
     return {
-      output: { records },
-      message: `Retrieved **${records.length}** ${ctx.input.resourceType.replace(/_/g, ' ')}.`
+      output: { records, pagination: result.pagination },
+      message: `Retrieved **${records.length}** record(s).`
     };
   })
   .build();

@@ -4,6 +4,7 @@ export * from './get-contents';
 export * from './manage-webset';
 export * from './research';
 export * from './search';
+export * from './team';
 export * from './webset-enrichments';
 export * from './webset-exports';
 export * from './webset-items';

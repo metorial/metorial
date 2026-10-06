@@ -1,0 +1,240 @@
+{
+  "query_content": {
+    "name": "Query Content",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The GraphQL query string to execute against the Contentful Content Delivery API."
+        },
+        "variables": {
+          "description": "Optional variables for the GraphQL query. Keys are variable names, values are their corresponding values.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "queryResult": {
+          "description": "The data returned by the GraphQL query."
+        },
+        "errors": {
+          "description": "GraphQL errors, if any occurred during query execution.",
+          "type": "array",
+          "items": {}
+        }
+      },
+      "required": ["queryResult"],
+      "additionalProperties": false
+    }
+  },
+  "preview_content": {
+    "name": "Preview Content",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The GraphQL query string to execute against the Contentful Content Preview API."
+        },
+        "variables": {
+          "description": "Optional variables for the GraphQL query.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "queryResult": {
+          "description": "The data returned by the GraphQL query (includes draft content)."
+        },
+        "errors": {
+          "description": "GraphQL errors, if any occurred during query execution.",
+          "type": "array",
+          "items": {}
+        }
+      },
+      "required": ["queryResult"],
+      "additionalProperties": false
+    }
+  },
+  "introspect_schema": {
+    "name": "Introspect Schema",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "includeSystemTypes": {
+          "default": false,
+          "description": "Whether to include internal GraphQL system types (types starting with \"__\"). Defaults to false.",
+          "type": "boolean"
+        }
+      },
+      "required": ["includeSystemTypes"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "queryTypeName": {
+          "description": "Name of the root query type.",
+          "type": "string"
+        },
+        "contentTypes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "kind": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "typeName": {
+                      "type": "string"
+                    },
+                    "typeKind": {
+                      "type": "string"
+                    },
+                    "args": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "typeName": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["name"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["name"],
+            "additionalProperties": false
+          },
+          "description": "Available content types and their fields."
+        }
+      },
+      "required": ["contentTypes"],
+      "additionalProperties": false
+    }
+  },
+  "list_content_types": {
+    "name": "List Content Types",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "queryFields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fieldName": {
+                "type": "string",
+                "description": "The GraphQL field name to use in queries."
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "returnType": {
+                "description": "The return type of the query field.",
+                "type": "string"
+              },
+              "isCollection": {
+                "type": "boolean",
+                "description": "Whether this field returns a collection of items."
+              }
+            },
+            "required": ["fieldName", "isCollection"],
+            "additionalProperties": false
+          },
+          "description": "Available top-level query fields in the GraphQL schema."
+        }
+      },
+      "required": ["queryFields"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,14 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, identifier, text } from '../lib/client';
 import { spec } from '../spec';
 
 export let launchPhantom = SlateTool.create(spec, {
   name: 'Launch Phantom',
   key: 'launch_phantom',
-  description: `Launch a Phantom immediately with optional custom arguments. The Phantom must already be set up in your PhantomBuster workspace. Returns a container ID to track the execution.`,
+  description: `Add a Phantom to the launch queue with optional custom arguments. The Phantom must already be set up in your PhantomBuster workspace. Returns a container ID to track the asynchronous execution. Launches can use paid runtime and perform external actions configured in the Phantom.`,
+  tags: { readOnly: false, destructive: true },
   instructions: [
-    'The Phantom must be fully configured in your PhantomBuster workspace before launching via API.',
+    'The Phantom must be fully configured in your PhantomBuster workspace and have succeeded at least once from the dashboard before launching via API.',
     'Combined Phantoms (multi-step automations/Flows) cannot be launched using this tool.',
     'Pass arguments matching the Phantom\'s expected input fields. Use the "Get Phantom" tool to see the current argument configuration.'
   ]
@@ -39,10 +40,10 @@ export let launchPhantom = SlateTool.create(spec, {
 
     return {
       output: {
-        containerId: result?.containerId ? String(result.containerId) : undefined,
-        status: result?.status ?? 'launched'
+        containerId: identifier(result.containerId, 'Returned container ID'),
+        status: text(result.status)
       },
-      message: `Phantom **${ctx.input.phantomId}** has been launched.${result?.containerId ? ` Container ID: ${result.containerId}` : ''}`
+      message: `Phantom **${ctx.input.phantomId}** was accepted into the launch queue.${result?.containerId ? ` Container ID: ${result.containerId}` : ''}`
     };
   })
   .build();

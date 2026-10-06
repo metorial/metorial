@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, mergeQuery, pageInfo } from '../lib/helpers';
+import { limitSchema, pageOutput, resourceId, selection, skipSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let searchAssets = SlateTool.create(spec, {
@@ -13,6 +14,18 @@ export let searchAssets = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...selection,
+      locale: resourceId
+        .optional()
+        .describe(
+          'Locale for the summary file fields. When omitted these fields are returned only for a single file locale.'
+        ),
+      api: z
+        .enum(['management', 'delivery', 'preview'])
+        .optional()
+        .describe(
+          'API for legacy token-only connections. Must match the credential type; reconnect if unknown.'
+        ),
       mimeTypeGroup: z
         .string()
         .optional()
@@ -23,21 +36,20 @@ export let searchAssets = SlateTool.create(spec, {
         .record(z.string(), z.string())
         .optional()
         .describe('Additional Contentful search parameters as key-value pairs.'),
-      limit: z
-        .number()
-        .optional()
-        .describe('Max number of assets to return (1-1000, default 100).'),
-      skip: z.number().optional().describe('Number of assets to skip for pagination.')
+      limit: limitSchema.describe('Max number of assets to return (1-1000, default 100).'),
+      skip: skipSchema.describe('Number of assets to skip for pagination.')
     })
   )
   .output(
     z.object({
+      ...pageOutput,
       total: z.number().describe('Total number of matching assets.'),
       skip: z.number().describe('Number of assets skipped.'),
       limit: z.number().describe('Max assets returned.'),
       assets: z.array(
         z.object({
-          assetId: z.string(),
+          assetId: resourceId,
+          fileLocales: z.array(z.string()).optional(),
           title: z.record(z.string(), z.string()).optional(),
           description: z.record(z.string(), z.string()).optional(),
           fileName: z.string().optional(),
@@ -54,30 +66,27 @@ export let searchAssets = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
 
     let params: Record<string, string | number | boolean> = {};
     if (ctx.input.mimeTypeGroup) params.mimetype_group = ctx.input.mimeTypeGroup;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.skip) params.skip = ctx.input.skip;
-    if (ctx.input.queryParams) {
-      for (let [key, value] of Object.entries(ctx.input.queryParams)) {
-        params[key] = value;
-      }
-    }
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
+    if (ctx.input.skip !== undefined) params.skip = ctx.input.skip;
+    mergeQuery(params, ctx.input.queryParams);
 
     let result = await client.getAssets(params);
-    let items = result.items || [];
+    let items = result.items;
 
-    // Extract file info from the first locale available
     let assets = items.map((item: any) => {
       let fields = item.fields || {};
       let fileField = fields.file;
-      let firstLocale = fileField ? Object.keys(fileField)[0] : undefined;
+      let locales = fileField ? Object.keys(fileField) : [];
+      let firstLocale = ctx.input.locale ?? (locales.length === 1 ? locales[0] : undefined);
       let file = firstLocale ? fileField[firstLocale] : undefined;
 
       return {
         assetId: item.sys?.id,
+        fileLocales: locales,
         title: fields.title,
         description: fields.description,
         fileName: file?.fileName,
@@ -94,12 +103,13 @@ export let searchAssets = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total || 0,
-        skip: result.skip || 0,
-        limit: result.limit || 100,
+        ...pageInfo(result),
+        total: result.total,
+        skip: result.skip,
+        limit: result.limit,
         assets
       },
-      message: `Found **${result.total || 0}** assets (showing ${assets.length}).`
+      message: `Found **${result.total}** assets (showing ${assets.length}).`
     };
   })
   .build();

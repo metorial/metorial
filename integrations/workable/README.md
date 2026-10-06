@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/workable.svg" height="20"> Workable
 
-Manage recruiting, hiring, and HR processes. Create and track job postings, manage candidates through hiring pipelines, and handle employee records. Create, move, disqualify, and comment on candidates. Manage requisitions with approval workflows. Retrieve offers and scheduled events like interviews. Create and manage departments. Handle employee data, documents, and time-off requests. Subscribe to webhooks for candidate, employee, and time-off events. Build custom careers pages with public job listing endpoints.
+Manage recruiting, hiring, and HR processes. Create and track job postings, manage candidates through hiring pipelines, and handle employee records. Create, move, disqualify, and comment on candidates. Manage requisitions with approval workflows. Retrieve offers and scheduled events like interviews. Create and manage departments. Handle employee data, documents, and time-off requests. Build custom careers pages with public job listing endpoints.
 
 ## Tools
 

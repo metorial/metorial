@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwitchClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageRoles = SlateTool.create(spec, {
@@ -44,7 +45,8 @@ export let manageRoles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId);
+    validateInput('manage_roles', ctx.input, [ctx.auth.token]);
+    let client = new TwitchClient(ctx.auth.token, ctx.auth.clientId, ctx.auth.userId);
 
     if (ctx.input.action === 'list') {
       if (ctx.input.role === 'moderator') {
@@ -78,7 +80,8 @@ export let manageRoles = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.userId) throw new Error('userId is required for add/remove actions');
+    if (!ctx.input.userId)
+      throw createApiServiceError('userId is required for add/remove actions');
 
     if (ctx.input.action === 'add') {
       if (ctx.input.role === 'moderator') {

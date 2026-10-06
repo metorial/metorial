@@ -1,87 +1,42 @@
-Now let me check for schema databases and database seeding/branching features:I now have enough information to create a comprehensive specification. Let me compile it.
+# Turso integration specification
 
-# Slates Specification for Turso
+Verified against current official Turso Cloud documentation and official Platform API/TypeScript SDK source on 2026-10-05.
 
-## Overview
+## Authentication and organization selection
 
-Turso is a distributed SQLite-compatible database platform built on libSQL. It provides a Platform API for programmatically managing organizations, groups, databases, locations, members, and API tokens. Turso is commonly used for multi-tenant architectures where each user or tenant gets their own SQLite database in the cloud.
+The Platform API is `https://api.turso.tech`, authenticated with a Platform API Bearer token. Token validation uses `GET /v1/auth/validate`; the authenticated profile and `get_current_user` use `GET /v1/user`. `list_organizations` exposes stable organization slugs and display names. Scoped tools accept optional `organizationSlug`; a legacy saved organization remains a fallback for existing connections. No organization is selected automatically for a mutation.
 
-## Authentication
+New Platform tokens should be organization-scoped. Group-scoped Platform tokens require organization, group and scopes. Unrestricted tokens are deprecated, but existing tokens continue to work. Database/group SQL tokens have a separate purpose and authenticate database hosts, not the Platform API.
 
-The Turso API uses API tokens to authenticate requests. You can create and revoke API tokens using the Turso CLI and the Authentication API.
+## Capabilities and routes
 
-Turso uses Bearer authentication, and requires your API token to be passed with all protected requests in the `Authorization` header:
+- Databases: v1 organization-scoped list/create/get/delete/configuration/usage/stats/instances and SQL-token creation/rotation. List accepts group and parent filters. Configuration includes size, read/write blocking, delete protection, IP/VPC restrictions and legacy ATTACH. Empty restriction lists clear those restrictions; omission leaves them unchanged.
+- Groups: v1 list/create/get/delete, SQL-token creation/rotation, transfer, unarchive and grandfathered replica-location add/remove. Removing the primary location is rejected before mutation. A group transfer includes every database and revokes group-scoped Platform tokens under Turso's policy.
+- Organizations: v1 retrieval, usage, subscription and invoice metadata; identity/discovery tools cover `/v1/user` and `/v1/organizations`.
+- Members: v1 member list/add/remove; current v2 invitation list/create/delete. Pending invitations map `accepted` to false because the v2 list contains pending invitations only. The official SDK and OpenAPI disagree about the legacy member-add route; the implementation follows the current documented POST collection route with `username`.
+- Platform API tokens: v1 list/create/revoke plus `/v1/auth/validate`. Optional organization/group/scopes create restricted tokens. Credential values appear only in the explicit token-creation results.
+- Audit logs: v1 `page` and `page_size`, independently sent. Defaults remain with the provider (documented page size 100); returned pagination is mapped without synthetic totals. Audit logs require Scaler or higher.
+- Closest region: public `GET https://region.turso.io/`, without sending the Platform credential. This describes the request origin, not the end user's machine.
 
-```
-Authorization: Bearer TOKEN
-```
+## Lifecycle and schema compatibility
 
-**Base URL:** `https://api.turso.tech`
+All 21 original tool keys and supported inputs remain. Two additions provide user and organization discovery. Replica placement, Multi-DB Schemas and ATTACH were discontinued for new users; eligible existing paid users remain supported. The official SDK retains dump seeds and replica methods, so these inputs/routes are preserved rather than retired based on incomplete OpenAPI coverage.
 
-**How to obtain an API token:**
+Current creation responses provide only `Name`, `DbId`, `Hostname`. Other database responses and group responses can omit legacy fields such as regions, server version, archive/sleep/schema/ATTACH status. Existing output field names and types remain, but omitted provider fields are optional. No false state or region list is manufactured. Optional invoice dates/PDF URLs account for unpaid/upcoming invoice responses. Subscription objects map their name/plan into the existing subscription string.
 
-1. Install the Turso CLI and log in with `turso auth login` (authenticates via GitHub in the browser).
-2. The Turso CLI will generate a temporary token once you login that expires in one week.
-3. Create a long-lived API token that doesn't expire using the Platform API:
-   ```
-   POST https://api.turso.tech/v1/auth/api-tokens/{tokenName}
-   ```
-4. The token in the response is never revealed again. Store this somewhere safe, and never share or commit it to source control.
+The database HTTP API (`/v2/pipeline`, `/v1/upload`, `/dump`) uses database-host URLs and SQL tokens; these operations are outside this control-plane integration's 23-tool scope. Invoice tools return metadata/permalinks, not a generated/downloaded file. There are no triggers.
 
-An API token belongs to a user and grants access to any organization you own or are a member of.
+Resource responses must identify the requested database, group, member or token before completion is reported. Malformed Unicode identifiers fail validation before a request. Error messages redact the connection token and supplied dump URL; HTTP status and a valid numeric or HTTP-date Retry-After remain available without retaining raw requests, response bodies or arbitrary headers.
 
-**Additional context:** The Platform API can be used with your personal account or with an organization. Most API calls are scoped to an organization slug, which is passed as a path parameter (e.g., `/v1/organizations/{organizationSlug}/databases`).
+## Official references
 
-**Database Tokens (separate from API tokens):** Tokens by default enable full-access to databases, but you can create a read-only token by passing the query string `authorization=read-only`. Database tokens are used to connect to databases via SDKs, not for the Platform API itself.
-
-## Features
-
-### Database Management
-
-Create, list, retrieve, delete, and configure databases within an organization. Turso provides two types of databases: individual and schema databases. An individual database is a standalone database. A schema database is used to control the schema of other databases (Multi-DB Schemas).
-
-- Databases are created within a group and inherit the group's locations.
-- Databases can be seeded from an existing database, a database dump URL, or a database file upload.
-- Database configuration includes options to block reads, block writes, allow attach, and set size limits.
-- You can retrieve database usage statistics (rows read, rows written, storage) and top queries for performance analysis.
-- Generate database-specific auth tokens with optional expiration and read-only access.
-
-### Group Management
-
-Groups represent physical machines that host databases in specific regions. Each time you add locations to a group, you create a new machine in a new location with a replica of all databases from the primary.
-
-- Create, list, retrieve, and delete groups.
-- Manage groups including adding and removing locations, as well as unarchiving or upgrading group versions.
-- Generate group-level auth tokens that grant access to all databases in the group.
-- Group tokens can be configured with custom expiration (e.g., `2w1d30m`) and read-only authorization.
-- Token rotation is available to invalidate all existing tokens for a group.
-
-### Location Discovery
-
-Fetch all available locations where your database group can be located. You can also find the closest location to the requester.
-
-### Organization Management
-
-Manage your organization, its members and invites.
-
-- List, retrieve, and update organizations.
-- View available plans and current subscription details.
-- Retrieve invoices and current usage (rows read, rows written, storage).
-- Add and remove members with roles (e.g., admin).
-- Invite users by email and manage pending invitations.
-
-### API Token Management
-
-Create, validate and revoke API keys that can be used to access the API.
-
-- Tokens are created with a name and returned as JWTs.
-- List existing tokens and revoke them by name.
-- Validate tokens to check expiration status.
-
-### Audit Logs
-
-Access audit logs to monitor activity within your organization, tracking actions taken by members.
-
-## Events
-
-The provider does not support events. Turso's Platform API does not offer webhooks or event subscription mechanisms for changes to databases, groups, or other resources.
+- https://docs.turso.tech/api-reference/introduction
+- https://docs.turso.tech/api-reference/authentication
+- https://docs.turso.tech/api-reference/user/get-current
+- https://docs.turso.tech/api-reference/organizations/list
+- https://docs.turso.tech/api-reference/locations/closest-region
+- https://docs.turso.tech/api-reference/databases/upload
+- https://docs.turso.tech/sdk/http/reference
+- https://turso.tech/blog/upcoming-changes-to-the-turso-platform-and-roadmap
+- https://github.com/tursodatabase/turso-docs/blob/46be9b6e36a2246277639182e977f0a215490886/api-reference/openapi.json
+- https://github.com/tursodatabase/turso-api-client-ts/tree/38a8b4ebbc3825fca0e6e525ba7648192eb73c0d/src

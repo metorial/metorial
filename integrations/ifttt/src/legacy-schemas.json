@@ -1,0 +1,380 @@
+{
+  "get_connection": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The ID of the connection to retrieve"
+        },
+        "userId": {
+          "description": "The user ID to retrieve user-specific connection configuration",
+          "type": "string"
+        }
+      },
+      "required": ["connectionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The connection ID"
+        },
+        "status": {
+          "description": "The connection status (e.g., enabled, disabled)",
+          "type": "string"
+        },
+        "connection": {
+          "description": "Full connection details including triggers, actions, queries, and user configuration"
+        }
+      },
+      "required": ["connectionId", "connection"],
+      "additionalProperties": false
+    }
+  },
+  "update_connection": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The ID of the connection to update"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The user ID whose connection to update"
+        },
+        "configuration": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "The full connection configuration object to set (replaces existing configuration)"
+        }
+      },
+      "required": ["connectionId", "userId", "configuration"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The connection ID that was updated"
+        },
+        "result": {
+          "description": "The updated connection configuration"
+        }
+      },
+      "required": ["connectionId", "result"],
+      "additionalProperties": false
+    }
+  },
+  "run_action": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The ID of the connection containing the action"
+        },
+        "actionId": {
+          "type": "string",
+          "description": "The action identifier (e.g., \"google_calendar.create_event\")"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The user ID to run the action for"
+        },
+        "fields": {
+          "description": "Action field values specific to the action being run",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "userFeatureId": {
+          "description": "Optional user feature ID to scope the action",
+          "type": "string"
+        }
+      },
+      "required": ["connectionId", "actionId", "userId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The connection ID"
+        },
+        "actionId": {
+          "type": "string",
+          "description": "The action that was executed"
+        },
+        "result": {
+          "description": "The action execution result, if any"
+        }
+      },
+      "required": ["connectionId", "actionId"],
+      "additionalProperties": false
+    }
+  },
+  "perform_query": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The ID of the connection containing the query"
+        },
+        "queryId": {
+          "type": "string",
+          "description": "The query identifier (e.g., \"weather.current_conditions\")"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The user ID to run the query for"
+        },
+        "fields": {
+          "description": "Query field values specific to the query being run",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "limit": {
+          "description": "Maximum number of results to return (default: 50)",
+          "type": "number"
+        },
+        "cursor": {
+          "description": "Pagination cursor from a previous query response",
+          "type": "string"
+        }
+      },
+      "required": ["connectionId", "queryId", "userId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The connection ID"
+        },
+        "queryId": {
+          "type": "string",
+          "description": "The query that was executed"
+        },
+        "items": {
+          "description": "The query result items"
+        }
+      },
+      "required": ["connectionId", "queryId", "items"],
+      "additionalProperties": false
+    }
+  },
+  "test_trigger": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The ID of the connection containing the trigger"
+        },
+        "triggerId": {
+          "type": "string",
+          "description": "The trigger identifier (e.g., \"google_calendar.any_event_starts\")"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The user ID to simulate the trigger event for"
+        },
+        "userFeatureId": {
+          "description": "Optional user feature ID to scope the trigger test",
+          "type": "string"
+        }
+      },
+      "required": ["connectionId", "triggerId", "userId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The connection ID"
+        },
+        "triggerId": {
+          "type": "string",
+          "description": "The trigger that was tested"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether the test trigger request was accepted"
+        }
+      },
+      "required": ["connectionId", "triggerId", "success"],
+      "additionalProperties": false
+    }
+  },
+  "fire_webhook": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "eventName": {
+          "type": "string",
+          "description": "The webhook event name (letters, numbers, and underscores only)"
+        },
+        "value1": {
+          "description": "First value to pass to the webhook trigger",
+          "type": "string"
+        },
+        "value2": {
+          "description": "Second value to pass to the webhook trigger",
+          "type": "string"
+        },
+        "value3": {
+          "description": "Third value to pass to the webhook trigger",
+          "type": "string"
+        },
+        "jsonPayload": {
+          "description": "Full JSON payload for the JSON webhook trigger variant. When provided, value1-3 are ignored and the JSON trigger endpoint is used instead.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["eventName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "eventName": {
+          "type": "string",
+          "description": "The event name that was fired"
+        },
+        "response": {
+          "description": "Response from the IFTTT Webhooks service"
+        }
+      },
+      "required": ["eventName", "response"],
+      "additionalProperties": false
+    }
+  },
+  "send_realtime_notification": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "notifications": {
+          "minItems": 1,
+          "maxItems": 1000,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "description": "The user ID to notify IFTTT about",
+                "type": "string"
+              },
+              "triggerIdentity": {
+                "description": "The trigger identity to notify IFTTT about",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "description": "Array of notification targets (each must have userId and/or triggerIdentity)"
+        }
+      },
+      "required": ["notifications"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "notificationCount": {
+          "type": "number",
+          "description": "Number of notifications sent"
+        },
+        "result": {
+          "description": "Response from the Realtime API"
+        }
+      },
+      "required": ["notificationCount", "result"],
+      "additionalProperties": false
+    }
+  },
+  "get_field_options": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The ID of the connection"
+        },
+        "fieldType": {
+          "type": "string",
+          "enum": ["triggers", "actions", "queries"],
+          "description": "The type of field (triggers, actions, or queries)"
+        },
+        "typeId": {
+          "type": "string",
+          "description": "The trigger, action, or query identifier"
+        },
+        "fieldSlug": {
+          "type": "string",
+          "description": "The field slug to get options for"
+        },
+        "userId": {
+          "description": "The user ID for user-specific field options",
+          "type": "string"
+        }
+      },
+      "required": ["connectionId", "fieldType", "typeId", "fieldSlug"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "The connection ID"
+        },
+        "fieldSlug": {
+          "type": "string",
+          "description": "The field slug"
+        },
+        "options": {
+          "description": "Array of available option objects with label and value properties"
+        }
+      },
+      "required": ["connectionId", "fieldSlug", "options"],
+      "additionalProperties": false
+    }
+  }
+}

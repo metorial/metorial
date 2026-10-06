@@ -1,57 +1,31 @@
 # <img src="https://provider-logos.metorial-cdn.com/mode.png" height="20"> Mode
 
-Manage collaborative analytics reports, SQL queries, and dashboards. Create, update, archive, and delete reports within collections. Execute report runs and retrieve query results, with export to CSV or PDF. Schedule recurring report executions and manage subscriptions for report distribution. Manage datasets, data source connections, and metric definitions. Organize reports into collections (spaces). Access and manage Python/R notebooks within reports. Manage workspace members and roles. Receive webhook notifications for report, run, data source, definition, and membership events.
+Read and manage Mode reports, SQL queries, collections, datasets and reusable SQL definitions. Inspect asynchronous runs, download existing results as CSV, JSON or PDF, and manage recurring report schedules.
 
-## Tools
+Connect a paid Mode workspace using its workspace slug, API token and secret. Workspace API tokens have administrator access. Existing personal tokens retain the user's permissions; Mode no longer issues new personal tokens. The connection verifies credentials and access to the selected workspace. Existing connections with a workspace slug in configuration continue to work.
 
-### Get Report
+| Tools | Capabilities |
+| --- | --- |
+| Get Current Account | Verify credentials and identify the authorized configured workspace |
+| Get Report / List Reports / Manage Report | Read, update, move, archive, unarchive or delete reports |
+| Manage Query | Create, list, update or delete SQL queries in a report |
+| Run Report / Get Report Run / List Report Runs | Request asynchronous execution and inspect report/query-run status |
+| Download Results | Download successful report results as CSV, JSON or PDF; query results as CSV or JSON |
+| List Collections / Manage Collection | Read, create, update or delete empty collections |
+| List Datasets / Manage Dataset | Read by collection/data source, update, move or delete datasets |
+| List Data Sources | Discover connections and numeric IDs needed for SQL queries and definitions |
+| List Definitions / Manage Definition | Read, create, update or delete reusable SQL definitions |
+| List Report Schedules / Manage Report Schedule | Read and manage recurring executions |
+| List Members | Read workspace memberships and roles |
 
-Retrieve detailed information about a specific Mode report by its token. Returns the report's name, description, archived status, timestamps, and associated collection.
+Lists follow provider pagination when no page is requested. An explicit page returns one page and available pagination metadata. Dataset listing requires exactly one collection or data source; report listing can read the entire workspace.
 
-### List Data Sources
+Executing reports runs their SQL and notebooks and may incur warehouse costs or other configured effects. Schedules repeat those effects and may notify existing subscribers. Downloads read existing results, accept files up to 50 MiB and do not execute reports. PDF exports apply to a whole report run. Permanent deletion cannot be undone.
 
-List all database connections (data sources) configured in the workspace. Returns each data source's name, adapter type, host, database, and port.
+The current Mode API does not provide general report or dataset creation in this integration. Workspace tokens cannot clone reports. Data-source administration, invitations, subscription changes and notebook editing are outside this tool set.
 
-### List Members
-
-List all members of the Mode workspace. Returns each member's username, email, name, admin status, and membership state.
-
-### List Reports
-
-List reports within a Mode workspace. You can filter reports by collection or data source. Supports ordering and filtering by creation or update timestamps.
-
-### List Collections
-
-List all collections (formerly Spaces) in the workspace. Optionally filter to include all collections (including ones the admin has not joined) or only custom collections.
-
-### List Datasets
-
-List datasets in the workspace. Filter by collection or data source. Supports ordering by creation or update timestamps.
-
-### List Definitions
-
-List metric definitions in the workspace. Definitions provide a shared vocabulary for key metrics across the organization. Optionally filter by tokens.
-
-### Manage Query
-
-Create, update, list, or delete SQL queries within a Mode report. Use **create** to add a new SQL query to a report. Use **update** to modify an existing query's SQL, name, or data source. Use **list** to get all queries in a report. Use **delete** to remove a query from a report.
-
-### Manage Report
-
-Update, archive, unarchive, or delete a Mode report. Use **update** to change the report's name, description, or move it to a different collection. Use **archive** or **unarchive** to soft-delete/restore a report. Use **delete** to permanently remove a report.
-
-### List Report Schedules
-
-List all scheduled runs configured for a specific Mode report. Returns schedule details including frequency, time, and timezone.
-
-### Run Report
-
-Trigger a new execution (run) of a Mode report. Optionally pass parameters to customize the run. Returns the run's token and initial state so you can track its progress.
+[Official Mode API reference](https://mode.com/developer/api-reference/introduction/).
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE)

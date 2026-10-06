@@ -11,7 +11,21 @@ export let listTemplates = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum templates per page (1-100).'),
+      nextToken: z
+        .string()
+        .optional()
+        .describe('Cursor from a previous response to fetch the next page.')
+    })
+  )
   .output(
     z.object({
       templates: z
@@ -26,6 +40,10 @@ export let listTemplates = SlateTool.create(spec, {
             diskSizeMb: z.number().optional().describe('Disk size in megabytes.'),
             public: z.boolean().describe('Whether the template is publicly available.'),
             aliases: z.array(z.string()).describe('Human-readable aliases for the template.'),
+            names: z
+              .array(z.string())
+              .optional()
+              .describe('Names of the template including the team namespace.'),
             createdAt: z
               .string()
               .optional()
@@ -40,18 +58,22 @@ export let listTemplates = SlateTool.create(spec, {
               .describe('Current build status (e.g., ready, building, error).')
           })
         )
-        .describe('List of available templates.')
+        .describe('List of available templates.'),
+      nextToken: z
+        .string()
+        .optional()
+        .describe('Cursor to fetch the next page when more templates exist.')
     })
   )
   .handleInvocation(async ctx => {
     let client = new E2BClient({ token: ctx.auth.token });
 
     ctx.progress('Fetching templates...');
-    let templates = await client.listTemplates();
+    let result = await client.listTemplates(ctx.input);
 
     return {
-      output: { templates },
-      message: `Found **${templates.length}** template(s).`
+      output: result,
+      message: `Found **${result.templates.length}** template(s).`
     };
   })
   .build();

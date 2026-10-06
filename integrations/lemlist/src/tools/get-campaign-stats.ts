@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, optionalNumber } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCampaignStats = SlateTool.create(spec, {
@@ -33,7 +33,12 @@ export let getCampaignStats = SlateTool.create(spec, {
       leadsLaunched: z.number().optional(),
       leadsReached: z.number().optional(),
       leadsOpened: z.number().optional(),
-      leadsClicked: z.number().optional(),
+      leadsClicked: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy field for the provider nbLeadsInteracted metric, which includes clicks and replies; it is not a click-only counter.'
+        ),
       leadsReplied: z.number().optional(),
       leadsInterested: z.number().optional(),
       leadsNotInterested: z.number().optional(),
@@ -49,37 +54,33 @@ export let getCampaignStats = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let stats = await client.getCampaignStats(ctx.input.campaignId, {
-      startDate: ctx.input.startDate,
-      endDate: ctx.input.endDate,
-      channels: ctx.input.channels
-    });
-
-    let output = {
-      leadsTotal: stats.nbLeads,
-      leadsLaunched: stats.nbLeadsLaunched,
-      leadsReached: stats.nbLeadsReached,
-      leadsOpened: stats.nbLeadsOpened,
-      leadsClicked: stats.nbLeadsInteracted,
-      leadsReplied: stats.nbLeadsAnswered,
-      leadsInterested: stats.nbLeadsInterested,
-      leadsNotInterested: stats.nbLeadsNotInterested,
-      leadsUnsubscribed: stats.nbLeadsUnsubscribed,
-      messagesSent: stats.messagesSent,
-      messagesNotSent: stats.messagesNotSent,
-      messagesBounced: stats.messagesBounced,
-      delivered: stats.delivered,
-      opened: stats.opened,
-      clicked: stats.clicked,
-      replied: stats.replied,
-      meetingBooked: stats.meetingBooked
+    const stats = await new Client({ token: ctx.auth.token }).getCampaignStats(
+      ctx.input.campaignId,
+      ctx.input
+    );
+    const output = {
+      leadsTotal: optionalNumber(stats.nbLeads),
+      leadsLaunched: optionalNumber(stats.nbLeadsLaunched),
+      leadsReached: optionalNumber(stats.nbLeadsReached),
+      leadsOpened: optionalNumber(stats.nbLeadsOpened),
+      leadsClicked: optionalNumber(stats.nbLeadsInteracted),
+      leadsReplied: optionalNumber(stats.nbLeadsAnswered),
+      leadsInterested: optionalNumber(stats.nbLeadsInterested),
+      leadsNotInterested: optionalNumber(stats.nbLeadsNotInterested),
+      leadsUnsubscribed: optionalNumber(stats.nbLeadsUnsubscribed),
+      messagesSent: optionalNumber(stats.messagesSent),
+      messagesNotSent: optionalNumber(stats.messagesNotSent),
+      messagesBounced: optionalNumber(stats.messagesBounced),
+      delivered: optionalNumber(stats.delivered),
+      opened: optionalNumber(stats.opened),
+      clicked: optionalNumber(stats.clicked),
+      replied: optionalNumber(stats.replied),
+      meetingBooked: optionalNumber(stats.meetingBooked)
     };
-
     return {
       output,
-      message: `Campaign stats: **${output.messagesSent ?? 0}** sent, **${output.opened ?? 0}** opened, **${output.clicked ?? 0}** clicked, **${output.replied ?? 0}** replied.`
+      message:
+        'Retrieved the available campaign metrics for the requested date range. Omitted counters remain unknown.'
     };
   })
   .build();

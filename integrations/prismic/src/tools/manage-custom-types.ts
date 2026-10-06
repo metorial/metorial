@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TypesApiClient } from '../lib/client';
+import { invalid, protect } from '../lib/contracts';
 import { spec } from '../spec';
 
 let customTypeOutputSchema = z.object({
@@ -8,7 +9,7 @@ let customTypeOutputSchema = z.object({
   label: z.string().describe('Human-readable label'),
   repeatable: z.boolean().describe('Whether multiple documents of this type can exist'),
   status: z.boolean().describe('Whether the custom type is active'),
-  json: z.record(z.string(), z.any()).describe('JSON schema defining the type structure')
+  json: z.record(z.string(), z.unknown()).describe('JSON schema defining the type structure')
 });
 
 export let listCustomTypes = SlateTool.create(spec, {
@@ -29,12 +30,19 @@ Requires a Write API token.`,
     })
   )
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing custom types.');
+      invalid('Write API token is required for managing custom types.');
     }
 
     let client = new TypesApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 
@@ -71,12 +79,19 @@ Requires a Write API token.`,
   )
   .output(customTypeOutputSchema)
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing custom types.');
+      invalid('Write API token is required for managing custom types.');
     }
 
     let client = new TypesApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 
@@ -113,18 +128,25 @@ Requires a Write API token.`,
       repeatable: z.boolean().describe('Whether multiple documents of this type can exist'),
       status: z.boolean().optional().describe('Whether the type is active (default true)'),
       json: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .describe('JSON schema defining the type structure (tabs with field definitions)')
     })
   )
   .output(customTypeOutputSchema)
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing custom types.');
+      invalid('Write API token is required for managing custom types.');
     }
 
     let client = new TypesApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 
@@ -164,17 +186,24 @@ Requires a Write API token.`,
       label: z.string().describe('Updated human-readable label'),
       repeatable: z.boolean().describe('Whether multiple documents of this type can exist'),
       status: z.boolean().describe('Whether the type is active'),
-      json: z.record(z.string(), z.any()).describe('Updated JSON schema')
+      json: z.record(z.string(), z.unknown()).describe('Updated JSON schema')
     })
   )
   .output(customTypeOutputSchema)
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing custom types.');
+      invalid('Write API token is required for managing custom types.');
     }
 
     let client = new TypesApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 
@@ -220,12 +249,19 @@ Requires a Write API token.`,
     })
   )
   .handleInvocation(async ctx => {
+    const protectedTokens = [
+      ctx.auth.token,
+      ctx.auth.writeToken,
+      ctx.auth.migrationToken
+    ].filter((value): value is string => !!value);
+    protect(ctx.input, protectedTokens);
     if (!ctx.auth.writeToken) {
-      throw new Error('Write API token is required for managing custom types.');
+      invalid('Write API token is required for managing custom types.');
     }
 
     let client = new TypesApiClient({
       repositoryName: ctx.config.repositoryName,
+      protectedTokens,
       writeToken: ctx.auth.writeToken
     });
 

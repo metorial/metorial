@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { safeMonitorUrl } from '../lib/types';
 import { spec } from '../spec';
 
 let monitorSchema = z.object({
@@ -29,9 +30,10 @@ let monitorSchema = z.object({
 export let listMonitors = SlateTool.create(spec, {
   name: 'List Monitors',
   key: 'list_monitors',
-  description: `Retrieve monitors from your UptimeRobot account with optional filtering by type, status, or search term. Returns monitor details including current status, URL, type, and check interval. Supports pagination for large monitor lists.`,
+  description: `Use a Legacy API Key connection (API v2). Retrieve monitors from your UptimeRobot account with optional filtering by type, status, or search term. Returns monitor details including current status, URL, type, and check interval. Supports pagination for large monitor lists.`,
   tags: {
-    readOnly: true
+    readOnly: true,
+    destructive: false
   }
 })
   .input(
@@ -64,7 +66,7 @@ export let listMonitors = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let typeMap: Record<string, number> = {
       http: 1,
@@ -92,22 +94,24 @@ export let listMonitors = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let monitors = result.monitors.map((m: any) => ({
+    let monitors = result.monitors.map(m => ({
       monitorId: m.id,
       friendlyName: m.friendly_name,
-      url: m.url,
+      url: m.type === 5 ? '[redacted]' : (safeMonitorUrl(m.url) ?? ''),
       type: m.type,
       status: m.status,
       interval: m.interval,
-      ...(m.custom_uptime_ratio && { uptimeRatio: m.custom_uptime_ratio }),
+      ...((m.custom_uptime_ratios ?? m.custom_uptime_ratio) && {
+        uptimeRatio: m.custom_uptime_ratios ?? m.custom_uptime_ratio
+      }),
       ...(m.ssl && {
         ssl: { brand: m.ssl.brand, product: m.ssl.product, expires: m.ssl.expires }
       })
     }));
 
-    let total = result.pagination?.total ?? monitors.length;
-    let offset = result.pagination?.offset ?? 0;
-    let limit = result.pagination?.limit ?? 50;
+    let total = result.pagination.total;
+    let offset = result.pagination.offset;
+    let limit = result.pagination.limit;
 
     return {
       output: { monitors, total, offset, limit },

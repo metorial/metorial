@@ -15,8 +15,6 @@ import {
   publishEvent,
   updateEvent
 } from './tools';
-import { attendeeActivity, eventLifecycle, orderActivity } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,5 +32,5 @@ export let provider = Slate.create({
     manageOrganizer,
     getUser
   ],
-  triggers: [eventLifecycle, orderActivity, attendeeActivity]
+  triggers: []
 });

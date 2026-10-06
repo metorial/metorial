@@ -13,8 +13,8 @@ export let forkRepo = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Owner of the repository to fork'),
-      repo: z.string().describe('Name of the repository to fork'),
+      owner: z.string().min(1).describe('Owner of the repository to fork'),
+      repo: z.string().min(1).describe('Name of the repository to fork'),
       organization: z
         .string()
         .optional()
@@ -31,7 +31,7 @@ export let forkRepo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let r = await client.forkRepo(ctx.input.owner, ctx.input.repo, {
       organization: ctx.input.organization,
       name: ctx.input.name

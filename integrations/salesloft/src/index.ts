@@ -6,14 +6,17 @@ import {
   createNote,
   createPerson,
   deleteAccount,
+  deleteNote,
   deletePerson,
   getAccount,
   getCadence,
   getEmailTemplate,
   getMe,
+  getNote,
   getPerson,
   getTask,
   listAccounts,
+  listCadenceMemberships,
   listCadences,
   listCallActivities,
   listEmailActivities,
@@ -28,16 +31,6 @@ import {
   updateNote,
   updatePerson
 } from './tools';
-import {
-  accountEvents,
-  cadenceEvents,
-  callEvents,
-  meetingEvents,
-  noteEvents,
-  personEvents,
-  taskEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -66,15 +59,10 @@ export let provider = Slate.create({
     listTasks,
     getTask,
     listUsers,
-    getMe
+    getMe,
+    getNote,
+    deleteNote,
+    listCadenceMemberships
   ],
-  triggers: [
-    personEvents,
-    accountEvents,
-    cadenceEvents,
-    callEvents,
-    meetingEvents,
-    noteEvents,
-    taskEvents
-  ]
+  triggers: []
 });

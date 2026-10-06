@@ -1,41 +1,45 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImgixClient } from '../lib/client';
+import { assetOutput, mapAsset, originPath, sourceId } from '../lib/schemas';
 import { spec } from '../spec';
-
-export let refreshAsset = SlateTool.create(spec, {
+export const refreshAsset = SlateTool.create(spec, {
   name: 'Refresh Asset',
   key: 'refresh_asset',
-  description: `Refresh an asset from its origin storage, forcing Imgix to re-fetch and reprocess the latest version. If the asset's ETag has changed, the cache is automatically purged. Use this when the origin file has been updated and you want Imgix to pick up the changes.`,
-  constraints: ['Rate limit: 10 requests per minute.'],
-  tags: {
-    destructive: false
-  }
+  description:
+    'Request origin re-fetch, reprocessing when the ETag changes, and cache purge for a path in a source discovered by list_sources. Can also add a previously uncrawled origin asset. This does not erase origin files or history.',
+  constraints: [
+    'Requires Asset Manager Edit and Purge permissions; the documented refresh rate is 10 per minute.'
+  ],
+  tags: { readOnly: false, destructive: true }
 })
-  .input(
-    z.object({
-      sourceId: z.string().describe('ID of the source containing the asset'),
-      originPath: z
-        .string()
-        .describe('Origin path of the asset to refresh (e.g., "images/photo.jpg")')
-    })
-  )
+  .input(z.object({ sourceId, originPath }))
   .output(
     z.object({
-      originPath: z.string().describe('Origin path of the refreshed asset'),
-      refreshed: z.boolean().describe('Whether the refresh request was accepted')
+      originPath: z.string(),
+      refreshed: z
+        .boolean()
+        .describe(
+          'The provider returned a successful refresh receipt; this does not prove every cached derivative changed.'
+        ),
+      asset: assetOutput
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ImgixClient(ctx.auth.token);
-    await client.refreshAsset(ctx.input.sourceId, ctx.input.originPath);
-
+    const asset = (
+      await new ImgixClient(ctx.auth.token).refreshAsset(
+        ctx.input.sourceId,
+        ctx.input.originPath
+      )
+    ).data;
     return {
       output: {
-        originPath: ctx.input.originPath,
-        refreshed: true
+        originPath: asset.attributes.origin_path,
+        refreshed: true,
+        asset: mapAsset(asset)
       },
-      message: `Refreshed asset **${ctx.input.originPath}** from origin.`
+      message:
+        'The provider accepted refresh and returned asset metadata. Origin files and retained history remain; cached clients may need a separate refresh.'
     };
   })
   .build();

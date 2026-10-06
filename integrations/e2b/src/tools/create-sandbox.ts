@@ -23,6 +23,9 @@ You can specify a custom template, set a timeout, configure auto-pause behavior,
         ),
       timeout: z
         .number()
+        .int()
+        .min(1)
+        .max(86400)
         .optional()
         .describe(
           'Sandbox timeout in seconds. After this period the sandbox is killed (or paused if autoPause is enabled). Max 86400 (24h) for Pro, 3600 (1h) for Hobby.'
@@ -37,6 +40,21 @@ You can specify a custom template, set a timeout, configure auto-pause behavior,
         .record(z.string(), z.string())
         .optional()
         .describe('Custom key-value metadata to attach to the sandbox.'),
+      volumeMounts: z
+        .array(
+          z.object({
+            name: z
+              .string()
+              .min(1)
+              .describe('Volume name. Use list_volumes to discover available volumes.'),
+            path: z
+              .string()
+              .regex(/^\//)
+              .describe('Absolute path inside the sandbox where the volume is mounted.')
+          })
+        )
+        .optional()
+        .describe('Persistent volumes to mount inside the sandbox.'),
       envVars: z
         .record(z.string(), z.string())
         .optional()
@@ -53,6 +71,7 @@ You can specify a custom template, set a timeout, configure auto-pause behavior,
       endAt: z
         .string()
         .describe('ISO 8601 timestamp when the sandbox is scheduled to expire.'),
+      state: z.string().optional().describe('Current state of the created sandbox.'),
       cpuCount: z.number().optional().describe('Number of vCPUs allocated.'),
       memoryMb: z.number().optional().describe('Memory allocated in megabytes.'),
       metadata: z
@@ -70,7 +89,8 @@ You can specify a custom template, set a timeout, configure auto-pause behavior,
       timeout: ctx.input.timeout,
       autoPause: ctx.input.autoPause,
       metadata: ctx.input.metadata,
-      envVars: ctx.input.envVars
+      envVars: ctx.input.envVars,
+      volumeMounts: ctx.input.volumeMounts
     });
 
     return {
@@ -83,7 +103,8 @@ You can specify a custom template, set a timeout, configure auto-pause behavior,
         endAt: sandbox.endAt,
         cpuCount: sandbox.cpuCount,
         memoryMb: sandbox.memoryMb,
-        metadata: sandbox.metadata
+        metadata: sandbox.metadata,
+        state: sandbox.state
       },
       message: `Created sandbox **${sandbox.sandboxId}** from template \`${sandbox.templateId || 'default'}\`. Expires at ${sandbox.endAt || 'N/A'}.`
     };

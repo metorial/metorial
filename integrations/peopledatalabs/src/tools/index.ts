@@ -1,4 +1,5 @@
 export * from './autocomplete';
+export * from './bulk-enrichment';
 export * from './clean-data';
 export * from './enrich-company';
 export * from './enrich-ip';

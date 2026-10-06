@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getRelatedItems = SlateTool.create(spec, {
@@ -26,11 +27,12 @@ export let getRelatedItems = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'get_related_items');
     let client = new Client(ctx.auth);
     let items = await client.getRelatedItems(ctx.input.entityType, ctx.input.entityId);
 
     return {
-      output: { relatedItems: Array.isArray(items) ? items : [] },
+      output: { relatedItems: items },
       message: `Retrieved related items for ${ctx.input.entityType} ${ctx.input.entityId}.`
     };
   })
@@ -66,6 +68,7 @@ export let createRelatedItem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'create_related_item');
     let client = new Client(ctx.auth);
     await client.createRelatedItem(ctx.input.entityType, ctx.input.entityId, {
       resource: {
@@ -107,6 +110,7 @@ export let deleteRelatedItem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'delete_related_item');
     let client = new Client(ctx.auth);
     await client.deleteRelatedItem(ctx.input.entityType, ctx.input.entityId, {
       resource: {

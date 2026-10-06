@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WriterClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,6 +15,7 @@ export let textCompletion = SlateTool.create(spec, {
     z.object({
       model: z
         .enum([
+          'palmyra-x6',
           'palmyra-x5',
           'palmyra-x4',
           'palmyra-fin',
@@ -22,7 +23,15 @@ export let textCompletion = SlateTool.create(spec, {
           'palmyra-creative',
           'palmyra-x-003-instruct'
         ])
-        .describe('Palmyra model to use for text generation'),
+        .optional()
+        .describe('Palmyra model to use. Choose this or modelId.'),
+      modelId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          'Available model ID from list_models, including external models. Choose this or model.'
+        ),
       prompt: z.string().describe('Input text prompt for the model to complete'),
       temperature: z
         .number()
@@ -30,7 +39,12 @@ export let textCompletion = SlateTool.create(spec, {
         .max(2)
         .optional()
         .describe('Controls randomness (0 = deterministic, 2 = creative). Default: 1'),
-      maxTokens: z.number().optional().describe('Maximum number of tokens to generate'),
+      maxTokens: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum number of tokens to generate'),
       topP: z.number().min(0).max(1).optional().describe('Nucleus sampling threshold (0-1)'),
       stop: z
         .union([z.string(), z.array(z.string())])
@@ -38,9 +52,11 @@ export let textCompletion = SlateTool.create(spec, {
         .describe('Stop sequence(s) that halt generation'),
       bestOf: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Generate multiple completions and return the best one'),
-      randomSeed: z.number().optional().describe('Seed for reproducible outputs')
+      randomSeed: z.number().int().optional().describe('Seed for reproducible outputs')
     })
   )
   .output(
@@ -56,12 +72,21 @@ export let textCompletion = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.model === undefined) === (ctx.input.modelId === undefined))
+      throw createApiServiceError(
+        'Provide either model or modelId. Call list_models to discover available IDs.'
+      );
+    let model = ctx.input.modelId ?? ctx.input.model;
+    if (!model)
+      throw createApiServiceError(
+        'Choose a model using list_models before generating content.'
+      );
     let client = new WriterClient(ctx.auth.token);
 
     ctx.progress('Generating text completion...');
 
     let result = await client.textCompletion({
-      model: ctx.input.model,
+      model,
       prompt: ctx.input.prompt,
       temperature: ctx.input.temperature,
       maxTokens: ctx.input.maxTokens,

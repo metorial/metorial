@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { listIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getContact = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let getContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      listId: z.string().describe('ID of the list the contact belongs to'),
+      listId: listIdSchema,
       contactId: z.string().describe('Contact ID or MD5 hash of the lowercase email address')
     })
   )
@@ -21,7 +22,13 @@ export let getContact = SlateTool.create(spec, {
     z.object({
       contactId: z.string().describe('Unique identifier of the contact'),
       emailAddress: z.string().describe('Email address of the contact'),
-      fields: z.record(z.string(), z.string()).describe('Custom field values'),
+      fields: z
+        .record(z.string(), z.string())
+        .describe('Custom field values as text; null is an empty string'),
+      fieldValues: z
+        .record(z.string(), z.union([z.string(), z.number(), z.null()]))
+        .optional()
+        .describe('Original typed custom field values'),
       tags: z.array(z.string()).describe('Tags assigned to the contact'),
       status: z.string().describe('Subscription status'),
       createdAt: z.string().describe('ISO 8601 creation timestamp'),

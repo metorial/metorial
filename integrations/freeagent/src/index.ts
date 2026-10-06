@@ -42,15 +42,6 @@ import {
   updateTimeslip
 } from './tools';
 
-import {
-  billChanges,
-  contactChanges,
-  expenseChanges,
-  inboundWebhook,
-  invoiceChanges,
-  projectChanges
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -93,12 +84,5 @@ export let provider = Slate.create({
     listUsers,
     listCategories
   ],
-  triggers: [
-    inboundWebhook,
-    invoiceChanges,
-    contactChanges,
-    expenseChanges,
-    billChanges,
-    projectChanges
-  ]
+  triggers: []
 });

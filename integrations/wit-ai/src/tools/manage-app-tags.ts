@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { appIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let tagSchema = z.object({
@@ -14,14 +15,14 @@ let tagSchema = z.object({
 export let listAppTags = SlateTool.create(spec, {
   name: 'List App Tags',
   key: 'list_app_tags',
-  description: `List all version tags for a Wit.ai app. Tags provide version control for your NLU models, allowing you to snapshot and reference specific model versions.`,
+  description: `List all version tags for a Wit.ai app. Call list_apps to discover accessible app IDs. Tags provide version control for your NLU models, allowing you to snapshot and reference specific model versions.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      appId: z.string().describe('ID of the app')
+      appId: appIdSchema
     })
   )
   .output(
@@ -37,14 +38,14 @@ export let listAppTags = SlateTool.create(spec, {
 
     let result = await client.listAppTags(ctx.input.appId);
 
-    let tagsList = Array.isArray(result) ? result : [];
+    let tagsList = Array.isArray(result) ? result.flat() : [];
 
     return {
       output: {
         appTags: tagsList.map((t: Record<string, unknown>) => ({
           name: t.name as string | undefined,
           tag: t.tag as string | undefined,
-          description: t.description as string | undefined,
+          description: (t.desc ?? t.description) as string | undefined,
           createdAt: t.created_at as string | undefined,
           updatedAt: t.updated_at as string | undefined
         }))
@@ -57,14 +58,14 @@ export let listAppTags = SlateTool.create(spec, {
 export let createAppTag = SlateTool.create(spec, {
   name: 'Create App Tag',
   key: 'create_app_tag',
-  description: `Create a new version tag for a Wit.ai app. Tags snapshot the current NLU model state for versioning.`,
+  description: `Create a new version tag for a Wit.ai app. Call list_apps to discover accessible app IDs. Tags snapshot the current NLU model state for versioning.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
-      appId: z.string().describe('ID of the app'),
+      appId: appIdSchema,
       tagName: z.string().describe('Name for the new tag')
     })
   )
@@ -79,9 +80,9 @@ export let createAppTag = SlateTool.create(spec, {
 
     return {
       output: {
-        name: result.name,
+        name: result.name ?? ctx.input.tagName,
         tag: result.tag,
-        description: result.description,
+        description: result.desc ?? result.description,
         createdAt: result.created_at,
         updatedAt: result.updated_at
       },
@@ -93,14 +94,14 @@ export let createAppTag = SlateTool.create(spec, {
 export let deleteAppTag = SlateTool.create(spec, {
   name: 'Delete App Tag',
   key: 'delete_app_tag',
-  description: `Delete a version tag from a Wit.ai app. This cannot be undone.`,
+  description: `Delete a version tag from a Wit.ai app. Call list_apps to discover accessible app IDs. This cannot be undone.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      appId: z.string().describe('ID of the app'),
+      appId: appIdSchema,
       tagName: z.string().describe('Name of the tag to delete')
     })
   )

@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { articlePayload } from '../lib/payloads';
+import { mapArticle } from '../lib/schemas';
+import { apiError, fail, integer, required } from '../lib/validation';
 import { spec } from '../spec';
 
 let priceSchema = z
@@ -9,7 +12,6 @@ let priceSchema = z
     grossPrice: z.number().optional().describe('Gross price of the article'),
     taxRatePercentage: z
       .enum(['0', '7', '19'])
-      .transform(Number)
       .optional()
       .describe('Tax rate percentage (0, 7, or 19)'),
     leadingPrice: z
@@ -50,9 +52,9 @@ export let manageArticle = SlateTool.create(spec, {
   key: 'manage_article',
   description: `Create, retrieve, update, or delete articles (products or services) in Lexoffice. Articles represent goods or services that can be used on invoices and other vouchers.`,
   instructions: [
-    'Use action "create" to add a new article — title and type are required.',
+    'Use action "create" to add a new article — title, type, unitName and complete price are required.',
     'Use action "get" to retrieve full details of an article by its ID.',
-    'Use action "update" to modify an existing article — articleId is required.',
+    'Use action "update" to modify an existing article — articleId is required; unchanged fields are preserved with the current version.',
     'Use action "delete" to permanently remove an article — articleId is required.'
   ],
   tags: {
@@ -79,136 +81,54 @@ export let manageArticle = SlateTool.create(spec, {
       gtin: z.string().optional().describe('Global Trade Item Number (EAN/UPC)'),
       note: z.string().optional().describe('Internal note for the article'),
       unitName: z.string().optional().describe('Unit name, e.g. "Stück", "Stunde", "kg"'),
+      expectedVersion: z
+        .number()
+        .optional()
+        .describe('Expected current article version; refuse the update if it changed'),
       price: priceSchema
     })
   )
   .output(articleOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let { action } = ctx.input;
-
+    const client = new Client({ token: ctx.auth.token });
+    const { action, articleId, ...input } = ctx.input;
     if (action === 'create') {
-      if (!ctx.input.title) throw new Error('title is required for article creation');
-      if (!ctx.input.type) throw new Error('type is required for article creation');
-
-      let articleData: Record<string, any> = {
-        title: ctx.input.title,
-        type: ctx.input.type
-      };
-      if (ctx.input.description) articleData.description = ctx.input.description;
-      if (ctx.input.articleNumber) articleData.articleNumber = ctx.input.articleNumber;
-      if (ctx.input.gtin) articleData.gtin = ctx.input.gtin;
-      if (ctx.input.note) articleData.note = ctx.input.note;
-      if (ctx.input.unitName) articleData.unitName = ctx.input.unitName;
-      if (ctx.input.price) {
-        articleData.price = {};
-        if (ctx.input.price.netPrice !== undefined)
-          articleData.price.netPrice = ctx.input.price.netPrice;
-        if (ctx.input.price.grossPrice !== undefined)
-          articleData.price.grossPrice = ctx.input.price.grossPrice;
-        if (ctx.input.price.taxRatePercentage !== undefined)
-          articleData.price.taxRatePercentage = ctx.input.price.taxRatePercentage;
-        if (ctx.input.price.leadingPrice)
-          articleData.price.leadingPrice = ctx.input.price.leadingPrice;
-      }
-
-      let result = await client.createArticle(articleData);
-
-      return {
-        output: {
-          id: result.id,
-          resourceUri: result.resourceUri,
-          title: ctx.input.title,
-          type: ctx.input.type,
-          version: result.version,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
-        },
-        message: `Created article **${ctx.input.title}** (${result.id}).`
-      };
+      const result = await client.createArticle(articlePayload(input));
+      return { output: result, message: `Created article **${result.id}**.` };
     }
-
-    if (action === 'get') {
-      if (!ctx.input.articleId) throw new Error('articleId is required for get action');
-
-      let article = await client.getArticle(ctx.input.articleId);
-
-      return {
-        output: {
-          id: article.id,
-          resourceUri: article.resourceUri,
-          title: article.title,
-          description: article.description,
-          type: article.type,
-          articleNumber: article.articleNumber,
-          gtin: article.gtin,
-          note: article.note,
-          unitName: article.unitName,
-          price: article.price
-            ? {
-                netPrice: article.price.netPrice,
-                grossPrice: article.price.grossPrice,
-                taxRatePercentage: article.price.taxRatePercentage,
-                leadingPrice: article.price.leadingPrice
-              }
-            : undefined,
-          version: article.version,
-          createdDate: article.createdDate,
-          updatedDate: article.updatedDate
-        },
-        message: `Retrieved article **${article.title}** (${article.id}) — ${article.type}, article number: ${article.articleNumber || 'N/A'}.`
-      };
+    const id = required(articleId, 'articleId');
+    const current = await client.getArticle(id);
+    if (input.expectedVersion !== undefined) {
+      integer(input.expectedVersion, 'expectedVersion');
+      if (input.expectedVersion !== current.version)
+        fail('The article version changed; retrieve it again before updating or deleting.');
     }
-
+    if (action === 'get')
+      return {
+        output: mapArticle(current),
+        message: `Retrieved article **${current.title}** (${current.id}).`
+      };
     if (action === 'update') {
-      if (!ctx.input.articleId) throw new Error('articleId is required for update action');
-
-      let articleData: Record<string, any> = {};
-      if (ctx.input.title) articleData.title = ctx.input.title;
-      if (ctx.input.description) articleData.description = ctx.input.description;
-      if (ctx.input.type) articleData.type = ctx.input.type;
-      if (ctx.input.articleNumber) articleData.articleNumber = ctx.input.articleNumber;
-      if (ctx.input.gtin) articleData.gtin = ctx.input.gtin;
-      if (ctx.input.note) articleData.note = ctx.input.note;
-      if (ctx.input.unitName) articleData.unitName = ctx.input.unitName;
-      if (ctx.input.price) {
-        articleData.price = {};
-        if (ctx.input.price.netPrice !== undefined)
-          articleData.price.netPrice = ctx.input.price.netPrice;
-        if (ctx.input.price.grossPrice !== undefined)
-          articleData.price.grossPrice = ctx.input.price.grossPrice;
-        if (ctx.input.price.taxRatePercentage !== undefined)
-          articleData.price.taxRatePercentage = ctx.input.price.taxRatePercentage;
-        if (ctx.input.price.leadingPrice)
-          articleData.price.leadingPrice = ctx.input.price.leadingPrice;
-      }
-
-      let result = await client.updateArticle(ctx.input.articleId, articleData);
-
-      return {
-        output: {
-          id: result.id,
-          resourceUri: result.resourceUri,
-          title: ctx.input.title,
-          version: result.version,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
-        },
-        message: `Updated article **${ctx.input.title || result.id}**.`
-      };
+      if (
+        !Object.entries(input).some(
+          ([key, value]) => key !== 'expectedVersion' && value !== undefined
+        )
+      )
+        fail('Provide at least one article field to update.');
+      const result = await client.updateArticle(id, articlePayload(input, current));
+      return { output: result, message: `Updated article **${result.id}**.` };
     }
-
-    // delete
-    if (!ctx.input.articleId) throw new Error('articleId is required for delete action');
-
-    await client.deleteArticle(ctx.input.articleId);
-
-    return {
-      output: {
-        id: ctx.input.articleId,
-        deleted: true
-      },
-      message: `Deleted article **${ctx.input.articleId}**.`
-    };
+    await client.deleteArticle(id);
+    try {
+      await client.getArticle(id);
+    } catch (error) {
+      if (apiError(error).data.upstreamStatus === 404)
+        return {
+          output: { id, deleted: true },
+          message: `Deleted article **${id}**; its absence was confirmed.`
+        };
+      throw error;
+    }
+    fail('The article is still readable after deletion; its absence is unconfirmed.');
   })
   .build();

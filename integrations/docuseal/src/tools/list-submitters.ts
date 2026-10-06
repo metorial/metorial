@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listSubmitters = SlateTool.create(spec, {
@@ -37,12 +38,15 @@ export let listSubmitters = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: paginationSchema.describe(
+        'Native page count and ID cursors; use next as after to continue.'
+      ),
       submitters: z
         .array(
           z.object({
             submitterId: z.number().describe('Submitter ID'),
             submissionId: z.number().optional().describe('Submission ID'),
-            email: z.string().optional().describe('Submitter email'),
+            email: z.string().nullable().optional().describe('Submitter email'),
             name: z.string().nullable().optional().describe('Submitter name'),
             phone: z.string().nullable().optional().describe('Submitter phone'),
             status: z.string().optional().describe('Submitter status'),
@@ -72,8 +76,8 @@ export let listSubmitters = SlateTool.create(spec, {
       before: ctx.input.before
     });
 
-    let items = Array.isArray(data) ? data : data.data || [];
-    let submitters = items.map((s: any) => ({
+    let items = data.data;
+    let submitters = items.map(s => ({
       submitterId: s.id,
       submissionId: s.submission_id,
       email: s.email,
@@ -87,7 +91,7 @@ export let listSubmitters = SlateTool.create(spec, {
     }));
 
     return {
-      output: { submitters },
+      output: { submitters, pagination: data.pagination },
       message: `Found **${submitters.length}** submitter(s).`
     };
   })

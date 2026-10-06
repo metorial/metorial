@@ -30,7 +30,7 @@ export let createContactGroup = SlateTool.create(spec, {
       pingUrl: z
         .string()
         .optional()
-        .describe('Webhook URL to receive alert notifications via HTTP POST')
+        .describe('Endpoint URL to receive alert notifications via HTTP GET')
     })
   )
   .output(
@@ -42,13 +42,13 @@ export let createContactGroup = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { emailAddresses, mobileNumbers, pingUrl, ...rest } = ctx.input;
 
-    let data: Record<string, any> = { ...rest };
+    let data: Record<string, unknown> = { ...rest };
     if (emailAddresses) data.email_addresses = emailAddresses;
     if (mobileNumbers) data.mobile_numbers = mobileNumbers;
     if (pingUrl !== undefined) data.ping_url = pingUrl;
 
     let result = await client.createContactGroup(data);
-    let groupId = String(result?.data?.new_id ?? result?.new_id ?? '');
+    let groupId = result.data.new_id;
 
     return {
       output: { groupId },

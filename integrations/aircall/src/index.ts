@@ -2,7 +2,11 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createInsightCard,
+  downloadCallMedia,
   getCall,
+  getCompany,
+  getContact,
+  getFileUrl,
   getUser,
   listCalls,
   listContacts,
@@ -16,14 +20,6 @@ import {
   sendMessage,
   startCall
 } from './tools';
-import {
-  callEvents,
-  contactEvents,
-  messageEvents,
-  numberEvents,
-  userEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,7 +36,11 @@ export let provider = Slate.create({
     manageTeam,
     listTags,
     sendMessage,
-    createInsightCard
+    createInsightCard,
+    getCompany,
+    getContact,
+    downloadCallMedia,
+    getFileUrl
   ],
-  triggers: [callEvents, userEvents, contactEvents, numberEvents, messageEvents]
+  triggers: []
 });

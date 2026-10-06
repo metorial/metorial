@@ -3,8 +3,11 @@ import { spec } from './spec';
 import {
   copyMoveFile,
   deleteFiles,
+  downloadFile,
+  getBulkJobStatus,
   getFile,
   getFileMetadata,
+  getFileUrl,
   listFiles,
   manageCustomMetadataFields,
   manageFileVersions,
@@ -14,11 +17,12 @@ import {
   updateFile,
   uploadFile
 } from './tools';
-import { uploadTransform, videoTransformation } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    downloadFile,
+    getFileUrl,
+    getBulkJobStatus,
     uploadFile,
     listFiles,
     getFile,
@@ -32,5 +36,5 @@ export let provider = Slate.create({
     manageFolders,
     manageFileVersions
   ],
-  triggers: [videoTransformation, uploadTransform]
+  triggers: []
 });

@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let outputMediaTool = SlateTool.create(spec, {
   name: 'Bot Output Media',
   key: 'output_media',
-  description: `Control what a bot outputs into a live meeting for both audio and video. Use this to make bots "speak" audio, display images/video via their camera feed, or share screen content. Enables building interactive AI agents, real-time translators, and avatar-based participants.`,
+  description: `Start or stop what a bot outputs into a live meeting for both audio and video. Use this to make bots "speak" audio, display images/video via their camera feed, or share screen content. Enables building interactive AI agents, real-time translators, and avatar-based participants.`,
   instructions: [
     'The bot must be actively in a meeting to output media.',
-    'Refer to Recall.ai docs for supported media kinds and data formats.'
+    'Audio requires automaticAudioOutput configured with create_bot or update_bot; video streams a webpage through its camera or screenshare.'
   ],
   constraints: ['The bot must be in an active call.'],
   tags: {
@@ -20,14 +20,17 @@ export let outputMediaTool = SlateTool.create(spec, {
   .input(
     z.object({
       botId: z.string().describe('The unique identifier of the bot to output media from'),
-      kind: z
-        .string()
-        .describe(
-          'The type of media output, e.g. "audio", "video_camera", "video_screenshare"'
-        ),
+      kind: z.string().describe('Output type: audio, video_camera, or video_screenshare'),
+      stop: z
+        .boolean()
+        .optional()
+        .describe('Stop output of the selected kind; mediaData is unnecessary when true'),
       mediaData: z
         .record(z.string(), z.unknown())
-        .describe('Media output data (format depends on kind)')
+        .optional()
+        .describe(
+          'For video use {kind:"webpage",config:{url:"https://..."}}; for audio use {kind:"mp3",b64_data:"..."}'
+        )
     })
   )
   .output(
@@ -46,7 +49,8 @@ export let outputMediaTool = SlateTool.create(spec, {
 
     let response = await client.outputMedia(ctx.input.botId, {
       kind: ctx.input.kind,
-      data: ctx.input.mediaData
+      data: ctx.input.mediaData,
+      stop: ctx.input.stop
     });
 
     return {
@@ -54,7 +58,7 @@ export let outputMediaTool = SlateTool.create(spec, {
         botId: ctx.input.botId,
         response
       },
-      message: `Output media (${ctx.input.kind}) sent via bot ${ctx.input.botId}.`
+      message: `Output media (${ctx.input.kind}) ${ctx.input.stop ? 'stopped' : 'started'} via bot ${ctx.input.botId}.`
     };
   })
   .build();

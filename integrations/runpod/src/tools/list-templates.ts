@@ -13,15 +13,25 @@ let templateSchema = z.object({
     .boolean()
     .nullable()
     .describe('Whether template is for Serverless endpoints'),
-  containerDiskInGb: z.number().nullable().describe('Container disk in GB'),
-  volumeInGb: z.number().nullable().describe('Volume size in GB'),
+  containerDiskInGb: z
+    .number()
+    .refine(Number.isInteger, 'Must be an integer.')
+    .min(1)
+    .nullable()
+    .describe('Container disk in GB'),
+  volumeInGb: z
+    .number()
+    .refine(Number.isInteger, 'Must be an integer.')
+    .min(10)
+    .nullable()
+    .describe('Volume size in GB'),
   volumeMountPath: z.string().nullable().describe('Volume mount path')
 });
 
 export let listTemplates = SlateTool.create(spec, {
   name: 'List Templates',
   key: 'list_templates',
-  description: `List templates in your RunPod account. Templates define reusable Pod and endpoint configurations including container images, environment variables, and resource requirements. Optionally include public and RunPod-provided templates.`,
+  description: `List templates in your Runpod account. Templates define reusable Pod and endpoint configurations including container images, environment variables, and resource requirements. Optionally include public and Runpod-provided templates.`,
   tags: {
     readOnly: true
   }
@@ -35,11 +45,11 @@ export let listTemplates = SlateTool.create(spec, {
       includeRunpodTemplates: z
         .boolean()
         .optional()
-        .describe('Include official RunPod templates'),
+        .describe('Include official Runpod templates'),
       includeEndpointBoundTemplates: z
         .boolean()
         .optional()
-        .describe('Include templates bound to Serverless endpoints')
+        .describe('Retained for compatibility; current API lists all owned templates.')
     })
   )
   .output(

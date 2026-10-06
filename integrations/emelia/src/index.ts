@@ -18,8 +18,6 @@ import {
   updateEmailCampaign,
   verifyEmail
 } from './tools';
-import { campaignActivity, scraperWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     manageLinkedInScraper,
     manageWebhooks
   ],
-  triggers: [campaignActivity, scraperWebhook]
+  triggers: []
 });

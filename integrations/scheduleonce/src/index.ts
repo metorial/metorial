@@ -9,8 +9,6 @@ import {
   listTeams,
   listUsers
 } from './tools';
-import { bookingEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     listUsers,
     listTeams
   ],
-  triggers: [bookingEvents]
+  triggers: []
 });

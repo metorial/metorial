@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Boxhero
 
-Manage inventory items, track stock levels, and process inventory transactions. Retrieve items with details like SKU, barcode, cost, price, and custom attributes. Record stock in, stock out, adjust stock, and move stock transactions. Look up warehouse locations and partner (supplier/customer) information. Receive real-time webhook notifications for transaction and item changes.
+Manage inventory items, track stock levels, and process inventory transactions. Retrieve items with details like SKU, barcode, cost, price, and custom attributes. Record stock in, stock out, adjust stock, and move stock transactions. Look up warehouse locations and partner (supplier/customer) information.
 
 ## License
 

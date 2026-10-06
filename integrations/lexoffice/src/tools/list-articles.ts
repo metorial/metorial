@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapArticle, pageOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let articleSummarySchema = z.object({
@@ -23,25 +24,6 @@ let articleSummarySchema = z.object({
     .describe('Pricing details')
 });
 
-let mapArticle = (article: any) => ({
-  id: article.id,
-  resourceUri: article.resourceUri,
-  title: article.title,
-  description: article.description,
-  type: article.type,
-  articleNumber: article.articleNumber,
-  gtin: article.gtin,
-  unitName: article.unitName,
-  price: article.price
-    ? {
-        netPrice: article.price.netPrice,
-        grossPrice: article.price.grossPrice,
-        taxRatePercentage: article.price.taxRatePercentage,
-        leadingPrice: article.price.leadingPrice
-      }
-    : undefined
-});
-
 export let listArticles = SlateTool.create(spec, {
   name: 'List Articles',
   key: 'list_articles',
@@ -60,12 +42,25 @@ export let listArticles = SlateTool.create(spec, {
       articleNumber: z.string().optional().describe('Filter by exact article number'),
       gtin: z.string().optional().describe('Filter by Global Trade Item Number'),
       type: z.enum(['product', 'service']).optional().describe('Filter by article type'),
+      size: z.number().optional().describe('Page size, between 1 and 250'),
       page: z.number().optional().describe('Page number (starting from 0)')
     })
   )
   .output(
     z.object({
       articles: z.array(articleSummarySchema).describe('List of articles'),
+      currentPage: z.number().optional().describe('Actual zero-based page index'),
+      first: z.boolean().optional().describe('Whether this is the first page'),
+      last: z
+        .boolean()
+        .optional()
+        .describe('Whether this is the last page in the search window'),
+      nextPage: z.number().optional().describe('Next page index, when available'),
+      searchWindowLimit: z.number().optional().describe('Maximum searchable results'),
+      windowMayBeTruncated: z
+        .boolean()
+        .optional()
+        .describe('Whether narrower filters may be needed beyond the search window'),
       count: z.number().describe('Number of articles returned on this page'),
       totalPages: z.number().optional().describe('Total number of pages available'),
       totalElements: z
@@ -75,25 +70,11 @@ export let listArticles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.listArticles({
-      articleNumber: ctx.input.articleNumber,
-      gtin: ctx.input.gtin,
-      type: ctx.input.type,
-      page: ctx.input.page
-    });
-
-    let articles = (result.content || []).map(mapArticle);
-
+    const result = await new Client({ token: ctx.auth.token }).listArticles(ctx.input);
+    const articles = result.content.map(mapArticle);
     return {
-      output: {
-        articles,
-        count: articles.length,
-        totalPages: result.totalPages,
-        totalElements: result.totalElements
-      },
-      message: `Found **${articles.length}** article(s)${result.totalElements !== undefined ? ` of ${result.totalElements} total` : ''}${ctx.input.page !== undefined ? ` on page ${ctx.input.page}` : ''}.`
+      output: { articles, count: articles.length, ...pageOutput(result) },
+      message: `Retrieved ${articles.length} article(s) on page ${result.number}.`
     };
   })
   .build();

@@ -21,8 +21,6 @@ import {
   manageProduct,
   manageProductVariant
 } from './tools';
-import { extensionEvents, orderEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     getSiteInfo,
     listStorePages
   ],
-  triggers: [orderEvents, extensionEvents]
+  triggers: []
 });

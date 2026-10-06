@@ -1,25 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  conversationIdSchema,
+  documentIdSchema,
+  documentSchema,
+  folderIdSchema,
+  pageSchema,
+  paginationSchema
+} from '../lib/schemas';
 import { spec } from '../spec';
-
-let documentSchema = z.object({
-  documentId: z.string().describe('Unique document identifier'),
-  name: z.string().describe('Document name'),
-  status: z.string().describe('Sync status: syncing, synced, or sync_failed'),
-  contentUrl: z.string().describe('URL to download the content as HTML'),
-  folderId: z.string().describe('ID of the folder containing this document'),
-  createdAt: z.number().describe('Unix timestamp of creation in seconds')
-});
-
-let paginationSchema = z.object({
-  count: z.number(),
-  total: z.number(),
-  perPage: z.number(),
-  totalPages: z.number(),
-  nextPage: z.number().nullable(),
-  previousPage: z.number().nullable()
-});
 
 export let listDocuments = SlateTool.create(spec, {
   name: 'List Documents',
@@ -31,13 +21,10 @@ export let listDocuments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      folderId: z.string().optional().describe('Filter by folder ID'),
-      conversationId: z
-        .string()
-        .optional()
-        .describe('Filter to documents focused on a specific conversation'),
+      folderId: folderIdSchema.optional(),
+      conversationId: conversationIdSchema.optional(),
       keyword: z.string().optional().describe('Search documents by partial name match'),
-      page: z.number().optional().describe('Page number for pagination')
+      page: pageSchema
     })
   )
   .output(
@@ -65,14 +52,14 @@ export let listDocuments = SlateTool.create(spec, {
 export let getDocument = SlateTool.create(spec, {
   name: 'Get Document',
   key: 'get_document',
-  description: `Retrieve details of a specific knowledge base document including its sync status and content URL.`,
+  description: `Retrieve a knowledge base document's learning status and content URL. Call list_documents to discover document IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      documentId: z.string().describe('ID of the document to retrieve')
+      documentId: documentIdSchema
     })
   )
   .output(documentSchema)
@@ -90,15 +77,15 @@ export let getDocument = SlateTool.create(spec, {
 export let createDocumentFromContent = SlateTool.create(spec, {
   name: 'Create Document from Content',
   key: 'create_document_from_content',
-  description: `Create a new knowledge base document from text or HTML content. Structured HTML with headings and paragraphs yields best results for the AI.`,
+  description: `Create a knowledge base document from text or HTML content. Call list_folders to discover the target folder. Structured HTML with headings and paragraphs yields best results for the AI.`,
   constraints: [
     'Content must be 768 KB or less. For larger content, upload as a file instead.'
   ]
 })
   .input(
     z.object({
-      name: z.string().describe('Name for the document'),
-      folderId: z.string().optional().describe('Folder ID to place the document in'),
+      name: z.string().min(1).describe('Name for the document'),
+      folderId: folderIdSchema.optional(),
       content: z.string().describe('Text or HTML content for the document (up to 768 KB)')
     })
   )
@@ -121,13 +108,19 @@ export let createDocumentFromContent = SlateTool.create(spec, {
 export let createDocumentFromWebpage = SlateTool.create(spec, {
   name: 'Create Document from Webpage',
   key: 'create_document_from_webpage',
-  description: `Create a new knowledge base document by crawling a publicly accessible webpage URL. Cody will ingest the page content automatically.`,
+  description: `Create a knowledge base document by crawling a publicly accessible webpage URL. Call list_folders to discover the target folder. Cody will ingest the page content automatically.`,
   constraints: ['The webpage must be publicly accessible without login.']
 })
   .input(
     z.object({
-      folderId: z.string().describe('Folder ID to place the document in'),
-      url: z.string().describe('Publicly accessible webpage URL to crawl')
+      folderId: folderIdSchema,
+      url: z
+        .url()
+        .refine(
+          value => ['http:', 'https:'].includes(new URL(value).protocol),
+          'Use an HTTP or HTTPS webpage URL.'
+        )
+        .describe('Publicly accessible webpage URL to crawl')
     })
   )
   .output(documentSchema)
@@ -148,7 +141,7 @@ export let createDocumentFromWebpage = SlateTool.create(spec, {
 export let getUploadUrl = SlateTool.create(spec, {
   name: 'Get File Upload URL',
   key: 'get_upload_url',
-  description: `Get a signed S3 upload URL for uploading a file to the knowledge base. Returns a URL for uploading via PUT and a key to use when creating a document from the uploaded file.`,
+  description: `Get a signed file upload URL for uploading a file to the knowledge base. Returns a URL for uploading via PUT and a key to use when creating a document from the uploaded file.`,
   instructions: [
     'After obtaining the URL, upload the file via a PUT request to the returned URL with the correct Content-Type header.',
     'Then use the returned key with the "Create Document from File" tool to create the document.'
@@ -160,16 +153,26 @@ export let getUploadUrl = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      fileName: z.string().describe('File name with extension (e.g. "report.pdf")'),
+      fileName: z
+        .string()
+        .regex(
+          /\.(txt|md|rtf|pdf|ppt|pptx|pptm|doc|docx|docm)$/i,
+          'Use a supported file extension.'
+        )
+        .describe('File name with extension (e.g. "report.pdf")'),
       contentType: z
         .string()
+        .min(1)
         .describe('MIME content type of the file (e.g. "application/pdf")')
     })
   )
   .output(
     z.object({
-      uploadUrl: z.string().describe('Signed S3 URL for uploading the file via PUT request'),
-      key: z.string().describe('Key to reference the uploaded file when creating a document')
+      uploadUrl: z.string().describe('Signed URL for uploading the file via PUT request'),
+      key: z
+        .string()
+        .min(1)
+        .describe('Key to reference the uploaded file when creating a document')
     })
   )
   .handleInvocation(async ctx => {
@@ -201,8 +204,8 @@ export let createDocumentFromFile = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      folderId: z.string().describe('Folder ID to place the document in'),
-      key: z.string().describe('Upload key from the signed URL endpoint')
+      folderId: folderIdSchema,
+      key: z.string().min(1).describe('Upload key from the signed URL endpoint')
     })
   )
   .output(
@@ -227,14 +230,14 @@ export let createDocumentFromFile = SlateTool.create(spec, {
 export let deleteDocument = SlateTool.create(spec, {
   name: 'Delete Document',
   key: 'delete_document',
-  description: `Permanently delete a knowledge base document.`,
+  description: `Permanently delete a knowledge base document. Call list_documents to discover document IDs.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      documentId: z.string().describe('ID of the document to delete')
+      documentId: documentIdSchema
     })
   )
   .output(

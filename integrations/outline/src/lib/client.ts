@@ -1,469 +1,401 @@
-import { createAxios } from 'slates';
+import { createAxios, pickDefined } from 'slates';
+import { z } from 'zod';
+import {
+  nativeCollection,
+  nativeComment,
+  nativeDocument,
+  nativeGroup,
+  nativeMembership,
+  nativeUser,
+  paginationSchema
+} from './schemas';
+import {
+  apiError,
+  assertNoCredential,
+  identifier,
+  instanceUrl,
+  parse,
+  requireValue
+} from './validation';
 
-export interface PaginationParams {
-  offset?: number;
-  limit?: number;
+export type OutlineDocument = z.infer<typeof nativeDocument>;
+export type OutlineCollection = z.infer<typeof nativeCollection>;
+export type OutlineComment = z.infer<typeof nativeComment>;
+export type OutlineGroup = z.infer<typeof nativeGroup>;
+export type OutlineUser = z.infer<typeof nativeUser>;
+export type Pagination = z.infer<typeof paginationSchema>;
+export interface ClientConfig {
+  token: string;
+  baseUrl?: string;
 }
-
-export interface OutlineDocument {
-  id: string;
-  title: string;
-  text: string;
-  emoji?: string;
-  color?: string;
-  collectionId?: string;
-  parentDocumentId?: string;
-  templateId?: string;
-  template: boolean;
-  publishedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-  archivedAt?: string;
-  deletedAt?: string;
-  revision: number;
-  fullWidth: boolean;
-  createdBy: { id: string; name: string };
-  updatedBy: { id: string; name: string };
+export function clientConfig(
+  auth: ClientConfig,
+  config: Record<string, unknown> = {}
+): ClientConfig {
+  const baseUrl =
+    auth.baseUrl ?? (typeof config.baseUrl === 'string' ? config.baseUrl : undefined);
+  requireValue(
+    baseUrl,
+    'Reconnect API Token authentication with the exact Outline instance URL. Legacy connections may retain their configured instance URL.'
+  );
+  return { token: auth.token, baseUrl: instanceUrl(baseUrl) };
 }
-
-export interface OutlineCollection {
-  id: string;
-  name: string;
-  description?: string;
-  color?: string;
-  icon?: string;
-  permission?: string;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string;
-  archivedAt?: string;
-  documents?: any[];
-}
-
-export interface OutlineUser {
-  id: string;
-  name: string;
-  email?: string;
-  avatarUrl?: string;
-  role: string;
-  isSuspended: boolean;
-  isAdmin: boolean;
-  isViewer: boolean;
-  createdAt: string;
-  updatedAt: string;
-  lastActiveAt?: string;
-}
-
-export interface OutlineComment {
-  id: string;
-  data: any;
-  documentId: string;
-  parentCommentId?: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: { id: string; name: string };
-}
-
-export interface OutlineGroup {
-  id: string;
-  name: string;
-  memberCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface OutlineEvent {
-  id: string;
-  name: string;
-  modelId?: string;
-  actorId: string;
-  collectionId?: string;
-  documentId?: string;
-  createdAt: string;
-  data: any;
-  actor: { id: string; name: string };
-}
-
-export interface OutlineWebhookSubscription {
-  id: string;
-  name: string;
-  url: string;
-  enabled: boolean;
-  events: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SearchResult {
-  ranking: number;
-  context: string;
-  document: OutlineDocument;
-}
-
+const envelope = z.object({
+  ok: z.boolean().optional(),
+  success: z.boolean().optional(),
+  data: z.unknown().optional(),
+  pagination: z.unknown().optional()
+});
 export class Client {
-  private baseUrl: string;
-  private token: string;
-
-  constructor(config: { token: string; baseUrl: string }) {
-    this.token = config.token;
-    this.baseUrl = config.baseUrl.replace(/\/$/, '');
+  readonly baseUrl: string;
+  readonly token: string;
+  constructor(config: ClientConfig) {
+    requireValue(
+      config.baseUrl,
+      'Set the exact Outline instance URL in API Token authentication before using this connection.'
+    );
+    this.baseUrl = instanceUrl(config.baseUrl);
+    this.token = identifier(config.token, 'API token');
   }
-
-  private getAxios() {
-    return createAxios({
-      baseURL: `${this.baseUrl}/api`,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+  async post(endpoint: string, data: Record<string, unknown> = {}) {
+    requireValue(/^[a-z]+\.[a-z_]+$/.test(endpoint), 'Unsupported Outline operation.');
+    assertNoCredential(data, this.token);
+    let response: { status: number; data: unknown };
+    try {
+      response = await createAxios({}).post(`/${endpoint}`, pickDefined(data), {
+        baseURL: `${this.baseUrl}/api`,
+        timeout: 30_000,
+        maxRedirects: 0,
+        maxContentLength: 16 * 1024 * 1024,
+        maxBodyLength: 4 * 1024 * 1024,
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'x-api-version': '1'
+        }
+      });
+    } catch (error) {
+      throw apiError(error, endpoint);
+    }
+    if (response.status !== 200 && response.status !== 201)
+      throw apiError({ response: { status: response.status } }, endpoint);
+    assertNoCredential(response.data, this.token);
+    const result = parse(envelope, response.data, endpoint);
+    requireValue(
+      result.ok !== false && result.success !== false,
+      `Outline ${endpoint} was not accepted. Check permissions and server version, then inspect state before retrying a write.`
+    );
+    return result;
   }
-
-  private async post<T = any>(endpoint: string, data: any = {}): Promise<T> {
-    let axios = this.getAxios();
-    let response = await axios.post(endpoint, data);
-    return response.data;
+  async one<T extends { id: string; urlId?: string }>(
+    endpoint: string,
+    schema: z.ZodType<T>,
+    data: Record<string, unknown>,
+    expectedId?: string
+  ): Promise<T> {
+    const response = await this.post(endpoint, data);
+    const resource = parse(schema, response.data, endpoint);
+    requireValue(
+      !expectedId || resource.id === expectedId || resource.urlId === expectedId,
+      'Outline returned a different resource. Inspect the exact resource before retrying a write.'
+    );
+    return resource;
   }
-
-  // Documents
-
-  async getDocument(documentId: string): Promise<OutlineDocument> {
-    let result = await this.post<{ data: OutlineDocument }>('/documents.info', {
-      id: documentId
-    });
-    return result.data;
+  async page<T>(endpoint: string, schema: z.ZodType<T>, data: Record<string, unknown> = {}) {
+    const response = await this.post(endpoint, data);
+    const resources = parse(z.array(schema), response.data, endpoint);
+    return { data: resources, pagination: this.pagination(response.pagination, endpoint) };
   }
-
-  async listDocuments(
-    params: {
-      collectionId?: string;
-      parentDocumentId?: string;
-      template?: boolean;
-      sort?: string;
-      direction?: 'ASC' | 'DESC';
-    } & PaginationParams = {}
-  ): Promise<{ data: OutlineDocument[]; pagination: any }> {
-    return this.post('/documents.list', params);
+  pagination(value: unknown, endpoint: string): Pagination | undefined {
+    if (value === undefined) return undefined;
+    const result = parse(paginationSchema, value, 'pagination');
+    if (result.nextPath) {
+      const url = new URL(result.nextPath, `${this.baseUrl}/`);
+      requireValue(
+        url.origin === new URL(this.baseUrl).origin &&
+          url.pathname ===
+            `${new URL(this.baseUrl).pathname}/api/${endpoint}`.replace(/\/+/g, '/') &&
+          !url.username &&
+          !url.password &&
+          !url.hash,
+        'Outline returned an unsupported pagination path. Continue using explicit limit and offset.'
+      );
+    }
+    return result;
   }
-
-  async listDrafts(
-    params: {
-      collectionId?: string;
-      sort?: string;
-      direction?: 'ASC' | 'DESC';
-    } & PaginationParams = {}
-  ): Promise<{ data: OutlineDocument[]; pagination: any }> {
-    return this.post('/documents.drafts', params);
+  async accepted(endpoint: string, data: Record<string, unknown>) {
+    const result = await this.post(endpoint, data);
+    requireValue(
+      result.success === true,
+      `Outline did not confirm ${endpoint}. Inspect state before retrying; prior effects may remain.`
+    );
   }
-
-  async createDocument(params: {
-    title: string;
-    text?: string;
-    collectionId?: string;
-    parentDocumentId?: string;
-    templateId?: string;
-    template?: boolean;
-    publish?: boolean;
-    emoji?: string;
-    fullWidth?: boolean;
-  }): Promise<OutlineDocument> {
-    let result = await this.post<{ data: OutlineDocument }>('/documents.create', params);
-    return result.data;
+  async getIdentity() {
+    const result = await this.post('auth.info');
+    return parse(
+      z.object({
+        user: nativeUser,
+        team: z.object({ id: z.string().min(1), name: z.string(), url: z.string().optional() })
+      }),
+      result.data,
+      'identity'
+    );
   }
-
-  async updateDocument(params: {
-    id: string;
-    title?: string;
-    text?: string;
-    emoji?: string;
-    fullWidth?: boolean;
-    append?: boolean;
-    publish?: boolean;
-    done?: boolean;
-  }): Promise<OutlineDocument> {
-    let result = await this.post<{ data: OutlineDocument }>('/documents.update', params);
-    return result.data;
+  getDocument(id: string) {
+    return this.one(
+      'documents.info',
+      nativeDocument,
+      { id: identifier(id), apiVersion: 1 },
+      id
+    );
   }
-
-  async deleteDocument(documentId: string, permanent?: boolean): Promise<void> {
-    await this.post('/documents.delete', { id: documentId, permanent });
+  listDocuments(data: Record<string, unknown> = {}) {
+    return this.page('documents.list', nativeDocument, data);
   }
-
-  async archiveDocument(documentId: string): Promise<OutlineDocument> {
-    let result = await this.post<{ data: OutlineDocument }>('/documents.archive', {
-      id: documentId
-    });
-    return result.data;
+  listDrafts(data: Record<string, unknown> = {}) {
+    return this.page('documents.drafts', nativeDocument, data);
   }
-
-  async restoreDocument(documentId: string): Promise<OutlineDocument> {
-    let result = await this.post<{ data: OutlineDocument }>('/documents.restore', {
-      id: documentId
-    });
-    return result.data;
+  createDocument(data: Record<string, unknown>) {
+    return this.one('documents.create', nativeDocument, data);
   }
-
+  updateDocument(data: Record<string, unknown> & { id: string }) {
+    return this.one('documents.update', nativeDocument, data, data.id);
+  }
+  archiveDocument(id: string) {
+    return this.one('documents.archive', nativeDocument, { id: identifier(id) }, id);
+  }
+  restoreDocument(id: string, collectionId?: string) {
+    return this.one(
+      'documents.restore',
+      nativeDocument,
+      { id: identifier(id), collectionId },
+      id
+    );
+  }
+  deleteDocument(id: string, permanent = false) {
+    return this.accepted('documents.delete', { id: identifier(id), permanent });
+  }
   async moveDocument(
-    documentId: string,
+    id: string,
     collectionId?: string,
-    parentDocumentId?: string
-  ): Promise<OutlineDocument> {
-    let result = await this.post<{ data: OutlineDocument }>('/documents.move', {
-      id: documentId,
+    parentDocumentId?: string,
+    index?: number
+  ) {
+    const result = await this.post('documents.move', {
+      id: identifier(id),
       collectionId,
-      parentDocumentId
+      parentDocumentId,
+      index
     });
-    return result.data;
-  }
-
-  async searchDocuments(
-    params: {
-      query: string;
-      collectionId?: string;
-      userId?: string;
-      dateFilter?: string;
-      statusFilter?: string[];
-      titleFilter?: boolean;
-    } & PaginationParams
-  ): Promise<{ data: SearchResult[]; pagination: any }> {
-    return this.post('/documents.search', params);
-  }
-
-  // Collections
-
-  async getCollection(collectionId: string): Promise<OutlineCollection> {
-    let result = await this.post<{ data: OutlineCollection }>('/collections.info', {
-      id: collectionId
-    });
-    return result.data;
-  }
-
-  async listCollections(
-    params: PaginationParams = {}
-  ): Promise<{ data: OutlineCollection[]; pagination: any }> {
-    return this.post('/collections.list', params);
-  }
-
-  async createCollection(params: {
-    name: string;
-    description?: string;
-    color?: string;
-    icon?: string;
-    permission?: string;
-  }): Promise<OutlineCollection> {
-    let result = await this.post<{ data: OutlineCollection }>('/collections.create', params);
-    return result.data;
-  }
-
-  async updateCollection(params: {
-    id: string;
-    name?: string;
-    description?: string;
-    color?: string;
-    icon?: string;
-    permission?: string;
-  }): Promise<OutlineCollection> {
-    let result = await this.post<{ data: OutlineCollection }>('/collections.update', params);
-    return result.data;
-  }
-
-  async deleteCollection(collectionId: string): Promise<void> {
-    await this.post('/collections.delete', { id: collectionId });
-  }
-
-  async getCollectionDocuments(collectionId: string): Promise<any> {
-    let result = await this.post('/collections.documents', { id: collectionId });
-    return result.data;
-  }
-
-  // Users
-
-  async getUser(userId: string): Promise<OutlineUser> {
-    let result = await this.post<{ data: OutlineUser }>('/users.info', { id: userId });
-    return result.data;
-  }
-
-  async listUsers(
-    params: {
-      query?: string;
-      filter?: string;
-      role?: string;
-    } & PaginationParams = {}
-  ): Promise<{ data: OutlineUser[]; pagination: any }> {
-    return this.post('/users.list', params);
-  }
-
-  // Comments
-
-  async getComment(commentId: string): Promise<OutlineComment> {
-    let result = await this.post<{ data: OutlineComment }>('/comments.info', {
-      id: commentId
-    });
-    return result.data;
-  }
-
-  async listComments(
-    params: {
-      documentId?: string;
-      collectionId?: string;
-    } & PaginationParams = {}
-  ): Promise<{ data: OutlineComment[]; pagination: any }> {
-    return this.post('/comments.list', params);
-  }
-
-  async createComment(params: {
-    documentId: string;
-    parentCommentId?: string;
-    data: any;
-  }): Promise<OutlineComment> {
-    let result = await this.post<{ data: OutlineComment }>('/comments.create', params);
-    return result.data;
-  }
-
-  async updateComment(params: { id: string; data: any }): Promise<OutlineComment> {
-    let result = await this.post<{ data: OutlineComment }>('/comments.update', params);
-    return result.data;
-  }
-
-  async deleteComment(commentId: string): Promise<void> {
-    await this.post('/comments.delete', { id: commentId });
-  }
-
-  // Groups
-
-  async getGroup(groupId: string): Promise<OutlineGroup> {
-    let result = await this.post<{ data: OutlineGroup }>('/groups.info', { id: groupId });
-    return result.data;
-  }
-
-  async listGroups(
-    params: PaginationParams = {}
-  ): Promise<{ data: OutlineGroup[]; pagination: any }> {
-    return this.post('/groups.list', params);
-  }
-
-  async createGroup(params: { name: string }): Promise<OutlineGroup> {
-    let result = await this.post<{ data: OutlineGroup }>('/groups.create', params);
-    return result.data;
-  }
-
-  async updateGroup(params: { id: string; name: string }): Promise<OutlineGroup> {
-    let result = await this.post<{ data: OutlineGroup }>('/groups.update', params);
-    return result.data;
-  }
-
-  async deleteGroup(groupId: string): Promise<void> {
-    await this.post('/groups.delete', { id: groupId });
-  }
-
-  async addUserToGroup(groupId: string, userId: string): Promise<void> {
-    await this.post('/groups.add_user', { id: groupId, userId });
-  }
-
-  async removeUserFromGroup(groupId: string, userId: string): Promise<void> {
-    await this.post('/groups.remove_user', { id: groupId, userId });
-  }
-
-  // Events
-
-  async listEvents(
-    params: {
-      name?: string;
-      documentId?: string;
-      collectionId?: string;
-      auditLog?: boolean;
-      sort?: string;
-      direction?: 'ASC' | 'DESC';
-    } & PaginationParams = {}
-  ): Promise<{ data: OutlineEvent[]; pagination: any }> {
-    return this.post('/events.list', params);
-  }
-
-  // Webhook Subscriptions
-
-  async listWebhookSubscriptions(
-    params: PaginationParams = {}
-  ): Promise<{ data: OutlineWebhookSubscription[]; pagination: any }> {
-    return this.post('/webhookSubscriptions.list', params);
-  }
-
-  async createWebhookSubscription(params: {
-    name: string;
-    url: string;
-    secret?: string;
-    events: string[];
-  }): Promise<OutlineWebhookSubscription> {
-    let result = await this.post<{ data: OutlineWebhookSubscription }>(
-      '/webhookSubscriptions.create',
-      params
+    const data = parse(
+      z.object({
+        documents: z.array(nativeDocument),
+        collections: z.array(nativeCollection).optional()
+      }),
+      result.data,
+      'document move'
     );
-    return result.data;
-  }
-
-  async updateWebhookSubscription(params: {
-    id: string;
-    name?: string;
-    url?: string;
-    secret?: string;
-    events?: string[];
-  }): Promise<OutlineWebhookSubscription> {
-    let result = await this.post<{ data: OutlineWebhookSubscription }>(
-      '/webhookSubscriptions.update',
-      params
+    const document = data.documents.find(d => d.id === id || d.urlId === id);
+    requireValue(
+      document,
+      'Outline did not identify the moved document. Inspect both collections before retrying; the move may already have occurred.'
     );
-    return result.data;
+    requireValue(
+      (collectionId === undefined || document.collectionId === collectionId) &&
+        (parentDocumentId === undefined || document.parentDocumentId === parentDocumentId),
+      'Outline move receipt differs from the requested destination. Re-read the document before retrying.'
+    );
+    return {
+      document,
+      affectedDocumentIds: data.documents.map(d => d.id),
+      affectedCollectionIds: data.collections?.map(c => c.id)
+    };
   }
-
-  async deleteWebhookSubscription(webhookId: string): Promise<void> {
-    await this.post('/webhookSubscriptions.delete', { id: webhookId });
+  async searchDocuments(data: Record<string, unknown>) {
+    return this.page(
+      'documents.search',
+      z.object({ context: z.string(), ranking: z.number(), document: nativeDocument }),
+      data
+    );
   }
-
-  // Shares
-
-  async createShare(documentId: string): Promise<any> {
-    let result = await this.post('/shares.create', { documentId });
-    return result.data;
+  async exportDocument(id: string) {
+    const result = await this.post('documents.export', {
+      id: identifier(id),
+      includeChildDocuments: false
+    });
+    const markdown = parse(z.string(), result.data, 'Markdown export');
+    const bytes = Buffer.from(markdown, 'utf8');
+    requireValue(
+      bytes.byteLength <= 8 * 1024 * 1024,
+      'Markdown export exceeds the supported 8 MiB size. Export a smaller document.'
+    );
+    return bytes;
   }
-
-  async listShares(params: PaginationParams = {}): Promise<{ data: any[]; pagination: any }> {
-    return this.post('/shares.list', params);
+  getCollection(id: string) {
+    return this.one('collections.info', nativeCollection, { id: identifier(id) }, id);
   }
-
-  async revokeShare(shareId: string): Promise<void> {
-    await this.post('/shares.revoke', { id: shareId });
+  listCollections(data: Record<string, unknown> = {}) {
+    return this.page('collections.list', nativeCollection, data);
   }
-
-  // Templates
-
-  async listTemplates(
-    params: PaginationParams = {}
-  ): Promise<{ data: OutlineDocument[]; pagination: any }> {
-    return this.post('/templates.list', params);
+  createCollection(data: Record<string, unknown>) {
+    return this.one('collections.create', nativeCollection, data);
   }
-
-  // Collection memberships
-
-  async addUserToCollection(
-    collectionId: string,
-    userId: string,
+  updateCollection(data: Record<string, unknown> & { id: string }) {
+    return this.one('collections.update', nativeCollection, data, data.id);
+  }
+  deleteCollection(id: string) {
+    return this.accepted('collections.delete', { id: identifier(id) });
+  }
+  async collectionMemberships(
+    id: string,
+    groups: boolean,
+    data: Record<string, unknown> = {}
+  ) {
+    const endpoint = groups ? 'collections.group_memberships' : 'collections.memberships';
+    const result = await this.post(endpoint, { ...data, id: identifier(id) });
+    const memberships = groups
+      ? (() => {
+          const parsed = parse(
+            z.object({
+              groupMemberships: z.array(nativeMembership).optional(),
+              collectionGroupMemberships: z.array(nativeMembership).optional()
+            }),
+            result.data,
+            'collection group memberships'
+          );
+          return parsed.groupMemberships ?? parsed.collectionGroupMemberships;
+        })()
+      : parse(
+          z.object({ memberships: z.array(nativeMembership) }),
+          result.data,
+          'collection user memberships'
+        ).memberships;
+    requireValue(
+      memberships,
+      'Outline did not provide collection membership records. Check your server version.'
+    );
+    requireValue(
+      memberships.every(m => m.collectionId === id),
+      'Outline returned memberships for a different collection.'
+    );
+    return { memberships, pagination: this.pagination(result.pagination, endpoint) };
+  }
+  async addCollectionMember(
+    id: string,
+    targetId: string,
+    group: boolean,
     permission?: string
-  ): Promise<void> {
-    await this.post('/collections.add_user', { id: collectionId, userId, permission });
+  ) {
+    const endpoint = group ? 'collections.add_group' : 'collections.add_user';
+    const result = await this.post(endpoint, {
+      id: identifier(id),
+      [group ? 'groupId' : 'userId']: identifier(targetId),
+      permission
+    });
+    const data = parse(
+      z.object({
+        memberships: z.array(nativeMembership).optional(),
+        groupMemberships: z.array(nativeMembership).optional(),
+        collectionGroupMemberships: z.array(nativeMembership).optional()
+      }),
+      result.data,
+      'collection membership'
+    );
+    const memberships = group
+      ? (data.groupMemberships ?? data.collectionGroupMemberships)
+      : data.memberships;
+    const membership = memberships?.find(
+      m => m.collectionId === id && (group ? m.groupId === targetId : m.userId === targetId)
+    );
+    requireValue(
+      membership && (permission === undefined || membership.permission === permission),
+      'Outline did not confirm the exact collection membership and permission. Inspect membership state before retrying.'
+    );
+    return membership;
   }
-
-  async removeUserFromCollection(collectionId: string, userId: string): Promise<void> {
-    await this.post('/collections.remove_user', { id: collectionId, userId });
+  removeCollectionMember(id: string, targetId: string, group: boolean) {
+    return this.accepted(group ? 'collections.remove_group' : 'collections.remove_user', {
+      id: identifier(id),
+      [group ? 'groupId' : 'userId']: identifier(targetId)
+    });
   }
-
-  async addGroupToCollection(
-    collectionId: string,
-    groupId: string,
-    permission?: string
-  ): Promise<void> {
-    await this.post('/collections.add_group', { id: collectionId, groupId, permission });
+  getUser(id: string) {
+    return this.one('users.info', nativeUser, { id: identifier(id) }, id);
   }
-
-  async removeGroupFromCollection(collectionId: string, groupId: string): Promise<void> {
-    await this.post('/collections.remove_group', { id: collectionId, groupId });
+  listUsers(data: Record<string, unknown> = {}) {
+    return this.page('users.list', nativeUser, data);
+  }
+  getComment(id: string) {
+    return this.one('comments.info', nativeComment, { id: identifier(id) }, id);
+  }
+  listComments(data: Record<string, unknown> = {}) {
+    return this.page('comments.list', nativeComment, data);
+  }
+  createComment(data: Record<string, unknown>) {
+    return this.one('comments.create', nativeComment, data);
+  }
+  updateComment(data: Record<string, unknown> & { id: string }) {
+    return this.one('comments.update', nativeComment, data, data.id);
+  }
+  deleteComment(id: string) {
+    return this.accepted('comments.delete', { id: identifier(id) });
+  }
+  getGroup(id: string) {
+    return this.one('groups.info', nativeGroup, { id: identifier(id) }, id);
+  }
+  createGroup(data: Record<string, unknown>) {
+    return this.one('groups.create', nativeGroup, data);
+  }
+  updateGroup(data: Record<string, unknown> & { id: string }) {
+    return this.one('groups.update', nativeGroup, data, data.id);
+  }
+  deleteGroup(id: string) {
+    return this.accepted('groups.delete', { id: identifier(id) });
+  }
+  async listGroups(data: Record<string, unknown> = {}) {
+    const result = await this.post('groups.list', data);
+    const parsed = parse(z.object({ groups: z.array(nativeGroup) }), result.data, 'groups');
+    return {
+      data: parsed.groups,
+      pagination: this.pagination(result.pagination, 'groups.list')
+    };
+  }
+  async groupMemberships(id: string, data: Record<string, unknown> = {}) {
+    const result = await this.post('groups.memberships', { ...data, id: identifier(id) });
+    const parsed = parse(
+      z.object({ groupMemberships: z.array(nativeMembership) }),
+      result.data,
+      'group memberships'
+    );
+    requireValue(
+      parsed.groupMemberships.every(m => m.groupId === id),
+      'Outline returned memberships for a different group.'
+    );
+    return {
+      memberships: parsed.groupMemberships,
+      pagination: this.pagination(result.pagination, 'groups.memberships')
+    };
+  }
+  async changeGroupMember(id: string, userId: string, add: boolean) {
+    const result = await this.post(add ? 'groups.add_user' : 'groups.remove_user', {
+      id: identifier(id),
+      userId: identifier(userId)
+    });
+    const data = parse(
+      z.object({
+        groups: z.array(nativeGroup),
+        groupMemberships: z.array(nativeMembership).optional()
+      }),
+      result.data,
+      'group membership'
+    );
+    const group = data.groups.find(g => g.id === id);
+    requireValue(
+      group &&
+        (!add || data.groupMemberships?.some(m => m.groupId === id && m.userId === userId)),
+      'Outline did not confirm the requested group membership operation. Inspect current membership state before retrying.'
+    );
+    return group;
   }
 }

@@ -23,8 +23,6 @@ import {
   updateExpense,
   updateUser
 } from './tools';
-import { accountActivity, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     getCurrencies,
     getCategories
   ],
-  triggers: [inboundWebhook, accountActivity]
+  triggers: []
 });

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HootsuiteClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,15 +8,15 @@ export let manageOrganizationMembersTool = SlateTool.create(spec, {
   key: 'manage_organization_members',
   description: `List, retrieve, invite, or remove members in a Hootsuite organization.
 Use **list** to see all members. Use **get** to fetch a specific member's details and permissions.
-Use **invite** to add a new member by email. Use **remove** to delete a member from the organization.`,
+Use **invite** to create or invite a member by email; this can consume a seat and send an invitation. Use **remove** to remove organization membership; it does not delete the member's Hootsuite account.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: z.string().describe('Organization ID from get_user_info'),
       action: z.enum(['list', 'get', 'invite', 'remove']).describe('Action to perform'),
       memberId: z.string().optional().describe('Member ID (required for get/remove)'),
       fullName: z
@@ -59,7 +59,7 @@ Use **invite** to add a new member by email. Use **remove** to delete a member f
 
     if (action === 'list') {
       let result = await client.getOrganizationMembers(organizationId, ctx.input.cursor);
-      let members = result.members.map((m: any) => ({
+      let members = result.members.map(m => ({
         memberId: String(m.id),
         fullName: m.fullName,
         email: m.email,
@@ -75,12 +75,14 @@ Use **invite** to add a new member by email. Use **remove** to delete a member f
     }
 
     if (action === 'get') {
-      if (!ctx.input.memberId) throw new Error('memberId is required for get action');
+      if (!ctx.input.memberId)
+        throw createApiServiceError('memberId is required for get action');
 
       let member = await client.getOrganizationMember(organizationId, ctx.input.memberId);
-      let permissions = await client
-        .getOrganizationMemberPermissions(organizationId, ctx.input.memberId)
-        .catch(() => null);
+      let permissions = await client.getOrganizationMemberPermissions(
+        organizationId,
+        ctx.input.memberId
+      );
 
       return {
         output: {
@@ -104,10 +106,10 @@ Use **invite** to add a new member by email. Use **remove** to delete a member f
 
     if (action === 'invite') {
       if (!ctx.input.fullName || !ctx.input.email) {
-        throw new Error('fullName and email are required for invite action');
+        throw createApiServiceError('fullName and email are required for invite action');
       }
 
-      await client.inviteOrganizationMember({
+      let member = await client.inviteOrganizationMember({
         organizationId,
         fullName: ctx.input.fullName,
         email: ctx.input.email,
@@ -117,13 +119,27 @@ Use **invite** to add a new member by email. Use **remove** to delete a member f
       });
 
       return {
-        output: { members: undefined, cursor: undefined, success: true },
-        message: `Invited **${ctx.input.fullName}** (${ctx.input.email}) to organization **${organizationId}**.`
+        output: {
+          members: [
+            {
+              memberId: member.id,
+              fullName: member.fullName,
+              email: member.email,
+              companyName: member.companyName,
+              bio: member.bio,
+              timezone: member.timezone
+            }
+          ],
+          cursor: undefined,
+          success: true
+        },
+        message: `Created or invited **${ctx.input.fullName}** (${ctx.input.email}) to organization **${organizationId}**.`
       };
     }
 
     // remove
-    if (!ctx.input.memberId) throw new Error('memberId is required for remove action');
+    if (!ctx.input.memberId)
+      throw createApiServiceError('memberId is required for remove action');
 
     await client.removeOrganizationMember(organizationId, ctx.input.memberId);
     return {

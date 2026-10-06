@@ -11,6 +11,7 @@ import {
   deleteObject,
   generativeSearch,
   getCollection,
+  getCurrentUser,
   getObject,
   listCollections,
   listObjects,
@@ -22,13 +23,12 @@ import {
   updateObject
 } from './tools/index';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [
     listCollections,
     getCollection,
+    getCurrentUser,
     createCollection,
     updateCollection,
     deleteCollection,
@@ -47,5 +47,5 @@ export let provider = Slate.create({
     manageReferences,
     clusterStatus
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

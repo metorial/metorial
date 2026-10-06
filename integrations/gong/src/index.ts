@@ -27,8 +27,6 @@ import {
   unassignProspectFromFlow,
   updateMeeting
 } from './tools';
-import { callEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,5 +56,5 @@ export let provider = Slate.create({
     getCrmData,
     getCrmMetadata
   ],
-  triggers: [callEvent]
+  triggers: []
 });

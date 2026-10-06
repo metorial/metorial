@@ -9,13 +9,6 @@ import {
   upsertCustomerTool,
   upsertOrderTool
 } from './tools';
-import {
-  emailEventsTrigger,
-  newsletterEventsTrigger,
-  smsEventsTrigger,
-  suppressionEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -27,10 +20,5 @@ export let provider = Slate.create({
     sendCustomEventTool,
     batchUploadContactsTool
   ],
-  triggers: [
-    emailEventsTrigger,
-    smsEventsTrigger,
-    newsletterEventsTrigger,
-    suppressionEventsTrigger
-  ]
+  triggers: []
 });

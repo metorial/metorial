@@ -22,15 +22,6 @@ import {
   recordCustomerPayment,
   recordInventoryAdjustment
 } from './tools';
-import {
-  contactChanges,
-  inboundWebhook,
-  invoiceChanges,
-  itemChanges,
-  purchaseOrderChanges,
-  salesOrderChanges
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -55,12 +46,5 @@ export let provider = Slate.create({
     listWarehouses,
     deleteResource
   ],
-  triggers: [
-    inboundWebhook,
-    itemChanges,
-    salesOrderChanges,
-    invoiceChanges,
-    purchaseOrderChanges,
-    contactChanges
-  ]
+  triggers: []
 });

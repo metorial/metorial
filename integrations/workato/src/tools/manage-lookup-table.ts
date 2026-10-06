@@ -1,6 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import {
+  field,
+  idNumber,
+  invalid,
+  malformed,
+  numericId,
+  records,
+  required
+} from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageLookupTableTool = SlateTool.create(spec, {
@@ -49,13 +58,13 @@ export let manageLookupTableTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the operation succeeded'),
+      success: z.boolean().optional().describe('Whether the operation succeeded'),
       tables: z
         .array(
           z.object({
-            tableId: z.number().describe('Table ID'),
-            tableName: z.string().describe('Table name'),
-            projectId: z.number().nullable().describe('Project ID')
+            tableId: z.number().optional().describe('Table ID'),
+            tableName: z.string().optional().describe('Table name'),
+            projectId: z.number().nullable().optional().describe('Project ID')
           })
         )
         .optional()
@@ -66,8 +75,8 @@ export let manageLookupTableTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let {
+    const client = createClient(ctx);
+    const {
       action,
       tableId,
       tableName,
@@ -79,85 +88,61 @@ export let manageLookupTableTool = SlateTool.create(spec, {
       page,
       perPage
     } = ctx.input;
-
     if (action === 'list_tables') {
-      let result = await client.listLookupTables({ page, perPage });
-      let items = Array.isArray(result) ? result : (result.items ?? result.data ?? []);
-      let tables = items.map((t: any) => ({
-        tableId: t.id,
-        tableName: t.name,
-        projectId: t.project_id ?? null
+      const result = await client.listLookupTables({ page, perPage });
+      const tables = records(result.items).map(t => ({
+        tableId: idNumber(t.id),
+        tableName: field(t, 'name', z.string()),
+        projectId:
+          t.project_id === undefined
+            ? undefined
+            : t.project_id === null
+              ? null
+              : idNumber(t.project_id)
       }));
       return {
         output: { success: true, tables },
-        message: `Found **${tables.length}** lookup tables.`
+        message: `Returned ${tables.length} lookup tables from this page.`
       };
     }
-
     if (action === 'create_table') {
-      if (!tableName || !columns)
-        throw new Error('Table name and columns are required for create_table');
-      let result = await client.createLookupTable({
-        name: tableName,
+      if (!columns) invalid('Columns are required for create_table.');
+      const result = await client.createLookupTable({
+        name: required(tableName, 'Table name'),
         projectId,
         schema: columns
       });
-      let created = result.result ?? result;
       return {
-        output: { success: true, tableId: created.id },
-        message: `Created lookup table **${tableName}** with ID ${created.id}.`
+        output: { success: true, tableId: idNumber(result.id) },
+        message: 'Created lookup table. This tool does not delete tables.'
       };
     }
-
-    if (!tableId) throw new Error('Table ID is required for row operations');
-
+    const id = numericId(tableId, 'tableId');
     if (action === 'list_rows') {
-      let result = await client.listLookupTableRows(tableId, { page, perPage, filter });
-      let items = Array.isArray(result)
-        ? result
-        : (result.items ?? result.data ?? result.rows ?? []);
+      const result = await client.listLookupTableRows(id, { page, perPage, filter });
+      const rows = records(result.items);
       return {
-        output: { success: true, rows: items },
-        message: `Found **${items.length}** rows in lookup table ${tableId}.`
+        output: { success: true, rows },
+        message: `Returned ${rows.length} rows from this page.`
       };
     }
-
     if (action === 'lookup_row') {
-      if (!filter) throw new Error('Filter is required for lookup_row');
-      let result = await client.lookupRow(tableId, filter);
-      return {
-        output: { success: true, row: result },
-        message: `Found matching row in lookup table ${tableId}.`
-      };
+      if (!filter) invalid('Filter is required for lookup_row.');
+      const row = await client.lookupRow(id, filter);
+      idNumber(row.id);
+      return { output: { success: true, row }, message: 'Retrieved the first matching row.' };
     }
-
-    if (action === 'add_row') {
-      if (!rowData) throw new Error('Row data is required for add_row');
-      let result = await client.addLookupTableRow(tableId, rowData);
-      return {
-        output: { success: true, row: result },
-        message: `Added row to lookup table ${tableId}.`
-      };
-    }
-
-    if (action === 'update_row') {
-      if (!rowId || !rowData)
-        throw new Error('Row ID and row data are required for update_row');
-      let result = await client.updateLookupTableRow(tableId, rowId, rowData);
-      return {
-        output: { success: true, row: result },
-        message: `Updated row ${rowId} in lookup table ${tableId}.`
-      };
-    }
-
     if (action === 'delete_row') {
-      if (!rowId) throw new Error('Row ID is required for delete_row');
-      await client.deleteLookupTableRow(tableId, rowId);
-      return {
-        output: { success: true },
-        message: `Deleted row ${rowId} from lookup table ${tableId}.`
-      };
+      await client.deleteLookupTableRow(id, numericId(rowId, 'rowId'));
+      return { output: { success: true }, message: 'Deleted lookup row.' };
     }
-
-    throw new Error(`Unknown action: ${action}`);
+    if (!rowData) invalid('Row data is required.');
+    const row =
+      action === 'add_row'
+        ? await client.addLookupTableRow(id, rowData)
+        : await client.updateLookupTableRow(id, numericId(rowId, 'rowId'), rowData);
+    const returnedId = idNumber(row.id);
+    if (action === 'update_row' && String(returnedId) !== numericId(rowId, 'rowId'))
+      malformed();
+    return { output: { success: true, row }, message: `Row ${action} accepted.` };
   });

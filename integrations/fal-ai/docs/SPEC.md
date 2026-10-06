@@ -1,122 +1,48 @@
-# Slates Specification for Fal.ai
-
-## Overview
-
-Fal.ai is a serverless generative AI platform that provides a unified API to run inference on 1,000+ production-ready models for image, video, audio, and 3D content generation. It gives instant access to state-of-the-art AI models for image, video, audio, and multimodal generation, with automatic scaling, queue-based reliability, and pay-per-use billing.
+# Fal.ai Tool Reference
 
 ## Authentication
 
-Fal.ai uses **API Key** authentication exclusively.
+Connect an API key from the [fal.ai dashboard](https://fal.ai/docs/documentation/getting-started/get-your-api-key). The API uses `Authorization: Key <key_id:key_secret>`. Keys are scoped to their personal or team account. No additional connection configuration is required. Model inference and discovery accept API-scoped keys. `get_account` requires an ADMIN-scoped key, as documented in the [account billing API](https://fal.ai/docs/platform-apis/v1/account/billing); connecting does not require an ADMIN key.
 
-### Obtaining an API Key
+## Tools
 
-Fal.ai relies on API keys for authentication. You generate one from the dashboard by logging in and clicking on the "Keys" section under your profile, then selecting "Generate New Key." The system displays the key immediately—copy it and store it securely, as Fal.ai does not show it again.
+| Tool | Behavior |
+| --- | --- |
+| `search_models` | Search using free text, category, endpoint IDs, or status. Follow `nextCursor` while `hasMore` is true. Set `includeSchema: true` to discover the full OpenAPI input/output contract of an endpoint. |
+| `get_model_pricing` | Retrieve current unit prices, billing units, and currencies for 1–50 endpoint IDs. Resolution, duration, and the model's billing rules can affect final charges. |
+| `get_account` | Identify the authenticated account by username and read current credit balance/currency. Requires an ADMIN key. |
+| `generate_image` | Run synchronous image inference. Supports common parameters plus `additionalParams` for endpoint-specific inputs. Returns image URLs/metadata and downloadable images. |
+| `generate_video` | Run synchronous video inference and provide a downloadable video. Numeric `duration` is converted to the string enum used by Kling endpoints; `additionalParams` can override model-specific fields. Prefer asynchronous inference for slow video models. |
+| `generate_speech` | Generate downloadable speech. For `fal-ai/f5-tts`, supply `referenceAudioUrl`; `model_type` defaults to `F5-TTS`, and `audio_url` is decoded as a File object. Other models default to the `text` input field; use `textParameter` and `additionalParams` according to their schema. |
+| `transcribe_audio` | Run Whisper-compatible transcription or translation, with optional diarization and none/segment/word timestamp chunks. Preserves inferred languages and separate diarization segments. |
+| `run_model` | Run an arbitrary model with its documented input object, preserving structured results and providing downloadable files from returned File objects. |
+| `submit_queue_request` | Submit asynchronous inference and return request ID plus status/result/cancellation URLs. A gateway ID and queue position are returned only when present. Optionally notify a caller-supplied webhook URL. |
+| `check_queue_status` | Poll status/logs/metrics/errors; fetch completed model output and downloadable files with `action: "result"`; request cancellation with `action: "cancel"`. |
+| `upload_file` | Download a public input file of up to 90 MiB, upload it through the CDN upload protocol, and return its actual public CDN URL. The basename of `targetPath` is the preferred filename; the CDN assigns the storage location. Files expire after `expiresInSeconds` (default 3600). |
 
-If you're part of a team, make sure to select your team in the top-left corner of the dashboard before creating a key. Keys are scoped to the account (personal or team) that created them.
+Use endpoint IDs such as `fal-ai/flux/schnell`, not full URLs. All inference schemas are model-specific; unsupported parameters can cause upstream validation errors. Request control operations use the app root even when inference is submitted to a model subpath.
 
-### Key Scopes
+## Generated files and retention
 
-When creating a key, you choose a scope:
+Image, video, speech, generic inference, and completed queue results provide downloadable files. Existing structured URL fields remain available for subsequent operations. URLs work until the underlying media expires according to account settings or an explicitly supplied `fileRetentionSeconds`; deleted media cannot be renewed. Download files before their retention period ends.
 
-- **API scope**: Suitable for most use cases including model discovery, pricing, and analytics. Use this for running model inference.
-- **Admin scope**: Some Platform APIs require Admin scope keys for access to sensitive data. Required for managing API keys, deploying custom models, and managing compute instances.
+Models that return encoded media, including FLUX with `sync_mode: true`, provide a downloadable file and structured file metadata without embedding the media bytes in the output. Provider URL fields are present only when the model returns a hosted URL.
 
-When creating a key, you'll choose a scope that controls what the key can access. If you're not sure which to choose, start with API scope. You can always create an additional ADMIN key later if you need to deploy models.
+The synchronous API and long video generation may require a long-running call. Use the queue for long inference. `COMPLETED` may include a provider `error` and `errorType`; it does not by itself prove successful inference. Cancellation returns `CANCELLATION_REQUESTED` when accepted, and `cancelled: true` means accepted rather than a guarantee that running inference stopped. Already completed or missing requests cause an upstream error.
 
-### Using the API Key
+## Caller-managed webhooks
 
-Include your API key in the `Authorization` header with the `Key` prefix:
+No event triggers are exposed. You may set `webhookUrl` on a queue submission to deliver the result to your own server. Your server must implement the [official ED25519 signature and timestamp verification](https://fal.ai/docs/documentation/model-apis/inference/webhooks). Callback delivery and receiver configuration are the caller's responsibility.
 
-```
-Authorization: Key YOUR_API_KEY
-```
+## Official API contracts
 
-The key format is `key_id:key_secret` (e.g., `abc123def456:sk_live_abc123def456xyz789`).
+- [Model discovery and OpenAPI expansion](https://fal.ai/docs/platform-apis/v1/models)
+- [Pricing](https://fal.ai/docs/platform-apis/v1/models/pricing)
+- [Queue lifecycle, results, errors, and cancellation](https://fal.ai/docs/documentation/model-apis/inference/queue)
+- [FLUX schnell image schema](https://fal.ai/models/fal-ai/flux/schnell/api)
+- [Kling video schema](https://fal.ai/models/fal-ai/kling-video/v1/standard/text-to-video/api)
+- [F5-TTS speech schema](https://fal.ai/models/fal-ai/f5-tts/api)
+- [Whisper transcription schema](https://fal.ai/models/fal-ai/whisper/api)
+- [Official CDN upload implementation](https://github.com/fal-ai/fal-js/blob/main/libs/client/src/storage.ts)
 
-Alternatively, set the `FAL_KEY` environment variable and the official client libraries will pick it up automatically.
-
-### API Base URLs
-
-- **Synchronous model inference**: `https://fal.run/`
-- **Queue-based model inference**: `https://queue.fal.run/`
-- **Platform APIs**: `https://api.fal.ai/v1/`
-
-## Features
-
-### Model Inference (Image Generation)
-
-Run text-to-image and image-to-image generation across a wide range of models (FLUX, Stable Diffusion, Imagen, Ideogram, Recraft, etc.). Popular models such as Flux, Stable Video Diffusion, ControlNets, Whisper and more are available as ready-to-use APIs.
-
-- Key parameters include prompt, image size/aspect ratio, number of inference steps, guidance scale, seed, safety checker toggle, and number of images.
-- Supports LoRA adapters for customized model styles.
-- Input images can be provided as URLs, Base64 data URIs, or uploaded to fal's built-in file storage.
-
-### Model Inference (Video Generation)
-
-Generate videos from text, images, or other videos using models like Veo, Sora, Kling, LTX, and others. LTX-2.3, for example, supports text-to-video, image-to-video, and audio-to-video.
-
-- Parameters vary by model but typically include prompt, aspect ratio, duration, and audio toggle.
-- Some models support video-to-video transformation (remixing, style transfer, motion transfer).
-
-### Model Inference (Audio & Speech)
-
-Generate speech from text and transcribe audio to text. You can call the transcription API using models like Wizper (Whisper). Text-to-speech endpoints support voice cloning from reference audio.
-
-- Transcription supports speaker diarization, language detection, and word/segment-level chunking.
-- TTS supports multiple languages, custom pronunciation dictionaries, and reference audio for voice cloning.
-
-### Model Inference (3D Generation)
-
-Tripo3D on fal offers image-to-3D conversion that transforms 2D images into fully realized 3D models in seconds. Text-to-3D generation is also available.
-
-### Asynchronous Queue Processing
-
-Submit requests to fal.ai's queue system for asynchronous processing. This is the recommended approach for most use cases.
-
-- Submit a request and receive a `request_id`.
-- Poll for status (IN_QUEUE, IN_PROGRESS, COMPLETED).
-- Retrieve the result once completed.
-- Cancel queued requests when needed.
-- Optionally provide a `webhook_url` to receive results automatically upon completion.
-
-### Streaming
-
-For applications that require real-time interaction or handle streaming, fal offers a WebSocket-based integration. This allows you to establish a persistent connection and stream data back and forth between your client and the fal API.
-
-- Some models also support HTTP streaming via Server-Sent Events (SSE).
-- Useful for real-time image generation, LLM text streaming, and interactive applications.
-
-### File Storage
-
-Fal provides a convenient file storage that allows you to upload files and use them in your requests. You can upload files using the client API and use the returned URL in your requests.
-
-- Uploaded files are hosted on fal's CDN and can be referenced by URL in model inputs.
-
-### Model Discovery & Pricing
-
-The Platform APIs provide model metadata to search and discover available model endpoints, pricing information to retrieve real-time pricing and estimate costs, usage tracking to access detailed usage line items, and analytics to query time-bucketed metrics for request counts, success/error rates, and latency.
-
-### API Key Management
-
-You can create API keys programmatically. Authentication is required via admin API key. Keys can be listed, created with aliases, and revoked through the API.
-
-### Custom Model Deployment (Serverless)
-
-Manage apps, runners, and deployments programmatically. Deploy your own models to fal's serverless infrastructure with configurable scaling settings (concurrency, keep-alive, machine types, regions).
-
-### Compute Instance Management
-
-A REST API for managing compute instances on the fal platform. Create, list, retrieve details, and delete dedicated GPU instances. Requires Admin scope API keys.
-
-## Events
-
-Fal.ai supports **webhooks** for asynchronous request completion notifications.
-
-### Queue Completion Webhooks
-
-Setting up a webhook is straightforward. Pass a `webhook_url` when submitting a request to the queue, and fal will POST the result to that URL when processing completes.
-
-- The webhook payload includes the `request_id`, `gateway_request_id`, `status`, and the model output `payload`.
-- Initial webhook deliveries have a 15-second timeout. If a delivery exceeds this time or fails to deliver the payload, it will retry 10 times in the span of 2 hours.
-- To ensure the security and integrity of incoming webhook requests, you must verify that they originate from the expected source. This involves validating a cryptographic signature included in the request using a set of public keys. Signatures use ED25519 keys available via a JWKS endpoint.
-- Webhook is specified per-request (not globally configured); each queue submission can specify its own `webhook_url`.
+API key management, custom deployments, dedicated compute management, and broader analytics are not exposed by these tools.

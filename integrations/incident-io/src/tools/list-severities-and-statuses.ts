@@ -41,14 +41,14 @@ export let listSeveritiesAndStatuses = SlateTool.create(spec, {
       client.listIncidentStatuses()
     ]);
 
-    let severities = severitiesResult.severities.map((s: any) => ({
+    let severities = severitiesResult.severities.map(s => ({
       severityId: s.id,
       name: s.name,
       description: s.description || undefined,
       rank: s.rank ?? undefined
     }));
 
-    let statuses = statusesResult.incident_statuses.map((s: any) => ({
+    let statuses = statusesResult.incident_statuses.map(s => ({
       statusId: s.id,
       name: s.name,
       description: s.description || undefined,

@@ -6,14 +6,18 @@ import { spec } from '../spec';
 export let listWorkspaces = SlateTool.create(spec, {
   name: 'List Workspaces',
   key: 'list_workspaces',
-  description: `List all workspaces in your Tally account. Workspaces are used to group related forms together.`,
+  description: `List one page of accessible Tally workspaces. Workspaces are used to group related forms together.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({ page: z.number().optional().describe('One-based page number; default 1') })
+  )
   .output(
     z.object({
+      page: z.number().optional(),
+      hasMore: z.boolean().optional(),
       workspaces: z
         .array(
           z.object({
@@ -29,7 +33,7 @@ export let listWorkspaces = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.listWorkspaces();
+    let result = await client.listWorkspaces(ctx.input.page);
 
     let workspaces = result.items.map(ws => ({
       workspaceId: ws.id,
@@ -40,7 +44,9 @@ export let listWorkspaces = SlateTool.create(spec, {
 
     return {
       output: {
-        workspaces
+        workspaces,
+        page: result.page,
+        hasMore: result.hasMore
       },
       message: `Found **${workspaces.length}** workspace(s).`
     };

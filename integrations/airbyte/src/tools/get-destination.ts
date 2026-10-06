@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getDestinationTool = SlateTool.create(spec, {
   name: 'Get Destination',
   key: 'get_destination',
-  description: `Retrieve detailed information about a specific Airbyte destination connector, including its name, type, workspace, and full configuration.`,
+  description: `Retrieve detailed information about a specific Airbyte destination connector, including its name, type, workspace, and configuration keys with all values redacted.`,
   tags: {
     readOnly: true
   }
@@ -22,7 +22,11 @@ export let getDestinationTool = SlateTool.create(spec, {
       name: z.string(),
       destinationType: z.string(),
       workspaceId: z.string(),
-      configuration: z.record(z.string(), z.any())
+      configuration: z
+        .record(z.string(), z.unknown())
+        .describe(
+          'Configuration keys with all values redacted. Never reuse these values as connector input.'
+        )
     })
   )
   .handleInvocation(async ctx => {

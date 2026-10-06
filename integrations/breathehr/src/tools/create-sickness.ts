@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { dateRange, readOne, requireDate, requireId } from '../lib/response';
 import { spec } from '../spec';
 
 export let createSickness = SlateTool.create(spec, {
@@ -11,38 +12,51 @@ export let createSickness = SlateTool.create(spec, {
   .input(
     z.object({
       employeeId: z.string().describe('The ID of the employee'),
-      startDate: z.string().describe('Sickness start date (format: YYYY/MM/DD)'),
+      startDate: z.string().describe('Sickness start date (format: YYYY-MM-DD or YYYY/MM/DD)'),
       endDate: z
         .string()
         .optional()
-        .describe('Sickness end date (format: YYYY/MM/DD). Leave blank for ongoing sickness.'),
-      companySicknessTypeId: z.string().optional().describe('ID of the company sickness type'),
+        .describe(
+          'Sickness end date (format: YYYY-MM-DD or YYYY/MM/DD). Leave blank for ongoing sickness.'
+        ),
+      companySicknessTypeId: z
+        .string()
+        .optional()
+        .describe(
+          'Required company sickness type ID, supplied by an authorized account administrator'
+        ),
       reason: z.string().optional().describe('Reason for the sickness')
     })
   )
   .output(
     z.object({
-      sickness: z.record(z.string(), z.any()).describe('The created sickness record')
+      sickness: z.record(z.string(), z.unknown()).describe('The created sickness record')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let result = await client.createSickness(ctx.input.employeeId, {
-      startDate: ctx.input.startDate,
-      endDate: ctx.input.endDate,
-      companySicknessTypeId: ctx.input.companySicknessTypeId,
-      reason: ctx.input.reason
-    });
-
-    let sickness = result?.sicknesses?.[0] || result?.sickness || result;
-
+    const employeeId = requireId(ctx.input.employeeId, 'employeeId');
+    const startDate = requireDate(ctx.input.startDate, 'startDate');
+    const endDate =
+      ctx.input.endDate === undefined ? undefined : requireDate(ctx.input.endDate, 'endDate');
+    dateRange(startDate, endDate);
+    const sickness = readOne(
+      await new Client({
+        token: ctx.auth.token,
+        environment: ctx.config.environment
+      }).employeeCreate('sicknesses', employeeId, 'sickness', {
+        start_date: startDate,
+        end_date: endDate,
+        company_sicknesstype_id: requireId(
+          ctx.input.companySicknessTypeId,
+          'companySicknessTypeId from the account configuration'
+        ),
+        reason: ctx.input.reason
+      }),
+      'sicknesses'
+    );
     return {
       output: { sickness },
-      message: `Created sickness record for employee **${ctx.input.employeeId}** starting ${ctx.input.startDate}.`
+      message: 'Created the sickness record. Medical/personnel history may be retained.'
     };
   })
   .build();

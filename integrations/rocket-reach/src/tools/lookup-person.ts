@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEmails, mapPhones } from '../lib/responses';
 import { spec } from '../spec';
 
 let emailSchema = z.object({
@@ -50,14 +51,16 @@ This is the primary tool for **contact enrichment** — use it after searching f
   instructions: [
     'Provide at least one identifier: name + currentEmployer, linkedinUrl, email, or profileId.',
     'Using a LinkedIn URL or profileId typically returns faster and more accurate results.',
-    'If the lookup status is "searching" or "progress", the lookup is still processing. Use Check Lookup Status to poll for completion.'
+    'If the lookup status is "searching", "pending", "queued" or "progress", the lookup is still processing. Use Check Lookup Status to poll for completion.'
   ],
   constraints: [
-    'Lookup credits are deducted only when contact information is successfully retrieved.',
+    'This starts enrichment, may consume lookup/export credits according to your plan, and retains a lookup in your account history. Check Get Account before running it; do not repeat it to poll.',
+    'This REST tool does not select a lookup credit type. Confirm your account default and any additional person export charge before running it; do not assume every plan returns the same contact fields.',
     'Results may take time to process — check the status field in the response.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -147,23 +150,10 @@ This is the primary tool for **contact enrichment** — use it after searching f
       title: ctx.input.title
     });
 
-    let emails = (result.emails || []).map((e: any) => ({
-      email: e.email,
-      smtpValid: e.smtp_valid,
-      type: e.type,
-      grade: e.grade,
-      lastValidationCheck: e.last_validation_check
-    }));
+    let emails = mapEmails(result);
+    let phones = mapPhones(result);
 
-    let phones = (result.phones || []).map((p: any) => ({
-      number: p.number,
-      type: p.type,
-      validity: p.validity,
-      recommended: p.recommended,
-      premium: p.premium
-    }));
-
-    let jobHistory = (result.job_history || []).map((j: any) => ({
+    let jobHistory = (result.job_history || []).map(j => ({
       title: j.title,
       companyName: j.company_name,
       companyDomain: j.company_domain,
@@ -173,7 +163,7 @@ This is the primary tool for **contact enrichment** — use it after searching f
       department: j.department
     }));
 
-    let education = (result.education || []).map((e: any) => ({
+    let education = (result.education || []).map(e => ({
       school: e.school,
       degree: e.degree,
       major: e.major,
@@ -196,8 +186,10 @@ This is the primary tool for **contact enrichment** — use it after searching f
       linkedinUrl: result.linkedin_url,
       profilePic: result.profile_pic,
       recommendedEmail: result.recommended_email,
-      recommendedProfessionalEmail: result.recommended_professional_email,
-      recommendedPersonalEmail: result.recommended_personal_email,
+      recommendedProfessionalEmail:
+        result.recommended_professional_email ?? result.current_work_email,
+      recommendedPersonalEmail:
+        result.recommended_personal_email ?? result.current_personal_email,
       emails,
       phones,
       skills: result.skills,
@@ -206,10 +198,15 @@ This is the primary tool for **contact enrichment** — use it after searching f
       links: result.links
     };
 
+    const pending = ['pending', 'queued', 'waiting', 'searching', 'progress'].includes(
+      result.status ?? ''
+    );
     let statusMessage =
       result.status === 'complete'
         ? `Successfully retrieved contact details for **${result.name || 'the requested profile'}**.`
-        : `Lookup is **${result.status}**. The lookup may still be processing — use Check Lookup Status to check again later.`;
+        : pending
+          ? `Lookup is **${result.status}**. Use Check Lookup Status with the returned profile ID; wait between checks.`
+          : `Lookup returned status **${result.status}**. Do not assume it is pending or retry enrichment automatically.`;
 
     let emailCount = emails.length;
     let phoneCount = phones.length;

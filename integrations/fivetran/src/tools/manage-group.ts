@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FivetranClient } from '../lib/client';
+import { groupId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let groupOutputSchema = z.object({
-  groupId: z.string().describe('Unique identifier of the group'),
+  groupId: groupId,
   name: z.string().describe('Name of the group'),
   createdAt: z.string().optional().describe('Timestamp when the group was created')
 });
@@ -19,7 +20,7 @@ export let getGroup = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      groupId: z.string().describe('ID of the group to retrieve'),
+      groupId: groupId,
       includeConnections: z
         .boolean()
         .optional()
@@ -108,7 +109,7 @@ export let updateGroup = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      groupId: z.string().describe('ID of the group to update'),
+      groupId: groupId,
       name: z.string().describe('New name for the group')
     })
   )
@@ -131,14 +132,14 @@ export let updateGroup = SlateTool.create(spec, {
 export let deleteGroup = SlateTool.create(spec, {
   name: 'Delete Group',
   key: 'delete_group',
-  description: `Delete a group and all its associated resources (destination, connectors, etc.).`,
+  description: `Delete a group. Inspect its connections, destination and other associated resources before planning removal.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      groupId: z.string().describe('ID of the group to delete')
+      groupId: groupId
     })
   )
   .output(

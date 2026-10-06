@@ -1,6 +1,12 @@
 # Fal.ai
 
-Run inference on 1,000+ generative AI models for image, video, audio, 3D, and multimodal content generation. Generate images from text or other images using models like FLUX, Stable Diffusion, Ideogram, and Recraft with support for LoRA adapters. Generate videos from text, images, or other videos using models like Veo, Sora, Kling, and LTX. Transcribe audio to text with speaker diarization and generate speech from text with voice cloning. Convert images to 3D models or generate 3D from text. Submit requests synchronously or via an asynchronous queue with polling and webhook notifications. Upload files to built-in CDN storage for use in model inputs. Discover available models, retrieve pricing, track usage, and query analytics. Manage API keys programmatically. Deploy custom models to serverless infrastructure and manage dedicated GPU compute instances.
+Discover model endpoints and their OpenAPI input/output schemas, inspect current model pricing, and run image, video, speech, transcription, or arbitrary model inference. Generated media is provided as downloadable files with provider URLs when hosted. Upload public input files to the CDN with a chosen expiry, or submit asynchronous inference and poll its status, fetch results, and request cancellation.
+
+Use an API-scoped key for ordinary inference and model discovery. `get_account` identifies the account and reads its credit balance with an ADMIN-scoped key; it is optional and is not required to connect or run models.
+
+Model parameters vary by endpoint. Call `search_models` with `endpointId` and `includeSchema: true` before selecting model-specific options. Slow generation is best submitted with `submit_queue_request`. A caller-supplied `webhookUrl` sends results to your own server; this package exposes no event triggers.
+
+See [the tool reference](./docs/SPEC.md) and [fal.ai's official documentation](https://fal.ai/docs/documentation/model-apis/inference/queue).
 
 ## License
 

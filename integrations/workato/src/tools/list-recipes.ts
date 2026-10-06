@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/create-client';
+import * as map from '../lib/mappers';
+import { field, records } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listRecipesTool = SlateTool.create(spec, {
@@ -35,59 +37,43 @@ export let listRecipesTool = SlateTool.create(spec, {
     z.object({
       recipes: z.array(
         z.object({
-          recipeId: z.number().describe('Recipe ID'),
-          name: z.string().describe('Recipe name'),
-          description: z.string().nullable().describe('Recipe description'),
-          running: z.boolean().describe('Whether the recipe is currently running'),
-          triggerApplication: z.string().nullable().describe('Trigger application name'),
-          actionApplications: z.array(z.string()).describe('Action application names'),
-          folderId: z.number().nullable().describe('Folder ID'),
-          projectId: z.number().nullable().describe('Project ID'),
-          jobSucceededCount: z.number().describe('Count of succeeded jobs'),
-          jobFailedCount: z.number().describe('Count of failed jobs'),
-          lastRunAt: z.string().nullable().describe('Last run timestamp'),
-          createdAt: z.string().describe('Creation timestamp'),
-          updatedAt: z.string().describe('Last update timestamp')
+          recipeId: z.number().optional().describe('Recipe ID'),
+          name: z.string().optional().describe('Recipe name'),
+          description: z.string().nullable().optional().describe('Recipe description'),
+          running: z.boolean().optional().describe('Whether the recipe is currently running'),
+          triggerApplication: z
+            .string()
+            .nullable()
+            .optional()
+            .describe('Trigger application name'),
+          actionApplications: z
+            .array(z.string())
+            .optional()
+            .describe('Action application names'),
+          folderId: z.number().nullable().optional().describe('Folder ID'),
+          projectId: z.number().nullable().optional().describe('Project ID'),
+          jobSucceededCount: z.number().optional().describe('Count of succeeded jobs'),
+          jobFailedCount: z.number().optional().describe('Count of failed jobs'),
+          lastRunAt: z.string().nullable().optional().describe('Last run timestamp'),
+          createdAt: z.string().optional().describe('Creation timestamp'),
+          updatedAt: z.string().optional().describe('Last update timestamp')
         })
       ),
-      totalCount: z.number().describe('Total count of recipes matching the filter'),
-      page: z.number().describe('Current page number')
+      totalCount: z.number().optional().describe('Total count of recipes matching the filter'),
+      page: z.number().optional().describe('Current page number')
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let result = await client.listRecipes({
-      folderId: ctx.input.folderId,
-      running: ctx.input.running,
-      adapterNamesAny: ctx.input.adapterNamesAny,
-      page: ctx.input.page,
-      perPage: ctx.input.perPage,
-      order: ctx.input.order,
-      updatedAfter: ctx.input.updatedAfter
-    });
-
-    let recipes = (result.items ?? []).map((r: any) => ({
-      recipeId: r.id,
-      name: r.name,
-      description: r.description ?? null,
-      running: r.running ?? false,
-      triggerApplication: r.trigger_application ?? null,
-      actionApplications: r.action_applications ?? [],
-      folderId: r.folder_id ?? null,
-      projectId: r.project_id ?? null,
-      jobSucceededCount: r.job_succeeded_count ?? 0,
-      jobFailedCount: r.job_failed_count ?? 0,
-      lastRunAt: r.last_run_at ?? null,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at
-    }));
-
+    const client = createClient(ctx);
+    const result = await client.listRecipes(ctx.input);
+    const recipes = records(result.items).map(map.recipe);
     return {
       output: {
         recipes,
-        totalCount: result.count ?? recipes.length,
-        page: result.page ?? 1
+        totalCount: field(result, 'count', z.number().int().nonnegative().optional()),
+        page:
+          field(result, 'page', z.number().int().positive().optional()) ?? ctx.input.page ?? 1
       },
-      message: `Found **${recipes.length}** recipes (page ${result.page ?? 1}).`
+      message: `Returned ${recipes.length} recipes from this page.`
     };
   });

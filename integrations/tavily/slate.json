@@ -1,6 +1,6 @@
 {
   "name": "@metorial/tavily",
-  "description": "Search the web and extract content from URLs, optimized for AI and LLM workflows. Perform AI-powered web searches with configurable depth, topic filtering, time ranges, and domain controls. Extract clean, structured content from specific URLs in markdown or plain text. Crawl entire websites following links across pages with natural language instructions to guide traversal. Map website structures to discover all URLs without extracting content. Conduct autonomous multi-step research that produces comprehensive reports with citations. Track API credit usage across projects.",
+  "description": "Search the web, extract selected pages, and traverse websites with explicit depth, breadth and result limits. Create asynchronous research requests, resume their native status and download completed reports as Markdown or JSON. Read API-key credits separately from account plan usage. Content operations can consume credits and retain provider history; a returned request ID supports reconciliation without recreating an accepted job.",
   "categories": ["apis-and-http-requests", "web-search"],
   "skills": [
     "search the web",
@@ -11,7 +11,8 @@
     "filter by domain and time",
     "generate AI answers",
     "extract images from pages",
-    "track API usage"
+    "track API usage",
+    "download completed research reports"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/tavily.svg"
 }

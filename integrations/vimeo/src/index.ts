@@ -1,6 +1,5 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
-
 import {
   addCommentTool,
   createChannelTool,
@@ -10,9 +9,12 @@ import {
   deleteFolderTool,
   deleteShowcaseTool,
   deleteVideoTool,
+  downloadVideoTool,
   editShowcaseTool,
   editVideoTool,
   getChannelTool,
+  getFolderTool,
+  getShowcaseTool,
   getShowcaseVideosTool,
   getUserTool,
   getVideoTool,
@@ -30,10 +32,9 @@ import {
   manageChannelVideoTool,
   manageFolderVideoTool,
   manageShowcaseVideoTool,
+  renewVideoFile,
   searchVideosTool
 } from './tools';
-
-import { newVideoTrigger, videoEventsTrigger } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -66,7 +67,11 @@ export let provider = Slate.create({
     listChannelVideosTool,
     manageChannelVideoTool,
     listCategoriesTool,
-    listCategoryVideosTool
+    listCategoryVideosTool,
+    getFolderTool,
+    getShowcaseTool,
+    downloadVideoTool,
+    renewVideoFile
   ],
-  triggers: [videoEventsTrigger, newVideoTrigger]
+  triggers: []
 });

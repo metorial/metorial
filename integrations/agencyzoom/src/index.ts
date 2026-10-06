@@ -32,8 +32,6 @@ import {
   updateServiceTicket,
   updateTask
 } from './tools';
-import { inboundWebhook, newLeadTrigger, serviceTicketUpdatedTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -68,5 +66,5 @@ export let provider = Slate.create({
     batchCreateContacts,
     listReferenceData
   ],
-  triggers: [inboundWebhook, newLeadTrigger, serviceTicketUpdatedTrigger]
+  triggers: []
 });

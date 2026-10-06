@@ -1,10 +1,5 @@
 import { SlateConfig } from 'slates';
 import { z } from 'zod';
 
-export let config = SlateConfig.create(
-  z.object({
-    baseUrl: z
-      .string()
-      .describe('Base URL of the Strapi instance (e.g., https://your-strapi-instance.com)')
-  })
-);
+// Older connections stored the instance here. Preserve those values without asking twice.
+export const config = SlateConfig.create(z.object({}).passthrough());

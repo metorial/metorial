@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { destinationOutputSchema } from '../lib/models';
 import { spec } from '../spec';
 
 export let updateTransformation = SlateTool.create(spec, {
@@ -14,7 +15,7 @@ Set **publish** to true to make the updated code live for incoming event traffic
   ],
   tags: {
     readOnly: false,
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -43,7 +44,10 @@ Set **publish** to true to make the updated code live for incoming event traffic
       codeVersion: z.string().nullable().describe('Code version number'),
       language: z.string().describe('Programming language used'),
       createdAt: z.string().describe('Creation timestamp'),
-      updatedAt: z.string().describe('Last update timestamp')
+      updatedAt: z.string().describe('Last update timestamp'),
+      destinations: destinationOutputSchema.describe(
+        'Current destination associations when reported by the provider.'
+      )
     })
   )
   .handleInvocation(async ctx => {
@@ -72,7 +76,8 @@ Set **publish** to true to make the updated code live for incoming event traffic
         codeVersion: result.codeVersion ?? null,
         language: result.language,
         createdAt: result.createdAt,
-        updatedAt: result.updatedAt
+        updatedAt: result.updatedAt,
+        destinations: result.destinations
       },
       message: `Updated${published} transformation **${result.name}** (ID: \`${result.id}\`, version: \`${result.versionId}\`).`
     };

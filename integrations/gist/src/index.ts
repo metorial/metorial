@@ -30,8 +30,6 @@ import {
   searchConversations,
   trackEvent
 } from './tools';
-import { campaignEvents, contactEvents, conversationEvents, meetingEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -64,5 +62,5 @@ export let provider = Slate.create({
     manageProduct,
     manageCustomer
   ],
-  triggers: [contactEvents, conversationEvents, campaignEvents, meetingEvents]
+  triggers: []
 });

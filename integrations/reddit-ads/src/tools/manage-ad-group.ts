@@ -1,22 +1,50 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RedditAdsClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { accountInput, resourceOutput } from '../lib/contracts';
+import { adGroupPayload } from '../lib/mappers';
 import { spec } from '../spec';
 
 export let manageAdGroup = SlateTool.create(spec, {
   name: 'Manage Ad Group',
   key: 'manage_ad_group',
-  description: `Create a new ad group within a campaign or update an existing one. Configure targeting (subreddits, interests, keywords), bidding strategy, placements (Feed, Conversations), scheduling, and budget. Ad groups control how and where ads are shown within a campaign.`,
+  description:
+    'Create or update a Standard ad group. Creation requires an explicit status; ACTIVE may enable advertising spend. ARCHIVED/DELETED are retained states, not history erasure. Current API constraints and account ownership are checked before writing.',
   instructions: [
     'To create an ad group, omit adGroupId and provide campaignId. To update, provide adGroupId.',
-    'Bid amount is in cents (e.g., 500 = $5.00 CPM/CPC).'
+    'Bid amount is in cents of the account currency. CPC/CPM/CPV specify bid type; optimizationStrategy controls optimization.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
+      accountId: accountInput,
+      bidType: z
+        .enum(['CPC', 'CPM', 'CPV', 'CPV6', 'CPV15'])
+        .optional()
+        .describe('Current bid type; must agree with legacy bidStrategy when both are given.'),
+      optimizationStrategy: z
+        .enum(['BIDLESS', 'MANUAL_BIDDING', 'MAXIMIZE_VOLUME', 'TARGET_CPX'])
+        .nullable()
+        .optional()
+        .describe(
+          'Required for non-CBO creation. Null or omission inherits the campaign strategy for CBO.'
+        ),
+      conversionPixelId: z
+        .string()
+        .optional()
+        .describe('Pixel required for new ad groups; CBO groups inherit the parent Pixel.'),
+      goalType: z
+        .enum(['DAILY_SPEND', 'LIFETIME_SPEND'])
+        .optional()
+        .describe('Goal type for a new non-CBO ad group; CBO must match its parent.'),
+      goalCents: z.number().optional().describe('Non-CBO ad-group budget in cents.'),
+      optimizationGoal: z
+        .string()
+        .optional()
+        .describe('Objective-specific optimization goal; immutable.'),
       adGroupId: z
         .string()
         .optional()
@@ -30,8 +58,13 @@ export let manageAdGroup = SlateTool.create(spec, {
       bidStrategy: z
         .enum(['CPC', 'CPM', 'CPA', 'CPV'])
         .optional()
-        .describe('Bidding strategy'),
-      status: z.enum(['ACTIVE', 'PAUSED']).optional().describe('Ad group status'),
+        .describe(
+          'Legacy bid type. CPC/CPM/CPV map to bid_type; CPA is unsupported. Use optimizationStrategy for bidding optimization.'
+        ),
+      status: z
+        .enum(['ACTIVE', 'PAUSED', 'ARCHIVED', 'DELETED'])
+        .optional()
+        .describe('Ad group status'),
       startDate: z.string().optional().describe('Start date in ISO 8601 format'),
       endDate: z.string().optional().describe('End date in ISO 8601 format'),
       targetSubreddits: z
@@ -57,53 +90,18 @@ export let manageAdGroup = SlateTool.create(spec, {
       status: z.string().optional(),
       bidCents: z.number().optional(),
       bidStrategy: z.string().optional(),
+      optimizationStrategy: z.string().optional(),
       raw: z.any().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RedditAdsClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
-    });
-
-    let payload: Record<string, any> = {};
-    if (ctx.input.campaignId !== undefined) payload.campaign_id = ctx.input.campaignId;
-    if (ctx.input.name !== undefined) payload.name = ctx.input.name;
-    if (ctx.input.bidCents !== undefined) payload.bid_cents = ctx.input.bidCents;
-    if (ctx.input.bidStrategy !== undefined) payload.bid_strategy = ctx.input.bidStrategy;
-    if (ctx.input.status !== undefined) payload.status = ctx.input.status;
-    if (ctx.input.startDate !== undefined) payload.start_date = ctx.input.startDate;
-    if (ctx.input.endDate !== undefined) payload.end_date = ctx.input.endDate;
-    if (ctx.input.targetSubreddits !== undefined)
-      payload.target_subreddits = ctx.input.targetSubreddits;
-    if (ctx.input.targetInterests !== undefined)
-      payload.target_interests = ctx.input.targetInterests;
-    if (ctx.input.targetKeywords !== undefined)
-      payload.target_keywords = ctx.input.targetKeywords;
-    if (ctx.input.placements !== undefined) payload.placements = ctx.input.placements;
-
-    let result: any;
-    let action: string;
-
-    if (ctx.input.adGroupId) {
-      result = await client.updateAdGroup(ctx.input.adGroupId, payload);
-      action = 'updated';
-    } else {
-      result = await client.createAdGroup(payload);
-      action = 'created';
-    }
-
+    const client = createClient(ctx);
+    const payload = await adGroupPayload(client, ctx.input);
+    const result = await client.write('adGroup', ctx.input.adGroupId, payload);
     return {
-      output: {
-        adGroupId: result.id || result.ad_group_id,
-        campaignId: result.campaign_id,
-        name: result.name,
-        status: result.status || result.effective_status,
-        bidCents: result.bid_cents || result.bid,
-        bidStrategy: result.bid_strategy,
-        raw: result
-      },
-      message: `Ad group **${result.name || ctx.input.name}** ${action} successfully.`
+      output: resourceOutput('adGroup', result),
+      message:
+        'Reddit acknowledged the resource write. Read it back to verify its configured and effective delivery states.'
     };
   })
   .build();

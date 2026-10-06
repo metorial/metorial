@@ -1,121 +1,75 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
-import { spec } from '../spec';
-
-let jurisdictionOutputSchema = z.object({
-  jurisdictionId: z.string().optional().describe('Jurisdiction ID'),
-  country: z.string().optional().describe('Country code'),
-  region: z.string().optional().describe('Region/state code'),
-  name: z.string().optional().describe('Jurisdiction name'),
-  taxAccountNumber: z
-    .string()
-    .optional()
-    .describe('Tax registration number for this jurisdiction'),
-  status: z.string().optional().describe('Registration status')
-});
-
-export let listJurisdictions = SlateTool.create(spec, {
+import { jurisdictionOutput, mapJurisdiction } from '../lib/schemas';
+import { tool } from '../lib/tool';
+import { countryInput, idInput, invalid, pageInput, pageOutput } from '../lib/validation';
+export const listJurisdictions = tool({
   name: 'List Tax Jurisdictions',
   key: 'list_jurisdictions',
-  description: `Retrieve the list of tax jurisdictions where the business is registered for tax collection. Useful for understanding where the business has tax obligations.`,
-  tags: { readOnly: true }
-})
-  .input(
-    z.object({
-      page: z.number().optional().describe('Page number for pagination')
-    })
-  )
-  .output(
-    z.object({
-      jurisdictions: z.array(jurisdictionOutputSchema)
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let result = await client.listJurisdictions({ page: ctx.input.page });
-
-    let jurisdictions = (Array.isArray(result) ? result : []).map((j: any) => ({
-      jurisdictionId: j.id?.toString(),
-      country: j.country,
-      region: j.region,
-      name: j.name,
-      taxAccountNumber: j.tax_account_number,
-      status: j.status
-    }));
-
+  description:
+    'List the provider jurisdiction catalog, optionally filtered by country or region, or retrieve one with jurisdictionId alone. Catalog presence does not prove registration or a tax obligation.',
+  readOnly: true,
+  input: {
+    ...pageInput,
+    country: countryInput.optional(),
+    region: z.string().optional(),
+    jurisdictionId: idInput.optional()
+  },
+  output: { jurisdictions: z.array(z.object(jurisdictionOutput)), ...pageOutput },
+  run: async (input, client) => {
+    if (input.jurisdictionId) {
+      if (Object.entries(input).some(([k, v]) => k !== 'jurisdictionId' && v !== undefined))
+        throw invalid('Use jurisdictionId alone for an exact catalog read.');
+      return {
+        jurisdictions: [
+          mapJurisdiction(await client.get('jurisdictions', input.jurisdictionId))
+        ]
+      };
+    }
     return {
-      output: { jurisdictions },
-      message: `Found **${jurisdictions.length}** tax jurisdiction(s)`
+      jurisdictions: (
+        await client.list('jurisdictions', input, {
+          country: input.country,
+          region: input.region
+        })
+      ).map(mapJurisdiction),
+      ...client.pagination
     };
-  })
-  .build();
-
-export let createJurisdiction = SlateTool.create(spec, {
-  name: 'Register Tax Jurisdiction',
+  }
+});
+export const createJurisdiction = tool({
+  name: 'Create Tax Jurisdiction (Compatibility)',
   key: 'create_jurisdiction',
-  description: `Register a new tax jurisdiction where the business will collect taxes. This enables Quaderno to calculate taxes for this jurisdiction.`,
-  tags: { destructive: false }
-})
-  .input(
-    z.object({
-      country: z.string().describe('Two-letter ISO country code'),
-      region: z.string().optional().describe('Region/state code'),
-      taxAccountNumber: z
-        .string()
-        .optional()
-        .describe('Tax registration number for this jurisdiction')
-    })
-  )
-  .output(jurisdictionOutputSchema)
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-
-    let data: Record<string, any> = {
-      country: ctx.input.country
-    };
-    if (ctx.input.region) data.region = ctx.input.region;
-    if (ctx.input.taxAccountNumber) data.tax_account_number = ctx.input.taxAccountNumber;
-
-    let j = await client.createJurisdiction(data);
-
-    return {
-      output: {
-        jurisdictionId: j.id?.toString(),
-        country: j.country,
-        region: j.region,
-        name: j.name,
-        taxAccountNumber: j.tax_account_number,
-        status: j.status
-      },
-      message: `Registered tax jurisdiction **${j.name || ctx.input.country}**`
-    };
-  })
-  .build();
-
-export let deleteJurisdiction = SlateTool.create(spec, {
-  name: 'Remove Tax Jurisdiction',
+  description:
+    'Call the historical jurisdiction creation route. This mutation is not documented by the current API; account support varies. A returned record does not prove legal registration. For current registrations, use the provider tax-ID workflow.',
+  input: {
+    country: countryInput,
+    region: z.string().optional(),
+    taxAccountNumber: z.string().optional()
+  },
+  output: jurisdictionOutput,
+  run: async (input, client) =>
+    mapJurisdiction(
+      await client.create(
+        'jurisdictions.json',
+        {
+          country: input.country,
+          region: input.region,
+          tax_account_number: input.taxAccountNumber
+        },
+        true
+      )
+    )
+});
+export const deleteJurisdiction = tool({
+  name: 'Delete Tax Jurisdiction (Compatibility)',
   key: 'delete_jurisdiction',
-  description: `Remove a tax jurisdiction registration. Quaderno will no longer calculate taxes for this jurisdiction.`,
-  tags: { destructive: true }
-})
-  .input(
-    z.object({
-      jurisdictionId: z.string().describe('ID of the jurisdiction to remove')
-    })
-  )
-  .output(
-    z.object({
-      success: z.boolean().describe('Whether the jurisdiction was successfully removed')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    await client.deleteJurisdiction(ctx.input.jurisdictionId);
-
-    return {
-      output: { success: true },
-      message: `Removed tax jurisdiction **${ctx.input.jurisdictionId}**`
-    };
-  })
-  .build();
+  description:
+    'Call the historical jurisdiction deletion route. Use only a verified legacy registration ID, never a current catalog ID. Current API support is undocumented, and success does not prove removal of a legal registration.',
+  destructive: true,
+  input: { jurisdictionId: idInput },
+  output: { success: z.boolean() },
+  run: async (input, client) => {
+    await client.remove('jurisdictions', input.jurisdictionId, true);
+    return { success: true };
+  }
+});

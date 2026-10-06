@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FivetranClient } from '../lib/client';
+import { connectionId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getConnectionSchema = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let getConnectionSchema = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the connection')
+      connectionId: connectionId
     })
   )
   .output(
@@ -56,7 +57,7 @@ export let updateConnectionSchema = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the connection'),
+      connectionId: connectionId,
       schemaChangeHandling: z
         .enum(['ALLOW_ALL', 'ALLOW_COLUMNS', 'BLOCK_ALL'])
         .optional()
@@ -87,7 +88,7 @@ export let updateConnectionSchema = SlateTool.create(spec, {
     let body: Record<string, any> = {};
     if (ctx.input.schemaChangeHandling)
       body.schema_change_handling = ctx.input.schemaChangeHandling;
-    if (ctx.input.schemas) body.schemas = ctx.input.schemas;
+    if (ctx.input.schemas !== undefined) body.schemas = ctx.input.schemas;
 
     let schema = await client.updateConnectionSchema(ctx.input.connectionId, body);
 
@@ -108,7 +109,7 @@ export let reloadConnectionSchema = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      connectionId: z.string().describe('ID of the connection'),
+      connectionId: connectionId,
       excludeMode: z
         .enum(['EXCLUDE', 'PRESERVE'])
         .optional()

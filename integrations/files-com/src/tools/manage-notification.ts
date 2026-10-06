@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { nativeId, optionalText, reject } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageNotification = SlateTool.create(spec, {
@@ -85,10 +86,7 @@ export let manageNotification = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let { action, notificationId } = ctx.input;
 
@@ -102,13 +100,13 @@ export let manageNotification = SlateTool.create(spec, {
       });
 
       let notifications = result.notifications.map((n: Record<string, unknown>) => ({
-        notificationId: Number(n.id),
-        path: n.path ? String(n.path) : undefined,
+        notificationId: nativeId(n.id),
+        path: optionalText(n.path),
         userId: typeof n.user_id === 'number' ? n.user_id : undefined,
-        username: n.username ? String(n.username) : undefined,
+        username: optionalText(n.username),
         groupId: typeof n.group_id === 'number' ? n.group_id : undefined,
-        groupName: n.group_name ? String(n.group_name) : undefined,
-        sendInterval: n.send_interval ? String(n.send_interval) : undefined,
+        groupName: optionalText(n.group_name),
+        sendInterval: optionalText(n.send_interval),
         recursive: typeof n.recursive === 'boolean' ? n.recursive : undefined,
         notifyOnUpload:
           typeof n.notify_on_upload === 'boolean' ? n.notify_on_upload : undefined,
@@ -123,7 +121,7 @@ export let manageNotification = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!notificationId) throw new Error('notificationId is required for delete');
+      if (!notificationId) reject('notificationId is required for delete');
       await client.deleteNotification(notificationId);
       return {
         output: { deleted: true },
@@ -155,12 +153,12 @@ export let manageNotification = SlateTool.create(spec, {
       return {
         output: {
           notification: {
-            notificationId: Number(result.id),
-            path: result.path ? String(result.path) : undefined,
+            notificationId: nativeId(result.id),
+            path: optionalText(result.path),
             userId: typeof result.user_id === 'number' ? result.user_id : undefined,
-            username: result.username ? String(result.username) : undefined,
+            username: optionalText(result.username),
             groupId: typeof result.group_id === 'number' ? result.group_id : undefined,
-            sendInterval: result.send_interval ? String(result.send_interval) : undefined
+            sendInterval: optionalText(result.send_interval)
           }
         },
         message: `Created notification on \`${ctx.input.path || '/'}\``
@@ -168,17 +166,17 @@ export let manageNotification = SlateTool.create(spec, {
     }
 
     // update
-    if (!notificationId) throw new Error('notificationId is required for update');
+    if (!notificationId) reject('notificationId is required for update');
     let result = await client.updateNotification(notificationId, data);
     return {
       output: {
         notification: {
-          notificationId: Number(result.id),
-          path: result.path ? String(result.path) : undefined,
+          notificationId: nativeId(result.id),
+          path: optionalText(result.path),
           userId: typeof result.user_id === 'number' ? result.user_id : undefined,
-          username: result.username ? String(result.username) : undefined,
+          username: optionalText(result.username),
           groupId: typeof result.group_id === 'number' ? result.group_id : undefined,
-          sendInterval: result.send_interval ? String(result.send_interval) : undefined
+          sendInterval: optionalText(result.send_interval)
         }
       },
       message: `Updated notification **${notificationId}**`

@@ -23,8 +23,6 @@ import {
   updateRefund,
   validateAddress
 } from './tools';
-import { inboundWebhook, newOrderTrigger, newRefundTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -50,5 +48,5 @@ export let provider = Slate.create({
     validateAddress,
     listSummarizedRates
   ],
-  triggers: [inboundWebhook, newOrderTrigger, newRefundTrigger]
+  triggers: []
 });

@@ -27,12 +27,12 @@ describe('google-maps provider contract', () => {
         'generate_static_map',
         'geolocate'
       ],
-      triggerIds: ['inbound_webhook'],
+      triggerIds: [],
       authMethodIds: ['api_key'],
-      triggers: [{ id: 'inbound_webhook', invocationType: 'webhook' }]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(15);
+    expect(contract.actions).toHaveLength(14);
 
     for (let toolId of ['autocomplete', 'get_place_photo']) {
       let action = contract.actions.find(action => action.id === toolId);

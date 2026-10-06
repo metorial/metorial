@@ -1,3 +1,4 @@
+export * from './discovery';
 export * from './execute-wql';
 export * from './get-custom-report';
 export * from './get-time-blocks';

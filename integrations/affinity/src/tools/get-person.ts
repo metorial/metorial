@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AffinityClient } from '../lib/client';
+import { interactionDatesOutput, mapInteractionDates } from '../lib/interaction-dates';
 import { spec } from '../spec';
 
 export let getPerson = SlateTool.create(spec, {
@@ -39,13 +40,7 @@ export let getPerson = SlateTool.create(spec, {
         )
         .optional()
         .describe('List entries this person belongs to'),
-      interactionDates: z
-        .object({
-          firstEmail: z.string().nullable().optional(),
-          lastEmail: z.string().nullable().optional(),
-          firstEvent: z.string().nullable().optional(),
-          lastEvent: z.string().nullable().optional()
-        })
+      interactionDates: interactionDatesOutput
         .optional()
         .describe('Interaction date timestamps')
     })
@@ -57,31 +52,25 @@ export let getPerson = SlateTool.create(spec, {
       withInteractionDates: ctx.input.withInteractionDates
     });
 
-    let listEntries = (p.list_entries ?? []).map((e: any) => ({
+    let listEntries = (p.list_entries ?? []).map(e => ({
       listEntryId: e.id,
       listId: e.list_id,
       creatorId: e.creator_id ?? null,
       createdAt: e.created_at ?? null
     }));
 
-    let output: any = {
+    let output = {
       personId: p.id,
       firstName: p.first_name ?? null,
       lastName: p.last_name ?? null,
       primaryEmail: p.primary_email ?? null,
       emails: p.emails ?? [],
       organizationIds: p.organization_ids ?? [],
-      listEntries
+      listEntries,
+      interactionDates: ctx.input.withInteractionDates
+        ? mapInteractionDates(p.interaction_dates)
+        : undefined
     };
-
-    if (ctx.input.withInteractionDates) {
-      output.interactionDates = {
-        firstEmail: p.interaction_dates?.first_email_date ?? null,
-        lastEmail: p.interaction_dates?.last_email_date ?? null,
-        firstEvent: p.interaction_dates?.first_event_date ?? null,
-        lastEvent: p.interaction_dates?.last_event_date ?? null
-      };
-    }
 
     return {
       output,

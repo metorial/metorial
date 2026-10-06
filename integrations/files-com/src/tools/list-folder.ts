@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { nativePath, optionalText, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 let fileEntrySchema = z.object({
@@ -22,7 +23,7 @@ let fileEntrySchema = z.object({
 export let listFolder = SlateTool.create(spec, {
   name: 'List Folder',
   key: 'list_folder',
-  description: `List files and folders at a given path. Returns file metadata including name, size, type, timestamps, and checksums. Supports pagination for large directories and text search filtering.`,
+  description: `List files and folders at a given path. Returns file metadata including name, size, type, timestamps, and checksums. Supports pagination for large directories and text name search filtering; search results may be delayed or truncated.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -37,7 +38,7 @@ export let listFolder = SlateTool.create(spec, {
       search: z
         .string()
         .optional()
-        .describe('Search text to filter results across all fields'),
+        .describe('Ad-hoc file/folder name search; may be delayed or truncated'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
       perPage: z
         .number()
@@ -52,10 +53,7 @@ export let listFolder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.listFolder(ctx.input.path, {
       cursor: ctx.input.cursor,
@@ -64,16 +62,16 @@ export let listFolder = SlateTool.create(spec, {
     });
 
     let entries = result.entries.map((entry: Record<string, unknown>) => ({
-      path: String(entry.path ?? ''),
-      displayName: String(entry.display_name ?? ''),
-      type: String(entry.type ?? ''),
+      path: nativePath(entry.path),
+      displayName: nativePath(entry.display_name),
+      type: text(entry.type),
       size: typeof entry.size === 'number' ? entry.size : undefined,
-      mimeType: entry.mime_type ? String(entry.mime_type) : undefined,
-      mtime: entry.mtime ? String(entry.mtime) : undefined,
-      permissions: entry.permissions ? String(entry.permissions) : undefined,
-      crc32: entry.crc32 ? String(entry.crc32) : undefined,
-      md5: entry.md5 ? String(entry.md5) : undefined,
-      region: entry.region ? String(entry.region) : undefined
+      mimeType: optionalText(entry.mime_type),
+      mtime: optionalText(entry.mtime),
+      permissions: optionalText(entry.permissions),
+      crc32: optionalText(entry.crc32),
+      md5: optionalText(entry.md5),
+      region: optionalText(entry.region)
     }));
 
     let dirs = entries.filter((e: { type: string }) => e.type === 'directory');

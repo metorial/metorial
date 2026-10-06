@@ -9,7 +9,8 @@ export let editVideoTool = SlateTool.create(spec, {
   key: 'edit_video',
   description: `Update a video's metadata including its title, description, privacy settings, tags, password, and license. Only the fields you provide will be updated.`,
   instructions: [
-    'For password-protected videos, set privacy.view to "password" and provide the password field.'
+    'For password-protected videos, set privacy.view to "password" and provide a password of at most 32 characters.',
+    'Tags and embedDomains replace their complete existing sets through multiple native calls; an empty array clears the set. These writes are not atomic. Inspect native state before retrying a partial failure.'
   ],
   tags: {
     destructive: false
@@ -29,6 +30,7 @@ export let editVideoTool = SlateTool.create(spec, {
               'disable',
               'nobody',
               'password',
+              'team',
               'unlisted',
               'users'
             ])
@@ -61,7 +63,9 @@ export let editVideoTool = SlateTool.create(spec, {
       embedDomains: z
         .array(z.string())
         .optional()
-        .describe('Domains where the video can be embedded'),
+        .describe(
+          'Replacement set of bare embed domain names; an empty array clears existing domains'
+        ),
       license: z
         .enum(['by', 'by-nc', 'by-nc-nd', 'by-nc-sa', 'by-nd', 'by-sa', 'cc0'])
         .optional()

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageUser = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let manageUser = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       userId: z.string().optional().describe('User ID (required for update and delete)'),
       username: z.string().optional().describe('Username (required for create)'),
@@ -82,76 +84,78 @@ export let manageUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      let buildUserData = () => {
+        let data: Record<string, unknown> = {};
+        if (ctx.input.username !== undefined) data.username = ctx.input.username;
+        if (ctx.input.email !== undefined) data.email = ctx.input.email;
+        if (ctx.input.firstname !== undefined) data.firstname = ctx.input.firstname;
+        if (ctx.input.lastname !== undefined) data.lastname = ctx.input.lastname;
+        if (ctx.input.displayname !== undefined) data.displayname = ctx.input.displayname;
+        if (ctx.input.password !== undefined) data.password = ctx.input.password;
+        if (ctx.input.state !== undefined) data.state = ctx.input.state;
+        if (ctx.input.company !== undefined) data.company = ctx.input.company;
+        if (ctx.input.department !== undefined) data.department = ctx.input.department;
+        if (ctx.input.jobTitle !== undefined) data.jobTitle = ctx.input.jobTitle;
+        if (ctx.input.employeeIdentifier !== undefined)
+          data.employeeIdentifier = ctx.input.employeeIdentifier;
+        if (ctx.input.employeeType !== undefined) data.employeeType = ctx.input.employeeType;
+        if (ctx.input.location !== undefined) data.location = ctx.input.location;
+        if (ctx.input.alternateEmail !== undefined)
+          data.alternateEmail = ctx.input.alternateEmail;
+        if (ctx.input.description !== undefined) data.description = ctx.input.description;
+        if (ctx.input.ldapBindingUser !== undefined)
+          data.ldap_binding_user = ctx.input.ldapBindingUser;
+        if (ctx.input.enableMfa !== undefined)
+          data.enable_user_portal_multifactor = ctx.input.enableMfa;
+        if (ctx.input.passwordNeverExpires !== undefined)
+          data.password_never_expires = ctx.input.passwordNeverExpires;
+        if (ctx.input.passwordlessSudo !== undefined)
+          data.passwordless_sudo = ctx.input.passwordlessSudo;
+        if (ctx.input.attributes !== undefined) data.attributes = ctx.input.attributes;
+        if (ctx.input.phoneNumbers !== undefined) data.phoneNumbers = ctx.input.phoneNumbers;
+        return data;
+      };
 
-    let buildUserData = () => {
-      let data: Record<string, any> = {};
-      if (ctx.input.username !== undefined) data.username = ctx.input.username;
-      if (ctx.input.email !== undefined) data.email = ctx.input.email;
-      if (ctx.input.firstname !== undefined) data.firstname = ctx.input.firstname;
-      if (ctx.input.lastname !== undefined) data.lastname = ctx.input.lastname;
-      if (ctx.input.displayname !== undefined) data.displayname = ctx.input.displayname;
-      if (ctx.input.password !== undefined) data.password = ctx.input.password;
-      if (ctx.input.state !== undefined) data.state = ctx.input.state;
-      if (ctx.input.company !== undefined) data.company = ctx.input.company;
-      if (ctx.input.department !== undefined) data.department = ctx.input.department;
-      if (ctx.input.jobTitle !== undefined) data.jobTitle = ctx.input.jobTitle;
-      if (ctx.input.employeeIdentifier !== undefined)
-        data.employeeIdentifier = ctx.input.employeeIdentifier;
-      if (ctx.input.employeeType !== undefined) data.employeeType = ctx.input.employeeType;
-      if (ctx.input.location !== undefined) data.location = ctx.input.location;
-      if (ctx.input.alternateEmail !== undefined)
-        data.alternateEmail = ctx.input.alternateEmail;
-      if (ctx.input.description !== undefined) data.description = ctx.input.description;
-      if (ctx.input.ldapBindingUser !== undefined)
-        data.ldap_binding_user = ctx.input.ldapBindingUser;
-      if (ctx.input.enableMfa !== undefined)
-        data.enable_user_portal_multifactor = ctx.input.enableMfa;
-      if (ctx.input.passwordNeverExpires !== undefined)
-        data.password_never_expires = ctx.input.passwordNeverExpires;
-      if (ctx.input.passwordlessSudo !== undefined)
-        data.passwordless_sudo = ctx.input.passwordlessSudo;
-      if (ctx.input.attributes !== undefined) data.attributes = ctx.input.attributes;
-      if (ctx.input.phoneNumbers !== undefined) data.phoneNumbers = ctx.input.phoneNumbers;
-      return data;
-    };
+      let user: import('../lib/types').JumpCloudUser;
+      let actionMessage: string;
 
-    let user: any;
-    let actionMessage: string;
+      if (ctx.input.action === 'create') {
+        let data = buildUserData();
+        user = await client.createUser(data);
+        actionMessage = `Created user **${user.username}** (${user.email})`;
+      } else if (ctx.input.action === 'update') {
+        if (!ctx.input.userId)
+          throw createApiServiceError('userId is required for update action');
+        let data = buildUserData();
+        user = await client.updateUser(ctx.input.userId, data);
+        actionMessage = `Updated user **${user.username}** (${user.email})`;
+      } else {
+        if (!ctx.input.userId)
+          throw createApiServiceError('userId is required for delete action');
+        user = await client.deleteUser(ctx.input.userId);
+        actionMessage = `Deletion accepted for user **${user.username}** (${user.email})`;
+      }
 
-    if (ctx.input.action === 'create') {
-      let data = buildUserData();
-      user = await client.createUser(data as any);
-      actionMessage = `Created user **${user.username}** (${user.email})`;
-    } else if (ctx.input.action === 'update') {
-      if (!ctx.input.userId) throw new Error('userId is required for update action');
-      let data = buildUserData();
-      user = await client.updateUser(ctx.input.userId, data);
-      actionMessage = `Updated user **${user.username}** (${user.email})`;
-    } else {
-      if (!ctx.input.userId) throw new Error('userId is required for delete action');
-      user = await client.deleteUser(ctx.input.userId);
-      actionMessage = `Deleted user **${user.username}** (${user.email})`;
+      return {
+        output: {
+          userId: user._id,
+          username: user.username,
+          email: user.email,
+          firstname: user.firstname,
+          lastname: user.lastname,
+          displayname: user.displayname,
+          state: user.state,
+          activated: user.activated,
+          company: user.company,
+          department: user.department,
+          jobTitle: user.jobTitle
+        },
+        message: actionMessage
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
     }
-
-    return {
-      output: {
-        userId: user._id,
-        username: user.username,
-        email: user.email,
-        firstname: user.firstname,
-        lastname: user.lastname,
-        displayname: user.displayname,
-        state: user.state,
-        activated: user.activated,
-        company: user.company,
-        department: user.department,
-        jobTitle: user.jobTitle
-      },
-      message: actionMessage
-    };
   })
   .build();

@@ -39,8 +39,6 @@ import {
   updateWidget,
   verifyMemberLogin
 } from './tools';
-import { formSubmission, memberChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -82,5 +80,5 @@ export let provider = Slate.create({
     searchCategories,
     unsubscribeMember
   ],
-  triggers: [formSubmission, memberChanges]
+  triggers: []
 });

@@ -21,7 +21,7 @@ export let sendFax = SlateTool.create(spec, {
       mediaName: z.string().optional().describe('Name of previously uploaded media to fax'),
       fromDisplayName: z.string().optional().describe('Caller ID display name'),
       quality: z
-        .enum(['normal', 'high', 'ultra_light', 'ultra_dark'])
+        .enum(['normal', 'high', 'very_high', 'ultra_light', 'ultra_dark'])
         .optional()
         .describe('Fax quality setting'),
       storeMedia: z
@@ -35,9 +35,9 @@ export let sendFax = SlateTool.create(spec, {
       faxId: z.string().describe('Unique ID of the fax'),
       from: z.string().describe('Sender number'),
       to: z.string().describe('Recipient number'),
-      status: z.string().optional().describe('Current fax status'),
-      direction: z.string().optional().describe('Fax direction'),
-      createdAt: z.string().optional().describe('When the fax was created')
+      status: z.string().nullish().describe('Current fax status'),
+      direction: z.string().nullish().describe('Fax direction'),
+      createdAt: z.string().nullish().describe('When the fax was created')
     })
   )
   .handleInvocation(async ctx => {
@@ -57,13 +57,13 @@ export let sendFax = SlateTool.create(spec, {
     return {
       output: {
         faxId: result.id,
-        from: result.from ?? ctx.input.from,
-        to: result.to ?? ctx.input.to,
+        from: result.from,
+        to: result.to,
         status: result.status,
         direction: result.direction,
         createdAt: result.created_at
       },
-      message: `Fax queued from **${ctx.input.from}** to **${ctx.input.to}**. Fax ID: **${result.id}**, Status: ${result.status ?? 'queued'}.`
+      message: `Fax accepted from **${ctx.input.from}** to **${ctx.input.to}**. Fax ID: **${result.id}**, Status: ${result.status}.`
     };
   })
   .build();

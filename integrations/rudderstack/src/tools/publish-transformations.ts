@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ControlPlaneClient } from '../lib/client';
 import { spec } from '../spec';
@@ -12,12 +12,18 @@ export let publishTransformations = SlateTool.create(spec, {
     'RudderStack validates code before publishing — check your code if publishing fails.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      testInput: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe(
+          'Optional test events for validation of transformation revisions. Code validation may perform external requests defined by your code.'
+        ),
       transformationIds: z
         .array(z.string())
         .optional()
@@ -31,27 +37,11 @@ export let publishTransformations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ControlPlaneClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let { transformationIds, libraryIds } = ctx.input;
-
-    if (!transformationIds?.length && !libraryIds?.length) {
-      throw new Error('At least one transformation ID or library ID must be provided.');
-    }
-
-    await client.publish({ transformationIds, libraryIds });
-
-    let parts: string[] = [];
-    if (transformationIds?.length)
-      parts.push(`**${transformationIds.length}** transformation(s)`);
-    if (libraryIds?.length) parts.push(`**${libraryIds.length}** library(ies)`);
-
-    return {
-      output: { success: true },
-      message: `Successfully published ${parts.join(' and ')}.`
-    };
+    let client = new ControlPlaneClient({ token: ctx.auth.token, region: ctx.config.region });
+    let { transformationIds, libraryIds, testInput } = ctx.input;
+    if (!transformationIds?.length && !libraryIds?.length)
+      throw createApiServiceError('Provide at least one transformation ID or library ID.');
+    await client.publish({ transformationIds, libraryIds, testInput });
+    return { output: { success: true }, message: 'Published the latest selected revisions.' };
   })
   .build();

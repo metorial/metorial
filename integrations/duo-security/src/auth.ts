@@ -1,12 +1,14 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { credential, host, resourceId } from './lib/contracts';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       integrationKey: z.string(),
       secretKey: z.string(),
-      apiHostname: z.string()
+      apiHostname: z.string(),
+      signingVersion: z.enum(['v2', 'v5']).optional()
     })
   )
   .addCustomAuth({
@@ -20,15 +22,26 @@ export let auth = SlateAuth.create()
       secretKey: z.string().describe('Secret Key (skey) from the Duo Admin Panel'),
       apiHostname: z
         .string()
-        .describe('API Hostname in the format api-XXXXXXXX.duosecurity.com')
+        .describe(
+          'Exact API hostname from the Duo Admin Panel, api-XXXXXXXX.duosecurity.com or the Federal duofederal.com equivalent'
+        ),
+      signingVersion: z
+        .enum(['v2', 'v5'])
+        .optional()
+        .describe(
+          'v5 uses current HMAC-SHA512 signing; v2 preserves legacy HMAC-SHA1 form signing'
+        )
     }),
 
     getOutput: async ctx => {
+      resourceId(ctx.input.integrationKey);
+      credential(ctx.input.secretKey);
       return {
         output: {
           integrationKey: ctx.input.integrationKey,
           secretKey: ctx.input.secretKey,
-          apiHostname: ctx.input.apiHostname.toLowerCase().replace(/^https?:\/\//, '')
+          apiHostname: host(ctx.input.apiHostname),
+          signingVersion: ctx.input.signingVersion ?? 'v5'
         }
       };
     }

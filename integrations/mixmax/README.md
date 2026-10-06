@@ -1,11 +1,15 @@
 # Mixmax
 
-Send, track, and manage emails through Gmail. Create and manage automated email sequences (campaigns) with personalized variables, add or remove recipients from sequences, and monitor engagement. Manage reusable email templates, schedule meetings via appointment links, and access poll and Q&A results embedded in emails. Track email activity including opens, clicks, replies, and downloads via a live feed. Create insights reports for email analytics. Configure webhook rules triggered by real-time events such as email sent, opened, clicked, or meeting confirmed. Manage contacts and contact groups, handle unsubscribe lists, and integrate with Salesforce to search, create, and update accounts, contacts, leads, opportunities, and tasks. Manage teams and user preferences within a workspace.
+Read email activity, messages, sequences and activated recipients, tasks, templates, polls, meeting invitations, and analytics. Create unsent drafts, manage meeting types, teams, unsubscribe lists and paused rules, and use the connected Salesforce account where its permissions allow it.
+
+Connect with a personal or managed API token. Managed keys need the relevant permissions; task reads require `tasks:read`. Features can depend on the account plan and connected services.
+
+Sending email and activating sequence recipients have immediate communication effects. Set `scheduledAt: false` to retain newly added sequence recipients as drafts; omitted scheduling activates them immediately. The activated-recipient list does not include drafts. Direct email sending does not support tracking. Template deletion moves a template to retained Trash for 28 days, and the API has no documented draft deletion endpoint.
+
+The Contacts API is deprecated but currently documented as functional. Contact creation can merge an existing email. Inline rule actions, bulk cancellation by sequence IDs, contact-group updates, and team invitations by user ID are unsupported; their legacy fields produce an explanatory error.
+
+See the [API reference](https://developer.mixmax.com/reference/getting-started-with-the-api) for permissions, limits, and provider-specific behavior.
 
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>

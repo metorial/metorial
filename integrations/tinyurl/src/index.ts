@@ -9,8 +9,6 @@ import {
   listTinyUrls,
   updateTinyUrl
 } from './tools';
-import { inboundWebhook, newTinyUrl } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     archiveTinyUrl,
     getAnalytics
   ],
-  triggers: [inboundWebhook, newTinyUrl]
+  triggers: []
 });

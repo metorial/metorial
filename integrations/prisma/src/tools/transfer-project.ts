@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PrismaClient } from '../lib/client';
+import { projectIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let transferProject = SlateTool.create(spec, {
@@ -16,7 +17,7 @@ export let transferProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to transfer'),
+      projectId: projectIdInput,
       recipientAccessToken: z
         .string()
         .describe('OAuth access token of the recipient user who will claim the project')

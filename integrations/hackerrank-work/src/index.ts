@@ -18,8 +18,6 @@ import {
   manageUser,
   updateTest
 } from './tools';
-import { candidateStatusChange, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     listQuestions.build(),
     getQuestion.build()
   ],
-  triggers: [inboundWebhook, candidateStatusChange.build()]
+  triggers: []
 });

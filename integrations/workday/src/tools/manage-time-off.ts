@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { WorkdayClient } from '../lib/client';
+import { createClient, display } from '../lib/client';
+import { record, workerIdSchema } from '../lib/contracts';
 import { spec } from '../spec';
 
 let workdayReferenceSchema = z.object({
@@ -19,7 +20,7 @@ export let getTimeOffEntries = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workerId: z.string().describe('The Workday worker ID'),
+      workerId: workerIdSchema,
       fromDate: z.string().optional().describe('Start date filter in YYYY-MM-DD format'),
       toDate: z.string().optional().describe('End date filter in YYYY-MM-DD format'),
       limit: z.number().optional().describe('Maximum number of results (default: 20)'),
@@ -33,10 +34,16 @@ export let getTimeOffEntries = SlateTool.create(spec, {
           z.object({
             entryId: z.string().optional().describe('Time-off entry ID'),
             date: z.string().optional().describe('Date of the time-off entry'),
-            dailyQuantity: z.number().optional().describe('Number of hours for the day'),
+            dailyQuantity: z
+              .number()
+              .optional()
+              .describe('Quantity in the units of the selected time-off type'),
             timeOffType: workdayReferenceSchema.optional().describe('Type of time off'),
             worker: workdayReferenceSchema.optional().describe('Worker reference'),
-            status: z.string().optional().describe('Entry status')
+            status: z.string().optional().describe('Entry status'),
+            unit: workdayReferenceSchema
+              .optional()
+              .describe('Units for dailyQuantity, such as hours or days')
           })
         )
         .describe('List of time-off entries'),
@@ -44,11 +51,7 @@ export let getTimeOffEntries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let result = await client.getWorkerTimeOffEntries(ctx.input.workerId, {
       fromDate: ctx.input.fromDate,
@@ -58,12 +61,13 @@ export let getTimeOffEntries = SlateTool.create(spec, {
     });
 
     let entries = result.data.map(e => ({
-      entryId: e.id,
+      entryId: e.timeOffEntryId ?? e.id,
       date: e.date,
-      dailyQuantity: e.dailyQuantity,
+      dailyQuantity: e.quantity ?? e.dailyQuantity,
       timeOffType: e.timeOffType,
       worker: e.worker,
-      status: e.status
+      unit: e.unit,
+      status: display(e.status)
     }));
 
     return {
@@ -76,10 +80,10 @@ export let getTimeOffEntries = SlateTool.create(spec, {
 export let requestTimeOff = SlateTool.create(spec, {
   name: 'Request Time Off',
   key: 'request_time_off',
-  description: `Submit a time-off request for a specific worker. Creates a single-day time-off entry with the specified type and duration. For multi-day requests, submit one request per day.`,
+  description: `Submit a time-off request for a specific worker. Initiates a Request Time Off business process for one day with the specified type and quantity. Approval or later business-process steps may remain pending.`,
   instructions: [
     'Each request covers a single day. For multi-day time off, make separate requests for each day.',
-    'The dailyQuantity is typically 8 for a full day, matching the default Workday behavior.'
+    'Discover eligible_absence_types and valid_time_off_dates using list_resources first. Use their units and quantities; do not assume eight hours.'
   ],
   tags: {
     destructive: false
@@ -87,13 +91,33 @@ export let requestTimeOff = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workerId: z.string().describe('The Workday worker ID'),
+      workerId: workerIdSchema,
       date: z.string().describe('Date of the time-off request in YYYY-MM-DD format'),
       dailyQuantity: z
         .number()
-        .describe('Number of hours for the day (e.g., 8 for a full day)'),
+        .describe(
+          'Quantity in the discovered time-off type units; confirm its permitted range rather than assuming hours'
+        ),
       timeOffTypeId: z.string().describe('Workday ID of the time-off type'),
-      comment: z.string().optional().describe('Optional comment for the time-off request')
+      comment: z.string().optional().describe('Optional comment for the time-off request'),
+      positionId: z
+        .string()
+        .optional()
+        .describe('Position required by the eligible absence type, if any'),
+      reasonId: z
+        .string()
+        .optional()
+        .describe('Reason required by the eligible absence type, if any'),
+      start: z
+        .string()
+        .optional()
+        .describe(
+          'Start timestamp on the requested date when the time-off type requires an interval'
+        ),
+      end: z
+        .string()
+        .optional()
+        .describe('End timestamp on the requested date; provide with start')
     })
   )
   .output(
@@ -104,26 +128,30 @@ export let requestTimeOff = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let result = await client.requestTimeOff(ctx.input.workerId, {
       date: ctx.input.date,
       dailyQuantity: ctx.input.dailyQuantity,
       timeOffType: { id: ctx.input.timeOffTypeId },
-      comment: ctx.input.comment
+      comment: ctx.input.comment,
+      positionId: ctx.input.positionId,
+      reasonId: ctx.input.reasonId,
+      start: ctx.input.start,
+      end: ctx.input.end
     });
 
     return {
       output: {
-        requestId: result?.id,
-        status: result?.status ?? 'submitted',
+        requestId: typeof result.id === 'string' ? result.id : undefined,
+        status: display(
+          result.businessProcessParameters &&
+            record(result.businessProcessParameters).transactionStatus
+        ),
         rawResponse: result
       },
-      message: `Time-off request submitted for worker ${ctx.input.workerId} on ${ctx.input.date} (${ctx.input.dailyQuantity} hours).`
+      message:
+        'Workday accepted the time-off request business process. Approval and subsequent steps may still be pending.'
     };
   })
   .build();

@@ -8,8 +8,6 @@ import {
   listFormsTool,
   listPaymentsTool
 } from './tools';
-import { paymentCreatedTrigger, planEventTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -20,5 +18,5 @@ export let provider = Slate.create({
     listCustomersTool,
     getCustomerTool
   ],
-  triggers: [paymentCreatedTrigger, planEventTrigger]
+  triggers: []
 });

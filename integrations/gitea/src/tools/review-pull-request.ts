@@ -1,16 +1,19 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let reviewOutputSchema = z.object({
   reviewId: z.number().describe('Review ID'),
   body: z.string().describe('Review comment body'),
-  state: z.string().describe('Review state (APPROVED, CHANGES_REQUESTED, COMMENT, PENDING)'),
-  reviewerLogin: z.string().describe('Reviewer username'),
+  state: z.string().describe('Review state (APPROVED, REQUEST_CHANGES, COMMENT, PENDING)'),
+  reviewerLogin: z.string().describe('Reviewer username; empty for a team review request'),
+  reviewerTeamName: z.string().optional().describe('Team name for a team review request'),
   htmlUrl: z.string().describe('Web URL of the review'),
   submittedAt: z.string().describe('Submission timestamp'),
-  commitSha: z.string().describe('Commit SHA the review was made against')
+  commitSha: z.string().describe('Commit SHA the review was made against'),
+  commentsCount: z.number().optional().describe('Number of line comments in this review')
 });
 
 export let listPullRequestReviews = SlateTool.create(spec, {
@@ -23,11 +26,11 @@ export let listPullRequestReviews = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      prNumber: z.number().describe('Pull request number'),
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      prNumber: integerInput(1).describe('Pull request number'),
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page')
     })
   )
   .output(
@@ -36,7 +39,7 @@ export let listPullRequestReviews = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let reviews = await client.listPullRequestReviews(
       ctx.input.owner,
       ctx.input.repo,
@@ -53,10 +56,12 @@ export let listPullRequestReviews = SlateTool.create(spec, {
           reviewId: r.id,
           body: r.body || '',
           state: r.state,
-          reviewerLogin: r.user.login,
+          reviewerLogin: r.user?.login || '',
+          reviewerTeamName: r.team?.name,
           htmlUrl: r.html_url,
           submittedAt: r.submitted_at,
-          commitSha: r.commit_id
+          commitSha: r.commit_id,
+          commentsCount: r.comments_count
         }))
       },
       message: `Found **${reviews.length}** reviews on PR **#${ctx.input.prNumber}**`
@@ -74,9 +79,9 @@ export let createPullRequestReview = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      prNumber: z.number().describe('Pull request number'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      prNumber: integerInput(1).describe('Pull request number'),
       event: z.enum(['APPROVED', 'REQUEST_CHANGES', 'COMMENT']).describe('Review action'),
       body: z.string().optional().describe('Review body comment'),
       comments: z
@@ -84,8 +89,16 @@ export let createPullRequestReview = SlateTool.create(spec, {
           z.object({
             path: z.string().describe('File path to comment on'),
             body: z.string().describe('Comment body'),
-            newPosition: z.number().optional().describe('Line number in the new file'),
-            oldPosition: z.number().optional().describe('Line number in the old file')
+            newPosition: integerInput(0)
+              .optional()
+              .describe(
+                'Line number in the new file; zero or omission means the comment uses the other side'
+              ),
+            oldPosition: integerInput(0)
+              .optional()
+              .describe(
+                'Line number in the old file; zero or omission means the comment uses the other side'
+              )
           })
         )
         .optional()
@@ -94,7 +107,18 @@ export let createPullRequestReview = SlateTool.create(spec, {
   )
   .output(reviewOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
+    if (
+      ctx.input.comments?.some(
+        comment =>
+          (comment.newPosition ?? 0) > 0 === (comment.oldPosition ?? 0) > 0 ||
+          !comment.path.trim() ||
+          !comment.body.trim()
+      )
+    )
+      throw createApiServiceError(
+        'Each line comment requires a path, body, and one positive newPosition or oldPosition. Omit the other position or set it to zero.'
+      );
     let r = await client.createPullRequestReview(
       ctx.input.owner,
       ctx.input.repo,
@@ -116,10 +140,12 @@ export let createPullRequestReview = SlateTool.create(spec, {
         reviewId: r.id,
         body: r.body || '',
         state: r.state,
-        reviewerLogin: r.user.login,
+        reviewerLogin: r.user?.login || '',
+        reviewerTeamName: r.team?.name,
         htmlUrl: r.html_url,
         submittedAt: r.submitted_at,
-        commitSha: r.commit_id
+        commitSha: r.commit_id,
+        commentsCount: r.comments_count
       },
       message: `Submitted **${ctx.input.event}** review on PR **#${ctx.input.prNumber}**`
     };

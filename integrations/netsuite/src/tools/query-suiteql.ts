@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { connection } from '../lib/client';
 import { spec } from '../spec';
 
 export let querySuiteQL = SlateTool.create(spec, {
@@ -31,8 +31,13 @@ Use this for complex data retrieval, reporting, cross-record queries, and filter
       limit: z
         .number()
         .optional()
-        .describe('Maximum number of results to return per page (default varies by NetSuite)'),
-      offset: z.number().optional().describe('Number of results to skip for pagination')
+        .describe(
+          'Maximum number of results to return per page (native default 1000; integer 1–1000)'
+        ),
+      offset: z
+        .number()
+        .optional()
+        .describe('Nonnegative integer offset divisible by limit (default limit 1000)')
     })
   )
   .output(
@@ -45,10 +50,7 @@ Use this for complex data retrieval, reporting, cross-record queries, and filter
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      ...ctx.auth,
-      accountId: ctx.config.accountId
-    });
+    const client = connection(ctx.auth, ctx.config);
 
     let result = await client.executeSuiteQL(ctx.input.query, {
       limit: ctx.input.limit,
@@ -57,13 +59,13 @@ Use this for complex data retrieval, reporting, cross-record queries, and filter
 
     return {
       output: {
-        rows: result.items || [],
-        totalResults: result.totalResults || 0,
-        count: result.count || 0,
-        offset: result.offset || 0,
-        hasMore: result.hasMore || false
+        rows: result.items,
+        totalResults: result.totalResults,
+        count: result.count,
+        offset: result.offset,
+        hasMore: result.hasMore
       },
-      message: `SuiteQL query returned **${result.count || 0}** rows out of **${result.totalResults || 0}** total results.`
+      message: `SuiteQL query returned **${result.count}** rows out of **${result.totalResults}** total results.`
     };
   })
   .build();

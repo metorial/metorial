@@ -4,16 +4,18 @@ import {
   addMemory,
   deleteEntity,
   deleteMemory,
+  getCurrentUser,
+  getEvent,
   getMemory,
   listEntities,
   listMemories,
   searchMemories,
   updateMemory
 } from './tools';
-import { memoryEvents } from './triggers';
 
 export let provider = Slate.create({
   spec,
+  triggers: [],
   tools: [
     addMemory,
     searchMemories,
@@ -22,7 +24,8 @@ export let provider = Slate.create({
     updateMemory,
     deleteMemory,
     listEntities,
-    deleteEntity
-  ],
-  triggers: [memoryEvents]
+    deleteEntity,
+    getCurrentUser,
+    getEvent
+  ]
 });

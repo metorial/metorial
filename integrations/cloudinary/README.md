@@ -1,11 +1,11 @@
 # <img src="logo.png" height="20"> Cloudinary
 
-Upload, store, transform, optimize, and deliver images, videos, and files via a cloud-based media management platform with global CDN delivery. Apply on-the-fly image and video transformations including resizing, cropping, format conversion, overlays, background removal, and generative AI effects. Manage assets with full CRUD operations on files, folders, tags, and metadata. Search assets using expressions across tags, metadata, format, size, and dates, or via AI-powered visual and natural language search. Perform AI-based auto-tagging, content analysis, OCR, facial detection, and content moderation. Generate programmatic assets such as animated GIFs, sprites, collages, ZIP archives, and PDFs. Control media access with signed URLs, token-based authentication, and strict transformation modes. Manage video-specific operations including trimming, concatenation, adaptive bitrate streaming, and transcription. Provision and manage product environments, users, and user groups via the Admin and Provisioning APIs. Receive webhook notifications for upload completions, asset modifications, moderation results, and folder changes.
+Upload and manage images, videos and raw files in a Cloudinary product environment. Search or list assets, retrieve exact IDs, update tags and metadata, rename assets, delete selected assets, manage empty folders, read usage and folder settings, and download original files by immutable asset ID.
+
+Connect with the environment's cloud name, API key and API secret. Choose the provisioned data center; EU/AP routing requires the corresponding Cloudinary environment. Fresh connections support authenticated URL downloads. Older connections validate content against the original asset size, support downloads up to 64 MiB, and may need reconnection for larger files or when the provider omits the size.
+
+Uploads, transformations and downloads consume usage. Overwrites, global exclusive-tag commands and bulk deletions can affect existing media; backups, CDN copies, notifications and accrued usage can remain after cleanup. Dynamic asset folders and fixed public-ID folders differ. Preserve continuation cursors and filters when paging or completing a partial deletion.
 
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>

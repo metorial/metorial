@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapLead } from '../lib/models';
 import { spec } from '../spec';
 
 export let getLeadTool = SlateTool.create(spec, {
@@ -19,7 +20,7 @@ export let getLeadTool = SlateTool.create(spec, {
   .output(
     z.object({
       leadId: z.string().describe('Unique lead ID'),
-      name: z.string().describe('Lead/company name'),
+      name: z.string().optional().describe('Lead/company name'),
       statusId: z.string().nullable().describe('Lead status ID'),
       statusLabel: z.string().nullable().describe('Lead status label'),
       url: z.string().nullable().describe('Company website URL'),
@@ -39,7 +40,8 @@ export let getLeadTool = SlateTool.create(spec, {
                   type: z.string()
                 })
               )
-              .describe('Contact email addresses'),
+              .optional()
+              .describe('Contact email addresses, when provided'),
             phones: z
               .array(
                 z.object({
@@ -47,7 +49,8 @@ export let getLeadTool = SlateTool.create(spec, {
                   type: z.string()
                 })
               )
-              .describe('Contact phone numbers')
+              .optional()
+              .describe('Contact phone numbers, when provided')
           })
         )
         .describe('Contacts associated with the lead'),
@@ -61,7 +64,7 @@ export let getLeadTool = SlateTool.create(spec, {
           })
         )
         .describe('Opportunities associated with the lead'),
-      displayName: z.string().describe('Lead display name'),
+      displayName: z.string().optional().describe('Lead display name, when provided'),
       addresses: z
         .array(
           z.object({
@@ -73,58 +76,32 @@ export let getLeadTool = SlateTool.create(spec, {
             country: z.string().nullable()
           })
         )
-        .describe('Physical addresses for the lead')
+        .optional()
+        .describe('Physical addresses for the lead, when provided')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-    let lead = await client.getLead(ctx.input.leadId);
-
-    let output = {
-      leadId: lead.id,
-      name: lead.name || lead.display_name || '',
-      statusId: lead.status_id || null,
-      statusLabel: lead.status_label || null,
-      url: lead.url || null,
-      description: lead.description || null,
-      dateCreated: lead.date_created || '',
-      dateUpdated: lead.date_updated || '',
-      contacts: (lead.contacts || []).map((c: any) => ({
-        contactId: c.id,
-        name: c.name || null,
-        title: c.title || null,
-        emails: (c.emails || []).map((e: any) => ({
-          email: e.email || '',
-          type: e.type || 'office'
-        })),
-        phones: (c.phones || []).map((p: any) => ({
-          phone: p.phone || '',
-          type: p.type || 'office'
-        }))
-      })),
-      opportunities: (lead.opportunities || []).map((o: any) => ({
-        opportunityId: o.id,
-        statusLabel: o.status_label || null,
-        value: o.value ?? null,
-        confidence: o.confidence ?? null
-      })),
-      displayName: lead.display_name || lead.name || '',
-      addresses: (lead.addresses || []).map((a: any) => ({
-        address1: a.address_1 || null,
-        address2: a.address_2 || null,
-        city: a.city || null,
-        state: a.state || null,
-        zipcode: a.zipcode || null,
-        country: a.country || null
-      }))
-    };
-
-    let contactCount = output.contacts.length;
-    let oppCount = output.opportunities.length;
-
+    const lead = await new Client(ctx.auth).getLead(ctx.input.leadId);
     return {
-      output,
-      message: `Retrieved lead **${output.displayName}** (${output.statusLabel || 'No status'}) with ${contactCount} contact${contactCount !== 1 ? 's' : ''} and ${oppCount} opportunit${oppCount !== 1 ? 'ies' : 'y'}`
+      output: {
+        ...mapLead(lead),
+        description: lead.description ?? null,
+        opportunities: lead.opportunities.map(o => ({
+          opportunityId: o.id,
+          statusLabel: o.status_label ?? null,
+          value: o.value ?? null,
+          confidence: o.confidence
+        })),
+        addresses: lead.addresses?.map(a => ({
+          address1: a.address_1 ?? null,
+          address2: a.address_2 ?? null,
+          city: a.city ?? null,
+          state: a.state ?? null,
+          zipcode: a.zipcode ?? null,
+          country: a.country ?? null
+        }))
+      },
+      message: `Retrieved lead **${lead.id}**.`
     };
   })
   .build();

@@ -1,43 +1,25 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let http = createAxios({
-  baseURL: 'https://api.folk.app/v1'
-});
-
+import { Client } from './lib/client';
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+  .output(z.object({ token: z.string() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      apiKey: z.string().describe('Folk API key from Settings > API')
+      apiKey: z
+        .string()
+        .describe(
+          'Folk API key from workspace Settings > API. The key grants access according to its associated user and group permissions.'
+        )
     }),
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.apiKey
-        }
-      };
+      await new Client({ token: ctx.input.apiKey }).getCurrentUser();
+      return { output: { token: ctx.input.apiKey.trim() } };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let response = await http.get('/users/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-      let user = response.data.data;
-      return {
-        profile: {
-          id: user.id,
-          name: user.fullName,
-          email: user.email
-        }
-      };
+      const user = await new Client({ token: ctx.output.token }).getCurrentUser();
+      return { profile: { id: user.id, name: user.fullName, email: user.email } };
     }
   });

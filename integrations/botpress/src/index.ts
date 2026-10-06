@@ -2,26 +2,31 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createEventTool,
+  getAccountTool,
   getBotAnalyticsTool,
   getBotLogsTool,
+  getFileUrl,
   listBotIssuesTool,
   listBotsTool,
   listIntegrationsTool,
   listMessagesTool,
+  listWorkspacesTool,
   manageBotTool,
   manageConversationTool,
   manageFilesTool,
+  manageMessageTool,
   manageStateTool,
   manageTableRowsTool,
   manageTableTool,
   manageUserTool,
   sendMessageTool
 } from './tools';
-import { inboundWebhook, incomingEventTrigger, newMessageTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getAccountTool,
+    getFileUrl,
+    listWorkspacesTool,
     listBotsTool,
     manageBotTool,
     manageConversationTool,
@@ -31,6 +36,7 @@ export let provider = Slate.create({
     manageTableTool,
     manageTableRowsTool,
     manageFilesTool,
+    manageMessageTool,
     createEventTool,
     manageStateTool,
     getBotAnalyticsTool,
@@ -38,5 +44,5 @@ export let provider = Slate.create({
     listBotIssuesTool,
     listIntegrationsTool
   ],
-  triggers: [inboundWebhook, incomingEventTrigger, newMessageTrigger]
+  triggers: []
 });

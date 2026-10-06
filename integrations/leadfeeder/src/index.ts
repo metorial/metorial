@@ -11,8 +11,6 @@ import {
   getTrackingScript,
   getVisits
 } from './tools';
-import { inboundWebhook, newLeads } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     getTrackingScript,
     enrichIp
   ],
-  triggers: [inboundWebhook, newLeads]
+  triggers: []
 });

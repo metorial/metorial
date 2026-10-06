@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let stopExecution = SlateTool.create(spec, {
@@ -18,22 +18,21 @@ export let stopExecution = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      stopped: z.boolean().describe('Whether the execution was successfully stopped')
+      stopped: z.boolean().describe('Whether the native receipt reports canceled'),
+      status: z.string().optional().describe('Native status returned by the stop request')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
-    await client.stopExecution(ctx.input.executionId);
+    const result = await client.stopExecution(ctx.input.executionId);
 
     return {
       output: {
-        stopped: true
+        stopped: result.status === 'canceled',
+        status: String(result.status)
       },
-      message: `Stopped execution **${ctx.input.executionId}**.`
+      message: `Stop request accepted for execution **${ctx.input.executionId}**; native status is **${result.status}**. Prior external effects and retained history are not reversed.`
     };
   })
   .build();

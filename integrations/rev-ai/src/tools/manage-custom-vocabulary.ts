@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RevAIClient } from '../lib/client';
 import { spec } from '../spec';
@@ -18,7 +18,7 @@ export let manageCustomVocabulary = SlateTool.create(spec, {
     'Vocabulary must reach "complete" status before it can be used in transcription jobs.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -28,19 +28,26 @@ export let manageCustomVocabulary = SlateTool.create(spec, {
         .enum(['create', 'get', 'list', 'delete'])
         .describe('Action to perform on custom vocabularies'),
       phrases: z
-        .array(z.string())
+        .array(z.string().min(1))
+        .min(1)
+        .max(6000)
         .optional()
         .describe('List of custom words/phrases to compile (for "create" action)'),
       vocabularyId: z
         .string()
+        .min(1)
         .optional()
         .describe('Vocabulary ID (for "get" and "delete" actions)'),
       metadata: z
         .string()
+        .max(512)
         .optional()
         .describe('Optional metadata to associate with the vocabulary (for "create" action)'),
       limit: z
         .number()
+        .int()
+        .min(0)
+        .max(1000)
         .optional()
         .describe('Maximum number of vocabularies to return (for "list" action)')
     })
@@ -55,8 +62,9 @@ export let manageCustomVocabulary = SlateTool.create(spec, {
             .describe('Vocabulary status: "in_progress", "complete", "failed"'),
           createdOn: z.string().optional().describe('ISO 8601 creation timestamp'),
           completedOn: z.string().optional().describe('ISO 8601 completion timestamp'),
-          metadata: z.string().optional().describe('Associated metadata'),
-          failure: z.string().optional().describe('Failure reason if compilation failed')
+          metadata: z.string().max(512).optional().describe('Associated metadata'),
+          failure: z.string().optional().describe('Failure reason if compilation failed'),
+          failureDetail: z.string().optional().describe('Detailed failure information')
         })
         .optional()
         .describe('Single vocabulary details (for "create", "get", "delete" actions)'),
@@ -66,7 +74,7 @@ export let manageCustomVocabulary = SlateTool.create(spec, {
             vocabularyId: z.string().describe('Unique vocabulary identifier'),
             status: z.string().describe('Vocabulary status'),
             createdOn: z.string().optional().describe('ISO 8601 creation timestamp'),
-            metadata: z.string().optional().describe('Associated metadata')
+            metadata: z.string().max(512).optional().describe('Associated metadata')
           })
         )
         .optional()
@@ -83,7 +91,7 @@ export let manageCustomVocabulary = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.phrases?.length) {
-          throw new Error('phrases are required for the "create" action');
+          throw createApiServiceError('phrases are required for the "create" action');
         }
         let vocab = await client.submitCustomVocabulary({
           customVocabularies: [{ phrases: ctx.input.phrases }],
@@ -97,7 +105,8 @@ export let manageCustomVocabulary = SlateTool.create(spec, {
               createdOn: vocab.createdOn,
               completedOn: vocab.completedOn,
               metadata: vocab.metadata,
-              failure: vocab.failure
+              failure: vocab.failure,
+              failureDetail: vocab.failureDetail
             }
           },
           message: `Custom vocabulary **${vocab.vocabularyId}** created with **${ctx.input.phrases.length}** phrase(s). Status: **${vocab.status}**.`
@@ -106,7 +115,7 @@ export let manageCustomVocabulary = SlateTool.create(spec, {
 
       case 'get': {
         if (!ctx.input.vocabularyId) {
-          throw new Error('vocabularyId is required for the "get" action');
+          throw createApiServiceError('vocabularyId is required for the "get" action');
         }
         let vocab = await client.getCustomVocabulary(ctx.input.vocabularyId);
         return {
@@ -117,7 +126,8 @@ export let manageCustomVocabulary = SlateTool.create(spec, {
               createdOn: vocab.createdOn,
               completedOn: vocab.completedOn,
               metadata: vocab.metadata,
-              failure: vocab.failure
+              failure: vocab.failure,
+              failureDetail: vocab.failureDetail
             }
           },
           message: `Custom vocabulary **${vocab.vocabularyId}** is **${vocab.status}**.`
@@ -141,7 +151,7 @@ export let manageCustomVocabulary = SlateTool.create(spec, {
 
       case 'delete': {
         if (!ctx.input.vocabularyId) {
-          throw new Error('vocabularyId is required for the "delete" action');
+          throw createApiServiceError('vocabularyId is required for the "delete" action');
         }
         await client.deleteCustomVocabulary(ctx.input.vocabularyId);
         return {

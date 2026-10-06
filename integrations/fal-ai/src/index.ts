@@ -5,13 +5,14 @@ import {
   generateImage,
   generateSpeech,
   generateVideo,
+  getAccount,
+  getModelPricing,
   runModel,
   searchModels,
   submitQueueRequest,
   transcribeAudio,
   uploadFile
 } from './tools';
-import { queueCompleted } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -21,10 +22,12 @@ export let provider = Slate.create({
     transcribeAudio,
     generateSpeech,
     searchModels,
+    getAccount,
+    getModelPricing,
     submitQueueRequest,
     checkQueueStatus,
     uploadFile,
     runModel
   ],
-  triggers: [queueCompleted]
+  triggers: []
 });

@@ -14,8 +14,6 @@ import {
   searchAnalytics,
   sendEvents
 } from './tools';
-import { inboundWebhook, indexUpdated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,5 +30,5 @@ export let provider = Slate.create({
     getRecommendations,
     monitoring
   ],
-  triggers: [inboundWebhook, indexUpdated]
+  triggers: []
 });

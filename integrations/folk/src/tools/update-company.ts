@@ -8,10 +8,11 @@ export let updateCompany = SlateTool.create(spec, {
   key: 'update_company',
   description: `Updates an existing company in your Folk workspace. Supports partial updates to any field.`,
   instructions: [
-    'Array fields (emails, phones, addresses, urls, groups) replace the entire list when provided — include all desired values.'
+    'Array fields (emails, phones, addresses, urls, groups) replace the entire list when provided — include all desired values.',
+    'Removing a group also removes its custom field values. To set group-specific custom fields, include that group in groupIds; use null or an empty array to clear a field as appropriate for its type.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })

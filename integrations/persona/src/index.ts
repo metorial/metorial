@@ -38,15 +38,6 @@ import {
   updateAccount,
   updateCase
 } from './tools';
-import {
-  accountEvents,
-  caseEvents,
-  inquiryEvents,
-  reportEvents,
-  transactionEvents,
-  verificationEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -87,12 +78,5 @@ export let provider = Slate.create({
     listEvents,
     getEvent
   ],
-  triggers: [
-    inquiryEvents,
-    accountEvents,
-    verificationEvents,
-    reportEvents,
-    transactionEvents,
-    caseEvents
-  ]
+  triggers: []
 });

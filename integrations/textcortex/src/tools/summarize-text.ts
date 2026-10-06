@@ -1,14 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { generationMetadata, modelInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let summarizeText = SlateTool.create(spec, {
   name: 'Summarize Text',
   key: 'summarize_text',
-  description: `Summarize text content into a concise version. Accepts either raw text or a file ID from TextCortex. Supports different summarization modes including default and embeddings-based.`,
+  description: `Summarize supplied text into a concise version using a current TextCortex model. Provide raw text; the current API does not retrieve files by ID or support embeddings summarization.`,
   instructions: [
-    'Provide either "text" or "fileId", not both. If fileId is provided, the text from the file will be summarized.'
+    'Provide nonempty text and use mode "default". The legacy fileId and embeddings inputs are retained for existing callers but are unsupported by the current API.'
   ],
   tags: {
     readOnly: true
@@ -16,31 +17,35 @@ export let summarizeText = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      text: z.string().optional().describe('The text to summarize'),
+      text: z.string().min(1).optional().describe('The text to summarize'),
       fileId: z
         .string()
         .optional()
-        .describe('TextCortex file ID to summarize (alternative to raw text)'),
+        .describe(
+          'Legacy file ID input; unsupported by the current API. Supply the file contents as text instead'
+        ),
       mode: z
         .enum(['default', 'embeddings'])
         .optional()
-        .describe('Summarization mode. Default: "default"'),
-      model: z
-        .enum(['velox-1', 'alta-1', 'sophos-1', 'chat-sophos-1'])
-        .optional()
-        .describe('AI model to use'),
+        .describe(
+          'Summarization mode. Use "default"; legacy "embeddings" is unsupported by the current API'
+        ),
+      model: modelInput,
       maxTokens: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Maximum number of tokens for the summary (default: 512)'),
       temperature: z
         .number()
         .min(0)
-        .max(1)
+        .max(2)
         .optional()
-        .describe('Creativity level from 0 to 1. Default: 0.7'),
+        .describe("Creativity level from 0 to 2. Omit to use the model's default"),
       generationCount: z
         .number()
+        .int()
         .min(1)
         .max(5)
         .optional()
@@ -54,12 +59,16 @@ export let summarizeText = SlateTool.create(spec, {
       summaries: z
         .array(
           z.object({
-            text: z.string().describe('Summarized text'),
+            text: z.string().min(1).describe('Summarized text'),
             index: z.number().describe('Index of this generation')
           })
         )
         .describe('Array of generated summaries'),
-      remainingCredits: z.number().describe('Remaining API credits')
+      ...generationMetadata,
+      remainingCredits: z
+        .number()
+        .optional()
+        .describe('Remaining API credits when the balance can be retrieved')
     })
   )
   .handleInvocation(async ctx => {
@@ -82,9 +91,13 @@ export let summarizeText = SlateTool.create(spec, {
     return {
       output: {
         summaries: outputs.map(o => ({ text: o.text, index: o.index })),
+        balanceWarning: result.balanceWarning,
+        completionId: result.completionId,
+        model: result.model,
+        usage: result.usage,
         remainingCredits: result.data.remaining_credits
       },
-      message: `Generated **${outputs.length}** summary variation(s). Remaining credits: ${result.data.remaining_credits}.`
+      message: `Generated **${outputs.length}** summary variation(s). ${result.balanceWarning ?? `Remaining credits: ${result.data.remaining_credits}.`}`
     };
   })
   .build();

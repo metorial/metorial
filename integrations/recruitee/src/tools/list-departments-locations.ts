@@ -35,10 +35,7 @@ export let listDepartmentsLocations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
+    let client = await RecruiteeClient.forContext(ctx);
 
     let [deptResult, locResult] = await Promise.all([
       client.listDepartments(),
@@ -50,11 +47,11 @@ export let listDepartmentsLocations = SlateTool.create(spec, {
 
     return {
       output: {
-        departments: departments.map((d: any) => ({
+        departments: departments.map(d => ({
           departmentId: d.id,
           name: d.name
         })),
-        locations: locations.map((l: any) => ({
+        locations: locations.map(l => ({
           locationId: l.id,
           fullAddress: l.full_address || '',
           countryCode: l.country_code || null,

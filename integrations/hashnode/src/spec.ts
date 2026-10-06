@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'hashnode',
   name: 'Hashnode',
   description:
-    'Developer blogging platform and headless CMS. Manage blog posts, drafts, publications, series, comments, and static pages through a GraphQL API.',
+    'Developer blogging platform and headless CMS. Read publication, series, comment and static-page data; manage posts and drafts through the documented GraphQL API.',
   metadata: {},
   config,
   auth

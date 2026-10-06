@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoupaClient } from '../lib/client';
+import { customFields, decimal, page, pageFields, requireValue } from '../lib/contracts';
 import { spec } from '../spec';
 
 let contractOutputSchema = z.object({
@@ -18,7 +19,7 @@ let contractOutputSchema = z.object({
   terms: z.string().nullable().optional().describe('Contract terms'),
   createdAt: z.string().nullable().optional().describe('Creation timestamp'),
   updatedAt: z.string().nullable().optional().describe('Last update timestamp'),
-  rawData: z.any().optional().describe('Complete raw contract data')
+  rawData: z.any().optional().describe('Native data with documented credential fields omitted')
 });
 
 export let searchContracts = SlateTool.create(spec, {
@@ -60,14 +61,12 @@ export let searchContracts = SlateTool.create(spec, {
   .output(
     z.object({
       contracts: z.array(contractOutputSchema).describe('List of matching contracts'),
-      count: z.number().describe('Number of contracts returned')
+      count: z.number().describe('Number of contracts returned'),
+      ...pageFields
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let filters: Record<string, string> = {};
     if (ctx.input.filters) {
@@ -89,17 +88,17 @@ export let searchContracts = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let contracts = (Array.isArray(results) ? results : []).map((c: any) => ({
+    let contracts = results.map((c: any) => ({
       contractId: c.id,
-      contractNumber: c['contract-number'] ?? c.contract_number ?? null,
+      contractNumber: c.number ?? c.contract_number ?? null,
       name: c.name ?? null,
       status: c.status ?? null,
       type: c.type ?? null,
       supplier: c.supplier ?? null,
       startDate: c['start-date'] ?? c.start_date ?? null,
       endDate: c['end-date'] ?? c.end_date ?? null,
-      maxValue: c['max-value'] ?? c.max_value ?? null,
-      minValue: c['min-value'] ?? c.min_value ?? null,
+      maxValue: c['maximum-value'] ?? c.max_value ?? null,
+      minValue: c['minimum-value'] ?? c.min_value ?? null,
       currency: c.currency ?? null,
       terms: c.terms ?? null,
       createdAt: c['created-at'] ?? c.created_at ?? null,
@@ -110,7 +109,8 @@ export let searchContracts = SlateTool.create(spec, {
     return {
       output: {
         contracts,
-        count: contracts.length
+        count: contracts.length,
+        ...page(contracts.length, ctx.input)
       },
       message: `Found **${contracts.length}** contract(s).`
     };
@@ -127,6 +127,13 @@ export let createContract = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      number: z.string().optional().describe('Required unique native contract number'),
+      status: z
+        .string()
+        .optional()
+        .describe('Native contract status supported by your instance, such as inactive'),
+      maxValueDecimal: z.string().optional().describe('Exact maximum-value decimal'),
+      minValueDecimal: z.string().optional().describe('Exact minimum-value decimal'),
       name: z.string().describe('Contract name'),
       type: z.string().optional().describe('Contract type'),
       supplierId: z.number().optional().describe('Supplier ID to associate with the contract'),
@@ -136,49 +143,73 @@ export let createContract = SlateTool.create(spec, {
       minValue: z.number().optional().describe('Minimum contract value'),
       currency: z.object({ code: z.string() }).optional().describe('Contract currency'),
       terms: z.string().optional().describe('Contract terms text'),
+      customFieldsGlobalNamespace: z
+        .boolean()
+        .optional()
+        .describe(
+          'Use true for existing global custom fields (legacy default); false places fields under the modern custom-fields namespace'
+        ),
       customFields: z.record(z.string(), z.any()).optional().describe('Custom field values')
     })
   )
   .output(contractOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
+    requireValue(
+      ctx.input.number && ctx.input.supplierId && ctx.input.status,
+      'Provide the documented contract number, supplierId and explicit native status. Tenant renewal requirements are validated by Coupa.'
+    );
     let payload: any = {
+      number: ctx.input.number,
+      supplier: { id: ctx.input.supplierId },
+      status: ctx.input.status,
       name: ctx.input.name
     };
 
-    if (ctx.input.type) payload.type = ctx.input.type;
+    if (ctx.input.type) payload['contract-type'] = ctx.input.type;
     if (ctx.input.supplierId) payload.supplier = { id: ctx.input.supplierId };
     if (ctx.input.startDate) payload['start-date'] = ctx.input.startDate;
     if (ctx.input.endDate) payload['end-date'] = ctx.input.endDate;
-    if (ctx.input.maxValue !== undefined) payload['max-value'] = String(ctx.input.maxValue);
-    if (ctx.input.minValue !== undefined) payload['min-value'] = String(ctx.input.minValue);
+    if (ctx.input.maxValue !== undefined || ctx.input.maxValueDecimal !== undefined)
+      payload['maximum-value'] = decimal(
+        ctx.input.maxValue,
+        ctx.input.maxValueDecimal,
+        'maximum value',
+        32,
+        4
+      );
+    if (ctx.input.minValue !== undefined || ctx.input.minValueDecimal !== undefined)
+      payload['minimum-value'] = decimal(
+        ctx.input.minValue,
+        ctx.input.minValueDecimal,
+        'minimum value',
+        32,
+        4
+      );
     if (ctx.input.currency) payload.currency = ctx.input.currency;
     if (ctx.input.terms) payload.terms = ctx.input.terms;
 
-    if (ctx.input.customFields) {
-      for (let [key, value] of Object.entries(ctx.input.customFields)) {
-        payload[key] = value;
-      }
-    }
+    customFields(
+      payload,
+      ctx.input.customFields,
+      ctx.input.customFieldsGlobalNamespace ?? true
+    );
 
     let result = await client.createContract(payload);
 
     return {
       output: {
         contractId: result.id,
-        contractNumber: result['contract-number'] ?? result.contract_number ?? null,
+        contractNumber: result.number ?? result.contract_number ?? null,
         name: result.name ?? null,
         status: result.status ?? null,
         type: result.type ?? null,
         supplier: result.supplier ?? null,
         startDate: result['start-date'] ?? result.start_date ?? null,
         endDate: result['end-date'] ?? result.end_date ?? null,
-        maxValue: result['max-value'] ?? result.max_value ?? null,
-        minValue: result['min-value'] ?? result.min_value ?? null,
+        maxValue: result['maximum-value'] ?? result.max_value ?? null,
+        minValue: result['minimum-value'] ?? result.min_value ?? null,
         currency: result.currency ?? null,
         terms: result.terms ?? null,
         createdAt: result['created-at'] ?? result.created_at ?? null,

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageThread = SlateTool.create(spec, {
@@ -21,8 +22,8 @@ export let manageThread = SlateTool.create(spec, {
       name: z.string().optional().describe('Thread name (required for create)'),
       alias: z.string().optional().describe('Thread alias for easy reference'),
       metadata: z.record(z.string(), z.any()).optional().describe('Custom metadata'),
-      page: z.number().optional().describe('Page number (for list)'),
-      pageSize: z.number().optional().describe('Page size (for list)'),
+      page: z.number().int().min(1).optional().describe('Page number (for list)'),
+      pageSize: z.number().int().min(1).optional().describe('Page size (for list)'),
       startsWith: z.string().optional().describe('Filter threads by name prefix (for list)'),
       createdBy: z.string().optional().describe('Filter threads by creator (for list)')
     })
@@ -49,6 +50,7 @@ export let manageThread = SlateTool.create(spec, {
         )
         .optional()
         .describe('List of threads (for list action)'),
+      pagination: paginationSchema.optional().describe('Page navigation metadata'),
       totalCount: z.number().optional().describe('Total threads count (for list action)')
     })
   )
@@ -56,7 +58,8 @@ export let manageThread = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required for creating a thread');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required for creating a thread');
       let result = await client.createThread({
         name: ctx.input.name,
         alias: ctx.input.alias,
@@ -77,7 +80,7 @@ export let manageThread = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.threadId) throw new Error('threadId is required for get');
+      if (!ctx.input.threadId) throw createApiServiceError('threadId is required for get');
       let result = await client.getThread(ctx.input.threadId);
       return {
         output: {
@@ -94,7 +97,7 @@ export let manageThread = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.threadId) throw new Error('threadId is required for update');
+      if (!ctx.input.threadId) throw createApiServiceError('threadId is required for update');
       let result = await client.updateThread(ctx.input.threadId, {
         name: ctx.input.name,
         alias: ctx.input.alias,
@@ -115,7 +118,7 @@ export let manageThread = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.threadId) throw new Error('threadId is required for delete');
+      if (!ctx.input.threadId) throw createApiServiceError('threadId is required for delete');
       await client.deleteThread(ctx.input.threadId);
       return {
         output: { threadId: ctx.input.threadId, deleted: true },
@@ -139,11 +142,15 @@ export let manageThread = SlateTool.create(spec, {
         createdAt: t.created_at
       }));
       return {
-        output: { threads, totalCount: result.pagination.totalCount },
+        output: {
+          threads,
+          pagination: result.pagination,
+          totalCount: result.pagination.totalCount
+        },
         message: `Found **${result.pagination.totalCount}** thread(s).`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

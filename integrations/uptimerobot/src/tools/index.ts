@@ -2,6 +2,7 @@ export * from './create-alert-contact';
 export * from './create-maintenance-window';
 export * from './create-monitor';
 export * from './create-status-page';
+export * from './current-api';
 export * from './delete-alert-contact';
 export * from './delete-maintenance-window';
 export * from './delete-monitor';

@@ -1,18 +1,17 @@
 {
   "name": "@metorial/telnyx",
-  "description": "Cloud communications platform for programmable voice, messaging, and telephony. Make, receive, and control voice calls with actions like transfer, bridge, conference, record, play audio, gather DTMF, and text-to-speech. Send and receive SMS/MMS messages via long codes, toll-free, short codes, and alphanumeric sender IDs. Search, provision, port, and manage phone numbers globally. Perform two-factor authentication (Verify) via SMS, call, flashcall, WhatsApp, and PSD2. Look up number carrier and caller ID information. Send and receive faxes. Manage IoT SIM cards, data usage, and wireless connectivity. Create AI-powered chat completions, transcriptions, speech synthesis, and embeddings. Store files with S3-compatible object storage. Manage billing, invoices, usage reports, and account settings. Receive webhook events for calls, messages, fax, porting, and verification status updates.",
+  "description": "Telnyx v2 messaging, voice call control, fax status and PDF delivery, number search and management, Verify profiles, SIM status and actions, connection discovery, number lookup and account balance.",
   "categories": ["email-and-messaging", "iot-and-device-control"],
   "skills": [
-    "send and receive SMS/MMS",
+    "send SMS/MMS",
     "control voice calls",
-    "manage phone numbers",
-    "two-factor authentication",
-    "lookup number carrier info",
-    "send and receive faxes",
-    "manage IoT SIM cards",
-    "AI chat and speech",
-    "store files and media",
-    "manage billing and invoices"
+    "search and manage phone numbers",
+    "manage Verify profiles and read verification status",
+    "look up number carrier information",
+    "send faxes and retrieve PDF status",
+    "manage SIM cards and asynchronous actions",
+    "discover connections",
+    "read account balance"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/telnyx.png"
 }

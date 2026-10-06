@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCampaignReport = SlateTool.create(spec, {
@@ -16,6 +16,13 @@ export let getCampaignReport = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum results per page, 1–100; not used for summary or links reports'),
       campaignId: z.string().describe('ID of the campaign to get reports for'),
       reportType: z
         .enum(['summary', 'links', 'contacts'])
@@ -38,7 +45,9 @@ export let getCampaignReport = SlateTool.create(spec, {
       startingAfter: z
         .string()
         .optional()
-        .describe('Cursor for pagination (links and contacts reports only)')
+        .describe(
+          'Cursor for contact reports; links reports are unpaged and ignore this legacy input'
+        )
     })
   )
   .output(
@@ -70,19 +79,25 @@ export let getCampaignReport = SlateTool.create(spec, {
           z.object({
             contact: z.object({
               contactId: z.string(),
-              emailAddress: z.string(),
-              fields: z.record(z.string(), z.string()),
-              tags: z.array(z.string()),
-              status: z.string(),
-              createdAt: z.string(),
-              lastUpdatedAt: z.string()
+              emailAddress: z.string().optional(),
+              fields: z.record(z.string(), z.string()).optional(),
+              fieldValues: z
+                .record(z.string(), z.union([z.string(), z.number(), z.null()]))
+                .nullable()
+                .optional(),
+              tags: z.array(z.string()).optional(),
+              status: z.string().optional(),
+              createdAt: z.string().optional(),
+              lastUpdatedAt: z.string().optional()
             }),
-            occurredAt: z.string(),
+            occurredAt: z.string().optional(),
             type: z.string().optional()
           })
         )
         .optional()
-        .describe('Contact-level interactions (returned for contacts reportType)'),
+        .describe(
+          'Contact references and event times. The current API does not supply full contact metadata in these reports'
+        ),
       pagingNext: z.string().nullable().optional().describe('Cursor for the next page')
     })
   )
@@ -108,11 +123,12 @@ export let getCampaignReport = SlateTool.create(spec, {
 
     if (reportType === 'contacts') {
       if (!contactStatus)
-        throw new Error('contactStatus is required when reportType is "contacts".');
+        throw invalid('contactStatus is required when reportType is "contacts".');
       let result = await client.getCampaignContactReports(
         campaignId,
         contactStatus,
-        startingAfter
+        startingAfter,
+        ctx.input.limit
       );
       return {
         output: { contacts: result.data, pagingNext: result.pagingNext },
@@ -120,6 +136,6 @@ export let getCampaignReport = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown reportType: ${reportType}`);
+    throw invalid(`Unknown reportType: ${reportType}`);
   })
   .build();

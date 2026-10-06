@@ -11,8 +11,6 @@ import {
   updateCmsItem,
   updateProject
 } from './tools';
-import { cmsPublish, projectPublish } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     getProjectModel,
     updateProject
   ],
-  triggers: [projectPublish, cmsPublish]
+  triggers: []
 });

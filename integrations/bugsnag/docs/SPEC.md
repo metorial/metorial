@@ -1,109 +1,64 @@
-# Slates Specification for Bugsnag
+# Bugsnag Integration Specification
 
-## Overview
+This integration exposes 19 tools for the BugSnag Data Access API v2. It covers organizations, projects, errors and events, diagnostic trends and pivots, releases, stability, collaborators, comments, saved searches, and available event fields.
 
-Bugsnag (now part of SmartBear's Insight Hub) is an error monitoring and application stability management platform that captures crashes and errors in real-time from web, mobile, and desktop applications. It provides APIs for accessing error and project data, tracking releases and builds, reporting error events and sessions, and sending OpenTelemetry span data for performance monitoring.
+## Authentication and account endpoint
 
-## Authentication
+Use a personal auth token generated in the dashboard under My Account. Requests send `Authorization: token <personal-auth-token>` and `X-Version: 2`.
 
-All requests to the Bugsnag API require authentication.
+Choose the endpoint that matches the organization's dashboard:
 
-### Personal Auth Token (Recommended)
+| Dashboard | Data Access endpoint |
+| --- | --- |
+| `app.bugsnag.com` | `https://api.bugsnag.com` (default) |
+| `app.bugsnag.smartbear.com` | `https://api.bugsnag.smartbear.com` |
 
-Personal auth tokens are the primary and recommended authentication method for the Bugsnag Data Access API. Tokens can be generated in the Bugsnag dashboard under **My Account → Personal Auth Tokens** by selecting "Generate New Token".
+These are provider hosting choices, not inferred geographic regions. Error Reporting uses the separate `notify.bugsnag.com` or `notify.bugsnag.smartbear.com` hosts and a project notifier API key. It is not a Data Access personal token endpoint. The integration does not expose Error Reporting, builds, sessions, upload, performance, SCIM, or GDPR request APIs.
 
-The token can be sent in two ways:
+The connection is verified against the documented accessible-organizations endpoint. The current public API does not document a current-user profile endpoint; the connection profile identifies an accessible organization without inventing a user identity.
 
-1. **Authorization header** (preferred): `Authorization: token YOUR-AUTH-TOKEN`
-2. **Query parameter**: `?auth_token=YOUR-AUTH-TOKEN`
+## Supported workflows
 
-The API base URL is `https://api.bugsnag.com`.
+| Workflow | Tools |
+| --- | --- |
+| Discover organization and project IDs | `list_organizations`, `get_organization`, `list_projects`, `get_project` |
+| Create, update and delete projects | `manage_project` |
+| Search and inspect error groups | `list_errors`, `get_error` |
+| Update severity, assignment and workflow status | `update_error` |
+| Permanently remove one error and its events | `delete_error` |
+| Browse occurrences and full diagnostics | `list_events`, `get_event` |
+| Discover filter keys and comparisons | `list_event_fields` |
+| Inspect trends and distributions | `get_error_trends`, `get_pivots` |
+| Inspect releases and primary-stage stability | `list_releases`, `get_stability` |
+| Manage organization collaborators | `manage_collaborators` |
+| Collaborate on an error | `manage_comments` |
+| Save reusable error filters | `manage_saved_searches` |
 
-### User Credentials (On-Premise Only)
+List tools return one page. Where the provider supplies a `Link` next relation, use `nextPageUrl` as `pageUrl` with the same resource ID and account endpoint. Provider continuation URLs retain filtering and paging state. Cross-origin links, different resource paths, redirects, and credential-bearing page URLs are rejected. Requests expose provider total counts and remaining rate-limit capacity when available; HTTP 429 preserves `Retry-After` seconds without automatically retrying mutations.
 
-For on-premise Bugsnag installations, you can authenticate using Basic Authentication with dashboard email and password credentials. This method is not available for cloud-hosted Bugsnag. This method is unavailable when using multi-factor authentication.
+Release pages support 1–10 results, defaulting to 5. Other paginated collections support up to 100 results per page. When a continuation URL is provided, its paging and filter state takes precedence over the other list options.
 
-**Note:** Bugsnag also uses a separate **Project API Key** (found in project settings) for the Error Reporting and Session Tracking APIs used by SDKs to send error/session data. This is distinct from the personal auth token used for the Data Access API.
+Filters use event-field keys with arrays of `{ type, value }` comparisons. Supported comparisons are `eq`, `ne`, and `empty`; use `list_event_fields` to discover project-specific fields. The established `search` input searches event-message substrings.
 
-## Features
+Error updates map status to the documented `open`, `fix`, `snooze`, and `ignore` operations; severity and assignment use `override_severity` and `assign`. Multiple fields and explicit IDs are applied sequentially, then read back. A later failure reports how many errors completed and warns that earlier changes remain. There is no implicit project-wide bulk mutation.
 
-### Organization & Project Management
+Saved-search creation posts to `/saved_searches` with the project ID, `filters`, and `project_default: false`. Existing `searchFilters` inputs and outputs remain available under their established names. New saved searches are private and do not change project defaults.
 
-Manage organizations and projects within Bugsnag. Create, view, update, and delete organizations and projects. Regenerate API keys for projects. Configure project settings including stability targets and release stages.
+## Existing-input compatibility and provider limits
 
-### Error & Event Access
+All 16 established tool keys and field types remain. Pagination and filter discovery fields are additive. Existing event sort values remain accepted and map to the current event timestamp sort.
 
-Access information about your Bugsnag errors, projects, organization and more. List, view, update, and delete errors and individual error events within projects. Update error status (open, fixed, snoozed, ignored) and assign errors to collaborators. Bulk update multiple errors at once. Events and errors can be filtered using any of the filters available in the Bugsnag dashboard, including by error class, severity, release stage, user, device, browser, OS, and custom fields.
+The current trend resolutions are `1m`, `5m`, `30m`, `2h`, and `12h`. Other established resolution enum values remain in the schema but return a clear unsupported-parameter error. Omit resolution to use `bucketsCount` (1–50, default 30). Project and individual-error trends use the current plural `/trends` endpoints.
 
-### Error Trends & Pivots
+`manage_project.releaseStages` remains in the input schema, but release stages are derived from reported events and cannot be changed by this API. `get_stability.releaseStage` also remains, but the stability-trend endpoint only reports the project primary release stage; supplying this unsupported filter returns guidance instead of silently ignoring it. Projects without sessions return a null stability trend.
 
-View trend data for errors and projects over time. Analyze error distributions using pivots to break down errors by various dimensions such as device, browser, OS, or custom fields.
+Deletion and consolidated tools that can remove resources are marked destructive. Project and error deletions cannot be undone. The diagnostic tools return structured data, not downloadable files.
 
-### Release Tracking
+## Official references
 
-Provide extra information whenever you build, release, or deploy your application. List and view releases on a project or release group. Manage release groups and view project stability trends over time.
-
-### Error Reporting & Session Tracking
-
-Report details of errors and sessions from your applications, required for release stability scores. This is typically used by Bugsnag SDKs rather than called directly.
-
-### Performance Monitoring (Traces & Spans)
-
-Send OpenTelemetry span data to show performance data in your dashboard. List and view span groups, span group summaries, timelines, and distributions. Access individual spans and traces. Manage performance targets and network grouping rulesets.
-
-### Feature Flags
-
-List, view, and delete feature flags on a project. View feature flag summaries, error overviews per flag, and variant-level error breakdowns. Star/unstar feature flags for quick access.
-
-### Collaborator & Team Management
-
-Invite, list, update, and remove collaborators within an organization. Manage collaborator permissions and project access. Create and manage teams, add/remove team members, and configure team-level project access.
-
-### Integration Management
-
-List supported integrations, configure integrations on projects, and manage integration settings including trigger configurations. Test integrations and view integration connection details.
-
-### Saved Searches
-
-Create, view, update, and delete saved searches that store filter configurations for quick access to frequently used error views.
-
-### GDPR & CCPA Compliance
-
-The Data Access APIs enable you to retrieve and delete data that relate to individual users to ensure compliance with GDPR and CCPA legislation. Create event data requests to export user data and event deletion requests to remove user data.
-
-### SCIM Provisioning
-
-Manage collaborators and groups via the SCIM protocol for automated user provisioning from identity providers.
-
-### Error Assignment Rules
-
-Configure rules to automatically assign errors to specific collaborators based on patterns.
-
-## Events
-
-Bugsnag supports webhooks for real-time notifications about error-related events. Webhooks are configured per project under **Project Settings → Integrations and Email → Data Forwarding → Webhook**. You provide a URL to receive POST requests with JSON payloads containing detailed error and event information.
-
-### Error Occurrence Events
-
-- **New error**: Triggered when the first event of an error (per release stage) is received that matches your filters.
-- **Every error occurrence**: Triggered every time an event matching your filters is received.
-- **Frequent error**: Triggered when an error receives a configurable number of events, or impacts a configurable number of users, within a configurable time interval.
-- **Error milestone**: Triggered when the number of events of an error reaches a milestone (10th, 100th, 1000th, and every subsequent 1000th event).
-
-### Error Status Events
-
-- **Error reopened**: Triggered when an error marked as fixed or snoozed receives an event that causes it to be reopened.
-
-### Project-Level Events
-
-- **Error spike**: Triggered when there is an overall spike in errors matching your filter.
-- **New release**: Triggered every time a new release in a selected release stage is detected.
-- **Rate limiting**: Triggered each day when your project is being rate-limited.
-
-### Collaboration Events
-
-- **Comment on error**: Triggered when a collaborator adds a comment to an error that matches your filter.
-
-### Webhook Filtering Options
-
-Webhook notifications support filtering by release stage, error type (handled/unhandled), severity (error, warning, info), and error status. Advanced filtering using saved filtersets is available on Preferred and Enterprise plans, enabling filtering on any field available in the dashboard filter bar.
+- [Current Data Access API](https://developer.smartbear.com/bugsnag/docs/bugsnag-data-access-api)
+- [Published Data Access OpenAPI](https://api.swaggerhub.com/apis/smartbear-public/bugsnag-data-access-api/2/swagger.json)
+- [Filtering](https://developer.smartbear.com/bugsnag/docs/data-access-filtering)
+- [Pagination](https://developer.smartbear.com/bugsnag/docs/data-access-pagination)
+- [Rate limits](https://developer.smartbear.com/bugsnag/docs/data-access-rate-limiting)
+- [Error Reporting API](https://developer.smartbear.com/bugsnag/docs/bugsnag-error-reporting-api)

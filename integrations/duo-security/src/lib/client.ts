@@ -1,10 +1,14 @@
-import { createAxios } from 'slates';
-import { signRequest } from './hmac';
+import { pickDefined } from 'slates';
+import { credential, host, requireValue, resourceId, safeJson, upstream } from './contracts';
+import { canonicalizeParams, signRequest } from './hmac';
+import { createDuoAxios } from './http';
+import { validateNative } from './models';
 
 export interface DuoAuth {
   integrationKey: string;
   secretKey: string;
   apiHostname: string;
+  signingVersion?: 'v2' | 'v5';
 }
 
 export interface DuoResponse<T = any> {
@@ -27,101 +31,131 @@ export class DuoClient {
   private auth: DuoAuth;
 
   constructor(auth: DuoAuth) {
-    this.auth = auth;
+    credential(auth.integrationKey);
+    credential(auth.secretKey);
+    resourceId(auth.integrationKey);
+    requireValue(
+      auth.signingVersion === undefined || ['v2', 'v5'].includes(auth.signingVersion),
+      'Select v2 or v5 Duo request signing.'
+    );
+    this.auth = { ...auth, apiHostname: host(auth.apiHostname) };
   }
-
-  private createAxiosInstance() {
-    return createAxios({
-      baseURL: `https://${this.auth.apiHostname}`
-    });
-  }
-
-  private flattenParams(params: Record<string, any>): Record<string, string> {
-    let result: Record<string, string> = {};
-    for (let [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null && value !== '') {
-        result[key] = String(value);
-      }
+  private async request<T>(
+    method: 'GET' | 'POST' | 'DELETE',
+    path: string,
+    params: Record<string, unknown> = {}
+  ): Promise<DuoResponse<T>> {
+    requireValue(
+      /^\/admin\/v[123]\/[A-Za-z0-9_/-]+$/.test(path) &&
+        !path.includes('//') &&
+        !path.includes('..'),
+      'Use a supported Duo Admin API route.'
+    );
+    const clean = pickDefined(params);
+    safeJson(clean, [this.auth.secretKey]);
+    const flat: Record<string, string> = {};
+    for (const [key, value] of Object.entries(clean)) {
+      requireValue(
+        ['string', 'number', 'boolean'].includes(typeof value),
+        'Duo parameters must be scalar values.'
+      );
+      flat[key] = String(value);
     }
-    return result;
-  }
-
-  async get<T = any>(path: string, params: Record<string, any> = {}): Promise<DuoResponse<T>> {
-    let flatParams = this.flattenParams(params);
-    let { authorization, date } = await signRequest({
-      integrationKey: this.auth.integrationKey,
-      secretKey: this.auth.secretKey,
-      apiHostname: this.auth.apiHostname,
-      method: 'GET',
+    const version = this.auth.signingVersion ?? 'v2';
+    const query = method === 'POST' ? '' : canonicalizeParams(flat);
+    const body =
+      method === 'POST'
+        ? version === 'v2'
+          ? canonicalizeParams(flat)
+          : JSON.stringify(clean)
+        : undefined;
+    const signed = await signRequest({
+      ...this.auth,
+      method,
       path,
-      params: flatParams
+      params: version === 'v2' || method !== 'POST' ? flat : {},
+      version,
+      body
     });
-
-    let axiosInstance = this.createAxiosInstance();
-    let response = await axiosInstance.get(path, {
-      params: flatParams,
-      headers: {
-        Authorization: authorization,
-        Date: date
+    const secrets = [
+      this.auth.secretKey,
+      signed.authorization,
+      signed.authorization.slice(6),
+      Buffer.from(signed.authorization.slice(6), 'base64').toString().split(':')[1]!
+    ];
+    try {
+      const client = createDuoAxios(
+        {
+          baseURL: `https://${this.auth.apiHostname}`,
+          timeout: 30000,
+          maxRedirects: 0,
+          maxContentLength: 4 * 1024 * 1024,
+          maxBodyLength: 1024 * 1024,
+          errorMapping: {
+            mapAxiosError: () => ({
+              message:
+                'Duo request failed. Verify Admin API grants, application type and clock synchronization.'
+            })
+          }
+        },
+        secrets
+      );
+      const response = await client.request({
+        method,
+        url: path + (query ? '?' + query : ''),
+        data: body,
+        headers: {
+          Authorization: signed.authorization,
+          Date: signed.date,
+          ...(method === 'POST'
+            ? {
+                'Content-Type':
+                  version === 'v2' ? 'application/x-www-form-urlencoded' : 'application/json'
+              }
+            : {})
+        }
+      });
+      safeJson(response.data, secrets);
+      requireValue(response.status === 200, 'Duo returned an unexpected HTTP status.');
+      validateNative(method, path, response.data);
+      const result = response.data as DuoResponse<T>;
+      const segment = path.split('/'),
+        kind = segment[3],
+        id = segment[4];
+      if (id && !['enroll'].includes(id) && segment.length === 5 && method !== 'DELETE') {
+        const row = result.response as Record<string, unknown>,
+          field =
+            kind === 'integrations'
+              ? 'integration_key'
+              : kind === 'users'
+                ? 'user_id'
+                : kind === 'groups'
+                  ? 'group_id'
+                  : kind === 'phones'
+                    ? 'phone_id'
+                    : kind === 'admins'
+                      ? 'admin_id'
+                      : undefined;
+        if (field)
+          requireValue(row[field] === id, 'Duo returned a different resource than requested.');
       }
-    });
-
-    return response.data;
+      return result;
+    } catch (error) {
+      throw upstream(
+        error,
+        method === 'GET' ? 'read' : method === 'DELETE' ? 'delete' : 'write'
+      );
+    }
   }
-
-  async post<T = any>(
-    path: string,
-    params: Record<string, any> = {}
-  ): Promise<DuoResponse<T>> {
-    let flatParams = this.flattenParams(params);
-    let { authorization, date } = await signRequest({
-      integrationKey: this.auth.integrationKey,
-      secretKey: this.auth.secretKey,
-      apiHostname: this.auth.apiHostname,
-      method: 'POST',
-      path,
-      params: flatParams
-    });
-
-    let body = new URLSearchParams(flatParams).toString();
-    let axiosInstance = this.createAxiosInstance();
-    let response = await axiosInstance.post(path, body, {
-      headers: {
-        Authorization: authorization,
-        Date: date,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
-
-    return response.data;
+  get<T = any>(path: string, params: Record<string, unknown> = {}) {
+    return this.request<T>('GET', path, params);
   }
-
-  async delete<T = any>(
-    path: string,
-    params: Record<string, any> = {}
-  ): Promise<DuoResponse<T>> {
-    let flatParams = this.flattenParams(params);
-    let { authorization, date } = await signRequest({
-      integrationKey: this.auth.integrationKey,
-      secretKey: this.auth.secretKey,
-      apiHostname: this.auth.apiHostname,
-      method: 'DELETE',
-      path,
-      params: flatParams
-    });
-
-    let axiosInstance = this.createAxiosInstance();
-    let response = await axiosInstance.delete(path, {
-      params: flatParams,
-      headers: {
-        Authorization: authorization,
-        Date: date
-      }
-    });
-
-    return response.data;
+  post<T = any>(path: string, params: Record<string, unknown> = {}) {
+    return this.request<T>('POST', path, params);
   }
-
+  delete<T = any>(path: string, params: Record<string, unknown> = {}) {
+    return this.request<T>('DELETE', path, params);
+  }
   // ========================
   // Users
   // ========================
@@ -132,13 +166,13 @@ export class DuoClient {
     return this.get('/admin/v1/users', {
       limit: params.limit ?? 100,
       offset: params.offset ?? 0,
-      ...(params.username ? { username: params.username } : {}),
-      ...(params.email ? { email: params.email } : {})
+      ...(params.username !== undefined ? { username: params.username } : {}),
+      ...(params.email !== undefined ? { email: params.email } : {})
     });
   }
 
   async getUser(userId: string): Promise<DuoResponse<any>> {
-    return this.get(`/admin/v1/users/${userId}`);
+    return this.get(`/admin/v1/users/${resourceId(userId)}`);
   }
 
   async createUser(params: {
@@ -165,11 +199,11 @@ export class DuoClient {
       notes?: string;
     }
   ): Promise<DuoResponse<any>> {
-    return this.post(`/admin/v1/users/${userId}`, params);
+    return this.post(`/admin/v1/users/${resourceId(userId)}`, params);
   }
 
   async deleteUser(userId: string): Promise<DuoResponse<string>> {
-    return this.delete(`/admin/v1/users/${userId}`);
+    return this.delete(`/admin/v1/users/${resourceId(userId)}`);
   }
 
   async enrollUser(params: {
@@ -180,32 +214,32 @@ export class DuoClient {
     return this.post('/admin/v1/users/enroll', {
       username: params.username,
       email: params.email,
-      ...(params.validSecs ? { valid_secs: params.validSecs } : {})
+      ...(params.validSecs !== undefined ? { valid_secs: params.validSecs } : {})
     });
   }
 
   async getUserGroups(userId: string): Promise<DuoResponse<any[]>> {
-    return this.get(`/admin/v1/users/${userId}/groups`);
+    return this.get(`/admin/v1/users/${resourceId(userId)}/groups`);
   }
 
   async associateUserGroup(userId: string, groupId: string): Promise<DuoResponse<string>> {
-    return this.post(`/admin/v1/users/${userId}/groups`, { group_id: groupId });
+    return this.post(`/admin/v1/users/${resourceId(userId)}/groups`, { group_id: groupId });
   }
 
   async disassociateUserGroup(userId: string, groupId: string): Promise<DuoResponse<string>> {
-    return this.delete(`/admin/v1/users/${userId}/groups/${groupId}`);
+    return this.delete(`/admin/v1/users/${resourceId(userId)}/groups/${resourceId(groupId)}`);
   }
 
   async getUserPhones(userId: string): Promise<DuoResponse<any[]>> {
-    return this.get(`/admin/v1/users/${userId}/phones`);
+    return this.get(`/admin/v1/users/${resourceId(userId)}/phones`);
   }
 
   async associateUserPhone(userId: string, phoneId: string): Promise<DuoResponse<string>> {
-    return this.post(`/admin/v1/users/${userId}/phones`, { phone_id: phoneId });
+    return this.post(`/admin/v1/users/${resourceId(userId)}/phones`, { phone_id: phoneId });
   }
 
   async disassociateUserPhone(userId: string, phoneId: string): Promise<DuoResponse<string>> {
-    return this.delete(`/admin/v1/users/${userId}/phones/${phoneId}`);
+    return this.delete(`/admin/v1/users/${resourceId(userId)}/phones/${resourceId(phoneId)}`);
   }
 
   async createBypassCodes(
@@ -215,9 +249,9 @@ export class DuoClient {
       validSecs?: number;
     } = {}
   ): Promise<DuoResponse<string[]>> {
-    return this.post(`/admin/v1/users/${userId}/bypass_codes`, {
+    return this.post(`/admin/v1/users/${resourceId(userId)}/bypass_codes`, {
       ...(params.count ? { count: params.count } : {}),
-      ...(params.validSecs ? { valid_secs: params.validSecs } : {})
+      ...(params.validSecs !== undefined ? { valid_secs: params.validSecs } : {})
     });
   }
 
@@ -235,7 +269,7 @@ export class DuoClient {
   }
 
   async getGroup(groupId: string): Promise<DuoResponse<any>> {
-    return this.get(`/admin/v1/groups/${groupId}`);
+    return this.get(`/admin/v1/groups/${resourceId(groupId)}`);
   }
 
   async createGroup(params: {
@@ -247,7 +281,7 @@ export class DuoClient {
   }
 
   async deleteGroup(groupId: string): Promise<DuoResponse<string>> {
-    return this.delete(`/admin/v1/groups/${groupId}`);
+    return this.delete(`/admin/v1/groups/${resourceId(groupId)}`);
   }
 
   // ========================
@@ -264,7 +298,7 @@ export class DuoClient {
   }
 
   async getPhone(phoneId: string): Promise<DuoResponse<any>> {
-    return this.get(`/admin/v1/phones/${phoneId}`);
+    return this.get(`/admin/v1/phones/${resourceId(phoneId)}`);
   }
 
   async createPhone(params: {
@@ -285,11 +319,11 @@ export class DuoClient {
       platform?: string;
     }
   ): Promise<DuoResponse<any>> {
-    return this.post(`/admin/v1/phones/${phoneId}`, params);
+    return this.post(`/admin/v1/phones/${resourceId(phoneId)}`, params);
   }
 
   async deletePhone(phoneId: string): Promise<DuoResponse<string>> {
-    return this.delete(`/admin/v1/phones/${phoneId}`);
+    return this.delete(`/admin/v1/phones/${resourceId(phoneId)}`);
   }
 
   // ========================
@@ -306,13 +340,13 @@ export class DuoClient {
   }
 
   async getAdmin(adminId: string): Promise<DuoResponse<any>> {
-    return this.get(`/admin/v1/admins/${adminId}`);
+    return this.get(`/admin/v1/admins/${resourceId(adminId)}`);
   }
 
   async createAdmin(params: {
     name: string;
     email: string;
-    phone: string;
+    phone?: string;
     role?: string;
   }): Promise<DuoResponse<any>> {
     return this.post('/admin/v1/admins', params);
@@ -326,11 +360,11 @@ export class DuoClient {
       role?: string;
     }
   ): Promise<DuoResponse<any>> {
-    return this.post(`/admin/v1/admins/${adminId}`, params);
+    return this.post(`/admin/v1/admins/${resourceId(adminId)}`, params);
   }
 
   async deleteAdmin(adminId: string): Promise<DuoResponse<string>> {
-    return this.delete(`/admin/v1/admins/${adminId}`);
+    return this.delete(`/admin/v1/admins/${resourceId(adminId)}`);
   }
 
   // ========================
@@ -340,18 +374,23 @@ export class DuoClient {
   async listIntegrations(
     params: { limit?: number; offset?: number } = {}
   ): Promise<DuoResponse<any[]>> {
-    return this.get('/admin/v1/integrations', {
-      limit: params.limit ?? 100,
-      offset: params.offset ?? 0
-    });
+    return this.get(
+      this.auth.signingVersion !== 'v5' ? '/admin/v1/integrations' : '/admin/v3/integrations',
+      {
+        limit: params.limit ?? 100,
+        offset: params.offset ?? 0
+      }
+    );
   }
 
   async getIntegration(integrationKey: string): Promise<DuoResponse<any>> {
-    return this.get(`/admin/v1/integrations/${integrationKey}`);
+    return this.get(
+      `/admin/${this.auth.signingVersion !== 'v5' ? 'v1' : 'v3'}/integrations/${resourceId(integrationKey)}`
+    );
   }
 
   async deleteIntegration(integrationKey: string): Promise<DuoResponse<string>> {
-    return this.delete(`/admin/v1/integrations/${integrationKey}`);
+    return this.delete(`/admin/v1/integrations/${resourceId(integrationKey)}`);
   }
 
   // ========================
@@ -379,12 +418,20 @@ export class DuoClient {
       ...(params.sort ? { sort: params.sort } : {})
     };
 
-    // next_offset is passed as two separate parameters with the same key
-    // We handle this by appending them to the query string manually
     if (params.nextOffset && params.nextOffset.length === 2) {
-      queryParams.next_offset = params.nextOffset;
+      queryParams.next_offset = params.nextOffset.join(',');
     }
 
+    for (const name of [
+      'users',
+      'applications',
+      'results',
+      'factors',
+      'groups',
+      'reasons'
+    ] as const)
+      if (params[name] !== undefined) queryParams[name] = params[name];
+    if (params.eventTypes !== undefined) queryParams.event_types = params.eventTypes;
     return this.get('/admin/v2/logs/authentication', queryParams);
   }
 

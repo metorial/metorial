@@ -10,8 +10,6 @@ import {
   listUsers,
   logTime
 } from './tools';
-import { inboundWebhook, newTaskCreated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,5 +22,5 @@ export let provider = Slate.create({
     getNotifications,
     createContactRecord
   ],
-  triggers: [inboundWebhook, newTaskCreated]
+  triggers: []
 });

@@ -31,16 +31,6 @@ import {
   updateSection,
   updateTask
 } from './tools';
-import {
-  commentEvents,
-  filterEvents,
-  labelEvents,
-  projectEvents,
-  reminderEvents,
-  sectionEvents,
-  taskEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -74,13 +64,5 @@ export let provider = Slate.create({
     getCollaborators,
     getProductivityStats
   ] as any[],
-  triggers: [
-    taskEvents,
-    projectEvents,
-    commentEvents,
-    sectionEvents,
-    labelEvents,
-    filterEvents,
-    reminderEvents
-  ] as any[]
+  triggers: []
 });

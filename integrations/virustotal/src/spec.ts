@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'virustotal',
   name: 'VirusTotal',
   description:
-    "Analyze files, URLs, domains, and IP addresses for malware and security threats using VirusTotal's 70+ antivirus engines and security tools.",
+    'Retrieve VirusTotal indicator reports, request file rescans and URL analysis, explore relationships, and manage licensed hunting workflows.',
   metadata: {},
   config,
   auth

@@ -1,0 +1,1550 @@
+{
+  "list_ad_accounts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "search": {
+          "description": "Filter accounts by name",
+          "type": "string"
+        },
+        "pageSize": {
+          "description": "Number of results per page (max 100)",
+          "type": "number"
+        },
+        "pageToken": {
+          "description": "Page token for pagination",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "number",
+                "description": "Numeric ID of the ad account"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the ad account"
+              },
+              "status": {
+                "type": "string",
+                "description": "Account status (ACTIVE, CANCELED, DRAFT, etc.)"
+              },
+              "type": {
+                "type": "string",
+                "description": "Account type (BUSINESS, ENTERPRISE)"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Currency code for the account"
+              },
+              "reference": {
+                "type": "string",
+                "description": "URN of the associated organization"
+              },
+              "servingStatuses": {
+                "description": "Current serving statuses",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["accountId", "name", "status", "type", "currency", "reference"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "description": "Total number of accounts",
+          "type": "number"
+        }
+      },
+      "required": ["accounts"],
+      "additionalProperties": false
+    }
+  },
+  "get_ad_account": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Numeric ID of the ad account"
+        }
+      },
+      "required": ["accountId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "number",
+          "description": "Numeric ID of the ad account"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the ad account"
+        },
+        "status": {
+          "type": "string",
+          "description": "Account status"
+        },
+        "type": {
+          "type": "string",
+          "description": "Account type"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code"
+        },
+        "reference": {
+          "type": "string",
+          "description": "URN of the associated organization"
+        },
+        "servingStatuses": {
+          "description": "Current serving statuses",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "totalBudget": {
+          "description": "Total budget for the account",
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string"
+            },
+            "currencyCode": {
+              "type": "string"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "notifiedOnCreativeApproval": {
+          "type": "boolean"
+        },
+        "notifiedOnCreativeRejection": {
+          "type": "boolean"
+        },
+        "notifiedOnEndOfCampaign": {
+          "type": "boolean"
+        }
+      },
+      "required": ["accountId", "name", "status", "type", "currency", "reference"],
+      "additionalProperties": false
+    }
+  },
+  "list_campaign_groups": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Numeric ID of the ad account"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageToken": {
+          "description": "Page token for pagination",
+          "type": "string"
+        }
+      },
+      "required": ["accountId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignGroups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "campaignGroupId": {
+                "type": "number",
+                "description": "Numeric ID of the campaign group"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the campaign group"
+              },
+              "account": {
+                "type": "string",
+                "description": "Account URN"
+              },
+              "status": {
+                "type": "string",
+                "description": "Campaign group status"
+              },
+              "totalBudget": {
+                "description": "Total budget for the group",
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "string"
+                  },
+                  "currencyCode": {
+                    "type": "string"
+                  }
+                },
+                "required": ["amount", "currencyCode"],
+                "additionalProperties": false
+              },
+              "runSchedule": {
+                "description": "Scheduled run dates (epoch ms)",
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "number"
+                  },
+                  "end": {
+                    "type": "number"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["campaignGroupId", "name", "account", "status"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["campaignGroups"],
+      "additionalProperties": false
+    }
+  },
+  "create_campaign_group": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Numeric ID of the ad account"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name for the campaign group"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED", "ARCHIVED", "DRAFT"],
+          "description": "Initial status of the campaign group"
+        },
+        "totalBudget": {
+          "description": "Total budget for the campaign group",
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "description": "Budget amount as string (e.g., \"1000.00\")"
+            },
+            "currencyCode": {
+              "type": "string",
+              "description": "ISO currency code (e.g., \"USD\")"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "runScheduleStart": {
+          "description": "Start date as epoch milliseconds",
+          "type": "number"
+        },
+        "runScheduleEnd": {
+          "description": "End date as epoch milliseconds",
+          "type": "number"
+        }
+      },
+      "required": ["accountId", "name", "status"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignGroupId": {
+          "type": "string",
+          "description": "ID of the created campaign group"
+        }
+      },
+      "required": ["campaignGroupId"],
+      "additionalProperties": false
+    }
+  },
+  "update_campaign_group": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignGroupId": {
+          "type": "string",
+          "description": "Numeric ID of the campaign group to update"
+        },
+        "name": {
+          "description": "New name for the campaign group",
+          "type": "string"
+        },
+        "status": {
+          "description": "New status",
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED", "ARCHIVED", "DRAFT"]
+        },
+        "totalBudget": {
+          "description": "New total budget",
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string"
+            },
+            "currencyCode": {
+              "type": "string"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "runScheduleStart": {
+          "description": "New start date as epoch milliseconds",
+          "type": "number"
+        },
+        "runScheduleEnd": {
+          "description": "New end date as epoch milliseconds",
+          "type": "number"
+        }
+      },
+      "required": ["campaignGroupId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "list_campaigns": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Numeric ID of the ad account"
+        },
+        "campaignGroupId": {
+          "description": "Filter by campaign group ID",
+          "type": "string"
+        },
+        "statuses": {
+          "description": "Filter by statuses (e.g., [\"ACTIVE\", \"PAUSED\"])",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageToken": {
+          "description": "Page token for pagination",
+          "type": "string"
+        }
+      },
+      "required": ["accountId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaigns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "campaignId": {
+                "type": "number",
+                "description": "Numeric ID of the campaign"
+              },
+              "name": {
+                "type": "string",
+                "description": "Campaign name"
+              },
+              "status": {
+                "type": "string",
+                "description": "Campaign status"
+              },
+              "objectiveType": {
+                "type": "string",
+                "description": "Campaign objective type"
+              },
+              "type": {
+                "type": "string",
+                "description": "Campaign type (e.g., SPONSORED_UPDATES)"
+              },
+              "costType": {
+                "type": "string",
+                "description": "Cost type (e.g., CPM, CPC)"
+              },
+              "dailyBudget": {
+                "description": "Daily budget",
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "string",
+                    "description": "Budget amount as string (e.g., \"50.00\")"
+                  },
+                  "currencyCode": {
+                    "type": "string",
+                    "description": "ISO currency code (e.g., \"USD\")"
+                  }
+                },
+                "required": ["amount", "currencyCode"],
+                "additionalProperties": false
+              },
+              "totalBudget": {
+                "description": "Total budget",
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "string",
+                    "description": "Budget amount as string (e.g., \"50.00\")"
+                  },
+                  "currencyCode": {
+                    "type": "string",
+                    "description": "ISO currency code (e.g., \"USD\")"
+                  }
+                },
+                "required": ["amount", "currencyCode"],
+                "additionalProperties": false
+              },
+              "campaignGroup": {
+                "type": "string",
+                "description": "Campaign group URN"
+              },
+              "account": {
+                "type": "string",
+                "description": "Account URN"
+              },
+              "servingStatuses": {
+                "description": "Serving statuses",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "campaignId",
+              "name",
+              "status",
+              "objectiveType",
+              "type",
+              "costType",
+              "campaignGroup",
+              "account"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["campaigns"],
+      "additionalProperties": false
+    }
+  },
+  "get_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "Numeric ID of the campaign"
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "number",
+          "description": "Numeric ID of the campaign"
+        },
+        "name": {
+          "type": "string",
+          "description": "Campaign name"
+        },
+        "status": {
+          "type": "string",
+          "description": "Campaign status"
+        },
+        "objectiveType": {
+          "type": "string",
+          "description": "Campaign objective"
+        },
+        "type": {
+          "type": "string",
+          "description": "Campaign type"
+        },
+        "costType": {
+          "type": "string",
+          "description": "Cost type"
+        },
+        "dailyBudget": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "description": "Budget amount as string (e.g., \"50.00\")"
+            },
+            "currencyCode": {
+              "type": "string",
+              "description": "ISO currency code (e.g., \"USD\")"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "totalBudget": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "description": "Budget amount as string (e.g., \"50.00\")"
+            },
+            "currencyCode": {
+              "type": "string",
+              "description": "ISO currency code (e.g., \"USD\")"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "unitCost": {
+          "description": "Bid amount",
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "description": "Budget amount as string (e.g., \"50.00\")"
+            },
+            "currencyCode": {
+              "type": "string",
+              "description": "ISO currency code (e.g., \"USD\")"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "campaignGroup": {
+          "type": "string",
+          "description": "Campaign group URN"
+        },
+        "account": {
+          "type": "string",
+          "description": "Account URN"
+        },
+        "targetingCriteria": {
+          "description": "Targeting criteria configuration"
+        },
+        "runSchedule": {
+          "description": "Scheduled run dates (epoch ms)",
+          "type": "object",
+          "properties": {
+            "start": {
+              "type": "number"
+            },
+            "end": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "creativeSelection": {
+          "type": "string"
+        },
+        "format": {
+          "description": "Ad format",
+          "type": "string"
+        },
+        "optimizationTargetType": {
+          "type": "string"
+        },
+        "audienceExpansionEnabled": {
+          "type": "boolean"
+        },
+        "servingStatuses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "campaignId",
+        "name",
+        "status",
+        "objectiveType",
+        "type",
+        "costType",
+        "campaignGroup",
+        "account"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "create_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Numeric ID of the ad account"
+        },
+        "campaignGroupId": {
+          "type": "string",
+          "description": "Numeric ID of the campaign group"
+        },
+        "name": {
+          "type": "string",
+          "description": "Campaign name"
+        },
+        "objectiveType": {
+          "type": "string",
+          "description": "Campaign objective (e.g., BRAND_AWARENESS, WEBSITE_VISITS, LEAD_GENERATION)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Campaign type (e.g., SPONSORED_UPDATES, TEXT_AD, SPONSORED_INMAILS)"
+        },
+        "costType": {
+          "type": "string",
+          "description": "Cost type (e.g., CPM, CPC, CPV)"
+        },
+        "status": {
+          "default": "DRAFT",
+          "description": "Initial campaign status",
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED", "ARCHIVED", "DRAFT"]
+        },
+        "dailyBudget": {
+          "description": "Daily budget",
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "description": "Budget amount as string (e.g., \"50.00\")"
+            },
+            "currencyCode": {
+              "type": "string",
+              "description": "ISO currency code (e.g., \"USD\")"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "totalBudget": {
+          "description": "Total campaign budget",
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "description": "Budget amount as string (e.g., \"50.00\")"
+            },
+            "currencyCode": {
+              "type": "string",
+              "description": "ISO currency code (e.g., \"USD\")"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "unitCost": {
+          "description": "Bid amount per unit",
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "description": "Budget amount as string (e.g., \"50.00\")"
+            },
+            "currencyCode": {
+              "type": "string",
+              "description": "ISO currency code (e.g., \"USD\")"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "runScheduleStart": {
+          "description": "Start date as epoch milliseconds",
+          "type": "number"
+        },
+        "runScheduleEnd": {
+          "description": "End date as epoch milliseconds",
+          "type": "number"
+        },
+        "locale": {
+          "description": "Locale for the campaign",
+          "type": "object",
+          "properties": {
+            "country": {
+              "type": "string",
+              "description": "ISO country code (e.g., \"US\")"
+            },
+            "language": {
+              "type": "string",
+              "description": "ISO language code (e.g., \"en\")"
+            }
+          },
+          "required": ["country", "language"],
+          "additionalProperties": false
+        },
+        "audienceExpansionEnabled": {
+          "description": "Enable audience expansion",
+          "type": "boolean"
+        },
+        "offsiteDeliveryEnabled": {
+          "description": "Enable offsite delivery",
+          "type": "boolean"
+        },
+        "optimizationTargetType": {
+          "description": "Optimization target (e.g., MAX_CLICK, MAX_IMPRESSION, MAX_CONVERSION)",
+          "type": "string"
+        },
+        "targetingCriteria": {
+          "description": "Targeting criteria JSON object"
+        }
+      },
+      "required": [
+        "accountId",
+        "campaignGroupId",
+        "name",
+        "objectiveType",
+        "type",
+        "costType",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "ID of the created campaign"
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    }
+  },
+  "update_campaign": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "Numeric ID of the campaign to update"
+        },
+        "name": {
+          "description": "New campaign name",
+          "type": "string"
+        },
+        "status": {
+          "description": "New status",
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED", "ARCHIVED", "DRAFT"]
+        },
+        "dailyBudget": {
+          "description": "New daily budget",
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "description": "Budget amount as string (e.g., \"50.00\")"
+            },
+            "currencyCode": {
+              "type": "string",
+              "description": "ISO currency code (e.g., \"USD\")"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "totalBudget": {
+          "description": "New total budget",
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "description": "Budget amount as string (e.g., \"50.00\")"
+            },
+            "currencyCode": {
+              "type": "string",
+              "description": "ISO currency code (e.g., \"USD\")"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "unitCost": {
+          "description": "New bid amount",
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "string",
+              "description": "Budget amount as string (e.g., \"50.00\")"
+            },
+            "currencyCode": {
+              "type": "string",
+              "description": "ISO currency code (e.g., \"USD\")"
+            }
+          },
+          "required": ["amount", "currencyCode"],
+          "additionalProperties": false
+        },
+        "runScheduleStart": {
+          "description": "New start date as epoch milliseconds",
+          "type": "number"
+        },
+        "runScheduleEnd": {
+          "description": "New end date as epoch milliseconds",
+          "type": "number"
+        },
+        "audienceExpansionEnabled": {
+          "description": "Enable/disable audience expansion",
+          "type": "boolean"
+        },
+        "optimizationTargetType": {
+          "description": "New optimization target",
+          "type": "string"
+        },
+        "targetingCriteria": {
+          "description": "New targeting criteria JSON"
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "list_creatives": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "Numeric ID of the campaign"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageToken": {
+          "description": "Page token for pagination",
+          "type": "string"
+        }
+      },
+      "required": ["campaignId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "creatives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "creativeId": {
+                "type": "string",
+                "description": "ID of the creative (URN format)"
+              },
+              "campaign": {
+                "type": "string",
+                "description": "Campaign URN"
+              },
+              "account": {
+                "type": "string",
+                "description": "Account URN"
+              },
+              "intendedStatus": {
+                "type": "string",
+                "description": "Intended status (ACTIVE, PAUSED, ARCHIVED)"
+              },
+              "content": {
+                "description": "Creative content configuration"
+              },
+              "servingStatuses": {
+                "description": "Current serving statuses",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "isTest": {
+                "description": "Whether this is a test creative",
+                "type": "boolean"
+              }
+            },
+            "required": ["creativeId", "campaign", "account", "intendedStatus"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["creatives"],
+      "additionalProperties": false
+    }
+  },
+  "create_creative": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "description": "Numeric ID of the campaign"
+        },
+        "intendedStatus": {
+          "default": "ACTIVE",
+          "description": "Intended status of the creative",
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED", "ARCHIVED"]
+        },
+        "content": {
+          "description": "Creative content configuration (format depends on campaign type)"
+        },
+        "isTest": {
+          "description": "Whether this is a test creative",
+          "type": "boolean"
+        }
+      },
+      "required": ["campaignId", "intendedStatus", "content"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "creativeId": {
+          "type": "string",
+          "description": "ID of the created creative"
+        }
+      },
+      "required": ["creativeId"],
+      "additionalProperties": false
+    }
+  },
+  "update_creative": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "creativeId": {
+          "type": "string",
+          "description": "ID of the creative to update (URN format)"
+        },
+        "intendedStatus": {
+          "description": "New intended status",
+          "type": "string",
+          "enum": ["ACTIVE", "PAUSED", "ARCHIVED"]
+        },
+        "content": {
+          "description": "New content configuration"
+        }
+      },
+      "required": ["creativeId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "get_ad_analytics": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pivot": {
+          "type": "string",
+          "enum": [
+            "ACCOUNT",
+            "CAMPAIGN",
+            "CAMPAIGN_GROUP",
+            "CREATIVE",
+            "MEMBER_COMPANY",
+            "MEMBER_COMPANY_SIZE",
+            "MEMBER_JOB_FUNCTION",
+            "MEMBER_JOB_TITLE",
+            "MEMBER_INDUSTRY",
+            "MEMBER_SENIORITY",
+            "MEMBER_COUNTRY",
+            "MEMBER_REGION"
+          ],
+          "description": "Dimension to group results by"
+        },
+        "startDate": {
+          "type": "object",
+          "properties": {
+            "year": {
+              "type": "number",
+              "description": "Year (e.g., 2025)"
+            },
+            "month": {
+              "type": "number",
+              "description": "Month (1-12)"
+            },
+            "day": {
+              "type": "number",
+              "description": "Day of month (1-31)"
+            }
+          },
+          "required": ["year", "month", "day"],
+          "additionalProperties": false,
+          "description": "Start date for the analytics period"
+        },
+        "endDate": {
+          "type": "object",
+          "properties": {
+            "year": {
+              "type": "number",
+              "description": "Year (e.g., 2025)"
+            },
+            "month": {
+              "type": "number",
+              "description": "Month (1-12)"
+            },
+            "day": {
+              "type": "number",
+              "description": "Day of month (1-31)"
+            }
+          },
+          "required": ["year", "month", "day"],
+          "additionalProperties": false,
+          "description": "End date for the analytics period (exclusive)"
+        },
+        "timeGranularity": {
+          "default": "ALL",
+          "description": "Time granularity for breakdown",
+          "type": "string",
+          "enum": ["DAILY", "MONTHLY", "ALL"]
+        },
+        "accountIds": {
+          "description": "Ad account IDs to query",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "campaignIds": {
+          "description": "Campaign IDs to query",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "creativeIds": {
+          "description": "Creative IDs (URN format) to query",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "campaignGroupIds": {
+          "description": "Campaign group IDs to query",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fields": {
+          "description": "Specific metric fields to return (e.g., [\"impressions\", \"clicks\", \"costInLocalCurrency\"])",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["pivot", "startDate", "endDate", "timeGranularity"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "analytics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Array of analytics data rows with requested metrics"
+        },
+        "totalCount": {
+          "description": "Total number of rows",
+          "type": "number"
+        }
+      },
+      "required": ["analytics"],
+      "additionalProperties": false
+    }
+  },
+  "list_conversion_rules": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Numeric ID of the ad account"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageToken": {
+          "description": "Page token for pagination",
+          "type": "string"
+        }
+      },
+      "required": ["accountId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "conversionRules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "conversionRuleId": {
+                "type": "number",
+                "description": "Numeric ID of the conversion rule"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the conversion rule"
+              },
+              "account": {
+                "type": "string",
+                "description": "Account URN"
+              },
+              "conversionMethod": {
+                "type": "string",
+                "description": "Conversion method (e.g., CONVERSIONS_API)"
+              },
+              "type": {
+                "type": "string",
+                "description": "Conversion type (e.g., PURCHASE, SIGN_UP, LEAD, ADD_TO_CART)"
+              },
+              "postClickAttributionWindowSize": {
+                "description": "Post-click attribution window in days",
+                "type": "number"
+              },
+              "viewThroughAttributionWindowSize": {
+                "description": "View-through attribution window in days",
+                "type": "number"
+              },
+              "attributionType": {
+                "description": "Attribution type",
+                "type": "string"
+              },
+              "enabled": {
+                "description": "Whether the rule is enabled",
+                "type": "boolean"
+              }
+            },
+            "required": ["conversionRuleId", "name", "account", "conversionMethod", "type"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["conversionRules"],
+      "additionalProperties": false
+    }
+  },
+  "create_conversion_rule": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Numeric ID of the ad account"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name for the conversion rule"
+        },
+        "type": {
+          "type": "string",
+          "description": "Conversion type (e.g., PURCHASE, SIGN_UP, LEAD, ADD_TO_CART)"
+        },
+        "conversionMethod": {
+          "default": "CONVERSIONS_API",
+          "description": "Conversion tracking method",
+          "type": "string"
+        },
+        "postClickAttributionWindowSize": {
+          "description": "Post-click attribution window in days (1, 7, 30, or 90)",
+          "type": "number"
+        },
+        "viewThroughAttributionWindowSize": {
+          "description": "View-through attribution window in days (1, 7, 30, or 90)",
+          "type": "number"
+        },
+        "attributionType": {
+          "description": "Attribution type (e.g., LAST_TOUCH_BY_CAMPAIGN, LAST_TOUCH_BY_CONVERSION)",
+          "type": "string"
+        }
+      },
+      "required": ["accountId", "name", "type", "conversionMethod"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "conversionRuleId": {
+          "type": "string",
+          "description": "ID of the created conversion rule"
+        }
+      },
+      "required": ["conversionRuleId"],
+      "additionalProperties": false
+    }
+  },
+  "send_conversion_events": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "conversionUrn": {
+                "type": "string",
+                "description": "URN of the conversion rule"
+              },
+              "conversionHappenedAt": {
+                "type": "number",
+                "description": "Timestamp of conversion in epoch milliseconds"
+              },
+              "conversionValue": {
+                "description": "Monetary value of the conversion",
+                "type": "object",
+                "properties": {
+                  "currencyCode": {
+                    "type": "string",
+                    "description": "ISO currency code"
+                  },
+                  "amount": {
+                    "type": "string",
+                    "description": "Conversion value amount"
+                  }
+                },
+                "required": ["currencyCode", "amount"],
+                "additionalProperties": false
+              },
+              "eventId": {
+                "description": "Unique event ID for deduplication",
+                "type": "string"
+              },
+              "userIds": {
+                "description": "User identifiers for matching",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "idType": {
+                      "type": "string",
+                      "description": "ID type (e.g., SHA256_EMAIL, LINKEDIN_FIRST_PARTY_ADS_TRACKING_UUID)"
+                    },
+                    "idValue": {
+                      "type": "string",
+                      "description": "The ID value"
+                    }
+                  },
+                  "required": ["idType", "idValue"],
+                  "additionalProperties": false
+                }
+              },
+              "userInfo": {
+                "description": "Additional user information for matching",
+                "type": "object",
+                "properties": {
+                  "firstName": {
+                    "type": "string"
+                  },
+                  "lastName": {
+                    "type": "string"
+                  },
+                  "companyName": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "countryCode": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["conversionUrn", "conversionHappenedAt"],
+            "additionalProperties": false
+          },
+          "description": "Array of conversion events to send"
+        }
+      },
+      "required": ["events"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "eventCount": {
+          "type": "number",
+          "description": "Number of events sent"
+        }
+      },
+      "required": ["success", "eventCount"],
+      "additionalProperties": false
+    }
+  },
+  "list_lead_forms": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "Numeric ID of the ad account"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageToken": {
+          "description": "Page token for pagination",
+          "type": "string"
+        }
+      },
+      "required": ["accountId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadForms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "leadFormId": {
+                "type": "number",
+                "description": "Numeric ID of the lead form"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the lead form"
+              },
+              "status": {
+                "type": "string",
+                "description": "Form status"
+              },
+              "headline": {
+                "description": "Form headline shown to users",
+                "type": "string"
+              },
+              "description": {
+                "description": "Form description",
+                "type": "string"
+              },
+              "privacyPolicyUrl": {
+                "description": "Privacy policy URL",
+                "type": "string"
+              },
+              "questions": {
+                "description": "Form questions",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "predefinedField": {
+                      "description": "Predefined field type",
+                      "type": "string"
+                    },
+                    "customQuestionText": {
+                      "description": "Custom question text",
+                      "type": "string"
+                    },
+                    "required": {
+                      "description": "Whether the question is required",
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["leadFormId", "name", "status"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["leadForms"],
+      "additionalProperties": false
+    }
+  },
+  "get_lead_form_responses": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "leadFormId": {
+          "description": "Numeric ID of a specific lead form",
+          "type": "string"
+        },
+        "accountId": {
+          "description": "Numeric ID of the ad account (alternative to leadFormId)",
+          "type": "string"
+        },
+        "startTime": {
+          "description": "Filter responses submitted after this epoch timestamp (ms)",
+          "type": "number"
+        },
+        "endTime": {
+          "description": "Filter responses submitted before this epoch timestamp (ms)",
+          "type": "number"
+        },
+        "pageSize": {
+          "description": "Number of results per page",
+          "type": "number"
+        },
+        "pageToken": {
+          "description": "Page token for pagination",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "responses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "responseId": {
+                "type": "string",
+                "description": "ID of the lead form response"
+              },
+              "leadForm": {
+                "type": "string",
+                "description": "Lead form URN"
+              },
+              "submittedAt": {
+                "type": "number",
+                "description": "Submission timestamp in epoch milliseconds"
+              },
+              "answers": {
+                "description": "Submitted answers",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "questionId": {
+                      "description": "Question identifier",
+                      "type": "string"
+                    },
+                    "answer": {
+                      "description": "User's answer",
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "associatedEntity": {
+                "description": "URN of the associated campaign/creative",
+                "type": "string"
+              }
+            },
+            "required": ["responseId", "leadForm", "submittedAt"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["responses"],
+      "additionalProperties": false
+    }
+  }
+}

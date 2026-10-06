@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,8 +18,9 @@ export let resolveBankAccount = SlateTool.create(spec, {
   .input(
     z.object({
       action: z
-        .enum(['resolve', 'list_banks'])
+        .enum(['resolve', 'list_banks', 'list_branches'])
         .describe('Action: resolve an account or list banks'),
+      bankId: z.number().optional().describe('Bank ID from list_banks, for list_branches'),
       accountNumber: z.string().optional().describe('Bank account number to resolve'),
       accountBank: z.string().optional().describe('Bank code (e.g. "044" for Access Bank)'),
       countryCode: z
@@ -30,14 +31,29 @@ export let resolveBankAccount = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      branches: z
+        .array(
+          z.object({
+            branchId: z.number().optional(),
+            branchCode: z.string(),
+            branchName: z.string().optional()
+          })
+        )
+        .optional()
+        .describe('Bank branches, for list_branches'),
       accountName: z.string().optional().describe('Resolved account holder name'),
+      bankId: z.number().optional().describe('Bank ID from list_banks, for list_branches'),
       accountNumber: z.string().optional().describe('Account number'),
       banks: z
         .array(
           z.object({
             bankId: z.number().optional().describe('Bank ID'),
             bankCode: z.string().describe('Bank code'),
-            bankName: z.string().describe('Bank name')
+            bankName: z.string().describe('Bank name'),
+            hasBranches: z
+              .boolean()
+              .optional()
+              .describe('Whether this bank requires a destination branch code')
           })
         )
         .optional()
@@ -45,15 +61,33 @@ export let resolveBankAccount = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, environment: ctx.config.environment });
+
+    if (ctx.input.action === 'list_branches') {
+      if (ctx.input.bankId === undefined)
+        throw createApiServiceError('bankId is required to list branches.');
+      const result = await client.getBankBranches(ctx.input.bankId);
+      return {
+        output: {
+          branches: result.data.map((b: any) => ({
+            branchId: b.id,
+            branchCode: b.branch_code,
+            branchName: b.branch_name
+          }))
+        },
+        message: `Retrieved ${result.data.length} bank branches.`
+      };
+    }
 
     if (ctx.input.action === 'list_banks') {
-      if (!ctx.input.countryCode) throw new Error('countryCode is required to list banks');
+      if (!ctx.input.countryCode)
+        throw createApiServiceError('countryCode is required to list banks');
       let result = await client.listBanks(ctx.input.countryCode);
       let banks = (result.data || []).map((b: any) => ({
         bankId: b.id,
         bankCode: b.code,
-        bankName: b.name
+        bankName: b.name,
+        hasBranches: b.has_branches
       }));
       return {
         output: { banks },
@@ -62,7 +96,9 @@ export let resolveBankAccount = SlateTool.create(spec, {
     }
 
     if (!ctx.input.accountNumber || !ctx.input.accountBank) {
-      throw new Error('accountNumber and accountBank are required to resolve an account');
+      throw createApiServiceError(
+        'accountNumber and accountBank are required to resolve an account'
+      );
     }
 
     let result = await client.resolveBankAccount(

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/confluence-logo.png" height="20"> Confluence
 
-Create, read, update, and delete pages, blog posts, comments, and attachments in Confluence spaces. List spaces, manage labels, content restrictions, and page properties, and search content using Confluence Query Language (CQL). Upload, inspect, list, and delete file attachments with version metadata. Read current user and group information. Listen for webhooks on page, blog, comment, attachment, space, and label events.
+Create, read, update, and delete pages, blog posts, comments, and attachments in Confluence spaces. List spaces, manage labels, content restrictions, and page properties, and search content using Confluence Query Language (CQL). Upload, inspect, list, and delete file attachments with version metadata. Read current user and group information.
 
 ## Tools
 

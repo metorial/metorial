@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FlowiseClient } from '../lib/client';
+import { FlowiseClient, parseFlowiseList } from '../lib/client';
+import { paginationOutputShape, paginationShape } from '../lib/schemas';
 import { spec } from '../spec';
 
 let chatflowSchema = z.object({
@@ -33,9 +34,18 @@ export let listChatflows = SlateTool.create(spec, {
     destructive: false
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      ...paginationShape,
+      type: z
+        .string()
+        .optional()
+        .describe('Flow type to filter: CHATFLOW, MULTIAGENT, ASSISTANT, or AGENTFLOW')
+    })
+  )
   .output(
     z.object({
+      ...paginationOutputShape,
       chatflows: z.array(chatflowSchema).describe('List of chatflows')
     })
   )
@@ -45,11 +55,12 @@ export let listChatflows = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let result = await client.listChatflows();
-    let chatflows = Array.isArray(result) ? result : [];
+    let result = await client.listChatflows(ctx.input);
+    let { items: chatflows, ...pagination } = parseFlowiseList(result, ctx.input);
 
     return {
       output: {
+        ...pagination,
         chatflows: chatflows.map((cf: any) => ({
           chatflowId: cf.id,
           name: cf.name,

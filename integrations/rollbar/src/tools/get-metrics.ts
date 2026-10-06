@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, levelName } from '../lib/client';
 import { spec } from '../spec';
 
 export let getMetrics = SlateTool.create(spec, {
@@ -18,20 +18,24 @@ export let getMetrics = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: z
+        .number()
+        .optional()
+        .describe('Project ID from manage_project; required with an account token.'),
       reportType: z
         .enum(['topActiveItems', 'occurrenceCounts', 'activatedCounts'])
         .describe('Type of metric report to fetch'),
       hours: z
         .number()
         .optional()
-        .describe('Time window in hours (for topActiveItems, default 24)'),
+        .describe('Time window in hours (for topActiveItems, 1–168; default 24)'),
       environment: z.string().optional().describe('Filter by environment'),
       itemId: z.number().optional().describe('Filter by item ID (for occurrenceCounts)'),
       bucketSize: z
         .enum(['60', '3600', '86400'])
         .optional()
         .describe(
-          'Bucket size in seconds (for occurrenceCounts/activatedCounts): 60=minute, 3600=hour, 86400=day'
+          'Bucket size in seconds (for occurrenceCounts/activatedCounts): 60=minute, 3600=hour, 86400=day; activatedCounts supports only 86400'
         )
     })
   )
@@ -64,7 +68,7 @@ export let getMetrics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
     if (ctx.input.reportType === 'topActiveItems') {
       let result = await client.getTopActiveItems({
@@ -72,12 +76,12 @@ export let getMetrics = SlateTool.create(spec, {
         environment: ctx.input.environment
       });
 
-      let items = (result?.result || []).map((entry: any) => ({
+      let items = (result?.result || []).map(entry => ({
         itemId: entry.item?.id,
         counter: entry.item?.counter,
         title: entry.item?.title,
-        level: entry.item?.level_string || entry.item?.level,
-        occurrenceCount: entry.occurrence_count
+        level: levelName(entry.item.level_string ?? entry.item.level),
+        occurrenceCount: entry.counts.reduce((sum, count) => sum + count, 0)
       }));
 
       return {
@@ -93,7 +97,7 @@ export let getMetrics = SlateTool.create(spec, {
         bucket_size: ctx.input.bucketSize
       });
 
-      let counts = (result?.result || []).map((entry: any) => ({
+      let counts = (result?.result || []).map(entry => ({
         timestamp: entry[0],
         count: entry[1]
       }));
@@ -110,7 +114,7 @@ export let getMetrics = SlateTool.create(spec, {
         bucket_size: ctx.input.bucketSize
       });
 
-      let counts = (result?.result || []).map((entry: any) => ({
+      let counts = (result?.result || []).map(entry => ({
         timestamp: entry[0],
         count: entry[1]
       }));
@@ -121,6 +125,6 @@ export let getMetrics = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown report type: ${ctx.input.reportType}`);
+    throw createApiServiceError(`Unknown report type: ${ctx.input.reportType}`);
   })
   .build();

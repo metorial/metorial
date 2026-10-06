@@ -1,21 +1,20 @@
 {
   "name": "@metorial/incidentio",
-  "description": "Create, manage, and track incidents throughout their lifecycle. Declare incidents with severity, status, custom fields, and assigned roles. Ingest and route alerts from external monitoring tools, configure escalation paths, and manage on-call schedules with rotations and overrides. Maintain a service catalog of types and entries. Define custom severities, statuses, incident roles, and timestamp milestones. Track post-incident follow-ups and actions. Manage public-facing status pages with incidents, maintenance windows, and component hierarchies. Create automated workflows triggered by incident events. Receive webhook notifications for incident, alert, and follow-up events.",
+  "description": "Declare, read and edit incidents; ingest HTTP alert events; inspect on-call coverage and manage temporary overrides; maintain catalog entries; discover status pages and publish incident updates. Read incident configuration, users, follow-ups and automation workflows.",
   "categories": [
     "apis-and-http-requests",
     "email-and-messaging",
     "task-and-project-management"
   ],
   "skills": [
-    "create and manage incidents",
-    "configure alert routing",
-    "manage on-call schedules",
-    "define escalation paths",
-    "maintain service catalog",
-    "manage status pages",
-    "track post-incident follow-ups",
-    "automate incident workflows",
-    "ingest alerts from sources",
-    "manage incident severities and statuses"
+    "declare and edit incidents",
+    "read alerts and ingest HTTP events",
+    "inspect on-call coverage",
+    "create and remove schedule overrides",
+    "maintain catalog entries",
+    "publish status page incident updates",
+    "read post-incident follow-ups",
+    "discover users and incident configuration",
+    "inspect automation workflows"
   ]
 }

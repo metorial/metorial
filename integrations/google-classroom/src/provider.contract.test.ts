@@ -33,12 +33,7 @@ describe('google-classroom provider contract', () => {
         'get_user_profile',
         'manage_rubrics'
       ],
-      triggerIds: [
-        'inbound_webhook',
-        'course_roster_changes',
-        'coursework_changes',
-        'announcement_changes'
-      ],
+      triggerIds: [],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'list_courses', readOnly: true },
@@ -50,15 +45,10 @@ describe('google-classroom provider contract', () => {
         { id: 'delete_coursework', readOnly: false, destructive: true },
         { id: 'get_user_profile', readOnly: true }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'course_roster_changes', invocationType: 'polling' },
-        { id: 'coursework_changes', invocationType: 'polling' },
-        { id: 'announcement_changes', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(23);
+    expect(contract.actions).toHaveLength(19);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -80,11 +70,7 @@ describe('google-classroom provider contract', () => {
       manage_coursework_materials: googleClassroomActionScopes.manageCourseworkMaterials,
       manage_guardians: googleClassroomActionScopes.manageGuardians,
       get_user_profile: googleClassroomActionScopes.getUserProfile,
-      manage_rubrics: googleClassroomActionScopes.manageRubrics,
-      inbound_webhook: googleClassroomActionScopes.inboundWebhook,
-      course_roster_changes: googleClassroomActionScopes.courseRosterChanges,
-      coursework_changes: googleClassroomActionScopes.courseworkChanges,
-      announcement_changes: googleClassroomActionScopes.announcementChanges
+      manage_rubrics: googleClassroomActionScopes.manageRubrics
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

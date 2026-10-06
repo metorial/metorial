@@ -1,17 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { actionFields, safeJson } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageRetrohunt = SlateTool.create(spec, {
   name: 'Manage Retrohunt',
   key: 'manage_retrohunt',
-  description: `Create and manage Retrohunt jobs that apply YARA rules to VirusTotal's historical file collection. Jobs scan 600TB+ of files submitted during the past year and take 3-4 hours to complete. **Premium feature.**`,
+  description: `Create and manage Retrohunt jobs that apply YARA rules to VirusTotal's historical file collection. Corpus history, quotas and execution time depend on your hunting license. **Premium feature.**`,
   constraints: [
-    'This feature requires a VirusTotal Premium API key.',
+    'This feature requires the relevant VirusTotal Intelligence and hunting privileges.',
     'Maximum 300 YARA rules per Retrohunt job.',
     'Limit of 10 concurrent jobs per user.',
-    'Jobs take 3-4 hours to complete.'
+    'Job creation consumes hunting quota and retains a job; no completion time is guaranteed.'
   ],
   tags: {
     readOnly: false
@@ -64,6 +65,10 @@ export let manageRetrohunt = SlateTool.create(spec, {
           z.object({
             fileHash: z.string().describe('SHA-256 hash of matching file'),
             fileType: z.string().optional().describe('Object type'),
+            errorCode: z
+              .string()
+              .optional()
+              .describe('Native availability error for the matched object'),
             attributes: z.record(z.string(), z.any()).optional().describe('File attributes')
           })
         )
@@ -73,12 +78,22 @@ export let manageRetrohunt = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    safeJson(ctx.input, [ctx.auth.token]);
+    actionFields(
+      ctx.input,
+      {
+        create: ['rules', 'corpus', 'notificationEmail'],
+        get: ['jobId'],
+        list: ['limit', 'cursor'],
+        get_matches: ['jobId', 'limit', 'cursor']
+      }[ctx.input.action]
+    );
+    let client = new Client(ctx.auth);
 
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.rules) {
-          throw new Error('YARA rules are required to create a Retrohunt job.');
+          throw createApiServiceError('YARA rules are required to create a Retrohunt job.');
         }
         let result = await client.createRetrohuntJob(
           ctx.input.rules,
@@ -89,7 +104,7 @@ export let manageRetrohunt = SlateTool.create(spec, {
         return {
           output: {
             job: {
-              jobId: result?.id ?? '',
+              jobId: result.id,
               status: attrs.status,
               rules: attrs.rules,
               numMatchingFiles: attrs.num_matches,
@@ -99,19 +114,19 @@ export let manageRetrohunt = SlateTool.create(spec, {
               progress: attrs.progress
             }
           },
-          message: `Retrohunt job \`${result?.id}\` created. Status: **${attrs.status ?? 'queued'}**. It will take 3-4 hours to complete.`
+          message: `Retrohunt job \`${result?.id}\` created. Status: **${attrs.status ?? 'unknown (not returned by VirusTotal)'}**. Execution time and history depend on your hunting license.`
         };
       }
       case 'get': {
         if (!ctx.input.jobId) {
-          throw new Error('Job ID is required for get.');
+          throw createApiServiceError('Job ID is required for get.');
         }
         let result = await client.getRetrohuntJob(ctx.input.jobId);
         let attrs = result?.attributes ?? {};
         return {
           output: {
             job: {
-              jobId: result?.id ?? '',
+              jobId: result.id,
               status: attrs.status,
               rules: attrs.rules,
               numMatchingFiles: attrs.num_matches,
@@ -126,8 +141,8 @@ export let manageRetrohunt = SlateTool.create(spec, {
       }
       case 'list': {
         let result = await client.getRetrohuntJobs(ctx.input.limit, ctx.input.cursor);
-        let jobs = (result?.data ?? []).map((item: any) => ({
-          jobId: item.id ?? '',
+        let jobs = (result?.data ?? []).map(item => ({
+          jobId: item.id,
           status: item.attributes?.status,
           numMatchingFiles: item.attributes?.num_matches,
           progress: item.attributes?.progress
@@ -142,16 +157,17 @@ export let manageRetrohunt = SlateTool.create(spec, {
       }
       case 'get_matches': {
         if (!ctx.input.jobId) {
-          throw new Error('Job ID is required for get_matches.');
+          throw createApiServiceError('Job ID is required for get_matches.');
         }
         let result = await client.getRetrohuntJobMatchingFiles(
           ctx.input.jobId,
           ctx.input.limit,
           ctx.input.cursor
         );
-        let files = (result?.data ?? []).map((item: any) => ({
-          fileHash: item.id ?? '',
+        let files = (result?.data ?? []).map(item => ({
+          fileHash: item.id,
           fileType: item.type,
+          errorCode: item.error?.code,
           attributes: item.attributes
         }));
         return {

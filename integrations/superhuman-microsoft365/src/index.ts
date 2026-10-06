@@ -7,8 +7,6 @@ import {
   sendReply,
   triageConversation
 } from './tools';
-import { conversationChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -18,5 +16,5 @@ export let provider = Slate.create({
     manageReplyDraft,
     sendReply
   ],
-  triggers: [conversationChanges]
+  triggers: []
 });

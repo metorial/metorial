@@ -8,14 +8,14 @@ export let suppressUser = SlateTool.create(spec, {
   key: 'suppress_user',
   description: `Create a user suppression regulation in RudderStack for GDPR/CCPA compliance. Supports two modes:
 - **suppress**: Stops collecting data for specified users at the source level.
-- **suppress_with_delete**: Stops collecting data and deletes existing data from specified destinations.`,
+- **suppress_with_delete**: Stops collecting data and requests deletion from supported cloud-mode destinations.`,
   instructions: [
     'Use sourceIds with "suppress" regulation type.',
     'Use destinationIds with "suppress_with_delete" regulation type — do not mix sourceIds and destinationIds.',
     'userId is mandatory for each user in the users array.'
   ],
   constraints: [
-    'Most suppression requests are processed within 24 hours, but may take up to 30 days.'
+    'Enterprise feature. Downstream deletion fulfillment must be verified separately. Omitting sourceIds or destinationIds applies to all corresponding resources in the workspace. Cancellation cannot restore deleted data.'
   ],
   tags: {
     destructive: true,
@@ -53,28 +53,13 @@ export let suppressUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ControlPlaneClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
-
-    let { regulationType, sourceIds, destinationIds, users } = ctx.input;
-
-    let result = await client.createRegulation({
-      regulationType,
-      sourceIds,
-      destinationIds,
-      users
-    });
-
-    let regulationId = result.regulationId || result.id;
-
+    let client = new ControlPlaneClient({ token: ctx.auth.token, region: ctx.config.region });
+    let result = await client.createRegulation(ctx.input);
+    let id = result.regulationId ?? result.id;
     return {
-      output: {
-        regulationId,
-        success: true
-      },
-      message: `Created **${regulationType}** regulation for **${users.length}** user(s)${regulationId ? ` (regulation: \`${regulationId}\`)` : ''}.`
+      output: { regulationId: typeof id === 'string' ? id : undefined, success: true },
+      message:
+        'RudderStack accepted the regulation. This does not confirm completion of downstream deletion; verify fulfillment with each destination. Some acknowledgements do not include an ID; list regulations to discover it.'
     };
   })
   .build();

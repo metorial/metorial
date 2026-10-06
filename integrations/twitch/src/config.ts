@@ -6,6 +6,8 @@ export let config = SlateConfig.create(
     broadcasterId: z
       .string()
       .optional()
-      .describe('Default broadcaster user ID to use for channel-specific operations')
+      .describe(
+        'Legacy optional broadcaster reference. Channel tools require an explicit broadcaster ID; discover IDs with get_user_info.'
+      )
   })
 );

@@ -1,19 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PrismaClient } from '../lib/client';
+import { mapDatabase, PrismaClient } from '../lib/client';
+import { paginationInput, paginationOutput, projectIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listDatabases = SlateTool.create(spec, {
   name: 'List Databases',
   key: 'list_databases',
-  description: `List all Prisma Postgres databases accessible to the authenticated user across all workspaces and projects. Returns database metadata including name, region, status, and connection details.`,
+  description: `Discover accessible Prisma Postgres database IDs, names, regions, and projects. Optionally filter by a project ID from list_projects. Omit cursor and limit to retrieve all pages.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ ...paginationInput, projectId: projectIdInput.optional() }))
   .output(
     z.object({
+      ...paginationOutput,
       databases: z
         .array(
           z.object({
@@ -38,21 +40,28 @@ export let listDatabases = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new PrismaClient(ctx.auth.token);
-    let databases = await client.listDatabases();
+    let databases = await client.listDatabases(ctx.input, ctx.input.projectId);
 
-    let mapped = databases.map(db => ({
-      databaseId: db.id,
-      databaseName: db.name,
-      region: db.region,
-      status: db.status,
-      createdAt: db.createdAt,
-      isDefault: db.isDefault,
-      projectId: db.project?.id,
-      projectName: db.project?.name
-    }));
+    let mapped = databases.data.map(database => {
+      const mapped = mapDatabase(database);
+      return {
+        databaseId: mapped.databaseId,
+        databaseName: mapped.databaseName,
+        region: mapped.region,
+        status: mapped.status,
+        createdAt: mapped.createdAt,
+        isDefault: mapped.isDefault,
+        projectId: mapped.projectId,
+        projectName: mapped.projectName
+      };
+    });
 
     return {
-      output: { databases: mapped },
+      output: {
+        databases: mapped,
+        nextCursor: databases.nextCursor,
+        hasMore: databases.hasMore
+      },
       message: `Found **${mapped.length}** database(s).`
     };
   })

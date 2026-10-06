@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, TravisCIClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let triggerBuild = SlateTool.create(spec, {
@@ -22,6 +22,13 @@ export let triggerBuild = SlateTool.create(spec, {
         .optional()
         .describe('Branch to build. Defaults to the repository default branch.'),
       message: z.string().optional().describe('Custom message for the build request.'),
+      sha: z.string().optional().describe('Specific commit SHA to build.'),
+      mergeMode: z
+        .enum(['deep_merge_append', 'deep_merge_prepend', 'deep_merge', 'merge', 'replace'])
+        .optional()
+        .describe(
+          'How request config combines with .travis.yml. replace uses only request config; omission retains the provider default.'
+        ),
       config: z
         .record(z.string(), z.any())
         .optional()
@@ -40,13 +47,15 @@ export let triggerBuild = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
     let result = await client.triggerBuild(ctx.input.repoSlugOrId, {
       branch: ctx.input.branch,
       message: ctx.input.message,
-      config: ctx.input.config
+      config: ctx.input.config,
+      mergeMode: ctx.input.mergeMode,
+      sha: ctx.input.sha
     });
 
     let request = result.request || result;
@@ -55,12 +64,13 @@ export let triggerBuild = SlateTool.create(spec, {
     return {
       output: {
         requestId: request.id,
-        repositorySlug: request.repository?.slug || ctx.input.repoSlugOrId,
-        branch: request.branch?.name || ctx.input.branch,
+        repositorySlug:
+          result.repository?.slug || request.repository?.slug || ctx.input.repoSlugOrId,
+        branch: request.branch || ctx.input.branch,
         message: request.message || ctx.input.message,
         remaining
       },
-      message: `Build triggered for **${ctx.input.repoSlugOrId}**${ctx.input.branch ? ` on branch **${ctx.input.branch}**` : ''}. Request ID: ${request.id}.`
+      message: `Build request queued for **${ctx.input.repoSlugOrId}**${ctx.input.branch ? ` on branch **${ctx.input.branch}**` : ''}. Request ID: ${request.id}.`
     };
   })
   .build();

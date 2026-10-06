@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SerpApiClient } from '../lib/client';
+import { receiptMessage, receiptOutput, SerpApiClient } from '../lib/client';
+import { searchMetadataSchema } from '../lib/contracts';
+import { searchParams } from '../lib/params';
 import { spec } from '../spec';
 
 let imageResultSchema = z.object({
@@ -50,11 +52,35 @@ export let imageSearchTool = SlateTool.create(spec, {
         .describe('Device type to emulate'),
       safeSearch: z.boolean().optional().describe('Enable safe search filtering'),
       pageNumber: z.number().optional().describe('Page number for pagination (0-indexed)'),
+      startOffset: z
+        .number()
+        .optional()
+        .describe(
+          'Exact native Bing Images first offset, starting at 1; mutually exclusive with pageNumber.'
+        ),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Submit asynchronously and return the native search ID/status. Not compatible with noCache or Ludicrous Speed accounts.'
+        ),
       noCache: z.boolean().optional().describe('Force fresh results')
     })
   )
   .output(
     z.object({
+      isComplete: z
+        .boolean()
+        .describe(
+          'Whether native search status is Success; queued/processing receipts are incomplete.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Native pagination metadata; follow native offsets/tokens without inferring a total.'
+        ),
+      searchMetadata: searchMetadataSchema.optional(),
       images: z.array(imageResultSchema).describe('Image search results'),
       suggestedSearches: z
         .array(
@@ -69,28 +95,9 @@ export let imageSearchTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SerpApiClient({ apiKey: ctx.auth.token });
+    let client = new SerpApiClient({ apiKey: ctx.auth.token, accountId: ctx.auth.accountId });
 
-    let engine = ctx.input.engine;
-
-    let params: Record<string, any> = {
-      engine
-    };
-
-    if (engine === 'google_lens' && ctx.input.imageUrl) {
-      params.url = ctx.input.imageUrl;
-    } else {
-      params.q = ctx.input.query;
-    }
-
-    if (ctx.input.location) params.location = ctx.input.location;
-    if (ctx.input.language) params.hl = ctx.input.language;
-    if (ctx.input.country) params.gl = ctx.input.country;
-    if (ctx.input.device) params.device = ctx.input.device;
-    if (ctx.input.noCache) params.no_cache = ctx.input.noCache;
-    if (ctx.input.safeSearch !== undefined)
-      params.safe = ctx.input.safeSearch ? 'active' : 'off';
-    if (ctx.input.pageNumber !== undefined) params.ijn = ctx.input.pageNumber;
+    let params = searchParams('image_search', ctx.input);
 
     let data = await client.search(params);
 
@@ -115,10 +122,14 @@ export let imageSearchTool = SlateTool.create(spec, {
 
     return {
       output: {
+        ...receiptOutput(data),
         images,
         suggestedSearches
       },
-      message: `Image search returned **${images.length}** results${ctx.input.query ? ` for "${ctx.input.query}"` : ''} using ${engine}.`
+      message: receiptMessage(
+        data,
+        `Image search returned **${images.length}** results${ctx.input.query ? ` for "${ctx.input.query}"` : ''} using ${ctx.input.engine}.`
+      )
     };
   })
   .build();

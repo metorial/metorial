@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let updatePod = SlateTool.create(spec, {
   name: 'Update Pod',
   key: 'update_pod',
-  description: `Update a Pod's configuration including its name, container image, disk sizes, environment variables, ports, and other settings. Note: updating triggers a Pod reset, and GPU type cannot be changed.`,
+  description: `Update a Pod's configuration including its name, container image, disk sizes, environment variables, ports, and other settings. Some changes take effect on the next restart. GPU type and mount kind cannot be changed.`,
   constraints: [
-    'Updating a Pod triggers a Pod reset.',
+    'Some changes take effect on the next start or restart.',
     'GPU type cannot be changed via update.'
   ],
   tags: {
@@ -20,8 +20,18 @@ export let updatePod = SlateTool.create(spec, {
       podId: z.string().describe('ID of the Pod to update'),
       name: z.string().optional().describe('New name for the Pod'),
       imageName: z.string().optional().describe('New container image'),
-      containerDiskInGb: z.number().optional().describe('New container disk size in GB'),
-      volumeInGb: z.number().optional().describe('New persistent volume size in GB'),
+      containerDiskInGb: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(1)
+        .optional()
+        .describe('New container disk size in GB'),
+      volumeInGb: z
+        .number()
+        .refine(Number.isInteger, 'Must be an integer.')
+        .min(10)
+        .optional()
+        .describe('New persistent volume size in GB'),
       volumeMountPath: z.string().optional().describe('Volume mount path'),
       env: z
         .record(z.string(), z.string())
@@ -30,7 +40,7 @@ export let updatePod = SlateTool.create(spec, {
       ports: z.array(z.string()).optional().describe('Updated port mappings'),
       dockerEntrypoint: z.array(z.string()).optional().describe('Override Docker ENTRYPOINT'),
       dockerStartCmd: z.array(z.string()).optional().describe('Override Docker CMD'),
-      locked: z.boolean().optional().describe('Prevent stopping/resetting the Pod'),
+      locked: z.boolean().optional().describe('Prevent stopping the Pod'),
       containerRegistryAuthId: z
         .string()
         .optional()

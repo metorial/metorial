@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { page, pagination, text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listUsersTool = SlateTool.create(spec, {
@@ -28,23 +29,14 @@ export let listUsersTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, environment: ctx.auth.environment });
-
-    let params: Record<string, any> = {};
-    if (ctx.input.email) params.email = ctx.input.email;
-    if (ctx.input.includeDeactivated) params.includeDeactivated = ctx.input.includeDeactivated;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.offset) params.offset = ctx.input.offset;
-
-    let result = await client.listUsers(params);
-
+    const params = pagination(ctx.input);
+    if (ctx.input.email !== undefined) params.email = text(ctx.input.email, 'User email');
+    if (ctx.input.includeDeactivated !== undefined)
+      params.includeDeactivated = ctx.input.includeDeactivated;
+    const result = page(await new Client(ctx.auth).listUsers(params));
     return {
-      output: {
-        users: result.data || [],
-        hasNext: result.hasNext || false,
-        next: result.next || undefined
-      },
-      message: `Found ${(result.data || []).length} users.${result.hasNext ? ' More results available.' : ''}`
+      output: { users: result.data, hasNext: result.hasNext, next: result.next },
+      message: `Retrieved ${result.data.length} users${result.hasNext ? '; more pages available' : ''}.`
     };
   })
   .build();

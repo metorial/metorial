@@ -21,8 +21,6 @@ import {
   updateTimeEntryTool
 } from './tools';
 
-import { timeEntryEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     updateTimeEntryTool,
     deleteTimeEntryTool
   ],
-  triggers: [timeEntryEventsTrigger]
+  triggers: []
 });

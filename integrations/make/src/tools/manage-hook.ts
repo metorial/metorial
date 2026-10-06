@@ -1,20 +1,39 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MakeClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageHook = SlateTool.create(spec, {
   name: 'Manage Webhook',
   key: 'manage_hook',
-  description: `Get details, create, rename, enable, disable, ping, or delete a webhook (hook). Use "ping" to check if the hook endpoint is responsive. Use "enable"/"disable" to control whether the hook accepts incoming data.`,
+  description: `Get details, create, rename, enable, disable, ping, or delete a webhook (hook). Use "ping" to read native gone/attached/learning metadata without sending a payload. Use "enable"/"disable" to control whether the hook accepts incoming data.`,
   instructions: [
     'For "create", provide teamId, name, and typeName (e.g. "gateway-webhook").',
     'For "rename", provide hookId and name.',
-    '"ping" checks if the hook is active and operational.'
+    '"ping" does not prove network reachability. Enabled hooks accept payloads; dependent executions and retention can continue.'
   ]
 })
   .input(
     z.object({
+      method: z
+        .boolean()
+        .optional()
+        .describe('Include request method in received payloads; defaults to false.'),
+      headers: z
+        .boolean()
+        .optional()
+        .describe('Include request headers in received payloads; defaults to false.'),
+      stringify: z
+        .boolean()
+        .optional()
+        .describe('Return JSON payloads as strings; defaults to false.'),
+      confirmed: z
+        .boolean()
+        .optional()
+        .describe(
+          'Explicitly acknowledge the provider confirmation for referenced resources or app installation; omission does not bypass it.'
+        ),
       action: z
         .enum(['get', 'create', 'rename', 'enable', 'disable', 'ping', 'delete'])
         .describe('Action to perform'),
@@ -22,7 +41,12 @@ export let manageHook = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Hook ID (required for get, rename, enable, disable, ping, delete)'),
-      teamId: z.number().optional().describe('Team ID (required for create)'),
+      teamId: z
+        .number()
+        .optional()
+        .describe(
+          'Team ID; call list_teams after list_organizations to discover authorized IDs. (required for create)'
+        ),
       name: z.string().optional().describe('Hook name (required for create and rename)'),
       typeName: z
         .string()
@@ -39,119 +63,60 @@ export let manageHook = SlateTool.create(spec, {
       url: z.string().optional().describe('Hook URL'),
       typeName: z.string().optional().describe('Hook type'),
       enabled: z.boolean().optional().describe('Whether the hook is enabled'),
+      gone: z.boolean().optional(),
+      attached: z.boolean().optional(),
+      learning: z.boolean().optional(),
       alive: z.boolean().optional().describe('Whether the hook responded to ping'),
       deleted: z.boolean().optional().describe('Whether the hook was deleted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MakeClient({
-      token: ctx.auth.token,
-      zoneUrl: ctx.config.zoneUrl
-    });
-
-    let { action } = ctx.input;
-
-    if (action === 'get') {
-      if (!ctx.input.hookId) throw new Error('hookId is required for get action');
-      let result = await client.getHook(ctx.input.hookId);
-      let h = result.hook ?? result;
-      return {
-        output: {
-          hookId: h.id,
-          name: h.name,
-          url: h.url,
-          typeName: h.typeName,
-          enabled: h.enabled
-        },
-        message: `Webhook **${h.name}** (ID: ${h.id}) — ${h.enabled ? 'Enabled' : 'Disabled'}.`
-      };
-    }
-
-    if (action === 'create') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for create action');
-      if (!ctx.input.name) throw new Error('name is required for create action');
-      if (!ctx.input.typeName) throw new Error('typeName is required for create action');
-
-      let result = await client.createHook({
-        name: ctx.input.name,
-        teamId: ctx.input.teamId,
-        typeName: ctx.input.typeName
-      });
-      let h = result.hook ?? result;
-      return {
-        output: {
-          hookId: h.id,
-          name: h.name,
-          url: h.url,
-          typeName: h.typeName,
-          enabled: h.enabled
-        },
-        message: `Created webhook **${h.name}** (ID: ${h.id}).`
-      };
-    }
-
-    if (action === 'rename') {
-      if (!ctx.input.hookId) throw new Error('hookId is required for rename action');
-      if (!ctx.input.name) throw new Error('name is required for rename action');
-      let result = await client.updateHook(ctx.input.hookId, { name: ctx.input.name });
-      let h = result.hook ?? result;
-      return {
-        output: {
-          hookId: h.id ?? ctx.input.hookId,
-          name: h.name ?? ctx.input.name
-        },
-        message: `Webhook ${ctx.input.hookId} renamed to **${ctx.input.name}**.`
-      };
-    }
-
-    if (action === 'enable') {
-      if (!ctx.input.hookId) throw new Error('hookId is required for enable action');
-      await client.enableHook(ctx.input.hookId);
-      return {
-        output: {
-          hookId: ctx.input.hookId,
-          enabled: true
-        },
-        message: `Webhook ${ctx.input.hookId} **enabled**.`
-      };
-    }
-
-    if (action === 'disable') {
-      if (!ctx.input.hookId) throw new Error('hookId is required for disable action');
-      await client.disableHook(ctx.input.hookId);
-      return {
-        output: {
-          hookId: ctx.input.hookId,
-          enabled: false
-        },
-        message: `Webhook ${ctx.input.hookId} **disabled**.`
-      };
-    }
-
+    const client = clientFor(ctx);
+    const { action } = ctx.input;
     if (action === 'ping') {
-      if (!ctx.input.hookId) throw new Error('hookId is required for ping action');
-      let result = await client.pingHook(ctx.input.hookId);
+      const result = await client.pingHook(ctx.input.hookId!);
       return {
         output: {
           hookId: ctx.input.hookId,
-          alive: Boolean(result)
+          alive: !result.gone,
+          gone: result.gone,
+          attached: result.attached,
+          learning: result.learning
         },
-        message: `Webhook ${ctx.input.hookId} ping: **${result ? 'Alive' : 'Unresponsive'}**.`
+        message:
+          'Retrieved native hook availability metadata. This does not send a payload or prove network reachability.'
       };
     }
-
     if (action === 'delete') {
-      if (!ctx.input.hookId) throw new Error('hookId is required for delete action');
-      await client.deleteHook(ctx.input.hookId);
+      await client.deleteHook(ctx.input.hookId!, ctx.input.confirmed);
       return {
-        output: {
-          hookId: ctx.input.hookId,
-          deleted: true
-        },
-        message: `Webhook ${ctx.input.hookId} **deleted**.`
+        output: { hookId: ctx.input.hookId, deleted: true },
+        message:
+          'Make acknowledged exact hook deletion. Dependent scenarios can fail; prior payloads, history, and external effects are not erased.'
       };
     }
-
-    throw new Error(`Unknown action: ${action}`);
+    if (action === 'rename' && ctx.input.name === undefined)
+      throw invalid('name is required for rename.');
+    const result =
+      action === 'get'
+        ? await client.getHook(ctx.input.hookId!)
+        : action === 'create'
+          ? await client.createHook(ctx.input)
+          : action === 'rename'
+            ? await client.updateHook(ctx.input.hookId!, { name: ctx.input.name! })
+            : action === 'enable'
+              ? await client.enableHook(ctx.input.hookId!)
+              : await client.disableHook(ctx.input.hookId!);
+    const h = result.hook;
+    return {
+      output: {
+        hookId: h.id,
+        name: h.name,
+        url: h.url ?? undefined,
+        typeName: h.typeName,
+        enabled: h.enabled
+      },
+      message: `Confirmed native hook ${action}. An enabled hook accepts incoming data; scenario executions and retained payloads depend on its assignment.`
+    };
   })
   .build();

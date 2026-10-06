@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { xRechnungSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let addressSchema = z
@@ -9,7 +10,7 @@ let addressSchema = z
     street: z.string().optional().describe('Street name and house number'),
     zip: z.string().optional().describe('Postal/ZIP code'),
     city: z.string().optional().describe('City name'),
-    countryCode: z.string().optional().describe('ISO 3166-1 alpha-2 country code')
+    countryCode: z.string().optional().describe('Provider country or tax-region code')
   })
   .describe('Postal address');
 
@@ -73,6 +74,7 @@ let contactOutputSchema = z.object({
     .describe('Person details (present if contact is a person)'),
   archived: z.boolean().optional().describe('Whether the contact is archived'),
   note: z.string().optional().describe('Free-text note (max 1000 characters)'),
+  xRechnung: xRechnungSchema.optional().describe('Customer XRechnung settings'),
   addresses: z
     .object({
       billing: z.array(addressSchema).optional().describe('Billing addresses'),
@@ -145,6 +147,7 @@ export let getContact = SlateTool.create(spec, {
         person: contact.person,
         archived: contact.archived,
         note: contact.note,
+        xRechnung: contact.xRechnung,
         addresses: contact.addresses,
         xpiEditUrl: contact.xpiEditUrl,
         emailAddresses: contact.emailAddresses,

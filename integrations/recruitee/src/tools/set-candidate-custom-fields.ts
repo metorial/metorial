@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let setCandidateCustomFields = SlateTool.create(spec, {
   name: 'Set Candidate Custom Fields',
   key: 'set_candidate_custom_fields',
-  description: `Set custom field values on a candidate profile. Supports various field types including text, boolean, date, skills, salary, experience, education, and more.
+  description: `Create profile fields on a candidate profile. This endpoint creates one field per request; it does not find and overwrite an existing field. Supports various field types including text, boolean, date, skills, salary, experience, education, and more.
 
 Supported **kind** values and their **values** format:
 - \`single_line\` / \`multi_line\`: \`[{"text": "value"}]\`
@@ -34,7 +34,15 @@ Supported **kind** values and their **values** format:
               .describe(
                 'Field type (e.g., single_line, boolean, skills, salary, date, experience, education)'
               ),
-            values: z.array(z.any()).describe('Array of value objects matching the field kind')
+            name: z
+              .string()
+              .optional()
+              .describe(
+                'Name required for custom single-line, multi-line, boolean, number, or date fields'
+              ),
+            values: z
+              .array(z.unknown())
+              .describe('Array of value objects matching the field kind')
           })
         )
         .describe('Custom fields to set on the candidate')
@@ -43,23 +51,25 @@ Supported **kind** values and their **values** format:
   .output(
     z.object({
       candidateId: z.number().describe('ID of the candidate'),
-      fieldsSet: z.number().describe('Number of fields set')
+      fieldsSet: z.number().describe('Number of confirmed created profile fields'),
+      createdFieldIds: z.array(z.number()).optional().describe('Confirmed created field IDs')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
+    let client = await RecruiteeClient.forContext(ctx);
 
-    await client.setCandidateCustomFields(ctx.input.candidateId, ctx.input.fields);
+    let result = await client.setCandidateCustomFields(
+      ctx.input.candidateId,
+      ctx.input.fields
+    );
 
     return {
       output: {
         candidateId: ctx.input.candidateId,
-        fieldsSet: ctx.input.fields.length
+        fieldsSet: result.createdFieldIds.length,
+        createdFieldIds: result.createdFieldIds
       },
-      message: `Set ${ctx.input.fields.length} custom field(s) on candidate ${ctx.input.candidateId}.`
+      message: `Created ${result.createdFieldIds.length} profile field(s) on candidate ${ctx.input.candidateId}.`
     };
   })
   .build();

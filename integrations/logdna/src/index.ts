@@ -12,10 +12,14 @@ import {
   deleteExclusionRule,
   deletePresetAlert,
   deleteView,
+  downloadLogExport,
   exportLogs,
   getArchiveConfig,
   getBoard,
+  getCategory,
+  getExclusionRule,
   getIngestionStatus,
+  getPresetAlert,
   getUsage,
   getView,
   ingestLogs,
@@ -32,11 +36,13 @@ import {
   updatePresetAlert,
   updateView
 } from './tools';
-import { alertWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    downloadLogExport,
+    getCategory,
+    getExclusionRule,
+    getPresetAlert,
     ingestLogs,
     exportLogs,
     listViews,
@@ -68,5 +74,5 @@ export let provider = Slate.create({
     resumeIngestion,
     getUsage
   ],
-  triggers: [alertWebhook]
+  triggers: []
 });

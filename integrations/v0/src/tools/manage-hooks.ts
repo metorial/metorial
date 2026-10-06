@@ -39,7 +39,7 @@ export let listHooksTool = SlateTool.create(spec, {
     let client = new V0Client(ctx.auth.token);
     let result = await client.listHooks();
 
-    let hooks = (result.data || []).map((h: any) => ({
+    let hooks = (result.data || []).map(h => ({
       hookId: h.id,
       name: h.name,
       events: h.events,
@@ -64,10 +64,10 @@ export let createHookTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('Human-readable name for the webhook'),
+      name: z.string().min(1).describe('Human-readable name for the webhook'),
       events: z.array(hookEventTypes).describe('Event types to subscribe to'),
       url: z.string().describe('Target URL to receive webhook payloads'),
-      chatId: z.string().optional().describe('Scope the hook to a specific chat')
+      chatId: z.string().min(1).optional().describe('Scope the hook to a specific chat')
     })
   )
   .output(hookSchema)
@@ -98,7 +98,7 @@ export let getHookTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      hookId: z.string().describe('The webhook ID to retrieve')
+      hookId: z.string().min(1).describe('The webhook ID to retrieve')
     })
   )
   .output(hookSchema)
@@ -129,7 +129,7 @@ export let deleteHookTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      hookId: z.string().describe('The webhook ID to delete')
+      hookId: z.string().min(1).describe('The webhook ID to delete')
     })
   )
   .output(

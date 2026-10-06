@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageAlert = SlateTool.create(spec, {
   name: 'Manage Alert',
   key: 'manage_alert',
-  description: `Acknowledge or resolve an alert. Use this to update alert status as part of incident response.`,
+  description: `Acknowledge or resolve an alert. Open alerts cannot be acknowledged; inspect a triggered alert before acknowledgement. Resolving an alert does not resolve its related incidents.`,
   tags: {
     destructive: false
   }
@@ -25,12 +25,10 @@ export let manageAlert = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result: any;
-    if (ctx.input.action === 'acknowledge') {
-      result = await client.acknowledgeAlert(ctx.input.alertId);
-    } else {
-      result = await client.resolveAlert(ctx.input.alertId);
-    }
+    const result =
+      ctx.input.action === 'acknowledge'
+        ? await client.acknowledgeAlert(ctx.input.alertId)
+        : await client.resolveAlert(ctx.input.alertId);
 
     let alert = flattenResource(result.data as JsonApiResource);
 

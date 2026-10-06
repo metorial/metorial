@@ -13,7 +13,9 @@ let widgetSchema = z.object({
 let boardOutputSchema = z.object({
   boardId: z.string().describe('Unique ID of the board'),
   title: z.string().optional().describe('Title of the board'),
-  widgets: z.array(z.any()).optional().describe('List of widgets on the board')
+  widgets: z.array(z.any()).optional().describe('List of widgets on the board'),
+  account: z.string().optional().describe('Account number associated with the board'),
+  category: z.array(z.string()).optional().describe('Board category IDs')
 });
 
 export let listBoards = SlateTool.create(spec, {
@@ -29,16 +31,22 @@ export let listBoards = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let boards = await client.listBoards();
-    let boardList = Array.isArray(boards) ? boards : [];
+    let boardList = boards;
 
     return {
       output: {
-        boards: boardList.map((b: any) => ({
-          boardId: b.id || b.boardID || '',
+        boards: boardList.map(b => ({
+          boardId: b.boardID,
           title: b.title,
-          widgets: b.widgets
+          widgets: b.widgets,
+          account: b.account,
+          category: b.category
         }))
       },
       message: `Found **${boardList.length}** board(s).`
@@ -59,14 +67,20 @@ export let getBoard = SlateTool.create(spec, {
   )
   .output(boardOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let b = await client.getBoard(ctx.input.boardId);
 
     return {
       output: {
-        boardId: b.id || b.boardID || ctx.input.boardId,
+        boardId: b.boardID,
         title: b.title,
-        widgets: b.widgets
+        widgets: b.widgets,
+        account: b.account,
+        category: b.category
       },
       message: `Retrieved board **${b.title || ctx.input.boardId}**.`
     };
@@ -76,28 +90,53 @@ export let getBoard = SlateTool.create(spec, {
 export let createBoard = SlateTool.create(spec, {
   name: 'Create Board',
   key: 'create_board',
-  description: `Create a new board (dashboard) with a title and optional widgets for monitoring log data.`,
+  description: `Create an empty board (dashboard) with a title and optional categories. Configure graphs in the provider dashboard; widgets are not supported by the current create endpoint.`,
   tags: { destructive: false, readOnly: false }
 })
   .input(
     z.object({
       title: z.string().describe('Title for the new board'),
-      widgets: z.array(widgetSchema).optional().describe('Widgets to add to the board')
+      account: z
+        .string()
+        .optional()
+        .describe(
+          'Optional account number when required; discover it on an existing board with list_boards'
+        ),
+      category: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Category IDs. Call list_categories with type boards to discover categories.'
+        ),
+      widgets: z
+        .array(widgetSchema)
+        .optional()
+        .describe(
+          'Legacy option not accepted by the current create API; configure graphs in the dashboard instead'
+        )
     })
   )
   .output(boardOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let b = await client.createBoard({
       title: ctx.input.title,
+      account: ctx.input.account,
+      category: ctx.input.category,
       widgets: ctx.input.widgets
     });
 
     return {
       output: {
-        boardId: b.id || b.boardID || '',
+        boardId: b.boardID,
         title: b.title,
-        widgets: b.widgets
+        widgets: b.widgets,
+        account: b.account,
+        category: b.category
       },
       message: `Created board **${b.title || ctx.input.title}**.`
     };
@@ -121,7 +160,11 @@ export let deleteBoard = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     await client.deleteBoard(ctx.input.boardId);
 
     return {

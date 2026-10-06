@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapContact } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listContacts = SlateTool.create(spec, {
@@ -36,7 +37,7 @@ export let listContacts = SlateTool.create(spec, {
             .array(
               z.object({
                 phoneNumberId: z.number(),
-                label: z.string(),
+                label: z.string().optional(),
                 value: z.string()
               })
             )
@@ -45,73 +46,40 @@ export let listContacts = SlateTool.create(spec, {
             .array(
               z.object({
                 emailId: z.number(),
-                label: z.string(),
+                label: z.string().optional(),
                 value: z.string()
               })
             )
             .describe('Email addresses'),
-          createdAt: z.string().describe('Creation date as ISO string'),
+          createdAt: z.string().optional().describe('Creation date as ISO string'),
           updatedAt: z.string().nullable().describe('Last update date as ISO string')
         })
       ),
+      perPage: z.number().optional(),
+      nextPageLink: z.string().nullable().optional(),
+      previousPageLink: z.string().nullable().optional(),
+      collectionLimit: z.number().optional(),
+      historyWindowMonths: z.number().optional(),
       totalCount: z.number().describe('Total number of matching contacts'),
       currentPage: z.number().describe('Current page number')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth);
-
-    let hasSearchFilters = ctx.input.phoneNumber || ctx.input.email;
-
-    let result: any;
-    if (hasSearchFilters) {
-      result = await client.searchContacts({
-        phoneNumber: ctx.input.phoneNumber,
-        email: ctx.input.email,
-        order: ctx.input.order,
-        page: ctx.input.page,
-        perPage: ctx.input.perPage
-      });
-    } else {
-      result = await client.listContacts({
-        from: ctx.input.from,
-        to: ctx.input.to,
-        order: ctx.input.order,
-        page: ctx.input.page,
-        perPage: ctx.input.perPage
-      });
-    }
-
-    let contacts = result.items.map((contact: any) => ({
-      contactId: contact.id,
-      firstName: contact.first_name ?? null,
-      lastName: contact.last_name ?? null,
-      fullName: contact.name ?? null,
-      companyName: contact.company_name ?? null,
-      information: contact.information ?? null,
-      phoneNumbers: (contact.phone_numbers || []).map((p: any) => ({
-        phoneNumberId: p.id,
-        label: p.label,
-        value: p.value
-      })),
-      emails: (contact.emails || []).map((e: any) => ({
-        emailId: e.id,
-        label: e.label,
-        value: e.value
-      })),
-      createdAt: contact.created_at
-        ? new Date(contact.created_at * 1000).toISOString()
-        : new Date().toISOString(),
-      updatedAt: contact.updated_at ? new Date(contact.updated_at * 1000).toISOString() : null
-    }));
-
+    const client = new Client(ctx.auth);
+    const result =
+      ctx.input.phoneNumber !== undefined || ctx.input.email !== undefined
+        ? await client.searchContacts(ctx.input)
+        : await client.listContacts(ctx.input);
     return {
       output: {
-        contacts,
+        contacts: result.items.map(mapContact),
         totalCount: result.meta.total,
-        currentPage: result.meta.currentPage
+        currentPage: result.meta.currentPage,
+        perPage: result.meta.perPage,
+        nextPageLink: result.meta.nextPageLink,
+        collectionLimit: 10000
       },
-      message: `Found **${result.meta.total}** contacts (showing page ${result.meta.currentPage}, ${contacts.length} results).`
+      message: `Retrieved ${result.items.length} shared contacts from native page ${result.meta.currentPage}. Narrow the date window to stay below the 10,000-result limit.`
     };
   })
   .build();

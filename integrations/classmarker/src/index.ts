@@ -9,8 +9,6 @@ import {
   manageAccessList,
   manageCategory
 } from './tools';
-import { examResultsCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -22,5 +20,5 @@ export let provider = Slate.create({
     createOrUpdateQuestion,
     manageAccessList
   ],
-  triggers: [examResultsCompleted]
+  triggers: []
 });

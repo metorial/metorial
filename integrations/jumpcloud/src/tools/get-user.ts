@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getUser = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let getUser = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       userId: z.string().describe('JumpCloud user ID')
     })
   )
@@ -79,44 +81,44 @@ export let getUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      let user = await client.getUser(ctx.input.userId);
 
-    let user = await client.getUser(ctx.input.userId);
-
-    return {
-      output: {
-        userId: user._id,
-        username: user.username,
-        email: user.email,
-        firstname: user.firstname,
-        lastname: user.lastname,
-        displayname: user.displayname,
-        state: user.state,
-        activated: user.activated,
-        suspended: user.suspended,
-        company: user.company,
-        department: user.department,
-        jobTitle: user.jobTitle,
-        employeeIdentifier: user.employeeIdentifier,
-        employeeType: user.employeeType,
-        location: user.location,
-        alternateEmail: user.alternateEmail,
-        description: user.description,
-        created: user.created,
-        ldapBindingUser: user.ldap_binding_user,
-        enableMfa: user.enable_user_portal_multifactor,
-        passwordNeverExpires: user.password_never_expires,
-        passwordlessSudo: user.passwordless_sudo,
-        externallyManaged: user.externally_managed,
-        attributes: user.attributes,
-        phoneNumbers: user.phoneNumbers,
-        addresses: user.addresses,
-        mfaConfigured: user.mfa?.configured
-      },
-      message: `Retrieved user **${user.username}** (${user.email}) — state: ${user.state}`
-    };
+      return {
+        output: {
+          userId: user._id,
+          username: user.username,
+          email: user.email,
+          firstname: user.firstname,
+          lastname: user.lastname,
+          displayname: user.displayname,
+          state: user.state,
+          activated: user.activated,
+          suspended: user.suspended,
+          company: user.company,
+          department: user.department,
+          jobTitle: user.jobTitle,
+          employeeIdentifier: user.employeeIdentifier,
+          employeeType: user.employeeType,
+          location: user.location,
+          alternateEmail: user.alternateEmail,
+          description: user.description,
+          created: user.created,
+          ldapBindingUser: user.ldap_binding_user,
+          enableMfa: user.enable_user_portal_multifactor,
+          passwordNeverExpires: user.password_never_expires,
+          passwordlessSudo: user.passwordless_sudo,
+          externallyManaged: user.externally_managed,
+          attributes: user.attributes,
+          phoneNumbers: user.phoneNumbers,
+          addresses: user.addresses,
+          mfaConfigured: user.mfa?.configured
+        },
+        message: `Retrieved user **${user.username}** (${user.email}) — state: ${user.state}`
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
+    }
   })
   .build();

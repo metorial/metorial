@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WebexClient } from '../lib/client';
+import { required } from '../lib/http';
 import { spec } from '../spec';
 
 let messageSchema = z.object({
@@ -31,6 +32,12 @@ export let listMessages = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Native next-page URL returned by this tool. Use alone; do not add filters.'
+        ),
       roomId: z.string().optional().describe('ID of the space to list messages from'),
       personId: z.string().optional().describe('Person ID to list direct messages with'),
       personEmail: z.string().optional().describe('Email to list direct messages with'),
@@ -58,21 +65,53 @@ export let listMessages = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageUrl: z.string().optional().describe('URL for the next native page, if present'),
       messages: z.array(messageSchema).describe('List of messages')
     })
   )
   .handleInvocation(async ctx => {
     let client = new WebexClient({ token: ctx.auth.token });
-    let items: any[];
-
-    if (ctx.input.personId || ctx.input.personEmail) {
-      let result = await client.listDirectMessages({
+    let result: Awaited<ReturnType<WebexClient['listMessages']>>;
+    const direct = ctx.input.personId !== undefined || ctx.input.personEmail !== undefined;
+    if (ctx.input.roomId !== undefined && direct)
+      throw createApiServiceError('Choose a space or a direct-message target, not both.');
+    if (
+      direct &&
+      [
+        ctx.input.mentionedPeople,
+        ctx.input.before,
+        ctx.input.beforeMessage,
+        ctx.input.max
+      ].some(v => v !== undefined)
+    )
+      throw createApiServiceError(
+        'Direct-message listing supports parentId, personId or personEmail only. Use roomId for page-size, mention and date filters.'
+      );
+    if (ctx.input.nextPageUrl) {
+      if (
+        Object.entries(ctx.input).some(
+          ([key, value]) => key !== 'nextPageUrl' && value !== undefined
+        )
+      )
+        throw createApiServiceError('Use nextPageUrl alone.');
+      let url: URL;
+      try {
+        url = new URL(ctx.input.nextPageUrl);
+      } catch {
+        throw createApiServiceError('Use a native next-page URL.');
+      }
+      result =
+        url.pathname === '/v1/messages/direct'
+          ? await client.listDirectMessages({ nextPageUrl: ctx.input.nextPageUrl })
+          : await client.listMessages({ nextPageUrl: ctx.input.nextPageUrl });
+    } else if (direct) {
+      result = await client.listDirectMessages({
         personId: ctx.input.personId,
-        personEmail: ctx.input.personEmail
+        personEmail: ctx.input.personEmail,
+        parentId: ctx.input.parentId
       });
-      items = result.items || [];
-    } else if (ctx.input.roomId) {
-      let result = await client.listMessages({
+    } else {
+      result = await client.listMessages({
         roomId: ctx.input.roomId,
         parentId: ctx.input.parentId,
         mentionedPeople: ctx.input.mentionedPeople,
@@ -80,14 +119,12 @@ export let listMessages = SlateTool.create(spec, {
         beforeMessage: ctx.input.beforeMessage,
         max: ctx.input.max
       });
-      items = result.items || [];
-    } else {
-      items = [];
     }
+    let items = result.items;
 
-    let messages = items.map((m: any) => ({
+    let messages = items.map(m => ({
       messageId: m.id,
-      roomId: m.roomId,
+      roomId: required(m.roomId, 'message room ID'),
       roomType: m.roomType,
       personId: m.personId,
       personEmail: m.personEmail,
@@ -100,7 +137,7 @@ export let listMessages = SlateTool.create(spec, {
     }));
 
     return {
-      output: { messages },
+      output: { messages, nextPageUrl: result.nextPageUrl },
       message: `Found **${messages.length}** message(s).`
     };
   })

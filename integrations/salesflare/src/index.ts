@@ -21,6 +21,8 @@ import {
   listAccounts,
   listContacts,
   listCurrencies,
+  listCustomFields,
+  listNotes,
   listOpportunities,
   listPipelines,
   listTags,
@@ -36,8 +38,6 @@ import {
   updateTag,
   updateTask
 } from './tools';
-import { contactChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -74,7 +74,9 @@ export let provider = Slate.create({
     getMe,
     listWorkflows,
     getWorkflow,
-    listCurrencies
+    listCurrencies,
+    listNotes,
+    listCustomFields
   ],
-  triggers: [inboundWebhook, contactChanges]
+  triggers: []
 });

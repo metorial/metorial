@@ -1,0 +1,1333 @@
+{
+  "create_contact": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "identifiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["email", "phone"]
+              },
+              "id": {
+                "type": "string"
+              },
+              "channels": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": ["subscribed", "nonSubscribed", "unsubscribed"]
+                      },
+                      "statusDate": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["status"],
+                    "additionalProperties": false
+                  },
+                  "sms": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": ["subscribed", "nonSubscribed", "unsubscribed"]
+                      },
+                      "statusDate": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["status"],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "consent": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "ip": {
+                    "type": "string"
+                  },
+                  "userAgent": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["type", "id"],
+            "additionalProperties": false
+          }
+        },
+        "email": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "address": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string"
+        },
+        "countryCode": {
+          "type": "string"
+        },
+        "birthdate": {
+          "type": "string"
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["m", "f"]
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "customProperties": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "sendWelcomeEmail": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "country": {
+          "type": "string"
+        },
+        "countryCode": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["contactId"],
+      "additionalProperties": false
+    }
+  },
+  "get_contact": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string"
+        }
+      },
+      "required": ["contactId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "address": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string"
+        },
+        "countryCode": {
+          "type": "string"
+        },
+        "birthdate": {
+          "type": "string"
+        },
+        "gender": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "customProperties": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "identifiers": {
+          "type": "array",
+          "items": {}
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["contactId"],
+      "additionalProperties": false
+    }
+  },
+  "list_contacts": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["subscribed", "nonSubscribed", "unsubscribed"]
+        },
+        "segmentId": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 250
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "updatedAfter": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contactId": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "status": {
+                "type": "string"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": ["contactId"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        },
+        "previousCursor": {
+          "type": "string"
+        }
+      },
+      "required": ["contacts"],
+      "additionalProperties": false
+    }
+  },
+  "update_contact": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "postalCode": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string"
+        },
+        "countryCode": {
+          "type": "string"
+        },
+        "birthdate": {
+          "type": "string"
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["m", "f"]
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "customProperties": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "identifiers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["email", "phone"]
+              },
+              "id": {
+                "type": "string"
+              },
+              "channels": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": ["subscribed", "nonSubscribed", "unsubscribed"]
+                      },
+                      "statusDate": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["status"],
+                    "additionalProperties": false
+                  },
+                  "sms": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": ["subscribed", "nonSubscribed", "unsubscribed"]
+                      },
+                      "statusDate": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["status"],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["type", "id"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["contactId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["contactId"],
+      "additionalProperties": false
+    }
+  },
+  "create_product": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["inStock", "outOfStock", "notAvailable"]
+        },
+        "defaultImageUrl": {
+          "type": "string"
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "vendor": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "categoryIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "variantId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "price": {
+                "type": "number"
+              },
+              "url": {
+                "type": "string"
+              },
+              "sku": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["inStock", "outOfStock", "notAvailable"]
+              },
+              "defaultImageUrl": {
+                "type": "string"
+              },
+              "images": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "strikeThroughPrice": {
+                "type": "number"
+              }
+            },
+            "required": ["variantId", "title", "price", "url"],
+            "additionalProperties": false
+          }
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": ["productId", "title", "url", "currency", "status"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "defaultImageUrl": {
+          "type": "string"
+        },
+        "vendor": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["productId"],
+      "additionalProperties": false
+    }
+  },
+  "get_product": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "type": "string"
+        }
+      },
+      "required": ["productId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "defaultImageUrl": {
+          "type": "string"
+        },
+        "vendor": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "variantId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "price": {
+                "type": "number"
+              },
+              "sku": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": ["variantId"],
+            "additionalProperties": false
+          }
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["productId"],
+      "additionalProperties": false
+    }
+  },
+  "list_products": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 250
+        },
+        "offset": {
+          "type": "number"
+        },
+        "sort": {
+          "type": "string",
+          "enum": ["date", "updatedAt", "createdAt"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "products": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "defaultImageUrl": {
+                "type": "string"
+              },
+              "vendor": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": ["productId"],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "nextOffset": {
+          "type": "number"
+        }
+      },
+      "required": ["products", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  "delete_product": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "productId": {
+          "type": "string"
+        }
+      },
+      "required": ["productId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  },
+  "send_event": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "eventName": {
+          "type": "string"
+        },
+        "eventVersion": {
+          "type": "string"
+        },
+        "eventId": {
+          "type": "string"
+        },
+        "eventTime": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "contact": {
+          "type": "object",
+          "properties": {
+            "email": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "contactId": {
+              "type": "string"
+            },
+            "firstName": {
+              "type": "string"
+            },
+            "lastName": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "customProperties": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            }
+          },
+          "additionalProperties": false
+        },
+        "properties": {
+          "type": "object",
+          "properties": {
+            "orderId": {
+              "type": "string"
+            },
+            "orderNumber": {
+              "type": "string"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "totalPrice": {
+              "type": "number"
+            },
+            "subTotalPrice": {
+              "type": "number"
+            },
+            "totalDiscount": {
+              "type": "number"
+            },
+            "totalTax": {
+              "type": "number"
+            },
+            "shippingPrice": {
+              "type": "number"
+            },
+            "paymentMethod": {
+              "type": "string"
+            },
+            "paymentStatus": {
+              "type": "string"
+            },
+            "fulfillmentStatus": {
+              "type": "string"
+            },
+            "shippingMethod": {
+              "type": "string"
+            },
+            "orderStatusUrl": {
+              "type": "string"
+            },
+            "billingAddress": {
+              "type": "object",
+              "properties": {
+                "firstName": {
+                  "type": "string"
+                },
+                "lastName": {
+                  "type": "string"
+                },
+                "company": {
+                  "type": "string"
+                },
+                "address1": {
+                  "type": "string"
+                },
+                "address2": {
+                  "type": "string"
+                },
+                "city": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "stateCode": {
+                  "type": "string"
+                },
+                "zip": {
+                  "type": "string"
+                },
+                "country": {
+                  "type": "string"
+                },
+                "phone": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "shippingAddress": {
+              "type": "object",
+              "properties": {
+                "firstName": {
+                  "type": "string"
+                },
+                "lastName": {
+                  "type": "string"
+                },
+                "company": {
+                  "type": "string"
+                },
+                "address1": {
+                  "type": "string"
+                },
+                "address2": {
+                  "type": "string"
+                },
+                "city": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "stateCode": {
+                  "type": "string"
+                },
+                "zip": {
+                  "type": "string"
+                },
+                "country": {
+                  "type": "string"
+                },
+                "phone": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "lineItems": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "productId": {
+                    "type": "string"
+                  },
+                  "productTitle": {
+                    "type": "string"
+                  },
+                  "productDescription": {
+                    "type": "string"
+                  },
+                  "productPrice": {
+                    "type": "number"
+                  },
+                  "productQuantity": {
+                    "type": "number"
+                  },
+                  "productSku": {
+                    "type": "string"
+                  },
+                  "productDiscount": {
+                    "type": "number"
+                  },
+                  "productUrl": {
+                    "type": "string"
+                  },
+                  "productImageUrl": {
+                    "type": "string"
+                  },
+                  "productVariantId": {
+                    "type": "string"
+                  },
+                  "productVariantTitle": {
+                    "type": "string"
+                  },
+                  "productVendor": {
+                    "type": "string"
+                  },
+                  "productTags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "productCategories": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "categoryId": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "note": {
+              "type": "string"
+            },
+            "tracking": {
+              "type": "object",
+              "properties": {
+                "courierTitle": {
+                  "type": "string"
+                },
+                "courierUrl": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "cartId": {
+              "type": "string"
+            },
+            "cartUrl": {
+              "type": "string"
+            },
+            "productId": {
+              "type": "string"
+            },
+            "productTitle": {
+              "type": "string"
+            },
+            "productUrl": {
+              "type": "string"
+            },
+            "productImageUrl": {
+              "type": "string"
+            },
+            "productPrice": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        "customProperties": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["eventName", "contact"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "accepted": {
+          "type": "boolean"
+        }
+      },
+      "required": ["accepted"],
+      "additionalProperties": false
+    }
+  },
+  "list_campaigns": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "updatedAfter": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "campaigns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "campaignId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "channel": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "subjectLine": {
+                "type": "string"
+              },
+              "startDate": {
+                "type": "string"
+              },
+              "endDate": {
+                "type": "string"
+              },
+              "sendStartDate": {
+                "type": "string"
+              },
+              "sendEndDate": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "tzoEnabled": {
+                "type": "boolean"
+              }
+            },
+            "required": ["campaignId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["campaigns"],
+      "additionalProperties": false
+    }
+  },
+  "list_automations": {
+    "input": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "automations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "automationId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "triggerType": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": ["automationId"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["automations"],
+      "additionalProperties": false
+    }
+  },
+  "list_categories": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 250
+        },
+        "offset": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "categoryId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": ["categoryId"],
+            "additionalProperties": false
+          }
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": ["categories", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  "create_category": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "categoryId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": ["categoryId", "title"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "categoryId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": ["categoryId"],
+      "additionalProperties": false
+    }
+  },
+  "delete_category": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "categoryId": {
+          "type": "string"
+        }
+      },
+      "required": ["categoryId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": ["success"],
+      "additionalProperties": false
+    }
+  }
+}

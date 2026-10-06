@@ -1,11 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageIdSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let managePostmortem = SlateTool.create(spec, {
   name: 'Manage Postmortem',
   key: 'manage_postmortem',
+  tags: { readOnly: false, destructive: true },
   description: `Create, update, publish, or revert a postmortem for a resolved incident. Postmortems support a draft workflow:
 - **Get**: Retrieve the current postmortem for an incident.
 - **Save draft**: Provide \`body\` to create or update the postmortem draft.
@@ -14,6 +16,7 @@ export let managePostmortem = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageId: pageIdSchema,
       incidentId: z.string().describe('ID of the resolved incident'),
       body: z.string().optional().describe('Postmortem body content (markdown supported)'),
       publish: z.boolean().optional().describe('Set to true to publish the postmortem'),
@@ -34,8 +37,22 @@ export let managePostmortem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, pageId: ctx.config.pageId });
+    let client = new Client({
+      token: ctx.auth.token,
+      pageId: ctx.input.pageId ?? ctx.config.pageId
+    });
 
+    if (ctx.input.revert && ctx.input.publish)
+      throw createApiServiceError('Choose publish or revert, not both.');
+    if (ctx.input.body !== undefined && (ctx.input.publish || ctx.input.revert))
+      throw createApiServiceError(
+        'Save the draft body first, then publish or revert in a separate call.'
+      );
+    if (
+      (ctx.input.notifySubscribers !== undefined || ctx.input.notifyTwitter !== undefined) &&
+      !ctx.input.publish
+    )
+      throw createApiServiceError('Notification options apply only when publishing.');
     if (ctx.input.revert) {
       await client.revertPostmortem(ctx.input.incidentId);
       return {
@@ -61,13 +78,11 @@ export let managePostmortem = SlateTool.create(spec, {
     }
 
     if (ctx.input.body !== undefined) {
-      let result = await client.createOrUpdatePostmortem(ctx.input.incidentId, {
-        body: ctx.input.body
-      });
+      let result = await client.createOrUpdatePostmortem(ctx.input.incidentId, ctx.input.body);
       return {
         output: {
           incidentId: ctx.input.incidentId,
-          postmortemBody: result?.body
+          postmortemBody: result.body_draft ?? result.body
         },
         message: `Saved postmortem draft for incident \`${ctx.input.incidentId}\`.`
       };
@@ -77,7 +92,7 @@ export let managePostmortem = SlateTool.create(spec, {
     return {
       output: {
         incidentId: ctx.input.incidentId,
-        postmortemBody: result?.body
+        postmortemBody: result.body_draft ?? result.body
       },
       message: `Retrieved postmortem for incident \`${ctx.input.incidentId}\`.`
     };

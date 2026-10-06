@@ -14,6 +14,7 @@ Returns the mutation result.`,
     'Mutations run within an ACID transaction and will be automatically retried on conflicts'
   ],
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
@@ -46,8 +47,8 @@ Returns the mutation result.`,
 
     return {
       output: {
-        result: result.value !== undefined ? result.value : result,
-        status: result.status || 'success'
+        result: result.value,
+        status: result.status
       },
       message: `Mutation **${ctx.input.functionPath}** executed successfully.`
     };

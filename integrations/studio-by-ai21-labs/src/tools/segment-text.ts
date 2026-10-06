@@ -1,13 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let segmentText = SlateTool.create(spec, {
   name: 'Segment Text',
   key: 'segment_text',
-  description: `Break long text into paragraphs segmented by distinct topics. Each segment represents a coherent topical unit. Can also process content from a URL.`,
+  description:
+    'DEPRECATED — use `chat_completion` instead. AI21 retired the specialized text segmentation API.',
+  instructions: [
+    'Use chat_completion with task instructions and supplied context, or maestro_run with validation requirements. These APIs do not reproduce the retired response semantics automatically.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true,
     destructive: false
   }
@@ -30,22 +34,9 @@ export let segmentText = SlateTool.create(spec, {
         .describe('List of text segments')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.segmentText({
-      source: ctx.input.source,
-      sourceType: ctx.input.sourceType
-    });
-
-    let segments = (result.segments ?? []).map((s: any) => ({
-      segmentText: s.segment_text ?? s.segmentText ?? '',
-      segmentType: s.segment_type ?? s.segmentType
-    }));
-
-    return {
-      output: { segments },
-      message: `Split content into **${segments.length}** topical segment(s).`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'AI21 retired the specialized text segmentation API. Use chat_completion with explicit task instructions and context, or maestro_run with validation requirements.'
+    );
   })
   .build();

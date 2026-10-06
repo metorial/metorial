@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let reportCheckIn = SlateTool.create(spec, {
   name: 'Report Check-In',
   key: 'report_check_in',
-  description: `Send a check-in ping to Honeybadger to indicate that a scheduled task or cron job has run successfully. Uses the Reporting API and requires a project API key.`,
+  description: `Send a check-in ping to Honeybadger to indicate that a scheduled task or cron job has run successfully. Uses the check-in ID as the ping capability; a project API key is not required.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -23,13 +23,9 @@ export let reportCheckIn = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.projectToken) {
-      throw new Error(
-        'A project API key is required to report check-ins. Configure it in your authentication settings.'
-      );
-    }
     let reportingClient = new HoneybadgerReportingClient({
-      projectToken: ctx.auth.projectToken
+      projectToken: ctx.auth.projectToken,
+      region: ctx.auth.region
     });
     await reportingClient.reportCheckIn(ctx.input.checkInId);
 

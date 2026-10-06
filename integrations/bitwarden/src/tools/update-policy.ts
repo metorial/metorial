@@ -17,12 +17,18 @@ export let updatePolicy = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      policyId: z.string().describe('ID of the policy to update'),
+      policyId: z
+        .string()
+        .describe(
+          'Exact policy ID from list_policies; it is resolved to its native policyType before the update. A decimal policyType from list_policies is also accepted.'
+        ),
       enabled: z.boolean().describe('Whether to enable or disable the policy'),
       configuration: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Policy-specific configuration data')
+        .describe(
+          'Complete policy-specific configuration replacement; omission preserves current configuration.'
+        )
     })
   )
   .output(
@@ -35,8 +41,7 @@ export let updatePolicy = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      serverUrl: ctx.auth.serverUrl
+      ...ctx.auth
     });
 
     let result = await client.updatePolicy(ctx.input.policyId, {
@@ -49,7 +54,7 @@ export let updatePolicy = SlateTool.create(spec, {
         policyId: result.id,
         policyType: result.type,
         enabled: result.enabled,
-        configuration: result.data
+        configuration: result.data ?? null
       },
       message: `Policy **${result.id}** has been **${result.enabled ? 'enabled' : 'disabled'}**.`
     };

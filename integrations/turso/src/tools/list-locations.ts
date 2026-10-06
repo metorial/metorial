@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientForContext } from '../lib/client';
 import { spec } from '../spec';
 
 export let listLocations = SlateTool.create(spec, {
@@ -27,14 +27,13 @@ export let listLocations = SlateTool.create(spec, {
       closestLocation: z
         .string()
         .optional()
-        .describe('The location code closest to the requester')
+        .describe(
+          'The region serving this API request; it reflects the request origin rather than your own device'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    const client = clientForContext(ctx);
 
     let result = await client.listLocations();
     let closestLocation: string | undefined;

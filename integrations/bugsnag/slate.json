@@ -1,17 +1,15 @@
 {
   "name": "@metorial/bugsnag",
-  "description": "Monitor and manage application errors, crashes, and performance data. Access and update error details, statuses, and assignments. Track releases and builds across projects. View error trends, pivots, and stability metrics. Manage feature flags and their error impact. Send and retrieve OpenTelemetry span data for performance monitoring. Configure integrations and webhooks for error notifications. Manage collaborators, teams, and permissions within organizations. Create saved searches for filtered error views. Handle GDPR/CCPA data requests for user data export and deletion. Provision users via SCIM. Report error events and sessions from applications.",
+  "description": "Read and manage Bugsnag errors and projects. Search errors and events, update severity and workflow status, inspect diagnostics, trends, pivots, releases, and stability, and manage collaborators, comments, and saved searches.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "monitor application errors",
-    "track releases and builds",
-    "manage error status assignments",
+    "search errors and events",
+    "manage error status and assignments",
+    "inspect crash diagnostics",
     "view error trends and pivots",
-    "manage feature flags",
-    "monitor performance spans",
-    "manage collaborators and teams",
-    "configure project integrations",
-    "handle GDPR data requests",
+    "manage projects and collaborators",
+    "track releases and stability",
     "create saved error searches"
   ]
 }

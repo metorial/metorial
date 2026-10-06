@@ -1,0 +1,1095 @@
+{
+  "get_token_info": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "User ID associated with the token"
+        },
+        "scope": {
+          "description": "Token scope/permissions",
+          "type": "string"
+        },
+        "rawTokenInfo": {
+          "description": "Full token info response"
+        }
+      },
+      "required": ["userId", "rawTokenInfo"],
+      "additionalProperties": false
+    }
+  },
+  "list_connections": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "connectionId": {
+                "type": "string",
+                "description": "Unique connection identifier"
+              },
+              "name": {
+                "description": "Connection name",
+                "type": "string"
+              },
+              "type": {
+                "description": "Connection type (e.g., http, rest, netsuite, salesforce)",
+                "type": "string"
+              },
+              "lastModified": {
+                "description": "Last modification timestamp",
+                "type": "string"
+              },
+              "offline": {
+                "description": "Whether the connection is offline",
+                "type": "boolean"
+              }
+            },
+            "required": ["connectionId"],
+            "additionalProperties": false
+          },
+          "description": "List of connections"
+        }
+      },
+      "required": ["connections"],
+      "additionalProperties": false
+    }
+  },
+  "get_connection": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "ID of the connection to retrieve"
+        },
+        "testConnection": {
+          "default": false,
+          "description": "If true, also ping the connection to verify it is operational",
+          "type": "boolean"
+        }
+      },
+      "required": ["connectionId", "testConnection"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "Unique connection identifier"
+        },
+        "name": {
+          "description": "Connection name",
+          "type": "string"
+        },
+        "type": {
+          "description": "Connection type",
+          "type": "string"
+        },
+        "lastModified": {
+          "description": "Last modification timestamp",
+          "type": "string"
+        },
+        "offline": {
+          "description": "Whether the connection is offline",
+          "type": "boolean"
+        },
+        "pingResult": {
+          "description": "Result of the connection ping test, if requested"
+        },
+        "rawConnection": {
+          "description": "Full connection object from the API"
+        }
+      },
+      "required": ["connectionId", "rawConnection"],
+      "additionalProperties": false
+    }
+  },
+  "create_connection": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionData": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Connection configuration object. Must include \"name\" and \"type\" at minimum, plus type-specific settings."
+        }
+      },
+      "required": ["connectionData"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "ID of the newly created connection"
+        },
+        "name": {
+          "description": "Name of the created connection",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type of the created connection",
+          "type": "string"
+        },
+        "rawConnection": {
+          "description": "Full connection object returned by the API"
+        }
+      },
+      "required": ["connectionId", "rawConnection"],
+      "additionalProperties": false
+    }
+  },
+  "update_connection": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "ID of the connection to update"
+        },
+        "connectionData": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Updated connection configuration object"
+        }
+      },
+      "required": ["connectionId", "connectionData"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "ID of the updated connection"
+        },
+        "name": {
+          "description": "Name of the updated connection",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type of the updated connection",
+          "type": "string"
+        },
+        "rawConnection": {
+          "description": "Full updated connection object"
+        }
+      },
+      "required": ["connectionId", "rawConnection"],
+      "additionalProperties": false
+    }
+  },
+  "delete_connection": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "description": "ID of the connection to delete"
+        }
+      },
+      "required": ["connectionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the connection was successfully deleted"
+        },
+        "connectionId": {
+          "type": "string",
+          "description": "ID of the deleted connection"
+        }
+      },
+      "required": ["deleted", "connectionId"],
+      "additionalProperties": false
+    }
+  },
+  "list_flows": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "flows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "flowId": {
+                "type": "string",
+                "description": "Unique flow identifier"
+              },
+              "name": {
+                "description": "Flow name",
+                "type": "string"
+              },
+              "disabled": {
+                "description": "Whether the flow is disabled",
+                "type": "boolean"
+              },
+              "integrationId": {
+                "description": "Parent integration ID",
+                "type": "string"
+              },
+              "lastModified": {
+                "description": "Last modification timestamp",
+                "type": "string"
+              },
+              "schedule": {
+                "description": "Cron schedule expression, if scheduled",
+                "type": "string"
+              }
+            },
+            "required": ["flowId"],
+            "additionalProperties": false
+          },
+          "description": "List of flows"
+        }
+      },
+      "required": ["flows"],
+      "additionalProperties": false
+    }
+  },
+  "get_flow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "flowId": {
+          "type": "string",
+          "description": "ID of the flow to retrieve"
+        },
+        "includeDependencies": {
+          "default": false,
+          "description": "If true, also fetch the flow dependencies",
+          "type": "boolean"
+        }
+      },
+      "required": ["flowId", "includeDependencies"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "flowId": {
+          "type": "string",
+          "description": "Unique flow identifier"
+        },
+        "name": {
+          "description": "Flow name",
+          "type": "string"
+        },
+        "disabled": {
+          "description": "Whether the flow is disabled",
+          "type": "boolean"
+        },
+        "integrationId": {
+          "description": "Parent integration ID",
+          "type": "string"
+        },
+        "lastModified": {
+          "description": "Last modification timestamp",
+          "type": "string"
+        },
+        "schedule": {
+          "description": "Cron schedule expression",
+          "type": "string"
+        },
+        "pageGenerators": {
+          "description": "Export components of the flow",
+          "type": "array",
+          "items": {}
+        },
+        "pageProcessors": {
+          "description": "Import/lookup components of the flow",
+          "type": "array",
+          "items": {}
+        },
+        "dependencies": {
+          "description": "Flow dependencies, if requested"
+        },
+        "rawFlow": {
+          "description": "Full flow object from the API"
+        }
+      },
+      "required": ["flowId", "rawFlow"],
+      "additionalProperties": false
+    }
+  },
+  "manage_flow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "update", "enable", "disable", "run", "clone", "delete"],
+          "description": "The operation to perform on the flow"
+        },
+        "flowId": {
+          "description": "ID of the flow (required for all actions except \"create\")",
+          "type": "string"
+        },
+        "flowData": {
+          "description": "Flow configuration data (required for \"create\" and \"update\")",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "flowId": {
+          "description": "ID of the affected flow",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the flow",
+          "type": "string"
+        },
+        "disabled": {
+          "description": "Whether the flow is disabled",
+          "type": "boolean"
+        },
+        "deleted": {
+          "description": "Whether the flow was deleted",
+          "type": "boolean"
+        },
+        "rawResult": {
+          "description": "Full API response"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_exports": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "exports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "exportId": {
+                "type": "string",
+                "description": "Unique export identifier"
+              },
+              "name": {
+                "description": "Export name",
+                "type": "string"
+              },
+              "type": {
+                "description": "Export type (e.g., webhook, test, delta)",
+                "type": "string"
+              },
+              "lastModified": {
+                "description": "Last modification timestamp",
+                "type": "string"
+              },
+              "connectionId": {
+                "description": "Associated connection ID",
+                "type": "string"
+              }
+            },
+            "required": ["exportId"],
+            "additionalProperties": false
+          },
+          "description": "List of exports"
+        }
+      },
+      "required": ["exports"],
+      "additionalProperties": false
+    }
+  },
+  "manage_export": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["get", "create", "update", "clone", "delete"],
+          "description": "The operation to perform"
+        },
+        "exportId": {
+          "description": "ID of the export (required for get, update, clone, delete)",
+          "type": "string"
+        },
+        "exportData": {
+          "description": "Export configuration data (required for create and update)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "exportId": {
+          "description": "ID of the affected export",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the export",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type of the export",
+          "type": "string"
+        },
+        "deleted": {
+          "description": "Whether the export was deleted",
+          "type": "boolean"
+        },
+        "rawResult": {
+          "description": "Full API response"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_imports": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "imports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "importId": {
+                "type": "string",
+                "description": "Unique import identifier"
+              },
+              "name": {
+                "description": "Import name",
+                "type": "string"
+              },
+              "lastModified": {
+                "description": "Last modification timestamp",
+                "type": "string"
+              },
+              "connectionId": {
+                "description": "Associated connection ID",
+                "type": "string"
+              }
+            },
+            "required": ["importId"],
+            "additionalProperties": false
+          },
+          "description": "List of imports"
+        }
+      },
+      "required": ["imports"],
+      "additionalProperties": false
+    }
+  },
+  "manage_import": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["get", "create", "update", "clone", "delete"],
+          "description": "The operation to perform"
+        },
+        "importId": {
+          "description": "ID of the import (required for get, update, clone, delete)",
+          "type": "string"
+        },
+        "importData": {
+          "description": "Import configuration data (required for create and update)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "importId": {
+          "description": "ID of the affected import",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the import",
+          "type": "string"
+        },
+        "deleted": {
+          "description": "Whether the import was deleted",
+          "type": "boolean"
+        },
+        "rawResult": {
+          "description": "Full API response"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "list_integrations": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "integrations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "integrationId": {
+                "type": "string",
+                "description": "Unique integration identifier"
+              },
+              "name": {
+                "description": "Integration name",
+                "type": "string"
+              },
+              "lastModified": {
+                "description": "Last modification timestamp",
+                "type": "string"
+              },
+              "readme": {
+                "description": "Integration description/readme",
+                "type": "string"
+              }
+            },
+            "required": ["integrationId"],
+            "additionalProperties": false
+          },
+          "description": "List of integrations"
+        }
+      },
+      "required": ["integrations"],
+      "additionalProperties": false
+    }
+  },
+  "manage_integration": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["get", "create", "update", "clone", "delete"],
+          "description": "The operation to perform"
+        },
+        "integrationId": {
+          "description": "ID of the integration (required for get, update, clone, delete)",
+          "type": "string"
+        },
+        "integrationData": {
+          "description": "Integration configuration data (required for create and update)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "integrationId": {
+          "description": "ID of the affected integration",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name of the integration",
+          "type": "string"
+        },
+        "deleted": {
+          "description": "Whether the integration was deleted",
+          "type": "boolean"
+        },
+        "rawResult": {
+          "description": "Full API response"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_flow_errors": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "flowId": {
+          "type": "string",
+          "description": "ID of the flow"
+        },
+        "processorId": {
+          "type": "string",
+          "description": "ID of the export or import step within the flow"
+        },
+        "occurredAtFrom": {
+          "description": "Filter errors occurring on or after this time (ISO 8601 UTC)",
+          "type": "string"
+        },
+        "occurredAtTo": {
+          "description": "Filter errors occurring on or before this time (ISO 8601 UTC)",
+          "type": "string"
+        }
+      },
+      "required": ["flowId", "processorId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "errors": {
+          "type": "array",
+          "items": {},
+          "description": "List of error objects"
+        },
+        "retryData": {
+          "description": "Retry data dictionary keyed by retryDataKey"
+        },
+        "nextPageUrl": {
+          "description": "URL for the next page of results, if more errors exist",
+          "type": "string"
+        }
+      },
+      "required": ["errors"],
+      "additionalProperties": false
+    }
+  },
+  "resolve_errors": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "flowId": {
+          "type": "string",
+          "description": "ID of the flow"
+        },
+        "processorId": {
+          "type": "string",
+          "description": "ID of the export or import step"
+        },
+        "errorIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of error IDs to resolve"
+        }
+      },
+      "required": ["flowId", "processorId", "errorIds"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "resolved": {
+          "type": "boolean",
+          "description": "Whether the errors were successfully resolved"
+        },
+        "rawResult": {
+          "description": "API response"
+        }
+      },
+      "required": ["resolved"],
+      "additionalProperties": false
+    }
+  },
+  "retry_errors": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "flowId": {
+          "type": "string",
+          "description": "ID of the flow"
+        },
+        "processorId": {
+          "type": "string",
+          "description": "ID of the export or import step"
+        },
+        "retryDataKeys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of retryDataKey values from the error objects to retry"
+        }
+      },
+      "required": ["flowId", "processorId", "retryDataKeys"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "retried": {
+          "type": "boolean",
+          "description": "Whether the retry was successfully initiated"
+        },
+        "rawResult": {
+          "description": "API response"
+        }
+      },
+      "required": ["retried"],
+      "additionalProperties": false
+    }
+  },
+  "list_jobs": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "flowId": {
+          "description": "Filter jobs by flow ID",
+          "type": "string"
+        },
+        "integrationId": {
+          "description": "Filter jobs by integration ID",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter by job status (e.g., running, completed, failed, cancelled)",
+          "type": "string"
+        },
+        "createdAtFrom": {
+          "description": "Filter jobs created on or after this time (ISO 8601 UTC)",
+          "type": "string"
+        },
+        "createdAtTo": {
+          "description": "Filter jobs created on or before this time (ISO 8601 UTC)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "jobId": {
+                "type": "string",
+                "description": "Unique job identifier"
+              },
+              "type": {
+                "description": "Job type",
+                "type": "string"
+              },
+              "status": {
+                "description": "Job status",
+                "type": "string"
+              },
+              "numSuccess": {
+                "description": "Number of successful records",
+                "type": "number"
+              },
+              "numError": {
+                "description": "Number of errored records",
+                "type": "number"
+              },
+              "numIgnore": {
+                "description": "Number of ignored records",
+                "type": "number"
+              },
+              "startedAt": {
+                "description": "Job start time",
+                "type": "string"
+              },
+              "endedAt": {
+                "description": "Job end time",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "Job creation time",
+                "type": "string"
+              },
+              "flowId": {
+                "description": "Associated flow ID",
+                "type": "string"
+              },
+              "flowJobId": {
+                "description": "Parent flow job ID",
+                "type": "string"
+              }
+            },
+            "required": ["jobId"],
+            "additionalProperties": false
+          },
+          "description": "List of jobs"
+        }
+      },
+      "required": ["jobs"],
+      "additionalProperties": false
+    }
+  },
+  "get_job": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "ID of the job to retrieve"
+        },
+        "includeErrors": {
+          "default": false,
+          "description": "If true, also fetch errors for this job (up to 1,000)",
+          "type": "boolean"
+        }
+      },
+      "required": ["jobId", "includeErrors"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "description": "Unique job identifier"
+        },
+        "type": {
+          "description": "Job type",
+          "type": "string"
+        },
+        "status": {
+          "description": "Job status",
+          "type": "string"
+        },
+        "numSuccess": {
+          "description": "Number of successful records",
+          "type": "number"
+        },
+        "numError": {
+          "description": "Number of errored records",
+          "type": "number"
+        },
+        "numIgnore": {
+          "description": "Number of ignored records",
+          "type": "number"
+        },
+        "startedAt": {
+          "description": "Job start time",
+          "type": "string"
+        },
+        "endedAt": {
+          "description": "Job end time",
+          "type": "string"
+        },
+        "jobErrors": {
+          "description": "Job errors, if requested",
+          "type": "array",
+          "items": {}
+        },
+        "rawJob": {
+          "description": "Full job object from the API"
+        }
+      },
+      "required": ["jobId", "rawJob"],
+      "additionalProperties": false
+    }
+  },
+  "manage_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "get", "invite", "update", "delete"],
+          "description": "The operation to perform"
+        },
+        "userId": {
+          "description": "ID of the user (required for get, update, delete)",
+          "type": "string"
+        },
+        "userData": {
+          "description": "User data (required for invite and update). For invite, include \"email\" and role/permission fields.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "description": "List of users (for list action)",
+          "type": "array",
+          "items": {}
+        },
+        "userId": {
+          "description": "ID of the affected user",
+          "type": "string"
+        },
+        "deleted": {
+          "description": "Whether the user was deleted",
+          "type": "boolean"
+        },
+        "rawResult": {
+          "description": "Full API response"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_state": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list_keys", "get", "set", "delete"],
+          "description": "The operation to perform"
+        },
+        "key": {
+          "description": "State key (required for get, set, delete)",
+          "type": "string"
+        },
+        "stateValue": {
+          "description": "JSON data to store (required for set)",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "resourceType": {
+          "description": "Resource type for resource-specific state (e.g., \"flows\", \"exports\", \"imports\"). Omit for global state.",
+          "type": "string"
+        },
+        "resourceId": {
+          "description": "Resource ID for resource-specific state. Omit for global state.",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "keys": {
+          "description": "List of state keys (for list_keys action)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "stateValue": {
+          "description": "The state value (for get action)"
+        },
+        "updated": {
+          "description": "Whether the state was updated (for set action)",
+          "type": "boolean"
+        },
+        "deleted": {
+          "description": "Whether the state was deleted (for delete action)",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

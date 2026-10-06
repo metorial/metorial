@@ -1,18 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapExpense } from '../lib/schemas';
+import { exact, fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let updateExpense = SlateTool.create(spec, {
   name: 'Update Expense',
   key: 'update_expense',
-  description: `Update a card expense in Brex. Modify the memo, category, or other editable fields on an expense. Can also be used to retrieve a specific expense by ID when no update fields are provided.`
+  description: `Update a card expense in Brex. Modify the memo on a card expense. The retained category input is unsupported by the current update API and is rejected. Can also be used to retrieve a specific expense by ID when no update fields are provided.`
 })
   .input(
     z.object({
       expenseId: z.string().describe('ID of the expense to update or retrieve'),
-      memo: z.string().optional().describe('Memo or note to attach to the expense'),
-      category: z.string().optional().describe('Expense category to assign')
+      memo: z.string().nullable().optional().describe('Memo or note to attach to the expense'),
+      category: z
+        .string()
+        .optional()
+        .describe(
+          'Retained legacy field; current expense updates support memo only. Rejected before a request.'
+        )
+        .meta({ deprecated: true })
     })
   )
   .output(
@@ -20,7 +28,8 @@ export let updateExpense = SlateTool.create(spec, {
       expenseId: z.string().describe('ID of the expense'),
       memo: z.string().nullable().optional().describe('Updated memo'),
       category: z.string().nullable().optional().describe('Updated category'),
-      status: z.string().optional().describe('Payment status'),
+      status: z.string().nullish().describe('Expense status'),
+      paymentStatus: z.string().nullish().describe('Separate payment status'),
       amount: z
         .object({
           amount: z.number().describe('Amount in cents'),
@@ -32,35 +41,19 @@ export let updateExpense = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let expense: any;
-
-    let hasUpdates = ctx.input.memo !== undefined || ctx.input.category !== undefined;
-
-    if (hasUpdates) {
-      let updateData: Record<string, any> = {};
-      if (ctx.input.memo !== undefined) updateData.memo = ctx.input.memo;
-      if (ctx.input.category !== undefined) updateData.category = ctx.input.category;
-
-      expense = await client.updateCardExpense(ctx.input.expenseId, updateData);
-    } else {
-      expense = await client.getCardExpense(ctx.input.expenseId);
-    }
-
+    if (ctx.input.category !== undefined)
+      fail(
+        'category updates are not supported by the current Brex expense update API. Omit category; memo remains editable.'
+      );
+    const client = new Client({ token: ctx.auth.token });
+    const expense =
+      ctx.input.memo !== undefined
+        ? await client.updateCardExpense(ctx.input.expenseId, { memo: ctx.input.memo })
+        : await client.getCardExpense(ctx.input.expenseId);
+    exact(expense.id, ctx.input.expenseId);
     return {
-      output: {
-        expenseId: expense.id,
-        memo: expense.memo,
-        category: expense.category,
-        status: expense.status ?? expense.payment_status,
-        amount: expense.amount
-          ? { amount: expense.amount.amount, currency: expense.amount.currency }
-          : undefined,
-        updatedAt: expense.updated_at
-      },
-      message: hasUpdates
-        ? `Expense **${expense.id}** updated successfully.`
-        : `Retrieved expense **${expense.id}**.`
+      output: mapExpense(expense),
+      message: ctx.input.memo !== undefined ? 'Expense memo updated.' : 'Expense retrieved.'
     };
   })
   .build();

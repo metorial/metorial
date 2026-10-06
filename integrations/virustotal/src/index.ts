@@ -5,6 +5,7 @@ import {
   addVote,
   getAnalysisStatus,
   getComments,
+  getConnectionContext,
   getDomainReport,
   getFileReport,
   getIpReport,
@@ -16,14 +17,13 @@ import {
   scanUrl,
   searchIntelligence
 } from './tools';
-import { inboundWebhook, iocStream } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     scanFile,
     scanUrl,
     getFileReport,
+    getConnectionContext,
     getUrlReport,
     getDomainReport,
     getIpReport,
@@ -36,5 +36,5 @@ export let provider = Slate.create({
     manageLivehuntRuleset,
     manageRetrohunt
   ],
-  triggers: [inboundWebhook, iocStream]
+  triggers: []
 });

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageLeadLists = SlateTool.create(spec, {
@@ -73,14 +73,14 @@ export let manageLeadLists = SlateTool.create(spec, {
       let lists = result.items.map((l: any) => ({
         listId: l.id,
         name: l.name,
-        hasEnrichmentTask: l.has_enrichment_task,
+        hasEnrichmentTask: l.has_enrichment_task ?? undefined,
         timestampCreated: l.timestamp_created
       }));
 
       return {
         output: {
           lists,
-          nextStartingAfter: result.next_starting_after,
+          nextStartingAfter: result.next_starting_after ?? null,
           success: true
         },
         message: `Found **${lists.length}** lead list(s).`
@@ -111,9 +111,6 @@ export let manageLeadLists = SlateTool.create(spec, {
       };
     }
 
-    return {
-      output: { success: false },
-      message: 'Missing required parameters for the specified action.'
-    };
+    throw invalid('Provide the required fields for the selected action.');
   })
   .build();

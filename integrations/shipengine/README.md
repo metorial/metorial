@@ -1,6 +1,8 @@
-# <img src="logo.svg" height="20"> Shipengine
+# <img src="logo.png" height="20"> ShipEngine
 
-Create shipping labels, compare carrier rates, validate addresses, and track packages across multiple carriers including FedEx, UPS, USPS, and DHL. Manage shipments with customs documentation, insurance, and multi-package support. Parse addresses from unstructured text. Schedule carrier pickups, create manifests, and handle LTL freight quotes and bills of lading. Connect and manage carrier accounts, organize warehouses, import sales orders from marketplaces, and find carrier pick-up/drop-off service points. Subscribe to real-time tracking updates and batch completion events via webhooks.
+Validate addresses, compare carrier rates, purchase and void shipping labels, track packages, manage shipments and warehouses, discover carrier services, find service points, schedule pickups, create manifests, and download existing shipping documents.
+
+ShipEngine is now ShipStation API; existing API hosts remain supported. Production label purchases and pickups can incur charges. Cancellation and void operations retain provider history, and refund completion follows carrier policy.
 
 ## License
 

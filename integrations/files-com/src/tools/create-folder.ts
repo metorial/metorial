@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { FilesComClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { text } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let createFolder = SlateTool.create(spec, {
@@ -32,10 +33,7 @@ export let createFolder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FilesComClient({
-      token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
-    });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.createFolder(ctx.input.path, {
       mkdirParents: ctx.input.mkdirParents
@@ -43,11 +41,11 @@ export let createFolder = SlateTool.create(spec, {
 
     return {
       output: {
-        path: String(result.path ?? ctx.input.path),
-        displayName: String(result.display_name ?? ctx.input.path.split('/').pop() ?? ''),
+        path: text(result.path),
+        displayName: text(result.display_name),
         type: 'directory'
       },
-      message: `Created folder \`${result.path ?? ctx.input.path}\``
+      message: `Created folder \`${result.path}\``
     };
   })
   .build();

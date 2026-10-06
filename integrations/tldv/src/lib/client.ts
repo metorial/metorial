@@ -1,4 +1,12 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  pickDefined,
+  requestAxios,
+  requestAxiosData
+} from 'slates';
 
 let BASE_URL = 'https://pasta.tldv.io/v1alpha1';
 
@@ -22,11 +30,6 @@ export interface Invitee {
   email: string;
 }
 
-export interface NoteTemplate {
-  id: string;
-  name: string;
-}
-
 export interface Meeting {
   id: string;
   name: string;
@@ -35,14 +38,18 @@ export interface Meeting {
   duration: number;
   organizer: Organizer;
   invitees: Invitee[];
-  template?: NoteTemplate;
-  conferenceId?: string;
+  template?: string;
+  extraProperties?: { conferenceId?: string };
+  phoneNumber?: string | null;
+  metadata?: Record<string, string | number | boolean> | null;
 }
 
 export interface ListMeetingsResponse {
   results: Meeting[];
-  hasMore: boolean;
-  total?: number;
+  page: number;
+  pages: number;
+  total: number;
+  pageSize: number;
 }
 
 export interface TranscriptSegment {
@@ -77,73 +84,161 @@ export interface HighlightsResponse {
 
 export interface DownloadResponse {
   url: string;
+  expiresAt: string;
 }
 
 export interface ImportMeetingParams {
+  name: string;
   url: string;
+  happenedAt?: string;
+  dryRun?: boolean;
+  participants?: string[];
+  phoneNumber?: string;
+  metadata?: Record<string, string | number | boolean>;
+}
+
+export interface ImportMeetingResponse {
+  success: boolean;
+  jobId?: string;
+  message: string;
+}
+
+export interface NotesResponse {
+  structuredNotes: {
+    segmentId: string;
+    timestamp: number;
+    text: string;
+    topicId: string;
+  }[];
+  markdownContent: string;
+  topics: { id: string; order: number; title: string; summary: string }[];
 }
 
 export class TldvClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+
+  private mapError = (error: unknown, operation: string) =>
+    buildApiServiceError(error, {
+      parent: {},
+      providerLabel: 'tl;dv',
+      reason: 'tldv_api_error',
+      operation
+    });
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        'x-api-key': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'x-api-key', value: config.token },
+      timeout: 30_000
     });
   }
 
   async listMeetings(params?: ListMeetingsParams): Promise<ListMeetingsResponse> {
-    let queryParams: Record<string, string | number | boolean> = {};
-
-    if (params?.query) queryParams.query = params.query;
-    if (params?.happenedAfter) queryParams.happenedAfter = params.happenedAfter;
-    if (params?.happenedBefore) queryParams.happenedBefore = params.happenedBefore;
-    if (params?.participated !== undefined) queryParams.participated = params.participated;
-    if (params?.meetingType) queryParams.meetingType = params.meetingType;
-    if (params?.page !== undefined) queryParams.page = params.page;
-    if (params?.limit !== undefined) queryParams.limit = params.limit;
-
-    let response = await this.axios.get('/meetings', { params: queryParams });
-    return response.data;
+    for (let [field, value] of [
+      ['happenedAfter', params?.happenedAfter],
+      ['happenedBefore', params?.happenedBefore]
+    ]) {
+      if (value !== undefined && !Number.isFinite(Date.parse(value))) {
+        throw createApiServiceError(`${field} must be a valid ISO 8601 date or timestamp.`);
+      }
+    }
+    if (
+      params?.happenedAfter &&
+      params.happenedBefore &&
+      Date.parse(params.happenedAfter) > Date.parse(params.happenedBefore)
+    ) {
+      throw createApiServiceError('happenedAfter must be on or before happenedBefore.');
+    }
+    return requestAxiosData<ListMeetingsResponse>(
+      'list meetings',
+      () =>
+        this.axios.get('/meetings', {
+          params: pickDefined({
+            query: params?.query,
+            from: params?.happenedAfter,
+            to: params?.happenedBefore,
+            onlyParticipated: params?.participated,
+            meetingType: params?.meetingType,
+            page: params?.page === 0 ? 1 : params?.page,
+            limit: params?.limit
+          })
+        }),
+      this.mapError
+    );
   }
 
   async getMeeting(meetingId: string): Promise<Meeting> {
-    let response = await this.axios.get(`/meetings/${meetingId}`);
-    return response.data;
+    return requestAxiosData<Meeting>(
+      'get meeting',
+      () => this.axios.get(`/meetings/${encodeURIComponent(meetingId)}`),
+      this.mapError
+    );
   }
 
   async getTranscript(meetingId: string): Promise<Transcript> {
-    let response = await this.axios.get(`/meetings/${meetingId}/transcript`);
-    return response.data;
+    return requestAxiosData<Transcript>(
+      'get transcript',
+      () => this.axios.get(`/meetings/${encodeURIComponent(meetingId)}/transcript`),
+      this.mapError
+    );
   }
 
   async getHighlights(meetingId: string): Promise<HighlightsResponse> {
-    let response = await this.axios.get(`/meetings/${meetingId}/highlights`);
-    return response.data;
+    return requestAxiosData<HighlightsResponse>(
+      'get highlights',
+      () => this.axios.get(`/meetings/${encodeURIComponent(meetingId)}/highlights`),
+      this.mapError
+    );
+  }
+
+  async getNotes(meetingId: string): Promise<NotesResponse> {
+    return requestAxiosData<NotesResponse>(
+      'get notes',
+      () => this.axios.get(`/meetings/${encodeURIComponent(meetingId)}/notes`),
+      this.mapError
+    );
   }
 
   async getDownloadUrl(meetingId: string): Promise<DownloadResponse> {
-    let response = await this.axios.get(`/meetings/${meetingId}/download`, {
-      maxRedirects: 0,
-      validateStatus: (status: number) => status >= 200 && status < 400
-    });
-
-    if (response.status === 302 || response.status === 301) {
-      let location = response.headers.location as string;
-      return { url: location };
+    let requestedAt = Date.now();
+    let response = await requestAxios(
+      'download recording',
+      () =>
+        this.axios.get(`/meetings/${encodeURIComponent(meetingId)}/download`, {
+          maxRedirects: 0,
+          validateStatus: (status: number) => status === 302
+        }),
+      this.mapError
+    );
+    let location = getResponseHeaderValue(response.headers, 'location');
+    if (!location || !/^https:\/\//i.test(location)) {
+      throw createApiServiceError('tl;dv did not return a secure recording download URL.');
     }
-
-    return response.data;
+    // Renew shortly before the documented six-hour lifetime ends.
+    return { url: location, expiresAt: new Date(requestedAt + 355 * 60_000).toISOString() };
   }
 
-  async importMeeting(params: ImportMeetingParams): Promise<Meeting> {
-    let response = await this.axios.post('/meetings/import', {
-      url: params.url
-    });
-    return response.data;
+  async importMeeting(params: ImportMeetingParams): Promise<ImportMeetingResponse> {
+    if (params.metadata && Object.keys(params.metadata).length > 20) {
+      throw createApiServiceError('metadata supports at most 20 keys.');
+    }
+    let happenedAt: string | undefined;
+    if (params.happenedAt !== undefined) {
+      if (!Number.isFinite(Date.parse(params.happenedAt))) {
+        throw createApiServiceError('happenedAt must be a valid ISO 8601 timestamp.');
+      }
+      happenedAt = new Date(params.happenedAt).toISOString();
+    }
+    let result = await requestAxiosData<ImportMeetingResponse>(
+      'import meeting',
+      () => this.axios.post('/meetings/import', pickDefined({ ...params, happenedAt })),
+      this.mapError
+    );
+    if (result.success !== true) {
+      throw createApiServiceError(
+        `tl;dv did not accept the import: ${result.message || 'unknown reason'}`
+      );
+    }
+    return result;
   }
 }

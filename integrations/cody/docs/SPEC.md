@@ -1,53 +1,27 @@
-I see there are two different products called "Cody" — Sourcegraph's Cody (AI coding assistant for IDEs) and Cody AI from meetcody.ai (business AI assistant). The Sourcegraph Cody explicitly states it has no public API. The meetcody.ai Cody has an API. Let me research the meetcody.ai Cody API more thoroughly.Now let me get the details on the remaining endpoints.Now I have enough information to write the specification.
+# Cody Integration Specification
 
-# Slates Specification for Cody
-
-## Overview
-
-Cody (meetcody.ai) is an AI assistant platform that allows businesses to create custom AI bots trained on their own knowledge base. Users can upload documents, organize them in folders, and interact with AI bots through conversations that generate responses based on the uploaded knowledge. The API is available at `https://getcody.ai/api/v1`.
+Cody is the business assistant at [meetcody.ai](https://meetcody.ai), using the [Cody AI API](https://developers.meetcody.ai/) at `https://getcody.ai/api/v1`.
 
 ## Authentication
 
-Cody uses API key authentication. API keys can be generated from the API Keys page in the Cody dashboard. The key must be passed as a Bearer token in the `Authorization` header of each request:
+Use a secret API key from [the dashboard API Keys page](https://getcody.ai/settings/api) as a Bearer token. Keys do not have an OAuth refresh flow. [Paid Cody Assist plans include API access](https://meetcody.ai/pricing/).
 
-```
-Authorization: Bearer <API_KEY>
-```
+## API capabilities
 
-API keys are secret and should not be exposed in client-side code. Requests should be proxied through a backend server.
+| Capability | Tools | Provider contract |
+| --- | --- | --- |
+| Bot discovery | `list_bots` | List and filter configured bots. Bot creation and configuration happen in the dashboard. |
+| Folders | `list_folders`, `get_folder`, `create_folder`, `update_folder` | Read, create, and rename folders. No documented delete/archive endpoint. |
+| Documents | `list_documents`, `get_document`, `create_document_from_content`, `create_document_from_webpage`, `get_upload_url`, `create_document_from_file`, `delete_document`, `download_document` | Filter by folder, conversation, or name. Text/HTML content is limited to 768 KB. File upload uses a signed PUT URL then an import request; conversion may take up to one hour and returns acceptance without a document ID. Maximum file size is 100 MB. Document HTML is delivered from the provider content URL. |
+| Conversations | `list_conversations`, `get_conversation`, `create_conversation`, `update_conversation`, `delete_conversation` | Creation and update require name and bot ID. Focus mode accepts up to 1,000 document IDs accessible to that bot. Optional `includeDocumentIds` returns the focus IDs on reads. |
+| Messages | `list_messages`, `get_message`, `send_message`, `send_message_stream` | Messages are limited to 2,000 characters. Optional sources and token/credit usage are available on reads. Streaming returns an SSE URL with `redirect: false`; streams end with `[END]`. |
 
-## Features
+The official reference includes pagination metadata but omits a `page` query parameter in its OpenAPI schema. Existing page inputs are preserved for compatibility; live verification of later pages remains necessary.
 
-### Bot Management
+The signed-upload reference shows direct `url`/`key` fields, while its official JavaScript example uses a `data` envelope. Both documented response shapes are accepted.
 
-Retrieve a list of all AI bots configured in your account. Bots are the AI assistants that have been set up with access to specific knowledge base folders and customized behavior.
+The public API does not document an account/self endpoint, bot mutations, folder deletion, document updates, or events. No speculative tools or event handlers are exposed.
 
-### Knowledge Base (Documents & Folders)
+## Live verification
 
-Manage the knowledge base that powers your AI bots. Documents can be created in three ways:
-
-- **From text/HTML content**: Directly provide text or HTML (up to 768 KB). Structured HTML with headings and paragraphs yields the best results.
-- **From file upload**: Upload files (e.g., PDFs) via a two-step process — first obtain a signed S3 upload URL, then upload the file and reference the returned key.
-- **From webpage URL**: Provide a publicly accessible URL and Cody will crawl and ingest its content.
-
-Documents are organized into folders. Folders can be created, listed, retrieved, and updated. Documents have a sync status (`syncing`, `synced`, or `sync_failed`) indicating whether they have been processed into the knowledge base.
-
-### Conversations
-
-Create and manage conversations with AI bots. A conversation is tied to a specific bot and maintains message history. Conversations can be created, listed, retrieved, updated, and deleted.
-
-- **Focus Mode**: When creating or updating a conversation, you can specify a list of document IDs (up to 1,000) to restrict the bot's knowledge to only those documents, rather than its entire knowledge base. Useful for tasks like summarization, review, or rephrasing of specific content.
-
-### Messaging
-
-Send messages within a conversation and receive AI-generated responses based on the bot's knowledge base.
-
-- Message content can be up to 2,000 characters.
-- **Standard messaging**: Send a message and receive the full AI response in a single response.
-- **Streaming**: Send a message and receive the AI response as a Server-Sent Events (SSE) stream, enabling real-time progressive rendering. The stream can be received via redirect or as a URL in the response body.
-- Message history for a conversation can be listed and individual messages can be retrieved.
-- A subscription plan's 30-day message limit applies; requests return an error when the limit is reached.
-
-## Events
-
-The provider does not support events.
+The live suite performs safe discovery, owns conversations and documents, and verifies readback, deletion, response sources/usage, SSE content, and actual HTML download bytes. A dedicated folder must be provisioned in the dashboard for document and folder rename scenarios. An optional focusBotId must identify a bot configured to access that folder for focused conversation creation, document filtering, focus updates, and clearing verification. Folder creation and asynchronous file import scenarios are gated because the public API cannot guarantee their cleanup. Webpage ingestion requires a configured public test webpage and account support.

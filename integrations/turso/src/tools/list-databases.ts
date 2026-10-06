@@ -1,17 +1,34 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientForContext } from '../lib/client';
 import { spec } from '../spec';
 
 export let listDatabases = SlateTool.create(spec, {
   name: 'List Databases',
   key: 'list_databases',
-  description: `List all databases in the organization. Returns database names, hostnames, regions, group assignments, and status information.`,
+  description: `Choose an organization with list_organizations. List all databases in the organization. Returns database names, hostnames, regions, group assignments, and status information.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      groupName: z
+        .string()
+        .optional()
+        .describe('Filter by a group name; discover it with list_groups.'),
+      parentDatabaseId: z
+        .string()
+        .optional()
+        .describe('Filter branches by their parent database ID.'),
+      organizationSlug: z
+        .string()
+        .optional()
+        .describe(
+          'Organization slug. Call list_organizations to discover authorized organizations; older connections may use their saved organization.'
+        )
+    })
+  )
   .output(
     z.object({
       databases: z.array(
@@ -19,28 +36,37 @@ export let listDatabases = SlateTool.create(spec, {
           databaseName: z.string().describe('Name of the database'),
           databaseId: z.string().describe('Unique identifier of the database'),
           hostname: z.string().describe('Hostname for connecting to the database'),
-          regions: z.array(z.string()).describe('Regions where the database is replicated'),
-          primaryRegion: z.string().describe('Primary region of the database'),
-          group: z.string().describe('Group the database belongs to'),
-          type: z.string().describe('Type of the database'),
-          isSchema: z.boolean().describe('Whether the database is a schema database'),
+          regions: z
+            .array(z.string())
+            .optional()
+            .describe('Regions where the database is replicated'),
+          primaryRegion: z.string().optional().describe('Primary region of the database'),
+          group: z.string().optional().describe('Group the database belongs to'),
+          type: z.string().optional().describe('Type of the database'),
+          isSchema: z
+            .boolean()
+            .optional()
+            .describe('Whether the database is a schema database'),
           schema: z.string().optional().describe('Parent schema database name, if applicable'),
-          sleeping: z.boolean().describe('Whether the database is currently sleeping'),
-          blockReads: z.boolean().describe('Whether reads are blocked'),
-          blockWrites: z.boolean().describe('Whether writes are blocked'),
-          allowAttach: z.boolean().describe('Whether ATTACH is allowed'),
-          version: z.string().describe('Database version')
+          sleeping: z
+            .boolean()
+            .optional()
+            .describe('Whether the database is currently sleeping'),
+          blockReads: z.boolean().optional().describe('Whether reads are blocked'),
+          blockWrites: z.boolean().optional().describe('Whether writes are blocked'),
+          allowAttach: z.boolean().optional().describe('Whether ATTACH is allowed'),
+          version: z.string().optional().describe('Database version')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    const client = clientForContext(ctx);
 
-    let result = await client.listDatabases();
+    let result = await client.listDatabases({
+      group: ctx.input.groupName,
+      parent: ctx.input.parentDatabaseId
+    });
 
     let databases = result.databases.map(db => ({
       databaseName: db.Name,

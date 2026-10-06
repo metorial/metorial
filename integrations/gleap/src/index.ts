@@ -21,8 +21,6 @@ import {
   updateSession,
   updateTicket
 } from './tools';
-import { feedbackWebhook, ticketUpdated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     manageTeam,
     manageAiContent
   ],
-  triggers: [feedbackWebhook, ticketUpdated]
+  triggers: []
 });

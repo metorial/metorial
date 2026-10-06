@@ -1,18 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { RedditAdsClient } from '../lib/client';
+import { createClient } from '../lib/client';
+import { accountInput, pagingInput, pagingOutput, resourceOutput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listCampaigns = SlateTool.create(spec, {
   name: 'List Campaigns',
   key: 'list_campaigns',
-  description: `Retrieve all advertising campaigns for the configured Reddit Ads account. Returns campaign details including name, objective, status, budget, and scheduling information.`,
+  description:
+    'Retrieve one page of campaigns for a selected ad account. Returns current configured state, relationships and provider values. Follow nextUrl to continue; a campaign status filter applies only to the returned page.',
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      accountId: accountInput,
+      ...pagingInput,
       status: z
         .enum(['ACTIVE', 'PAUSED', 'COMPLETED', 'DRAFT'])
         .optional()
@@ -21,6 +25,7 @@ export let listCampaigns = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...pagingOutput,
       campaigns: z.array(
         z.object({
           campaignId: z.string().optional(),
@@ -38,31 +43,14 @@ export let listCampaigns = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RedditAdsClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
-    });
-
-    let campaigns = await client.listCampaigns({
-      status: ctx.input.status
-    });
-
-    let mapped = (Array.isArray(campaigns) ? campaigns : []).map((c: any) => ({
-      campaignId: c.id || c.campaign_id,
-      name: c.name,
-      objective: c.objective,
-      status: c.status || c.effective_status,
-      budgetCents: c.budget_cents || c.budget,
-      budgetType: c.budget_type,
-      startDate: c.start_date,
-      endDate: c.end_date,
-      isProcessing: c.is_processing,
-      raw: c
-    }));
-
+    const page = await createClient(ctx).list('campaign', ctx.input);
     return {
-      output: { campaigns: mapped },
-      message: `Found **${mapped.length}** campaign(s).`
+      output: {
+        campaigns: page.items.map(value => resourceOutput('campaign', value)),
+        nextUrl: page.nextUrl,
+        hasMore: page.hasMore
+      },
+      message: `Retrieved ${page.items.length} campaigns in this page${page.hasMore ? '; more pages are available' : ''}.`
     };
   })
   .build();

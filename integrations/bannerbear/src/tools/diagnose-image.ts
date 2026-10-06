@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { stateMessage } from '../lib/contracts';
+import { diagnosisOutput } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let diagnoseImage = SlateTool.create(spec, {
@@ -14,6 +17,7 @@ export let diagnoseImage = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       imageUid: z.string().describe('UID of the generated image to diagnose')
     })
   )
@@ -37,34 +41,12 @@ export let diagnoseImage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.createDiagnosis(ctx.input.imageUid);
-
-    // If the diagnosis is pending, try to fetch it
-    let diagnosis = result;
-    if (result.status === 'pending' && result.uid) {
-      try {
-        diagnosis = await client.getDiagnosis(result.uid);
-      } catch {
-        // Still pending, return initial result
-      }
-    }
-
-    let report =
-      diagnosis.report?.external_images?.map((item: any) => ({
-        url: item.url,
-        result: item.result,
-        comment: item.comment
-      })) || null;
-
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const result = await client.createDiagnosis(ctx.input.imageUid);
+    const output = diagnosisOutput(result);
     return {
-      output: {
-        diagnosisUid: diagnosis.uid,
-        status: diagnosis.status,
-        report
-      },
-      message: `Diagnosis ${diagnosis.status === 'completed' ? 'completed' : 'initiated'} for image ${ctx.input.imageUid}. ${report ? `Found ${report.length} external image(s) checked.` : 'Report is still processing.'}`
+      output,
+      message: `Image diagnosis ${stateMessage(result.status)} (UID: ${output.diagnosisUid}). Read the final report with get_resource.`
     };
   })
   .build();

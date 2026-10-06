@@ -6,8 +6,9 @@ import { spec } from '../spec';
 export let deleteAlertContact = SlateTool.create(spec, {
   name: 'Delete Alert Contact',
   key: 'delete_alert_contact',
-  description: `Permanently delete an alert contact. The contact will no longer receive notifications for any monitors it was assigned to.`,
+  description: `Use a Legacy API Key connection (API v2). Permanently delete an alert contact. The contact will no longer receive notifications for any monitors it was assigned to.`,
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
@@ -22,7 +23,7 @@ export let deleteAlertContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.deleteAlertContact(ctx.input.contactId);
 

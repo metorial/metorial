@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, pagination, TravisCIClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listBuildRequests = SlateTool.create(spec, {
@@ -32,13 +32,15 @@ export let listBuildRequests = SlateTool.create(spec, {
           buildIds: z.array(z.number()).optional().describe('Associated build IDs')
         })
       ),
-      totalCount: z.number().optional().describe('Total number of requests')
+      totalCount: z.number().optional().describe('Total number of requests'),
+      hasMore: z.boolean().optional().describe('Whether another page is available'),
+      nextOffset: z.number().optional().describe('Offset for the next page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
     let result = await client.listRequests(ctx.input.repoSlugOrId, {
@@ -46,7 +48,7 @@ export let listBuildRequests = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let requests = (result.requests || []).map((req: any) => ({
+    let requests = (result.requests || []).map(req => ({
       requestId: req.id,
       state: req.state,
       result: req.result ?? null,
@@ -54,13 +56,13 @@ export let listBuildRequests = SlateTool.create(spec, {
       branchName: req.branch_name,
       eventType: req.event_type,
       createdAt: req.created_at,
-      buildIds: (req.builds || []).map((b: any) => b.id)
+      buildIds: (req.builds || []).map(b => b.id)
     }));
 
     return {
       output: {
         requests,
-        totalCount: result['@pagination']?.count
+        ...pagination(result)
       },
       message: `Found **${requests.length}** build requests for **${ctx.input.repoSlugOrId}**.`
     };

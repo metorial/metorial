@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema, paging, pagingShape } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listBroadcasts = SlateTool.create(spec, {
@@ -13,13 +14,17 @@ export let listBroadcasts = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       status: z
-        .enum(['draft', 'scheduled', 'sent'])
+        .enum(['draft', 'scheduled', 'sending', 'sent', 'canceled', 'deleted', 'all'])
         .optional()
         .describe('Filter by broadcast status.'),
       page: z.number().optional().describe('Page number for pagination.'),
       perPage: z.number().optional().describe('Results per page.'),
-      sortBy: z.enum(['name', 'created_at', 'send_at']).optional().describe('Sort field.'),
+      sortBy: z
+        .enum(['name', 'created_at', 'updated_at', 'send_at'])
+        .optional()
+        .describe('Sort field.'),
       sortDirection: z.enum(['asc', 'desc']).optional().describe('Sort direction.')
     })
   )
@@ -35,13 +40,14 @@ export let listBroadcasts = SlateTool.create(spec, {
             createdAt: z.string().optional()
           })
         )
-        .describe('List of broadcasts.')
+        .describe('List of broadcasts.'),
+      ...pagingShape
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 
@@ -62,7 +68,7 @@ export let listBroadcasts = SlateTool.create(spec, {
     }));
 
     return {
-      output: { broadcasts },
+      output: { broadcasts, ...paging(result) },
       message: `Found **${broadcasts.length}** broadcasts.`
     };
   })

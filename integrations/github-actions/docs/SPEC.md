@@ -1,110 +1,49 @@
-Now let me get the full list of GitHub Actions REST API endpoint categories and the OAuth/GitHub App scopes:Now I have comprehensive information. Let me compile the specification.
+# GitHub Actions API specification
 
-# Slates Specification for GitHub Actions
+Manage GitHub Actions workflows, runs, jobs, artifacts, secrets, variables, caches, self-hosted runners, and repository Actions policies.
 
-## Overview
+Connect using a fine-grained personal access token or OAuth. Repository OAuth requests `repo`; the separate repository-and-organization OAuth option also requests `admin:org`. Fine-grained tokens require the permission for each resource: Actions, Secrets, Variables, Environments, repository Administration, organization Secrets/Variables, or organization Self-hosted runners. A token's grants do not replace the user's repository or organization access.
 
-GitHub Actions is GitHub's built-in CI/CD and workflow automation platform. Its REST API allows programmatic management of workflows, workflow runs, jobs, artifacts, secrets, variables, caches, runners (both GitHub-hosted and self-hosted), and Actions permissions at the repository, organization, and enterprise levels.
+All API calls target `https://api.github.com`, use `Authorization: Bearer`, accept `application/vnd.github+json`, and select REST API version `2026-03-10`.
 
-## Authentication
+## Tools
 
-GitHub Actions is accessed via the GitHub REST API, which supports the following authentication methods:
+| Tool | Outcome |
+| --- | --- |
+| `get_current_user` | Identify the connected GitHub user. |
+| `list_workflows` | Discover workflow IDs/file paths and active/disabled state. |
+| `trigger_workflow` | Dispatch a workflow on a branch/tag with string inputs; return accepted run ID and URLs. The workflow needs `workflow_dispatch` on the default branch. |
+| `manage_workflow_state` | Read, enable, or disable a workflow; retain the deprecated `get_usage` action for compatibility. GitHub is closing its usage endpoint. |
+| `list_workflow_runs` | Page through runs, optionally filtering workflow, actor, branch, event, status, creation date, or commit SHA. GitHub caps filtered searches at 1,000 results; narrow date ranges for larger histories. |
+| `get_workflow_run` | Inspect status, attempt, commit, actor, and an optional page of jobs/steps. `jobsTotalCount` and `jobsNextPage` expose additional job pages. |
+| `control_workflow_run` | Cancel, rerun all/failed/specific jobs, delete runs, approve fork runs, or approve/reject pending environment reviews. Specific jobs must belong to the supplied run. Deployment reviews require environment IDs, state, and a nonempty comment. |
+| `list_pending_deployments` | Read environment IDs, wait timers, and whether the connected user can approve pending reviews. |
+| `get_workflow_run_logs` | Download run logs as ZIP or individual job logs as text; permanently delete run logs. |
+| `list_artifacts` | Page through repository/run artifacts by name, including expiry and associated run IDs. |
+| `manage_artifact` | Inspect, download ZIP, or permanently delete an artifact. Expired artifacts cannot be downloaded. |
+| `manage_secrets` | List/read metadata, retrieve encryption public keys, write encrypted values, and delete secrets at repository, organization, or environment scope. Encrypt values with LibSodium sealed boxes; secret values cannot be retrieved. |
+| `manage_variables` | List/read/write/delete visible configuration values at repository, organization, or environment scope. |
+| `manage_caches` | List caches and delete by ID or exact key/ref; key deletion returns GitHub's actual deleted count. |
+| `manage_runners` | List/read/remove self-hosted runners, create short-lived registration/removal tokens, and manage repository or organization custom labels. Setting labels replaces all custom labels. |
+| `manage_permissions` | Read/write repository Actions enablement, allowed actions, selected-action patterns, and default GITHUB_TOKEN/PR-review permissions. Selected policies require `allowedActions: selected`. |
 
-### Personal Access Token (PAT)
+Paginated tools accept `perPage` (1–100, default 30) and `page` (positive integer, default 1). Existing numeric ID and pagination input types remain numbers; invalid fractions and bounds are rejected before requests.
 
-GitHub recommends using a fine-grained personal access token instead of a personal access token (classic).
+## Download behavior
 
-- **Fine-grained PAT**: Scoped to specific repositories with granular permissions. For GitHub Actions, relevant permissions include `actions` (read/write for workflows, runs, artifacts, caches), `administration` (for runner management), and `secrets`/`variables` management.
-- **Classic PAT**: OAuth tokens and personal access tokens (classic) need the `repo` scope for most Actions endpoints. Organization-level secrets require the `admin:org` scope.
+Downloads provide downloadable files backed by the authenticated GitHub API endpoint, which obtains a fresh temporary redirect when fetched. The legacy `downloadUrl` field continues to contain GitHub's direct temporary download URL and expires after one minute. Request the download again for a new direct URL. The downloadable file remains retrievable while the underlying file exists and access is granted. A deleted or retention-expired file cannot be renewed.
 
-Tokens are passed via the `Authorization` header:
+Workflow dispatch and rerun requests indicate API acceptance; inspect the returned run ID to determine execution status and completion. Workflow execution may consume paid runner time or perform deployment and external actions configured in its YAML.
 
-```
-Authorization: Bearer <YOUR-TOKEN>
-```
+## References
 
-### GitHub App (Installation Access Token)
+- [GitHub Actions REST API](https://docs.github.com/en/rest/actions)
+- [API versions](https://docs.github.com/en/rest/about-the-rest-api/api-versions)
+- [OAuth scopes](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps)
+- [Secret encryption](https://docs.github.com/en/rest/guides/encrypting-secrets-for-the-rest-api)
 
-You can generate a token with a GitHub App. You must register a GitHub App, store your app's credentials, and install your app. The app requires at least read-level access for the "Actions" repository permission for most read operations, and write-level access for mutations. An installation access token is generated using the App ID and a private key, and is short-lived (expires after 1 hour).
+## License
 
-### GITHUB_TOKEN (Workflow Context Only)
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE)
 
-If you want to use the API in a GitHub Actions workflow, GitHub recommends that you authenticate with the built-in GITHUB_TOKEN instead of creating a token. You can grant permissions to the GITHUB_TOKEN with the `permissions` key. However, the GITHUB_TOKEN can only access resources within the workflow's repository. This method is only applicable when calling the API from within a running workflow.
-
-### Base URL
-
-All API requests are made to `https://api.github.com`. The API version header `X-GitHub-Api-Version: 2022-11-28` should be included.
-
-## Features
-
-### Workflow Management
-
-View workflows for a repository. Workflows automate your software development life cycle with a wide range of tools and services. You can list, get, enable, and disable workflows. You can also trigger a workflow run via the `workflow_dispatch` event, passing custom inputs defined in the workflow file. Workflow usage statistics (billable minutes by runner OS) can be retrieved.
-
-### Workflow Run Management
-
-View, re-run, cancel, and view logs for workflow runs in GitHub Actions. You can list runs filtered by branch, event, status, or actor. Supports re-running all jobs, only failed jobs, or a specific job. You can approve runs from fork pull requests, review and approve/reject pending deployments, download or delete run logs, and get run usage/timing data.
-
-### Workflow Job Inspection
-
-View logs and workflow jobs in GitHub Actions. A workflow job is a set of steps that execute on the same runner. You can list jobs for a given run or run attempt, get details for a specific job (including step-level status and timing), and download job logs.
-
-### Artifact Management
-
-Download, delete, and retrieve information about workflow artifacts. Artifacts enable you to share data between jobs in a workflow and store data once that workflow has completed. You can list artifacts for a repository or a specific workflow run, download artifact archives, and delete artifacts.
-
-### Secrets Management
-
-Create, update, delete, and retrieve information about secrets that can be used in workflows. Secrets can be managed at three levels: organization, repository, and environment. Secret values must be encrypted with the repository's or organization's public key (using LibSodium) before being sent. For organization secrets, you can control which repositories have access to each secret.
-
-### Variables Management
-
-Create, read, update, and delete configuration variables at the organization, repository, and environment levels. Unlike secrets, variable values are not encrypted and are visible in API responses. Organization variables can be scoped to selected repositories.
-
-### Cache Management
-
-List, inspect, and delete GitHub Actions caches for a repository. You can also configure cache retention limits and storage limits at the enterprise, organization, and repository levels. Caches can be deleted by cache key or cache ID.
-
-### Self-Hosted Runner Management
-
-Register, list, get, and remove self-hosted runners at the organization and repository levels. You can create registration and removal tokens, configure just-in-time runners, and manage custom labels on runners. Self-hosted runner groups (organization-level) allow controlling which repositories can use specific runners.
-
-### GitHub-Hosted Runner Management
-
-List, create, update, and delete GitHub-hosted runners at the organization level. You can manage custom images and image versions, view available machine specs, platforms, and GitHub-owned/partner images, and query runner limits.
-
-### Permissions and Policies
-
-Configure GitHub Actions permissions at the organization and repository levels. This includes enabling/disabling Actions for selected repositories, restricting which actions and reusable workflows are allowed, setting default workflow permissions (read-only vs. read-write for `GITHUB_TOKEN`), configuring artifact/log retention periods, and managing fork pull request approval and workflow settings.
-
-### OIDC Configuration
-
-Get and set customization templates for OIDC subject claims at the organization and repository levels. This allows customizing the `sub` claim in OIDC tokens issued to workflows for use with cloud providers that support OIDC federation.
-
-## Events
-
-GitHub supports webhooks that can be configured at the repository or organization level. The following webhook event categories are specifically relevant to GitHub Actions:
-
-### Workflow Run Events (`workflow_run`)
-
-This event occurs when there is activity relating to a run of a GitHub Actions workflow. Activity types include `requested`, `completed`, and `in_progress`. To subscribe to this event, a GitHub App must have at least read-level access for the "Actions" repository permission.
-
-### Workflow Job Events (`workflow_job`)
-
-This event occurs when there is activity relating to a job in a GitHub Actions workflow. Activity types include `queued`, `in_progress`, `completed`, and `waiting`. Useful for autoscaling self-hosted runners based on job demand.
-
-### Workflow Dispatch Events (`workflow_dispatch`)
-
-This event occurs when a GitHub Actions workflow is manually triggered. For more information, see "Manually running a workflow." To subscribe to this event, a GitHub App must have at least read-level access for the "Contents" repository permission.
-
-### Check Run Events (`check_run`)
-
-This event occurs when there is activity relating to a check run. For information about check runs, see "Getting started with the Checks API." Activity types include `created`, `completed`, `rerequested`, and `requested_action`. GitHub Actions workflow jobs create check runs automatically.
-
-### Check Suite Events (`check_suite`)
-
-Occurs when a check suite is created, completed, or rerequested. A check suite groups check runs (including those from GitHub Actions) for a specific commit.
-
-### Deployment and Deployment Status Events
-
-`deployment` and `deployment_status` events fire when deployments are created or their statuses change, which is relevant when GitHub Actions workflows manage deployments to environments.
+Run list/details also expose the provider display title for identifying a configured run-name. Missing nullable run names become null, and artifact workflow-run metadata can be absent or null. API redirects are followed only within the secure GitHub API origin; download redirects are inspected separately without forwarding credentials. Unexpected successful response shapes fail clearly before mapping.

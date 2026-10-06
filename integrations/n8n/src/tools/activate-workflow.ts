@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { invalid } from '../lib/connection';
 import { spec } from '../spec';
 
 export let activateWorkflow = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let activateWorkflow = SlateTool.create(spec, {
   key: 'activate_workflow',
   description: `Activate (publish) or deactivate a workflow. Activating makes the workflow live and able to receive trigger events. Optionally activate a specific historical version by providing a version ID.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -29,12 +30,11 @@ export let activateWorkflow = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    if (!ctx.input.active && ctx.input.versionId !== undefined)
+      throw invalid('versionId applies only to activation; omit it when deactivating.');
+    const client = clientFor(ctx);
 
-    let workflow: any;
+    let workflow: Awaited<ReturnType<typeof client.activateWorkflow>>;
     if (ctx.input.active) {
       workflow = await client.activateWorkflow(ctx.input.workflowId, {
         versionId: ctx.input.versionId

@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, identifier, number, text } from '../lib/client';
 import { spec } from '../spec';
 
 export let getWorkspace = SlateTool.create(spec, {
   name: 'Get Workspace',
   key: 'get_workspace',
-  description: `Retrieve information about your PhantomBuster workspace (organization), including plan details, resource quotas, and storage usage.`,
+  description: `Retrieve information about your PhantomBuster workspace (organization), including its identity and any plan or resource details returned by the provider.`,
   tags: {
     readOnly: true
   }
@@ -30,14 +30,14 @@ export let getWorkspace = SlateTool.create(spec, {
 
     return {
       output: {
-        workspaceId: String(org.id),
-        name: org.name ?? undefined,
-        timezone: org.timezone ?? undefined,
-        planSlug: org.planSlug ?? undefined,
-        s3Folder: org.s3Folder ?? undefined,
-        dailyExecutionTime: org.dailyExecutionTime ?? undefined,
-        storageLeft: org.s3Storage ?? undefined,
-        createdAt: org.createdAt ?? undefined
+        workspaceId: identifier(org.id, 'Returned workspace ID'),
+        name: text(org.name),
+        timezone: text(org.timezone),
+        planSlug: text(org.planSlug),
+        s3Folder: text(org.s3Folder),
+        dailyExecutionTime: number(org.dailyExecutionTime),
+        storageLeft: number(org.storageLeft),
+        createdAt: number(org.createdAt)
       },
       message: `Workspace: **${org.name ?? org.id}** (Plan: ${org.planSlug ?? 'unknown'}).`
     };

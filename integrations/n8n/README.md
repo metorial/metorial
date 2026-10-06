@@ -1,105 +1,15 @@
-# <img src="https://provider-logos.metorial-cdn.com/n8n.png" height="20"> N8n
+# n8n
 
-Manage workflows, executions, credentials, users, and projects on an n8n workflow automation instance. Create, update, activate, deactivate, and delete workflows programmatically. List and retrieve execution history, retry failed executions, and filter by status or date range. Create and manage credentials for external service authentication, including retrieving credential schemas. Organize resources with tags and variables. Manage projects for access control. Pull and push workflow changes via source control integration with Git. Generate security audit reports for the instance.
+Manage the documented Public API of your explicitly connected n8n instance. The 24 tools cover workflow definitions and publication, execution history and lifecycle, credential metadata and creation, users, tags, variables, projects, transfers, source-control pull and security audits. API-key capability discovery exposes native scopes and request schemas when supported. It does not identify a current user or certify server version, license or project permissions.
 
-## Tools
+Connect with a raw Public API key and your API root ending in `/api/v1`, including any deployment path and port. Existing stored instance settings remain supported. HTTP and HTTPS self-hosted instances are supported; HTTP sends the key without transport encryption. Credentials never follow redirects. API availability, expiration, scopes, user/project permissions and licensed features vary by deployment. Unsupported routes fail with guidance; there is no guessed editor-session endpoint or token refresh.
 
-### Activate Workflow
+Workflow reads preserve native current-versus-historical semantics. Historical snapshots have their own workflow/version IDs and do not imply current publication state. The current version-read route can fall back to the documented deprecated route only after an exact read returns 404. Existing activation/deactivation routes remain supported; current n8n documentation also calls these publishing/unpublishing. Optional JSON delivery provides the retrieved definition as a downloadable file, which may contain sensitive node parameters.
 
-Activate (publish) or deactivate a workflow. Activating makes the workflow live and able to receive trigger events. Optionally activate a specific historical version by providing a version ID.
+Workflow updates hydrate omitted writable definition fields from a fresh native read and reject unknown replacement state. Provided nodes, connections or settings replace that field in full. `expectedVersionId` is a local stale-state check, not an atomic lock. Updating a published workflow can re-publish it unless the supported `publishIfActive=false` option is supplied. A publication failure can still leave a saved draft; read state before retrying. Creating an inactive workflow does not execute it.
 
-### Create Credential
+Some native mutations return no object. Variable writes and project updates expose request acceptance separately from observed state; list the resources to inspect them. Workflow tag replacement sends native `{id}` records. Exact credential metadata, tag and user reads are available within the existing list/manage tools. No credential secret data is returned by credential metadata tools.
 
-Create a new credential in n8n. Use the **Get Credential Schema** tool first to understand the required fields for a given credential type.
+Retrying executes workflow nodes again. Stopping reports the returned native status and does not reverse earlier external effects. Deleting resources/history, transfers, project membership changes and source-control pulls can have irreversible or partial effects. A pull returns per-resource results; inspect conflicts and publication errors. Variable overrides are not part of the verified pull contract; use explicit variable operations or your deployment-specific native contract. Deletion does not promise removal of backups, logs or external effects.
 
-### Create Workflow
-
-Create a new workflow in n8n. Provide the workflow name, nodes, connections, and optional settings. The workflow is created in an inactive state by default.
-
-### Delete Credential
-
-Permanently delete a credential from n8n. Workflows using this credential will no longer be able to authenticate. This action cannot be undone.
-
-### Delete Execution
-
-Permanently delete a workflow execution record. This action cannot be undone.
-
-### Delete Workflow
-
-Permanently delete a workflow from n8n. This action cannot be undone.
-
-### Generate Security Audit
-
-Generate a security audit report for your n8n instance. The report covers risk categories including credentials, database, nodes, filesystem, and instance-level risks. Optionally configure which categories to include and the threshold for abandoned workflows.
-
-### Get Credential Schema
-
-Retrieve the JSON schema for a specific credential type. This is useful for understanding the required fields and their types before creating a credential.
-
-### Get Execution
-
-Retrieve details of a specific workflow execution including its status, timing, and optionally the full execution data with node-level results.
-
-### Get Workflow
-
-Retrieve a specific workflow by ID, including its full definition with nodes, connections, and settings. Optionally retrieve a specific historical version of the workflow.
-
-### List Credentials
-
-List all credentials stored in your n8n instance. Returns metadata only (name, type, timestamps) without exposing sensitive credential data.
-
-### List Executions
-
-List workflow executions with optional filtering by workflow, status, and project. Returns execution metadata including status, start/end times, and workflow info.
-
-### List Users
-
-List users on the n8n instance. Only available to the instance owner.
-
-### List Workflows
-
-List workflows in your n8n instance with optional filtering. Returns workflow metadata including name, active status, creation date, and tags. Supports filtering by active status, tags, name, and project.
-
-### Manage Projects
-
-Create, update, delete, or list projects in n8n. Projects group workflows and credentials for access control. Also supports managing project members.
-
-### Manage Tags
-
-Create, update, delete, or list tags used to organize workflows and credentials. Specify an **action** to determine the operation.
-
-### Manage Variables
-
-Create, update, delete, or list variables stored in your n8n instance. Variables provide fixed data accessible across all workflows. Requires Pro or Enterprise plan.
-
-### Manage Workflow Tags
-
-Get or update the tags assigned to a workflow. Use this to organize workflows by setting their tags, or to inspect current tag assignments.
-
-### Retry Execution
-
-Retry a failed workflow execution. By default, retries using the original workflow version from the failed execution. Set **useCurrentWorkflow** to true to retry with the latest workflow definition instead.
-
-### Source Control Pull
-
-Pull workflow changes from a connected Git repository into your n8n instance. Requires the Source Control feature to be licensed and configured.
-
-### Stop Execution
-
-Stop a currently running workflow execution.
-
-### Transfer Resource
-
-Transfer a workflow or credential to a different project. Useful for reorganizing resources across projects.
-
-### Update Workflow
-
-Update an existing workflow's definition, including its name, nodes, connections, and settings. If the workflow is currently active, it will be automatically reactivated with the new definition.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+No triggers, administrative expansion, new execution-creation endpoint or fabricated identity is included.

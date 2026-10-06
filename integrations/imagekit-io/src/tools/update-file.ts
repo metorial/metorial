@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Update } from '../lib/client';
+import { invalid } from '../lib/validation';
 import { spec } from '../spec';
 
 export let updateFile = SlateTool.create(spec, {
@@ -24,11 +25,11 @@ export let updateFile = SlateTool.create(spec, {
         .optional()
         .describe('Custom focus area in format "x,y,width,height"'),
       customMetadata: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Custom metadata key-value pairs to set'),
       extensions: z
-        .array(z.record(z.string(), z.any()))
+        .array(z.record(z.string(), z.unknown()))
         .optional()
         .describe(
           'Extensions to apply, e.g. [{"name": "google-auto-tagging", "minConfidence": 80}]'
@@ -54,7 +55,7 @@ export let updateFile = SlateTool.create(spec, {
       size: z.number().describe('File size in bytes'),
       tags: z.array(z.string()).optional().nullable().describe('Updated tags'),
       customMetadata: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .nullable()
         .describe('Updated custom metadata'),
@@ -64,7 +65,9 @@ export let updateFile = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let updateParams: any = {};
+    if (ctx.input.includeFileVersions !== undefined && ctx.input.isPublished === undefined)
+      throw invalid('includeFileVersions requires isPublished.');
+    let updateParams: Update = {};
     if (ctx.input.tags !== undefined) updateParams.tags = ctx.input.tags;
     if (ctx.input.customCoordinates !== undefined)
       updateParams.customCoordinates = ctx.input.customCoordinates;

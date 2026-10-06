@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getCallDuration } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCallTranscript = SlateTool.create(spec, {
@@ -36,9 +36,17 @@ export let getCallTranscript = SlateTool.create(spec, {
               .optional()
               .describe('Message role (user, assistant, system, tool_call, tool_result)'),
             content: z.string().optional().describe('Message content'),
-            time: z.number().optional().describe('Time offset in seconds'),
-            endTime: z.number().optional().describe('End time offset in seconds'),
-            duration: z.number().optional().describe('Duration in seconds')
+            time: z.number().optional().describe('Provider message timestamp'),
+            endTime: z.number().optional().describe('Provider message end timestamp'),
+            secondsFromStart: z
+              .number()
+              .optional()
+              .describe('Seconds from the start of the conversation'),
+            duration: z.number().optional().describe('Duration in seconds'),
+            toolCalls: z.array(z.unknown()).optional().describe('Invoked tool definitions'),
+            toolCallId: z.string().optional().describe('ID linking a tool result to its call'),
+            name: z.string().optional().describe('Name of the tool that returned the result'),
+            result: z.unknown().optional().describe('Result returned by the invoked tool')
           })
         )
         .optional()
@@ -48,15 +56,20 @@ export let getCallTranscript = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, ctx.auth.region);
     let call = await client.getCall(ctx.input.callId);
 
-    let messages = (call.messages || []).map((m: any) => ({
+    let messages = (call.artifact?.messages ?? call.messages ?? []).map((m: any) => ({
       role: m.role,
-      content: m.message || m.content,
+      content: m.message ?? m.content,
       time: m.time,
       endTime: m.endTime,
-      duration: m.duration
+      secondsFromStart: m.secondsFromStart,
+      duration: m.duration,
+      toolCalls: m.toolCalls,
+      toolCallId: m.toolCallId,
+      name: m.name,
+      result: m.result
     }));
 
     return {
@@ -64,17 +77,20 @@ export let getCallTranscript = SlateTool.create(spec, {
         callId: call.id,
         status: call.status,
         transcript: call.artifact?.transcript,
-        recordingUrl: call.artifact?.recordingUrl,
-        stereoRecordingUrl: call.artifact?.stereoRecordingUrl,
-        videoRecordingUrl: call.artifact?.videoRecordingUrl,
+        recordingUrl:
+          call.artifact?.recording?.mono?.combinedUrl ?? call.artifact?.recordingUrl,
+        stereoRecordingUrl:
+          call.artifact?.recording?.stereoUrl ?? call.artifact?.stereoRecordingUrl,
+        videoRecordingUrl:
+          call.artifact?.recording?.videoUrl ?? call.artifact?.videoRecordingUrl,
         summary: call.analysis?.summary,
         structuredData: call.analysis?.structuredData,
         successEvaluation: call.analysis?.successEvaluation,
         messages,
-        duration: call.duration,
+        duration: getCallDuration(call),
         endedReason: call.endedReason
       },
-      message: `Retrieved transcript for call **${call.id}** (${call.status}). ${messages.length} message(s), duration: ${call.duration ? `${call.duration}s` : 'N/A'}.`
+      message: `Retrieved transcript for call **${call.id}** (${call.status}). ${messages.length} message(s), duration: ${getCallDuration(call) !== undefined ? `${getCallDuration(call)}s` : 'N/A'}.`
     };
   })
   .build();

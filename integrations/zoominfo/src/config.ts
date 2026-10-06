@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .enum(['new', 'legacy'])
       .default('legacy')
       .describe(
-        'API version to use. "new" uses the /gtm path prefix with OAuth2 PKCE. "legacy" uses the classic Enterprise API with JWT authentication.'
+        'Fallback API dialect for connections created before auth methods persisted it. New OAuth connections use the current GTM Data API; legacy password/PKI connections use the Enterprise API.'
       )
   })
 );

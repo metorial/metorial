@@ -1,144 +1,239 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
-import { spec } from '../spec';
+import { fields, mapDocumentOutput, metadata, tags, taxClass } from '../lib/schemas';
+import { tool } from '../lib/tool';
+import {
+  countryInput,
+  currencyInput,
+  date,
+  dateInput,
+  decimal,
+  decimalInput,
+  idInput,
+  invalid,
+  numericId,
+  safeInteger,
+  textInput
+} from '../lib/validation';
 
-let transactionItemSchema = z.object({
-  description: z.string().optional().describe('Item description'),
-  quantity: z.number().optional().describe('Quantity'),
-  amount: z.string().optional().describe('Total item amount'),
-  taxName: z.string().optional().describe('Tax name'),
-  taxRate: z.number().optional().describe('Tax rate'),
-  taxCountry: z.string().optional().describe('Tax country code'),
-  productCode: z.string().optional().describe('Product code')
+const item = z.object({
+  description: z.string().optional(),
+  quantity: z.number().finite().optional(),
+  amount: decimalInput
+    .optional()
+    .describe(
+      'Required total charged for this line after discounts and taxes, in major currency units.'
+    ),
+  taxName: z.string().optional(),
+  taxRate: z.number().finite().min(0).max(100).optional(),
+  taxCountry: countryInput.optional(),
+  productCode: textInput.optional(),
+  taxCode: taxClass.optional(),
+  taxRegion: z.string().optional(),
+  taxablePart: z.number().finite().min(0).max(100).optional(),
+  additionalTaxName: z.string().optional(),
+  additionalTaxRate: z.number().finite().min(0).max(100).optional(),
+  additionalTaxablePart: z.number().finite().min(0).max(100).optional(),
+  discountRate: z.number().finite().min(0).max(100).optional()
 });
-
-let evidenceSchema = z.object({
-  billingCountry: z.string().optional().describe('Country from billing address'),
-  ipAddress: z.string().optional().describe('Customer IP address'),
-  bankCountry: z.string().optional().describe('Country from bank details')
+const evidence = z.object({
+  billingCountry: countryInput.optional(),
+  ipAddress: z.string().optional(),
+  bankCountry: countryInput.optional()
 });
-
-export let createTransaction = SlateTool.create(spec, {
+export const createTransaction = tool({
   name: 'Create Transaction',
   key: 'create_transaction',
-  description: `Record a sale or refund transaction in Quaderno. Quaderno uses this data for invoices, tax reports, and compliance alerts. Location evidence is used to determine the correct tax treatment.`,
-  instructions: [
-    'Use type "sale" for new sales and "refund" for refunds',
-    'Provide location evidence (billing country, IP, bank country) for accurate tax calculation'
-  ],
-  tags: { destructive: false }
-})
-  .input(
-    z.object({
-      type: z.enum(['sale', 'refund']).describe('Transaction type'),
-      currency: z.string().optional().describe('Currency code (e.g., "USD", "EUR")'),
-      contactId: z.string().optional().describe('Existing contact ID'),
-      contactFirstName: z
-        .string()
-        .optional()
-        .describe('Customer first name (if creating new contact)'),
-      contactLastName: z.string().optional().describe('Customer last name'),
-      contactEmail: z.string().optional().describe('Customer email'),
-      contactTaxId: z.string().optional().describe('Customer tax ID'),
-      contactCountry: z.string().optional().describe('Customer country code'),
-      contactPostalCode: z.string().optional().describe('Customer postal code'),
-      contactCity: z.string().optional().describe('Customer city'),
-      contactStreetLine1: z.string().optional().describe('Customer street address'),
-      items: z.array(transactionItemSchema).min(1).describe('Transaction line items'),
-      evidence: evidenceSchema.optional().describe('Location evidence for tax calculation'),
-      paymentMethod: z
-        .string()
-        .optional()
-        .describe('Payment method (e.g., "credit_card", "paypal", "wire_transfer")'),
-      paymentProcessorId: z
-        .string()
-        .optional()
-        .describe('ID from payment processor (e.g., Stripe charge ID)'),
-      paymentProcessor: z
-        .string()
-        .optional()
-        .describe('Payment processor name (e.g., "stripe", "paypal")'),
-      notes: z.string().optional().describe('Transaction notes'),
-      tag: z.string().optional().describe('Tag for categorization'),
-      customMetadata: z
-        .record(z.string(), z.string())
-        .optional()
-        .describe('Custom metadata key-value pairs')
-    })
-  )
-  .output(
-    z.object({
-      transactionId: z.string().optional().describe('Transaction document ID'),
-      number: z.string().optional().describe('Document number'),
-      type: z.string().optional().describe('Transaction type'),
-      currency: z.string().optional().describe('Currency'),
-      total: z.string().optional().describe('Total amount'),
-      state: z.string().optional().describe('Document state'),
-      permalink: z.string().optional().describe('Public permalink')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-
-    let data: Record<string, any> = {
-      type: ctx.input.type,
-      items_attributes: ctx.input.items.map(item => {
-        let mapped: Record<string, any> = {};
-        if (item.description) mapped.description = item.description;
-        if (item.quantity !== undefined) mapped.quantity = item.quantity;
-        if (item.amount) mapped.amount = item.amount;
-        if (item.taxName) mapped.tax_name = item.taxName;
-        if (item.taxRate !== undefined) mapped.tax_rate = item.taxRate;
-        if (item.taxCountry) mapped.tax_country = item.taxCountry;
-        if (item.productCode) mapped.product_code = item.productCode;
-        return mapped;
-      })
-    };
-
-    if (ctx.input.currency) data.currency = ctx.input.currency;
-    if (ctx.input.contactId) data.contact_id = ctx.input.contactId;
-    if (ctx.input.notes) data.notes = ctx.input.notes;
-    if (ctx.input.tag) data.tag = ctx.input.tag;
-    if (ctx.input.customMetadata) data.custom_metadata = ctx.input.customMetadata;
-
-    // Contact details for new contact
-    if (ctx.input.contactFirstName) data.contact_first_name = ctx.input.contactFirstName;
-    if (ctx.input.contactLastName) data.contact_last_name = ctx.input.contactLastName;
-    if (ctx.input.contactEmail) data.contact_email = ctx.input.contactEmail;
-    if (ctx.input.contactTaxId) data.contact_tax_id = ctx.input.contactTaxId;
-    if (ctx.input.contactCountry) data.contact_country = ctx.input.contactCountry;
-    if (ctx.input.contactPostalCode) data.contact_postal_code = ctx.input.contactPostalCode;
-    if (ctx.input.contactCity) data.contact_city = ctx.input.contactCity;
-    if (ctx.input.contactStreetLine1)
-      data.contact_street_line_1 = ctx.input.contactStreetLine1;
-
-    // Payment details
-    if (ctx.input.paymentMethod) data.payment_method = ctx.input.paymentMethod;
-    if (ctx.input.paymentProcessorId) data.payment_processor_id = ctx.input.paymentProcessorId;
-    if (ctx.input.paymentProcessor) data.payment_processor = ctx.input.paymentProcessor;
-
-    // Evidence
-    if (ctx.input.evidence) {
-      let ev = ctx.input.evidence;
-      if (ev.billingCountry) data.billing_country = ev.billingCountry;
-      if (ev.ipAddress) data.ip_address = ev.ipAddress;
-      if (ev.bankCountry) data.bank_country = ev.bankCountry;
-    }
-
-    let result = await client.createTransaction(data);
-
-    return {
-      output: {
-        transactionId: result.id?.toString(),
-        number: result.number?.toString(),
-        type: result.type,
-        currency: result.currency,
-        total: result.total,
-        state: result.state,
-        permalink: result.permalink
+  description:
+    'Record a sale or refund already made, with location evidence and payment details. Quaderno returns the resulting financial document. This does not charge a customer or issue a cash refund. Records can be retained and may affect tax reports.',
+  input: {
+    type: z.enum(['sale', 'refund']),
+    currency: currencyInput.optional(),
+    contactId: idInput.optional(),
+    contactFirstName: textInput.optional(),
+    contactLastName: z.string().optional(),
+    contactEmail: z.string().email().optional(),
+    contactTaxId: z.string().optional(),
+    contactCountry: countryInput.optional(),
+    contactPostalCode: z.string().optional(),
+    contactCity: z.string().optional(),
+    contactStreetLine1: z.string().optional(),
+    items: z.array(item).min(1).max(200),
+    evidence: evidence.optional(),
+    paymentMethod: z
+      .enum([
+        'credit_card',
+        'cash',
+        'wire_transfer',
+        'direct_debit',
+        'check',
+        'iou',
+        'paypal',
+        'other'
+      ])
+      .optional(),
+    paymentProcessorId: z.string().optional(),
+    paymentProcessor: z.string().optional(),
+    notes: z.string().optional(),
+    tag: z.string().optional(),
+    customMetadata: z.record(z.string().max(40), z.string().max(500)).optional(),
+    date: dateInput.optional(),
+    processor: z.string().optional().describe('Platform recording this transaction.'),
+    processorId: z
+      .string()
+      .optional()
+      .describe(
+        'Platform transaction ID; reuse to link a sale and related refund. This is not a retry guarantee.'
+      ),
+    processorFeeCents: safeInteger.nonnegative().optional(),
+    exchangeRate: z.number().finite().positive().optional()
+  },
+  output: {
+    transactionId: z.string().optional(),
+    number: z.string().optional(),
+    type: z.string().optional(),
+    currency: z.string().optional(),
+    total: z.string().optional(),
+    state: z.string().optional(),
+    permalink: z.string().optional(),
+    documentType: z
+      .string()
+      .optional()
+      .describe('Provider document route, when supplied in its resource URL.'),
+    totalCents: safeInteger.optional(),
+    subtotalCents: safeInteger.optional()
+  },
+  run: async (input, client) => {
+    const contactFields = [
+      'contactFirstName',
+      'contactLastName',
+      'contactEmail',
+      'contactTaxId',
+      'contactCountry',
+      'contactPostalCode',
+      'contactCity',
+      'contactStreetLine1'
+    ];
+    if (input.contactId && contactFields.some(key => Reflect.get(input, key) !== undefined))
+      throw invalid('Use contactId or inline contact details, not both.');
+    if (
+      !input.contactId &&
+      contactFields.some(key => Reflect.get(input, key) !== undefined) &&
+      !input.contactFirstName
+    )
+      throw invalid('Inline customer details require contactFirstName.');
+    if (input.contactId) await client.get('contacts', input.contactId);
+    const customer = input.contactId
+      ? { id: numericId(input.contactId) }
+      : input.contactFirstName === undefined
+        ? undefined
+        : fields(input, {
+            contactFirstName: 'first_name',
+            contactLastName: 'last_name',
+            contactEmail: 'email',
+            contactTaxId: 'tax_id',
+            contactCountry: 'country',
+            contactPostalCode: 'postal_code',
+            contactCity: 'city',
+            contactStreetLine1: 'street_line_1'
+          });
+    const data = {
+      type: input.type,
+      currency: input.currency,
+      customer,
+      date: input.date === undefined ? undefined : date(input.date),
+      items: input.items.map(value => {
+        if (value.amount === undefined)
+          throw invalid(
+            'Each transaction item requires amount, the total after discounts and taxes.'
+          );
+        if (!value.description && !value.productCode)
+          throw invalid('Each transaction item requires description or productCode.');
+        const taxSupplied = [
+          value.taxName,
+          value.taxRate,
+          value.taxCountry,
+          value.taxCode,
+          value.taxRegion,
+          value.taxablePart,
+          value.additionalTaxRate,
+          value.additionalTaxName,
+          value.additionalTaxablePart
+        ].some(v => v !== undefined);
+        if (
+          taxSupplied &&
+          (value.taxRate === undefined || !value.taxCountry || !value.taxCode)
+        )
+          throw invalid(
+            'Explicit transaction tax details require taxRate, taxCountry and taxCode.'
+          );
+        return {
+          description: value.description,
+          product_code: value.productCode,
+          quantity: value.quantity,
+          amount: decimal(value.amount),
+          discount_rate: value.discountRate,
+          tax: taxSupplied
+            ? {
+                name: value.taxName,
+                rate: value.taxRate,
+                country: value.taxCountry,
+                tax_code: value.taxCode,
+                region: value.taxRegion,
+                taxable_part: value.taxablePart,
+                additional_name: value.additionalTaxName,
+                additional_rate: value.additionalTaxRate,
+                additional_taxable_part: value.additionalTaxablePart
+              }
+            : undefined
+        };
+      }),
+      evidence:
+        input.evidence === undefined
+          ? undefined
+          : fields(input.evidence, {
+              billingCountry: 'billing_country',
+              ipAddress: 'ip_address',
+              bankCountry: 'bank_country'
+            }),
+      payment: {
+        method: input.paymentMethod,
+        processor: input.paymentProcessor,
+        processor_id: input.paymentProcessorId
       },
-      message: `Created ${ctx.input.type} transaction **#${result.number || result.id}** for ${result.total} ${result.currency || ''}`
+      processor: input.processor,
+      processor_id: input.processorId,
+      processor_fee_cents: input.processorFeeCents,
+      exchange_rate: input.exchangeRate,
+      notes: input.notes,
+      tags: tags(input.tag)?.join(','),
+      custom_metadata: metadata(input.customMetadata)
     };
-  })
-  .build();
+    const record = await client.create('transactions', data);
+    const doc = mapDocumentOutput(record);
+    let documentType: string | undefined;
+    if (typeof record.url === 'string') {
+      let resourceURL: URL;
+      try {
+        resourceURL = new URL(record.url);
+      } catch {
+        throw invalid('Quaderno returned an invalid transaction resource URL.');
+      }
+      const match = /^\/api\/(invoices|receipts|credits)\/[a-zA-Z0-9_-]+(?:\.json)?$/.exec(
+        resourceURL.pathname
+      );
+      if (match) documentType = match[1];
+    }
+    return {
+      transactionId: doc.documentId,
+      documentType,
+      number: doc.number,
+      type: input.type,
+      currency: doc.currency,
+      total: doc.total,
+      state: doc.state,
+      permalink: doc.permalink,
+      totalCents: doc.totalCents,
+      subtotalCents: doc.subtotalCents
+    };
+  }
+});

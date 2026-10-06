@@ -64,7 +64,7 @@ export let listNotes = SlateTool.create(spec, {
       cursor: ctx.input.cursor
     });
 
-    let notes = (result.notes || []).map((note: any) => ({
+    let notes = result.notes.map(note => ({
       noteId: note.id,
       title: note.title,
       url: note.url,
@@ -79,11 +79,11 @@ export let listNotes = SlateTool.create(spec, {
     return {
       output: {
         notes,
-        total: result.total ?? notes.length,
-        hasNextPage: result.hasNextPage ?? false,
-        nextCursor: result.nextCursor ?? null
+        total: result.total,
+        hasNextPage: result.hasNextPage,
+        nextCursor: result.nextCursor
       },
-      message: `Listed **${notes.length}** note(s) (total: ${result.total ?? notes.length})${result.hasNextPage ? ' — more results available' : ''}`
+      message: `Listed **${notes.length}** note(s) (total: ${result.total})${result.hasNextPage ? ' — more results available' : ''}`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { V0Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,15 +30,19 @@ let chatDetailSchema = z.object({
 export let listChatsTool = SlateTool.create(spec, {
   name: 'List Chats',
   key: 'list_chats',
-  description: `Retrieve a list of chats with pagination and filtering support. Filter by favorite status, Vercel project, or Git branch.`,
+  description: `DEPRECATED — use \`list_current_chats\` instead. This tool uses API v1. Retrieve a list of chats with pagination and filtering support. Filter by favorite status, Vercel project, or Git branch.`,
   tags: {
+    deprecated: true,
     readOnly: true
-  }
+  },
+  instructions: [
+    'Use list_current_chats for current API v2 chats. This tool operates only on API v1 chats; v1 IDs cannot be used with v2.'
+  ]
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Max number of chats to return'),
-      offset: z.number().optional().describe('Pagination offset'),
+      limit: z.number().min(1).max(100).optional().describe('Max number of chats to return'),
+      offset: z.number().min(0).optional().describe('Pagination offset'),
       isFavorite: z.boolean().optional().describe('Filter by favorite status'),
       vercelProjectId: z.string().optional().describe('Filter by Vercel project ID'),
       branch: z.string().optional().describe('Filter by Git branch name')
@@ -66,10 +70,15 @@ export let listChatsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      (ctx.input.limit !== undefined && !Number.isInteger(ctx.input.limit)) ||
+      (ctx.input.offset !== undefined && !Number.isInteger(ctx.input.offset))
+    )
+      throw createApiServiceError('limit and offset must be whole numbers.');
     let client = new V0Client(ctx.auth.token);
     let result = await client.listChats(ctx.input);
 
-    let chats = (result.data || []).map((c: any) => ({
+    let chats = (result.data || []).map(c => ({
       chatId: c.id,
       name: c.name,
       privacy: c.privacy,
@@ -93,14 +102,18 @@ export let listChatsTool = SlateTool.create(spec, {
 export let getChatTool = SlateTool.create(spec, {
   name: 'Get Chat',
   key: 'get_chat',
-  description: `Retrieve full details of a specific chat including its message history, latest version status, and associated metadata.`,
+  description: `DEPRECATED — use \`get_current_chat\` instead. This tool uses API v1. Retrieve full details of a specific chat including its message history, latest version status, and associated metadata.`,
   tags: {
+    deprecated: true,
     readOnly: true
-  }
+  },
+  instructions: [
+    'Use get_current_chat for current API v2 chats. This tool operates only on API v1 chats; v1 IDs cannot be used with v2.'
+  ]
 })
   .input(
     z.object({
-      chatId: z.string().describe('The chat ID to retrieve')
+      chatId: z.string().min(1).describe('The chat ID to retrieve')
     })
   )
   .output(chatDetailSchema)
@@ -108,7 +121,7 @@ export let getChatTool = SlateTool.create(spec, {
     let client = new V0Client(ctx.auth.token);
     let result = await client.getChat(ctx.input.chatId);
 
-    let messages = (result.messages || []).map((m: any) => ({
+    let messages = (result.messages || []).map(m => ({
       role: m.role,
       content: m.content,
       createdAt: m.createdAt,
@@ -140,14 +153,18 @@ export let getChatTool = SlateTool.create(spec, {
 export let deleteChatTool = SlateTool.create(spec, {
   name: 'Delete Chat',
   key: 'delete_chat',
-  description: `Permanently delete a chat and all its contents. This operation is irreversible.`,
+  description: `DEPRECATED — use \`delete_current_chat\` instead. This tool uses API v1. Permanently delete a chat and all its contents. This operation is irreversible.`,
   tags: {
+    deprecated: true,
     destructive: true
-  }
+  },
+  instructions: [
+    'Use delete_current_chat for current API v2 chats. This tool operates only on API v1 chats; v1 IDs cannot be used with v2.'
+  ]
 })
   .input(
     z.object({
-      chatId: z.string().describe('The chat ID to delete')
+      chatId: z.string().min(1).describe('The chat ID to delete')
     })
   )
   .output(

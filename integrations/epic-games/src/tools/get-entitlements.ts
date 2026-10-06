@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { EosAccountServicesClient } from '../lib/client';
+import { accountClient, resolvedSandbox } from '../lib/client';
 import { spec } from '../spec';
 
 let entitlementSchema = z.object({
@@ -31,7 +31,9 @@ Can optionally filter by entitlement name and include already-redeemed entitleme
       sandboxId: z
         .string()
         .optional()
-        .describe('Sandbox ID. Uses the configured sandboxId if not provided.'),
+        .describe(
+          'Sandbox ID. Uses the auth-observed or validated legacy sandbox only when available.'
+        ),
       entitlementNames: z
         .array(z.string())
         .optional()
@@ -48,41 +50,16 @@ Can optionally filter by entitlement name and include already-redeemed entitleme
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EosAccountServicesClient({
-      token: ctx.auth.token,
-      accountId: ctx.auth.accountId
-    });
-
-    let sandboxId = ctx.input.sandboxId ?? ctx.config.sandboxId;
-    if (!sandboxId) {
-      throw new Error('sandboxId is required either in the input or in the configuration');
-    }
-
-    let data = await client.getEntitlements(
+    const data = await accountClient(ctx).getEntitlements(
       ctx.input.accountId,
-      sandboxId,
+      resolvedSandbox(ctx, ctx.input.sandboxId),
       ctx.input.entitlementNames,
       ctx.input.includeRedeemed
     );
-
-    let entitlements = Array.isArray(data)
-      ? data.map((e: any) => ({
-          entitlementId: e.id,
-          entitlementName: e.entitlementName,
-          namespace: e.namespace,
-          catalogItemId: e.catalogItemId,
-          entitlementType: e.entitlementType,
-          grantDate: e.grantDate,
-          consumable: e.consumable,
-          status: e.status,
-          useCount: e.useCount,
-          entitlementSource: e.entitlementSource
-        }))
-      : [];
-
+    const entitlements = data.map(({ id, ...record }) => ({ entitlementId: id, ...record }));
     return {
       output: { entitlements },
-      message: `Found **${entitlements.length}** entitlement(s) for account \`${ctx.input.accountId}\`.`
+      message: `Returned ${entitlements.length} native entitlement record(s). No redemption occurred.`
     };
   })
   .build();

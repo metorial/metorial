@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let askQuestion = SlateTool.create(spec, {
   name: 'Ask Question',
   key: 'ask_question',
-  description: `Ask a natural language question to Slite's AI-powered knowledge base. The AI searches across all accessible notes and returns an answer with source references. Results can be scoped to a specific parent note or assistant.`,
+  description: `Ask a natural language question to Slite's AI-powered knowledge base. The AI searches across all accessible notes and returns an answer with source references. Results can be scoped to a specific parent note or assistant. The question can create a retained thread; a processing result is not a completed answer. Read the same thread rather than resubmitting.`,
   tags: {
     destructive: false,
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -27,6 +27,9 @@ export let askQuestion = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      status: z.enum(['completed', 'processing']),
+      threadId: z.string().optional(),
+      retryAfterSeconds: z.number().optional(),
       answer: z.string().describe('AI-generated answer to the question'),
       sources: z
         .array(
@@ -53,7 +56,7 @@ export let askQuestion = SlateTool.create(spec, {
       assistantId: ctx.input.assistantId
     });
 
-    let sources = (result.sources || []).map((source: any) => ({
+    let sources = result.sources.map(source => ({
       noteId: source.id,
       title: source.title,
       url: source.url,
@@ -63,10 +66,17 @@ export let askQuestion = SlateTool.create(spec, {
 
     return {
       output: {
+        status: result.status,
+        threadId: 'threadId' in result ? result.threadId : undefined,
+        retryAfterSeconds:
+          'retryAfterSeconds' in result ? result.retryAfterSeconds : undefined,
         answer: result.answer,
         sources
       },
-      message: `**Answer:** ${result.answer}\n\nBased on ${sources.length} source(s).`
+      message:
+        result.status === 'processing'
+          ? `The question is still processing. Save threadId ${'threadId' in result ? result.threadId : ''} and inspect it with get_ask_thread; do not submit the question again implicitly.`
+          : `**Answer:** ${result.answer}\n\nBased on ${sources.length} source(s).`
     };
   })
   .build();

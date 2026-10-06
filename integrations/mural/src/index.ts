@@ -36,8 +36,6 @@ import {
   updateTagTool,
   updateWidgetTool
 } from './tools';
-import { inboundWebhook, newMuralTrigger, newWidgetTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -76,5 +74,5 @@ export let provider = Slate.create({
     managePrivateModeTool,
     getChatHistoryTool
   ],
-  triggers: [inboundWebhook, newMuralTrigger, newWidgetTrigger]
+  triggers: []
 });

@@ -17,14 +17,16 @@ export let sendMessage = SlateTool.create(spec, {
       from: z
         .string()
         .describe(
-          'Sender phone number or alphanumeric sender ID in E.164 format (e.g., +15551234567)'
+          'Sender E.164 number, short code, or alphanumeric sender ID (e.g., +15551234567)'
         ),
       to: z.string().describe('Recipient phone number in E.164 format (e.g., +15559876543)'),
       text: z.string().optional().describe('Message body text'),
       mediaUrls: z
         .array(z.string())
         .optional()
-        .describe('Array of media URLs for MMS (total size must be under 1MB)'),
+        .describe(
+          'Up to ten media URLs for MMS, total size under 1MB. Omit for SMS; an empty array also selects MMS. Text-only MMS can omit this field.'
+        ),
       messagingProfileId: z
         .string()
         .optional()
@@ -45,10 +47,10 @@ export let sendMessage = SlateTool.create(spec, {
       messageId: z.string().describe('Unique ID of the sent message'),
       from: z.string().describe('Sender phone number or ID'),
       to: z.string().describe('Recipient phone number'),
-      text: z.string().optional().describe('Message body text'),
-      type: z.string().optional().describe('Message type (SMS or MMS)'),
-      direction: z.string().optional().describe('Message direction'),
-      status: z.string().optional().describe('Current message status')
+      text: z.string().nullish().describe('Message body text'),
+      type: z.string().nullish().describe('Message type (SMS or MMS)'),
+      direction: z.string().nullish().describe('Message direction'),
+      status: z.string().nullish().describe('Current message status')
     })
   )
   .handleInvocation(async ctx => {
@@ -68,14 +70,14 @@ export let sendMessage = SlateTool.create(spec, {
     return {
       output: {
         messageId: result.id,
-        from: result.from?.phone_number ?? ctx.input.from,
-        to: result.to?.[0]?.phone_number ?? ctx.input.to,
+        from: result.from.phone_number,
+        to: result.to[0]!.phone_number,
         text: result.text,
         type: result.type,
         direction: result.direction,
         status: result.to?.[0]?.status
       },
-      message: `Message sent from **${ctx.input.from}** to **${ctx.input.to}**. Status: ${result.to?.[0]?.status ?? 'queued'}.`
+      message: `Message accepted from **${ctx.input.from}** to **${ctx.input.to}**. Status: ${result.to[0]!.status ?? 'not reported'}.`
     };
   })
   .build();

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let lookupRates = SlateTool.create(spec, {
@@ -12,7 +12,8 @@ export let lookupRates = SlateTool.create(spec, {
   ],
   constraints: [
     'Does not account for nexus, sourcing, shipping taxability, product exemptions, customer exemptions, or sales tax holidays.',
-    'For accurate tax calculations on actual orders, use the Calculate Sales Tax tool instead.'
+    'For tax calculations on actual orders, use calculate_tax instead.',
+    'Rate lookups count toward API usage. Sandbox rates must not be used as tax accuracy evidence.'
   ],
   tags: {
     readOnly: true
@@ -44,11 +45,7 @@ export let lookupRates = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = clientFor(ctx);
 
     let result = await client.getRatesForLocation(ctx.input.zip, {
       country: ctx.input.country,

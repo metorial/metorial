@@ -20,8 +20,6 @@ import {
   registerModel,
   startAutopilot
 } from './tools';
-import { datasetEvents, deploymentEvents, projectEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     listModelPackages,
     registerModel
   ],
-  triggers: [deploymentEvents, projectEvents, datasetEvents]
+  triggers: []
 });

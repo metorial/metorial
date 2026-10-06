@@ -19,6 +19,7 @@ export let setSpendLimit = SlateTool.create(spec, {
       spendLimitDollars: z
         .number()
         .int()
+        .nonnegative()
         .nullable()
         .describe('Monthly spend limit in dollars (integer). Set to null to remove the limit.')
     })

@@ -6,8 +6,12 @@ import { spec } from '../spec';
 export let listDatabases = SlateTool.create(spec, {
   name: 'List Databases',
   key: 'list_databases',
-  description: `List all databases in the configured workspace. Returns database names, regions, and metadata.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: List all databases in the configured workspace. Returns database names, regions, and metadata.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })
@@ -49,8 +53,12 @@ export let listDatabases = SlateTool.create(spec, {
 export let createDatabase = SlateTool.create(spec, {
   name: 'Create Database',
   key: 'create_database',
-  description: `Create a new database in the configured workspace. Optionally specify a region and initial branch name.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Create a new database in the configured workspace. Optionally specify a region and initial branch name.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     destructive: false
   }
 })
@@ -98,8 +106,12 @@ export let createDatabase = SlateTool.create(spec, {
 export let deleteDatabase = SlateTool.create(spec, {
   name: 'Delete Database',
   key: 'delete_database',
-  description: `Permanently delete a database and all its branches, tables, and data. This action cannot be undone.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Permanently delete a database and all its branches, tables, and data. This action cannot be undone.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     destructive: true
   }
 })
@@ -132,8 +144,12 @@ export let deleteDatabase = SlateTool.create(spec, {
 export let listWorkspaces = SlateTool.create(spec, {
   name: 'List Workspaces',
   key: 'list_workspaces',
-  description: `List all workspaces accessible to the authenticated user. Useful for discovering available workspaces and their IDs.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: List all workspaces accessible to the authenticated user. Useful for discovering available workspaces and their IDs.`,
+  instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

@@ -27,12 +27,12 @@ describe('google-cloud-vision provider contract', () => {
         'get_crop_hints',
         'detect_web'
       ],
-      triggerIds: ['inbound_webhook'],
+      triggerIds: [],
       authMethodIds: ['google_oauth', 'api_key'],
-      triggers: [{ id: 'inbound_webhook', invocationType: 'webhook' }]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(12);
+    expect(contract.actions).toHaveLength(11);
 
     let expectedScopes = {
       analyze_image: googleCloudVisionActionScopes.analyzeImage,

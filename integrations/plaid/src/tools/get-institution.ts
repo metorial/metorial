@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PlaidClient } from '../lib/client';
+import type { productStatus } from '../lib/contracts';
 import { spec } from '../spec';
 
 let statusSchema = z
@@ -71,14 +72,14 @@ export let getInstitutionTool = SlateTool.create(spec, {
     );
 
     let inst = result.institution;
-    let mapStatus = (s: any) =>
+    let mapStatus = (s: z.infer<typeof productStatus> | undefined) =>
       s ? { status: s.status, lastStatusChange: s.last_status_change ?? null } : undefined;
 
     let institution = {
       institutionId: inst.institution_id,
       name: inst.name,
-      products: inst.products || [],
-      countryCodes: inst.country_codes || [],
+      products: inst.products,
+      countryCodes: inst.country_codes,
       oauth: inst.oauth,
       url: inst.url ?? null,
       primaryColor: inst.primary_color ?? null,

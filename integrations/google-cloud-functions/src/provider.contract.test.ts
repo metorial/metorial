@@ -26,15 +26,12 @@ describe('google-cloud-functions provider contract', () => {
         'manage_iam_policy',
         'get_operation'
       ],
-      triggerIds: ['inbound_webhook', 'function_changes'],
+      triggerIds: [],
       authMethodIds: ['google_oauth', 'service_account'],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'function_changes', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(12);
+    expect(contract.actions).toHaveLength(10);
 
     let expectedScopes = {
       list_functions: googleCloudFunctionsActionScopes.listFunctions,
@@ -46,8 +43,7 @@ describe('google-cloud-functions provider contract', () => {
       generate_upload_url: googleCloudFunctionsActionScopes.generateUploadUrl,
       generate_download_url: googleCloudFunctionsActionScopes.generateDownloadUrl,
       manage_iam_policy: googleCloudFunctionsActionScopes.manageIamPolicy,
-      get_operation: googleCloudFunctionsActionScopes.getOperation,
-      function_changes: googleCloudFunctionsActionScopes.functionChanges
+      get_operation: googleCloudFunctionsActionScopes.getOperation
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

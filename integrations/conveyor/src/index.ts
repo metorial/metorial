@@ -24,8 +24,6 @@ import {
   updateDocument,
   updateQuestionnaireRequest
 } from './tools';
-import { accessRequested } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -52,5 +50,5 @@ export let provider = Slate.create({
     updateQuestionnaireRequest,
     askQuestion
   ],
-  triggers: [accessRequested]
+  triggers: []
 });

@@ -1,76 +1,29 @@
-Now I have a comprehensive understanding of the Databox API. Let me compile the specification.
+# Databox API coverage
 
-# Slates Specification for Databox
+Fifteen tools cover credential validation and identity, account/source discovery, custom source and dataset lifecycle, ingestion, ingestion history and current dataset row readback. All twelve existing tool keys and field types remain available. No triggers are registered.
 
-## Overview
+## API versions
 
-Databox is a business analytics platform that consolidates KPIs and metrics from hundreds of data sources into dashboards, reports, and alerts. It provides a REST API (v1) that allows programmatic data ingestion, data source management, and dataset operations, enabling users to push custom data from any external system into Databox for visualization and analysis.
+The [official migration guide](https://developers.databox.com/docs/api/migration-guide) confirms v1 remains available. Existing connections default to v1; `apiVersion: "v2"` explicitly selects current request and response envelopes. V2 resources are nested under `data`, list items under `data.items`, and pagination starts at zero. V1 ingestion pagination starts at one. Provider pagination is returned as supplied, never synthesized.
 
-## Authentication
+The current v2 OpenAPI declares integer dataset IDs, while the migration guide says identifiers are unchanged and shows a UUID example. V1 UUIDs are preserved; v2 IDs follow its schema, are checked for exact JavaScript integer representation and returned as decimal strings. Invalid or cross-version identifiers fail before network calls. Do not guess ID conversions.
 
-Databox uses **API Key** authentication for its v1 API. To access the API, you must authenticate requests using an API key. Support for OAuth 2.0 is coming soon.
+The legacy `list_accounts` classification has no equivalent in v2 and fails locally there with remediation. `get_dataset_data` is v2-only. V2 dataset creation requires additive `columns` definitions. V1 rejects fields that only have a v2 meaning rather than ignoring them. Source creation accepts an optional account ID: explicit values retain the v1 body field or v2 account header semantics, while omission uses the API key’s default scope. Both managed and self-managed accounts follow the documented source context; their billing differences do not classify legacy account types.
 
-**Obtaining an API Key:**
-Go to your Profile page (Account Management > Profile). In the Password & Security section, find the API key option. Click Create to generate a new key.
+## Authentication and ingestion
 
-Access to API key management is currently limited to Admin users.
+User-specific API keys use `x-api-key`, inherit user permissions and may be IP-restricted. Current profile discovery provides stable user identity without revealing a credential prefix. Account context headers apply only to documented v2 operations; profile, key validation and timezone discovery ignore account selection.
 
-**Usage:**
-The API key is passed via the `x-api-key` header on all requests to `https://api.databox.com`.
+Databox v1 allows 100 records per ingestion request. Current v2 documentation allows 500 records or 10 MB, with optional 24-hour idempotency keys for creation, ingestion and purge. No write retries or chunking are automatic. JSON-compatible values and finite numbers are required; datetime values are caller-supplied ISO 8601 strings, not implicitly converted v0 metric timestamps. Rejected rows and processing status must be checked separately from request acceptance. Ingestion errors containing records are omitted from status output; only counts are returned.
 
-**Key Properties:**
+Nonempty top-level error lists fail the request even on HTTP 2xx; provider error records are never echoed. A v1 dataset title explicitly returned as null is represented by an empty title string, retaining the existing public field type.
 
-- API keys are user-specific. Each key inherits the access rights and permissions of the user who created it.
-- You can optionally restrict usage of your API key to specific IP addresses by clicking Manage allowed IPs and entering one or more IP addresses. Only requests coming from the specified IPs will be accepted.
+Deletion and purge are irreversible; dataset primary keys permit overwrites. Storage, feature access and retained history depend on the account and plan. Billing, destination provisioning, metric definitions and historic v0 metric pushes are outside this focused surface.
 
-**Validation:**
-Use `GET /v1/auth/validate-key` to validate the API key supplied in the x-api-key header. Use this endpoint as a setup/health check. Integration partners can call it to confirm a customer's key before enabling data ingestion or completing account linking.
+## Sources
 
-**Legacy Push API (v0):**
-The deprecated v0 Push API uses a different token-based authentication via HTTP Basic Auth (token as username, no password) against `https://push.databox.com`. This version is no longer recommended for new implementations.
-
-## Features
-
-### Account Management
-
-Retrieve a list of Databox accounts the authenticated user has access to and their associated data sources. This is needed to identify the correct account ID for creating data sources and ingesting data.
-
-### Data Source Management
-
-A data source serves as a logical container for the datasets you'll send to Databox. You can think of it as the equivalent of an integration or connection within your Databox account. You can create and delete data sources, configure their timezone, and list all datasets belonging to a data source.
-
-- Each data source requires a title and optionally an account ID and IANA timezone string.
-- Deleting a data source permanently removes all its datasets and data.
-
-### Dataset Management
-
-The Databox API (v1) is dataset-based, meaning you create containers for data and then ingest records into them. Datasets are created within a data source and can define primary keys to uniquely identify rows.
-
-- You can create, delete, and purge (clear all data without deleting the structure) datasets.
-- Primary keys can be specified to control how rows are identified and updated.
-
-### Data Ingestion
-
-Push structured, row-level data into datasets. You can send data to Databox as frequently as needed, including real-time or event-based updates. Data is sent as JSON payloads to a dataset's ingestion endpoint.
-
-- Each ingestion is tracked with a unique ingestion ID.
-- You can list all ingestion events for a dataset and retrieve details about a specific ingestion, including metrics about the outcome (rows processed, errors, etc.).
-
-### Timezone Support
-
-Retrieve a full list of supported IANA timezones to configure data sources correctly for visualization purposes.
-
-### Dataset Enrichment (In-Platform)
-
-Beyond visualization, Databox offers tools to manage and enrich datasets: Add calculated columns to create new columns derived from existing data using formulas. Merge datasets to combine multiple datasets into a single, unified dataset to consolidate related information. These operations are performed within the Databox platform, not via API.
-
-### MCP (Model Context Protocol) Integration
-
-Databox MCP is a Model Context Protocol server that connects your AI tools to your Databox data. It provides a standardized way for AI applications (like ChatGPT, Claude, or custom agents) to ingest data into Databox and query it using natural language.
-
-- MCP uses OAuth 2.0 for authentication (separate from the API key auth used for the REST API).
-- Compatible with MCP-enabled AI clients such as Claude, ChatGPT, and Cursor.
-
-## Events
-
-The provider does not support events. Databox does not offer webhooks, event subscriptions, or purpose-built polling mechanisms through its API.
+- [Current API reference](https://developers.databox.com/docs/api/api.databox.com)
+- [Authentication and account context](https://developers.databox.com/docs/api/authentication)
+- [Version migration and compatibility](https://developers.databox.com/docs/api/migration-guide)
+- [Rate limits and idempotency](https://developers.databox.com/docs/api/rate-limits)
+- [Current API overview and availability](https://developers.databox.com/docs/api/overview)

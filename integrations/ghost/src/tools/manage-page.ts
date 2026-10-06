@@ -1,26 +1,32 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GhostAdminClient } from '../lib/client';
+import { getClient } from '../lib/client';
+import { invalid, resourceId, validateContentWrite } from '../lib/schemas';
 import { spec } from '../spec';
 
-let pageOutputSchema = z.object({
-  pageId: z.string().describe('Unique page ID'),
-  uuid: z.string().describe('Page UUID'),
-  title: z.string().describe('Page title'),
-  slug: z.string().describe('URL-friendly slug'),
-  status: z.string().describe('Page status'),
-  visibility: z.string().describe('Page visibility level'),
-  html: z.string().nullable().optional().describe('HTML content'),
-  excerpt: z.string().nullable().describe('Auto-generated excerpt'),
-  customExcerpt: z.string().nullable().describe('Custom excerpt'),
-  featureImage: z.string().nullable().describe('Feature image URL'),
-  metaTitle: z.string().nullable().describe('SEO meta title'),
-  metaDescription: z.string().nullable().describe('SEO meta description'),
-  publishedAt: z.string().nullable().describe('Publication timestamp'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp'),
-  url: z.string().describe('Full URL of the page')
-});
+let pageOutputSchema = z
+  .object({
+    pageId: z.string().describe('Unique page ID'),
+    uuid: z.string().optional().describe('Page UUID'),
+    title: z.string().optional().describe('Page title'),
+    slug: z.string().optional().describe('URL-friendly slug'),
+    status: z.string().optional().describe('Page status'),
+    visibility: z.string().optional().describe('Page visibility level'),
+    lexical: z.string().nullable().optional().describe('Native Lexical document'),
+    plaintext: z.string().nullable().optional().describe('Native plain text'),
+    html: z.string().nullable().optional().describe('HTML content'),
+    excerpt: z.string().nullable().optional().describe('Auto-generated excerpt'),
+    customExcerpt: z.string().nullable().optional().describe('Custom excerpt'),
+    featureImage: z.string().nullable().optional().describe('Feature image URL'),
+    metaTitle: z.string().nullable().optional().describe('SEO meta title'),
+    metaDescription: z.string().nullable().optional().describe('SEO meta description'),
+    publishedAt: z.string().nullable().optional().describe('Publication timestamp'),
+    createdAt: z.string().optional().describe('Creation timestamp'),
+    updatedAt: z.string().optional().describe('Last update timestamp'),
+    url: z.string().optional().describe('Full URL of the page')
+  })
+  .partial()
+  .required({ pageId: true });
 
 export let managePage = SlateTool.create(spec, {
   name: 'Manage Page',
@@ -36,9 +42,15 @@ export let managePage = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      api: z
+        .enum(['admin', 'content'])
+        .optional()
+        .describe(
+          'Read through Admin or published Content API. Writes require Admin. Defaults to the connection type.'
+        ),
       action: z.enum(['create', 'read', 'update', 'delete']).describe('Operation to perform'),
-      pageId: z.string().optional().describe('Page ID (required for read/update/delete)'),
-      slug: z.string().optional().describe('Page slug (alternative to pageId for reading)'),
+      pageId: resourceId.optional().describe('Page ID (required for read/update/delete)'),
+      slug: resourceId.optional().describe('Page slug (alternative to pageId for reading)'),
       title: z.string().optional().describe('Page title'),
       html: z.string().optional().describe('HTML content'),
       lexical: z.string().optional().describe('Lexical JSON content'),
@@ -64,15 +76,14 @@ export let managePage = SlateTool.create(spec, {
   )
   .output(pageOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GhostAdminClient({
-      domain: ctx.config.adminDomain,
-      apiKey: ctx.auth.token
-    });
+    let client = getClient(ctx, ctx.input.api);
 
     let { action } = ctx.input;
 
     if (action === 'read') {
       let result: any;
+      if (ctx.input.slug && ctx.input.pageId)
+        throw invalid('Provide one exact ID or slug, not both.');
       if (ctx.input.slug) {
         result = await client.readPageBySlug(ctx.input.slug, {
           include: 'tags,authors',
@@ -84,14 +95,14 @@ export let managePage = SlateTool.create(spec, {
           formats: 'html'
         });
       } else {
-        throw new Error('Either pageId or slug is required for reading a page');
+        throw invalid('Either pageId or slug is required for reading a page');
       }
       let p = result.pages[0];
       return { output: mapPage(p), message: `Retrieved page **"${p.title}"** (${p.status}).` };
     }
 
     if (action === 'delete') {
-      if (!ctx.input.pageId) throw new Error('pageId is required for deleting a page');
+      if (!ctx.input.pageId) throw invalid('pageId is required for deleting a page');
       await client.deletePage(ctx.input.pageId);
       return {
         output: {
@@ -116,6 +127,7 @@ export let managePage = SlateTool.create(spec, {
       };
     }
 
+    validateContentWrite(ctx.input);
     let pageData = buildPageData(ctx.input);
     let sourceParams = ctx.input.source ? { source: ctx.input.source } : {};
 
@@ -126,15 +138,15 @@ export let managePage = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.pageId) throw new Error('pageId is required for updating a page');
-      if (!ctx.input.updatedAt) throw new Error('updatedAt is required for updating a page');
+      if (!ctx.input.pageId) throw invalid('pageId is required for updating a page');
+      if (!ctx.input.updatedAt) throw invalid('updatedAt is required for updating a page');
       pageData.updated_at = ctx.input.updatedAt;
       let result = await client.updatePage(ctx.input.pageId, pageData, sourceParams);
       let p = result.pages[0];
       return { output: mapPage(p), message: `Updated page **"${p.title}"** (${p.status}).` };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw invalid(`Unknown action: ${action}`);
   })
   .build();
 
@@ -159,17 +171,19 @@ let buildPageData = (input: any): Record<string, any> => {
 let mapPage = (p: any) => ({
   pageId: p.id,
   uuid: p.uuid,
+  lexical: p.lexical,
+  plaintext: p.plaintext,
   title: p.title,
   slug: p.slug,
   status: p.status,
   visibility: p.visibility,
-  html: p.html ?? null,
-  excerpt: p.excerpt ?? null,
-  customExcerpt: p.custom_excerpt ?? null,
-  featureImage: p.feature_image ?? null,
-  metaTitle: p.meta_title ?? null,
-  metaDescription: p.meta_description ?? null,
-  publishedAt: p.published_at ?? null,
+  html: p.html,
+  excerpt: p.excerpt,
+  customExcerpt: p.custom_excerpt,
+  featureImage: p.feature_image,
+  metaTitle: p.meta_title,
+  metaDescription: p.meta_description,
+  publishedAt: p.published_at,
   createdAt: p.created_at,
   updatedAt: p.updated_at,
   url: p.url

@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { credentials } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -18,19 +19,19 @@ export let auth = SlateAuth.create()
       companyId: z
         .string()
         .describe(
-          'Company ID (CID / Account Number) found in the LastPass Admin Console Dashboard'
+          'Company ID (CID / Account Number) from the Admin Console account menu; configured account, not a verified person'
         ),
       provisioningHash: z
         .string()
-        .describe('Provisioning Hash generated at Admin Console > Advanced > Enterprise API')
+        .describe(
+          'Enterprise API provisioning hash from Advanced > Enterprise API; not a REST API lpkey_ or AD Connector key'
+        )
     }),
 
     getOutput: async ctx => {
+      let output = credentials(ctx.input);
       return {
-        output: {
-          companyId: ctx.input.companyId,
-          provisioningHash: ctx.input.provisioningHash
-        }
+        output
       };
     }
   });

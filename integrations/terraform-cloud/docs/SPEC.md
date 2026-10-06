@@ -1,117 +1,30 @@
-Now let me get the full list of notification events:Now I have comprehensive information. Let me compile the specification.
+# HCP Terraform integration specification
 
-# Slates Specification for Terraform Cloud
+Version 0.3.1 exposes 42 REST API v2 tools. All 38 historical tool keys and field types remain available; four tools add account/organization discovery and workspace-grant discovery/revocation. Tool schemas are top-level objects. There are no registered event triggers. Workspace run-trigger configuration is an ordinary API capability.
 
-## Overview
+The [README](../README.md) lists the complete public tool surface, authentication, permissions, paging and effects. The selected HTTPS `/api/v2` connection origin is used for all authenticated requests, including account discovery. A stored legacy configuration API URL remains readable for existing connections. The configured organization is optional; explicit organizationName inputs take precedence for organization-scoped operations.
 
-Terraform Cloud (now branded as HCP Terraform) is HashiCorp's managed service for infrastructure-as-code workflows using Terraform. It provides remote state management, remote Terraform execution, workspace and team management, policy enforcement, and VCS integration for collaborative infrastructure provisioning.
+## API contracts
 
-## Authentication
+- JSON:API resource types, IDs, attributes and pagination are checked before mapping selected public fields. Errors do not echo tokens, request bodies, state values or upstream messages. Paths encode resource IDs and names; requests have a timeout and do not forward credentials through redirects.
+- Workspace list/create and name lookup use organization-scoped routes; ID reads/updates/deletion and lock actions use workspace routes. Agent execution needs an existing agent pool.
+- Runs use `/runs` and workspace run collections. Apply, discard, cancel, force-cancel and force-execute return asynchronous acceptance. `allowEmptyApply` can automatically apply empty plans even with auto-apply disabled. Run lists exclude plan-only runs by default; the optional operation filter includes them. New run and access-grant responses must match the requested workspace/configuration/team relationships, and paginated responses must match the requested page.
+- Workspace variables use the nested workspace `/vars` routes. Sensitive values are always hidden and missing sensitivity classifications fail closed.
+- State versions are listed at `/state-versions` using required organization-name and workspace-name filters resolved from the requested workspace ID. State output listing is paginated; current-state reads fetch all pages and distinguish pending extraction from an empty result.
+- Run-trigger lists include the required inbound/outbound filter. Creates identify an existing source workspace through the sourceable relationship.
+- Membership adds use user IDs resolved from accepted organization members; removals use usernames. HCP Europe membership operations direct callers to HCP group administration.
+- Workspace-grant creation/listing uses `/team-workspaces`; deletion uses the exact relationship ID. Granular permission fields require custom access.
+- HCP Terraform notification email addresses resolve against the workspace's owning organization and produce a users relationship; Terraform Enterprise retains direct email-addresses support. Notifications are disabled by default. Returned URLs are redacted and HMAC secrets are never mapped.
 
-Terraform Cloud uses **Bearer Token** authentication for all API requests. All requests must be authenticated with a bearer token, using the HTTP header `Authorization` with the value `Bearer <token>`.
+## Primary references
 
-The API base URL is `https://app.terraform.io/api/v2`. For HCP Europe organizations, use `https://app.eu.terraform.io/api/v2`.
+- [API overview](https://developer.hashicorp.com/terraform/cloud-docs/api-docs)
+- [Account](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/account), [Organizations](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/organizations), [API tokens](https://developer.hashicorp.com/terraform/cloud-docs/users-teams-organizations/api-tokens)
+- [Workspaces](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/workspaces), [Runs](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/run), [Workspace variables](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/workspace-variables)
+- [Projects](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/projects), [Teams](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/teams), [Membership](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/team-members), [Organization memberships](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/organization-memberships), [Workspace grants](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/team-access)
+- [Variable sets](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/variable-sets), [Policy sets](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/policy-sets)
+- [State versions](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/state-versions), [State outputs](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/state-version-outputs)
+- [Current official SDK OpenAPI](https://github.com/hashicorp/go-tfe/blob/80416ebd711140e637c39beb3f32b587926ad956/v2/openapi/spec.json) confirms the plural notification JSON:API type and the email-addresses attribute. The current main branch uses generated v2 models; historical root-level SDK files are no longer present. The [official Kubernetes operator reference](https://developer.hashicorp.com/terraform/cloud-docs/integrations/kubernetes/api-reference) identifies direct email addresses as Terraform Enterprise only; HCP Terraform uses organization users.
+- [Workspace notifications](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/notification-configurations/workspace), [Run triggers](https://developer.hashicorp.com/terraform/cloud-docs/api-docs/run-triggers)
 
-There are four types of API tokens, each with different scopes:
-
-- **User Tokens**: Each HCP Terraform user can have any number of API tokens, which can make requests on their behalf. These have the broadest permissions, based on the user's team memberships and organization roles. User tokens can be created in the UI under User Settings → Tokens, or via the API.
-
-- **Team Tokens**: Each team can have one API token at a time. This is intended for performing plans and applies via a CI/CD pipeline. Team tokens inherit the team's workspace permissions.
-
-- **Organization Tokens**: Each organization can have one API token at a time. This is intended for automating the management of teams, team membership, and workspaces. The organization token cannot perform plans and applies.
-
-- **Audit Trails Tokens**: Each organization can have a single token that can read that organization's audit trails. Use this token type to authenticate integrations pulling audit trail data.
-
-You can create user, team, and organization tokens with an expiration date and time. Once the expiration time has passed, the token is no longer treated as valid and may not be used to authenticate to any API.
-
-## Features
-
-### Workspace Management
-
-A workspace is a group of infrastructure resources managed by Terraform. HCP Terraform manages infrastructure collections with workspaces instead of directories. A workspace contains everything Terraform needs to manage a given collection of infrastructure, and separate workspaces function like completely separate working directories. You can create, list, update, delete, lock, and unlock workspaces. Workspaces can be configured with execution mode (remote, local, or agent), Terraform version, working directory, auto-apply settings, and VCS repository connections.
-
-### Runs and Plans
-
-You can trigger and manage Terraform runs (plan, apply, destroy) within workspaces. HCP Terraform has three workflows for managing Terraform runs: the UI/VCS-driven run workflow, the API-driven run workflow, and the CLI-driven run workflow. Runs can be created, listed, approved, cancelled, discarded, or force-executed via the API. For the API-driven workflow, you upload configuration versions as `.tar.gz` files before triggering runs.
-
-### Variable Management
-
-You can create both environment variables and Terraform variables in HCP Terraform. Variables can be set at the workspace level or through reusable variable sets that apply to multiple workspaces. Variables can be marked as sensitive to protect secrets like API keys and credentials. Variable sets can be scoped to organizations, projects, or specific workspaces.
-
-### Organization and Team Management
-
-Manage organizations, teams, and team memberships. Teams can have granular permissions on workspaces including access to runs, variables, state versions, and workspace locking. Organization API tokens have permissions across the entire organization. They can perform all CRUD operations on most resources, but have some limitations.
-
-### Policy Enforcement
-
-Policies are rules that HCP Terraform enforces on runs in workspaces. You can use policies to validate that the Terraform plan complies with security rules and best practices. HCP Terraform policy enforcement lets you use the policy-as-code frameworks Sentinel and Open Policy Agent (OPA) to apply policy checks to HCP Terraform workspaces. Policies are organized into policy sets that can be applied globally or to specific projects and workspaces.
-
-### State Management
-
-Workspaces store and manage Terraform state files. You can list state versions, read current and historical state, download state files, and create new state versions. State outputs can be shared across workspaces using remote state access.
-
-### Projects
-
-Workspaces are organized into projects. Each workspace belongs to a project. Projects help organize workspaces and manage access at a higher level.
-
-### VCS Integration
-
-Connect workspaces to version control repositories (GitHub, GitLab, Bitbucket, Azure DevOps) to trigger runs automatically when code is pushed. Manage OAuth clients and tokens for VCS provider connections.
-
-### Run Tasks
-
-Run tasks integrate external services into the Terraform run pipeline. During the Pre-plan, Post-Plan, or Apply stages, you can invoke a run task that calls an external service's endpoint, enabling integration with vulnerability scanners, cost estimation tools, approval workflows, and other services.
-
-### Run Triggers
-
-Run triggers allow runs to queue automatically in your workspace when runs in other workspaces are successful. This enables workspace dependency chains.
-
-### Health Assessments
-
-HCP Terraform can perform automatic health assessments in a workspace. Health assessments include drift detection (whether real-world infrastructure matches Terraform configuration) and continuous validation (whether custom conditions continue to pass after provisioning). Available on Standard and Premium editions.
-
-### Private Registry
-
-Publish and manage private Terraform modules and providers within your organization through a built-in private registry.
-
-### Audit Trails
-
-Access organization audit logs to track actions performed by users and systems. Requires an audit trails token for authentication.
-
-### Agent Pools
-
-Manage agent pools for running Terraform operations on private or on-premises infrastructure. Agent pools have their own set of API tokens which allow agents to communicate with HCP Terraform, scoped to an organization.
-
-## Events
-
-Terraform Cloud supports webhook notifications for workspace and run events. HCP Terraform can use webhooks to notify external systems about run progress and other events. Each workspace has its own notification settings and can notify up to 20 destinations.
-
-Webhook destinations can be generic (custom URL), Slack, Microsoft Teams, or Email. Generic webhooks can include an HMAC-SHA512 signature for authenticity verification using a configurable secret token.
-
-### Run Events
-
-Notifications about the lifecycle of Terraform runs within a workspace:
-
-- **Created**: A run begins and enters the Pending stage.
-- **Planning**: A run acquires the lock and starts to execute.
-- **Needs Attention**: A plan has changes and requires user input to continue (e.g., approving the plan or a policy override).
-- **Applying**: A run enters the Apply stage.
-- **Completed**: A run completed successfully.
-- **Errored**: A run terminated early due to error or cancellation.
-
-### Workspace Health Events
-
-Notifications about workspace health assessments (requires health assessments to be enabled, available on Standard/Premium editions):
-
-- **Check failed**: HCP Terraform detected one or more failed continuous validation checks.
-- **Drift detected**: HCP Terraform detected configuration drift for the first time, or a previously detected drift has changed.
-- **Health assessment errored**: A health assessment failed. Health assessments fail when HCP Terraform cannot perform drift detection, continuous validation, or both.
-
-### Auto Destroy Events
-
-- **Auto destroy reminder**: Sends reminders 12 and 24 hours before a scheduled auto destroy run.
-- **Auto destroy results**: HCP Terraform performed an auto destroy run in the workspace. Reports both successful and errored runs.
-
-### Team Notification Events
-
-HCP Terraform can use webhooks to notify external systems about run progress, change requests, and other events. Team notifications allow you to configure relevant alerts that notify teams whenever a certain event occurs. You can only configure team notifications to notify your team of change requests.
+References checked 2026-10-05. The provider documents removal of sensitive plaintext from state-output responses on 2026-11-10; this integration redacts values now.

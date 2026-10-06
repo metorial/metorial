@@ -28,6 +28,17 @@ Optionally include escalation levels and paths for full policy details.`,
   )
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of records returned in this response'),
+      currentPage: z.number().optional().describe('Provider page number, when supplied'),
+      totalPages: z.number().optional().describe('Provider page count, when supplied'),
+      nextCursor: z
+        .string()
+        .optional()
+        .describe('Provider continuation cursor, when supplied'),
+      included: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Requested related resources'),
       escalationPolicies: z
         .array(z.record(z.string(), z.any()))
         .describe('List of escalation policies'),
@@ -49,6 +60,11 @@ Optionally include escalation levels and paths for full policy details.`,
 
     return {
       output: {
+        returnedCount: escalationPolicies.length,
+        currentPage: result.meta?.current_page,
+        totalPages: result.meta?.total_pages,
+        nextCursor: result.meta?.next_cursor,
+        included: result.included ? flattenResources(result.included) : undefined,
         escalationPolicies,
         totalCount: result.meta?.total_count
       },

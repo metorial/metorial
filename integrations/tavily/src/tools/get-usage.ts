@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getUsage = SlateTool.create(spec, {
   name: 'Get Usage',
   key: 'get_usage',
-  description: `Retrieve API credit usage information for your Tavily account. Returns a breakdown of credits consumed by each endpoint (search, extract, crawl, map, research) along with plan limits and pay-as-you-go usage.`,
+  description: `Retrieve native API-key usage (optionally project scoped) and separate account plan usage. Returns a breakdown of credits consumed by each endpoint (search, extract, crawl, map, research) along with plan limits and pay-as-you-go usage.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,8 +15,13 @@ export let getUsage = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      totalCreditsUsed: z.number().describe('Total credits used this billing cycle'),
-      creditsLimit: z.number().nullable().describe('Usage cap (null if unlimited)'),
+      totalCreditsUsed: z
+        .number()
+        .describe('Native API-key credits used; optionally scoped by configured project'),
+      creditsLimit: z
+        .number()
+        .nullable()
+        .describe('Native API-key usage cap (null if unlimited)'),
       searchCreditsUsed: z.number().describe('Credits consumed by search requests'),
       extractCreditsUsed: z.number().describe('Credits consumed by extract requests'),
       crawlCreditsUsed: z.number().describe('Credits consumed by crawl requests'),
@@ -52,7 +57,7 @@ export let getUsage = SlateTool.create(spec, {
         paygoCreditsUsed: usage.paygoUsage,
         paygoCreditsLimit: usage.paygoLimit
       },
-      message: `**${usage.currentPlan}** plan: **${usage.usage}** credits used${usage.limit !== null ? ` of ${usage.limit}` : ''}. Search: ${usage.searchUsage}, Extract: ${usage.extractUsage}, Crawl: ${usage.crawlUsage}, Map: ${usage.mapUsage}, Research: ${usage.researchUsage}.`
+      message: `${ctx.config.projectId ? 'Project-scoped API-key' : 'API-key'} usage: **${usage.usage}** credits${usage.limit !== null ? ` of ${usage.limit}` : ' (no key cap reported)'}. Account **${usage.currentPlan}** plan: **${usage.planUsage} of ${usage.planLimit}** credits. Pay-as-you-go: **${usage.paygoUsage} of ${usage.paygoLimit}** credits. Key endpoint totals — Search: ${usage.searchUsage}, Extract: ${usage.extractUsage}, Crawl: ${usage.crawlUsage}, Map: ${usage.mapUsage}, Research: ${usage.researchUsage}.`
     };
   })
   .build();

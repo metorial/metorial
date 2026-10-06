@@ -1,83 +1,72 @@
+import { z } from 'zod';
 export interface CloudinaryConfig {
   cloudName: string;
   apiKey: string;
   apiSecret: string;
   region: 'us' | 'eu' | 'ap';
 }
-
-export interface CloudinaryResource {
-  assetId: string;
-  publicId: string;
-  format: string;
-  version: number;
-  resourceType: string;
-  type: string;
-  createdAt: string;
-  bytes: number;
-  width?: number;
-  height?: number;
-  folder: string;
-  assetFolder?: string;
-  displayName?: string;
-  url: string;
-  secureUrl: string;
-  tags?: string[];
-  context?: Record<string, string>;
-  metadata?: Record<string, any>;
-  accessMode?: string;
-}
-
-export interface CloudinaryUploadResponse {
-  assetId: string;
-  publicId: string;
-  version: number;
-  versionId: string;
-  signature: string;
-  width?: number;
-  height?: number;
-  format: string;
-  resourceType: string;
-  createdAt: string;
-  tags: string[];
-  bytes: number;
-  type: string;
-  url: string;
-  secureUrl: string;
-  folder: string;
-  assetFolder?: string;
-  displayName?: string;
-  originalFilename?: string;
-}
-
-export interface CloudinarySearchResult {
-  totalCount: number;
-  time: number;
-  nextCursor?: string;
-  resources: CloudinaryResource[];
-}
-
+export const resourceSchema = z.object({
+  assetId: z.string(),
+  publicId: z.string(),
+  format: z.string().optional(),
+  version: z.number().optional(),
+  resourceType: z.string().optional(),
+  type: z.string().optional(),
+  createdAt: z.string().optional(),
+  bytes: z.number().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  folder: z.string().optional(),
+  assetFolder: z.string().optional(),
+  displayName: z.string().optional(),
+  url: z.string().optional(),
+  secureUrl: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  context: z.record(z.string(), z.string()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  accessMode: z.string().optional(),
+  originalFilename: z.string().optional(),
+  moderation: z.array(z.object({ kind: z.string().optional(), status: z.string() })).optional()
+});
+export type CloudinaryResource = z.infer<typeof resourceSchema>;
+export type CloudinaryUploadResponse = CloudinaryResource;
 export interface CloudinaryListResult {
   resources: CloudinaryResource[];
   nextCursor?: string;
-  rate_limit_allowed?: number;
-  rate_limit_remaining?: number;
-  rate_limit_reset_at?: string;
 }
-
-export interface CloudinaryFolder {
-  name: string;
-  path: string;
-  externalId?: string;
+export interface CloudinarySearchResult extends CloudinaryListResult {
+  totalCount: number;
+  time?: number;
+  aggregations?: Record<string, unknown>;
 }
-
+export const folderSchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  externalId: z.string().optional()
+});
+export type CloudinaryFolder = z.infer<typeof folderSchema>;
 export interface CloudinaryFolderListResult {
   folders: CloudinaryFolder[];
   nextCursor?: string;
   totalCount?: number;
 }
-
-export interface CloudinaryTrigger {
-  triggerId: string;
-  notificationUrl: string;
-  eventType: string;
-}
+export const deleteSchema = z.object({
+  deleted: z.record(z.string(), z.string()),
+  partial: z.boolean().optional(),
+  nextCursor: z.string().optional()
+});
+export const metricSchema = z.object({
+  usage: z.number().optional(),
+  limit: z.number().optional(),
+  usedPercent: z.number().optional()
+});
+export const usageSchema = z.object({
+  plan: z.string().optional(),
+  lastUpdated: z.string().optional(),
+  storage: metricSchema.optional(),
+  bandwidth: metricSchema.optional(),
+  transformations: metricSchema.optional(),
+  requests: z.number().optional(),
+  resources: z.number().optional(),
+  derivedResources: z.number().optional()
+});

@@ -11,8 +11,6 @@ import {
   removeUser,
   updateSession
 } from './tools';
-import { spaceEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -26,5 +24,5 @@ export let provider = Slate.create({
     listUsers,
     removeUser
   ],
-  triggers: [spaceEvents]
+  triggers: []
 });

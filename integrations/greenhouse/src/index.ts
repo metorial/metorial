@@ -5,32 +5,35 @@ import {
   advanceApplicationTool,
   createCandidateTool,
   createJobTool,
+  downloadApplicationAttachmentTool,
   getApplicationTool,
   getCandidateTool,
+  getCurrentContextTool,
+  getFileUrl,
   getJobTool,
   getUserTool,
+  listApplicationAttachmentsTool,
   listApplicationsTool,
   listCandidatesTool,
   listDepartmentsTool,
   listJobsTool,
   listOffersTool,
   listOfficesTool,
+  listRejectionReasonsTool,
   listScheduledInterviewsTool,
   listUsersTool,
   manageCandidateTagsTool,
   rejectApplicationTool,
   updateCandidateTool
 } from './tools';
-import {
-  applicationEventsTrigger,
-  candidateEventsTrigger,
-  interviewEventsTrigger,
-  jobEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentContextTool,
+    listRejectionReasonsTool,
+    listApplicationAttachmentsTool,
+    downloadApplicationAttachmentTool,
+    getFileUrl,
     listCandidatesTool,
     getCandidateTool,
     createCandidateTool,
@@ -51,10 +54,5 @@ export let provider = Slate.create({
     addCandidateNoteTool,
     manageCandidateTagsTool
   ],
-  triggers: [
-    applicationEventsTrigger,
-    candidateEventsTrigger,
-    jobEventsTrigger,
-    interviewEventsTrigger
-  ]
+  triggers: []
 });

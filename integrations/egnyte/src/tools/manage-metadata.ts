@@ -34,10 +34,7 @@ export let setMetadataTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new EgnyteClient({
-      token: ctx.auth.token,
-      domain: ctx.auth.domain
-    });
+    let client = new EgnyteClient(ctx.auth);
 
     if (ctx.input.targetType === 'file') {
       await client.setFileMetadataProperties(

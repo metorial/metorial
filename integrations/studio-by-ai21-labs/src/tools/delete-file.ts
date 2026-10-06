@@ -14,7 +14,10 @@ export let deleteFile = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      fileId: z.string().describe('ID of the file to delete')
+      fileId: z
+        .string()
+        .min(1)
+        .describe('ID of the file to delete; use list_files to discover files')
     })
   )
   .output(

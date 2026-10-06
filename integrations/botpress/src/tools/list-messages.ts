@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RuntimeClient } from '../lib/client';
+import { resolveRuntimeParams, runtimeScopeFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listMessagesTool = SlateTool.create(spec, {
   name: 'List Messages',
   key: 'list_messages',
-  description: `List messages in a bot's conversations. Optionally filter by conversation ID. Returns message content, sender, timestamps, and direction (incoming/outgoing).`,
+  description: `List messages in a bot's conversations. Optionally filter by conversation ID. Returns message content, sender, timestamps, and direction (incoming/outgoing). Call list_workspaces to discover workspace IDs, then list_bots to discover bot IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      botId: z.string().optional().describe('Bot ID. Falls back to config botId.'),
+      ...runtimeScopeFields,
       conversationId: z
         .string()
         .optional()
@@ -38,10 +39,10 @@ export let listMessagesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let botId = ctx.input.botId || ctx.config.botId;
-    if (!botId) throw new Error('botId is required (provide in input or config)');
-
-    let client = new RuntimeClient({ token: ctx.auth.token, botId });
+    let client = new RuntimeClient({
+      token: ctx.auth.token,
+      ...resolveRuntimeParams(ctx.input, ctx.config)
+    });
 
     let result = await client.listMessages({
       conversationId: ctx.input.conversationId,

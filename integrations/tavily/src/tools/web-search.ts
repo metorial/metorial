@@ -16,7 +16,7 @@ export let webSearch = SlateTool.create(spec, {
   constraints: [
     'Maximum 20 results per search.',
     'Up to 300 include domains and 150 exclude domains.',
-    'Chunks per source is only configurable with "advanced" or "fast" search depth (range 1-3).'
+    'Chunks per source is only configurable with "advanced", "basic" or "fast" search depth (range 1-3).'
   ],
   tags: {
     destructive: false,
@@ -39,13 +39,13 @@ export let webSearch = SlateTool.create(spec, {
         .min(0)
         .max(20)
         .optional()
-        .describe('Maximum number of results to return (0-20). Defaults to 5'),
+        .describe('Maximum number of results to return (0-20). Defaults to 10'),
       chunksPerSource: z
         .number()
         .min(1)
         .max(3)
         .optional()
-        .describe('Max content chunks per source (1-3). Only for advanced/fast depth'),
+        .describe('Max content chunks per source (1-3). Only for advanced/basic/fast depth'),
       timeRange: z
         .enum(['day', 'week', 'month', 'year'])
         .optional()
@@ -77,7 +77,7 @@ export let webSearch = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Two-letter country code to boost results from (only works with "general" topic)'
+          'Documented lowercase country name, such as united states, to boost results from (only works with "general" topic)'
         ),
       autoParameters: z
         .boolean()
@@ -118,6 +118,13 @@ export let webSearch = SlateTool.create(spec, {
         .record(z.string(), z.unknown())
         .optional()
         .describe('Auto-configured parameters used'),
+      requestId: z.string().optional().describe('Native request identifier when returned'),
+      usageCredits: z
+        .number()
+        .optional()
+        .describe(
+          'Native credits reported for this request; zero may reflect batched billing'
+        ),
       responseTime: z.number().describe('Time to complete the request in seconds')
     })
   )
@@ -158,6 +165,8 @@ export let webSearch = SlateTool.create(spec, {
         images: result.images,
         results: result.results,
         autoParameters: result.autoParameters,
+        requestId: result.requestId,
+        usageCredits: result.usageCredits,
         responseTime: result.responseTime
       },
       message: `Search for **"${result.query}"** returned **${resultCount} result${resultCount !== 1 ? 's' : ''}**${hasAnswer ? ' with an AI-generated answer' : ''}${hasImages ? ` and ${result.images!.length} image(s)` : ''} in ${result.responseTime.toFixed(2)}s.`

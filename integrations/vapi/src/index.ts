@@ -1,20 +1,24 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  downloadCallArtifact,
   getCallTranscript,
   listAssistants,
   listCalls,
+  listCampaigns,
   listFiles,
   listPhoneNumbers,
+  listSquads,
+  listTools,
   manageAssistant,
   manageCall,
   manageCampaign,
+  manageFile,
   managePhoneNumber,
   manageSquad,
   manageTool,
   manageWorkflow
 } from './tools';
-import { assistantRequest, callEvent, toolCallRequest } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -30,7 +34,12 @@ export let provider = Slate.create({
     manageWorkflow,
     manageTool,
     manageCampaign,
-    listFiles
+    listFiles,
+    listSquads,
+    listTools,
+    listCampaigns,
+    downloadCallArtifact,
+    manageFile
   ],
-  triggers: [callEvent, assistantRequest, toolCallRequest]
+  triggers: []
 });

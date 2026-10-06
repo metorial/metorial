@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'later',
   name: 'Later',
   description:
-    'Later Influence Reporting API integration for retrieving influencer campaign performance data, campaign listings, reporting groups, and instance information.',
+    'Later Influence reporting for authorized instances, campaign rosters, performance metrics and time series, with separate legacy reporting compatibility.',
   metadata: {},
   config,
   auth

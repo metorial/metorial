@@ -1,0 +1,1615 @@
+{
+  "web_search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The search query"
+        },
+        "searchType": {
+          "description": "Search method to use. Default: auto",
+          "type": "string",
+          "enum": ["neural", "auto", "fast", "deep"]
+        },
+        "category": {
+          "description": "Focus on a specific content category",
+          "type": "string",
+          "enum": [
+            "company",
+            "research paper",
+            "news",
+            "tweet",
+            "personal site",
+            "financial report",
+            "people"
+          ]
+        },
+        "numResults": {
+          "description": "Number of results to return (1-100, default: 10)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "includeDomains": {
+          "description": "Only include results from these domains",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludeDomains": {
+          "description": "Exclude results from these domains",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "startPublishedDate": {
+          "description": "Filter results published after this ISO 8601 date",
+          "type": "string"
+        },
+        "endPublishedDate": {
+          "description": "Filter results published before this ISO 8601 date",
+          "type": "string"
+        },
+        "startCrawlDate": {
+          "description": "Filter results crawled after this ISO 8601 date",
+          "type": "string"
+        },
+        "endCrawlDate": {
+          "description": "Filter results crawled before this ISO 8601 date",
+          "type": "string"
+        },
+        "includeText": {
+          "description": "Only include results containing these text strings",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludeText": {
+          "description": "Exclude results containing these text strings",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contents": {
+          "description": "Controls what content to retrieve for each result",
+          "type": "object",
+          "properties": {
+            "text": {
+              "description": "Return the full text content of results as markdown",
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "maxCharacters": {
+                      "description": "Maximum number of characters to return",
+                      "type": "number"
+                    },
+                    "includeHtmlTags": {
+                      "description": "Whether to include HTML tags in the text",
+                      "type": "boolean"
+                    }
+                  }
+                }
+              ]
+            },
+            "highlights": {
+              "description": "Return key excerpts most relevant to the query",
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "maxCharacters": {
+                      "description": "Maximum number of characters per highlight",
+                      "type": "number"
+                    },
+                    "query": {
+                      "description": "Custom query for highlight extraction",
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "summary": {
+              "description": "Return a concise AI-generated summary",
+              "type": "object",
+              "properties": {
+                "query": {
+                  "description": "Custom query to tailor the summary",
+                  "type": "string"
+                }
+              }
+            },
+            "livecrawl": {
+              "description": "Live crawl mode for fetching fresh content",
+              "type": "string",
+              "enum": ["always", "preferred", "fallback", "never"]
+            },
+            "subpages": {
+              "description": "Number of subpages to crawl",
+              "type": "number"
+            },
+            "extras": {
+              "description": "Additional data to extract",
+              "type": "object",
+              "properties": {
+                "links": {
+                  "description": "Number of links to extract",
+                  "type": "number"
+                },
+                "imageLinks": {
+                  "description": "Number of image links to extract",
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "moderation": {
+          "description": "Filter out unsafe content",
+          "type": "boolean"
+        },
+        "maxAgeHours": {
+          "description": "Maximum age of content in hours",
+          "type": "number"
+        }
+      },
+      "required": ["query"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique request identifier"
+        },
+        "searchType": {
+          "description": "Search method that was used",
+          "type": "string"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "resultId": {
+                "type": "string",
+                "description": "Unique result identifier"
+              },
+              "title": {
+                "type": "string",
+                "description": "Page title"
+              },
+              "url": {
+                "type": "string",
+                "description": "Page URL"
+              },
+              "publishedDate": {
+                "description": "Publication date in ISO 8601 format",
+                "type": "string"
+              },
+              "author": {
+                "description": "Content author",
+                "type": "string"
+              },
+              "text": {
+                "description": "Full text content as markdown",
+                "type": "string"
+              },
+              "highlights": {
+                "description": "Key excerpts from the content",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "summary": {
+                "description": "AI-generated summary",
+                "type": "string"
+              }
+            },
+            "required": ["resultId", "title", "url"],
+            "additionalProperties": false
+          },
+          "description": "Search results"
+        }
+      },
+      "required": ["requestId", "results"],
+      "additionalProperties": false
+    }
+  },
+  "get_contents": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "urls": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "URLs to extract content from"
+        },
+        "text": {
+          "description": "Return full text content as markdown",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "maxCharacters": {
+                  "description": "Maximum characters to return",
+                  "type": "number"
+                },
+                "includeHtmlTags": {
+                  "description": "Include HTML tags",
+                  "type": "boolean"
+                }
+              }
+            }
+          ]
+        },
+        "highlights": {
+          "description": "Return key excerpts",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "maxCharacters": {
+                  "description": "Maximum characters per highlight",
+                  "type": "number"
+                },
+                "query": {
+                  "description": "Custom query for highlight extraction",
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        },
+        "summary": {
+          "description": "Return an AI-generated summary",
+          "type": "object",
+          "properties": {
+            "query": {
+              "description": "Custom query to tailor the summary",
+              "type": "string"
+            }
+          }
+        },
+        "subpages": {
+          "description": "Number of subpages to crawl per URL",
+          "type": "number"
+        },
+        "livecrawlTimeout": {
+          "description": "Timeout for live crawling in milliseconds (default: 10000)",
+          "type": "number"
+        }
+      },
+      "required": ["urls"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique request identifier"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Page title"
+              },
+              "url": {
+                "type": "string",
+                "description": "Page URL"
+              },
+              "publishedDate": {
+                "description": "Publication date",
+                "type": "string"
+              },
+              "author": {
+                "description": "Content author",
+                "type": "string"
+              },
+              "text": {
+                "description": "Full text content as markdown",
+                "type": "string"
+              },
+              "highlights": {
+                "description": "Key excerpts",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "summary": {
+                "description": "AI-generated summary",
+                "type": "string"
+              }
+            },
+            "required": ["title", "url"],
+            "additionalProperties": false
+          },
+          "description": "Extracted content for each URL"
+        }
+      },
+      "required": ["requestId", "results"],
+      "additionalProperties": false
+    }
+  },
+  "find_similar": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "The URL to find similar pages for"
+        },
+        "numResults": {
+          "description": "Number of results (1-100, default: 10)",
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "includeDomains": {
+          "description": "Only include results from these domains",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludeDomains": {
+          "description": "Exclude results from these domains",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "startPublishedDate": {
+          "description": "Filter by publish date start (ISO 8601)",
+          "type": "string"
+        },
+        "endPublishedDate": {
+          "description": "Filter by publish date end (ISO 8601)",
+          "type": "string"
+        },
+        "startCrawlDate": {
+          "description": "Filter by crawl date start (ISO 8601)",
+          "type": "string"
+        },
+        "endCrawlDate": {
+          "description": "Filter by crawl date end (ISO 8601)",
+          "type": "string"
+        },
+        "includeText": {
+          "description": "Only include results containing these strings",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludeText": {
+          "description": "Exclude results containing these strings",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contents": {
+          "description": "Controls what content to retrieve for each result",
+          "type": "object",
+          "properties": {
+            "text": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "maxCharacters": {
+                      "type": "number"
+                    }
+                  }
+                }
+              ]
+            },
+            "highlights": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "maxCharacters": {
+                      "type": "number"
+                    },
+                    "query": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "summary": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              }
+            },
+            "livecrawl": {
+              "type": "string",
+              "enum": ["always", "preferred", "fallback", "never"]
+            }
+          }
+        },
+        "moderation": {
+          "description": "Filter unsafe content",
+          "type": "boolean"
+        }
+      },
+      "required": ["url"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "description": "Unique request identifier"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "resultId": {
+                "type": "string",
+                "description": "Unique result identifier"
+              },
+              "title": {
+                "type": "string",
+                "description": "Page title"
+              },
+              "url": {
+                "type": "string",
+                "description": "Page URL"
+              },
+              "publishedDate": {
+                "description": "Publication date",
+                "type": "string"
+              },
+              "author": {
+                "description": "Content author",
+                "type": "string"
+              },
+              "text": {
+                "description": "Full text content",
+                "type": "string"
+              },
+              "highlights": {
+                "description": "Key excerpts",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "summary": {
+                "description": "AI-generated summary",
+                "type": "string"
+              }
+            },
+            "required": ["resultId", "title", "url"],
+            "additionalProperties": false
+          },
+          "description": "Similar pages found"
+        }
+      },
+      "required": ["requestId", "results"],
+      "additionalProperties": false
+    }
+  },
+  "answer_question": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The question to answer"
+        },
+        "includeSourceText": {
+          "description": "Include the full text of cited sources in the response",
+          "type": "boolean"
+        }
+      },
+      "required": ["query"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "answer": {
+          "type": "string",
+          "description": "The AI-generated answer"
+        },
+        "citations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "Source URL"
+              },
+              "title": {
+                "description": "Source page title",
+                "type": "string"
+              },
+              "author": {
+                "description": "Source author",
+                "type": "string"
+              },
+              "publishedDate": {
+                "description": "Publication date",
+                "type": "string"
+              },
+              "text": {
+                "description": "Source text content (when includeSourceText is true)",
+                "type": "string"
+              }
+            },
+            "required": ["url"],
+            "additionalProperties": false
+          },
+          "description": "Web sources cited in the answer"
+        }
+      },
+      "required": ["answer", "citations"],
+      "additionalProperties": false
+    }
+  },
+  "create_research": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "instructions": {
+          "type": "string",
+          "maxLength": 4096,
+          "description": "Instructions for what to research"
+        },
+        "model": {
+          "description": "Research model to use (default: exa-research)",
+          "type": "string",
+          "enum": ["exa-research-fast", "exa-research", "exa-research-pro"]
+        },
+        "outputSchema": {
+          "description": "JSON Schema for structured output format",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": ["instructions"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "researchId": {
+          "type": "string",
+          "description": "Unique research task identifier for polling"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status: pending, running, completed, failed, or canceled"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp in milliseconds"
+        }
+      },
+      "required": ["researchId", "status", "createdAt"],
+      "additionalProperties": false
+    }
+  },
+  "get_research_status": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "researchId": {
+          "type": "string",
+          "description": "The research task ID returned by Create Research"
+        }
+      },
+      "required": ["researchId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "researchId": {
+          "type": "string",
+          "description": "Research task identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status: pending, running, completed, failed, or canceled"
+        },
+        "content": {
+          "description": "Research output content (available when completed)",
+          "type": "string"
+        },
+        "parsedOutput": {
+          "description": "Structured output if an output schema was provided",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "error": {
+          "description": "Error message if the task failed",
+          "type": "string"
+        },
+        "costTotal": {
+          "description": "Total cost in USD",
+          "type": "number"
+        },
+        "finishedAt": {
+          "description": "Completion timestamp in milliseconds",
+          "type": "number"
+        }
+      },
+      "required": ["researchId", "status"],
+      "additionalProperties": false
+    }
+  },
+  "create_webset": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Natural language search description (1-5000 chars)",
+          "type": "string"
+        },
+        "count": {
+          "description": "Target number of results (default: 10)",
+          "type": "number"
+        },
+        "entity": {
+          "description": "Entity type to search for",
+          "type": "string",
+          "enum": ["company", "person", "article", "research_paper", "custom"]
+        },
+        "criteria": {
+          "description": "Custom evaluation criteria (max 5)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "Criterion description for verifying results"
+              }
+            },
+            "required": ["description"]
+          }
+        },
+        "enrichments": {
+          "description": "Data extraction tasks for found items",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "Description of data to extract"
+              },
+              "format": {
+                "description": "Expected format of the enrichment value",
+                "type": "string"
+              }
+            },
+            "required": ["description"]
+          }
+        },
+        "title": {
+          "description": "Custom name for the Webset",
+          "type": "string"
+        },
+        "externalId": {
+          "description": "Your internal identifier (max 300 chars)",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom key-value pairs",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "Webset identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Webset status: idle, pending, running, or paused"
+        },
+        "title": {
+          "description": "Webset title",
+          "type": "string"
+        },
+        "externalId": {
+          "description": "External reference identifier",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom key-value metadata",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["websetId", "status", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "get_webset": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID to retrieve"
+        }
+      },
+      "required": ["websetId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "Webset identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Webset status: idle, pending, running, or paused"
+        },
+        "title": {
+          "description": "Webset title",
+          "type": "string"
+        },
+        "externalId": {
+          "description": "External reference identifier",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom key-value metadata",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        },
+        "searches": {
+          "description": "Associated searches",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "enrichments": {
+          "description": "Associated enrichments",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "monitors": {
+          "description": "Associated monitors",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        }
+      },
+      "required": ["websetId", "status", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "list_websets": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "description": "Pagination cursor from a previous response",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of Websets to return",
+          "type": "number"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "websetId": {
+                "type": "string",
+                "description": "Webset identifier"
+              },
+              "status": {
+                "type": "string",
+                "description": "Webset status: idle, pending, running, or paused"
+              },
+              "title": {
+                "description": "Webset title",
+                "type": "string"
+              },
+              "externalId": {
+                "description": "External reference identifier",
+                "type": "string"
+              },
+              "metadata": {
+                "description": "Custom key-value metadata",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last update timestamp"
+              }
+            },
+            "required": ["websetId", "status", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          },
+          "description": "List of Websets"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether more results are available"
+        },
+        "nextCursor": {
+          "description": "Cursor for the next page",
+          "type": "string"
+        }
+      },
+      "required": ["websets", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  "update_webset": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID to update"
+        },
+        "title": {
+          "description": "New title",
+          "type": "string"
+        },
+        "externalId": {
+          "description": "New external identifier",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Updated metadata key-value pairs",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["websetId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "Webset identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Webset status: idle, pending, running, or paused"
+        },
+        "title": {
+          "description": "Webset title",
+          "type": "string"
+        },
+        "externalId": {
+          "description": "External reference identifier",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom key-value metadata",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["websetId", "status", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "delete_webset": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID to delete"
+        }
+      },
+      "required": ["websetId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "cancel_webset": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID to cancel"
+        }
+      },
+      "required": ["websetId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "Webset identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Webset status: idle, pending, running, or paused"
+        },
+        "title": {
+          "description": "Webset title",
+          "type": "string"
+        },
+        "externalId": {
+          "description": "External reference identifier",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "Custom key-value metadata",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["websetId", "status", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "list_webset_items": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID to list items from"
+        },
+        "cursor": {
+          "description": "Pagination cursor",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of items to return",
+          "type": "number"
+        },
+        "status": {
+          "description": "Filter by item status",
+          "type": "string"
+        }
+      },
+      "required": ["websetId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "itemId": {
+                "type": "string",
+                "description": "Item identifier"
+              },
+              "status": {
+                "type": "string",
+                "description": "Item status"
+              },
+              "url": {
+                "type": "string",
+                "description": "Source URL"
+              },
+              "title": {
+                "description": "Item title",
+                "type": "string"
+              },
+              "source": {
+                "description": "Item source",
+                "type": "string"
+              },
+              "properties": {
+                "description": "Item properties",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "enrichments": {
+                "description": "Enrichment results",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last update timestamp"
+              }
+            },
+            "required": ["itemId", "status", "url", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          },
+          "description": "Webset items"
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether more results are available"
+        },
+        "nextCursor": {
+          "description": "Cursor for the next page",
+          "type": "string"
+        }
+      },
+      "required": ["items", "hasMore"],
+      "additionalProperties": false
+    }
+  },
+  "get_webset_item": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID"
+        },
+        "itemId": {
+          "type": "string",
+          "description": "The item ID to retrieve"
+        }
+      },
+      "required": ["websetId", "itemId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string",
+          "description": "Item identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Item status"
+        },
+        "url": {
+          "type": "string",
+          "description": "Source URL"
+        },
+        "title": {
+          "description": "Item title",
+          "type": "string"
+        },
+        "source": {
+          "description": "Item source",
+          "type": "string"
+        },
+        "properties": {
+          "description": "Item properties",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "enrichments": {
+          "description": "Enrichment results",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["itemId", "status", "url", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "delete_webset_item": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID"
+        },
+        "itemId": {
+          "type": "string",
+          "description": "The item ID to delete"
+        }
+      },
+      "required": ["websetId", "itemId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "create_enrichment": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID to add the enrichment to"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the data to extract (e.g., \"Find the company's founding year\")"
+        },
+        "format": {
+          "description": "Expected format: text, number, date, etc.",
+          "type": "string"
+        }
+      },
+      "required": ["websetId", "description"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "enrichmentId": {
+          "type": "string",
+          "description": "Enrichment identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Enrichment status"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what data to extract"
+        },
+        "format": {
+          "description": "Expected format of the enrichment value",
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["enrichmentId", "status", "description", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "update_enrichment": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID"
+        },
+        "enrichmentId": {
+          "type": "string",
+          "description": "The enrichment ID to update"
+        },
+        "description": {
+          "description": "New description",
+          "type": "string"
+        },
+        "format": {
+          "description": "New format",
+          "type": "string"
+        }
+      },
+      "required": ["websetId", "enrichmentId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "enrichmentId": {
+          "type": "string",
+          "description": "Enrichment identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Enrichment status"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what data to extract"
+        },
+        "format": {
+          "description": "Expected format of the enrichment value",
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["enrichmentId", "status", "description", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "delete_enrichment": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID"
+        },
+        "enrichmentId": {
+          "type": "string",
+          "description": "The enrichment ID to delete"
+        }
+      },
+      "required": ["websetId", "enrichmentId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "create_monitor": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID to monitor"
+        },
+        "behaviorType": {
+          "type": "string",
+          "enum": ["search", "refresh"],
+          "description": "search: find new content, refresh: update existing items"
+        },
+        "cronSchedule": {
+          "type": "string",
+          "description": "Cron expression for the schedule (e.g., \"0 9 * * 1\" for every Monday at 9am)"
+        }
+      },
+      "required": ["websetId", "behaviorType", "cronSchedule"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "monitorId": {
+          "type": "string",
+          "description": "Monitor identifier"
+        },
+        "behaviorType": {
+          "type": "string",
+          "description": "Monitor behavior: search or refresh"
+        },
+        "cronSchedule": {
+          "type": "string",
+          "description": "Cron expression for the schedule"
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "type": "string"
+        },
+        "updatedAt": {
+          "description": "Last update timestamp",
+          "type": "string"
+        }
+      },
+      "required": ["monitorId", "behaviorType", "cronSchedule"],
+      "additionalProperties": false
+    }
+  },
+  "delete_monitor": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID"
+        },
+        "monitorId": {
+          "type": "string",
+          "description": "The monitor ID to delete"
+        }
+      },
+      "required": ["websetId", "monitorId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "export_webset": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID to export"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["csv", "json", "xlsx"],
+          "description": "Export format"
+        }
+      },
+      "required": ["websetId", "format"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "exportId": {
+          "type": "string",
+          "description": "Export job identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Export status"
+        }
+      },
+      "required": ["exportId", "status"],
+      "additionalProperties": false
+    }
+  },
+  "get_export_status": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "websetId": {
+          "type": "string",
+          "description": "The Webset ID"
+        },
+        "exportId": {
+          "type": "string",
+          "description": "The export ID to check"
+        }
+      },
+      "required": ["websetId", "exportId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "exportId": {
+          "type": "string",
+          "description": "Export job identifier"
+        },
+        "status": {
+          "type": "string",
+          "description": "Export status"
+        },
+        "downloadUrl": {
+          "description": "URL to download the export file (when completed)",
+          "type": "string"
+        }
+      },
+      "required": ["exportId", "status"],
+      "additionalProperties": false
+    }
+  }
+}

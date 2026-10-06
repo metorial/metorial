@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ModeClient } from '../lib/client';
+import { ModeClient, requireToken } from '../lib/client';
 import { getEmbedded, normalizeQuery } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -53,11 +53,7 @@ Use **delete** to remove a query from a report.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ModeClient({
-      token: ctx.auth.token,
-      secret: ctx.auth.secret,
-      workspaceName: ctx.config.workspaceName
-    });
+    const client = ModeClient.fromContext(ctx);
 
     let { action, reportToken } = ctx.input;
 
@@ -71,9 +67,13 @@ Use **delete** to remove a query from a report.`,
     }
 
     if (action === 'create') {
+      if (ctx.input.rawQuery === undefined || ctx.input.dataSourceId === undefined)
+        throw createApiServiceError(
+          'Provide rawQuery and dataSourceId when creating a query.'
+        );
       let raw = await client.createQuery(reportToken, {
-        rawQuery: ctx.input.rawQuery!,
-        dataSourceId: ctx.input.dataSourceId!,
+        rawQuery: ctx.input.rawQuery,
+        dataSourceId: ctx.input.dataSourceId,
         name: ctx.input.name
       });
       let query = normalizeQuery(raw);
@@ -84,11 +84,15 @@ Use **delete** to remove a query from a report.`,
     }
 
     if (action === 'update') {
-      let raw = await client.updateQuery(reportToken, ctx.input.queryToken!, {
-        rawQuery: ctx.input.rawQuery,
-        dataSourceId: ctx.input.dataSourceId,
-        name: ctx.input.name
-      });
+      let raw = await client.updateQuery(
+        reportToken,
+        requireToken(ctx.input.queryToken, 'queryToken'),
+        {
+          rawQuery: ctx.input.rawQuery,
+          dataSourceId: ctx.input.dataSourceId,
+          name: ctx.input.name
+        }
+      );
       let query = normalizeQuery(raw);
       return {
         output: { query },
@@ -97,9 +101,12 @@ Use **delete** to remove a query from a report.`,
     }
 
     // action === 'delete'
-    let existing = await client.getQuery(reportToken, ctx.input.queryToken!);
+    let existing = await client.getQuery(
+      reportToken,
+      requireToken(ctx.input.queryToken, 'queryToken')
+    );
     let query = normalizeQuery(existing);
-    await client.deleteQuery(reportToken, ctx.input.queryToken!);
+    await client.deleteQuery(reportToken, requireToken(ctx.input.queryToken, 'queryToken'));
     return {
       output: { query },
       message: `Deleted query **${query.name || query.queryToken}**.`

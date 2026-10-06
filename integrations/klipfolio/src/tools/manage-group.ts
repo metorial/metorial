@@ -1,12 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let manageGroup = SlateTool.create(spec, {
   name: 'Manage Group',
   key: 'manage_group',
   description: `Manage group membership and default dashboards. Add or remove users from a group, and configure which dashboards are automatically assigned to new group members.`,
+  constraints: [
+    'Membership and default dashboard changes affect user access. Use assignment IDs, not dashboard IDs, when removing default tabs. Earlier changes remain if a later request fails.'
+  ],
   instructions: [
     'Provide a groupId and use the available fields to add/remove users and manage default tabs.',
     'Default tab visibility options: "library" (visible in library), "dashboard" (visible on dashboard), "permanent" (always visible).'
@@ -43,6 +47,14 @@ export let manageGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
+    if (
+      ctx.input.addUserIds === undefined &&
+      ctx.input.removeUserIds === undefined &&
+      ctx.input.addDefaultTabs === undefined &&
+      ctx.input.removeDefaultTabIds === undefined
+    )
+      throw createApiServiceError('Provide at least one change.', { reason: 'invalid_input' });
     let client = new Client({ token: ctx.auth.token });
     let actions: string[] = [];
 

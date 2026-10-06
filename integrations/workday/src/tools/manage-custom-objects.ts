@@ -1,19 +1,27 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { WorkdayClient } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCustomObjects = SlateTool.create(spec, {
   name: 'List Custom Objects',
   key: 'list_custom_objects',
-  description: `List records of a specific custom object type in Workday. Custom objects extend Workday's data model for organization-specific needs.`,
+  description: `List worker-scoped multi-instance records of a tenant-defined custom object type. Pagination slices a verified complete native collection locally. Custom objects extend Workday's data model for organization-specific needs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      objectName: z.string().describe('Name of the custom object type'),
+      objectName: z
+        .string()
+        .describe('Web-service alias from the tenant View Custom Object task'),
+      workerId: z
+        .string()
+        .optional()
+        .describe(
+          'Extended worker ID from list_workers; required at runtime because tenant-wide listing is unsupported'
+        ),
       limit: z.number().optional().describe('Maximum number of results (default: 20)'),
       offset: z.number().optional().describe('Pagination offset (default: 0)')
     })
@@ -27,15 +35,12 @@ export let listCustomObjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let result = await client.listCustomObjects(ctx.input.objectName, {
       limit: ctx.input.limit,
-      offset: ctx.input.offset
+      offset: ctx.input.offset,
+      workerId: ctx.input.workerId
     });
 
     return {
@@ -65,11 +70,7 @@ export let getCustomObject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let result = await client.getCustomObject(ctx.input.objectName, ctx.input.objectId);
 
@@ -83,7 +84,7 @@ export let getCustomObject = SlateTool.create(spec, {
 export let createCustomObject = SlateTool.create(spec, {
   name: 'Create Custom Object',
   key: 'create_custom_object',
-  description: `Create a new custom object record in Workday. The record fields depend on the custom object definition configured in your tenant.`,
+  description: `Create a new custom object record in Workday. The record fields depend on the custom object definition configured in your tenant. Include the extended worker in fields.worker and a custom reference ID. Supply its exact compound objectId for readback; types without reference IDs cannot be created safely through this tool.`,
   tags: {
     destructive: false
   }
@@ -91,6 +92,12 @@ export let createCustomObject = SlateTool.create(spec, {
   .input(
     z.object({
       objectName: z.string().describe('Name of the custom object type'),
+      objectId: z
+        .string()
+        .optional()
+        .describe(
+          'Exact worker-WID;referenceAlias=value identity, required at runtime for receipt-only creation and readback'
+        ),
       fields: z
         .record(z.string(), z.any())
         .describe('Field values for the new custom object record')
@@ -102,13 +109,13 @@ export let createCustomObject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
-    let result = await client.createCustomObject(ctx.input.objectName, ctx.input.fields);
+    let result = await client.createCustomObject(
+      ctx.input.objectName,
+      ctx.input.fields,
+      ctx.input.objectId
+    );
 
     return {
       output: { record: result },
@@ -120,7 +127,7 @@ export let createCustomObject = SlateTool.create(spec, {
 export let updateCustomObject = SlateTool.create(spec, {
   name: 'Update Custom Object',
   key: 'update_custom_object',
-  description: `Update an existing custom object record in Workday. Only the fields provided will be updated; other fields remain unchanged.`,
+  description: `Update an existing custom object record in Workday. The documented PUT accepts the fields to update. Worker binding and custom reference identity cannot be changed; the result is read back before success is returned.`,
   tags: {
     destructive: false
   }
@@ -140,11 +147,7 @@ export let updateCustomObject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     let result = await client.updateCustomObject(
       ctx.input.objectName,
@@ -181,11 +184,7 @@ export let deleteCustomObject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WorkdayClient({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      tenant: ctx.config.tenant
-    });
+    const client = createClient(ctx.auth, ctx.config);
 
     await client.deleteCustomObject(ctx.input.objectName, ctx.input.objectId);
 

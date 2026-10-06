@@ -5,17 +5,18 @@ import {
   createDataset,
   deleteDataSource,
   deleteDataset,
+  getCurrentUser,
+  getDatasetData,
   getIngestionStatus,
   ingestData,
   listAccounts,
+  listDataSources,
   listDatasets,
   listIngestions,
   listTimezones,
   purgeDataset,
   validateKey
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -31,7 +32,10 @@ export let provider = Slate.create({
     getIngestionStatus,
     listIngestions,
     listTimezones,
-    validateKey
+    validateKey,
+    getCurrentUser,
+    getDatasetData,
+    listDataSources
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

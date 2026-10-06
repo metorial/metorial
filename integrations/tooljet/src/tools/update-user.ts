@@ -1,50 +1,70 @@
-import { SlateTool } from 'slates';
-import { z } from 'zod';
+import { pickDefined, SlateTool } from 'slates';
 import { Client } from '../lib/client';
+import { mappedUser, userSchema } from '../lib/schemas';
+import { fail, text, z } from '../lib/validation';
 import { spec } from '../spec';
-
-export let updateUser = SlateTool.create(spec, {
+export const updateUser = SlateTool.create(spec, {
   name: 'Update User',
   key: 'update_user',
-  description: `Update an existing user's details such as name, email, password, or status. Identify the user by UUID or email address.`,
-  tags: {
-    destructive: false
-  }
+  description:
+    'Partially update user fields by exact UUID or email from list_users. Archive preserves the account/history. Password changes are accepted by the server but cannot be verified through readable fields.',
+  tags: { destructive: true }
 })
   .input(
     z.object({
-      identifier: z
-        .string()
-        .describe('User UUID or email address to identify the user to update'),
-      name: z.string().optional().describe('New name for the user'),
-      email: z.string().optional().describe('New email address for the user'),
-      password: z.string().optional().describe('New password for the user (5-100 characters)'),
-      status: z.enum(['active', 'archived']).optional().describe('New status for the user')
+      identifier: z.string(),
+      name: z.string().optional(),
+      email: z.string().optional(),
+      password: z.string().optional(),
+      status: z.enum(['active', 'archived']).optional()
     })
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the update was successful')
+      success: z.boolean(),
+      user: userSchema.optional(),
+      verification: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+    const body = pickDefined({
+      name: ctx.input.name,
+      email: ctx.input.email,
+      password: ctx.input.password,
+      status: ctx.input.status
     });
-
-    let body: Record<string, string> = {};
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.email) body.email = ctx.input.email;
-    if (ctx.input.password) body.password = ctx.input.password;
-    if (ctx.input.status) body.status = ctx.input.status;
-
-    await client.updateUser(ctx.input.identifier, body);
-
-    let changes = Object.keys(body).join(', ');
+    if (!Object.keys(body).length) fail('Provide at least one changed user field.');
+    for (const [k, v] of Object.entries(body)) text(v, k);
+    const client = new Client(ctx.auth, ctx.config),
+      before = await client.getUser(ctx.input.identifier);
+    await client.updateUser(before.id, body);
+    let after: Awaited<ReturnType<Client['getUser']>>;
+    try {
+      after = await client.getUser(before.id);
+    } catch {
+      fail(
+        'ToolJet accepted the update but exact readback failed. Reconcile this user before retrying.',
+        'update_unverified',
+        { userId: before.id }
+      );
+    }
+    for (const k of ['name', 'email', 'status'] as const)
+      if (ctx.input[k] !== undefined && after[k] !== ctx.input[k])
+        fail(
+          'ToolJet accepted the update but native readable fields differ. Reconcile this user before retrying.',
+          'update_unverified',
+          { userId: before.id }
+        );
     return {
-      output: { success: true },
-      message: `Updated user **${ctx.input.identifier}**: changed ${changes}.`
+      output: {
+        success: true,
+        user: mappedUser(after),
+        verification:
+          ctx.input.password === undefined
+            ? 'readable_fields_confirmed'
+            : 'readable_fields_confirmed_password_not_readable'
+      },
+      message: 'ToolJet accepted the update and returned the current readable user state.'
     };
   })
   .build();

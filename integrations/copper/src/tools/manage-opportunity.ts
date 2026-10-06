@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { closeDateTimestamp, pageContinuation, validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 let opportunityOutputSchema = z.object({
@@ -91,23 +92,27 @@ export let createOpportunity = SlateTool.create(spec, {
   )
   .output(opportunityOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'create_opportunity');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = { name: ctx.input.name };
-    if (ctx.input.primaryContactId) body.primary_contact_id = ctx.input.primaryContactId;
-    if (ctx.input.companyId) body.company_id = ctx.input.companyId;
-    if (ctx.input.pipelineId) body.pipeline_id = ctx.input.pipelineId;
-    if (ctx.input.pipelineStageId) body.pipeline_stage_id = ctx.input.pipelineStageId;
-    if (ctx.input.assigneeId) body.assignee_id = ctx.input.assigneeId;
+    if (ctx.input.primaryContactId !== undefined)
+      body.primary_contact_id = ctx.input.primaryContactId;
+    if (ctx.input.companyId !== undefined) body.company_id = ctx.input.companyId;
+    if (ctx.input.pipelineId !== undefined) body.pipeline_id = ctx.input.pipelineId;
+    if (ctx.input.pipelineStageId !== undefined)
+      body.pipeline_stage_id = ctx.input.pipelineStageId;
+    if (ctx.input.assigneeId !== undefined) body.assignee_id = ctx.input.assigneeId;
     if (ctx.input.monetaryValue !== undefined) body.monetary_value = ctx.input.monetaryValue;
     if (ctx.input.winProbability !== undefined)
       body.win_probability = ctx.input.winProbability;
-    if (ctx.input.closeDate) body.close_date = ctx.input.closeDate;
-    if (ctx.input.customerSourceId) body.customer_source_id = ctx.input.customerSourceId;
-    if (ctx.input.priority) body.priority = ctx.input.priority;
-    if (ctx.input.details) body.details = ctx.input.details;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.customFields) {
+    if (ctx.input.closeDate !== undefined) body.close_date = ctx.input.closeDate;
+    if (ctx.input.customerSourceId !== undefined)
+      body.customer_source_id = ctx.input.customerSourceId;
+    if (ctx.input.priority !== undefined) body.priority = ctx.input.priority;
+    if (ctx.input.details !== undefined) body.details = ctx.input.details;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.customFields !== undefined) {
       body.custom_fields = ctx.input.customFields.map(cf => ({
         custom_field_definition_id: cf.customFieldDefinitionId,
         value: cf.value
@@ -136,6 +141,7 @@ export let getOpportunity = SlateTool.create(spec, {
   )
   .output(opportunityOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'get_opportunity');
     let client = new Client(ctx.auth);
     let opportunity = await client.getOpportunity(ctx.input.opportunityId);
 
@@ -186,6 +192,7 @@ export let updateOpportunity = SlateTool.create(spec, {
   )
   .output(opportunityOutputSchema)
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'update_opportunity');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {};
@@ -242,6 +249,7 @@ export let deleteOpportunity = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'delete_opportunity');
     let client = new Client(ctx.auth);
     await client.deleteOpportunity(ctx.input.opportunityId);
 
@@ -267,7 +275,7 @@ export let searchOpportunities = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Field to sort by: name, assignee, company_name, status, monetary_value, close_date'
+          'Field to sort by: name, assignee, company_name, status, monetary_value, date_created, date_modified'
         ),
       sortDirection: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
       name: z.string().optional().describe('Filter by name'),
@@ -282,47 +290,67 @@ export let searchOpportunities = SlateTool.create(spec, {
       lossReasonIds: z.array(z.number()).optional().describe('Filter by loss reason IDs'),
       minimumMonetaryValue: z.number().optional().describe('Minimum monetary value'),
       maximumMonetaryValue: z.number().optional().describe('Maximum monetary value'),
-      minimumCloseDate: z.string().optional().describe('Minimum close date (Unix timestamp)'),
-      maximumCloseDate: z.string().optional().describe('Maximum close date (Unix timestamp)'),
+      minimumCloseDate: z
+        .string()
+        .optional()
+        .describe('Minimum close date as Unix seconds encoded as a decimal string'),
+      maximumCloseDate: z
+        .string()
+        .optional()
+        .describe('Maximum close date as Unix seconds encoded as a decimal string'),
       tags: z.array(z.string()).optional().describe('Filter by tags')
     })
   )
   .output(
     z.object({
       opportunities: z.array(opportunityOutputSchema).describe('Matching opportunity records'),
-      count: z.number().describe('Number of results returned')
+      count: z.number().describe('Number of results returned'),
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('A full page suggests another page may be available'),
+      nextPageNumber: z.number().optional().describe('Next page to request when available'),
+      atSearchLimit: z
+        .boolean()
+        .optional()
+        .describe('Narrow filters when the 100,000-result window is reached')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input, 'search_opportunities');
     let client = new Client(ctx.auth);
 
     let body: Record<string, any> = {
       page_number: ctx.input.pageNumber,
       page_size: ctx.input.pageSize
     };
-    if (ctx.input.sortBy) body.sort_by = ctx.input.sortBy;
-    if (ctx.input.sortDirection) body.sort_direction = ctx.input.sortDirection;
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.assigneeIds) body.assignee_ids = ctx.input.assigneeIds;
-    if (ctx.input.pipelineIds) body.pipeline_ids = ctx.input.pipelineIds;
-    if (ctx.input.statusIds) body.status_ids = ctx.input.statusIds;
-    if (ctx.input.companyIds) body.company_ids = ctx.input.companyIds;
-    if (ctx.input.customerSourceIds) body.customer_source_ids = ctx.input.customerSourceIds;
-    if (ctx.input.lossReasonIds) body.loss_reason_ids = ctx.input.lossReasonIds;
+    if (ctx.input.sortBy !== undefined) body.sort_by = ctx.input.sortBy;
+    if (ctx.input.sortDirection !== undefined) body.sort_direction = ctx.input.sortDirection;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.assigneeIds !== undefined) body.assignee_ids = ctx.input.assigneeIds;
+    if (ctx.input.pipelineIds !== undefined) body.pipeline_ids = ctx.input.pipelineIds;
+    if (ctx.input.statusIds !== undefined) body.status_ids = ctx.input.statusIds;
+    if (ctx.input.companyIds !== undefined) body.company_ids = ctx.input.companyIds;
+    if (ctx.input.customerSourceIds !== undefined)
+      body.customer_source_ids = ctx.input.customerSourceIds;
+    if (ctx.input.lossReasonIds !== undefined) body.loss_reason_ids = ctx.input.lossReasonIds;
     if (ctx.input.minimumMonetaryValue !== undefined)
       body.minimum_monetary_value = ctx.input.minimumMonetaryValue;
     if (ctx.input.maximumMonetaryValue !== undefined)
       body.maximum_monetary_value = ctx.input.maximumMonetaryValue;
-    if (ctx.input.minimumCloseDate) body.minimum_close_date = ctx.input.minimumCloseDate;
-    if (ctx.input.maximumCloseDate) body.maximum_close_date = ctx.input.maximumCloseDate;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
+    if (ctx.input.minimumCloseDate !== undefined)
+      body.minimum_close_date = closeDateTimestamp(ctx.input.minimumCloseDate);
+    if (ctx.input.maximumCloseDate !== undefined)
+      body.maximum_close_date = closeDateTimestamp(ctx.input.maximumCloseDate);
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
 
     let opportunities = await client.searchOpportunities(body);
 
     return {
       output: {
         opportunities: opportunities.map(mapOpportunity),
-        count: opportunities.length
+        count: opportunities.length,
+        ...pageContinuation(ctx.input, opportunities.length)
       },
       message: `Found **${opportunities.length}** opportunities matching the search criteria.`
     };

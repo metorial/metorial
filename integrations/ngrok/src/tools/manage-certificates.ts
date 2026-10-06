@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NgrokClient } from '../lib/client';
+import type { CertificateAuthority, TLSCertificate } from '../lib/models';
 import { spec } from '../spec';
 
 let tlsCertOutputSchema = z.object({
@@ -26,7 +27,7 @@ let tlsCertOutputSchema = z.object({
   serialNumber: z.string().describe('Certificate serial number')
 });
 
-let mapTlsCert = (c: any) => ({
+let mapTlsCert = (c: TLSCertificate) => ({
   certificateId: c.id,
   uri: c.uri || '',
   createdAt: c.created_at || '',
@@ -58,7 +59,7 @@ let caOutputSchema = z.object({
   notAfter: z.string().optional().nullable().describe('Validity end')
 });
 
-let mapCa = (c: any) => ({
+let mapCa = (c: CertificateAuthority) => ({
   certificateAuthorityId: c.id,
   uri: c.uri || '',
   createdAt: c.created_at || '',
@@ -77,8 +78,17 @@ export let listTlsCertificates = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -90,6 +100,7 @@ export let listTlsCertificates = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listTlsCertificates({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });
@@ -187,8 +198,17 @@ export let listCertificateAuthorities = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      nextPageUri: z
+        .string()
+        .optional()
+        .describe(
+          'Next page URL returned by this same list tool; omit beforeId and limit when using it.'
+        ),
       beforeId: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Max results per page')
+      limit: z
+        .number()
+        .optional()
+        .describe('Max results per page (whole number from 1 to 100)')
     })
   )
   .output(
@@ -200,6 +220,7 @@ export let listCertificateAuthorities = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NgrokClient(ctx.auth.token);
     let result = await client.listCertificateAuthorities({
+      nextPageUri: ctx.input.nextPageUri,
       beforeId: ctx.input.beforeId,
       limit: ctx.input.limit
     });

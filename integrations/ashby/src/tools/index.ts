@@ -1,7 +1,9 @@
 export { createApplicationTool } from './create-application';
 export { createCandidateTool } from './create-candidate';
 export { createJobTool } from './create-job';
+export { downloadFile, getFileUrl } from './files';
 export { getCandidateTool } from './get-candidate';
+export { getCurrentApiKey } from './identity';
 export { listApplicationsTool } from './list-applications';
 export { listJobsTool } from './list-jobs';
 export { listOrganizationTool } from './list-organization';

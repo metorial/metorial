@@ -1,13 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShipdayClient } from '../lib/client';
+import { id } from '../lib/validation';
 import { spec } from '../spec';
 
 let orderItemSchema = z.object({
   name: z.string().describe('Name of the item'),
   quantity: z.number().describe('Quantity of the item'),
   unitPrice: z.number().optional().describe('Unit price of the item'),
-  addOns: z.string().optional().describe('Add-ons or modifications for the item'),
+  addOns: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .describe('Add-ons or modifications for the item'),
   detail: z.string().optional().describe('Additional details about the item')
 });
 
@@ -119,18 +123,21 @@ export let createDeliveryOrder = SlateTool.create(spec, {
       body.deliveryInstruction = ctx.input.deliveryInstruction;
     if (ctx.input.orderSource) body.orderSource = ctx.input.orderSource;
     if (ctx.input.isCatering !== undefined) body.isCatering = ctx.input.isCatering;
-    if (ctx.input.pickup) body.pickup = ctx.input.pickup;
-    if (ctx.input.dropoff) body.dropoff = ctx.input.dropoff;
+    if (ctx.input.pickup) body.pickup = { address: ctx.input.pickup };
+    if (ctx.input.dropoff) body.dropoff = { address: ctx.input.dropoff };
 
     let result = await client.createDeliveryOrder(body);
 
     return {
       output: {
-        success: result.success,
-        orderId: result.orderId,
-        responseMessage: result.response
+        success: true,
+        orderId: id(result.orderId, 'Created order ID'),
+        responseMessage:
+          typeof result.response === 'string'
+            ? result.response
+            : 'Creation confirmed by native order ID'
       },
-      message: `Created delivery order **#${ctx.input.orderNumber}** (ID: ${result.orderId}) for **${ctx.input.customerName}** at ${ctx.input.customerAddress}.`
+      message: `Shipday confirmed delivery order creation (ID: ${result.orderId}).`
     };
   })
   .build();

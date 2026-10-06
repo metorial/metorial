@@ -6,8 +6,10 @@ import { spec } from '../spec';
 export let getVoice = SlateTool.create(spec, {
   name: 'Get Voice',
   key: 'get_voice',
-  description: `Retrieves detailed information about a specific LMNT voice by its ID, including name, state, type, gender, and preview audio URL.`,
+  description:
+    'DEPRECATED — LMNT has shut down. This tool is retained for existing workflows and cannot perform provider operations.',
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

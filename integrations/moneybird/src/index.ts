@@ -4,9 +4,12 @@ import {
   createContact,
   createEstimate,
   createSalesInvoice,
+  downloadSalesInvoice,
   getContact,
+  getFileUrl,
   getSalesInvoice,
   linkBooking,
+  listAdministrations,
   listContacts,
   listEstimates,
   listFinancialMutations,
@@ -21,18 +24,12 @@ import {
   manageTimeEntries,
   updateContact
 } from './tools';
-import {
-  contactEvents,
-  documentEvents,
-  estimateEvents,
-  paymentEvents,
-  recurringInvoiceEvents,
-  salesInvoiceEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    listAdministrations,
+    downloadSalesInvoice,
+    getFileUrl,
     listContacts,
     getContact,
     createContact,
@@ -52,13 +49,6 @@ export let provider = Slate.create({
     manageProjects,
     listFinancialMutations,
     linkBooking
-  ] as any,
-  triggers: [
-    contactEvents,
-    salesInvoiceEvents,
-    estimateEvents,
-    paymentEvents,
-    documentEvents,
-    recurringInvoiceEvents
-  ] as any
+  ],
+  triggers: []
 });

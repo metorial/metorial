@@ -1,5 +1,6 @@
 export * from './calculate-tax';
 export * from './create-transaction';
+export * from './get-current-account';
 export * from './manage-checkout-sessions';
 export * from './manage-contacts';
 export * from './manage-credit-notes';

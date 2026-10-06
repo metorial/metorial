@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/notion.svg" height="20"> Notion
 
-Create, read, update, and archive pages and databases in a Notion workspace. Manage blocks (paragraphs, lists, headings, embeds, etc.) within pages. Query databases with filters and sorts across rich property types including text, numbers, dates, selects, relations, and formulas. Search across pages and databases by title. Add and read comments on pages and blocks. Upload files to pages. Manage workspace users and retrieve user profiles. Receive real-time webhook notifications for page changes, new pages, comments, and database schema updates.
+Create, read, update, and archive pages and databases in a Notion workspace. Manage blocks (paragraphs, lists, headings, embeds, etc.) within pages. Query databases with filters and sorts across rich property types including text, numbers, dates, selects, relations, and formulas. Search across pages and databases by title. Add and read comments on pages and blocks. Upload files to pages. Manage workspace users and retrieve user profiles.
 
 ## Tools
 

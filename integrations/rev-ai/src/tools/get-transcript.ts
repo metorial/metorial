@@ -20,7 +20,7 @@ export let getTranscript = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      jobId: z.string().describe('ID of the completed transcription job'),
+      jobId: z.string().min(1).describe('ID of the completed transcription job'),
       format: z
         .enum(['text', 'json'])
         .optional()

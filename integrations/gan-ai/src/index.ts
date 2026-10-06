@@ -24,8 +24,6 @@ import {
   listWorkspaces,
   manageConsent
 } from './tools';
-import { playgroundWebhook, studioVideoWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -52,5 +50,5 @@ export let provider = Slate.create({
     createPersonalizedVideos,
     getVideoStatus
   ],
-  triggers: [playgroundWebhook, studioVideoWebhook]
+  triggers: []
 });

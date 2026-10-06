@@ -1,6 +1,17 @@
 # <img src="logo.jpeg" height="20"> Humanloop
 
-Manage LLM prompts, evaluations, and observability for AI applications. Create, version, and deploy prompts with templated variables. Run evaluations using code-based, AI-based, or human evaluators against datasets. Log LLM calls with inputs, outputs, latencies, token counts, and costs. Proxy calls to model providers (OpenAI, Anthropic, Cohere, AWS Bedrock) with automatic logging. Manage datasets of test cases for benchmarking. Configure and trace multi-step agent workflows and flows. Deploy prompt versions to different environments (staging, production). Organize files into directories and attach human feedback to logs.
+Humanloop is retired. Its platform and API shut down on September 8, 2025,
+and account data became permanently inaccessible after that date.
+
+The existing eleven tools and their input/output contracts remain listed for
+compatibility. Every call returns a clear retirement error, and new connections
+are unavailable. Legacy triggers have been removed.
+
+Use data exported before the shutdown with your chosen replacement platform.
+There is no live Humanloop API for a new export or migration.
+
+Official sources: [platform sunset announcement](https://humanloop.com/docs/changelog/2025/08)
+and [migration guide](https://humanloop.com/docs/guides/migrating-from-humanloop).
 
 ## License
 

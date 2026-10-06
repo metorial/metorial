@@ -19,7 +19,7 @@ export let getCampaign = SlateTool.create(spec, {
   .output(
     z.object({
       campaignId: z.string().describe('Unique identifier of the campaign'),
-      status: z.string().describe('Campaign status: DRAFT, SENDING, SENT, or ERROR'),
+      status: z.string().describe('Provider campaign status, such as draft or sent'),
       name: z.string().describe('Internal campaign name'),
       subject: z.string().describe('Email subject line'),
       to: z.array(z.string()).describe('List IDs the campaign targets'),
@@ -29,7 +29,9 @@ export let getCampaign = SlateTool.create(spec, {
       }),
       content: z.object({
         html: z.string().describe('HTML content of the email'),
-        plainText: z.string().describe('Plain text content of the email')
+        plainText: z
+          .string()
+          .describe('Plain text when supplied by the provider; otherwise an empty string')
       }),
       createdAt: z.string().describe('ISO 8601 creation timestamp'),
       sentAt: z.string().nullable().describe('ISO 8601 sent timestamp, null if not sent')

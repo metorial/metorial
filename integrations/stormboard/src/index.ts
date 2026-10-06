@@ -16,8 +16,6 @@ import {
   manageTags,
   updateStormSection
 } from './tools';
-import { commentEvents, ideaEvents, legendEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     manageParticipants,
     getUserProfile
   ],
-  triggers: [ideaEvents, commentEvents, legendEvents]
+  triggers: []
 });

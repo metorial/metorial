@@ -1,16 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { currentVersion, invalid, recovery, resourceId, selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createAsset = SlateTool.create(spec, {
   name: 'Create Asset',
   key: 'create_asset',
-  description: `Create a new asset in Contentful. Provide file upload URL, title, and description per locale. Optionally process and publish the asset immediately.`,
+  description: `Create a new asset in Contentful. Provide file upload URL, title, and description per locale. Optionally request processing and publish only after completion.`,
   instructions: [
     'Fields must use locale keys, e.g. {"en-US": {...}}.',
     'The file.upload field should be a publicly accessible URL for Contentful to download.',
-    'Set processAndPublish to true to process the file and publish the asset in one step.'
+    'Processing is asynchronous. A pending receipt preserves the asset ID; inspect get_asset before publishing or retrying.'
   ],
   tags: {
     destructive: false
@@ -18,6 +19,7 @@ export let createAsset = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...selection,
       title: z
         .record(z.string(), z.string())
         .describe('Asset title by locale, e.g. {"en-US": "Photo"}.'),
@@ -31,7 +33,14 @@ export let createAsset = SlateTool.create(spec, {
           z.object({
             fileName: z.string().describe('File name with extension.'),
             contentType: z.string().describe('MIME type, e.g. "image/jpeg".'),
-            upload: z.string().describe('Public URL of the file to upload.')
+            upload: z
+              .string()
+              .url()
+              .refine(
+                value => value.startsWith('https://'),
+                'Use a publicly reachable HTTPS URL.'
+              )
+              .describe('Public URL of the file to upload.')
           })
         )
         .describe(
@@ -45,7 +54,7 @@ export let createAsset = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      assetId: z.string().describe('ID of the created asset.'),
+      assetId: resourceId.describe('ID of the created asset.'),
       version: z.number().describe('Current version number.'),
       processed: z.boolean().describe('Whether the asset file was processed.'),
       published: z.boolean().describe('Whether the asset was published.'),
@@ -53,7 +62,7 @@ export let createAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
 
     let fields: Record<string, any> = {
       title: ctx.input.title,
@@ -63,34 +72,44 @@ export let createAsset = SlateTool.create(spec, {
       fields.description = ctx.input.description;
     }
 
+    if (!Object.keys(ctx.input.file).length)
+      throw invalid('Provide at least one file locale.');
     let asset = await client.createAsset(fields);
     let processed = false;
     let published = false;
 
     if (ctx.input.processAndPublish) {
-      // Process file for each locale
-      for (let locale of Object.keys(ctx.input.file)) {
-        await client.processAsset(asset.sys.id, locale, asset.sys.version);
+      try {
+        for (let locale of Object.keys(ctx.input.file)) {
+          asset = await client.getAsset(asset.sys.id);
+          await client.processAsset(asset.sys.id, locale, currentVersion(asset));
+        }
+        for (let attempt = 0; attempt < 8; attempt++) {
+          asset = await client.getAsset(asset.sys.id);
+          processed = Object.keys(ctx.input.file).every(
+            locale => typeof asset.fields?.file?.[locale]?.url === 'string'
+          );
+          if (processed) break;
+          if (attempt < 7) await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        if (processed) {
+          asset = await client.publishAsset(asset.sys.id, currentVersion(asset));
+          published = true;
+        }
+      } catch {
+        throw recovery('asset', asset.sys.id, client.spaceId, client.environmentId);
       }
-      processed = true;
-
-      // Wait briefly for processing, then fetch updated version and publish
-      // Contentful processing is async, re-fetch to get updated version
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      let updated = await client.getAsset(asset.sys.id);
-      asset = await client.publishAsset(updated.sys.id, updated.sys.version);
-      published = true;
     }
 
     return {
       output: {
         assetId: asset.sys.id,
-        version: asset.sys.version,
+        version: currentVersion(asset),
         processed,
         published,
         createdAt: asset.sys.createdAt
       },
-      message: `Created asset **${asset.sys.id}**${published ? ', processed and published it' : ''}.`
+      message: `Created asset **${asset.sys.id}**${published ? ', processed and published it' : ctx.input.processAndPublish ? '; processing is pending, inspect the existing asset before publishing' : ''}.`
     };
   })
   .build();

@@ -2,9 +2,11 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   controlWorkflowRun,
+  getCurrentUser,
   getWorkflowRun,
   getWorkflowRunLogs,
   listArtifacts,
+  listPendingDeployments,
   listWorkflowRuns,
   listWorkflows,
   manageArtifact,
@@ -16,16 +18,11 @@ import {
   manageWorkflowState,
   triggerWorkflow
 } from './tools';
-import {
-  checkRunTrigger,
-  deploymentStatusTrigger,
-  workflowJobTrigger,
-  workflowRunTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    listPendingDeployments,
     listWorkflows,
     triggerWorkflow,
     manageWorkflowState,
@@ -41,5 +38,5 @@ export let provider = Slate.create({
     manageRunners,
     managePermissions
   ],
-  triggers: [workflowRunTrigger, workflowJobTrigger, checkRunTrigger, deploymentStatusTrigger]
+  triggers: []
 });

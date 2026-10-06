@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { salesPayload } from '../lib/payloads';
 import { spec } from '../spec';
 
 let addressSchema = z
@@ -22,7 +23,9 @@ let addressSchema = z
     countryCode: z
       .string()
       .optional()
-      .describe('ISO 3166-1 alpha-2 country code (e.g. DE, AT, CH)')
+      .describe(
+        'Provider country or tax-region code (e.g. DE, ES_CN); discover choices with list_reference_data'
+      )
   })
   .describe(
     'Address of the quotation recipient. Provide either contactId or inline address fields.'
@@ -98,7 +101,7 @@ let paymentConditionsSchema = z
     paymentTermLabelTemplate: z
       .string()
       .optional()
-      .describe('Template for payment term label with placeholders'),
+      .describe('Legacy read-only field; use paymentTermLabel for writes'),
     paymentTermDuration: z.number().optional().describe('Payment term duration in days')
   })
   .describe('Payment conditions');
@@ -136,7 +139,7 @@ export let createQuotation = SlateTool.create(spec, {
         .describe('Payment conditions for the quotation'),
       shippingConditions: shippingConditionsSchema
         .optional()
-        .describe('Shipping or service date conditions'),
+        .describe('Legacy field unsupported for quotations; omit it'),
       title: z.string().optional().describe('Custom title for the quotation'),
       introduction: z
         .string()
@@ -169,38 +172,12 @@ export let createQuotation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let quotationData: Record<string, any> = {
-      address: ctx.input.address,
-      lineItems: ctx.input.lineItems,
-      taxConditions: ctx.input.taxConditions
-    };
-
-    if (ctx.input.totalPrice) quotationData.totalPrice = ctx.input.totalPrice;
-    if (ctx.input.paymentConditions)
-      quotationData.paymentConditions = ctx.input.paymentConditions;
-    if (ctx.input.shippingConditions)
-      quotationData.shippingConditions = ctx.input.shippingConditions;
-    if (ctx.input.title) quotationData.title = ctx.input.title;
-    if (ctx.input.introduction) quotationData.introduction = ctx.input.introduction;
-    if (ctx.input.remark) quotationData.remark = ctx.input.remark;
-    if (ctx.input.voucherDate) quotationData.voucherDate = ctx.input.voucherDate;
-    if (ctx.input.expirationDate) quotationData.expirationDate = ctx.input.expirationDate;
-
-    let result = await client.createQuotation(quotationData, {
-      finalize: ctx.input.finalize
-    });
-
+    const client = new Client({ token: ctx.auth.token });
+    const data = salesPayload(ctx.input, 'quotation');
+    const result = await client.createQuotation(data, { finalize: ctx.input.finalize });
     return {
-      output: {
-        id: result.id,
-        resourceUri: result.resourceUri,
-        createdDate: result.createdDate,
-        updatedDate: result.updatedDate,
-        version: result.version
-      },
-      message: `Created quotation **${result.id}**${ctx.input.finalize ? ' (finalized)' : ' (draft)'}`
+      output: result,
+      message: `Created quotation **${result.id}**${ctx.input.finalize ? '; immediate finalization was requested' : '; created as a draft'}.`
     };
   })
   .build();

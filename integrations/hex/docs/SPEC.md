@@ -1,80 +1,25 @@
-# Slates Specification for Hex
+# Hex API integration
 
-## Overview
-
-Hex is a collaborative data workspace that allows teams to build notebooks, data apps, and analytics projects using SQL and Python. The Hex public API allows teams to programmatically interact with their Hex workspace — including listing projects, triggering runs of published projects, managing access controls, and configuring data connections.
+The 24-tool surface uses the authenticated deployment's documented `/api/v1` API. Twenty established keys remain; identity, group/collection details and project-file export are added. No trigger is registered.
 
 ## Authentication
 
-API requests are authenticated using OAuth 2.0 Bearer Tokens in the header of the HTTP request. The token is always bound to a single Hex user's account and requests are executed as that Hex user.
+`api_token` retains its required `token`. Optional deployment origin is stored after successful `/users/me` verification; old token-only auth and stored config origins remain compatible. Auth origin wins over legacy config. Only HTTPS Hex origins without credentials, paths, query/fragment or non-default ports are accepted; requests do not follow redirects with credentials. Personal identity/expiry fields are provider-supplied and omitted for workspace tokens when unavailable. No token/prefix or unsupported automatic refresh is exposed.
 
-**Token Types:**
+## API contracts
 
-There are two types of tokens users can create: Personal access tokens and Workspace tokens. Tokens are prefixed to indicate their type: `hxtp_` for personal access tokens and `hxtw_` for workspace tokens.
+Project DTOs map native id, status/category names, lastEditedAt and lastPublishedAt to established fields. Required email-only person shapes do not gain fabricated IDs/names. Sharing sends nested user/group/collection IDs and access, unwraps `{project, errors}`, prevalidates all input categories, and reports sequential partial failures.
 
-- **Personal Access Tokens:** Mirror the same permissions that a user has within the Hex product. They can be created by anyone with an Editor or higher workspace role. Unlike workspace tokens (which can have no expiration), they must be configured to expire after a fixed duration. Durations may include 7, 30, 60, 90, or 120 days.
-- **Workspace Tokens:** If you are creating a token that is used to orchestrate projects across a workspace, consider using a Workspace token so that the token is not scoped to an individual user. When creating a workspace token, admins can specify an expiration that is a fixed duration (one of 7, 30, 60, 90, or 120 days), or no expiry.
+Documented 201 creation and 204 deletion/cancellation codes are required. Group creation reads back the real creation timestamp; failed readback identifies the accepted ID and warns against duplicate creation. Run lists parse `{runs, nextPage, previousPage}` and select API-triggered history. Deactivation requires 200 and the matching returned user ID; its acknowledgement is not independent activation-state proof.
 
-**Token Scopes:**
+Membership uses `members.users[].id` and add/remove entries. Absent collection/user/data metadata stays optional; null user names remain null. Connection details/credentials and free-form notification diagnostics are excluded. Pagination exposes real cursors and returned counts only. Unsupported legacy sort fields fail with guidance.
 
-Read projects: The token will work with any API endpoint that only gets information (e.g. ListProjects and GetProjectRuns). Run projects: The token will also work with the RunProjects endpoint. For Users, Groups, Collections, and Data connections: The token can be specified to have read-only or write access (which includes read).
+Published execution preserves variable-name inputs, explicit recipients and deprecated cache semantics. Submission/cancellation is not completion. Embedding converts decimal seconds exactly to whole milliseconds, maps legacy export scopes/base padding, and validates signed links against the selected deployment. Header semantics are not invented.
 
-**Base URL:**
+Export POST `/projects/export` produces a downloadable YAML file with a sanitized basename and metadata. Draft is default; latest means latest published. No unsupported project/collection/history deletion, publication, cells/guides/semantic-model management or data-connection writes are added.
 
-For most Hex users, the base URL is `https://app.hex.tech/api/v1`. For single tenant, EU multi tenant, and HIPAA multi tenant customers, replace `app.hex.tech` with your custom URL (e.g. `atreides.hex.tech`, `eu.hex.tech`).
+## Verification and effects
 
-The token is passed as a Bearer token in the `Authorization` header: `Authorization: Bearer <token>`.
+Timeouts, disabled credential-forwarding redirects, sanitized service failures and no automatic mutation retries protect uncertain operations. Schema contracts preserve historical keys/input types/enums/requiredness, allowing only documented output relaxations. Private live checks use exact independent workspace identity, complete bounded paging, unique markers, preregistered cleanup and approved synthetic effects fixtures. Project/collection cleanup requires a real authorized administrative service plus native permanent-absence proof. User deactivation is safety-gated without an actual disposable-user setup/reactivation/readback lifecycle. Missing local profiles alone do not skip the suite.
 
-## Features
-
-### Project Management
-
-Create, list, and retrieve Hex projects. Projects can be filtered by statuses, categories, creator, owner, or collection. You can update a project's status (including endorsements). Admin APIs are available on both the Team and Enterprise plans; certain endpoints are exclusive to the Enterprise plan.
-
-### Project Execution
-
-Trigger runs of published projects programmatically, with optional custom input parameters or saved views. You can monitor run status (PENDING, RUNNING, ERRORED, COMPLETED, KILLED), cancel running executions, and optionally update published app results with latest run output. Notifications can be configured for run completion, delivered to Slack channels, Hex users, or groups.
-
-### Project Sharing & Access Control
-
-Manage sharing permissions for projects at multiple levels: individual users, groups, collections, workspace-wide, and public web. Access levels include NONE, APP_ONLY, CAN_VIEW, CAN_EDIT, and FULL_ACCESS.
-
-### Embedded Analytics
-
-Generate presigned URLs for embedding Hex apps in external applications. Supports custom user attributes, input parameter defaults, display options (theme, padding, headers), export scopes (PDF, CSV), and configurable URL expiration.
-
-### User Management
-
-List workspace users with details including name, role, email, and last login date. Users can be filtered by group membership. Deactivate users from the workspace. If your workspace is using Directory Sync, users and groups will continue to be managed there and not via API.
-
-### Group Management
-
-Create, list, edit, and delete groups. Add or remove users from groups. Groups can be used for project sharing and access control.
-
-### Collection Management
-
-Create, list, edit, and retrieve collections. Collections serve as organizational containers for projects with their own sharing permissions at user, group, and workspace levels.
-
-### Data Connection Management
-
-Create, list, retrieve, and edit data connections to external databases. Supported database types include Athena, BigQuery, Databricks, PostgreSQL, Redshift, and Snowflake. Configure schema filters (include/exclude databases, schemas, and tables), schema refresh schedules, and sharing permissions. Statuses and endorsements can be applied to databases, schemas, and tables within a connection.
-
-### Semantic Model Management
-
-Ingest semantic projects from zip files and update statuses/endorsements on datasets and views within semantic projects. Supports dry-run mode and verbose output for validation.
-
-### Cell Management
-
-List, create, read, update, and delete individual cells within a project's draft version. Currently supports CODE and SQL cell types, including reading and writing source code content. Cells can be positioned at specific locations within the project.
-
-### Guide Management
-
-Create, update, publish, and delete guide drafts. Guides can be synced from external sources (e.g., GitHub). Supports batch publishing of all draft guides or selective publishing by ID.
-
-### Observability
-
-Retrieve queried tables for a given project (Observability API) — available on the Enterprise plan only.
-
-## Events
-
-The provider does not support webhooks or event subscriptions. There is no webhook or purpose-built polling mechanism in the Hex API.
+Sources: [overview/auth/limits](https://learn.hex.tech/docs/api-integrations/api/overview), [reference](https://learn.hex.tech/docs/api-integrations/api/reference), [OpenAPI](https://static.hex.site/openapi.json).

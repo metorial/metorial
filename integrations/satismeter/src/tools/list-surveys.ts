@@ -1,17 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SatisMeterClient } from '../lib/client';
+import { projectIdSchema, resolveProject } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listSurveysTool = SlateTool.create(spec, {
   name: 'List Surveys',
   key: 'list_surveys',
-  description: `Retrieve all surveys (campaigns) for the configured project. Returns each survey's ID, name, type, and state. Use this to discover available surveys before fetching responses or statistics.`,
+  description: `Retrieve all surveys (campaigns) for the selected project. Returns each survey's ID, name, type, and state. Use this to discover available surveys before fetching responses or statistics.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ projectId: projectIdSchema }))
   .output(
     z.object({
       surveys: z
@@ -28,9 +29,9 @@ export let listSurveysTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new SatisMeterClient(ctx.auth.token, ctx.auth.writeKey);
-    let result = await client.listSurveys(ctx.config.projectId);
+    let result = await client.listSurveys(resolveProject(ctx.input.projectId, ctx.config));
 
-    let surveys = (result?.data || []).map((s: any) => ({
+    let surveys = result.map(s => ({
       surveyId: s.id,
       name: s.name,
       type: s.type,

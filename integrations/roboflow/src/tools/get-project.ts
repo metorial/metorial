@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getProjectTool = SlateTool.create(spec, {
@@ -13,12 +14,12 @@ export let getProjectTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('Project URL slug (e.g., "my-project-abc12")')
+      projectId: projectIdSchema
     })
   )
   .output(
     z.object({
-      projectId: z.string().describe('Unique project identifier'),
+      projectId: projectIdSchema,
       name: z.string().describe('Display name of the project'),
       type: z.string().describe('Project type (e.g., object-detection, classification)'),
       imageCount: z.number().describe('Total number of images'),
@@ -57,15 +58,31 @@ export let getProjectTool = SlateTool.create(spec, {
     let data = await client.getProject(workspaceId, ctx.input.projectId);
 
     let project = data.project || data;
-    let versions = (project.versions || []).map((v: any) => ({
-      versionId: v.id || String(v.name),
-      versionNumber: typeof v.name === 'number' ? v.name : Number.parseInt(v.name, 10) || 0,
-      imageCount: v.images,
-      preprocessing: v.preprocessing,
-      augmentation: v.augmentation,
-      hasModel: !!v.model,
-      createdAt: v.created
-    }));
+    const rawVersions = Array.isArray(data.versions)
+      ? data.versions
+      : Array.isArray(project.versions)
+        ? project.versions
+        : [];
+    let versions = rawVersions.map((v: any) => {
+      const versionNumber = Number.parseInt(
+        typeof v.id === 'string' ? v.id.split('/').at(-1)! : String(v.version ?? v.name),
+        10
+      );
+      if (!Number.isInteger(versionNumber) || versionNumber < 1) {
+        throw createApiServiceError(
+          'Roboflow returned a dataset version without a usable version number.'
+        );
+      }
+      return {
+        versionId: v.id || `${project.id || ctx.input.projectId}/${versionNumber}`,
+        versionNumber,
+        imageCount: v.images,
+        preprocessing: v.preprocessing,
+        augmentation: v.augmentation,
+        hasModel: !!v.model,
+        createdAt: v.created
+      };
+    });
 
     return {
       output: {

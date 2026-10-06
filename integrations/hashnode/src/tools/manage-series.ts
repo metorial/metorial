@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { selection } from '../lib/schemas';
 import { spec } from '../spec';
 
 let seriesOutputSchema = z.object({
@@ -22,22 +23,20 @@ let seriesOutputSchema = z.object({
       })
     )
     .optional()
-    .describe('Posts in the series'),
-  totalPosts: z.number().nullable().optional().describe('Total number of posts')
+    .describe('At most 20 posts in the series; remaining posts require the dashboard.'),
+  postsHasNextPage: z.boolean().optional(),
+  postsEndCursor: z.string().nullable().optional(),
+  totalPosts: z.number().nullable().optional().describe('Native total number of posts')
 });
 
 export let manageSeries = SlateTool.create(spec, {
   name: 'Manage Series',
   key: 'manage_series',
-  description: `Create, retrieve, list, update, or delete a post series. A series groups related articles so readers can view them in order.
-- **create**: Create a new series.
-- **get**: Get a series by its slug, including its posts.
-- **list**: List all series in the publication.
-- **update**: Update a series name, slug, description, or cover image.
-- **delete**: Remove a series permanently.`
+  description: `Read a series by slug or list a page of series in the selected publication. Series reads include at most 20 posts. Legacy create, update, and delete inputs remain accepted for compatibility, but those writes are absent from the current public API and refuse locally. Use the dashboard for series changes.`
 })
   .input(
     z.object({
+      ...selection,
       action: z
         .enum(['create', 'get', 'list', 'update', 'delete'])
         .describe('Operation to perform'),
@@ -62,7 +61,14 @@ export let manageSeries = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Sort order (e.g. "asc" or "desc") — used with "create" and "update"'),
-      first: z.number().optional().default(10).describe('Number of series to list'),
+      first: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .default(10)
+        .describe('Number of series to list'),
       after: z.string().optional().describe('Pagination cursor for "list"')
     })
   )
@@ -92,42 +98,27 @@ export let manageSeries = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      publicationHost: ctx.config.publicationHost
+      publicationHost:
+        ctx.input.publicationHost ??
+        (ctx.input.publicationId === undefined ? ctx.config.publicationHost : undefined),
+      publicationId: ctx.input.publicationId
     });
 
     let { action } = ctx.input;
 
-    if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required to create a series');
-
-      let series = await client.createSeries({
-        name: ctx.input.name,
-        slug: ctx.input.slug,
-        description: ctx.input.description,
-        coverImage: ctx.input.coverImage,
-        sortOrder: ctx.input.sortOrder
-      });
-
-      return {
-        output: {
-          series: {
-            seriesId: series.id,
-            name: series.name,
-            slug: series.slug,
-            createdAt: series.createdAt
-          }
-        },
-        message: `Created series **"${series.name}"**`
-      };
-    }
+    if (!['get', 'list'].includes(action))
+      throw createApiServiceError(
+        'Series writes are unavailable in the current public API. Use the Hashnode dashboard; no request was sent.',
+        { reason: 'unsupported_operation' }
+      );
 
     if (action === 'get') {
-      if (!ctx.input.slug) throw new Error('slug is required to get a series');
+      if (!ctx.input.slug) throw createApiServiceError('slug is required to get a series');
 
       let series = await client.getSeriesBySlug(ctx.input.slug);
-      if (!series) throw new Error('Series not found');
+      if (!series) throw createApiServiceError('Series not found');
 
-      let posts = (series.posts?.edges || []).map((e: any) => ({
+      let posts = (series.posts?.edges || []).map(e => ({
         postId: e.node.id,
         title: e.node.title,
         slug: e.node.slug,
@@ -146,7 +137,9 @@ export let manageSeries = SlateTool.create(spec, {
             sortOrder: series.sortOrder,
             authorUsername: series.author?.username,
             posts,
-            totalPosts: series.posts?.totalDocuments
+            postsHasNextPage: series.posts?.pageInfo.hasNextPage,
+            postsEndCursor: series.posts?.pageInfo.endCursor,
+            totalPosts: series.posts?.pageInfo.totalDocuments
           }
         },
         message: `Retrieved series **"${series.name}"** with ${posts.length} posts`
@@ -155,11 +148,11 @@ export let manageSeries = SlateTool.create(spec, {
 
     if (action === 'list') {
       let result = await client.listSeries({
-        first: Math.min(ctx.input.first, 20),
+        first: ctx.input.first,
         after: ctx.input.after
       });
 
-      let seriesList = result.series.map((s: any) => ({
+      let seriesList = result.series.map(s => ({
         seriesId: s.id,
         name: s.name,
         slug: s.slug,
@@ -179,42 +172,6 @@ export let manageSeries = SlateTool.create(spec, {
       };
     }
 
-    if (action === 'update') {
-      if (!ctx.input.seriesId) throw new Error('seriesId is required to update a series');
-
-      let series = await client.updateSeries(ctx.input.seriesId, {
-        name: ctx.input.name,
-        slug: ctx.input.slug,
-        description: ctx.input.description,
-        coverImage: ctx.input.coverImage,
-        sortOrder: ctx.input.sortOrder
-      });
-
-      return {
-        output: {
-          series: {
-            seriesId: series.id,
-            name: series.name,
-            slug: series.slug
-          }
-        },
-        message: `Updated series **"${series.name}"**`
-      };
-    }
-
-    if (action === 'delete') {
-      if (!ctx.input.seriesId) throw new Error('seriesId is required to delete a series');
-
-      await client.removeSeries(ctx.input.seriesId);
-
-      return {
-        output: {
-          deleted: true
-        },
-        message: `Deleted series \`${ctx.input.seriesId}\``
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

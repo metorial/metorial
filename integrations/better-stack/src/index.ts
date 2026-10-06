@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  exportDashboard,
   listDashboards,
   listIncidents,
   listMonitors,
@@ -13,8 +14,6 @@ import {
   manageSource,
   manageStatusPage
 } from './tools';
-import { inboundWebhook, incidentEvents, monitorEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,7 +27,8 @@ export let provider = Slate.create({
     manageSource,
     listDashboards,
     manageAlert,
-    manageIncomingWebhook
+    manageIncomingWebhook,
+    exportDashboard
   ],
-  triggers: [inboundWebhook, incidentEvents, monitorEvents]
+  triggers: []
 });

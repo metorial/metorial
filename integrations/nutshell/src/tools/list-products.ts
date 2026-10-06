@@ -14,8 +14,16 @@ export let listProducts = SlateTool.create(spec, {
   .input(
     z.object({
       searchQuery: z.string().optional().describe('Search term to filter products by name'),
-      limit: z.number().optional().describe('Number of results per page (default: 50)'),
-      page: z.number().optional().describe('Page number (default: 1)')
+      limit: z
+        .number()
+        .optional()
+        .describe(
+          'Results per page in list mode (default: 50); maximum matches in search mode (default: 10)'
+        ),
+      page: z
+        .number()
+        .optional()
+        .describe('List page number (default: 1). Name search only supports page 1.')
     })
   )
   .output(
@@ -38,9 +46,13 @@ export let listProducts = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let results: any[];
+    let results: Awaited<ReturnType<NutshellClient['findProducts']>>;
     if (ctx.input.searchQuery) {
-      results = await client.searchProducts(ctx.input.searchQuery);
+      results = await client.searchProducts(
+        ctx.input.searchQuery,
+        ctx.input.limit,
+        ctx.input.page
+      );
     } else {
       results = await client.findProducts({
         limit: ctx.input.limit,
@@ -48,7 +60,7 @@ export let listProducts = SlateTool.create(spec, {
       });
     }
 
-    let products = results.map((p: any) => ({
+    let products = results.map(p => ({
       productId: p.id,
       name: p.name,
       entityType: p.entityType

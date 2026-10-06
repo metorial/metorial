@@ -6,8 +6,10 @@ import { spec } from '../spec';
 export let getAccount = SlateTool.create(spec, {
   name: 'Get Account',
   key: 'get_account',
-  description: `Retrieves your LMNT account details including plan type, character limits, voice limits, and current usage for the billing period.`,
+  description:
+    'DEPRECATED — LMNT has shut down. This tool is retained for existing workflows and cannot perform provider operations.',
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

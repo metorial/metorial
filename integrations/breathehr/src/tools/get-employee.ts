@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { readOne, requireId } from '../lib/response';
 import { spec } from '../spec';
 
 export let getEmployee = SlateTool.create(spec, {
@@ -18,22 +19,19 @@ export let getEmployee = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      employee: z.record(z.string(), z.any()).describe('Full employee record')
+      employee: z.record(z.string(), z.unknown()).describe('Full employee record')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
-
-    let result = await client.getEmployee(ctx.input.employeeId);
-
-    let employee = result?.employees?.[0] || result?.employee || result;
-
-    return {
-      output: { employee },
-      message: `Retrieved employee **${employee?.first_name || ''} ${employee?.last_name || ''}** (ID: ${ctx.input.employeeId}).`
-    };
+    const employeeId = requireId(ctx.input.employeeId, 'employeeId');
+    const employee = readOne(
+      await new Client({ token: ctx.auth.token, environment: ctx.config.environment }).get(
+        'employees',
+        employeeId
+      ),
+      'employees',
+      employeeId
+    );
+    return { output: { employee }, message: 'Retrieved the requested employee.' };
   })
   .build();

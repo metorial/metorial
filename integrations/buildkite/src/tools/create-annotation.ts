@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createAnnotation = SlateTool.create(spec, {
@@ -13,7 +14,8 @@ export let createAnnotation = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pipelineSlug: z.string().describe('Slug of the pipeline'),
+      ...organizationInput,
+      pipelineSlug: z.string().describe('Pipeline slug from list_pipelines'),
       buildNumber: z.number().describe('Build number to annotate'),
       body: z.string().describe('Annotation content (supports Markdown and HTML)'),
       context: z
@@ -43,10 +45,7 @@ export let createAnnotation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     let a = await client.createAnnotation(ctx.input.pipelineSlug, ctx.input.buildNumber, {
       body: ctx.input.body,

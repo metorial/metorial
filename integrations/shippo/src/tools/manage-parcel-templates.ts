@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShippoClient } from '../lib/client';
+import { invalid } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let createParcelTemplate = SlateTool.create(spec, {
@@ -14,11 +15,14 @@ export let createParcelTemplate = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('Name for the parcel template'),
-      length: z.string().describe('Length'),
-      width: z.string().describe('Width'),
-      height: z.string().describe('Height'),
-      distanceUnit: z.enum(['cm', 'in', 'ft', 'mm', 'm', 'yd']).describe('Dimension unit'),
+      name: z.string().optional().describe('Name for the parcel template'),
+      length: z.string().optional().describe('Length'),
+      width: z.string().optional().describe('Width'),
+      height: z.string().optional().describe('Height'),
+      distanceUnit: z
+        .enum(['cm', 'in', 'ft', 'mm', 'm', 'yd'])
+        .optional()
+        .describe('Dimension unit'),
       weight: z.string().optional().describe('Default weight'),
       massUnit: z.enum(['g', 'oz', 'lb', 'kg']).optional().describe('Weight unit'),
       template: z.string().optional().describe('Base carrier parcel template token')
@@ -35,18 +39,18 @@ export let createParcelTemplate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    let client = new ShippoClient(ctx.auth);
 
-    let result = (await client.createUserParcelTemplate({
+    let result = await client.createUserParcelTemplate({
       name: ctx.input.name,
       length: ctx.input.length,
       width: ctx.input.width,
       height: ctx.input.height,
       distance_unit: ctx.input.distanceUnit,
       weight: ctx.input.weight,
-      mass_unit: ctx.input.massUnit,
+      weight_unit: ctx.input.massUnit,
       template: ctx.input.template
-    })) as Record<string, any>;
+    });
 
     return {
       output: {
@@ -57,7 +61,7 @@ export let createParcelTemplate = SlateTool.create(spec, {
         height: result.height,
         distanceUnit: result.distance_unit
       },
-      message: `Parcel template **${ctx.input.name}** created (${result.object_id}).`
+      message: `Parcel template **${result.name ?? 'Parcel template'}** created (${result.object_id}).`
     };
   })
   .build();
@@ -108,10 +112,12 @@ export let listParcelTemplates = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShippoClient(ctx.auth.token);
+    if (ctx.input.carrier !== undefined && !ctx.input.includeCarrierTemplates)
+      throw invalid('carrier applies only when includeCarrierTemplates is true.');
+    let client = new ShippoClient(ctx.auth);
 
-    let userResult = (await client.listUserParcelTemplates()) as Record<string, any>;
-    let userTemplates = (userResult.results || []).map((t: any) => ({
+    let userResult = await client.listUserParcelTemplates();
+    let userTemplates = (userResult.results || []).map(t => ({
       templateId: t.object_id,
       name: t.name,
       length: t.length,
@@ -120,12 +126,22 @@ export let listParcelTemplates = SlateTool.create(spec, {
       distanceUnit: t.distance_unit
     }));
 
-    let carrierTemplates: any[] | undefined;
+    let carrierTemplates:
+      | Array<{
+          token: string;
+          carrier?: string;
+          name?: string;
+          length?: string;
+          width?: string;
+          height?: string;
+          distanceUnit?: string;
+        }>
+      | undefined;
     if (ctx.input.includeCarrierTemplates) {
-      let carrierResult = (await client.listCarrierParcelTemplates({
+      let carrierResult = await client.listCarrierParcelTemplates({
         carrier: ctx.input.carrier
-      })) as Record<string, any>;
-      carrierTemplates = (carrierResult.results || []).map((t: any) => ({
+      });
+      carrierTemplates = (carrierResult.results || []).map(t => ({
         token: t.token,
         carrier: t.carrier,
         name: t.name,

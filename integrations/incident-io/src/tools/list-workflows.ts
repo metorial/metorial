@@ -14,11 +14,14 @@ export let listWorkflows = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      returnedCount: z.number().int().nonnegative(),
       workflows: z.array(
         z.object({
           workflowId: z.string(),
           name: z.string(),
           trigger: z.string().optional(),
+          triggerLabel: z.string().optional(),
+          state: z.string().optional(),
           enabled: z.boolean().optional(),
           runsOnIncidents: z.string().optional(),
           runsOnIncidentModes: z.array(z.string()).optional(),
@@ -33,11 +36,13 @@ export let listWorkflows = SlateTool.create(spec, {
 
     let result = await client.listWorkflows();
 
-    let workflows = result.workflows.map((w: any) => ({
+    let workflows = result.workflows.map(w => ({
       workflowId: w.id,
       name: w.name,
-      trigger: w.trigger || undefined,
-      enabled: w.enabled ?? undefined,
+      trigger: w.trigger.name,
+      triggerLabel: w.trigger.label,
+      state: w.state,
+      enabled: w.state === 'active',
       runsOnIncidents: w.runs_on_incidents || undefined,
       runsOnIncidentModes: w.runs_on_incident_modes || undefined,
       createdAt: w.created_at || undefined,
@@ -45,7 +50,7 @@ export let listWorkflows = SlateTool.create(spec, {
     }));
 
     return {
-      output: { workflows },
+      output: { workflows, returnedCount: workflows.length },
       message: `Found **${workflows.length}** workflow(s).`
     };
   })

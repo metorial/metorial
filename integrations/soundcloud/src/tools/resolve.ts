@@ -27,21 +27,21 @@ export let resolveUrl = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Username (for users, or uploader for tracks/playlists)'),
-      permalinkUrl: z.string().describe('Canonical permalink URL'),
+      permalinkUrl: z.string().nullable().optional().describe('Canonical permalink URL'),
       resource: z
         .record(z.string(), z.any())
         .describe('Full resource representation from the API')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let resource = await client.resolve(ctx.input.url);
 
-    let kind = resource.kind || 'unknown';
-    let resourceId = resource.urn || String(resource.id);
+    let kind = resource.kind;
+    let resourceId = resource.urn;
     let title = resource.title;
-    let username = resource.username || resource.user?.username;
+    let username = resource.username ?? resource.user?.username;
     let permalinkUrl = resource.permalink_url;
 
     return {

@@ -18,13 +18,6 @@ import {
   manageSubtasksTool,
   updateCardTool
 } from './tools';
-import {
-  boardEventsTrigger,
-  cardEventsTrigger,
-  commentEventsTrigger,
-  subtaskEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -45,5 +38,5 @@ export let provider = Slate.create({
     logTimeTool,
     blockCardTool
   ],
-  triggers: [cardEventsTrigger, subtaskEventsTrigger, commentEventsTrigger, boardEventsTrigger]
+  triggers: []
 });

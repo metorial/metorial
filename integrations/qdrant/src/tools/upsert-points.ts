@@ -37,6 +37,7 @@ export let upsertPoints = SlateTool.create(spec, {
               .describe('Optional JSON payload to attach to the point')
           })
         )
+        .min(1)
         .describe('Points to upsert'),
       wait: z
         .boolean()
@@ -52,7 +53,7 @@ export let upsertPoints = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new QdrantClient({
-      clusterEndpoint: ctx.config.clusterEndpoint!,
+      clusterEndpoint: ctx.config.clusterEndpoint,
       token: ctx.auth.token
     });
 
@@ -70,10 +71,10 @@ export let upsertPoints = SlateTool.create(spec, {
 
     return {
       output: {
-        operationId: result.result?.operation_id,
+        operationId: result.result?.operation_id ?? undefined,
         status: result.result?.status ?? 'completed'
       },
-      message: `Upserted **${ctx.input.points.length}** point(s) into \`${ctx.input.collectionName}\`. Status: **${result.result?.status ?? 'completed'}**.`
+      message: `Upsert operation for **${ctx.input.points.length}** point(s) in \`${ctx.input.collectionName}\`. Status: **${result.result?.status ?? 'completed'}**.`
     };
   })
   .build();

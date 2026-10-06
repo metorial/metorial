@@ -9,7 +9,6 @@
     "report solution accuracy",
     "check account balance",
     "configure proxy settings",
-    "receive webhook callbacks",
     "solve Cloudflare Turnstile",
     "browse proxy locations"
   ]

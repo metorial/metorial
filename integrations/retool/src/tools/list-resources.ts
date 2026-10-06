@@ -1,13 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listResources = SlateTool.create(spec, {
   name: 'List Resources',
   key: 'list_resources',
   description: `List all data source resources (database connections, API configurations, etc.) in the Retool organization. Supports pagination.`,
-  constraints: ['Available on Enterprise Premium plan only.'],
+  constraints: [
+    'Requires the relevant read or write API token scope and support in this deployment.'
+  ],
   tags: {
     readOnly: true
   }
@@ -30,7 +32,7 @@ export let listResources = SlateTool.create(spec, {
           resourceId: z.string(),
           resourceName: z.string(),
           resourceType: z.string().optional(),
-          description: z.string().optional(),
+          description: z.string().nullable().optional(),
           folderId: z.string().nullable().optional(),
           createdAt: z.string().optional(),
           updatedAt: z.string().optional()
@@ -42,7 +44,7 @@ export let listResources = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.listResources({
       limit: ctx.input.limit,
@@ -51,7 +53,7 @@ export let listResources = SlateTool.create(spec, {
 
     let resources = result.data.map(r => ({
       resourceId: r.id,
-      resourceName: r.name,
+      resourceName: r.display_name,
       resourceType: r.type,
       description: r.description,
       folderId: r.folder_id,

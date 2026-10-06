@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { id } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let getOpportunityTool = SlateTool.create(spec, {
   name: 'Get Opportunity',
   key: 'get_opportunity',
-  description: `Retrieve a single opportunity by ID with full details including contact info, applications, feedback, notes, offers, resumes, and files. Use the expand parameter to include related objects.`,
+  description: `Retrieve one opportunity by ID. Expand documented contact, stage, application and user relationships; use get_opportunity_activity for notes, interviews, offers, resumes and files.`,
   tags: { readOnly: true }
 })
   .input(
@@ -24,18 +25,14 @@ export let getOpportunityTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, environment: ctx.auth.environment });
-
-    let params: Record<string, any> = {};
-    if (ctx.input.expand) params.expand = ctx.input.expand;
-
-    let result = await client.getOpportunity(ctx.input.opportunityId, params);
-
+    const opportunityId = id(ctx.input.opportunityId, 'Opportunity ID');
+    const result = await new Client(ctx.auth).getOpportunity(
+      opportunityId,
+      ctx.input.expand === undefined ? {} : { expand: ctx.input.expand.join(',') }
+    );
     return {
-      output: {
-        opportunity: result.data
-      },
-      message: `Retrieved opportunity **${ctx.input.opportunityId}**.`
+      output: { opportunity: result.data },
+      message: `Retrieved opportunity ${opportunityId}.`
     };
   })
   .build();

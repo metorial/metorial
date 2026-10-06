@@ -1,55 +1,20 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, entity, id } from '../lib/client';
+import { leadOutputSchema, mapLead } from '../lib/lead';
 import { spec } from '../spec';
-
-let leadOutputSchema = z.object({
-  leadId: z.number().describe('Lead ID'),
-  email: z.string().nullable().describe('Email address'),
-  firstName: z.string().nullable().describe('First name'),
-  lastName: z.string().nullable().describe('Last name'),
-  position: z.string().nullable().describe('Job position'),
-  company: z.string().nullable().describe('Company name'),
-  companyIndustry: z.string().nullable().describe('Company industry'),
-  companySize: z.string().nullable().describe('Company size'),
-  website: z.string().nullable().describe('Website URL'),
-  countryCode: z.string().nullable().describe('Country code'),
-  linkedinUrl: z.string().nullable().describe('LinkedIn URL'),
-  phoneNumber: z.string().nullable().describe('Phone number'),
-  twitter: z.string().nullable().describe('Twitter handle'),
-  notes: z.string().nullable().describe('Notes'),
-  verificationStatus: z.string().nullable().describe('Email verification status')
-});
-
-let mapLead = (lead: any) => ({
-  leadId: lead.id,
-  email: lead.email ?? null,
-  firstName: lead.first_name ?? null,
-  lastName: lead.last_name ?? null,
-  position: lead.position ?? null,
-  company: lead.company ?? null,
-  companyIndustry: lead.company_industry ?? null,
-  companySize: lead.company_size?.toString() ?? null,
-  website: lead.website ?? null,
-  countryCode: lead.country_code ?? null,
-  linkedinUrl: lead.linkedin_url ?? null,
-  phoneNumber: lead.phone_number ?? null,
-  twitter: lead.twitter ?? null,
-  notes: lead.notes ?? null,
-  verificationStatus: lead.verification?.status ?? null
-});
 
 export let manageLead = SlateTool.create(spec, {
   name: 'Manage Lead',
   key: 'manage_lead',
-  description: `Create, update, or upsert a lead in Hunter. Supports creating a new lead, updating an existing lead by ID, or upserting (create or update) by email address. Leads can include contact details, company information, and custom attributes.`,
+  description: `Create, update, or upsert a lead in Hunter. Supports saving a lead, updating an existing lead by ID, or upserting by email address with contact details and company information.`,
   instructions: [
-    'To **create** a new lead, set action to "create" and provide at least an email.',
+    'To **create** a lead, set action to "create" and provide at least an email. Hunter deduplicates saved leads by email; this does not guarantee a new resource.',
     'To **update** an existing lead, set action to "update" and provide the leadId along with fields to change.',
     'To **upsert** (create or update by email), set action to "upsert" and provide an email — if a lead with that email exists it will be updated, otherwise a new lead will be created.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -77,39 +42,37 @@ export let manageLead = SlateTool.create(spec, {
   )
   .output(leadOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let data: Record<string, any> = {};
-    if (ctx.input.email) data.email = ctx.input.email;
-    if (ctx.input.firstName) data.first_name = ctx.input.firstName;
-    if (ctx.input.lastName) data.last_name = ctx.input.lastName;
-    if (ctx.input.position) data.position = ctx.input.position;
-    if (ctx.input.company) data.company = ctx.input.company;
-    if (ctx.input.companyIndustry) data.company_industry = ctx.input.companyIndustry;
-    if (ctx.input.companySize !== undefined) data.company_size = ctx.input.companySize;
-    if (ctx.input.website) data.website = ctx.input.website;
-    if (ctx.input.countryCode) data.country_code = ctx.input.countryCode;
-    if (ctx.input.linkedinUrl) data.linkedin_url = ctx.input.linkedinUrl;
-    if (ctx.input.phoneNumber) data.phone_number = ctx.input.phoneNumber;
-    if (ctx.input.twitter) data.twitter = ctx.input.twitter;
-    if (ctx.input.notes) data.notes = ctx.input.notes;
-    if (ctx.input.leadListId) data.lead_list_id = ctx.input.leadListId;
-
-    let result: any;
-    if (ctx.input.action === 'create') {
-      result = await client.createLead(data);
-    } else if (ctx.input.action === 'update') {
-      if (!ctx.input.leadId) throw new Error('leadId is required for update action');
-      result = await client.updateLead(ctx.input.leadId, data);
-    } else {
-      result = await client.upsertLead(data);
-    }
-
-    let lead = result.data;
-
+    const client = new Client({ token: ctx.auth.token });
+    const data = pickDefined({
+      email: ctx.input.email,
+      first_name: ctx.input.firstName,
+      last_name: ctx.input.lastName,
+      position: ctx.input.position,
+      company: ctx.input.company,
+      company_industry: ctx.input.companyIndustry,
+      company_size:
+        ctx.input.companySize === undefined ? undefined : String(ctx.input.companySize),
+      website: ctx.input.website,
+      country_code: ctx.input.countryCode,
+      linkedin_url: ctx.input.linkedinUrl,
+      phone_number: ctx.input.phoneNumber,
+      twitter: ctx.input.twitter,
+      notes: ctx.input.notes,
+      leads_list_id: ctx.input.leadListId
+    });
+    const result =
+      ctx.input.action === 'create'
+        ? await client.createLead(data)
+        : ctx.input.action === 'update'
+          ? await client.updateLead(id(ctx.input.leadId), data)
+          : await client.upsertLead(data);
+    const lead = entity(
+      result.data,
+      ctx.input.action === 'update' ? ctx.input.leadId : undefined
+    );
     return {
       output: mapLead(lead),
-      message: `Lead **${lead.email ?? lead.id}** has been ${ctx.input.action === 'create' ? 'created' : ctx.input.action === 'update' ? 'updated' : 'upserted'}.`
+      message: `Lead **${lead.id}** has been ${ctx.input.action === 'create' ? 'saved' : ctx.input.action === 'update' ? 'updated' : 'upserted'}.`
     };
   })
   .build();

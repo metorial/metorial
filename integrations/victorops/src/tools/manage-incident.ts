@@ -13,7 +13,7 @@ export let manageIncident = SlateTool.create(spec, {
     'Use action "reroute" to redirect incidents to different targets (users or escalation policies).'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -50,7 +50,7 @@ export let manageIncident = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let result: any;
+    let result: { results: unknown[] };
 
     switch (ctx.input.action) {
       case 'acknowledge':
@@ -98,9 +98,9 @@ export let manageIncident = SlateTool.create(spec, {
 
     return {
       output: {
-        results: result?.results ?? result?.reroutes ?? []
+        results: result.results
       },
-      message: `Successfully performed **${ctx.input.action}** on incident(s).`
+      message: `Accepted **${ctx.input.action}** on incident(s).`
     };
   })
   .build();

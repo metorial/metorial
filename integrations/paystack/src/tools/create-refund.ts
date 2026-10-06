@@ -1,7 +1,31 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PaystackClient } from '../lib/client';
+
+import {
+  exactId,
+  optionalNumericId,
+  optionalRecord,
+  pagination,
+  record,
+  records,
+  validateOutput
+} from '../lib/transport';
 import { spec } from '../spec';
+
+const createRefundOutput = z.object({
+  refundId: z.number().optional().describe('Refund ID'),
+  exactRefundId: z
+    .string()
+    .describe(
+      'Exact provider resource ID; legacy numeric ID is omitted outside its safe range'
+    ),
+  exactTransactionId: z.string().describe('Exact refunded transaction ID'),
+  transactionReference: z.string().optional().describe('Original transaction reference'),
+  amount: z.number().describe('Refund amount'),
+  currency: z.string().describe('Currency'),
+  status: z.string().describe('Refund status')
+});
 
 export let createRefund = SlateTool.create(spec, {
   name: 'Create Refund',
@@ -31,40 +55,62 @@ export let createRefund = SlateTool.create(spec, {
       merchantNote: z.string().optional().describe('Internal note about the refund reason')
     })
   )
-  .output(
-    z.object({
-      refundId: z.number().describe('Refund ID'),
-      transactionReference: z.string().describe('Original transaction reference'),
-      amount: z.number().describe('Refund amount'),
-      currency: z.string().describe('Currency'),
-      status: z.string().describe('Refund status')
-    })
-  )
+  .output(createRefundOutput)
   .handleInvocation(async ctx => {
-    let client = new PaystackClient({ token: ctx.auth.token });
-
-    let result = await client.createRefund({
+    const client = new PaystackClient({ token: ctx.auth.token });
+    const result = await client.createRefund({
       transaction: ctx.input.transactionReference,
       amount: ctx.input.amount,
       currency: ctx.input.currency,
       customerNote: ctx.input.customerNote,
       merchantNote: ctx.input.merchantNote
     });
-
-    let refund = result.data;
-
+    const refund = record(result.data);
+    const transaction = optionalRecord(refund.transaction);
+    const output = {
+      refundId: optionalNumericId(refund.id),
+      exactRefundId: exactId(refund.id),
+      transactionReference: transaction.reference,
+      exactTransactionId: exactId(transaction.id ?? refund.transaction),
+      amount: refund.amount,
+      currency: refund.currency,
+      status: refund.status
+    };
     return {
-      output: {
-        refundId: refund.id,
-        transactionReference: refund.transaction?.reference ?? ctx.input.transactionReference,
-        amount: refund.amount,
-        currency: refund.currency,
-        status: refund.status
-      },
-      message: `Refund created for transaction **${ctx.input.transactionReference}**. Amount: ${refund.amount} ${refund.currency}. Status: **${refund.status}**.`
+      output: validateOutput(createRefundOutput, output),
+      message:
+        'Refund request accepted for processing; final refund settlement is not confirmed.'
     };
   })
   .build();
+const listRefundsOutput = z.object({
+  refunds: z.array(
+    z.object({
+      refundId: z.number().optional().describe('Refund ID'),
+      exactRefundId: z
+        .string()
+        .describe(
+          'Exact provider resource ID; legacy numeric ID is omitted outside its safe range'
+        ),
+      amount: z.number().describe('Refund amount'),
+      currency: z.string().describe('Currency'),
+      status: z.string().describe('Refund status'),
+      exactTransactionId: z.string().describe('Exact refunded transaction ID'),
+      transactionReference: z.string().optional().describe('Transaction reference'),
+      createdAt: z.string().describe('Creation timestamp')
+    })
+  ),
+  totalCount: z.number().optional().describe('Total refunds'),
+  currentPage: z.number().optional().describe('Current page'),
+  totalPages: z.number().optional().describe('Total pages'),
+  nextCursor: z.string().nullable().optional().describe('Provider next cursor, when returned'),
+  previousCursor: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Provider previous cursor, when returned'),
+  perPage: z.number().optional().describe('Observed provider page size')
+});
 
 export let listRefunds = SlateTool.create(spec, {
   name: 'List Refunds',
@@ -84,54 +130,27 @@ export let listRefunds = SlateTool.create(spec, {
       to: z.string().optional().describe('End date (ISO 8601)')
     })
   )
-  .output(
-    z.object({
-      refunds: z.array(
-        z.object({
-          refundId: z.number().describe('Refund ID'),
-          amount: z.number().describe('Refund amount'),
-          currency: z.string().describe('Currency'),
-          status: z.string().describe('Refund status'),
-          transactionReference: z.string().describe('Transaction reference'),
-          createdAt: z.string().describe('Creation timestamp')
-        })
-      ),
-      totalCount: z.number().describe('Total refunds'),
-      currentPage: z.number().describe('Current page'),
-      totalPages: z.number().describe('Total pages')
-    })
-  )
+  .output(listRefundsOutput)
   .handleInvocation(async ctx => {
-    let client = new PaystackClient({ token: ctx.auth.token });
-
-    let result = await client.listRefunds({
-      perPage: ctx.input.perPage,
-      page: ctx.input.page,
-      reference: ctx.input.reference,
-      currency: ctx.input.currency,
-      from: ctx.input.from,
-      to: ctx.input.to
-    });
-
-    let refunds = (result.data ?? []).map((r: any) => ({
-      refundId: r.id,
-      amount: r.amount,
-      currency: r.currency,
-      status: r.status,
-      transactionReference: r.transaction?.reference ?? '',
-      createdAt: r.created_at ?? r.createdAt
-    }));
-
-    let meta = result.meta ?? {};
-
+    const client = new PaystackClient({ token: ctx.auth.token });
+    const result = await client.listRefunds(ctx.input);
+    const output = {
+      refunds: records(result.data).map(item => ({
+        refundId: optionalNumericId(item.id),
+        exactRefundId: exactId(item.id),
+        amount: item.amount,
+        currency: item.currency,
+        status: item.status,
+        transactionReference: optionalRecord(item.transaction).reference,
+        exactTransactionId: exactId(optionalRecord(item.transaction).id ?? item.transaction),
+        createdAt: item.created_at ?? item.createdAt
+      })),
+      ...pagination(result.meta)
+    };
     return {
-      output: {
-        refunds,
-        totalCount: meta.total ?? 0,
-        currentPage: meta.page ?? 1,
-        totalPages: meta.pageCount ?? 1
-      },
-      message: `Found **${meta.total ?? refunds.length}** refunds.`
+      output: validateOutput(listRefundsOutput, output),
+      message:
+        'Retrieved the requested page; continuation and counts are included only when returned by Paystack.'
     };
   })
   .build();

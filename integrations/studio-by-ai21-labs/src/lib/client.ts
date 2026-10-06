@@ -1,118 +1,111 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios, pickDefined } from 'slates';
 
-let http = createAxios({
-  baseURL: 'https://api.ai21.com/studio/v1'
-});
+export type ChatToolCall = {
+  toolCallId: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+};
+export type ChatParams = {
+  model: string;
+  messages: Array<{
+    role: string;
+    content?: string;
+    toolCallId?: string;
+    toolCalls?: ChatToolCall[];
+  }>;
+  maxTokens?: number;
+  temperature?: number;
+  topP?: number;
+  stop?: string[];
+  n?: number;
+  tools?: Array<{
+    type: string;
+    function: { name: string; description?: string; parameters?: Record<string, unknown> };
+  }>;
+  documents?: Array<{ id?: string; content: string; metadata?: Record<string, string> }>;
+  responseFormat?: { type: string };
+};
+export type MaestroParams = {
+  input: string | Array<{ role: string; content: string }>;
+  systemPrompt: string;
+  requirements?: Array<{ name: string; description: string; isMandatory?: boolean }>;
+  tools?: Record<string, unknown>[];
+  models?: string[];
+  budget?: string;
+  include?: string[];
+  responseLanguage?: string;
+};
 
 export class Client {
-  private headers: Record<string, string>;
+  private http;
+  private uploadHttp;
 
   constructor(config: { token: string }) {
-    this.headers = {
-      Authorization: `Bearer ${config.token}`,
-      'Content-Type': 'application/json'
+    const options = {
+      baseURL: 'https://api.ai21.com/studio/v1',
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: (error: unknown) =>
+        buildApiServiceError(error, {
+          parent: {},
+          providerLabel: 'AI21 Studio',
+          reason: 'ai21_api_error'
+        })
     };
+    this.http = createAuthenticatedAxios(options);
+    this.uploadHttp = createAuthenticatedAxios({ ...options, contentType: false });
   }
 
-  // ─── Chat Completions (Jamba) ───
-
-  async chatCompletion(params: {
-    model: string;
-    messages: Array<{
-      role: string;
-      content?: string;
-      toolCallId?: string;
-      tool_calls?: Array<{
-        id: string;
-        type: string;
-        function: { name: string; arguments: string };
-      }>;
-    }>;
-    maxTokens?: number;
-    temperature?: number;
-    topP?: number;
-    stop?: string[];
-    n?: number;
-    tools?: Array<{
-      type: string;
-      function: {
-        name: string;
-        description?: string;
-        parameters?: Record<string, any>;
-      };
-    }>;
-    documents?: Array<{
-      content: string;
-      metadata?: Record<string, string>;
-    }>;
-    responseFormat?: { type: string };
-  }) {
-    let body: Record<string, any> = {
+  async chatCompletion(params: ChatParams): Promise<unknown> {
+    const body = pickDefined({
       model: params.model,
-      messages: params.messages
-    };
-
-    if (params.maxTokens !== undefined) body.max_tokens = params.maxTokens;
-    if (params.temperature !== undefined) body.temperature = params.temperature;
-    if (params.topP !== undefined) body.top_p = params.topP;
-    if (params.stop !== undefined) body.stop = params.stop;
-    if (params.n !== undefined) body.n = params.n;
-    if (params.tools !== undefined) body.tools = params.tools;
-    if (params.documents !== undefined) body.documents = params.documents;
-    if (params.responseFormat !== undefined) body.response_format = params.responseFormat;
-
-    let response = await http.post('/chat/completions', body, {
-      headers: this.headers
+      messages: params.messages.map(message =>
+        pickDefined({
+          role: message.role,
+          content: message.content ?? (message.toolCalls?.length ? null : undefined),
+          tool_call_id: message.toolCallId,
+          tool_calls: message.toolCalls?.map(call => ({
+            id: call.toolCallId,
+            type: call.type,
+            function: call.function
+          }))
+        })
+      ),
+      max_tokens: params.maxTokens,
+      temperature: params.temperature,
+      top_p: params.topP,
+      stop: params.stop,
+      n: params.n,
+      tools: params.tools,
+      documents: params.documents,
+      response_format: params.responseFormat,
+      stream: false
     });
-
-    return response.data;
+    return (await this.http.post('/chat/completions', body)).data;
   }
 
-  // ─── Maestro Runs ───
-
-  async createMaestroRun(params: {
-    input: string | Array<{ role: string; content: string }>;
-    systemPrompt: string;
-    requirements?: Array<{
-      name: string;
-      description: string;
-      isMandatory?: boolean;
-    }>;
-    tools?: Record<string, any>[];
-    toolResources?: Record<string, any>;
-    models?: string[];
-    budget?: string;
-    include?: string[];
-    responseLanguage?: string;
-  }) {
-    let body: Record<string, any> = {
+  async createMaestroRun(params: MaestroParams): Promise<unknown> {
+    const body = pickDefined({
       input: params.input,
-      system_prompt: params.systemPrompt
-    };
-
-    if (params.requirements !== undefined) {
-      body.requirements = params.requirements.map(r => ({
-        name: r.name,
-        description: r.description,
-        is_mandatory: r.isMandatory
-      }));
-    }
-    if (params.tools !== undefined) body.tools = params.tools;
-    if (params.toolResources !== undefined) body.tool_resources = params.toolResources;
-    if (params.models !== undefined) body.models = params.models;
-    if (params.budget !== undefined) body.budget = params.budget;
-    if (params.include !== undefined) body.include = params.include;
-    if (params.responseLanguage !== undefined)
-      body.response_language = params.responseLanguage;
-
-    let response = await http.post('/maestro/runs', body, {
-      headers: this.headers
+      system_prompt: params.systemPrompt,
+      requirements: params.requirements?.map(item =>
+        pickDefined({
+          name: item.name,
+          description: item.description,
+          is_mandatory: item.isMandatory
+        })
+      ),
+      tools: params.tools,
+      models: params.models,
+      budget: params.budget,
+      include: params.include,
+      response_language: params.responseLanguage
     });
-
-    return response.data;
+    return (await this.http.post('/maestro/runs', body)).data;
   }
 
-  // ─── Conversational RAG ───
+  async getMaestroRun(runId: string): Promise<unknown> {
+    return (await this.http.get(`/maestro/runs/${encodeURIComponent(runId)}`)).data;
+  }
 
   async conversationalRag(params: {
     messages: Array<{ role: string; content: string }>;
@@ -124,252 +117,86 @@ export class Client {
     retrievalStrategy?: string;
     maxNeighbors?: number;
     hybridSearchAlpha?: number;
-  }) {
-    let body: Record<string, any> = {
-      messages: params.messages
-    };
-
-    if (params.path !== undefined) body.path = params.path;
-    if (params.labels !== undefined) body.labels = params.labels;
-    if (params.fileIds !== undefined) body.file_ids = params.fileIds;
-    if (params.maxSegments !== undefined) body.max_segments = params.maxSegments;
-    if (params.retrievalSimilarityThreshold !== undefined)
-      body.retrieval_similarity_threshold = params.retrievalSimilarityThreshold;
-    if (params.retrievalStrategy !== undefined)
-      body.retrieval_strategy = params.retrievalStrategy;
-    if (params.maxNeighbors !== undefined) body.max_neighbors = params.maxNeighbors;
-    if (params.hybridSearchAlpha !== undefined)
-      body.hybridsearch_alpha = params.hybridSearchAlpha;
-
-    let response = await http.post('/beta/conversational-rag', body, {
-      headers: this.headers
-    });
-
-    return response.data;
+  }): Promise<unknown> {
+    return (
+      await this.http.post(
+        '/beta/conversational-rag',
+        pickDefined({
+          messages: params.messages,
+          path: params.path,
+          labels: params.labels,
+          file_ids: params.fileIds,
+          max_segments: params.maxSegments,
+          retrieval_similarity_threshold: params.retrievalSimilarityThreshold,
+          retrieval_strategy: params.retrievalStrategy,
+          max_neighbors: params.maxNeighbors,
+          hybrid_search_alpha: params.hybridSearchAlpha
+        })
+      )
+    ).data;
   }
 
-  // ─── Document Library ───
-
-  async listFiles(params?: { labels?: string[]; offset?: number; limit?: number }) {
-    let queryParams: Record<string, any> = {};
-    if (params?.labels) queryParams.labels = params.labels.join(',');
-    if (params?.offset !== undefined) queryParams.offset = params.offset;
-    if (params?.limit !== undefined) queryParams.limit = params.limit;
-
-    let response = await http.get('/library/files', {
-      headers: this.headers,
-      params: queryParams
-    });
-
-    return response.data;
+  async listFiles(
+    params: {
+      labels?: string[];
+      offset?: number;
+      limit?: number;
+      name?: string;
+      status?: string;
+      path?: string;
+    } = {}
+  ): Promise<unknown> {
+    return (
+      await this.http.get('/library/files', {
+        params: pickDefined({
+          label: params.labels,
+          offset: params.offset,
+          limit: params.limit,
+          name: params.name,
+          status: params.status,
+          path: params.path
+        }),
+        paramsSerializer: { indexes: null }
+      })
+    ).data;
   }
 
-  async getFile(fileId: string) {
-    let response = await http.get(`/library/files/${fileId}`, {
-      headers: this.headers
-    });
-
-    return response.data;
+  async getFile(fileId: string): Promise<unknown> {
+    return (await this.http.get(`/library/files/${encodeURIComponent(fileId)}`)).data;
   }
 
-  async deleteFile(fileId: string) {
-    let response = await http.delete(`/library/files/${fileId}`, {
-      headers: this.headers
-    });
-
-    return response.data;
+  async deleteFile(fileId: string): Promise<void> {
+    await this.http.delete(`/library/files/${encodeURIComponent(fileId)}`);
   }
 
-  async updateFile(fileId: string, params: { publicUrl?: string; labels?: string[] }) {
-    let body: Record<string, any> = {};
-    if (params.publicUrl !== undefined) body.publicUrl = params.publicUrl;
-    if (params.labels !== undefined) body.labels = params.labels;
-
-    let response = await http.put(`/library/files/${fileId}`, body, {
-      headers: this.headers
-    });
-
-    return response.data;
+  async updateFile(
+    fileId: string,
+    params: { publicUrl?: string; labels?: string[] }
+  ): Promise<void> {
+    await this.http.put(`/library/files/${encodeURIComponent(fileId)}`, pickDefined(params));
   }
 
-  // ─── Summarize ───
-
-  async summarize(params: { source: string; sourceType: string; focus?: string }) {
-    let body: Record<string, any> = {
-      source: params.source,
-      sourceType: params.sourceType
-    };
-
-    if (params.focus !== undefined) body.focus = params.focus;
-
-    let response = await http.post('/summarize', body, {
-      headers: this.headers
-    });
-
-    return response.data;
-  }
-
-  // ─── Summarize by Segment ───
-
-  async summarizeBySegment(params: { source: string; sourceType: string; focus?: string }) {
-    let body: Record<string, any> = {
-      source: params.source,
-      sourceType: params.sourceType
-    };
-
-    if (params.focus !== undefined) body.focus = params.focus;
-
-    let response = await http.post('/summarize-by-segment', body, {
-      headers: this.headers
-    });
-
-    return response.data;
-  }
-
-  // ─── Paraphrase ───
-
-  async paraphrase(params: {
-    text: string;
-    style?: string;
-    startIndex?: number;
-    endIndex?: number;
-  }) {
-    let body: Record<string, any> = {
-      text: params.text
-    };
-
-    if (params.style !== undefined) body.style = params.style;
-    if (params.startIndex !== undefined) body.startIndex = params.startIndex;
-    if (params.endIndex !== undefined) body.endIndex = params.endIndex;
-
-    let response = await http.post('/paraphrase', body, {
-      headers: this.headers
-    });
-
-    return response.data;
-  }
-
-  // ─── Text Improvements ───
-
-  async textImprovements(params: { text: string; types: string[] }) {
-    let response = await http.post(
-      '/improvements',
-      {
-        text: params.text,
-        types: params.types
-      },
-      {
-        headers: this.headers
-      }
+  async uploadFile(params: {
+    fileName: string;
+    content: Uint8Array;
+    mimeType: string;
+    path?: string;
+    labels?: string[];
+    publicUrl?: string;
+  }): Promise<unknown> {
+    const form = new FormData();
+    form.append(
+      'file',
+      new Blob([params.content], { type: params.mimeType }),
+      params.fileName
     );
-
-    return response.data;
+    if (params.path !== undefined) form.append('path', params.path);
+    for (const label of params.labels ?? []) form.append('labels', label);
+    if (params.publicUrl !== undefined) form.append('publicUrl', params.publicUrl);
+    return (await this.uploadHttp.post('/library/files', form)).data;
   }
 
-  // ─── Grammatical Error Correction ───
-
-  async grammarCheck(params: { text: string }) {
-    let response = await http.post(
-      '/gec',
-      {
-        text: params.text
-      },
-      {
-        headers: this.headers
-      }
-    );
-
-    return response.data;
-  }
-
-  // ─── Text Segmentation ───
-
-  async segmentText(params: { source: string; sourceType: string }) {
-    let response = await http.post(
-      '/segmentation',
-      {
-        source: params.source,
-        sourceType: params.sourceType
-      },
-      {
-        headers: this.headers
-      }
-    );
-
-    return response.data;
-  }
-
-  // ─── Contextual Answers ───
-
-  async contextualAnswer(params: { context: string; question: string }) {
-    let response = await http.post(
-      '/experimental/answer',
-      {
-        context: params.context,
-        question: params.question
-      },
-      {
-        headers: this.headers
-      }
-    );
-
-    return response.data;
-  }
-
-  // ─── Text Completions (Jurassic-2) ───
-
-  async textCompletion(params: {
-    model: string;
-    prompt: string;
-    maxTokens?: number;
-    temperature?: number;
-    topP?: number;
-    numResults?: number;
-    stopSequences?: string[];
-    topKReturn?: number;
-    presencePenalty?: {
-      scale: number;
-      applyToWhitespaces?: boolean;
-      applyToPunctuations?: boolean;
-      applyToNumbers?: boolean;
-      applyToStopwords?: boolean;
-      applyToEmojis?: boolean;
-    };
-    countPenalty?: {
-      scale: number;
-      applyToWhitespaces?: boolean;
-      applyToPunctuations?: boolean;
-      applyToNumbers?: boolean;
-      applyToStopwords?: boolean;
-      applyToEmojis?: boolean;
-    };
-    frequencyPenalty?: {
-      scale: number;
-      applyToWhitespaces?: boolean;
-      applyToPunctuations?: boolean;
-      applyToNumbers?: boolean;
-      applyToStopwords?: boolean;
-      applyToEmojis?: boolean;
-    };
-  }) {
-    let body: Record<string, any> = {
-      prompt: params.prompt
-    };
-
-    if (params.maxTokens !== undefined) body.maxTokens = params.maxTokens;
-    if (params.temperature !== undefined) body.temperature = params.temperature;
-    if (params.topP !== undefined) body.topP = params.topP;
-    if (params.numResults !== undefined) body.numResults = params.numResults;
-    if (params.stopSequences !== undefined) body.stopSequences = params.stopSequences;
-    if (params.topKReturn !== undefined) body.topKReturn = params.topKReturn;
-    if (params.presencePenalty !== undefined) body.presencePenalty = params.presencePenalty;
-    if (params.countPenalty !== undefined) body.countPenalty = params.countPenalty;
-    if (params.frequencyPenalty !== undefined) body.frequencyPenalty = params.frequencyPenalty;
-
-    let response = await http.post(`/${params.model}/complete`, body, {
-      headers: this.headers
-    });
-
-    return response.data;
+  async getFileDownloadLink(fileId: string): Promise<unknown> {
+    return (await this.http.get(`/library/files/${encodeURIComponent(fileId)}/download`)).data;
   }
 }

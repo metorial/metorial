@@ -21,8 +21,6 @@ import {
   searchUsersTool,
   updateUserTool
 } from './tools';
-import { logEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,5 +44,5 @@ export let provider = Slate.create({
     manageActionsTool,
     manageClientGrantsTool
   ],
-  triggers: [logEventsTrigger]
+  triggers: []
 });

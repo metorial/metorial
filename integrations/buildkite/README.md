@@ -1,72 +1,24 @@
 # <img src="https://provider-logos.metorial-cdn.com/buildkite-logo.png" height="20"> Buildkite
 
-Manage CI/CD pipelines, builds, and agents on the Buildkite platform. Create, update, archive, and delete pipelines. Trigger, list, cancel, and rebuild builds with filtering by state, branch, commit, and creator. Inspect and retry individual jobs within builds, and retrieve job logs. List, stop, pause, and resume connected agents. Manage clusters, agent queues, and agent tokens for infrastructure isolation. Organize teams with configurable roles and pipeline access. List and download build artifacts, and create build annotations. Manage test suites, identify flaky tests, and quarantine problematic tests. Create and manage package registries supporting npm, Maven, Docker, Python, Ruby, Helm, and more. Receive webhook notifications for build, job, agent, and package events.
+Discover organizations, clusters and teams, then manage CI/CD pipelines and builds. Inspect build jobs, retry a job or unblock a manual step, inspect and stop agents, download logs and artifacts, and manage build annotations.
 
-## Tools
+Connect with a personal API access token containing `read_user` and the scopes needed for your operations. Organization-scoped tools accept an organization slug from `list_organizations`, or use the connection's optional default organization.
 
-### Archive Pipeline
+| Tools | Purpose |
+| --- | --- |
+| `who_am_i`, `list_organizations`, `list_clusters`, `list_teams` | Discover the current user and accessible resource IDs. |
+| `list_pipelines`, `get_pipeline`, `create_pipeline`, `update_pipeline` | Discover and configure pipelines. Creating a YAML pipeline requires its repository, configuration and cluster UUID. |
+| `archive_pipeline`, `delete_pipeline` | Archive/unarchive a pipeline or permanently delete it and its associated data. |
+| `list_builds`, `get_build`, `create_build`, `manage_build` | Inspect or start builds, request cancellation, or rebuild the original commit and settings. Use a pipeline's build number, not its UUID. |
+| `manage_job` | Retry a job or unblock a manual step using its UUID from `get_build`. |
+| `list_agents`, `get_agent`, `stop_agent` | Inspect connected/stopping agents or a known agent, and request shutdown. |
+| `list_artifacts`, `download_artifact`, `download_job_log` | Discover file metadata and prepare downloadable artifacts or plain-text logs. |
+| `get_job_log` | Deprecated legacy inline log inspection; prefer `download_job_log`. |
+| `create_annotation`, `list_annotations`, `delete_annotation` | Create, append, read or delete build annotations. |
 
-Archive or unarchive a Buildkite pipeline. Archived pipelines are hidden from the dashboard but retain their data and can be unarchived later.
+Paginated lists return `nextPage`; null means the last page. Cancellation and agent shutdown can be asynchronous, so inspect the resource to confirm completion. Creating or retrying builds can execute repository code and consume agent capacity. Use an isolated pipeline for experiments.
 
-### Create Annotation
-
-Add an annotation to a Buildkite build. Annotations display additional context on the build page and support Markdown/HTML. Useful for attaching test summaries, deployment links, or status information.
-
-### Create Build
-
-Trigger a new build for a Buildkite pipeline. Specify the commit SHA and branch, and optionally set a message, environment variables, and metadata. Use commit "HEAD" to build the latest commit on the branch.
-
-### Create Pipeline
-
-Create a new CI/CD pipeline in your Buildkite organization. Specify a name, repository URL, and optionally provide YAML step configuration, branch settings, team assignments, and tags.
-
-### Delete Pipeline
-
-Permanently delete a Buildkite pipeline. This action is irreversible and will remove all associated builds and data. Consider archiving instead if you may need the data later.
-
-### Get Build
-
-Retrieve detailed information about a specific build including all its jobs/steps. Use this to inspect build results, check individual step statuses, and find job IDs for retrying or inspecting logs.
-
-### Get Job Log
-
-Retrieve the output log for a specific job in a Buildkite build. Useful for debugging failed builds or inspecting command output. Also supports retrieving job environment variables.
-
-### Get Pipeline
-
-Retrieve detailed information about a specific Buildkite pipeline by its slug. Returns configuration, repository, build counts, provider settings, and step definitions.
-
-### List Agents
-
-List connected Buildkite agents in your organization. Returns agent names, versions, connection states, metadata tags, and whether they are currently running a job. Only connected agents are returned.
-
-### List Artifacts
-
-List artifacts produced by a specific build. Returns file names, paths, sizes, and download URLs. Artifacts are files generated during build execution (test reports, binaries, logs, etc.).
-
-### List Builds
-
-List builds across all pipelines or for a specific pipeline. Supports filtering by state, branch, commit, and creation date. Builds are returned newest-first.
-
-### List Pipelines
-
-List CI/CD pipelines in your Buildkite organization. Returns pipeline names, slugs, repositories, and current build counts. Use this to discover available pipelines before triggering builds or inspecting pipeline details.
-
-### Manage Build
-
-Cancel or rebuild an existing Buildkite build. Cancel stops a running/scheduled build. Rebuild creates a new build with the same settings as the original.
-
-### Manage Job
-
-Retry a failed job or unblock a blocked step in a Buildkite build. Retry re-runs a failed or timed-out job. Unblock releases a manual/block step so the build can continue.
-
-### Stop Agent
-
-Stop a connected Buildkite agent. By default, the agent finishes its current job before stopping. Use force mode to stop immediately.
-
-### Update Pipeline
-
-Update an existing Buildkite pipeline's settings. Supports changing the name, repository, YAML configuration, branch settings, tags, and visibility. Only provided fields are updated.
+See the [integration specification](./docs/SPEC.md) and [Buildkite API documentation](https://buildkite.com/docs/apis/rest-api).
 
 ## License
 

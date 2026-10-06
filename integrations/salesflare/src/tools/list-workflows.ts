@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Row } from '../lib/client';
 import { spec } from '../spec';
 
 export let listWorkflows = SlateTool.create(spec, {
@@ -27,14 +27,14 @@ export let listWorkflows = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let params: Record<string, any> = {
+    let params: Row = {
       limit: ctx.input.limit,
       offset: ctx.input.offset
     };
     if (ctx.input.search) params.search = ctx.input.search;
 
     let workflows = await client.listWorkflows(params);
-    let list = Array.isArray(workflows) ? workflows : [];
+    let list = workflows;
 
     return {
       output: {

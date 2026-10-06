@@ -27,14 +27,14 @@ export let listSchedules = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listSchedules({
       name: ctx.input.name,
       isDefault: ctx.input.isDefault,
       sequenceId: ctx.input.sequenceId
     });
 
-    let schedules = result?.data ?? (Array.isArray(result) ? result : []);
+    let schedules = result;
 
     return {
       output: { schedules },

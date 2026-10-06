@@ -26,13 +26,6 @@ import {
   sendSms,
   validateAddress
 } from './tools';
-import {
-  campaignStatus,
-  mailpieceStatus,
-  recipientBlacklisted,
-  recipientEvent
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -61,5 +54,5 @@ export let provider = Slate.create({
     sendSms,
     listTemplates
   ],
-  triggers: [campaignStatus, mailpieceStatus, recipientBlacklisted, recipientEvent]
+  triggers: []
 });

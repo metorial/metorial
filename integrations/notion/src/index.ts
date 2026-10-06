@@ -17,8 +17,6 @@ import {
   updateDatabase,
   updatePage
 } from './tools';
-import { commentEvents, databaseEvents, pageEvents, pageUpdates } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     listComments,
     listUsers
   ],
-  triggers: [pageEvents, commentEvents, databaseEvents, pageUpdates]
+  triggers: []
 });

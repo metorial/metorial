@@ -18,8 +18,6 @@ import {
   manageOrderPayments,
   manageTasks
 } from './tools';
-import { customerChanges, inboundWebhook, orderChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     manageOrderPayments,
     manageCustomFields
   ],
-  triggers: [inboundWebhook, orderChanges, customerChanges]
+  triggers: []
 });

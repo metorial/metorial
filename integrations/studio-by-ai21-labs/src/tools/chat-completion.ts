@@ -1,15 +1,27 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseResponse } from '../lib/schemas';
 import { spec } from '../spec';
 
+const toolCallSchema = z.object({
+  toolCallId: z.string().min(1).describe('Tool call identifier returned by the model'),
+  type: z.literal('function'),
+  function: z.object({ name: z.string().min(1), arguments: z.string() })
+});
 let messageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant', 'tool']).describe('Role of the message sender'),
   content: z.string().optional().describe('Text content of the message'),
   toolCallId: z
     .string()
     .optional()
-    .describe('ID of the tool call this message responds to (for tool role)')
+    .describe('ID of the tool call this message responds to (for tool role)'),
+  toolCalls: z
+    .array(toolCallSchema)
+    .optional()
+    .describe(
+      'For assistant messages, replay the tool calls returned by an earlier completion'
+    )
 });
 
 let toolDefinitionSchema = z.object({
@@ -25,11 +37,42 @@ let toolDefinitionSchema = z.object({
 });
 
 let documentSchema = z.object({
+  id: z.string().optional().describe('Optional stable document identifier'),
   content: z.string().describe('Document content'),
   metadata: z
     .record(z.string(), z.string())
     .optional()
     .describe('Key-value metadata for the document')
+});
+
+const chatResponseSchema = z.object({
+  id: z.string().min(1),
+  choices: z
+    .array(
+      z.object({
+        index: z.number(),
+        message: z.object({
+          role: z.string(),
+          content: z.string().nullish(),
+          tool_calls: z
+            .array(
+              z.object({
+                id: z.string(),
+                type: z.string(),
+                function: z.object({ name: z.string(), arguments: z.string() })
+              })
+            )
+            .optional()
+        }),
+        finish_reason: z.string().nullish()
+      })
+    )
+    .min(1),
+  usage: z.object({
+    prompt_tokens: z.number(),
+    completion_tokens: z.number(),
+    total_tokens: z.number()
+  })
 });
 
 export let chatCompletion = SlateTool.create(spec, {
@@ -43,11 +86,22 @@ export let chatCompletion = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      model: z.enum(['jamba-large', 'jamba-mini']).describe('Jamba model to use'),
-      messages: z.array(messageSchema).describe('Conversation messages'),
+      model: z
+        .enum([
+          'jamba-large',
+          'jamba-mini',
+          'jamba-large-1.7',
+          'jamba-large-1.7-2025-07',
+          'jamba-mini-2',
+          'jamba-mini-2-2026-01'
+        ])
+        .describe('Jamba model alias or current documented snapshot'),
+      messages: z.array(messageSchema).min(1).describe('Conversation messages'),
       maxTokens: z
         .number()
         .int()
+        .min(1)
+        .max(4096)
         .optional()
         .describe('Maximum number of tokens to generate (up to 4096)'),
       temperature: z
@@ -129,27 +183,50 @@ export let chatCompletion = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.n ?? 1) > 1 && ctx.input.temperature === 0)
+      throw createApiServiceError('Use n: 1 when temperature is zero.');
+    const knownCalls = new Set<string>();
+    for (const message of ctx.input.messages) {
+      if (message.role === 'tool') {
+        if (!message.toolCallId || !knownCalls.has(message.toolCallId))
+          throw createApiServiceError(
+            'Each tool message must reference a toolCallId from an earlier assistant message.'
+          );
+      } else if (message.toolCallId)
+        throw createApiServiceError('toolCallId is only valid for tool messages.');
+      if (message.toolCalls?.length && message.role !== 'assistant')
+        throw createApiServiceError('toolCalls are only valid for assistant messages.');
+      if (message.content === undefined && !message.toolCalls?.length)
+        throw createApiServiceError(
+          'Each message requires content, except an assistant message with toolCalls.'
+        );
+      for (const call of message.toolCalls ?? []) knownCalls.add(call.toolCallId);
+    }
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.chatCompletion({
-      model: ctx.input.model,
-      messages: ctx.input.messages,
-      maxTokens: ctx.input.maxTokens,
-      temperature: ctx.input.temperature,
-      topP: ctx.input.topP,
-      stop: ctx.input.stop,
-      n: ctx.input.n,
-      tools: ctx.input.tools,
-      documents: ctx.input.documents,
-      responseFormat: ctx.input.responseFormat
-    });
+    let result = parseResponse(
+      chatResponseSchema,
+      await client.chatCompletion({
+        model: ctx.input.model,
+        messages: ctx.input.messages,
+        maxTokens: ctx.input.maxTokens,
+        temperature: ctx.input.temperature,
+        topP: ctx.input.topP,
+        stop: ctx.input.stop,
+        n: ctx.input.n,
+        tools: ctx.input.tools,
+        documents: ctx.input.documents,
+        responseFormat: ctx.input.responseFormat
+      }),
+      'chat completion'
+    );
 
-    let choices = (result.choices || []).map((c: any) => ({
+    let choices = result.choices.map(c => ({
       index: c.index,
       message: {
         role: c.message?.role,
         content: c.message?.content ?? undefined,
-        toolCalls: c.message?.tool_calls?.map((tc: any) => ({
+        toolCalls: c.message?.tool_calls?.map(tc => ({
           toolCallId: tc.id,
           type: tc.type,
           function: {
@@ -158,16 +235,16 @@ export let chatCompletion = SlateTool.create(spec, {
           }
         }))
       },
-      finishReason: c.finish_reason
+      finishReason: c.finish_reason ?? undefined
     }));
 
     let output = {
       completionId: result.id,
       choices,
       usage: {
-        promptTokens: result.usage?.prompt_tokens ?? 0,
-        completionTokens: result.usage?.completion_tokens ?? 0,
-        totalTokens: result.usage?.total_tokens ?? 0
+        promptTokens: result.usage.prompt_tokens,
+        completionTokens: result.usage.completion_tokens,
+        totalTokens: result.usage.total_tokens
       }
     };
 

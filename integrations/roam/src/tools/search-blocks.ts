@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RoamClient } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let searchBlocks = SlateTool.create(spec, {
@@ -45,6 +46,17 @@ This is a convenience wrapper around a Datalog query that performs case-sensitiv
 
     let results = await client.query(query, [ctx.input.searchText]);
 
+    if (
+      !Array.isArray(results) ||
+      results.some(
+        row =>
+          !Array.isArray(row) ||
+          row.length !== 2 ||
+          typeof row[0] !== 'string' ||
+          typeof row[1] !== 'string'
+      )
+    )
+      fail('Roam returned malformed block search rows.');
     let blocks: Array<{ blockUid: string; content: string }> = [];
     if (Array.isArray(results)) {
       for (let row of results) {
@@ -59,7 +71,7 @@ This is a convenience wrapper around a Datalog query that performs case-sensitiv
 
     return {
       output: { blocks },
-      message: `Found **${blocks.length}** block(s) matching "${ctx.input.searchText}" in graph **${ctx.config.graphName}**.`
+      message: 'Read matching block UIDs and content.'
     };
   })
   .build();

@@ -26,8 +26,6 @@ import {
   removeFormEntry,
   updatePerson
 } from './tools';
-import { accountChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -56,5 +54,5 @@ export let provider = Slate.create({
     getAccount,
     queryAccountLog
   ],
-  triggers: [inboundWebhook, accountChanges]
+  triggers: []
 });

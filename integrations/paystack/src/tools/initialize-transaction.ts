@@ -1,7 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PaystackClient } from '../lib/client';
+
+import { record, validateOutput } from '../lib/transport';
 import { spec } from '../spec';
+
+const initializeTransactionOutput = z.object({
+  authorizationUrl: z.string().describe('URL for customer to complete payment'),
+  accessCode: z.string().describe('Access code for the transaction'),
+  reference: z.string().describe('Transaction reference')
+});
 
 export let initializeTransaction = SlateTool.create(spec, {
   name: 'Initialize Transaction',
@@ -55,39 +63,19 @@ Amounts are in the **smallest currency unit** (e.g., kobo for NGN: NGN 100 = 100
         .describe('Who bears the Paystack charges')
     })
   )
-  .output(
-    z.object({
-      authorizationUrl: z.string().describe('URL for customer to complete payment'),
-      accessCode: z.string().describe('Access code for the transaction'),
-      reference: z.string().describe('Transaction reference')
-    })
-  )
+  .output(initializeTransactionOutput)
   .handleInvocation(async ctx => {
-    let client = new PaystackClient({ token: ctx.auth.token });
-
-    let result = await client.initializeTransaction({
-      email: ctx.input.email,
-      amount: ctx.input.amount,
-      currency: ctx.input.currency,
-      reference: ctx.input.reference,
-      callbackUrl: ctx.input.callbackUrl,
-      metadata: ctx.input.metadata,
-      channels: ctx.input.channels,
-      subaccount: ctx.input.subaccount,
-      splitCode: ctx.input.splitCode,
-      transactionCharge: ctx.input.transactionCharge,
-      bearer: ctx.input.bearer
-    });
-
-    let txData = result.data;
-
+    const client = new PaystackClient({ token: ctx.auth.token });
+    const result = await client.initializeTransaction(ctx.input);
+    const tx = record(result.data);
+    const output = {
+      authorizationUrl: tx.authorization_url,
+      accessCode: tx.access_code,
+      reference: tx.reference
+    };
     return {
-      output: {
-        authorizationUrl: txData.authorization_url,
-        accessCode: txData.access_code,
-        reference: txData.reference
-      },
-      message: `Transaction initialized with reference **${txData.reference}**. Payment URL: ${txData.authorization_url}`
+      output: validateOutput(initializeTransactionOutput, output),
+      message: 'Payment session initialized; payment is not confirmed.'
     };
   })
   .build();

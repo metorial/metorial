@@ -1,14 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapSystem } from '../lib/schemas';
 import { spec } from '../spec';
 
-let systemSchema = z.object({
+export const systemSchema = z.object({
   systemId: z.number().describe('Unique system ID'),
   name: z.string().describe('Display name of the system'),
   hostname: z.string().nullable().describe('Syslog hostname filter'),
   ipAddress: z.string().nullable().describe('Source IP address'),
-  lastEventAt: z.string().nullable().describe('ISO 8601 timestamp of the last received event'),
+  lastEventAt: z
+    .string()
+    .nullable()
+    .describe('Timestamp of the last received event in the API token owner time zone'),
   autoDelete: z
     .boolean()
     .optional()
@@ -35,16 +39,7 @@ export let listSystems = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let data = await client.listSystems();
 
-    let systems = (Array.isArray(data) ? data : []).map((s: any) => ({
-      systemId: s.id,
-      name: s.name || '',
-      hostname: s.hostname ?? null,
-      ipAddress: s.ip_address ?? null,
-      lastEventAt: s.last_event_at ?? null,
-      autoDelete: s.auto_delete,
-      syslogHostname: s.syslog?.hostname,
-      syslogPort: s.syslog?.port
-    }));
+    let systems = data.map(mapSystem);
 
     return {
       output: { systems },
@@ -64,6 +59,11 @@ export let createSystem = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Display name for the new system'),
+      description: z.string().optional().describe('Freeform system description'),
+      autoDelete: z
+        .boolean()
+        .optional()
+        .describe('Whether to remove the system automatically when inactive'),
       hostname: z.string().optional().describe('Hostname to filter events by'),
       ipAddress: z
         .string()
@@ -82,6 +82,8 @@ export let createSystem = SlateTool.create(spec, {
 
     let result = await client.createSystem({
       name: ctx.input.name,
+      description: ctx.input.description,
+      autoDelete: ctx.input.autoDelete,
       hostname: ctx.input.hostname,
       ipAddress: ctx.input.ipAddress,
       destinationId: ctx.input.destinationId,
@@ -89,16 +91,7 @@ export let createSystem = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        systemId: result.id,
-        name: result.name || '',
-        hostname: result.hostname ?? null,
-        ipAddress: result.ip_address ?? null,
-        lastEventAt: result.last_event_at ?? null,
-        autoDelete: result.auto_delete,
-        syslogHostname: result.syslog?.hostname,
-        syslogPort: result.syslog?.port
-      },
+      output: mapSystem(result),
       message: `Created system **${result.name}** (ID: ${result.id}).`
     };
   })
@@ -116,6 +109,14 @@ export let updateSystem = SlateTool.create(spec, {
     z.object({
       systemId: z.number().describe('ID of the system to update'),
       name: z.string().optional().describe('New display name'),
+      description: z
+        .string()
+        .optional()
+        .describe('Freeform system description; empty clears it'),
+      autoDelete: z
+        .boolean()
+        .optional()
+        .describe('Whether to remove the system automatically when inactive'),
       hostname: z.string().optional().describe('New hostname filter'),
       ipAddress: z.string().optional().describe('New source IP address')
     })
@@ -126,21 +127,14 @@ export let updateSystem = SlateTool.create(spec, {
 
     let result = await client.updateSystem(ctx.input.systemId, {
       name: ctx.input.name,
+      description: ctx.input.description,
+      autoDelete: ctx.input.autoDelete,
       hostname: ctx.input.hostname,
       ipAddress: ctx.input.ipAddress
     });
 
     return {
-      output: {
-        systemId: result.id,
-        name: result.name || '',
-        hostname: result.hostname ?? null,
-        ipAddress: result.ip_address ?? null,
-        lastEventAt: result.last_event_at ?? null,
-        autoDelete: result.auto_delete,
-        syslogHostname: result.syslog?.hostname,
-        syslogPort: result.syslog?.port
-      },
+      output: mapSystem(result),
       message: `Updated system **${result.name}** (ID: ${result.id}).`
     };
   })

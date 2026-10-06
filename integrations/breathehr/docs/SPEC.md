@@ -1,79 +1,24 @@
-Let me get the full list of API resources from the Breathe knowledge base article.Now let me check the API environments page for base URLs.Now I have enough information to write the specification.
+# Breathe HR API coverage
 
-# Slates Specification for Breathe HR
+API version v1; API-key authentication in X-API-KEY. Production is https://api.breathehr.com/v1, sandbox is https://api.sandbox.breathehr.info/v1. Keys and selected environments must match. Account identity is discovered through GET /account, without a configured opaque account ID.
 
-## Overview
+| Tools | Documented resource |
+| --- | --- |
+| get_account | Account identity |
+| list_employees,get_employee,create_employee | Employee directory, exact records and current required creation fields |
+| list_absences,cancel_absence | Filtered absence pages and verified retained cancellation |
+| list_leave_requests,manage_leave_request | Leave pages, creation, exact read, approval and rejection |
+| list_sicknesses,create_sickness | Sickness pages and creation using a configured type ID |
+| manage_expense,manage_expense_claim | Expense/claim discovery, exact reads, creation, claim decision and confirmed deletion |
+| list_bonuses,list_salaries | Compensation read access |
+| list_organization,get_department_data | Organization discovery and department-scoped records |
+| list_training | Training types and course records |
+| list_working_patterns,list_holiday_allowances,list_other_leave_reasons | Unpaged configuration discovery |
 
-Breathe HR is a cloud-based HR management platform designed for small to medium-sized businesses. It enables organizations to manage personal data, company documents, holiday requests, expenses, and sick leave. The API provides read and write access to core HR data including employees, absences, departments, and more.
+Responses use named record arrays, including exact-resource reads. Missing expected arrays are failures, rather than empty successes. Account object compatibility requires a real identity. Paged resources use Link and Total headers; the default is25 records and maximum100. Page links are validated against the configured resource and host and never followed as arbitrary URLs. Paging inputs are rejected for current unpaged configuration resources.
 
-## Authentication
+Creation and mutation use current Swagger parameter roots. Employee email/company_join_date, sickness company_sicknesstype_id, expense company_expense_type_id/payable_to_employee, claim employee_expense_ids, and claim decision approve/approver_rejector_id are validated. Existing optional schema fields remain optional, with provider-required invocation checks. Supported numeric-ID/string-money fields preserve their public types. Legacy unsupported options fail locally with remediation.
 
-The Breathe HR API uses API key-based authentication. Include your API key in the `X-API-KEY` header of your HTTP requests to authenticate.
+Legal/personnel/financial history and notification effects can survive cancellation or deletion. The private suite requires explicit synthetic sandbox identity and authorization for any isolated lifecycle. No employee deletion, general HR administration, payroll, documents or event capability is exposed. Live provider acceptance and undocumented response details remain subject to verification with authorized fixtures.
 
-**Obtaining an API Key:**
-
-To enable your API, head to Configure > Settings > Integrations > API Setup, then click on the Enable API button to activate it. Because the API has access to sensitive information, this can only be actioned by the Admin of the account.
-
-Two keys are provided upon enabling the API: a production key (prefixed with `prod-`) and a sandbox key (prefixed with `sandbox-`).
-
-**Base URLs:**
-
-- **Production:** `https://api.breathehr.com/v1`
-- **Sandbox:** `https://api.sandbox.breathehr.info/v1`
-
-**Example request:**
-
-```
-GET https://api.breathehr.com/v1/employees
-X-API-KEY: prod-your-api-key-here
-```
-
-## Features
-
-### Employee Management
-
-Create, retrieve, and manage employee records including personal information (name, email, gender, date of birth), employment details (job title, department, division, location), and status. Supports change requests for updating employee details, where changes can optionally require approval.
-
-### Absence & Leave Management
-
-Retrieve absences with filtering by type, employee ID, department ID, and date range. Cancel absence requests. Manage leave requests and configure other leave reasons. List holiday allowances to track employee entitlements.
-
-### Sickness Tracking
-
-Retrieve sickness records with filtering by start date, end date, employee ID, and department ID. Create sickness records for employees.
-
-### Expense Management
-
-Create, retrieve, and delete employee expenses, including fields such as expense date, description, and amount. Manage employee expense claims with create and update operations.
-
-### Compensation Data
-
-Retrieve bonuses including details such as description, amount, and award date. Access salary information, including department-level salary data.
-
-### Benefits
-
-Retrieve employee benefits and department-level benefit information.
-
-### Training
-
-Retrieve company training types, each with an ID, name, and timestamps. Manage employee training course records.
-
-### Organizational Structure
-
-Manage departments, divisions, and locations. Retrieve department-level data including absences, benefits, bonuses, leave requests, and salaries.
-
-### Working Patterns & Statutory Holidays
-
-Access working pattern configurations and statutory holiday information by country.
-
-### Custom Fields
-
-Retrieve custom field definitions configured in the Breathe HR account.
-
-### Account Information
-
-Retrieve account details including the account's unique identifier, name, domain, and UUID.
-
-## Events
-
-The Breathe HR API does not natively support webhooks. The provider does not support events.
+Primary sources: https://developer.breathehr.com/documentation/getting_started ; https://api.breathehr.com/v1/swagger_doc ; https://developer.breathehr.com/documentation/authenticating ; https://developer.breathehr.com/documentation/environments ; https://developer.breathehr.com/documentation/request_and_response/root_object?partial=root_object ; https://developer.breathehr.com/documentation/request_and_response/pagination?partial=pagination .

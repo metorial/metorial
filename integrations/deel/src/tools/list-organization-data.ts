@@ -1,5 +1,12 @@
-import { SlateTool } from 'slates';
+import { anyOf, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import {
+  dataList,
+  pageSchema,
+  resourceSchema,
+  responsePage,
+  validateLimit
+} from '../lib/response';
 import { createClient } from '../lib/utils';
 import { spec } from '../spec';
 
@@ -11,26 +18,52 @@ export let listOrganizationData = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(anyOf('organizations:read', 'accounting:read'))
   .input(
     z.object({
       resourceType: z
         .enum(['legal_entities', 'teams', 'departments'])
-        .describe('Type of organization data to list')
+        .describe('Type of organization data to list'),
+      limit: z.number().optional().describe('For legal_entities: page size 1–100'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('For legal_entities: nextCursor from the previous result'),
+      includeArchived: z
+        .boolean()
+        .optional()
+        .describe('For legal_entities: include archived entities')
     })
   )
   .output(
     z.object({
-      items: z.array(z.record(z.string(), z.any())).describe('List of organization resources')
+      items: z.array(resourceSchema).describe('List of organization resources'),
+      page: pageSchema.optional(),
+      nextCursor: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateLimit(ctx.input.limit, 100);
+    if (
+      ctx.input.resourceType !== 'legal_entities' &&
+      (ctx.input.limit !== undefined ||
+        ctx.input.cursor !== undefined ||
+        ctx.input.includeArchived !== undefined)
+    )
+      throw createApiServiceError(
+        'Pagination and archive filters apply only to legal_entities.'
+      );
     let client = createClient(ctx);
 
-    let result: any;
+    let result: unknown;
 
     switch (ctx.input.resourceType) {
       case 'legal_entities':
-        result = await client.listLegalEntities();
+        result = await client.listLegalEntities({
+          limit: ctx.input.limit,
+          cursor: ctx.input.cursor,
+          include_archived: ctx.input.includeArchived
+        });
         break;
       case 'teams':
         result = await client.listGroups();
@@ -40,10 +73,11 @@ export let listOrganizationData = SlateTool.create(spec, {
         break;
     }
 
-    let items = result?.data ?? [];
+    let items = dataList(result, 'organization data');
+    let page = responsePage(result);
 
     return {
-      output: { items },
+      output: { items, page, nextCursor: page?.cursor },
       message: `Found ${items.length} ${ctx.input.resourceType.replace(/_/g, ' ')}.`
     };
   })

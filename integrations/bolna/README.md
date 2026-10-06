@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Bolna
 
-Create, configure, and manage conversational Voice AI agents that make and receive phone calls. Initiate outbound calls with dynamic context variables, handle inbound calls with caller identification, and automate batch calling campaigns via CSV uploads with scheduling and auto-retry. Upload PDF documents and URLs as knowledge bases for RAG-powered conversations. Configure function calling tools for live call transfers, calendar booking, and custom API integrations. Retrieve call execution history including transcripts, recordings, cost breakdowns, and extracted data. Purchase and manage phone numbers, import or clone custom voices, and connect external LLM, TTS, ASR, and telephony providers.
+Create and manage Voice AI agents, place and cancel queued calls, manage CSV calling batches, and ingest public URLs into knowledge bases. Inspect execution transcripts, costs, logs, and downloadable recordings. Discover owned or available phone numbers, configure inbound assignments, list voice providers and models, and check the current account balance and concurrency.
 
 ## License
 

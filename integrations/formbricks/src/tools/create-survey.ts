@@ -59,7 +59,8 @@ export let createSurvey = SlateTool.create(spec, {
   description: `Create a new survey in Formbricks. Specify the survey name, type, questions, and display settings. Supports all question types including open text, multiple choice, rating, NPS, date, matrix, consent, and more.`,
   instructions: [
     'The environmentId is required and can be found using the Get Account Info tool.',
-    'Questions must have at least a type and headline. The headline should be an object keyed by language code, e.g. { "default": "Your question text" }.'
+    'Questions need a type, headline, and any fields required by that question type. IDs and required=false are assigned only when omitted during creation. The headline should be an object keyed by language code, e.g. { "default": "Your question text" }.',
+    'Publishing an app survey may expose it to real visitors. Use draft for isolated setup; publishing and response processing can have retained effects.'
   ]
 })
   .input(
@@ -132,7 +133,8 @@ export let createSurvey = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.config.baseUrl,
+      instanceUrl: ctx.auth.instanceUrl
     });
 
     let { environmentId, name, type, status, questions, ...rest } = ctx.input;
@@ -149,10 +151,10 @@ export let createSurvey = SlateTool.create(spec, {
     return {
       output: {
         surveyId: survey.id,
-        name: survey.name ?? '',
-        status: survey.status ?? '',
-        type: survey.type ?? '',
-        createdAt: survey.createdAt ?? ''
+        name: survey.name,
+        status: survey.status,
+        type: survey.type,
+        createdAt: survey.createdAt
       },
       message: `Created survey **${survey.name}** with ID \`${survey.id}\` (status: ${survey.status}).`
     };

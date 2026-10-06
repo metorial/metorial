@@ -22,8 +22,6 @@ import {
   updateNodeTool,
   uploadImageTool
 } from './tools';
-import { albumUpdatedTrigger, inboundWebhook, newImagesTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     getShareUrisTool,
     browseFolderTool
   ],
-  triggers: [inboundWebhook, newImagesTrigger, albumUpdatedTrigger]
+  triggers: []
 });

@@ -1,0 +1,747 @@
+{
+  "list_campaigns": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of campaigns to return (1-100). Defaults to 10.",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "startingAfter": {
+        "description": "Cursor for pagination. Use the nextStartingAfter value from a previous response.",
+        "type": "string"
+      },
+      "search": {
+        "description": "Search campaigns by name.",
+        "type": "string"
+      },
+      "status": {
+        "description": "Filter by campaign status. 0 = draft, 1 = active, 2 = paused, 3 = completed.",
+        "type": "number"
+      },
+      "tagIds": {
+        "description": "Comma-separated tag UUIDs to filter campaigns.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "get_campaign": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "campaignId": {
+        "type": "string",
+        "description": "ID of the campaign to retrieve."
+      }
+    },
+    "required": ["campaignId"],
+    "additionalProperties": false
+  },
+  "create_campaign": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Campaign name."
+      },
+      "schedules": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "description": "Schedule name",
+              "type": "string"
+            },
+            "timing": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "description": "Start time, e.g. \"09:00\""
+                },
+                "to": {
+                  "type": "string",
+                  "description": "End time, e.g. \"17:00\""
+                }
+              },
+              "required": ["from", "to"],
+              "additionalProperties": false,
+              "description": "Sending window"
+            },
+            "days": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "boolean"
+              },
+              "description": "Days of week enabled. Keys: \"0\" (Sun) through \"6\" (Sat)."
+            },
+            "timezone": {
+              "type": "string",
+              "description": "Timezone, e.g. \"America/New_York\""
+            }
+          },
+          "required": ["timing", "days", "timezone"],
+          "additionalProperties": false
+        },
+        "description": "One or more sending schedules for the campaign."
+      },
+      "sequences": {
+        "description": "Email sequences with steps. Each step includes subject, body, and optional variants.",
+        "type": "array",
+        "items": {}
+      }
+    },
+    "required": ["name", "schedules"],
+    "additionalProperties": false
+  },
+  "update_campaign": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "campaignId": {
+        "type": "string",
+        "description": "ID of the campaign to update."
+      },
+      "action": {
+        "description": "Launch or pause the campaign.",
+        "type": "string",
+        "enum": ["activate", "pause"]
+      },
+      "name": {
+        "description": "New campaign name.",
+        "type": "string"
+      },
+      "dailyLimit": {
+        "description": "Daily email sending limit.",
+        "type": "number"
+      },
+      "stopOnReply": {
+        "description": "Stop sending when a reply is received.",
+        "type": "boolean"
+      },
+      "stopOnAutoReply": {
+        "description": "Stop sending when an auto-reply is received.",
+        "type": "boolean"
+      },
+      "linkTracking": {
+        "description": "Enable link click tracking.",
+        "type": "boolean"
+      },
+      "openTracking": {
+        "description": "Enable open tracking.",
+        "type": "boolean"
+      },
+      "textOnly": {
+        "description": "Send text-only emails (no HTML).",
+        "type": "boolean"
+      },
+      "campaignSchedule": {
+        "description": "Full campaign schedule object to replace the existing schedule."
+      }
+    },
+    "required": ["campaignId"],
+    "additionalProperties": false
+  },
+  "delete_campaign": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "campaignId": {
+        "type": "string",
+        "description": "ID of the campaign to delete."
+      }
+    },
+    "required": ["campaignId"],
+    "additionalProperties": false
+  },
+  "get_campaign_analytics": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "campaignId": {
+        "description": "Single campaign ID. Omit for all campaigns.",
+        "type": "string"
+      },
+      "campaignIds": {
+        "description": "Multiple campaign IDs to include.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "startDate": {
+        "description": "Start date in YYYY-MM-DD format.",
+        "type": "string"
+      },
+      "endDate": {
+        "description": "End date in YYYY-MM-DD format.",
+        "type": "string"
+      },
+      "view": {
+        "default": "summary",
+        "description": "Type of analytics view.",
+        "type": "string",
+        "enum": ["summary", "overview", "daily", "steps"]
+      }
+    },
+    "required": ["view"],
+    "additionalProperties": false
+  },
+  "list_leads": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "campaignId": {
+        "description": "Filter leads by campaign ID.",
+        "type": "string"
+      },
+      "listId": {
+        "description": "Filter leads by lead list ID.",
+        "type": "string"
+      },
+      "interestStatus": {
+        "description": "Filter by interest status value.",
+        "type": "number"
+      },
+      "limit": {
+        "description": "Number of leads to return (1-100).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "startingAfter": {
+        "description": "Cursor for pagination from a previous response.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "get_lead": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "leadId": {
+        "type": "string",
+        "description": "ID of the lead to retrieve."
+      }
+    },
+    "required": ["leadId"],
+    "additionalProperties": false
+  },
+  "create_lead": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "email": {
+        "description": "Lead email address. Required when adding to a campaign.",
+        "type": "string"
+      },
+      "firstName": {
+        "description": "Lead first name.",
+        "type": "string"
+      },
+      "lastName": {
+        "description": "Lead last name.",
+        "type": "string"
+      },
+      "companyName": {
+        "description": "Lead company name.",
+        "type": "string"
+      },
+      "website": {
+        "description": "Lead website URL.",
+        "type": "string"
+      },
+      "phone": {
+        "description": "Lead phone number.",
+        "type": "string"
+      },
+      "personalization": {
+        "description": "Custom personalization text.",
+        "type": "string"
+      },
+      "campaignId": {
+        "description": "Campaign ID to add the lead to.",
+        "type": "string"
+      },
+      "listId": {
+        "description": "Lead list ID to add the lead to.",
+        "type": "string"
+      },
+      "skipIfInWorkspace": {
+        "description": "Skip if the lead already exists in the workspace.",
+        "type": "boolean"
+      },
+      "skipIfInCampaign": {
+        "description": "Skip if the lead already exists in the campaign.",
+        "type": "boolean"
+      },
+      "customVariables": {
+        "description": "Custom variables for personalization. Values must be string, number, boolean, or null.",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "additionalProperties": false
+  },
+  "update_lead": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "leadId": {
+        "description": "ID of the lead to update (for contact detail updates).",
+        "type": "string"
+      },
+      "firstName": {
+        "description": "Updated first name.",
+        "type": "string"
+      },
+      "lastName": {
+        "description": "Updated last name.",
+        "type": "string"
+      },
+      "companyName": {
+        "description": "Updated company name.",
+        "type": "string"
+      },
+      "website": {
+        "description": "Updated website URL.",
+        "type": "string"
+      },
+      "phone": {
+        "description": "Updated phone number.",
+        "type": "string"
+      },
+      "personalization": {
+        "description": "Updated personalization text.",
+        "type": "string"
+      },
+      "customVariables": {
+        "description": "Custom variables to set or update.",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      },
+      "leadEmail": {
+        "description": "Lead email address (for interest status update).",
+        "type": "string"
+      },
+      "interestValue": {
+        "description": "New interest status value, or null to reset.",
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "campaignId": {
+        "description": "Campaign ID to scope the interest status update.",
+        "type": "string"
+      },
+      "listId": {
+        "description": "Lead list ID to scope the interest status update.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "delete_lead": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "leadId": {
+        "type": "string",
+        "description": "ID of the lead to delete."
+      }
+    },
+    "required": ["leadId"],
+    "additionalProperties": false
+  },
+  "move_leads": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "leadIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "IDs of leads to move."
+      },
+      "fromCampaignId": {
+        "description": "Source campaign ID.",
+        "type": "string"
+      },
+      "toCampaignId": {
+        "description": "Destination campaign ID.",
+        "type": "string"
+      },
+      "fromListId": {
+        "description": "Source lead list ID.",
+        "type": "string"
+      },
+      "toListId": {
+        "description": "Destination lead list ID.",
+        "type": "string"
+      }
+    },
+    "required": ["leadIds"],
+    "additionalProperties": false
+  },
+  "list_email_accounts": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of accounts to return (1-100).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "startingAfter": {
+        "description": "Cursor for pagination (datetime from previous response).",
+        "type": "string"
+      },
+      "search": {
+        "description": "Search accounts by email address.",
+        "type": "string"
+      },
+      "status": {
+        "description": "Filter by account status.",
+        "type": "number"
+      },
+      "tagIds": {
+        "description": "Comma-separated tag UUIDs to filter accounts.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "get_email_account": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "accountEmail": {
+        "type": "string",
+        "description": "Email address of the account to retrieve."
+      }
+    },
+    "required": ["accountEmail"],
+    "additionalProperties": false
+  },
+  "manage_email_account": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "accountEmail": {
+        "type": "string",
+        "description": "Email address of the account to manage."
+      },
+      "action": {
+        "description": "Action to perform on the account.",
+        "type": "string",
+        "enum": ["pause", "resume", "delete", "update"]
+      },
+      "dailyLimit": {
+        "description": "Updated daily sending limit.",
+        "type": "number"
+      },
+      "sendingGap": {
+        "description": "Updated gap between sends in seconds.",
+        "type": "number"
+      }
+    },
+    "required": ["accountEmail"],
+    "additionalProperties": false
+  },
+  "list_emails": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "limit": {
+        "description": "Number of emails to return (1-100).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "startingAfter": {
+        "description": "Cursor for pagination from a previous response.",
+        "type": "string"
+      },
+      "campaignId": {
+        "description": "Filter by campaign ID.",
+        "type": "string"
+      },
+      "listId": {
+        "description": "Filter by lead list ID.",
+        "type": "string"
+      },
+      "sendingAccount": {
+        "description": "Filter by sending account email (comma-separated for multiple).",
+        "type": "string"
+      },
+      "leadEmail": {
+        "description": "Filter by lead email address.",
+        "type": "string"
+      },
+      "search": {
+        "description": "Search by email address or \"thread:THREAD_ID\" for thread search.",
+        "type": "string"
+      },
+      "isUnread": {
+        "description": "Filter for unread emails only.",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false
+  },
+  "reply_to_email": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "replyToEmailId": {
+        "type": "string",
+        "description": "ID of the email to reply to."
+      },
+      "from": {
+        "type": "string",
+        "description": "Sending account email address to send the reply from."
+      },
+      "to": {
+        "type": "string",
+        "description": "Recipient email address."
+      },
+      "body": {
+        "type": "string",
+        "description": "Reply body content (HTML supported)."
+      },
+      "cc": {
+        "description": "CC email addresses.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "bcc": {
+        "description": "BCC email addresses.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": ["replyToEmailId", "from", "to", "body"],
+    "additionalProperties": false
+  },
+  "verify_email": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "email": {
+        "type": "string",
+        "description": "Email address to verify."
+      },
+      "checkOnly": {
+        "description": "If true, only check the status of a previously submitted verification.",
+        "type": "boolean"
+      }
+    },
+    "required": ["email"],
+    "additionalProperties": false
+  },
+  "manage_block_list": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["list", "add", "remove"],
+        "description": "Action to perform."
+      },
+      "entry": {
+        "description": "Email address or domain to block (for \"add\" action).",
+        "type": "string"
+      },
+      "entryId": {
+        "description": "ID of the block list entry to remove (for \"remove\" action).",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Number of entries to return (for \"list\" action).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "startingAfter": {
+        "description": "Cursor for pagination (for \"list\" action).",
+        "type": "string"
+      }
+    },
+    "required": ["action"],
+    "additionalProperties": false
+  },
+  "manage_custom_tags": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["list", "create", "delete", "assign", "unassign"],
+        "description": "Action to perform."
+      },
+      "tagName": {
+        "description": "Name of the tag to create (for \"create\" action).",
+        "type": "string"
+      },
+      "tagId": {
+        "description": "ID of the tag (for \"delete\", \"assign\", \"unassign\" actions).",
+        "type": "string"
+      },
+      "resourceIds": {
+        "description": "IDs of campaigns or accounts to assign/unassign the tag (for \"assign\"/\"unassign\" actions).",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "search": {
+        "description": "Search tags by name (for \"list\" action).",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Number of tags to return (for \"list\" action).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "startingAfter": {
+        "description": "Cursor for pagination (for \"list\" action).",
+        "type": "string"
+      }
+    },
+    "required": ["action"],
+    "additionalProperties": false
+  },
+  "manage_lead_labels": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["list", "create", "update", "delete"],
+        "description": "Action to perform."
+      },
+      "labelId": {
+        "description": "ID of the label (for \"update\" and \"delete\" actions).",
+        "type": "string"
+      },
+      "name": {
+        "description": "Label name (for \"create\" and \"update\" actions).",
+        "type": "string"
+      },
+      "color": {
+        "description": "Label color hex code (for \"create\" and \"update\" actions).",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Number of labels to return (for \"list\" action).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "startingAfter": {
+        "description": "Cursor for pagination (for \"list\" action).",
+        "type": "string"
+      }
+    },
+    "required": ["action"],
+    "additionalProperties": false
+  },
+  "manage_lead_lists": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["list", "create", "update", "delete"],
+        "description": "Action to perform."
+      },
+      "listId": {
+        "description": "ID of the lead list (for \"update\" and \"delete\" actions).",
+        "type": "string"
+      },
+      "name": {
+        "description": "Name for the lead list (for \"create\" and \"update\" actions).",
+        "type": "string"
+      },
+      "search": {
+        "description": "Search lead lists by name (for \"list\" action).",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Number of lists to return (for \"list\" action).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "startingAfter": {
+        "description": "Cursor for pagination (for \"list\" action).",
+        "type": "string"
+      }
+    },
+    "required": ["action"],
+    "additionalProperties": false
+  },
+  "manage_account_campaign_mappings": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["list", "add", "remove"],
+        "description": "Action to perform."
+      },
+      "campaignId": {
+        "description": "Campaign ID (for \"list\" and \"add\" actions).",
+        "type": "string"
+      },
+      "accountEmail": {
+        "description": "Sending account email address (for \"add\" action).",
+        "type": "string"
+      },
+      "mappingId": {
+        "description": "Mapping ID to remove (for \"remove\" action).",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Number of mappings to return (for \"list\" action).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "startingAfter": {
+        "description": "Cursor for pagination (for \"list\" action).",
+        "type": "string"
+      }
+    },
+    "required": ["action"],
+    "additionalProperties": false
+  }
+}

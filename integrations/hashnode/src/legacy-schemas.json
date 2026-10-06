@@ -1,0 +1,2460 @@
+{
+  "get_post": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "description": "The ID of the post to retrieve",
+          "type": "string"
+        },
+        "slug": {
+          "description": "The URL slug of the post to retrieve (used if postId is not provided)",
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "description": "Unique identifier of the post"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the post"
+        },
+        "subtitle": {
+          "description": "Subtitle of the post",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "slug": {
+          "type": "string",
+          "description": "URL slug of the post"
+        },
+        "url": {
+          "type": "string",
+          "description": "Full URL of the post"
+        },
+        "brief": {
+          "description": "Short excerpt of the post",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publishedAt": {
+          "description": "ISO timestamp when the post was published",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "updatedAt": {
+          "description": "ISO timestamp when the post was last updated",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "readTimeInMinutes": {
+          "description": "Estimated read time in minutes",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reactionCount": {
+          "description": "Number of reactions on the post",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "responseCount": {
+          "description": "Number of comments/responses",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contentMarkdown": {
+          "description": "Full post content in Markdown",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contentHtml": {
+          "description": "Full post content in HTML",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coverImageUrl": {
+          "description": "URL of the cover image",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authorId": {
+          "description": "ID of the post author",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authorUsername": {
+          "description": "Username of the post author",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authorName": {
+          "description": "Display name of the post author",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tags": {
+          "description": "Tags associated with the post",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tagId": {
+                "type": "string",
+                "description": "Tag ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Tag name"
+              },
+              "slug": {
+                "type": "string",
+                "description": "Tag slug"
+              }
+            },
+            "required": ["tagId", "name", "slug"],
+            "additionalProperties": false
+          }
+        },
+        "seriesId": {
+          "description": "ID of the series this post belongs to",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seriesName": {
+          "description": "Name of the series this post belongs to",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seoTitle": {
+          "description": "SEO title",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seoDescription": {
+          "description": "SEO description",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["postId", "title", "slug", "url"],
+      "additionalProperties": false
+    }
+  },
+  "list_posts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "first": {
+          "default": 10,
+          "description": "Number of posts to return (max 20)",
+          "type": "number"
+        },
+        "after": {
+          "description": "Cursor for pagination — use the endCursor from a previous response",
+          "type": "string"
+        },
+        "tagSlugs": {
+          "description": "Filter posts by tag slugs, e.g. [\"javascript\", \"react\"]",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "posts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "postId": {
+                "type": "string",
+                "description": "Unique identifier of the post"
+              },
+              "title": {
+                "type": "string",
+                "description": "Title of the post"
+              },
+              "slug": {
+                "type": "string",
+                "description": "URL slug of the post"
+              },
+              "url": {
+                "type": "string",
+                "description": "Full URL of the post"
+              },
+              "brief": {
+                "description": "Short excerpt",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "publishedAt": {
+                "description": "ISO timestamp when published",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updatedAt": {
+                "description": "ISO timestamp when last updated",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "readTimeInMinutes": {
+                "description": "Estimated read time",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reactionCount": {
+                "description": "Number of reactions",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "responseCount": {
+                "description": "Number of responses",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "coverImageUrl": {
+                "description": "URL of the cover image",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "authorUsername": {
+                "description": "Username of the author",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "authorName": {
+                "description": "Display name of the author",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "tagId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["tagId", "name", "slug"],
+                  "additionalProperties": false
+                }
+              },
+              "seriesName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["postId", "title", "slug", "url"],
+            "additionalProperties": false
+          },
+          "description": "List of posts"
+        },
+        "hasNextPage": {
+          "type": "boolean",
+          "description": "Whether more posts are available"
+        },
+        "endCursor": {
+          "description": "Cursor to use for fetching the next page",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalDocuments": {
+          "description": "Total number of posts in the publication",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["posts", "hasNextPage"],
+      "additionalProperties": false
+    }
+  },
+  "publish_post": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title of the blog post"
+        },
+        "contentMarkdown": {
+          "type": "string",
+          "description": "Full post content in Markdown format"
+        },
+        "subtitle": {
+          "description": "Subtitle of the post",
+          "type": "string"
+        },
+        "slug": {
+          "description": "Custom URL slug. If not provided, Hashnode generates one from the title",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags to associate with the post",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tagId": {
+                "description": "Existing tag ID",
+                "type": "string"
+              },
+              "name": {
+                "description": "Tag display name",
+                "type": "string"
+              },
+              "slug": {
+                "description": "Tag slug identifier",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "coverImageUrl": {
+          "description": "URL of the cover image",
+          "type": "string"
+        },
+        "canonicalUrl": {
+          "description": "Canonical URL if cross-posting from another source",
+          "type": "string"
+        },
+        "seriesId": {
+          "description": "ID of the series to add this post to",
+          "type": "string"
+        },
+        "disableComments": {
+          "description": "Disable comments on this post",
+          "type": "boolean"
+        },
+        "enableTableOfContent": {
+          "description": "Enable table of contents",
+          "type": "boolean"
+        },
+        "sendNewsletter": {
+          "description": "Send this post as a newsletter to subscribers",
+          "type": "boolean"
+        },
+        "publishedAt": {
+          "description": "Custom publish date (ISO 8601). Useful for backdating posts",
+          "type": "string"
+        }
+      },
+      "required": ["title", "contentMarkdown"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "description": "ID of the newly published post"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the published post"
+        },
+        "slug": {
+          "type": "string",
+          "description": "URL slug of the post"
+        },
+        "url": {
+          "type": "string",
+          "description": "Full URL of the published post"
+        }
+      },
+      "required": ["postId", "title", "slug", "url"],
+      "additionalProperties": false
+    }
+  },
+  "update_post": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "description": "ID of the post to update"
+        },
+        "title": {
+          "description": "New title",
+          "type": "string"
+        },
+        "contentMarkdown": {
+          "description": "New Markdown content",
+          "type": "string"
+        },
+        "subtitle": {
+          "description": "New subtitle",
+          "type": "string"
+        },
+        "slug": {
+          "description": "New URL slug",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Replace all tags with these",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tagId": {
+                "description": "Existing tag ID",
+                "type": "string"
+              },
+              "name": {
+                "description": "Tag display name",
+                "type": "string"
+              },
+              "slug": {
+                "description": "Tag slug identifier",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "coverImageUrl": {
+          "description": "New cover image URL",
+          "type": "string"
+        },
+        "canonicalUrl": {
+          "description": "New canonical URL",
+          "type": "string"
+        },
+        "seriesId": {
+          "description": "Assign to a series",
+          "type": "string"
+        },
+        "disableComments": {
+          "description": "Toggle comments on the post",
+          "type": "boolean"
+        },
+        "enableTableOfContent": {
+          "description": "Toggle table of contents",
+          "type": "boolean"
+        },
+        "publishedAt": {
+          "description": "Backdate the post publish date (ISO 8601)",
+          "type": "string"
+        }
+      },
+      "required": ["postId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "description": "ID of the updated post"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the updated post"
+        },
+        "slug": {
+          "type": "string",
+          "description": "URL slug of the updated post"
+        },
+        "url": {
+          "type": "string",
+          "description": "Full URL of the updated post"
+        }
+      },
+      "required": ["postId", "title", "slug", "url"],
+      "additionalProperties": false
+    }
+  },
+  "delete_post": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "description": "ID of the post to delete"
+        }
+      },
+      "required": ["postId"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string",
+          "description": "ID of the deleted post"
+        }
+      },
+      "required": ["postId"],
+      "additionalProperties": false
+    }
+  },
+  "manage_draft": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "get", "list", "publish"],
+          "description": "The operation to perform"
+        },
+        "draftId": {
+          "description": "Draft ID — required for \"get\" and \"publish\" actions",
+          "type": "string"
+        },
+        "title": {
+          "description": "Draft title — required for \"create\"",
+          "type": "string"
+        },
+        "contentMarkdown": {
+          "description": "Draft content in Markdown — required for \"create\"",
+          "type": "string"
+        },
+        "subtitle": {
+          "description": "Draft subtitle — used with \"create\"",
+          "type": "string"
+        },
+        "slug": {
+          "description": "Custom URL slug — used with \"create\"",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags — used with \"create\"",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tagId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "coverImageUrl": {
+          "description": "Cover image URL — used with \"create\"",
+          "type": "string"
+        },
+        "first": {
+          "default": 10,
+          "description": "Number of drafts to list — used with \"list\"",
+          "type": "number"
+        },
+        "after": {
+          "description": "Pagination cursor — used with \"list\"",
+          "type": "string"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "draft": {
+          "description": "Single draft — returned by \"create\", \"get\"",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "draftId": {
+                  "type": "string",
+                  "description": "Draft ID"
+                },
+                "title": {
+                  "description": "Draft title",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "slug": {
+                  "description": "Draft slug",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "updatedAt": {
+                  "description": "Last updated timestamp",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "contentMarkdown": {
+                  "description": "Draft content in Markdown",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "authorUsername": {
+                  "description": "Author username",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "tags": {
+                  "description": "Tags",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "tagId": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "slug": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["tagId", "name", "slug"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["draftId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "drafts": {
+          "description": "List of drafts — returned by \"list\"",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "draftId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "slug": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "updatedAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "authorUsername": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["draftId"],
+                "additionalProperties": false
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publishedPost": {
+          "description": "Published post — returned by \"publish\"",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "postId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["postId", "title", "slug", "url"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hasNextPage": {
+          "description": "Whether more drafts are available",
+          "type": "boolean"
+        },
+        "endCursor": {
+          "description": "Cursor for next page",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_publication": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {}
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "publicationId": {
+          "type": "string",
+          "description": "Unique identifier of the publication"
+        },
+        "title": {
+          "description": "Publication title",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "displayTitle": {
+          "description": "Display title",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "descriptionSeo": {
+          "description": "SEO description",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "aboutMarkdown": {
+          "description": "About section in Markdown",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "aboutHtml": {
+          "description": "About section in HTML",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url": {
+          "description": "Publication URL",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "canonicalUrl": {
+          "description": "Canonical URL",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "favicon": {
+          "description": "Favicon URL",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "headerColor": {
+          "description": "Header color",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "isTeam": {
+          "description": "Whether this is a team publication",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authorId": {
+          "description": "Author ID",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authorUsername": {
+          "description": "Author username",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "authorName": {
+          "description": "Author display name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["publicationId"],
+      "additionalProperties": false
+    }
+  },
+  "manage_series": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["create", "get", "list", "update", "delete"],
+          "description": "Operation to perform"
+        },
+        "seriesId": {
+          "description": "Series ID — required for \"update\" and \"delete\"",
+          "type": "string"
+        },
+        "slug": {
+          "description": "Series slug — used for \"get\" lookup and optionally for \"create\"/\"update\"",
+          "type": "string"
+        },
+        "name": {
+          "description": "Series name — required for \"create\"",
+          "type": "string"
+        },
+        "description": {
+          "description": "Series description in Markdown — used with \"create\" and \"update\"",
+          "type": "string"
+        },
+        "coverImage": {
+          "description": "Cover image URL — used with \"create\" and \"update\"",
+          "type": "string"
+        },
+        "sortOrder": {
+          "description": "Sort order (e.g. \"asc\" or \"desc\") — used with \"create\" and \"update\"",
+          "type": "string"
+        },
+        "first": {
+          "default": 10,
+          "description": "Number of series to list",
+          "type": "number"
+        },
+        "after": {
+          "description": "Pagination cursor for \"list\"",
+          "type": "string"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "series": {
+          "description": "Single series result",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "seriesId": {
+                  "type": "string",
+                  "description": "Series ID"
+                },
+                "name": {
+                  "description": "Series name",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "slug": {
+                  "description": "Series slug",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "createdAt": {
+                  "description": "Creation timestamp",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "descriptionMarkdown": {
+                  "description": "Description in Markdown",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "coverImage": {
+                  "description": "Cover image URL",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "sortOrder": {
+                  "description": "Sort order for posts in the series",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "authorUsername": {
+                  "description": "Author username",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "posts": {
+                  "description": "Posts in the series",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "postId": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "slug": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["postId", "title", "slug", "url"],
+                    "additionalProperties": false
+                  }
+                },
+                "totalPosts": {
+                  "description": "Total number of posts",
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["seriesId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seriesList": {
+          "description": "List of series",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "seriesId": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "slug": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "createdAt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "descriptionMarkdown": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "sortOrder": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["seriesId"],
+                "additionalProperties": false
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "endCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalDocuments": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deleted": {
+          "description": "Whether the series was deleted",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_comments": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "add", "reply", "delete_comment", "delete_reply"],
+          "description": "Operation to perform"
+        },
+        "postId": {
+          "description": "Post ID — required for \"list\" and \"add\"",
+          "type": "string"
+        },
+        "commentId": {
+          "description": "Comment ID — required for \"reply\", \"delete_comment\", and \"delete_reply\"",
+          "type": "string"
+        },
+        "replyId": {
+          "description": "Reply ID — required for \"delete_reply\"",
+          "type": "string"
+        },
+        "contentMarkdown": {
+          "description": "Comment/reply content in Markdown — required for \"add\" and \"reply\"",
+          "type": "string"
+        },
+        "first": {
+          "default": 10,
+          "description": "Number of comments to return — used with \"list\"",
+          "type": "number"
+        },
+        "after": {
+          "description": "Pagination cursor — used with \"list\"",
+          "type": "string"
+        }
+      },
+      "required": ["action"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "comment": {
+          "description": "Single comment — returned by \"add\"",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "commentId": {
+                  "type": "string",
+                  "description": "Comment ID"
+                },
+                "contentMarkdown": {
+                  "description": "Comment content in Markdown",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "contentHtml": {
+                  "description": "Comment content in HTML",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "authorId": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "authorUsername": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "authorName": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "dateAdded": {
+                  "description": "When the comment was posted",
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "totalReactions": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "replies": {
+                  "description": "Replies to this comment",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "replyId": {
+                        "type": "string"
+                      },
+                      "contentMarkdown": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "contentHtml": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "authorUsername": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "authorName": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "dateAdded": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "totalReactions": {
+                        "anyOf": [
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["replyId"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["commentId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reply": {
+          "description": "Single reply — returned by \"reply\"",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "replyId": {
+                  "type": "string"
+                },
+                "contentMarkdown": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "contentHtml": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "authorUsername": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "authorName": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "dateAdded": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["replyId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "comments": {
+          "description": "List of comments — returned by \"list\"",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "commentId": {
+                    "type": "string",
+                    "description": "Comment ID"
+                  },
+                  "contentMarkdown": {
+                    "description": "Comment content in Markdown",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "contentHtml": {
+                    "description": "Comment content in HTML",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "authorId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "authorUsername": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "authorName": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "dateAdded": {
+                    "description": "When the comment was posted",
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "totalReactions": {
+                    "anyOf": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "replies": {
+                    "description": "Replies to this comment",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "replyId": {
+                          "type": "string"
+                        },
+                        "contentMarkdown": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "contentHtml": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "authorUsername": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "authorName": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "dateAdded": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "totalReactions": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["replyId"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["commentId"],
+                "additionalProperties": false
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "endCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalDocuments": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "get_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "username": {
+          "description": "Username to look up. Omit to get the authenticated user's profile",
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Unique user ID"
+        },
+        "username": {
+          "type": "string",
+          "description": "Username"
+        },
+        "name": {
+          "description": "Display name",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "description": "Email (only available for authenticated user)",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "profilePicture": {
+          "description": "Profile picture URL",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tagline": {
+          "description": "User tagline",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bioMarkdown": {
+          "description": "Bio in Markdown",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "followersCount": {
+          "description": "Number of followers",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "followingsCount": {
+          "description": "Number of users being followed",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "location": {
+          "description": "User location",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dateJoined": {
+          "description": "When the user joined Hashnode",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "availableFor": {
+          "description": "What the user is available for",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "socialLinks": {
+          "description": "Social media links",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "website": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "github": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "twitter": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "instagram": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "facebook": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "stackoverflow": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "linkedin": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "youtube": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["userId", "username"],
+      "additionalProperties": false
+    }
+  },
+  "search_posts": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query string"
+        },
+        "first": {
+          "default": 10,
+          "description": "Number of results to return (max 20)",
+          "type": "number"
+        },
+        "after": {
+          "description": "Pagination cursor",
+          "type": "string"
+        }
+      },
+      "required": ["query"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "posts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "postId": {
+                "type": "string",
+                "description": "Post ID"
+              },
+              "title": {
+                "type": "string",
+                "description": "Post title"
+              },
+              "slug": {
+                "type": "string",
+                "description": "URL slug"
+              },
+              "url": {
+                "type": "string",
+                "description": "Full URL"
+              },
+              "brief": {
+                "description": "Short excerpt",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "publishedAt": {
+                "description": "Publish date",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "authorUsername": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "authorName": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "coverImageUrl": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "tagId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["tagId", "name", "slug"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["postId", "title", "slug", "url"],
+            "additionalProperties": false
+          },
+          "description": "Matching posts"
+        },
+        "hasNextPage": {
+          "type": "boolean",
+          "description": "Whether more results are available"
+        },
+        "endCursor": {
+          "description": "Cursor for next page",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": ["posts", "hasNextPage"],
+      "additionalProperties": false
+    }
+  },
+  "list_static_pages": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "description": "If provided, retrieve a single static page by its slug instead of listing all",
+          "type": "string"
+        },
+        "first": {
+          "default": 10,
+          "description": "Number of pages to return when listing",
+          "type": "number"
+        },
+        "after": {
+          "description": "Pagination cursor",
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "staticPage": {
+          "description": "Single page — returned when slug is provided",
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "pageId": {
+                  "type": "string"
+                },
+                "title": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "slug": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "hidden": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "contentMarkdown": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "contentHtml": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["pageId"],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "staticPages": {
+          "description": "List of pages",
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "pageId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "slug": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "hidden": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "contentMarkdown": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "contentHtml": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["pageId"],
+                "additionalProperties": false
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "endCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "subscribe_newsletter": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email address to subscribe"
+        }
+      },
+      "required": ["email"]
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Subscription status returned by Hashnode",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

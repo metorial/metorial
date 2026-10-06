@@ -27,8 +27,6 @@ import {
   pageScreen,
   trackEvent
 } from './tools';
-import { eventWebhookTrigger, workspaceActivityTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,5 +56,5 @@ export let provider = Slate.create({
     getUsage,
     listAuditEvents
   ],
-  triggers: [workspaceActivityTrigger, eventWebhookTrigger]
+  triggers: []
 });

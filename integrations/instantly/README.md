@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Instantly
 
-Manage cold email outreach campaigns at scale. Create, launch, pause, and monitor email campaigns with A/Z testing and automated follow-up sequences. Add, update, and organize leads into lists with custom labels and tags. Connect and manage sending email accounts (Google Workspace, Microsoft, SMTP/IMAP) with inbox rotation. Verify email addresses to reduce bounces. Run inbox placement tests to check spam and deliverability. Enrich leads using the B2B SuperSearch database for email and LinkedIn lookups. Manage block lists to prevent sending to specific addresses or domains. Retrieve campaign analytics including sends, opens, clicks, replies, and bounces. Manage workspace members and team settings. Subscribe to webhooks for real-time events on email sends, opens, clicks, replies, bounces, lead status changes, meeting bookings, campaign completions, and account errors.
+Manage draft campaigns, lead records and lists, labels, custom tags, block lists, sending-account settings and campaign analytics through the V2 API. Read inbox messages and submit replies, check verification results and track asynchronous lead moves. A current-workspace lookup identifies the workspace associated with an API key.
+
+Use a V2 API key with only the resource scopes needed for your workflow. V1 keys are incompatible. Campaign activation/resumption and replies can send real emails; verification can spend credits. Lead moves return background jobs and do not imply completion.
+
+Sender associations can be read by account email or campaign. The current documented API does not expose standalone mapping create/delete routes or opaque mapping IDs. Legacy add/remove inputs remain recognized and fail with an explanation; use the campaign's complete `sendingAccounts` replacement list to change senders. Lead-label color is likewise retained as a legacy input but unsupported by the current label API.
 
 ## License
 

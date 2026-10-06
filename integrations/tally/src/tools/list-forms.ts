@@ -17,8 +17,15 @@ export let listForms = SlateTool.create(spec, {
       limit: z
         .number()
         .optional()
-        .describe('Number of forms per page (default varies by API)'),
-      workspaceId: z.string().optional().describe('Filter forms by workspace ID')
+        .describe('Number of forms per page; integer 1–500, default 50'),
+      workspaceId: z
+        .string()
+        .optional()
+        .describe('Filter forms by one workspace ID; mutually exclusive with workspaceIds'),
+      workspaceIds: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by discovered workspace IDs; mutually exclusive with workspaceId')
     })
   )
   .output(
@@ -48,7 +55,8 @@ export let listForms = SlateTool.create(spec, {
     let result = await client.listForms({
       page: ctx.input.page,
       limit: ctx.input.limit,
-      workspaceId: ctx.input.workspaceId
+      workspaceId: ctx.input.workspaceId,
+      workspaceIds: ctx.input.workspaceIds
     });
 
     let forms = result.items.map(form => ({

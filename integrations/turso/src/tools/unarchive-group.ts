@@ -1,15 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientForContext } from '../lib/client';
 import { spec } from '../spec';
 
 export let unarchiveGroup = SlateTool.create(spec, {
+  tags: { readOnly: false },
   name: 'Unarchive Group',
   key: 'unarchive_group',
-  description: `Unarchive a previously archived database group, restoring access to all its databases.`
+  description: `Choose an organization with list_organizations. Unarchive a previously archived database group, restoring access to all its databases.`
 })
   .input(
     z.object({
+      organizationSlug: z
+        .string()
+        .optional()
+        .describe(
+          'Organization slug. Call list_organizations to discover authorized organizations; older connections may use their saved organization.'
+        ),
       groupName: z.string().describe('Name of the group to unarchive')
     })
   )
@@ -17,16 +24,13 @@ export let unarchiveGroup = SlateTool.create(spec, {
     z.object({
       groupName: z.string().describe('Name of the unarchived group'),
       groupUuid: z.string().describe('Unique identifier of the group'),
-      locations: z.array(z.string()).describe('Group locations'),
+      locations: z.array(z.string()).optional().describe('Group locations'),
       primary: z.string().describe('Primary location'),
-      archived: z.boolean().describe('Whether the group is archived')
+      archived: z.boolean().optional().describe('Whether the group is archived')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    const client = clientForContext(ctx);
 
     let result = await client.unarchiveGroup(ctx.input.groupName);
     let g = result.group;

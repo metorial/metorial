@@ -22,7 +22,7 @@ export let listShowcasesTool = SlateTool.create(spec, {
   .input(
     paginationInputSchema.extend({
       sort: z
-        .enum(['alphabetical', 'date', 'modified_time', 'videos'])
+        .enum(['alphabetical', 'date', 'modified_time', 'last_modified', 'duration', 'videos'])
         .optional()
         .describe('Sort order for the results')
     })
@@ -44,9 +44,10 @@ export let listShowcasesTool = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total ?? 0,
-        page: result.page ?? 1,
-        perPage: result.perPage ?? showcases.length,
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+        paging: result.paging,
         showcases
       },
       message: `Found **${result.total ?? showcases.length}** showcases`
@@ -67,7 +68,7 @@ export let createShowcaseTool = SlateTool.create(spec, {
       name: z.string().describe('Name of the showcase'),
       description: z.string().optional().describe('Description of the showcase'),
       privacy: z
-        .enum(['anybody', 'embed_only', 'nobody', 'password', 'team'])
+        .enum(['anybody', 'embed_only', 'nobody', 'password', 'team', 'unlisted'])
         .optional()
         .describe('Privacy setting for the showcase'),
       password: z
@@ -125,7 +126,7 @@ export let editShowcaseTool = SlateTool.create(spec, {
       name: z.string().optional().describe('New name for the showcase'),
       description: z.string().optional().describe('New description for the showcase'),
       privacy: z
-        .enum(['anybody', 'embed_only', 'nobody', 'password', 'team'])
+        .enum(['anybody', 'embed_only', 'nobody', 'password', 'team', 'unlisted'])
         .optional()
         .describe('Privacy setting for the showcase'),
       password: z.string().optional().describe('Password for the showcase'),
@@ -242,9 +243,10 @@ export let getShowcaseVideosTool = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total ?? 0,
-        page: result.page ?? 1,
-        perPage: result.perPage ?? videos.length,
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+        paging: result.paging,
         videos
       },
       message: `Found **${result.total ?? videos.length}** videos in showcase ${ctx.input.showcaseId}`

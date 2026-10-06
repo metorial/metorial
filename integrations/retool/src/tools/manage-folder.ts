@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor, invalid } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageFolder = SlateTool.create(spec, {
@@ -27,7 +27,7 @@ export let manageFolder = SlateTool.create(spec, {
       folderType: z
         .enum(['app', 'resource'])
         .optional()
-        .describe('Type of folder (only for create)')
+        .describe('Type of folder (only for create, defaults to app)')
     })
   )
   .output(
@@ -39,11 +39,11 @@ export let manageFolder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.folderName) {
-        throw new Error('folderName is required for the create action');
+        throw invalid('folderName is required for the create action');
       }
       let result = await client.createFolder({
         name: ctx.input.folderName,
@@ -64,7 +64,7 @@ export let manageFolder = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.folderId) {
-        throw new Error('folderId is required for the update action');
+        throw invalid('folderId is required for the update action');
       }
       let result = await client.updateFolder(ctx.input.folderId, {
         name: ctx.input.folderName,
@@ -84,7 +84,7 @@ export let manageFolder = SlateTool.create(spec, {
 
     // delete
     if (!ctx.input.folderId) {
-      throw new Error('folderId is required for the delete action');
+      throw invalid('folderId is required for the delete action');
     }
     await client.deleteFolder(ctx.input.folderId);
     return {

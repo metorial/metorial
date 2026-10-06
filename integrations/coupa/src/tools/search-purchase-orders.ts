@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoupaClient } from '../lib/client';
+import { page, pageFields } from '../lib/contracts';
 import { spec } from '../spec';
 
 let purchaseOrderSchema = z.object({
@@ -22,7 +23,7 @@ let purchaseOrderSchema = z.object({
   updatedAt: z.string().nullable().optional().describe('Last update timestamp'),
   createdBy: z.any().nullable().optional().describe('User who created the PO'),
   exportedFlag: z.boolean().nullable().optional().describe('Whether the PO has been exported'),
-  rawData: z.any().optional().describe('Complete raw PO data from API')
+  rawData: z.any().optional().describe('Native data with documented credential fields omitted')
 });
 
 export let searchPurchaseOrders = SlateTool.create(spec, {
@@ -77,14 +78,12 @@ export let searchPurchaseOrders = SlateTool.create(spec, {
       purchaseOrders: z
         .array(purchaseOrderSchema)
         .describe('List of matching purchase orders'),
-      count: z.number().describe('Number of purchase orders returned')
+      count: z.number().describe('Number of purchase orders returned'),
+      ...pageFields
     })
   )
   .handleInvocation(async ctx => {
-    let client = new CoupaClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.config.instanceUrl
-    });
+    let client = CoupaClient.from(ctx);
 
     let filters: Record<string, string> = {};
     if (ctx.input.filters) {
@@ -107,7 +106,7 @@ export let searchPurchaseOrders = SlateTool.create(spec, {
       exportedFlag: ctx.input.exportedFlag
     });
 
-    let purchaseOrders = (Array.isArray(results) ? results : []).map((po: any) => ({
+    let purchaseOrders = results.map((po: any) => ({
       purchaseOrderId: po.id,
       poNumber: po['po-number'] ?? po.po_number ?? null,
       status: po.status ?? null,
@@ -117,7 +116,7 @@ export let searchPurchaseOrders = SlateTool.create(spec, {
       currency: po.currency ?? null,
       paymentTerms: po['payment-term'] ?? po.payment_term ?? null,
       orderLines: po['order-lines'] ?? po.order_lines ?? null,
-      totalAmount: po.total ?? po.total ?? null,
+      totalAmount: po.total ?? null,
       createdAt: po['created-at'] ?? po.created_at ?? null,
       updatedAt: po['updated-at'] ?? po.updated_at ?? null,
       createdBy: po['created-by'] ?? po.created_by ?? null,
@@ -128,7 +127,8 @@ export let searchPurchaseOrders = SlateTool.create(spec, {
     return {
       output: {
         purchaseOrders,
-        count: purchaseOrders.length
+        count: purchaseOrders.length,
+        ...page(purchaseOrders.length, ctx.input)
       },
       message: `Found **${purchaseOrders.length}** purchase order(s).`
     };

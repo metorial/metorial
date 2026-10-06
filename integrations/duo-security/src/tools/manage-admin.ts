@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DuoClient } from '../lib/client';
+import { validateInput } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listAdmins = SlateTool.create(spec, {
@@ -35,14 +36,17 @@ export let listAdmins = SlateTool.create(spec, {
         })
       ),
       totalObjects: z.number().optional(),
-      hasMore: z.boolean()
+      hasMore: z.boolean(),
+      nextOffset: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('list_admins', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.listAdmins({
@@ -62,13 +66,17 @@ export let listAdmins = SlateTool.create(spec, {
     }));
 
     let totalObjects = result.metadata?.total_objects;
+    let nextOffset =
+      typeof result.metadata?.next_offset === 'number'
+        ? result.metadata.next_offset
+        : undefined;
     let hasMore =
-      totalObjects !== undefined
-        ? (ctx.input.offset ?? 0) + admins.length < totalObjects
-        : false;
+      nextOffset !== undefined ||
+      (totalObjects !== undefined &&
+        (ctx.input.offset ?? 0) + result.response.length < totalObjects);
 
     return {
-      output: { admins, totalObjects, hasMore },
+      output: { admins, totalObjects, hasMore, nextOffset },
       message: `Found **${admins.length}** admin(s).`
     };
   })
@@ -83,13 +91,17 @@ export let createAdmin = SlateTool.create(spec, {
     z.object({
       name: z.string().describe('Full name of the administrator'),
       email: z.string().describe('Email address for the administrator'),
-      phone: z.string().describe('Phone number for the administrator'),
+      phone: z
+        .string()
+        .optional()
+        .describe('Phone number for the administrator, if supplied it must be nonempty'),
       role: z
         .enum([
           'Owner',
           'Administrator',
           'User Manager',
           'Security Analyst',
+          'Help Desk',
           'Application Manager',
           'Read-only',
           'Billing'
@@ -103,14 +115,18 @@ export let createAdmin = SlateTool.create(spec, {
       adminId: z.string(),
       name: z.string(),
       email: z.string(),
-      role: z.string().optional()
+      role: z.string().optional(),
+      activationUrl: z.string().optional(),
+      activationUrlExpires: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('create_admin', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.createAdmin({
@@ -126,9 +142,11 @@ export let createAdmin = SlateTool.create(spec, {
         adminId: a.admin_id,
         name: a.name,
         email: a.email,
-        role: a.role || undefined
+        role: a.role || undefined,
+        activationUrl: a.activation_url,
+        activationUrlExpires: a.activation_url_expires
       },
-      message: `Created admin **${a.name}** (${a.email}) with role ${a.role || 'Owner'}.`
+      message: `Created admin **${a.name}** (${a.email}) with role ${a.role || 'not returned'}. Retrieve the returned activation link securely; no activation email was requested.`
     };
   })
   .build();
@@ -149,6 +167,7 @@ export let updateAdmin = SlateTool.create(spec, {
           'Administrator',
           'User Manager',
           'Security Analyst',
+          'Help Desk',
           'Application Manager',
           'Read-only',
           'Billing'
@@ -166,10 +185,12 @@ export let updateAdmin = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('update_admin', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     let result = await client.updateAdmin(ctx.input.adminId, {
@@ -210,10 +231,12 @@ export let deleteAdmin = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput('delete_admin', ctx.input, [ctx.auth.secretKey]);
     let client = new DuoClient({
       integrationKey: ctx.auth.integrationKey,
       secretKey: ctx.auth.secretKey,
-      apiHostname: ctx.auth.apiHostname
+      apiHostname: ctx.auth.apiHostname,
+      signingVersion: ctx.auth.signingVersion
     });
 
     await client.deleteAdmin(ctx.input.adminId);

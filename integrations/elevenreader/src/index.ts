@@ -17,12 +17,6 @@ import {
   speechToTextTool,
   textToSpeechTool
 } from './tools';
-import {
-  conversationEventsTrigger,
-  transcriptionCompletedTrigger,
-  voiceEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -42,5 +36,5 @@ export let provider = Slate.create({
     getUserTool,
     listPronunciationDictionariesTool
   ],
-  triggers: [conversationEventsTrigger, voiceEventsTrigger, transcriptionCompletedTrigger]
+  triggers: []
 });

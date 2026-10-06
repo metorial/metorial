@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ExaClient } from '../lib/client';
+import { requireValue } from '../lib/contracts';
 import { spec } from '../spec';
 
 let websetOutputSchema = z.object({
@@ -33,6 +34,10 @@ Optionally include enrichments to extract additional structured data from found 
         .enum(['company', 'person', 'article', 'research_paper', 'custom'])
         .optional()
         .describe('Entity type to search for'),
+      entityDescription: z
+        .string()
+        .optional()
+        .describe('Required description for a custom entity (2-200 characters)'),
       criteria: z
         .array(
           z.object({
@@ -45,7 +50,14 @@ Optionally include enrichments to extract additional structured data from found 
         .array(
           z.object({
             description: z.string().describe('Description of data to extract'),
-            format: z.string().optional().describe('Expected format of the enrichment value')
+            format: z
+              .string()
+              .optional()
+              .describe('Native format: text, date, number, options, email, phone or url'),
+            options: z
+              .array(z.object({ label: z.string() }))
+              .optional()
+              .describe('Native option labels')
           })
         )
         .optional()
@@ -57,13 +69,24 @@ Optionally include enrichments to extract additional structured data from found 
   )
   .output(websetOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
 
+    requireValue(
+      ctx.input.query !== undefined ||
+        [
+          ctx.input.count,
+          ctx.input.entity,
+          ctx.input.entityDescription,
+          ctx.input.criteria
+        ].every(v => v === undefined),
+      'Provide query with search count, entity or criteria; these fields cannot apply to an empty Webset.'
+    );
     let searchParam = ctx.input.query
       ? {
           query: ctx.input.query,
           count: ctx.input.count,
           entity: ctx.input.entity,
+          entityDescription: ctx.input.entityDescription,
           criteria: ctx.input.criteria
         }
       : undefined;
@@ -121,7 +144,7 @@ export let getWebsetTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
     let result = await client.getWebset(ctx.input.websetId);
 
     return {
@@ -153,7 +176,8 @@ export let listWebsetsTool = SlateTool.create(spec, {
   .input(
     z.object({
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
-      limit: z.number().optional().describe('Maximum number of Websets to return')
+      limit: z.number().optional().describe('Maximum number of Websets to return (1-100)'),
+      search: z.string().optional().describe('Native title or ID search (2-50 characters)')
     })
   )
   .output(
@@ -164,10 +188,11 @@ export let listWebsetsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
     let result = await client.listWebsets({
       cursor: ctx.input.cursor,
-      limit: ctx.input.limit
+      limit: ctx.input.limit,
+      search: ctx.input.search
     });
 
     let websets = result.data.map(w => ({
@@ -194,7 +219,7 @@ export let listWebsetsTool = SlateTool.create(spec, {
 export let updateWebsetTool = SlateTool.create(spec, {
   name: 'Update Webset',
   key: 'update_webset',
-  description: `Update a Webset's title, external ID, or metadata.`,
+  description: `Update a Webset's title or metadata. externalId is retained as a compatibility field but the current update endpoint does not support changing it.`,
   tags: {
     destructive: false
   }
@@ -203,7 +228,12 @@ export let updateWebsetTool = SlateTool.create(spec, {
     z.object({
       websetId: z.string().describe('The Webset ID to update'),
       title: z.string().optional().describe('New title'),
-      externalId: z.string().optional().describe('New external identifier'),
+      externalId: z
+        .string()
+        .optional()
+        .describe(
+          'Compatibility field; omit because the native update endpoint cannot change externalId'
+        ),
       metadata: z
         .record(z.string(), z.string())
         .optional()
@@ -212,7 +242,7 @@ export let updateWebsetTool = SlateTool.create(spec, {
   )
   .output(websetOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
     let result = await client.updateWebset(ctx.input.websetId, {
       title: ctx.input.title,
       externalId: ctx.input.externalId,
@@ -253,7 +283,7 @@ export let deleteWebsetTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
     await client.deleteWebset(ctx.input.websetId);
 
     return {
@@ -278,7 +308,7 @@ export let cancelWebsetTool = SlateTool.create(spec, {
   )
   .output(websetOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
     let result = await client.cancelWebset(ctx.input.websetId);
 
     return {

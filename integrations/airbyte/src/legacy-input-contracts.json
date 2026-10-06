@@ -1,0 +1,799 @@
+{
+  "list_sources": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "workspaceIds": {
+        "description": "Filter sources by workspace IDs. If empty, returns sources from all accessible workspaces.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "includeDeleted": {
+        "description": "Include deleted sources in results.",
+        "type": "boolean"
+      },
+      "limit": {
+        "description": "Maximum number of sources to return (1-100).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Offset for pagination.",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "get_source": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "sourceId": {
+        "type": "string",
+        "description": "The UUID of the source to retrieve."
+      }
+    },
+    "required": ["sourceId"],
+    "additionalProperties": false
+  },
+  "create_source": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Display name for the source."
+      },
+      "workspaceId": {
+        "type": "string",
+        "description": "UUID of the workspace to create the source in."
+      },
+      "sourceType": {
+        "type": "string",
+        "description": "The connector type (e.g. \"postgres\", \"mysql\", \"stripe\", \"hubspot\")."
+      },
+      "configuration": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Source-specific configuration including credentials and connection settings."
+      }
+    },
+    "required": ["name", "workspaceId", "sourceType", "configuration"],
+    "additionalProperties": false
+  },
+  "update_source": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "sourceId": {
+        "type": "string",
+        "description": "The UUID of the source to update."
+      },
+      "name": {
+        "description": "New display name for the source.",
+        "type": "string"
+      },
+      "configuration": {
+        "description": "Updated source-specific configuration.",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": ["sourceId"],
+    "additionalProperties": false
+  },
+  "delete_source": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "sourceId": {
+        "type": "string",
+        "description": "The UUID of the source to delete."
+      }
+    },
+    "required": ["sourceId"],
+    "additionalProperties": false
+  },
+  "list_destinations": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "workspaceIds": {
+        "description": "Filter destinations by workspace IDs.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "includeDeleted": {
+        "description": "Include deleted destinations in results.",
+        "type": "boolean"
+      },
+      "limit": {
+        "description": "Maximum number of destinations to return (1-100).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Offset for pagination.",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "get_destination": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "destinationId": {
+        "type": "string",
+        "description": "The UUID of the destination to retrieve."
+      }
+    },
+    "required": ["destinationId"],
+    "additionalProperties": false
+  },
+  "create_destination": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Display name for the destination."
+      },
+      "workspaceId": {
+        "type": "string",
+        "description": "UUID of the workspace to create the destination in."
+      },
+      "destinationType": {
+        "type": "string",
+        "description": "The connector type (e.g. \"bigquery\", \"snowflake\", \"postgres\", \"s3\")."
+      },
+      "configuration": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {},
+        "description": "Destination-specific configuration including credentials and connection settings."
+      }
+    },
+    "required": ["name", "workspaceId", "destinationType", "configuration"],
+    "additionalProperties": false
+  },
+  "update_destination": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "destinationId": {
+        "type": "string",
+        "description": "The UUID of the destination to update."
+      },
+      "name": {
+        "description": "New display name for the destination.",
+        "type": "string"
+      },
+      "configuration": {
+        "description": "Updated destination-specific configuration.",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": ["destinationId"],
+    "additionalProperties": false
+  },
+  "delete_destination": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "destinationId": {
+        "type": "string",
+        "description": "The UUID of the destination to delete."
+      }
+    },
+    "required": ["destinationId"],
+    "additionalProperties": false
+  },
+  "list_connections": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "workspaceIds": {
+        "description": "Filter connections by workspace IDs.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "includeDeleted": {
+        "description": "Include deleted connections in results.",
+        "type": "boolean"
+      },
+      "limit": {
+        "description": "Maximum number of connections to return (1-100).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Offset for pagination.",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "get_connection": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "connectionId": {
+        "type": "string",
+        "description": "The UUID of the connection to retrieve."
+      }
+    },
+    "required": ["connectionId"],
+    "additionalProperties": false
+  },
+  "create_connection": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "sourceId": {
+        "type": "string",
+        "description": "UUID of the source connector."
+      },
+      "destinationId": {
+        "type": "string",
+        "description": "UUID of the destination connector."
+      },
+      "name": {
+        "description": "Display name for the connection. Defaults to \"source → destination\".",
+        "type": "string"
+      },
+      "schedule": {
+        "description": "Sync schedule. Defaults to manual.",
+        "type": "object",
+        "properties": {
+          "scheduleType": {
+            "type": "string",
+            "enum": ["manual", "cron"],
+            "description": "Schedule type for the connection."
+          },
+          "cronExpression": {
+            "description": "Cron expression for automated syncs (UTC). Required if scheduleType is \"cron\".",
+            "type": "string"
+          }
+        },
+        "required": ["scheduleType"],
+        "additionalProperties": false
+      },
+      "namespaceDefinition": {
+        "description": "Namespace definition in the destination.",
+        "type": "string",
+        "enum": ["source", "destination", "custom_format"]
+      },
+      "namespaceFormat": {
+        "description": "Custom namespace format string (when namespaceDefinition is \"custom_format\").",
+        "type": "string"
+      },
+      "prefix": {
+        "description": "Prefix prepended to stream names at the destination.",
+        "type": "string"
+      },
+      "nonBreakingSchemaUpdatesBehavior": {
+        "description": "How to handle non-breaking schema changes.",
+        "type": "string",
+        "enum": ["ignore", "disable_connection", "propagate_columns", "propagate_fully"]
+      },
+      "status": {
+        "description": "Initial connection status.",
+        "type": "string",
+        "enum": ["active", "inactive"]
+      },
+      "dataResidency": {
+        "description": "Data processing region.",
+        "type": "string",
+        "enum": ["auto", "us", "eu"]
+      },
+      "streams": {
+        "description": "Stream configurations. If not specified, all streams sync with default settings.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the stream to sync."
+            },
+            "syncMode": {
+              "description": "Sync mode for this stream.",
+              "type": "string",
+              "enum": [
+                "full_refresh_overwrite",
+                "full_refresh_append",
+                "incremental_append",
+                "incremental_deduped_history"
+              ]
+            },
+            "cursorField": {
+              "description": "Cursor field path for incremental sync.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "primaryKey": {
+              "description": "Primary key field paths for deduplication.",
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "required": ["name"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["sourceId", "destinationId"],
+    "additionalProperties": false
+  },
+  "update_connection": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "connectionId": {
+        "type": "string",
+        "description": "The UUID of the connection to update."
+      },
+      "name": {
+        "description": "New display name for the connection.",
+        "type": "string"
+      },
+      "status": {
+        "description": "Connection status.",
+        "type": "string",
+        "enum": ["active", "inactive", "deprecated"]
+      },
+      "schedule": {
+        "description": "Updated sync schedule.",
+        "type": "object",
+        "properties": {
+          "scheduleType": {
+            "type": "string",
+            "enum": ["manual", "cron"],
+            "description": "Schedule type for the connection."
+          },
+          "cronExpression": {
+            "description": "Cron expression for automated syncs (UTC).",
+            "type": "string"
+          }
+        },
+        "required": ["scheduleType"],
+        "additionalProperties": false
+      },
+      "dataResidency": {
+        "description": "Data processing region.",
+        "type": "string",
+        "enum": ["auto", "us", "eu"]
+      },
+      "namespaceDefinition": {
+        "description": "Namespace definition in the destination.",
+        "type": "string",
+        "enum": ["source", "destination", "custom_format"]
+      },
+      "namespaceFormat": {
+        "description": "Custom namespace format string.",
+        "type": "string"
+      },
+      "prefix": {
+        "description": "Prefix prepended to stream names at the destination.",
+        "type": "string"
+      },
+      "nonBreakingSchemaUpdatesBehavior": {
+        "description": "How to handle non-breaking schema changes.",
+        "type": "string",
+        "enum": ["ignore", "disable_connection", "propagate_columns", "propagate_fully"]
+      },
+      "streams": {
+        "description": "Full replacement stream configurations.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the stream to sync."
+            },
+            "syncMode": {
+              "description": "Sync mode for this stream.",
+              "type": "string",
+              "enum": [
+                "full_refresh_overwrite",
+                "full_refresh_append",
+                "incremental_append",
+                "incremental_deduped_history"
+              ]
+            },
+            "cursorField": {
+              "description": "Cursor field path for incremental sync.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "primaryKey": {
+              "description": "Primary key field paths for deduplication.",
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "required": ["name"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["connectionId"],
+    "additionalProperties": false
+  },
+  "delete_connection": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "connectionId": {
+        "type": "string",
+        "description": "The UUID of the connection to delete."
+      }
+    },
+    "required": ["connectionId"],
+    "additionalProperties": false
+  },
+  "trigger_sync": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "connectionId": {
+        "type": "string",
+        "description": "UUID of the connection to trigger a job for."
+      },
+      "jobType": {
+        "default": "sync",
+        "description": "Type of job to trigger.",
+        "type": "string",
+        "enum": ["sync", "reset"]
+      }
+    },
+    "required": ["connectionId", "jobType"],
+    "additionalProperties": false
+  },
+  "get_job": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "jobId": {
+        "type": "number",
+        "description": "The numeric ID of the job to retrieve."
+      }
+    },
+    "required": ["jobId"],
+    "additionalProperties": false
+  },
+  "list_jobs": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "connectionId": {
+        "description": "Filter jobs by connection UUID.",
+        "type": "string"
+      },
+      "jobType": {
+        "description": "Filter by job type.",
+        "type": "string",
+        "enum": ["sync", "reset"]
+      },
+      "status": {
+        "description": "Filter by job status.",
+        "type": "string",
+        "enum": ["pending", "running", "incomplete", "failed", "succeeded", "cancelled"]
+      },
+      "workspaceIds": {
+        "description": "Filter jobs by workspace IDs.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "createdAtStart": {
+        "description": "Filter jobs created after this ISO 8601 timestamp.",
+        "type": "string"
+      },
+      "createdAtEnd": {
+        "description": "Filter jobs created before this ISO 8601 timestamp.",
+        "type": "string"
+      },
+      "updatedAtStart": {
+        "description": "Filter jobs updated after this ISO 8601 timestamp.",
+        "type": "string"
+      },
+      "updatedAtEnd": {
+        "description": "Filter jobs updated before this ISO 8601 timestamp.",
+        "type": "string"
+      },
+      "orderBy": {
+        "description": "Sort order, e.g. \"createdAt|ASC\" or \"updatedAt|DESC\".",
+        "type": "string"
+      },
+      "limit": {
+        "description": "Maximum number of jobs to return (1-100).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Offset for pagination.",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "cancel_job": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "jobId": {
+        "type": "number",
+        "description": "The numeric ID of the job to cancel."
+      }
+    },
+    "required": ["jobId"],
+    "additionalProperties": false
+  },
+  "list_workspaces": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "workspaceIds": {
+        "description": "Filter by specific workspace IDs. If empty, returns all accessible workspaces.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "includeDeleted": {
+        "description": "Include deleted workspaces in results.",
+        "type": "boolean"
+      },
+      "limit": {
+        "description": "Maximum number of workspaces to return (1-100).",
+        "type": "number",
+        "minimum": 1,
+        "maximum": 100
+      },
+      "offset": {
+        "description": "Offset for pagination.",
+        "type": "number"
+      }
+    },
+    "additionalProperties": false
+  },
+  "create_workspace": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name for the new workspace."
+      },
+      "organizationId": {
+        "description": "UUID of the organization to associate the workspace with.",
+        "type": "string"
+      }
+    },
+    "required": ["name"],
+    "additionalProperties": false
+  },
+  "update_workspace": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "workspaceId": {
+        "type": "string",
+        "description": "The UUID of the workspace to update."
+      },
+      "name": {
+        "description": "New name for the workspace.",
+        "type": "string"
+      },
+      "notifications": {
+        "description": "Updated notification configuration for the workspace.",
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "required": ["workspaceId"],
+    "additionalProperties": false
+  },
+  "delete_workspace": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "workspaceId": {
+        "type": "string",
+        "description": "The UUID of the workspace to delete."
+      }
+    },
+    "required": ["workspaceId"],
+    "additionalProperties": false
+  },
+  "get_stream_properties": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "sourceId": {
+        "type": "string",
+        "description": "UUID of the source to get stream properties for."
+      },
+      "destinationId": {
+        "description": "UUID of the destination to check compatibility with.",
+        "type": "string"
+      },
+      "ignoreCache": {
+        "description": "If true, pull the latest schema from the source instead of using the cache.",
+        "type": "boolean"
+      }
+    },
+    "required": ["sourceId"],
+    "additionalProperties": false
+  },
+  "list_permissions": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "userId": {
+        "description": "Filter permissions by user UUID.",
+        "type": "string"
+      },
+      "organizationId": {
+        "description": "Organization UUID. Required to view another user's permissions (must be org admin or higher).",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "create_permission": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "userId": {
+        "type": "string",
+        "description": "UUID of the user to grant permission to."
+      },
+      "permissionType": {
+        "type": "string",
+        "enum": [
+          "instance_admin",
+          "organization_admin",
+          "organization_editor",
+          "organization_reader",
+          "organization_member",
+          "workspace_admin",
+          "workspace_editor",
+          "workspace_reader"
+        ],
+        "description": "The permission role to grant."
+      },
+      "workspaceId": {
+        "description": "UUID of the workspace (for workspace-scoped permissions).",
+        "type": "string"
+      },
+      "organizationId": {
+        "description": "UUID of the organization (for organization-scoped permissions).",
+        "type": "string"
+      }
+    },
+    "required": ["userId", "permissionType"],
+    "additionalProperties": false
+  },
+  "delete_permission": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "permissionId": {
+        "type": "string",
+        "description": "The UUID of the permission to delete."
+      }
+    },
+    "required": ["permissionId"],
+    "additionalProperties": false
+  },
+  "list_tags": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "workspaceIds": {
+        "description": "Filter tags by workspace IDs.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "create_tag": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Display name for the tag."
+      },
+      "color": {
+        "type": "string",
+        "description": "Hexadecimal color value for the tag (e.g. \"#FF5733\")."
+      },
+      "workspaceId": {
+        "type": "string",
+        "description": "UUID of the workspace to create the tag in."
+      }
+    },
+    "required": ["name", "color", "workspaceId"],
+    "additionalProperties": false
+  },
+  "update_tag": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "tagId": {
+        "type": "string",
+        "description": "The UUID of the tag to update."
+      },
+      "name": {
+        "description": "New name for the tag.",
+        "type": "string"
+      },
+      "color": {
+        "description": "New hexadecimal color value for the tag.",
+        "type": "string"
+      }
+    },
+    "required": ["tagId"],
+    "additionalProperties": false
+  },
+  "delete_tag": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "tagId": {
+        "type": "string",
+        "description": "The UUID of the tag to delete."
+      }
+    },
+    "required": ["tagId"],
+    "additionalProperties": false
+  }
+}

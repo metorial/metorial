@@ -29,7 +29,7 @@ export interface TranscriptionUtterance {
   end: number;
   confidence: number;
   channel: number;
-  speaker: number;
+  speaker?: number;
   words: TranscriptionWord[];
 }
 
@@ -40,7 +40,7 @@ export interface TranscriptionSentence {
   end: number;
   confidence: number;
   channel: number;
-  speaker: number;
+  speaker?: number;
   words: TranscriptionWord[];
 }
 
@@ -52,15 +52,16 @@ export interface SubtitleEntry {
 export interface TranscriptionResult {
   metadata: {
     audio_duration: number;
-    number_of_channels: number;
+    number_of_distinct_channels: number;
     billing_time: number;
-    transcription_duration: number;
+    transcription_time: number;
+    number_of_channels?: number;
   };
-  transcription: {
+  transcription?: {
     full_transcript: string;
     languages: string[];
     utterances: TranscriptionUtterance[];
-    sentences?: TranscriptionSentence[];
+    sentences?: AudioIntelligenceResult[];
     subtitles?: SubtitleEntry[];
   };
   translation?: AudioIntelligenceResult;
@@ -71,14 +72,16 @@ export interface TranscriptionResult {
   chapterization?: AudioIntelligenceResult;
   audio_to_llm?: AudioIntelligenceResult;
   structured_data_extraction?: AudioIntelligenceResult;
+  name_consistency?: AudioIntelligenceResult;
+  sentences?: unknown;
 }
 
 export interface AudioIntelligenceResult {
   success: boolean;
   is_empty: boolean;
-  results: any[];
+  results: unknown;
   exec_time: number;
-  error: string | null;
+  error: unknown;
 }
 
 export interface TranscriptionResponse {
@@ -88,18 +91,18 @@ export interface TranscriptionResponse {
   status: 'queued' | 'processing' | 'done' | 'error';
   kind: string;
   created_at: string;
-  completed_at: string | null;
-  custom_metadata: Record<string, any>;
-  error_code: number | null;
-  file: {
+  completed_at?: string | null;
+  custom_metadata?: Record<string, unknown>;
+  error_code?: number | null;
+  file?: {
     id: string;
     filename: string;
     source: string;
     audio_duration: number;
     number_of_channels: number;
-  };
-  request_params: Record<string, any>;
-  result: TranscriptionResult | null;
+  } | null;
+  request_params?: Record<string, unknown> | null;
+  result?: TranscriptionResult | null;
 }
 
 export interface LiveSessionInitResponse {
@@ -123,7 +126,7 @@ export interface TranscriptionRequestParams {
   translation?: boolean;
   translation_config?: {
     target_languages?: string[];
-    model?: 'base' | 'enhanced';
+    model?: 'base' | 'batch' | 'enhanced';
   };
   summarization?: boolean;
   summarization_config?: {
@@ -131,7 +134,6 @@ export interface TranscriptionRequestParams {
   };
   sentiment_analysis?: boolean;
   named_entity_recognition?: boolean;
-  chapterization?: boolean;
   audio_to_llm?: boolean;
   audio_to_llm_config?: {
     prompts?: string[];
@@ -150,17 +152,13 @@ export interface TranscriptionRequestParams {
   };
   custom_spelling?: boolean;
   custom_spelling_config?: {
-    spelling?: { value: string; pronunciations: string[] }[];
+    spelling_dictionary: Record<string, string[]>;
   };
-  moderation?: boolean;
-  structured_data_extraction?: boolean;
-  structured_data_extraction_config?: {
-    classes?: string[];
-  };
-  name_consistency?: boolean;
   sentences?: boolean;
-  callback_url?: string;
-  custom_metadata?: Record<string, any>;
+  callback?: boolean;
+  callback_config?: { url: string; method?: 'POST' | 'PUT' };
+  model?: 'solaria-1' | 'solaria-3' | 'solaria-fusion';
+  custom_metadata?: Record<string, unknown>;
 }
 
 export interface LiveSessionRequestParams {
@@ -191,7 +189,7 @@ export interface LiveSessionRequestParams {
     translation?: boolean;
     translation_config?: {
       target_languages?: string[];
-      model?: 'base' | 'enhanced';
+      model?: 'base' | 'batch' | 'enhanced';
     };
     named_entity_recognition?: boolean;
     sentiment_analysis?: boolean;
@@ -201,14 +199,30 @@ export interface LiveSessionRequestParams {
     summarization_config?: {
       type?: 'general' | 'concise' | 'bullet_points';
     };
-    chapterization?: boolean;
   };
   messages_config?: {
     receive_partial_transcripts?: boolean;
   };
   callback_config?: {
     url?: string;
-    method?: 'POST' | 'PUT';
   };
-  custom_metadata?: Record<string, any>;
+  callback?: boolean;
+  custom_metadata?: Record<string, unknown>;
+}
+
+export interface ListTranscriptionsParams {
+  kind?: 'pre-recorded' | 'live';
+  offset?: number;
+  limit?: number;
+  date?: string;
+  before_date?: string;
+  after_date?: string;
+  status?: TranscriptionResponse['status'][];
+}
+
+export interface ListTranscriptionsResponse {
+  first: string;
+  current: string;
+  next: string | null;
+  items: TranscriptionResponse[];
 }

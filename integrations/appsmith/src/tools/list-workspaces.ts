@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listWorkspaces = SlateTool.create(spec, {
@@ -28,16 +28,13 @@ export let listWorkspaces = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    const client = clientFor(ctx);
 
     let workspaces = await client.listWorkspaces();
 
-    let mapped = workspaces.map((ws: any) => ({
-      workspaceId: ws.id ?? '',
-      name: ws.name ?? '',
+    let mapped = workspaces.map(ws => ({
+      workspaceId: ws.id,
+      name: ws.name,
       slug: ws.slug,
       website: ws.website,
       email: ws.email

@@ -8,6 +8,9 @@ import {
   getAdAccount,
   getAdAnalytics,
   getCampaign,
+  getCampaignGroup,
+  getCreative,
+  getCurrentUser,
   getLeadFormResponses,
   listAdAccounts,
   listCampaignGroups,
@@ -20,11 +23,12 @@ import {
   updateCampaignGroup,
   updateCreative
 } from './tools';
-import { campaignStatusChanges, inboundWebhook, leadFormSubmissions } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    getCampaignGroup,
+    getCreative,
     listAdAccounts,
     getAdAccount,
     listCampaignGroups,
@@ -44,5 +48,5 @@ export let provider = Slate.create({
     listLeadForms,
     getLeadFormResponses
   ],
-  triggers: [inboundWebhook, leadFormSubmissions, campaignStatusChanges]
+  triggers: []
 });

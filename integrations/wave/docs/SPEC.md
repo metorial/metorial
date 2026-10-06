@@ -1,111 +1,17 @@
-Now I have a clear picture. Let me note that there are actually **two distinct products** named "Wave" here:
+# Wave Financial integration
 
-1. **Wave Financial (WaveApps)** — the accounting/invoicing software with a GraphQL API and OAuth 2.0
-2. **Wave (wave.com)** — the mobile money/payments platform (Africa-focused) with a REST API and API keys
+This package uses the public GraphQL API at `https://gql.waveapps.com/graphql/public`. All 28 original tool keys remain, with two additions: consolidated exact `get_resource` and `get_invoice_pdf`. No triggers are registered. The [README](../README.md) describes the capability groups and compatibility constraints.
 
-Given the user asked about "Wave" without further specification, and given these are two very different products, let me clarify. The more commonly referenced "Wave" in integration contexts is **Wave Financial (WaveApps)** — the accounting platform. However, wave.com is a separate mobile money platform. Let me research Wave Financial's features more specifically to distinguish properly.Now I have enough information to write the specification. Important clarification: "Wave" commonly refers to **Wave Financial (WaveApps)** — the small business accounting platform. There's also **Wave (wave.com)**, a mobile money platform in Africa. Since the user simply said "Wave" and in the integration context Wave Financial is the more common one, I'll focus on **Wave Financial (WaveApps)**.
+Authentication uses the documented OAuth authorization code/refresh endpoints, or the documented full-access owner token. OAuth state and callback URI are preserved; refresh requires the original callback URI and keeps the previous refresh token when no replacement is returned. The scope list contains only used permissions, including the distinct invoice-send permission. The current subscription gate is documented in the [OAuth guide](https://developer.waveapps.com/hc/en-us/articles/360019493652-OAuth-Guide). Owner token use is described in the [business-owner guide](https://developer.waveapps.com/hc/en-us/articles/360020596571-Permitted-Use-Wave-Business-Owners).
 
-# Slates Specification for Wave
+Requests have fixed provider origins, a 60-second timeout and no automatic redirects or retries. GraphQL errors cause the complete operation to fail, including partial-data responses. Responses are parsed into bounded typed contracts before mapping. Empty mutation receipts, false success, mismatched resource/business IDs and incomplete pagination metadata fail clearly. Upstream failures become safe service errors containing bounded status and code metadata without raw transport parents or provider messages.
 
-## Overview
+Decimal scalars remain strings for Money fields and exact reads. Legacy numeric balances, prices, quantities and percentage tax rates are converted only when an exact decimal round trip is possible. Percentage rates are converted to fractional provider units for both tax creation and documented effective-date tax patches. Supplied precision beyond the provider's documented rounding boundary is rejected rather than silently rounded. Nullable optional fields become absent; required output values are never fabricated.
 
-Wave Financial (WaveApps) is a free accounting and invoicing platform for small businesses. It provides accounting, invoicing, receipt scanning, and payment processing capabilities. The API is built on GraphQL and allows programmatic access to business financial data including customers, invoices, accounts, products, and transactions.
+Invoice update uses `id`, invoice deletion and the other ID-based invoice mutations use `invoiceId`, sending supplies explicit recipients and `attachPDF`, and marking sent supplies the required delivery method. Invoice item `amount` maps to documented `total`. Account updates use optimistic revision sequences and do not automatically replay stale revisions. Unsupported legacy patch/write fields cause explicit input errors.
 
-## Authentication
+PDF delivery reads the exact invoice, validates its HTTPS Wave-hosted `pdfUrl`, and delivers that URL without credentials. No PDF generation endpoint is invented. Signed URL hosts outside Wave's domain are conservatively refused until documented or verified.
 
-Wave uses **OAuth 2.0** (Authorization Code flow) for API authentication.
+The accounting-entry tool uses the [documented creation mutation](https://developer.waveapps.com/hc/en-us/articles/360057230751-Mutation-Create-Money-Transaction); its receipt is not proof of funds movement or a reversible operation. Transaction querying, editing, deleting, transfers and automatic duplicate prevention are not claimed. Catalog archiving does not erase history. Estimate, payment, vendor mutation and business mutation expansions are deferred to keep the agreed tool surface bounded.
 
-### Setup
-
-1. Register an application in the Wave Developer Portal to obtain a **Client ID** and **Client Secret**.
-2. Configure one or more redirect URIs in the application settings.
-
-### OAuth 2.0 Flow
-
-1. **Authorization**: Redirect users to `https://api.waveapps.com/oauth2/authorize/` with the following parameters:
-   - `client_id` — Your application's Client ID
-   - `response_type` — Set to `code`
-   - `redirect_uri` — Must match a whitelisted redirect URI
-   - `scope` — Space-separated list of requested scopes
-
-2. **Token Exchange**: POST to `https://api.waveapps.com/oauth2/token/` with the authorization code to receive an `access_token` and `refresh_token`.
-
-3. **API Requests**: Include the access token as a Bearer token in the `Authorization` header when making requests to the GraphQL endpoint at `https://gql.waveapps.com/graphql/public`.
-
-4. **Token Refresh**: POST to `https://api.waveapps.com/oauth2/token/` with the refresh token to obtain a new access token. The previous access token is invalidated upon refresh.
-
-5. **Token Revocation**: POST to `https://api.waveapps.com/oauth2/token-revoke/` to revoke tokens.
-
-### Scopes
-
-Scopes control the level of access your application requests. Available scopes follow a `resource:permission` pattern (e.g., `account:read`, `account:write`). A full list is available in the Wave Developer Portal under OAuth Scopes.
-
-### Important Considerations
-
-- Users can only grant access to businesses that have an active **Pro** or **Wave Advisor** subscription.
-- If a business's subscription lapses, token refresh will fail with a 403 error.
-- You can send a user through the OAuth flow multiple times to access different businesses or upgrade scopes.
-
-## Features
-
-### Business Management
-
-- Query businesses associated with the authenticated user, including business type, subtype, and address information.
-- Each business is a separate entity with its own chart of accounts, customers, and financial data; most API operations are scoped to a specific business.
-
-### Chart of Accounts
-
-- Create, update, and archive accounts in a business's chart of accounts.
-- Accounts are categorized by type (Asset, Liability, Equity, Income, Expense) and subtype (e.g., Cash and Bank, Accounts Receivable, Credit Card).
-- Accounts cannot be deleted, only archived.
-
-### Customer Management
-
-- Create, update, and delete customers associated with a business.
-- Customer records include contact details, address, shipping details, currency preference, and internal notes.
-- Customers can be listed, sorted, and filtered.
-
-### Vendor Management
-
-- Query vendors associated with a business, including contact and shipping details.
-- Vendor records are similar in structure to customer records.
-
-### Invoice Management
-
-- Create, update, clone, delete, approve, send, and mark invoices as sent.
-- Invoices support line items with products, quantities, prices, taxes, and discounts.
-- Invoices can be configured with custom titles, footers, memos, PO numbers, and due dates.
-- Supports enabling/disabling credit card and bank payment options per invoice.
-- Invoice statuses track the lifecycle (draft, sent, viewed, paid, overdue, etc.).
-
-### Estimates
-
-- Create and manage estimates (approximate bills) for customers that are not yet requests for payment.
-
-### Product/Service Catalog
-
-- Create, update, and archive products and services.
-- Products can be listed, sorted, and paginated.
-
-### Sales Tax Management
-
-- Create, update, and archive sales tax entries.
-- Sales taxes support rate changes with effective dates.
-- Taxes can be applied to invoice line items.
-
-### Money Transactions
-
-- Create financial transactions by specifying an anchor account (bank/credit card) and categorization line items.
-- Transactions use simplified DEPOSIT/WITHDRAWAL directions for the anchor and INCREASE/DECREASE for line items.
-- Line item amounts must balance against the anchor account amount.
-- Querying or editing existing transactions is limited; the API primarily supports creating new transactions.
-
-### User Information
-
-- Retrieve the authenticated user's profile information including default email.
-
-## Events
-
-The provider does not support webhooks or event subscriptions through the Wave Financial (WaveApps) GraphQL API. There is no built-in webhook or event notification system for accounting events such as invoice changes, customer updates, or transaction creation.
-
-**Note**: Wave's separate mobile money product (wave.com) does support webhooks for payment events, but this is a different product and API from the Wave Financial accounting platform described here.
+Structural API contracts and rounding boundaries come from the [current reference](https://developer.waveapps.com/hc/en-us/articles/360019968212-API-Reference), with pagination from the [pagination guide](https://developer.waveapps.com/hc/en-us/articles/360018856791-Pagination) and permissions from the [scope reference](https://developer.waveapps.com/hc/en-us/articles/360032818132-OAuth-Scopes).

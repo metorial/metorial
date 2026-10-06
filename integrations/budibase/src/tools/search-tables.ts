@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTable } from '../lib/models';
 import { spec } from '../spec';
 
 let tableSchema = z.object({
@@ -8,7 +9,7 @@ let tableSchema = z.object({
   name: z.string().describe('Name of the table'),
   primaryDisplay: z.string().optional().describe('Column used as the primary display value'),
   schema: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .optional()
     .describe('Table column definitions keyed by column name')
 });
@@ -37,19 +38,10 @@ export let searchTables = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      appId: ctx.input.appId
-    });
+    let client = Client.fromContext(ctx, ctx.input.appId);
     let results = await client.searchTables({ name: ctx.input.name });
 
-    let tables = results.map((table: any) => ({
-      tableId: table._id,
-      name: table.name,
-      primaryDisplay: table.primaryDisplay,
-      schema: table.schema
-    }));
+    let tables = results.map(row => mapTable(row));
 
     return {
       output: { tables },

@@ -12,8 +12,6 @@ import {
   manageIamPolicy,
   updateFunction
 } from './tools';
-import { functionChanges, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -28,5 +26,5 @@ export let provider = Slate.create({
     manageIamPolicy,
     getOperation
   ],
-  triggers: [inboundWebhook, functionChanges]
+  triggers: []
 });

@@ -1,12 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createGraphQLClient } from '../lib/helpers';
+import { resolveType, scopeFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let queryFieldSchema = z.object({
   fieldName: z.string().describe('The GraphQL field name to use in queries.'),
   description: z.string().optional().nullable(),
   returnType: z.string().optional().describe('The return type of the query field.'),
+  typeSignature: z
+    .string()
+    .optional()
+    .describe('Native return type including list and non-null wrappers.'),
   isCollection: z.boolean().describe('Whether this field returns a collection of items.')
 });
 
@@ -16,11 +21,15 @@ export let listContentTypes = SlateTool.create(spec, {
   description: `List all available top-level query fields from the Contentful GraphQL schema. Shows which content types can be queried and whether they are collection or single-entry queries.
 
 This is a quick way to discover what content is available without a full schema introspection. Each content type typically has two query fields: one for fetching a single entry by ID (e.g. \`blogPost\`) and one for fetching a collection (e.g. \`blogPostCollection\`).`,
+  instructions: [
+    'Choose the key-authorized space ID. Optional list_spaces uses a CMA token for account discovery; verify delivery-key access separately.',
+    'CursorCollection fields use pageNext/pagePrev and pages.next/pages.prev. Offset Collection fields use skip/limit.'
+  ],
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object(scopeFields))
   .output(
     z.object({
       queryFields: z
@@ -29,42 +38,23 @@ This is a quick way to discover what content is available without a full schema 
     })
   )
   .handleInvocation(async ctx => {
-    let client = createGraphQLClient(ctx.config, ctx.auth);
-
-    let result = await client.getAvailableContentTypes();
-
-    if (result.errors && result.errors.length > 0) {
-      throw new Error(
-        `Failed to list content types: ${result.errors.map((e: any) => e.message).join(', ')}`
-      );
-    }
-
-    let fields = result.data?.__schema?.queryType?.fields || [];
-
-    let resolveTypeName = (type: any): string => {
-      if (!type) return 'unknown';
-      if (type.name) return type.name;
-      if (type.ofType) return resolveTypeName(type.ofType);
-      return type.kind || 'unknown';
-    };
-
+    let fields = await createGraphQLClient(
+      ctx.config,
+      ctx.auth,
+      ctx.input
+    ).getAvailableContentTypes();
     let queryFields = fields
-      .filter((f: any) => !f.name.startsWith('_'))
-      .map((f: any) => ({
-        fieldName: f.name,
-        description: f.description || null,
-        returnType: resolveTypeName(f.type),
-        isCollection: f.name.endsWith('Collection')
+      .filter(field => !field.name.startsWith('_'))
+      .map(field => ({
+        fieldName: field.name,
+        description: field.description ?? null,
+        returnType: resolveType(field.type).name,
+        typeSignature: resolveType(field.type).signature,
+        isCollection: field.name.endsWith('Collection')
       }));
-
-    let collectionCount = queryFields.filter((f: any) => f.isCollection).length;
-    let singleCount = queryFields.filter((f: any) => !f.isCollection).length;
-
     return {
-      output: {
-        queryFields
-      },
-      message: `Found **${queryFields.length}** query fields: ${collectionCount} collection queries and ${singleCount} single-entry queries.`
+      output: { queryFields },
+      message: `Found **${queryFields.length}** noninternal root query fields. Consult the schema for field arguments and native pagination.`
     };
   })
   .build();

@@ -1,0 +1,1293 @@
+{
+  "list_workflows": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "active": {
+          "description": "Filter by active status",
+          "type": "boolean"
+        },
+        "tags": {
+          "description": "Comma-separated list of tag names to filter by",
+          "type": "string"
+        },
+        "name": {
+          "description": "Filter workflows by name (partial match)",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "Filter by project ID",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of workflows to return",
+          "type": "number"
+        },
+        "cursor": {
+          "description": "Pagination cursor from a previous response",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workflowId": {
+                "type": "string",
+                "description": "Workflow ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Workflow name"
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Whether the workflow is active"
+              },
+              "createdAt": {
+                "type": "string",
+                "description": "Creation timestamp"
+              },
+              "updatedAt": {
+                "type": "string",
+                "description": "Last update timestamp"
+              },
+              "tags": {
+                "description": "Tags associated with the workflow",
+                "type": "array",
+                "items": {}
+              }
+            },
+            "required": ["workflowId", "name", "active", "createdAt", "updatedAt"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "description": "Cursor for the next page of results",
+          "type": "string"
+        }
+      },
+      "required": ["workflows"],
+      "additionalProperties": false
+    }
+  },
+  "get_workflow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "ID of the workflow to retrieve"
+        },
+        "versionId": {
+          "description": "Specific version ID to retrieve. If omitted, returns the current version.",
+          "type": "string"
+        }
+      },
+      "required": ["workflowId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "Workflow ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Workflow name"
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether the workflow is active"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {},
+          "description": "Array of workflow nodes"
+        },
+        "connections": {
+          "description": "Node connections mapping"
+        },
+        "settings": {
+          "description": "Workflow settings"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        },
+        "tags": {
+          "description": "Tags associated with the workflow",
+          "type": "array",
+          "items": {}
+        }
+      },
+      "required": [
+        "workflowId",
+        "name",
+        "active",
+        "nodes",
+        "connections",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "create_workflow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name for the new workflow"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {},
+          "description": "Array of node definitions for the workflow"
+        },
+        "connections": {
+          "description": "Object mapping source node names to their output connections"
+        },
+        "settings": {
+          "description": "Optional workflow settings (e.g., saveManualExecutions, timezone)"
+        }
+      },
+      "required": ["name", "nodes", "connections"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "ID of the created workflow"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the created workflow"
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether the workflow is active"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["workflowId", "name", "active", "createdAt", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "update_workflow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "ID of the workflow to update"
+        },
+        "name": {
+          "description": "New name for the workflow",
+          "type": "string"
+        },
+        "nodes": {
+          "description": "Updated array of node definitions",
+          "type": "array",
+          "items": {}
+        },
+        "connections": {
+          "description": "Updated connections mapping"
+        },
+        "settings": {
+          "description": "Updated workflow settings"
+        }
+      },
+      "required": ["workflowId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "ID of the updated workflow"
+        },
+        "name": {
+          "type": "string",
+          "description": "Updated workflow name"
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether the workflow is active"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["workflowId", "name", "active", "updatedAt"],
+      "additionalProperties": false
+    }
+  },
+  "delete_workflow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "ID of the workflow to delete"
+        }
+      },
+      "required": ["workflowId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "activate_workflow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "ID of the workflow to activate or deactivate"
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Set to true to activate, false to deactivate"
+        },
+        "versionId": {
+          "description": "Specific version ID to activate. Only applicable when activating.",
+          "type": "string"
+        }
+      },
+      "required": ["workflowId", "active"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "Workflow ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Workflow name"
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Current active status after the operation"
+        }
+      },
+      "required": ["workflowId", "name", "active"],
+      "additionalProperties": false
+    }
+  },
+  "manage_workflow_tags": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "ID of the workflow"
+        },
+        "tagIds": {
+          "description": "Array of tag IDs to assign to the workflow. If provided, replaces all existing tags. Omit to just retrieve current tags.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["workflowId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tagId": {
+                "type": "string",
+                "description": "Tag ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Tag name"
+              },
+              "createdAt": {
+                "description": "Tag creation timestamp",
+                "type": "string"
+              },
+              "updatedAt": {
+                "description": "Tag last update timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["tagId", "name"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["tags"],
+      "additionalProperties": false
+    }
+  },
+  "list_executions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "description": "Filter executions by workflow ID",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filter by execution status",
+          "type": "string",
+          "enum": ["canceled", "error", "running", "success", "waiting"]
+        },
+        "projectId": {
+          "description": "Filter by project ID",
+          "type": "string"
+        },
+        "includeData": {
+          "description": "Include full execution data in the response",
+          "type": "boolean"
+        },
+        "limit": {
+          "description": "Maximum number of executions to return",
+          "type": "number"
+        },
+        "cursor": {
+          "description": "Pagination cursor from a previous response",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "executions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "executionId": {
+                "type": "string",
+                "description": "Execution ID"
+              },
+              "workflowId": {
+                "description": "ID of the executed workflow",
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "description": "Execution status"
+              },
+              "startedAt": {
+                "description": "Execution start timestamp",
+                "type": "string"
+              },
+              "stoppedAt": {
+                "description": "Execution end timestamp",
+                "type": "string"
+              },
+              "finished": {
+                "description": "Whether the execution finished",
+                "type": "boolean"
+              },
+              "mode": {
+                "description": "Execution mode (manual, trigger, etc.)",
+                "type": "string"
+              },
+              "retryOf": {
+                "description": "ID of the original execution if this is a retry",
+                "type": "string"
+              }
+            },
+            "required": ["executionId", "status"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "description": "Cursor for the next page of results",
+          "type": "string"
+        }
+      },
+      "required": ["executions"],
+      "additionalProperties": false
+    }
+  },
+  "get_execution": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "executionId": {
+          "type": "string",
+          "description": "ID of the execution to retrieve"
+        },
+        "includeData": {
+          "description": "Include full execution data with node-level results. Defaults to false.",
+          "type": "boolean"
+        }
+      },
+      "required": ["executionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "executionId": {
+          "type": "string",
+          "description": "Execution ID"
+        },
+        "workflowId": {
+          "description": "ID of the executed workflow",
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "description": "Execution status"
+        },
+        "startedAt": {
+          "description": "Execution start timestamp",
+          "type": "string"
+        },
+        "stoppedAt": {
+          "description": "Execution end timestamp",
+          "type": "string"
+        },
+        "finished": {
+          "description": "Whether the execution finished",
+          "type": "boolean"
+        },
+        "mode": {
+          "description": "Execution mode",
+          "type": "string"
+        },
+        "executionData": {
+          "description": "Full execution data including node results (when includeData is true)"
+        }
+      },
+      "required": ["executionId", "status"],
+      "additionalProperties": false
+    }
+  },
+  "retry_execution": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "executionId": {
+          "type": "string",
+          "description": "ID of the failed execution to retry"
+        },
+        "useCurrentWorkflow": {
+          "description": "If true, retry with the current/latest workflow version instead of the original version used during the failed execution",
+          "type": "boolean"
+        }
+      },
+      "required": ["executionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "retried": {
+          "type": "boolean",
+          "description": "Whether the retry was initiated"
+        },
+        "newExecutionId": {
+          "description": "ID of the new retry execution, if available",
+          "type": "string"
+        }
+      },
+      "required": ["retried"],
+      "additionalProperties": false
+    }
+  },
+  "stop_execution": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "executionId": {
+          "type": "string",
+          "description": "ID of the running execution to stop"
+        }
+      },
+      "required": ["executionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "stopped": {
+          "type": "boolean",
+          "description": "Whether the execution was successfully stopped"
+        }
+      },
+      "required": ["stopped"],
+      "additionalProperties": false
+    }
+  },
+  "delete_execution": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "executionId": {
+          "type": "string",
+          "description": "ID of the execution to delete"
+        }
+      },
+      "required": ["executionId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "list_credentials": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "description": "Maximum number of credentials to return",
+          "type": "number"
+        },
+        "cursor": {
+          "description": "Pagination cursor from a previous response",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "credentials": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "credentialId": {
+                "type": "string",
+                "description": "Credential ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Credential name"
+              },
+              "type": {
+                "type": "string",
+                "description": "Credential type"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["credentialId", "name", "type"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "description": "Cursor for the next page of results",
+          "type": "string"
+        }
+      },
+      "required": ["credentials"],
+      "additionalProperties": false
+    }
+  },
+  "create_credential": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name for the credential"
+        },
+        "type": {
+          "type": "string",
+          "description": "Credential type identifier (e.g. \"slackApi\", \"githubApi\")"
+        },
+        "credentialData": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Credential data object matching the schema for the given type"
+        }
+      },
+      "required": ["name", "type", "credentialData"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "credentialId": {
+          "type": "string",
+          "description": "ID of the created credential"
+        },
+        "name": {
+          "type": "string",
+          "description": "Credential name"
+        },
+        "type": {
+          "type": "string",
+          "description": "Credential type"
+        },
+        "createdAt": {
+          "description": "Creation timestamp",
+          "type": "string"
+        }
+      },
+      "required": ["credentialId", "name", "type"],
+      "additionalProperties": false
+    }
+  },
+  "delete_credential": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "credentialId": {
+          "type": "string",
+          "description": "ID of the credential to delete"
+        }
+      },
+      "required": ["credentialId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "deleted": {
+          "type": "boolean",
+          "description": "Whether the deletion was successful"
+        }
+      },
+      "required": ["deleted"],
+      "additionalProperties": false
+    }
+  },
+  "get_credential_schema": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "credentialTypeName": {
+          "type": "string",
+          "description": "The credential type name (e.g. \"slackApi\", \"githubApi\", \"googleSheetsOAuth2Api\")"
+        }
+      },
+      "required": ["credentialTypeName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "schema": {
+          "description": "JSON schema describing the credential fields and their types"
+        }
+      },
+      "required": ["schema"],
+      "additionalProperties": false
+    }
+  },
+  "list_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "includeRole": {
+          "description": "Include role information for each user",
+          "type": "boolean"
+        },
+        "projectId": {
+          "description": "Filter users by project membership",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Maximum number of users to return",
+          "type": "number"
+        },
+        "cursor": {
+          "description": "Pagination cursor from a previous response",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "description": "User ID"
+              },
+              "email": {
+                "description": "User email address",
+                "type": "string"
+              },
+              "firstName": {
+                "description": "User first name",
+                "type": "string"
+              },
+              "lastName": {
+                "description": "User last name",
+                "type": "string"
+              },
+              "role": {
+                "description": "User role (when includeRole is true)",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "User creation timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["userId"],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "description": "Cursor for the next page of results",
+          "type": "string"
+        }
+      },
+      "required": ["users"],
+      "additionalProperties": false
+    }
+  },
+  "manage_tags": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "create", "update", "delete"],
+          "description": "The tag operation to perform"
+        },
+        "tagId": {
+          "description": "Tag ID (required for update and delete actions)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Tag name (required for create and update actions)",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Max results for list action",
+          "type": "number"
+        },
+        "cursor": {
+          "description": "Pagination cursor for list action",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tags": {
+          "description": "List of tags (for list action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tagId": {
+                "type": "string",
+                "description": "Tag ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Tag name"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["tagId", "name"],
+            "additionalProperties": false
+          }
+        },
+        "tag": {
+          "description": "Single tag result (for create, update, get actions)",
+          "type": "object",
+          "properties": {
+            "tagId": {
+              "type": "string",
+              "description": "Tag ID"
+            },
+            "name": {
+              "type": "string",
+              "description": "Tag name"
+            },
+            "createdAt": {
+              "description": "Creation timestamp",
+              "type": "string"
+            },
+            "updatedAt": {
+              "description": "Last update timestamp",
+              "type": "string"
+            }
+          },
+          "required": ["tagId", "name"],
+          "additionalProperties": false
+        },
+        "deleted": {
+          "description": "Whether deletion was successful (for delete action)",
+          "type": "boolean"
+        },
+        "nextCursor": {
+          "description": "Cursor for next page (for list action)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_variables": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["list", "create", "update", "delete"],
+          "description": "The variable operation to perform"
+        },
+        "variableId": {
+          "description": "Variable ID (required for update and delete)",
+          "type": "string"
+        },
+        "key": {
+          "description": "Variable key/name (required for create and update)",
+          "type": "string"
+        },
+        "value": {
+          "description": "Variable value (required for create and update)",
+          "type": "string"
+        },
+        "projectId": {
+          "description": "Project ID to scope the variable to (for create and list)",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Max results for list action",
+          "type": "number"
+        },
+        "cursor": {
+          "description": "Pagination cursor for list action",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "variables": {
+          "description": "List of variables (for list action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "variableId": {
+                "type": "string",
+                "description": "Variable ID"
+              },
+              "key": {
+                "type": "string",
+                "description": "Variable key"
+              },
+              "value": {
+                "type": "string",
+                "description": "Variable value"
+              }
+            },
+            "required": ["variableId", "key", "value"],
+            "additionalProperties": false
+          }
+        },
+        "variable": {
+          "description": "Single variable result (for create, update actions)",
+          "type": "object",
+          "properties": {
+            "variableId": {
+              "type": "string",
+              "description": "Variable ID"
+            },
+            "key": {
+              "type": "string",
+              "description": "Variable key"
+            },
+            "value": {
+              "type": "string",
+              "description": "Variable value"
+            }
+          },
+          "required": ["variableId", "key", "value"],
+          "additionalProperties": false
+        },
+        "deleted": {
+          "description": "Whether deletion was successful (for delete action)",
+          "type": "boolean"
+        },
+        "nextCursor": {
+          "description": "Cursor for next page (for list action)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "manage_projects": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "create",
+            "update",
+            "delete",
+            "list_members",
+            "add_members",
+            "remove_member"
+          ],
+          "description": "The project operation to perform"
+        },
+        "projectId": {
+          "description": "Project ID (required for update, delete, and member operations)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Project name (required for create and update)",
+          "type": "string"
+        },
+        "userId": {
+          "description": "User ID (required for remove_member)",
+          "type": "string"
+        },
+        "members": {
+          "description": "Members to add (for add_members action)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "description": "User ID"
+              },
+              "role": {
+                "type": "string",
+                "description": "Role for the user in the project"
+              }
+            },
+            "required": ["userId", "role"],
+            "additionalProperties": false
+          }
+        },
+        "limit": {
+          "description": "Max results for list actions",
+          "type": "number"
+        },
+        "cursor": {
+          "description": "Pagination cursor for list actions",
+          "type": "string"
+        }
+      },
+      "required": ["action"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "projects": {
+          "description": "List of projects",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "projectId": {
+                "type": "string",
+                "description": "Project ID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Project name"
+              },
+              "createdAt": {
+                "description": "Creation timestamp",
+                "type": "string"
+              },
+              "updatedAt": {
+                "description": "Last update timestamp",
+                "type": "string"
+              }
+            },
+            "required": ["projectId", "name"],
+            "additionalProperties": false
+          }
+        },
+        "project": {
+          "description": "Single project result",
+          "type": "object",
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "description": "Project ID"
+            },
+            "name": {
+              "type": "string",
+              "description": "Project name"
+            },
+            "createdAt": {
+              "description": "Creation timestamp",
+              "type": "string"
+            },
+            "updatedAt": {
+              "description": "Last update timestamp",
+              "type": "string"
+            }
+          },
+          "required": ["projectId", "name"],
+          "additionalProperties": false
+        },
+        "members": {
+          "description": "Project members",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "string",
+                "description": "User ID"
+              },
+              "email": {
+                "description": "User email",
+                "type": "string"
+              },
+              "role": {
+                "description": "User role in the project",
+                "type": "string"
+              }
+            },
+            "required": ["userId"],
+            "additionalProperties": false
+          }
+        },
+        "deleted": {
+          "description": "Whether deletion was successful",
+          "type": "boolean"
+        },
+        "nextCursor": {
+          "description": "Cursor for next page",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "transfer_resource": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "resourceType": {
+          "type": "string",
+          "enum": ["workflow", "credential"],
+          "description": "Type of resource to transfer"
+        },
+        "resourceId": {
+          "type": "string",
+          "description": "ID of the workflow or credential to transfer"
+        },
+        "destinationProjectId": {
+          "type": "string",
+          "description": "ID of the project to transfer the resource to"
+        }
+      },
+      "required": ["resourceType", "resourceId", "destinationProjectId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "transferred": {
+          "type": "boolean",
+          "description": "Whether the transfer was successful"
+        }
+      },
+      "required": ["transferred"],
+      "additionalProperties": false
+    }
+  },
+  "source_control_pull": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "force": {
+          "description": "Force pull, overwriting local changes",
+          "type": "boolean"
+        },
+        "autoPublish": {
+          "description": "Auto-publish setting: none (do not publish), all (publish all pulled workflows), or published (only publish previously published workflows)",
+          "type": "string",
+          "enum": ["none", "all", "published"]
+        },
+        "variables": {
+          "description": "Variable overrides as key-value pairs",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pullResult": {
+          "description": "Import result including affected workflows, credentials, tags, and variables"
+        }
+      },
+      "required": ["pullResult"],
+      "additionalProperties": false
+    }
+  },
+  "generate_audit": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "categories": {
+          "description": "Risk categories to include in the audit (e.g. \"credentials\", \"database\", \"nodes\", \"filesystem\", \"instance\")",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "daysAbandonedWorkflow": {
+          "description": "Number of days after which a workflow is considered abandoned",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "auditReport": {
+          "description": "Security audit report with risk assessments across configured categories"
+        }
+      },
+      "required": ["auditReport"],
+      "additionalProperties": false
+    }
+  }
+}

@@ -15,12 +15,18 @@ export let createBatchCall = SlateTool.create(spec, {
       name: z.string().optional().describe('Name for the batch campaign'),
       triggerTimestamp: z
         .number()
+        .int()
+        .min(0)
         .optional()
         .describe('Unix timestamp in ms to schedule the batch. Omit for immediate execution.'),
       tasks: z
         .array(
           z.object({
             toNumber: z.string().describe('Destination phone number in E.164 format'),
+            overrideAgentVersion: z
+              .union([z.number().int().min(0), z.string().min(1)])
+              .optional()
+              .describe('Agent version or environment tag for this task'),
             overrideAgentId: z
               .string()
               .optional()
@@ -35,9 +41,12 @@ export let createBatchCall = SlateTool.create(spec, {
               .describe('Custom metadata for this call')
           })
         )
+        .min(1)
         .describe('List of call tasks to execute'),
       reservedConcurrency: z
         .number()
+        .int()
+        .min(0)
         .optional()
         .describe('Concurrency reserved for non-batch calls (0 or more)')
     })
@@ -48,7 +57,10 @@ export let createBatchCall = SlateTool.create(spec, {
       name: z.string().optional().describe('Name of the batch'),
       fromNumber: z.string().describe('Source phone number'),
       totalTaskCount: z.number().describe('Total number of tasks in the batch'),
-      scheduledTimestamp: z.number().optional().describe('Scheduled execution timestamp')
+      scheduledTimestamp: z
+        .number()
+        .optional()
+        .describe('Scheduled execution timestamp returned by Retell, Unix seconds')
     })
   )
   .handleInvocation(async ctx => {
@@ -58,6 +70,8 @@ export let createBatchCall = SlateTool.create(spec, {
       from_number: ctx.input.fromNumber,
       tasks: ctx.input.tasks.map(t => {
         let task: Record<string, any> = { to_number: t.toNumber };
+        if (t.overrideAgentVersion !== undefined)
+          task.override_agent_version = t.overrideAgentVersion;
         if (t.overrideAgentId) task.override_agent_id = t.overrideAgentId;
         if (t.dynamicVariables) task.retell_llm_dynamic_variables = t.dynamicVariables;
         if (t.metadata) task.metadata = t.metadata;
@@ -66,7 +80,8 @@ export let createBatchCall = SlateTool.create(spec, {
     };
 
     if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.triggerTimestamp) body.trigger_timestamp = ctx.input.triggerTimestamp;
+    if (ctx.input.triggerTimestamp !== undefined)
+      body.trigger_timestamp = ctx.input.triggerTimestamp;
     if (ctx.input.reservedConcurrency !== undefined)
       body.reserved_concurrency = ctx.input.reservedConcurrency;
 

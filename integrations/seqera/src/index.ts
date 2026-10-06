@@ -20,8 +20,6 @@ import {
   manageLabels,
   manageSecrets
 } from './tools';
-import { inboundWebhook, workflowUpdate } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -44,5 +42,5 @@ export let provider = Slate.create({
     manageLabels,
     listParticipants
   ],
-  triggers: [inboundWebhook, workflowUpdate]
+  triggers: []
 });

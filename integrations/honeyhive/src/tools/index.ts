@@ -1,4 +1,5 @@
 export * from './manage-configurations';
+export * from './manage-datapoints';
 export * from './manage-datasets';
 export * from './manage-events';
 export * from './manage-metrics';

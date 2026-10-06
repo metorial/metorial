@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fail } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getCurrentUser = SlateTool.create(spec, {
@@ -18,9 +19,14 @@ export let getCurrentUser = SlateTool.create(spec, {
       userId: z.string().describe('GraphQL ID of the user'),
       username: z.string(),
       displayName: z.string().optional(),
-      email: z.string().optional(),
+      email: z
+        .string()
+        .optional()
+        .describe('Verified primary email, when the native deployment supplies one.'),
       avatarUrl: z.string().optional(),
       siteAdmin: z.boolean(),
+      organizationCount: z.number().optional(),
+      organizationsComplete: z.boolean().optional(),
       organizations: z
         .array(
           z.object({
@@ -33,33 +39,32 @@ export let getCurrentUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      instanceUrl: ctx.config.instanceUrl,
-      authorizationHeader: ctx.auth.authorizationHeader
-    });
+    let client = Client.forContext(ctx);
 
     let data = await client.getCurrentUser();
     let user = data.currentUser;
 
     if (!user) {
-      throw new Error('Unable to retrieve current user. The access token may be invalid.');
+      throw fail('Unable to retrieve current user. The access token may be invalid.');
     }
 
-    let organizations = (user.organizations?.nodes || []).map((org: any) => ({
+    let organizations = (user.organizations?.nodes || []).map(org => ({
       organizationId: org.id,
       name: org.name,
-      displayName: org.displayName || undefined
+      displayName: org.displayName ?? undefined
     }));
 
     return {
       output: {
         userId: user.id,
         username: user.username,
-        displayName: user.displayName || undefined,
-        email: user.email || undefined,
-        avatarUrl: user.avatarURL || undefined,
-        siteAdmin: user.siteAdmin || false,
-        organizations
+        displayName: user.displayName ?? undefined,
+        email: user.email ?? undefined,
+        avatarUrl: user.avatarURL ?? undefined,
+        siteAdmin: user.siteAdmin,
+        organizations,
+        organizationCount: user.organizations.totalCount,
+        organizationsComplete: organizations.length === user.organizations.totalCount
       },
       message: `Authenticated as **${user.username}**${user.siteAdmin ? ' (site admin)' : ''}.`
     };

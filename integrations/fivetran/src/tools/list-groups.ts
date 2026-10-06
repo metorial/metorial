@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FivetranClient } from '../lib/client';
+import { groupId } from '../lib/schemas';
 import { spec } from '../spec';
 
 let groupSchema = z.object({
-  groupId: z.string().describe('Unique identifier of the group'),
+  groupId: groupId,
   name: z.string().describe('Name of the group'),
   createdAt: z.string().optional().describe('Timestamp when the group was created')
 });

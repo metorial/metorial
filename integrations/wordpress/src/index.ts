@@ -37,13 +37,6 @@ import {
   updateTagTool,
   uploadMediaTool
 } from './tools';
-import {
-  inboundWebhook,
-  newCommentTrigger,
-  pageChangesTrigger,
-  postChangesTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -83,5 +76,5 @@ export let provider = Slate.create({
     getSiteStatsTool,
     searchContentTool
   ],
-  triggers: [inboundWebhook, postChangesTrigger, newCommentTrigger, pageChangesTrigger]
+  triggers: []
 });

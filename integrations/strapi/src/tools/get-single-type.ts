@@ -20,7 +20,9 @@ export let getSingleType = SlateTool.create(spec, {
       populate: z
         .union([z.string(), z.record(z.string(), z.any())])
         .optional()
-        .describe('Relations to populate. Use "*" for all, or an object for granular control'),
+        .describe(
+          'Relations to populate. Use "*" for permitted first-level fields, or an object for granular control'
+        ),
       status: z
         .enum(['draft', 'published'])
         .optional()
@@ -34,10 +36,7 @@ export let getSingleType = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.getSingleType(ctx.input.contentType, {
       fields: ctx.input.fields,

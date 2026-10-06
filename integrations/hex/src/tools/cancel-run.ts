@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let cancelRun = SlateTool.create(spec, {
   name: 'Cancel Run',
   key: 'cancel_run',
-  description: `Cancel an active project run. Only runs with PENDING or RUNNING status can be cancelled.`,
+  description: `Request cancellation of a PENDING or RUNNING project run. The acknowledgement does not prove the run has stopped; check its status afterward.`,
   tags: {
     destructive: true
   }
@@ -23,12 +23,15 @@ export let cancelRun = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
     await client.cancelRun(ctx.input.projectId, ctx.input.runId);
 
     return {
       output: { cancelled: true },
-      message: `Cancelled run **${ctx.input.runId}** for project ${ctx.input.projectId}.`
+      message: `Hex accepted cancellation of run **${ctx.input.runId}** for project ${ctx.input.projectId}. Check its status to confirm it stopped.`
     };
   })
   .build();

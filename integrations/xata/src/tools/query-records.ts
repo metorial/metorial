@@ -6,13 +6,15 @@ import { spec } from '../spec';
 export let queryRecords = SlateTool.create(spec, {
   name: 'Query Records',
   key: 'query_records',
-  description: `Query and filter records from a Xata table. Supports filtering with operators, sorting, column selection, and cursor-based pagination. Use this to retrieve records matching specific criteria or to list all records in a table.`,
+  description: `DEPRECATED — Xata Lite was permanently retired on February 28, 2026. This legacy operation is unavailable. Discover current organizations with list_organizations and use the current project/branch tools for platform management; data access uses native PostgreSQL. Legacy contract: Query and filter records from a Xata table. Supports filtering with operators, sorting, column selection, and cursor-based pagination. Use this to retrieve records matching specific criteria or to list all records in a table.`,
   instructions: [
+    'Xata Lite is retired. Use list_organizations, list_projects and the current project branch tools for platform management. Use a native PostgreSQL client for record, schema, search and transaction work; this legacy key is not remapped.',
     'Filters use Xata filter syntax, e.g. {"column": {"$gt": 5}} or {"column": {"$contains": "text"}}.',
     'Sort can be a single object or array of objects, e.g. {"column": "asc"} or [{"column": "asc"}, {"other": "desc"}].',
     'Pagination uses cursor-based approach. Pass the cursor from a previous response to get the next page.'
   ],
   tags: {
+    deprecated: true,
     readOnly: true
   }
 })

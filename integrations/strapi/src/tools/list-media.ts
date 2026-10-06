@@ -29,16 +29,26 @@ export let listMedia = SlateTool.create(spec, {
     z.object({
       files: z
         .array(z.record(z.string(), z.any()))
-        .describe('List of media files with metadata')
+        .describe('List of media files with metadata'),
+      pagination: z
+        .object({
+          page: z.number().optional(),
+          pageSize: z.number().optional(),
+          pageCount: z.number().optional(),
+          total: z.number().optional(),
+          start: z.number().optional(),
+          limit: z.number().optional()
+        })
+        .optional()
+        .describe(
+          'Native pagination counts when provided. Strapi 4 offset lists have no total count.'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
-    let files = await client.listFiles({
+    let result = await client.listFiles({
       pagination: {
         page: ctx.input.page,
         pageSize: ctx.input.pageSize
@@ -47,11 +57,12 @@ export let listMedia = SlateTool.create(spec, {
       filters: ctx.input.filters
     });
 
-    let count = Array.isArray(files) ? files.length : 0;
+    let count = result.data.length;
 
     return {
       output: {
-        files: Array.isArray(files) ? files : []
+        files: result.data,
+        pagination: result.meta.pagination
       },
       message: `Retrieved **${count}** media files.`
     };

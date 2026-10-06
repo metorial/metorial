@@ -1,4 +1,6 @@
+export * from './download-archive';
 export * from './get-account-usage';
+export * from './get-resources';
 export * from './list-archives';
 export * from './list-destinations';
 export * from './manage-groups';

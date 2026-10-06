@@ -5,6 +5,7 @@ import {
   createCampaign,
   deleteCampaign,
   getCampaigns,
+  getSenders,
   listSubscribers,
   manageCustomField,
   manageMailingList,
@@ -14,13 +15,12 @@ import {
   sendTransactionalEmail,
   updateCampaign
 } from './tools';
-import { campaignSent, inboundWebhook, newSubscriber } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     createCampaign,
     getCampaigns,
+    getSenders,
     sendCampaign,
     updateCampaign,
     deleteCampaign,
@@ -32,5 +32,5 @@ export let provider = Slate.create({
     manageSegment,
     sendTransactionalEmail
   ],
-  triggers: [inboundWebhook, newSubscriber, campaignSent]
+  triggers: []
 });

@@ -1,5 +1,6 @@
 export * from './create-dashboard';
 export * from './delete-dashboard';
+export * from './download-datasource-instance-data';
 export * from './get-dashboard';
 export * from './get-datasource';
 export * from './get-datasource-instance-data';
@@ -7,7 +8,9 @@ export * from './get-klip';
 export * from './get-profile';
 export * from './list-clients';
 export * from './list-dashboards';
+export * from './list-datasource-instances';
 export * from './list-datasources';
+export * from './list-groups';
 export * from './list-klips';
 export * from './list-published-links';
 export * from './list-roles';

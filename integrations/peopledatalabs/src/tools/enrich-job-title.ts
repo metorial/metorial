@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let enrichJobTitle = SlateTool.create(spec, {
   name: 'Enrich Job Title',
   key: 'enrich_job_title',
-  description: `Enrich and standardize a job title string. Returns the cleaned job title along with its role, sub-role, and seniority levels. Useful for normalizing job titles across different data sources.`,
+  description: `Enrich and standardize a job title string. Returns the cleaned job title along with similar titles and relevant skills. Useful for normalizing job titles across different data sources.`,
   tags: {
     readOnly: true
   }
@@ -19,6 +19,11 @@ export let enrichJobTitle = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      similarJobTitles: z
+        .array(z.string())
+        .optional()
+        .describe('Up to five contextually similar job titles'),
+      relevantSkills: z.array(z.string()).optional().describe('Up to five relevant skills'),
       cleanedJobTitle: z.string().nullable().optional().describe('Standardized job title'),
       role: z
         .string()
@@ -51,6 +56,8 @@ export let enrichJobTitle = SlateTool.create(spec, {
 
     return {
       output: {
+        similarJobTitles: data.similar_job_titles ?? [],
+        relevantSkills: data.relevant_skills ?? [],
         cleanedJobTitle: data.cleaned_job_title ?? data.job_title ?? null,
         role: data.role ?? null,
         subRole: data.sub_role ?? null,

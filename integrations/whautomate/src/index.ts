@@ -22,16 +22,6 @@ import {
   searchContacts,
   sendMessage
 } from './tools';
-import {
-  appointmentUpdate,
-  classParticipantUpdate,
-  clientEvent,
-  contactEvent,
-  invoiceUpdate,
-  messageReceived,
-  messageSent
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -56,13 +46,5 @@ export let provider = Slate.create({
     manageStaff,
     listLocations
   ],
-  triggers: [
-    messageReceived,
-    messageSent,
-    clientEvent,
-    contactEvent,
-    appointmentUpdate,
-    classParticipantUpdate,
-    invoiceUpdate
-  ]
+  triggers: []
 });

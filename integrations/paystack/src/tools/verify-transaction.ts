@@ -1,12 +1,39 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PaystackClient } from '../lib/client';
+
+import {
+  exactId,
+  optionalNumericId,
+  optionalRecord,
+  record,
+  sanitizeMetadata,
+  validateOutput
+} from '../lib/transport';
 import { spec } from '../spec';
+
+const verifyTransactionOutput = z.object({
+  exactTransactionId: z
+    .string()
+    .describe('Exact unsigned 64-bit transaction ID; use this field for durable identifiers'),
+  transactionId: z.number().optional().describe('Paystack transaction ID'),
+  status: z.string().describe('Transaction status (e.g., success, failed, abandoned)'),
+  reference: z.string().describe('Transaction reference'),
+  amount: z.number().describe('Amount in smallest currency unit'),
+  currency: z.string().describe('Currency code'),
+  channel: z.string().optional().describe('Payment channel used'),
+  customerEmail: z.string().describe('Customer email'),
+  customerCode: z.string().describe('Customer code'),
+  paidAt: z.string().nullable().describe('When the transaction was paid'),
+  createdAt: z.string().describe('When the transaction was created'),
+  gatewayResponse: z.string().optional().describe('Response from the payment gateway'),
+  metadata: z.any().optional().describe('Transaction metadata')
+});
 
 export let verifyTransaction = SlateTool.create(spec, {
   name: 'Verify Transaction',
   key: 'verify_transaction',
-  description: `Verify the status of a transaction using its reference. Returns full transaction details including payment status, amount, customer, and authorization info.`,
+  description: `Verify the status of a transaction using its reference. Returns full transaction details including payment status, amount and selected customer metadata.`,
   tags: {
     readOnly: true
   }
@@ -16,44 +43,29 @@ export let verifyTransaction = SlateTool.create(spec, {
       reference: z.string().describe('Transaction reference to verify')
     })
   )
-  .output(
-    z.object({
-      transactionId: z.number().describe('Paystack transaction ID'),
-      status: z.string().describe('Transaction status (e.g., success, failed, abandoned)'),
-      reference: z.string().describe('Transaction reference'),
-      amount: z.number().describe('Amount in smallest currency unit'),
-      currency: z.string().describe('Currency code'),
-      channel: z.string().describe('Payment channel used'),
-      customerEmail: z.string().describe('Customer email'),
-      customerCode: z.string().describe('Customer code'),
-      paidAt: z.string().nullable().describe('When the transaction was paid'),
-      createdAt: z.string().describe('When the transaction was created'),
-      gatewayResponse: z.string().describe('Response from the payment gateway'),
-      metadata: z.any().optional().describe('Transaction metadata')
-    })
-  )
+  .output(verifyTransactionOutput)
   .handleInvocation(async ctx => {
-    let client = new PaystackClient({ token: ctx.auth.token });
-
-    let result = await client.verifyTransaction(ctx.input.reference);
-    let tx = result.data;
-
+    const client = new PaystackClient({ token: ctx.auth.token });
+    const result = await client.verifyTransaction(ctx.input.reference);
+    const tx = record(result.data);
+    const output = {
+      transactionId: optionalNumericId(tx.id),
+      exactTransactionId: exactId(tx.id),
+      status: tx.status,
+      reference: tx.reference,
+      amount: tx.amount,
+      currency: tx.currency,
+      channel: tx.channel ?? undefined,
+      customerEmail: optionalRecord(tx.customer).email,
+      customerCode: optionalRecord(tx.customer).customer_code,
+      paidAt: tx.paid_at ?? tx.paidAt ?? null,
+      createdAt: tx.created_at ?? tx.createdAt,
+      gatewayResponse: tx.gateway_response ?? undefined,
+      metadata: sanitizeMetadata(tx.metadata, ctx.auth.token)
+    };
     return {
-      output: {
-        transactionId: tx.id,
-        status: tx.status,
-        reference: tx.reference,
-        amount: tx.amount,
-        currency: tx.currency,
-        channel: tx.channel,
-        customerEmail: tx.customer?.email ?? '',
-        customerCode: tx.customer?.customer_code ?? '',
-        paidAt: tx.paid_at ?? null,
-        createdAt: tx.created_at,
-        gatewayResponse: tx.gateway_response,
-        metadata: tx.metadata
-      },
-      message: `Transaction **${tx.reference}** status: **${tx.status}**. Amount: ${tx.amount} ${tx.currency}. Gateway: ${tx.gateway_response}`
+      output: validateOutput(verifyTransactionOutput, output),
+      message: 'Transaction status retrieved; review status before fulfillment.'
     };
   })
   .build();

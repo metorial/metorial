@@ -20,7 +20,11 @@ let transactionSchema = z.object({
     .nullable()
     .optional()
     .describe('Detailed personal finance category'),
-  isoCurrencyCode: z.string().nullable().optional().describe('ISO 4217 currency code')
+  isoCurrencyCode: z.string().nullable().optional().describe('ISO 4217 currency code'),
+  categoryVersion: z
+    .enum(['v1', 'v2'])
+    .optional()
+    .describe('Provider category taxonomy version')
 });
 
 export let getTransactionsTool = SlateTool.create(spec, {
@@ -29,7 +33,7 @@ export let getTransactionsTool = SlateTool.create(spec, {
   description: `Retrieve transactions for a date range using offset-based pagination. Returns transactions along with total count for pagination. For incremental updates, prefer **Sync Transactions** instead.`,
   instructions: [
     'Use startDate and endDate in YYYY-MM-DD format.',
-    'Use count and offset for pagination. Keep fetching while offset + count < totalTransactions.'
+    'Use count and offset for pagination. Advance offset by returnedCount, stopping when it reaches totalTransactions; do not advance by the requested size.'
   ],
   tags: {
     readOnly: true
@@ -45,13 +49,22 @@ export let getTransactionsTool = SlateTool.create(spec, {
         .optional()
         .describe('Number of transactions to return (default 100, max 500)'),
       offset: z.number().optional().describe('Offset for pagination (default 0)'),
-      accountIds: z.array(z.string()).optional().describe('Filter to specific account IDs')
+      accountIds: z.array(z.string()).optional().describe('Filter to specific account IDs'),
+      personalFinanceCategoryVersion: z
+        .enum(['v1', 'v2'])
+        .optional()
+        .describe('Requested category taxonomy, subject to account eligibility')
     })
   )
   .output(
     z.object({
       transactions: z.array(transactionSchema),
-      totalTransactions: z.number().describe('Total number of transactions matching the query')
+      totalTransactions: z.number().describe('Provider total matching the query'),
+      returnedCount: z.number().optional().describe('Transactions returned on this page'),
+      nextOffset: z
+        .number()
+        .optional()
+        .describe('Offset for the next page when the provider total indicates more results')
     })
   )
   .handleInvocation(async ctx => {
@@ -68,11 +81,12 @@ export let getTransactionsTool = SlateTool.create(spec, {
       {
         count: ctx.input.count,
         offset: ctx.input.offset,
-        accountIds: ctx.input.accountIds
+        accountIds: ctx.input.accountIds,
+        personalFinanceCategoryVersion: ctx.input.personalFinanceCategoryVersion
       }
     );
 
-    let transactions = (result.transactions || []).map((t: any) => ({
+    let transactions = result.transactions.map(t => ({
       transactionId: t.transaction_id,
       accountId: t.account_id,
       amount: t.amount,
@@ -83,13 +97,20 @@ export let getTransactionsTool = SlateTool.create(spec, {
       paymentChannel: t.payment_channel,
       category: t.personal_finance_category?.primary ?? null,
       categoryDetailed: t.personal_finance_category?.detailed ?? null,
-      isoCurrencyCode: t.iso_currency_code ?? null
+      isoCurrencyCode: t.iso_currency_code ?? null,
+      categoryVersion: t.personal_finance_category?.version
     }));
 
     return {
       output: {
         transactions,
-        totalTransactions: result.total_transactions
+        totalTransactions: result.total_transactions,
+        returnedCount: transactions.length,
+        nextOffset:
+          transactions.length > 0 &&
+          (ctx.input.offset ?? 0) + transactions.length < result.total_transactions
+            ? (ctx.input.offset ?? 0) + transactions.length
+            : undefined
       },
       message: `Retrieved **${transactions.length}** of **${result.total_transactions}** total transactions for ${ctx.input.startDate} to ${ctx.input.endDate}.`
     };

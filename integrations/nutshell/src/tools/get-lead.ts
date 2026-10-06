@@ -21,7 +21,10 @@ export let getLead = SlateTool.create(spec, {
       leadId: z.number().describe('ID of the lead'),
       rev: z.string().describe('Revision identifier'),
       name: z.string().optional().describe('Lead name/description'),
-      status: z.string().optional().describe('Lead status (open, won, lost, canceled)'),
+      status: z
+        .string()
+        .optional()
+        .describe('Lead status (open, pending, won, lost, canceled)'),
       value: z.any().optional().describe('Monetary value of the lead'),
       confidence: z.number().optional().describe('Win confidence percentage'),
       contacts: z.array(z.any()).optional().describe('Associated contacts'),

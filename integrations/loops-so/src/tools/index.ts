@@ -1,6 +1,8 @@
+export { checkContactSuppression } from './check-contact-suppression';
 export { createContact } from './create-contact';
 export { deleteContact } from './delete-contact';
 export { findContact } from './find-contact';
+export { getCurrentTeam } from './get-current-team';
 export { listContactProperties } from './list-contact-properties';
 export { listMailingLists } from './list-mailing-lists';
 export { listTransactionalEmails } from './list-transactional-emails';

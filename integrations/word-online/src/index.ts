@@ -16,8 +16,6 @@ import {
   shareDocument,
   uploadDocument
 } from './tools';
-import { driveItemChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     documentPreview,
     createFolder
   ],
-  triggers: [driveItemChanges]
+  triggers: []
 });

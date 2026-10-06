@@ -1,11 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import {
   buildRelationship,
   cleanAttributes,
   flattenResource,
-  mergeRelationships
+  mergeRelationships,
+  validateInput
 } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -26,7 +27,12 @@ Templates are reusable email content used in sequences and one-off emails. They 
       name: z.string().optional().describe('Template name'),
       subject: z.string().optional().describe('Email subject line'),
       bodyHtml: z.string().optional().describe('HTML body content'),
-      bodyText: z.string().optional().describe('Plain text body content'),
+      bodyText: z
+        .string()
+        .optional()
+        .describe(
+          'Deprecated: current API derives this read-only value. Do not supply; use bodyHtml.'
+        ),
       shareType: z
         .enum(['private', 'read_only', 'shared'])
         .optional()
@@ -46,13 +52,17 @@ Templates are reusable email content used in sequences and one-off emails. They 
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
+    if (ctx.input.bodyText !== undefined)
+      throw createApiServiceError(
+        'bodyText is deprecated and read-only in the current API. Supply bodyHtml; Outreach derives the plain-text body.'
+      );
     let client = new Client({ token: ctx.auth.token });
 
     let attributes = cleanAttributes({
       name: ctx.input.name,
       subject: ctx.input.subject,
       bodyHtml: ctx.input.bodyHtml,
-      bodyText: ctx.input.bodyText,
       shareType: ctx.input.shareType,
       tags: ctx.input.tags
     });
@@ -71,12 +81,17 @@ Templates are reusable email content used in sequences and one-off emails. They 
           createdAt: flat.createdAt,
           updatedAt: flat.updatedAt
         },
-        message: `Template **${flat.name}** created with ID ${flat.id}.`
+        message: `Template **${flat.name ?? flat.id}** created with ID ${flat.id}.`
       };
     }
 
-    if (!ctx.input.templateId) throw new Error('templateId is required for update');
-    let resource = await client.updateTemplate(ctx.input.templateId, attributes);
+    if (!ctx.input.templateId)
+      throw createApiServiceError('templateId is required for update');
+    let resource = await client.updateTemplate(
+      ctx.input.templateId,
+      attributes,
+      relationships
+    );
     let flat = flattenResource(resource);
     return {
       output: {
@@ -87,7 +102,7 @@ Templates are reusable email content used in sequences and one-off emails. They 
         createdAt: flat.createdAt,
         updatedAt: flat.updatedAt
       },
-      message: `Template **${flat.name}** (${flat.id}) updated successfully.`
+      message: `Template **${flat.name ?? flat.id}** (${flat.id}) updated successfully.`
     };
   })
   .build();

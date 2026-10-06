@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -28,16 +28,16 @@ export let searchSalesforce = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let results: any[];
+    let results: Record<string, unknown>[];
 
     if (ctx.input.email) {
       let data = await client.getSalesforceContactOrLead(ctx.input.email);
       results = Array.isArray(data) ? data : [data];
     } else if (ctx.input.query) {
       let data = await client.searchSalesforce(ctx.input.query);
-      results = data.results || data || [];
+      results = data;
     } else {
-      throw new Error('Either query or email must be provided');
+      throw createApiServiceError('Either query or email must be provided');
     }
 
     return {
@@ -86,7 +86,7 @@ export let manageSalesforceRecord = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.recordId) throw new Error('recordId is required for update');
+      if (!ctx.input.recordId) throw createApiServiceError('recordId is required for update');
       await client.updateSalesforceRecord(
         ctx.input.objectType,
         ctx.input.recordId,
@@ -101,6 +101,6 @@ export let manageSalesforceRecord = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

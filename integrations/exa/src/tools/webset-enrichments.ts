@@ -29,15 +29,23 @@ Define what data to extract and its expected format (text, number, date, etc.). 
         .describe(
           'Description of the data to extract (e.g., "Find the company\'s founding year")'
         ),
-      format: z.string().optional().describe('Expected format: text, number, date, etc.')
+      format: z
+        .string()
+        .optional()
+        .describe('Native format: text, date, number, options, email, phone or url'),
+      options: z
+        .array(z.object({ label: z.string() }))
+        .optional()
+        .describe('Native option labels')
     })
   )
   .output(enrichmentSchema)
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
     let result = await client.createEnrichment(ctx.input.websetId, {
       description: ctx.input.description,
-      format: ctx.input.format
+      format: ctx.input.format,
+      options: ctx.input.options
     });
 
     return {
@@ -67,15 +75,20 @@ export let updateEnrichmentTool = SlateTool.create(spec, {
       websetId: z.string().describe('The Webset ID'),
       enrichmentId: z.string().describe('The enrichment ID to update'),
       description: z.string().optional().describe('New description'),
-      format: z.string().optional().describe('New format')
+      format: z.string().optional().describe('New native format'),
+      options: z
+        .array(z.object({ label: z.string() }))
+        .optional()
+        .describe('Native option labels')
     })
   )
   .output(enrichmentSchema)
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
     let result = await client.updateEnrichment(ctx.input.websetId, ctx.input.enrichmentId, {
       description: ctx.input.description,
-      format: ctx.input.format
+      format: ctx.input.format,
+      options: ctx.input.options
     });
 
     return {
@@ -95,7 +108,7 @@ export let updateEnrichmentTool = SlateTool.create(spec, {
 export let deleteEnrichmentTool = SlateTool.create(spec, {
   name: 'Delete Enrichment',
   key: 'delete_enrichment',
-  description: `Remove an enrichment from a Webset. This stops the enrichment from running on future items.`,
+  description: `Remove an enrichment from a Webset. Cancels a running enrichment and removes its existing enrichment results; this does not undo consumed credits or history.`,
   tags: {
     destructive: true
   }
@@ -112,7 +125,7 @@ export let deleteEnrichmentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ExaClient(ctx.auth.token);
+    let client = new ExaClient(ctx.auth.token, ctx.input);
     await client.deleteEnrichment(ctx.input.websetId, ctx.input.enrichmentId);
 
     return {

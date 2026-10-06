@@ -6,11 +6,11 @@ import { spec } from '../spec';
 export let simpleImage = SlateTool.create(spec, {
   name: 'Simple Image Result',
   key: 'simple_image',
-  description: `Get a URL for the entire Wolfram Alpha result page rendered as a single image.
+  description: `Get a downloadable image of the entire Wolfram Alpha result page.
 Useful for embedding visual results or sharing computed answers as images. Supports customization of layout, colors, font size, and image width.`,
   instructions: [
-    'The returned URL can be used directly in image tags or shared as a link.',
-    'Use background/foreground colors as hex values without the "#" prefix (e.g., "F5F5F5").'
+    'Use the downloadable image for embedding or sharing; imageUrl is a provider endpoint requiring your AppID.',
+    'Background accepts HTML color names, hex RGB without "#", comma-separated RGB/RGBA, or transparent. Foreground accepts black or white.'
   ],
   constraints: ['Does not support disambiguation or interactive drilldown.'],
   tags: {
@@ -24,11 +24,14 @@ Useful for embedding visual results or sharing computed answers as images. Suppo
         .enum(['divider', 'labelbar'])
         .optional()
         .describe('Layout style for the image'),
-      background: z.string().optional().describe('Background color as hex (e.g., "F5F5F5")'),
+      background: z
+        .string()
+        .optional()
+        .describe('Background color, e.g., white, F5F5F5, 0,100,200, or transparent'),
       foreground: z
         .string()
         .optional()
-        .describe('Foreground/text color as hex (e.g., "000000")'),
+        .describe('Text color: black or white; 000000 and FFFFFF are accepted aliases'),
       fontSize: z.number().optional().describe('Font size in points (default is 14)'),
       width: z.number().optional().describe('Image width in pixels (default is 500)'),
       units: z.enum(['metric', 'imperial']).optional().describe('Unit system for the result'),
@@ -37,7 +40,11 @@ Useful for embedding visual results or sharing computed answers as images. Suppo
   )
   .output(
     z.object({
-      imageUrl: z.string().describe('URL of the rendered result image')
+      imageUrl: z
+        .string()
+        .describe(
+          'Provider image endpoint without credentials; use the downloadable image to view or share it'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -54,11 +61,17 @@ Useful for embedding visual results or sharing computed answers as images. Suppo
       timeout: ctx.input.timeout
     });
 
+    await ctx.addAttachment({
+      type: 'url',
+      url: imageUrl,
+      query: { appid: ctx.auth.token }
+    });
+
     return {
       output: {
         imageUrl
       },
-      message: `Generated image result: [View Image](${imageUrl})`
+      message: 'Prepared the computed image for download.'
     };
   })
   .build();

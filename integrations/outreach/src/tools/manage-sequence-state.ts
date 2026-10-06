@@ -1,11 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import {
   buildRelationship,
   cleanAttributes,
   flattenResource,
-  mergeRelationships
+  mergeRelationships,
+  validateInput
 } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -14,9 +15,9 @@ export let manageSequenceState = SlateTool.create(spec, {
   key: 'manage_sequence_state',
   description: `Add a prospect to a sequence, or update/manage their enrollment state.
 A sequence state represents a prospect's position and status within a sequence.
-Use the **create** action to enroll a prospect in a sequence, or **update** to pause/resume enrollment.`,
+Creating enrollment starts automation immediately. Update pauses, resumes or finishes enrollment through its supported lifecycle actions.`,
   instructions: [
-    'To add a prospect to a sequence, use action "create" and provide both prospectId and sequenceId.',
+    'To add a prospect to a sequence, use action "create" and provide prospectId, sequenceId and mailboxId. Automation starts immediately; confirm the recipient, mailbox and sequence effects before creating enrollment.',
     'To pause or resume, use action "update" and set the state field accordingly.'
   ],
   tags: {
@@ -37,7 +38,9 @@ Use the **create** action to enroll a prospect in a sequence, or **update** to p
       state: z
         .enum(['active', 'paused', 'finished', 'disabled'])
         .optional()
-        .describe('Enrollment state')
+        .describe(
+          'Update requests active (resume), paused (pause) or finished (finish). Deprecated disabled is provider-managed and cannot be requested. Create accepts only active or omission.'
+        )
     })
   )
   .output(
@@ -51,11 +54,18 @@ Use the **create** action to enroll a prospect in a sequence, or **update** to p
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
+      if (ctx.input.state !== undefined && ctx.input.state !== 'active')
+        throw createApiServiceError(
+          'Enrollment begins automation immediately; create cannot request a paused, finished or disabled initial state.'
+        );
+      if (!ctx.input.mailboxId)
+        throw createApiServiceError('mailboxId is required for enrollment.');
       if (!ctx.input.prospectId || !ctx.input.sequenceId) {
-        throw new Error('prospectId and sequenceId are required for create');
+        throw createApiServiceError('prospectId and sequenceId are required for create');
       }
 
       let relationships =
@@ -65,6 +75,14 @@ Use the **create** action to enroll a prospect in a sequence, or **update** to p
           buildRelationship('mailbox', ctx.input.mailboxId)
         ) ?? {};
 
+      const steps = await client.listSequenceSteps({
+        'filter[sequence][id]': ctx.input.sequenceId,
+        'page[limit]': '1'
+      });
+      if (!steps.records.length)
+        throw createApiServiceError(
+          'The sequence has no steps. Configure the intended sequence before starting enrollment.'
+        );
       let resource = await client.createSequenceState({}, relationships);
       let flat = flattenResource(resource);
       return {
@@ -76,11 +94,20 @@ Use the **create** action to enroll a prospect in a sequence, or **update** to p
           createdAt: flat.createdAt,
           updatedAt: flat.updatedAt
         },
-        message: `Prospect enrolled in sequence. Sequence state ID: ${flat.id}, state: ${flat.state}.`
+        message: `Prospect enrolled in sequence. Sequence state ID: ${flat.id}, state: ${flat.state ?? 'not returned'}.`
       };
     }
 
-    if (!ctx.input.sequenceStateId) throw new Error('sequenceStateId is required for update');
+    if (!ctx.input.sequenceStateId)
+      throw createApiServiceError('sequenceStateId is required for update');
+    if (
+      ctx.input.prospectId !== undefined ||
+      ctx.input.sequenceId !== undefined ||
+      ctx.input.mailboxId !== undefined
+    )
+      throw createApiServiceError(
+        'Enrollment relationships cannot be changed. Use these fields only when creating enrollment.'
+      );
     let attributes = cleanAttributes({
       state: ctx.input.state
     });
@@ -96,7 +123,7 @@ Use the **create** action to enroll a prospect in a sequence, or **update** to p
         createdAt: flat.createdAt,
         updatedAt: flat.updatedAt
       },
-      message: `Sequence state **${flat.id}** updated to **${flat.state}**.`
+      message: `Sequence state **${flat.id}** updated to **${flat.state ?? 'not returned'}**.`
     };
   })
   .build();

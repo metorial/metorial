@@ -1,61 +1,51 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
-import { getBaseUrl } from '../lib/helpers';
+import { invokeGusto } from '../lib/actions';
+import { companyIdSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
+
+const outputSchema = z.object({
+  pagination: paginationSchema.optional(),
+  accepted: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe(
+      'Whether Gusto accepted an asynchronous request, without confirming completion.'
+    ),
+  operation: z.enum(['calculate', 'submit']).optional(),
+  payrollId: z.string().describe('UUID of the payroll'),
+  processingStatus: z.string().nullable().optional().describe('Updated processing status'),
+  checkDate: z.string().nullable().optional().describe('Date employees are paid'),
+  totals: z.any().optional().describe('Payroll totals after calculation')
+});
 
 export let processPayroll = SlateTool.create(spec, {
   name: 'Process Payroll',
   key: 'process_payroll',
-  description: `Calculate or submit a payroll for processing. Use **calculate** to compute gross-to-net calculations for a payroll. Use **submit** to finalize and submit the payroll for processing (irreversible). Payrolls must be calculated before they can be submitted.`,
+  description:
+    'Request asynchronous payroll calculation or submission for an approved Embedded Payroll company. Gusto app integrations cannot run payroll. A successful response confirms acceptance; use get_payroll to verify the eventual processing outcome.',
   instructions: [
-    'A payroll must be in "unprocessed" status to calculate.',
-    'A payroll must be in "calculated" status to submit.',
-    'Submitting a payroll is irreversible — ensure calculations are reviewed first.'
+    'Call get_current_context to identify the authorized company and granted scopes.',
+    'Read and review the unprocessed payroll before submitting it.',
+    'Calculation and submission are asynchronous. Do not retry an ambiguous request until its outcome is checked in Gusto.'
   ],
-  constraints: ['Payroll submission is a destructive operation that cannot be undone.'],
+  constraints: [
+    'Payroll submission initiates payroll processing and may schedule money movement.'
+  ],
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      companyId: z.string().describe('The UUID of the company'),
+      companyId: companyIdSchema,
       payrollId: z.string().describe('The UUID of the payroll'),
       action: z
         .enum(['calculate', 'submit'])
         .describe('Whether to calculate or submit the payroll')
     })
   )
-  .output(
-    z.object({
-      payrollId: z.string().describe('UUID of the payroll'),
-      processingStatus: z.string().optional().describe('Updated processing status'),
-      checkDate: z.string().optional().describe('Date employees are paid'),
-      totals: z.any().optional().describe('Payroll totals after calculation')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      baseUrl: getBaseUrl(ctx.auth.environment)
-    });
-
-    let result: any;
-    if (ctx.input.action === 'calculate') {
-      result = await client.calculatePayroll(ctx.input.companyId, ctx.input.payrollId);
-    } else {
-      result = await client.submitPayroll(ctx.input.companyId, ctx.input.payrollId);
-    }
-
-    return {
-      output: {
-        payrollId: result.payroll_uuid || result.uuid || result.id?.toString(),
-        processingStatus: result.processing_status,
-        checkDate: result.check_date,
-        totals: result.totals
-      },
-      message: `Payroll ${ctx.input.payrollId} has been **${ctx.input.action === 'calculate' ? 'calculated' : 'submitted'}** (status: ${result.processing_status || 'pending'}).`
-    };
-  })
+  .output(outputSchema)
+  .handleInvocation(ctx => invokeGusto('process_payroll', ctx.input, ctx.auth, outputSchema))
   .build();

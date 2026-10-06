@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createProject = SlateTool.create(spec, {
   name: 'Create Project',
   key: 'create_project',
-  description: `Create a new annotation project in Scale AI. A project is tied to one specific task type and use case. You can configure default parameters, instructions, and ontology settings that apply to all tasks created under the project.`,
+  description: `Create a new annotation project in Scale AI. A project is tied to one specific task type and use case. You can configure default task parameters and instructions.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -32,6 +32,8 @@ export let createProject = SlateTool.create(spec, {
         .describe('Pipeline type (Studio projects only)'),
       consensusAttempts: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Number of consensus attempts (Studio consensus projects only)')
     })
@@ -46,6 +48,20 @@ export let createProject = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.rapid && ctx.input.studio) {
+      throw createApiServiceError('Choose either a Rapid or Studio project, not both.');
+    }
+    if (
+      (ctx.input.pipeline || ctx.input.consensusAttempts !== undefined) &&
+      !ctx.input.studio
+    ) {
+      throw createApiServiceError(
+        'pipeline and consensusAttempts are available only for Studio projects.'
+      );
+    }
+    if (ctx.input.consensusAttempts !== undefined && ctx.input.pipeline !== 'consensus_task') {
+      throw createApiServiceError('consensusAttempts requires pipeline consensus_task.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.createProject({

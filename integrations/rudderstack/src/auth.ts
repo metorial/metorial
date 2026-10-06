@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -8,6 +8,12 @@ export let auth = SlateAuth.create()
         .string()
         .describe(
           'Service Access Token (SAT) or Personal Access Token (PAT) for Control Plane and Management APIs.'
+        ),
+      organizationAccessToken: z
+        .string()
+        .optional()
+        .describe(
+          'Optional organization-level Service Access Token with Admin permissions for Enterprise audit logs; other tools use the workspace token.'
         ),
       sourceWriteKey: z
         .string()
@@ -22,6 +28,12 @@ export let auth = SlateAuth.create()
     name: 'Access Token',
     key: 'access_token',
     inputSchema: z.object({
+      organizationAccessToken: z
+        .string()
+        .optional()
+        .describe(
+          'Optional organization-level Service Access Token with Admin permissions for Enterprise audit logs.'
+        ),
       serviceAccessToken: z
         .string()
         .describe(
@@ -35,9 +47,20 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.serviceAccessToken.trim() || /[\r\n]/.test(ctx.input.serviceAccessToken))
+        throw createApiServiceError(
+          'Provide a valid workspace Service Access Token or Personal Access Token.'
+        );
+      if (
+        ctx.input.organizationAccessToken !== undefined &&
+        (!ctx.input.organizationAccessToken.trim() ||
+          /[\r\n]/.test(ctx.input.organizationAccessToken))
+      )
+        throw createApiServiceError('Provide a valid organization access token.');
       return {
         output: {
           token: ctx.input.serviceAccessToken,
+          organizationAccessToken: ctx.input.organizationAccessToken,
           sourceWriteKey: ctx.input.sourceWriteKey
         }
       };

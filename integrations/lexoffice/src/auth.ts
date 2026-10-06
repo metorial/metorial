@@ -1,6 +1,55 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createAuthenticatedAxios, normalizeOAuthTokenResponse, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { apiError, fail, required } from './lib/validation';
 
+// Partner endpoint URLs are inherited; public API docs do not publish the partner OAuth contract.
+const tokenUrl = 'https://app.lexoffice.de/oauth2/token';
+type ProfileContext = { output: { token: string } };
+type RefreshContext = ProfileContext & {
+  clientId: string;
+  clientSecret: string;
+  output: { token: string; refreshToken?: string };
+};
+const normalize = (data: unknown, previousRefreshToken?: string) => {
+  const parsed = z
+    .object({
+      access_token: z.string().min(1),
+      refresh_token: z.string().min(1).nullish(),
+      expires_in: z.union([z.number(), z.string()]).nullish()
+    })
+    .safeParse(data);
+  if (!parsed.success || !parsed.data.access_token.trim())
+    fail('Lexoffice returned an invalid OAuth token response.');
+  const expiry = parsed.data.expires_in;
+  if (
+    expiry !== undefined &&
+    expiry !== null &&
+    (!Number.isFinite(Number(expiry)) ||
+      Number(expiry) <= 0 ||
+      Date.now() + Number(expiry) * 1000 > 8640000000000000)
+  )
+    fail('Lexoffice returned an invalid OAuth expiry.');
+  return normalizeOAuthTokenResponse(parsed.data, {
+    providerLabel: 'Lexoffice',
+    previousRefreshToken
+  });
+};
+const tokenClient = (clientId: string, clientSecret: string) =>
+  createAuthenticatedAxios({
+    authHeader: {
+      value: `Basic ${Buffer.from(`${required(clientId, 'OAuth client ID')}:${required(clientSecret, 'OAuth client secret')}`).toString('base64')}`
+    },
+    contentType: 'application/x-www-form-urlencoded',
+    headers: { Accept: 'application/json' },
+    timeout: 30000,
+    maxRedirects: 0,
+    errorAdapter: apiError
+  });
+const profile = async (token: string) => {
+  const value = await new Client({ token }).getProfile();
+  return { profile: { id: value.organizationId, name: value.companyName } };
+};
 export let auth = SlateAuth.create()
   .output(
     z.object({
@@ -13,159 +62,51 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'OAuth 2.0 (Partner API)',
     key: 'oauth',
-
     scopes: [],
-
     getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
+      const params = new URLSearchParams({
         response_type: 'code',
-        client_id: ctx.clientId,
+        client_id: required(ctx.clientId, 'OAuth client ID'),
         redirect_uri: ctx.redirectUri,
         state: ctx.state
       });
-
-      return {
-        url: `https://app.lexoffice.de/oauth2/authorize?${params.toString()}`
-      };
+      return { url: `https://app.lexoffice.de/oauth2/authorize?${params.toString()}` };
     },
-
     handleCallback: async ctx => {
-      let http = createAxios();
-
-      let credentials = Buffer.from(`${ctx.clientId}:${ctx.clientSecret}`).toString('base64');
-
-      let response = await http.post(
-        'https://app.lexoffice.de/oauth2/token',
+      const response = await tokenClient(ctx.clientId, ctx.clientSecret).post<unknown>(
+        tokenUrl,
         new URLSearchParams({
           grant_type: 'authorization_code',
-          code: ctx.code,
+          code: required(ctx.code, 'Authorization code'),
           redirect_uri: ctx.redirectUri
-        }).toString(),
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Accept: 'application/json'
-          }
-        }
+        }).toString()
       );
-
-      let data = response.data;
-
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
+      return { output: normalize(response.data) };
     },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      let http = createAxios();
-
-      let credentials = Buffer.from(`${ctx.clientId}:${ctx.clientSecret}`).toString('base64');
-
-      let response = await http.post(
-        'https://app.lexoffice.de/oauth2/token',
+    handleTokenRefresh: async (ctx: RefreshContext) => {
+      const previous = required(ctx.output.refreshToken, 'Refresh token');
+      const response = await tokenClient(ctx.clientId, ctx.clientSecret).post<unknown>(
+        tokenUrl,
         new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken
-        }).toString(),
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Accept: 'application/json'
-          }
-        }
+          refresh_token: previous
+        }).toString()
       );
-
-      let data = response.data;
-
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt
-        }
-      };
+      return { output: normalize(response.data, previous) };
     },
-
-    getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://api.lexware.io/v1'
-      });
-
-      let response = await http.get('/profile', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          Accept: 'application/json'
-        }
-      });
-
-      let profile = response.data;
-
-      return {
-        profile: {
-          id: profile.organizationId,
-          name: profile.companyName ?? profile.businessName
-        }
-      };
-    }
+    getProfile: async (ctx: ProfileContext) => profile(ctx.output.token)
   })
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Key',
     key: 'api_key',
-
     inputSchema: z.object({
       apiKey: z
         .string()
         .describe(
-          'Your Lexoffice API key generated from https://app.lexware.de/addons/public-api'
+          'API key generated at https://app.lexware.de/addons/public-api with permissions for the tools you use'
         )
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.apiKey
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://api.lexware.io/v1'
-      });
-
-      let response = await http.get('/profile', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          Accept: 'application/json'
-        }
-      });
-
-      let profile = response.data;
-
-      return {
-        profile: {
-          id: profile.organizationId,
-          name: profile.companyName ?? profile.businessName
-        }
-      };
-    }
+    getOutput: async ctx => ({ output: { token: required(ctx.input.apiKey, 'API key') } }),
+    getProfile: async (ctx: ProfileContext) => profile(ctx.output.token)
   });

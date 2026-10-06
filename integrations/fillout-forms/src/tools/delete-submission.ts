@@ -13,13 +13,15 @@ export let deleteSubmission = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      formId: z.string().describe('Public identifier of the form'),
+      formId: z.string().describe('Form ID. Call list_forms to discover forms.'),
       submissionId: z.string().describe('Unique identifier of the submission to delete')
     })
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the deletion was successful')
+      success: z.boolean().describe('Whether Fillout accepted the exact deletion'),
+      formId: z.string(),
+      submissionId: z.string()
     })
   )
   .handleInvocation(async ctx => {
@@ -28,10 +30,10 @@ export let deleteSubmission = SlateTool.create(spec, {
       baseUrl: ctx.auth.baseUrl || ctx.config.baseUrl
     });
 
-    await client.deleteSubmission(ctx.input.formId, ctx.input.submissionId);
+    const result = await client.deleteSubmission(ctx.input.formId, ctx.input.submissionId);
 
     return {
-      output: { success: true },
+      output: result,
       message: `Deleted submission \`${ctx.input.submissionId}\` from form \`${ctx.input.formId}\`.`
     };
   })

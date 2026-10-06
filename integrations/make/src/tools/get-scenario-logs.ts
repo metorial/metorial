@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { MakeClient } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { paging } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getScenarioLogs = SlateTool.create(spec, {
@@ -24,41 +25,41 @@ export let getScenarioLogs = SlateTool.create(spec, {
         z.object({
           executionId: z.string().optional().describe('Execution ID'),
           timestamp: z.string().optional().describe('Execution timestamp'),
+          nativeStatus: z
+            .number()
+            .optional()
+            .describe('Native status code: 1 success, 2 warning, 3 error.'),
+          eventType: z.string().optional(),
+          resumeAt: z.string().optional(),
+          interruptReason: z.string().optional(),
           status: z.string().optional().describe('Execution status'),
           operations: z.number().optional().describe('Operations consumed'),
           duration: z.number().optional().describe('Duration in milliseconds'),
           transfer: z.number().optional().describe('Data transfer in bytes')
         })
       ),
+      page: paging.optional(),
       total: z.number().optional().describe('Total number of log entries')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MakeClient({
-      token: ctx.auth.token,
-      zoneUrl: ctx.config.zoneUrl
-    });
-
-    let result = await client.getScenarioLogs(ctx.input.scenarioId, {
-      limit: ctx.input.limit,
-      offset: ctx.input.offset
-    });
-
-    let logs = (result.scenarioLogs ?? result.logs ?? result ?? []).map((l: any) => ({
-      executionId: l.id ? String(l.id) : l.executionId,
-      timestamp: l.timestamp ?? l.created,
-      status: l.status,
+    const client = clientFor(ctx);
+    const result = await client.getScenarioLogs(ctx.input.scenarioId, ctx.input);
+    const logs = result.scenarioLogs.map(l => ({
+      executionId: l.id,
+      timestamp: l.timestamp,
+      status: l.status === undefined ? undefined : String(l.status),
+      nativeStatus: l.status,
       operations: l.operations,
       duration: l.duration,
-      transfer: l.transfer
+      transfer: l.transfer,
+      eventType: l.eventType,
+      resumeAt: l.resumeAt,
+      interruptReason: l.interruptReason
     }));
-
     return {
-      output: {
-        logs,
-        total: result.pg?.total
-      },
-      message: `Retrieved **${logs.length}** log entries for scenario ${ctx.input.scenarioId}.`
+      output: { logs, page: result.pg },
+      message: `Returned ${logs.length} native log events. Numeric status codes are preserved as strings; parked events can have no status.`
     };
   })
   .build();

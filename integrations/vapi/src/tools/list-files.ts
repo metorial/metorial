@@ -12,7 +12,14 @@ export let listFiles = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      purpose: z
+        .enum(['assistant', 'composer-attachment', 'knowledge-base-v2'])
+        .optional()
+        .describe('Filter files by their owning product flow')
+    })
+  )
   .output(
     z.object({
       files: z
@@ -38,8 +45,8 @@ export let listFiles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
-    let files = await client.listFiles();
+    let client = new Client(ctx.auth.token, ctx.auth.region);
+    let files = await client.listFiles(ctx.input);
 
     return {
       output: {

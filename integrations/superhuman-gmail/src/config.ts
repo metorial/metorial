@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .default('me')
       .describe(
-        'Gmail user ID. Use "me" for the authenticated user, or a mailbox email for delegated access.'
+        'Gmail user ID. Use "me" for the authenticated user, or a mailbox email only when the connection already has access.'
       )
   })
 );

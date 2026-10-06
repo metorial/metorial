@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SpotifyClient } from '../lib/client';
+import { paging, pagingOutputSchema } from '../lib/types';
 import { spec } from '../spec';
 
 export let getRecentlyPlayed = SlateTool.create(spec, {
@@ -31,6 +32,7 @@ export let getRecentlyPlayed = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      paging: pagingOutputSchema,
       recentTracks: z.array(
         z.object({
           playedAt: z.string(),
@@ -61,7 +63,10 @@ export let getRecentlyPlayed = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SpotifyClient({
       token: ctx.auth.token,
-      market: ctx.config.market
+      refreshToken: ctx.auth.refreshToken,
+      input: ctx.input,
+      market: ctx.config.market,
+      endpointCompatibility: ctx.config.endpointCompatibility
     });
 
     let result = await client.getRecentlyPlayed({
@@ -86,6 +91,7 @@ export let getRecentlyPlayed = SlateTool.create(spec, {
     return {
       output: {
         recentTracks,
+        paging: paging(result),
         cursors: {
           after: result.cursors?.after ?? null,
           before: result.cursors?.before ?? null

@@ -1,80 +1,22 @@
-Now I have comprehensive information. Let me compile the specification.
+# UptimeRobot capability specification
 
-# Slates Specification for Uptimerobot
+The integration supports two explicitly selected connection types: legacy v2 account API keys submitted in form bodies, and current v3 account tokens sent as Bearer authorization headers. Existing connections without a stored version continue to use v2. Account identity validates each connection; account-level read-only credentials support reads, and write access is required for mutations.
 
-## Overview
+| Workflow | Tools | API |
+| --- | --- | --- |
+| Identity and limits | `who_am_i` | v3 |
+| Monitor discovery and settings | `list_current_monitors`, `get_monitor`, `manage_monitor` | v3 |
+| Downtime investigation | `list_incidents` | v3 |
+| Existing monitor workflows | `list_monitors`, `create_monitor`, `update_monitor`, `delete_monitor` | v2 |
+| Account details | `get_account_details` | v2 |
+| Notification recipients | `list_alert_contacts`, `create_alert_contact`, `delete_alert_contact` | v2 |
+| Public status pages | `list_status_pages`, `create_status_page`, `delete_status_page` | v2 |
+| Maintenance scheduling | `list_maintenance_windows`, `create_maintenance_window`, `delete_maintenance_window` | v2 |
 
-UptimeRobot is a website monitoring service that tracks the uptime, downtime, and response times of websites, servers, and other internet services. It supports multiple monitor types (HTTP, keyword, ping, port, heartbeat, DNS) and provides public status pages, maintenance windows, alert contacts, and integrations with third-party services.
+All fourteen existing tool keys and field types remain available. The legacy SMS contact input remains accepted but returns a clear unsupported-operation error. Current create/update cover HTTP, keyword, ping, port, heartbeat and DNS types, with pause/start and permanent deletion. Changing monitor type is intentionally unsupported. Lists return the provider's actual pagination metadata; current cursors are extracted only from trusted provider pagination links.
 
-## Authentication
+Monitor outputs include monitoring state and settings, excluding credentials, request headers/bodies, API keys and heartbeat URLs. Credential-bearing alert-contact values are redacted, while email contacts retain their address. Status-page creation never silently includes all monitors. Errors preserve provider HTTP status, machine code and rate-limit/retry headers when available, without exposing request secrets. Mutations are never automatically retried.
 
-UptimeRobot supports two authentication methods depending on the API version:
+No triggers are registered. No bulk/reset operations, incident changes, external notification tests or broader administrative features are included.
 
-### API Key Authentication (v2)
-
-The API key is passed as a parameter (`api_key`) in the request body. There are three types of API keys:
-
-- **Account-specific API key:** Allows using all the API methods on all the monitors of an account.
-- **Monitor-specific API keys:** Allows using only the `getMonitors` method for the given monitor, useful for pulling data for a single monitor without revealing the main API key.
-- **Read-only API key:** Allows fetching data with all read-only API endpoints.
-
-### Bearer Token / JWT Authentication (v3)
-
-v3 supports bearer tokens (JWT) passed in the `Authorization` header, replacing the need to send API keys in request bodies.
-
-### How to obtain API keys
-
-Log in to the UptimeRobot dashboard and navigate to **Integrations & API** in the left sidebar. Choose **API** and create your main API keys or monitor-specific API keys.
-
-Base URL: `https://api.uptimerobot.com/v2/` (legacy) or the v3 REST endpoints.
-
-## Features
-
-### Monitor Management
-
-Create, retrieve, update, and delete monitors that check the availability and performance of your services. v3 supports standard REST operations on monitors (list, create, update, delete) using resource-oriented paths. Supported monitor types include:
-
-- **HTTP/HTTPS monitors:** Check website or endpoint availability via HTTP requests.
-- **Keyword monitors:** Check whether a specific keyword exists or is absent on a web page.
-- **Ping monitors:** Monitor server availability using ICMP ping.
-- **Port monitors:** Check if a specific port is open on a server.
-- **Heartbeat monitors:** Confirm that scheduled jobs or services are alive by expecting periodic pings from your application.
-- **DNS monitors:** Track DNS records and domain expiry dates.
-
-Monitors can be configured with custom timeouts, expected HTTP status codes, custom HTTP headers, SSL and domain expiry reminders, and tags.
-
-### Alert Contact Management
-
-Manage alert contacts that receive notifications when monitors change state (up/down). Alert contacts are whom to be notified when the monitor goes up/down. Contacts can be configured with threshold and recurrence settings to control how many minutes to wait before alerting and how often to repeat.
-
-### Integration Management
-
-The v3 API provides RESTful endpoints for managing integrations (`/integrations`). Programmatically set up notification integrations for services such as Slack, Microsoft Teams, Google Chat, Discord, Telegram, Pushover, Pushbullet, PagerDuty, Splunk, Mattermost, Zapier, and Webhooks.
-
-### Public Status Pages
-
-Create and manage public-facing status pages that display the uptime status of your monitors. The v3 API supports Public Status Pages via `/psps` endpoints. Status pages can be customized with light/dark themes, density settings, and incident history display options.
-
-### Maintenance Windows
-
-Create, edit, and delete maintenance windows to define scheduled downtime periods during which alerts are suppressed. Maintenance windows support explicit start/end times, recurrence rules, and assignment to specific monitors.
-
-### Account Information
-
-Retrieve the authenticated user's profile, subscription details, monitor limits, and list alert contacts directly via dedicated user endpoints.
-
-## Events
-
-UptimeRobot supports outbound webhooks for real-time event notifications.
-
-### Webhook Alert Contacts
-
-You can configure which monitor events (up, down, SSL, domain) fire off a webhook notification. Webhooks are set up as alert contacts and linked to specific monitors.
-
-- **Up/Down events:** Triggered when a monitor detects that a service has gone down or come back up.
-- **SSL events:** Triggered for SSL certificate-related alerts (e.g., upcoming expiry).
-- **Domain events:** Triggered for domain expiration-related alerts.
-
-You can choose to send default alert variables as a query string appended to your webhook URL, or as POST parameters. When POST is selected, you can also customize the POST values and choose how data is sent — as a query string, or POST/JSON — to match your app's setup.
-
-Available webhook payload variables include monitor name, monitor URL, monitor ID, alert type, alert details, and alert duration.
+Sources: [current API](https://uptimerobot.com/api/v3/), [official OpenAPI](https://cdn.uptimerobot.com/api/openapi.yaml), [legacy API](https://uptimerobot.com/api/legacy/).

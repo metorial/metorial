@@ -20,6 +20,10 @@ export let listGroups = SlateTool.create(spec, {
         .optional()
         .describe('Number of results per page (1-500)'),
       after: z.string().optional().describe('Pagination cursor for the next page'),
+      before: z
+        .string()
+        .optional()
+        .describe('Previous-page cursor; do not combine with after'),
       sortBy: z.enum(['CREATED_AT', 'NAME']).optional().describe('Field to sort by'),
       sortDirection: z.enum(['ASC', 'DESC']).optional().describe('Sort direction')
     })
@@ -33,25 +37,33 @@ export let listGroups = SlateTool.create(spec, {
           createdAt: z.string()
         })
       ),
+      returnedCount: z.number().optional(),
+      previousCursor: z.string().optional(),
       nextCursor: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = new Client({
+      token: ctx.auth.token,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl
+    });
 
     let result = await client.listGroups({
       limit: ctx.input.limit,
       after: ctx.input.after,
+      before: ctx.input.before,
       sortBy: ctx.input.sortBy,
       sortDirection: ctx.input.sortDirection
     });
 
-    let groups = result.values ?? [];
+    let groups = result.values;
 
     return {
       output: {
         groups,
-        nextCursor: result.pagination?.after
+        returnedCount: result.values.length,
+        previousCursor: result.pagination.before,
+        nextCursor: result.pagination.after
       },
       message: `Found **${groups.length}** group(s).${result.pagination?.after ? ' More results available.' : ''}`
     };

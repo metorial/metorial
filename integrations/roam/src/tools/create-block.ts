@@ -29,7 +29,10 @@ Blocks support Roam markup syntax including \`[[page references]]\`, \`#tags\`, 
           'Text content of the block. Supports Roam markup: [[page refs]], #tags, ((block refs)), **bold**, TODO/DONE, etc.'
         ),
       order: z
-        .union([z.number(), z.enum(['first', 'last'])])
+        .union([
+          z.number().nonnegative().max(Number.MAX_SAFE_INTEGER),
+          z.enum(['first', 'last'])
+        ])
         .default('last')
         .describe('Position among siblings: a number (0-based index), "first", or "last"'),
       blockUid: z.string().optional().describe('Optional custom UID for the block'),
@@ -37,7 +40,7 @@ Blocks support Roam markup syntax including \`[[page references]]\`, \`#tags\`, 
         .boolean()
         .optional()
         .describe('Whether the block is expanded (true) or collapsed (false)'),
-      heading: z.number().optional().describe('Heading level: 1, 2, or 3'),
+      heading: z.number().min(0).max(3).optional().describe('Heading level: 0, 1, 2, or 3'),
       textAlign: z
         .enum(['left', 'center', 'right', 'justify'])
         .optional()
@@ -50,6 +53,10 @@ Blocks support Roam markup syntax including \`[[page references]]\`, \`#tags\`, 
   )
   .output(
     z.object({
+      blockUid: z.string().describe('Exact target UID for independent reads and recovery'),
+      verified: z
+        .boolean()
+        .describe('Whether the requested outcome was confirmed by an exact read'),
       success: z.boolean().describe('Whether the block was created successfully')
     })
   )
@@ -75,8 +82,12 @@ Blocks support Roam markup syntax including \`[[page references]]\`, \`#tags\`, 
     );
 
     return {
-      output: { success: result.success },
-      message: `Block created under parent **${ctx.input.parentUid}** in graph **${ctx.config.graphName}**.`
+      output: {
+        success: result.success,
+        blockUid: result.targetUid,
+        verified: result.verified
+      },
+      message: 'Created the block and confirmed its exact UID and content.'
     };
   })
   .build();

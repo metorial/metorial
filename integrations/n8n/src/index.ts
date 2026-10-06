@@ -7,6 +7,7 @@ import {
   deleteCredential,
   deleteExecution,
   deleteWorkflow,
+  discoverApi,
   generateAudit,
   getCredentialSchema,
   getExecution,
@@ -25,11 +26,10 @@ import {
   transferResource,
   updateWorkflow
 } from './tools';
-import { executionCompleted, inboundWebhook, workflowChanges } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    discoverApi,
     listWorkflows,
     getWorkflow,
     createWorkflow,
@@ -54,5 +54,5 @@ export let provider = Slate.create({
     sourceControlPull,
     generateAudit
   ],
-  triggers: [inboundWebhook, workflowChanges, executionCompleted]
+  triggers: []
 });

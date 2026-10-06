@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { StudioClient } from '../lib/studio-client';
+import { fail, validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let flowSchema = z.object({
@@ -19,12 +20,18 @@ export let manageStudioFlowsTool = SlateTool.create(spec, {
   key: 'manage_studio_flows',
   description: `List, get, or trigger Studio Flow executions. Studio Flows are visual communication workflows for IVR, chatbot logic, and routing. Use this to view available flows, trigger outbound flow executions, or check execution history.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque continuation from nextPageToken; retain the same resource and filters.'
+        ),
       action: z
         .enum(['list', 'get', 'trigger', 'list_executions', 'get_execution'])
         .describe('Action to perform'),
@@ -53,6 +60,11 @@ export let manageStudioFlowsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Native continuation; omitted when this page is exhausted.'),
+      hasMore: z.boolean().optional().describe('Whether a next page is available.'),
       flows: z.array(flowSchema).optional().describe('Flow records'),
       executions: z
         .array(
@@ -70,7 +82,8 @@ export let manageStudioFlowsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new StudioClient(ctx.auth.token);
+    validateInput('manage_studio_flows', ctx.input);
+    let client = new StudioClient(ctx.auth.token, ctx.auth.accountSid, ctx.input.pageToken);
 
     if (ctx.input.action === 'list') {
       let result = await client.listFlows(ctx.input.pageSize);
@@ -78,20 +91,25 @@ export let manageStudioFlowsTool = SlateTool.create(spec, {
         flowSid: f.sid,
         friendlyName: f.friendly_name,
         status: f.status,
-        version: f.version,
+        version: f.version === undefined ? undefined : Number(f.version),
         revision: f.revision,
         commitMessage: f.commit_message,
         dateCreated: f.date_created,
         dateUpdated: f.date_updated
       }));
       return {
-        output: { flows, executions: [] },
+        output: {
+          flows,
+          executions: [],
+          nextPageToken: result.nextPageToken,
+          hasMore: result.hasMore
+        },
         message: `Found **${flows.length}** Studio flows.`
       };
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.flowSid) throw new Error('flowSid is required');
+      if (!ctx.input.flowSid) throw fail('flowSid is required');
       let f = await client.getFlow(ctx.input.flowSid);
       return {
         output: {
@@ -100,7 +118,7 @@ export let manageStudioFlowsTool = SlateTool.create(spec, {
               flowSid: f.sid,
               friendlyName: f.friendly_name,
               status: f.status,
-              version: f.version,
+              version: f.version === undefined ? undefined : Number(f.version),
               revision: f.revision,
               commitMessage: f.commit_message,
               dateCreated: f.date_created,
@@ -114,15 +132,15 @@ export let manageStudioFlowsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'trigger') {
-      if (!ctx.input.flowSid) throw new Error('flowSid is required');
-      if (!ctx.input.to) throw new Error('to is required');
-      if (!ctx.input.from) throw new Error('from is required');
+      if (!ctx.input.flowSid) throw fail('flowSid is required');
+      if (!ctx.input.to) throw fail('to is required');
+      if (!ctx.input.from) throw fail('from is required');
 
       let params: Record<string, string | undefined> = {
         To: ctx.input.to,
         From: ctx.input.from
       };
-      if (ctx.input.parameters) {
+      if (ctx.input.parameters !== undefined) {
         params.Parameters = JSON.stringify(ctx.input.parameters);
       }
       let result = await client.triggerFlowExecution(ctx.input.flowSid, params);
@@ -145,7 +163,7 @@ export let manageStudioFlowsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'list_executions') {
-      if (!ctx.input.flowSid) throw new Error('flowSid is required');
+      if (!ctx.input.flowSid) throw fail('flowSid is required');
       let result = await client.listExecutions(ctx.input.flowSid, ctx.input.pageSize);
       let executions = (result.executions || []).map((e: any) => ({
         executionSid: e.sid,
@@ -156,14 +174,19 @@ export let manageStudioFlowsTool = SlateTool.create(spec, {
         dateUpdated: e.date_updated
       }));
       return {
-        output: { flows: [], executions },
+        output: {
+          flows: [],
+          executions,
+          nextPageToken: result.nextPageToken,
+          hasMore: result.hasMore
+        },
         message: `Found **${executions.length}** executions for flow **${ctx.input.flowSid}**.`
       };
     }
 
     // get_execution
-    if (!ctx.input.flowSid) throw new Error('flowSid is required');
-    if (!ctx.input.executionSid) throw new Error('executionSid is required');
+    if (!ctx.input.flowSid) throw fail('flowSid is required');
+    if (!ctx.input.executionSid) throw fail('executionSid is required');
     let e = await client.getExecution(ctx.input.flowSid, ctx.input.executionSid);
     return {
       output: {

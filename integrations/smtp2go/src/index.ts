@@ -40,8 +40,6 @@ import {
   viewSuppressions,
   viewTemplate
 } from './tools';
-import { emailActivityTrigger, emailEventsTrigger, smsEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -84,5 +82,5 @@ export let provider = Slate.create({
     closeSubaccount,
     reopenSubaccount
   ],
-  triggers: [emailEventsTrigger, smsEventsTrigger, emailActivityTrigger]
+  triggers: []
 });

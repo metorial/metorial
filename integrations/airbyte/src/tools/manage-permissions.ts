@@ -61,6 +61,7 @@ export let listPermissionsTool = SlateTool.create(spec, {
 export let createPermissionTool = SlateTool.create(spec, {
   name: 'Create Permission',
   key: 'create_permission',
+  tags: { destructive: true },
   description: `Grant a permission to a user in Airbyte. Permissions are scoped to either a workspace or organization and define the user's role (admin, editor, reader, etc.).`
 })
   .input(
@@ -72,10 +73,12 @@ export let createPermissionTool = SlateTool.create(spec, {
           'organization_admin',
           'organization_editor',
           'organization_reader',
+          'organization_runner',
           'organization_member',
           'workspace_admin',
           'workspace_editor',
-          'workspace_reader'
+          'workspace_reader',
+          'workspace_runner'
         ])
         .describe('The permission role to grant.'),
       workspaceId: z

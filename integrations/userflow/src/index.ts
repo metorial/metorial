@@ -16,8 +16,6 @@ import {
   removeGroupMembership,
   trackEvent
 } from './tools';
-import { eventTracked, groupEvents, userEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     getContent,
     manageWebhookSubscription
   ],
-  triggers: [userEvents, groupEvents, eventTracked]
+  triggers: []
 });

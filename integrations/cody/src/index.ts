@@ -8,6 +8,7 @@ import {
   createFolder,
   deleteConversation,
   deleteDocument,
+  downloadDocument,
   getConversation,
   getDocument,
   getFolder,
@@ -24,8 +25,6 @@ import {
   updateFolder
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,6 +35,7 @@ export let provider = Slate.create({
     getFolder.build(),
     listDocuments.build(),
     getDocument.build(),
+    downloadDocument.build(),
     createDocumentFromContent.build(),
     createDocumentFromWebpage.build(),
     getUploadUrl.build(),
@@ -51,5 +51,5 @@ export let provider = Slate.create({
     listMessages.build(),
     getMessage.build()
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

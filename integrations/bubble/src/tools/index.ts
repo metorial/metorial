@@ -1,6 +1,7 @@
 export * from './bulk-create-records';
 export * from './create-record';
 export * from './delete-record';
+export * from './export-records';
 export * from './get-api-spec';
 export * from './get-record';
 export * from './replace-record';

@@ -14,8 +14,6 @@ import {
   searchCollection
 } from './tools';
 
-import { inboundWebhook } from './triggers/inbound-webhook';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -31,5 +29,5 @@ export let provider = Slate.create({
     getFileDownloadUrl,
     listConnectors
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

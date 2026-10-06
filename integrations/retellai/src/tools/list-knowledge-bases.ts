@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RetellClient } from '../lib/client';
 import { spec } from '../spec';
@@ -108,6 +108,62 @@ export let deleteKnowledgeBase = SlateTool.create(spec, {
     return {
       output: { success: true },
       message: `Deleted knowledge base **${ctx.input.knowledgeBaseId}**.`
+    };
+  })
+  .build();
+
+export let createKnowledgeBase = SlateTool.create(spec, {
+  name: 'Create Knowledge Base',
+  key: 'create_knowledge_base',
+  description:
+    'Create a knowledge base from text and public URLs for an agent response engine. Indexing is asynchronous; use get_knowledge_base to check status.'
+})
+  .input(
+    z.object({
+      name: z
+        .string()
+        .min(1)
+        .max(39)
+        .describe('Knowledge base name, fewer than 40 characters'),
+      texts: z
+        .array(z.object({ title: z.string().min(1), text: z.string().min(1) }))
+        .optional()
+        .describe('Named text sources'),
+      urls: z.array(z.string().url()).optional().describe('Public URLs to scrape'),
+      enableAutoRefresh: z.boolean().optional().describe('Refresh URL sources daily'),
+      maxChunkSize: z.number().int().min(600).max(6000).optional(),
+      minChunkSize: z.number().int().min(200).max(2000).optional()
+    })
+  )
+  .output(knowledgeBaseSchema)
+  .handleInvocation(async ctx => {
+    if (!ctx.input.texts?.length && !ctx.input.urls?.length)
+      throw createApiServiceError('Provide at least one text or URL source.');
+    if ((ctx.input.minChunkSize ?? 400) >= (ctx.input.maxChunkSize ?? 2000))
+      throw createApiServiceError('minChunkSize must be smaller than maxChunkSize.');
+    let form = new FormData();
+    form.append('knowledge_base_name', ctx.input.name);
+    if (ctx.input.texts?.length)
+      form.append('knowledge_base_texts', JSON.stringify(ctx.input.texts));
+    if (ctx.input.urls?.length)
+      form.append('knowledge_base_urls', JSON.stringify(ctx.input.urls));
+    if (ctx.input.enableAutoRefresh !== undefined)
+      form.append('enable_auto_refresh', String(ctx.input.enableAutoRefresh));
+    if (ctx.input.maxChunkSize !== undefined)
+      form.append('max_chunk_size', String(ctx.input.maxChunkSize));
+    if (ctx.input.minChunkSize !== undefined)
+      form.append('min_chunk_size', String(ctx.input.minChunkSize));
+    let kb = await new RetellClient(ctx.auth.token).createKnowledgeBase(form);
+    return {
+      output: {
+        knowledgeBaseId: kb.knowledge_base_id,
+        knowledgeBaseName: kb.knowledge_base_name,
+        status: kb.status,
+        enableAutoRefresh: kb.enable_auto_refresh,
+        sources: kb.knowledge_base_sources,
+        lastRefreshedTimestamp: kb.last_refreshed_timestamp
+      },
+      message: `Created knowledge base **${kb.knowledge_base_name}** (${kb.status}).`
     };
   })
   .build();

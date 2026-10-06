@@ -1,12 +1,8 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
+import { Client } from './lib/client';
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+  .output(z.object({ token: z.string() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Access Token',
@@ -14,35 +10,16 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .min(1)
         .describe(
-          'Buildkite API access token. Create one from your Personal Settings > API Access Tokens page.'
+          'Buildkite API access token from Personal Settings > API Access Tokens. Include read_user for identity and the scopes needed by your operations.'
         )
     }),
-    getOutput: async ctx => {
+    getOutput: async ctx => ({ output: { token: ctx.input.token } }),
+    getProfile: async (ctx: { output: { token: string } }) => {
+      const user = await new Client({ token: ctx.output.token }).getCurrentUser();
       return {
-        output: {
-          token: ctx.input.token
-        }
-      };
-    },
-    getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://api.buildkite.com/v2',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await http.get('/user');
-      let user = response.data;
-
-      return {
-        profile: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          imageUrl: user.avatar_url
-        }
+        profile: { id: user.id, name: user.name, email: user.email, imageUrl: user.avatar_url }
       };
     }
   });

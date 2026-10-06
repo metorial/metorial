@@ -16,8 +16,6 @@ import {
   updateNotebookTool,
   updateNoteTool
 } from './tools';
-import { noteChangesTrigger, noteUpdatesPollTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     manageTagTool,
     copyNoteTool
   ],
-  triggers: [noteChangesTrigger, noteUpdatesPollTrigger]
+  triggers: []
 });

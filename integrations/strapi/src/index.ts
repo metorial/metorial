@@ -4,7 +4,10 @@ import {
   createEntry,
   deleteEntry,
   deleteMedia,
+  downloadMedia,
+  getCurrentUser,
   getEntry,
+  getFileUrl,
   getMedia,
   getSingleType,
   listEntries,
@@ -14,8 +17,6 @@ import {
   updateSingleType,
   uploadMedia
 } from './tools';
-import { entryEvents, mediaEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -30,7 +31,10 @@ export let provider = Slate.create({
     getMedia,
     uploadMedia,
     updateMedia,
-    deleteMedia
+    deleteMedia,
+    getCurrentUser,
+    downloadMedia,
+    getFileUrl
   ],
-  triggers: [entryEvents, mediaEvents]
+  triggers: []
 });

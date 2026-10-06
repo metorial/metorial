@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient, type Rule } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageNotificationRules = SlateTool.create(spec, {
@@ -15,19 +15,25 @@ Each rule defines which events trigger a notification, with optional filters and
     'Use action "delete" with channel and ruleId to delete a rule.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
-      action: z.enum(['list', 'create', 'update', 'delete']).describe('Operation to perform'),
+      projectId: z
+        .number()
+        .optional()
+        .describe('Project ID from manage_project; required with an account token.'),
+      action: z
+        .enum(['list', 'get', 'create', 'update', 'delete'])
+        .describe('Operation to perform'),
       channel: z
         .enum(['webhook', 'slack', 'pagerduty', 'email'])
         .describe('Notification channel'),
       ruleId: z
         .number()
         .optional()
-        .describe('Rule ID (required for "update" and "delete" actions)'),
+        .describe('Rule ID (required for "get", "update" and "delete" actions)'),
       ruleConfig: z
         .record(z.string(), z.any())
         .optional()
@@ -62,12 +68,12 @@ Each rule defines which events trigger a notification, with optional filters and
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx);
 
-    let mapRule = (r: any) => ({
+    let mapRule = (r: Rule) => ({
       ruleId: r.id,
       trigger: r.trigger,
-      enabled: r.enabled,
+      enabled: r.status === undefined ? r.enabled : r.status === 'enabled',
       config: r
     });
 
@@ -80,8 +86,18 @@ Each rule defines which events trigger a notification, with optional filters and
       };
     }
 
+    if (ctx.input.action === 'get') {
+      if (ctx.input.ruleId === undefined)
+        throw createApiServiceError('ruleId is required for "get".');
+      const rule = mapRule(
+        (await client.getNotificationRule(ctx.input.channel, ctx.input.ruleId)).result
+      );
+      return { output: { rule }, message: `Retrieved notification rule ${rule.ruleId}.` };
+    }
+
     if (ctx.input.action === 'create') {
-      if (!ctx.input.ruleConfig) throw new Error('ruleConfig is required for "create" action');
+      if (!ctx.input.ruleConfig)
+        throw createApiServiceError('ruleConfig is required for "create" action');
       let result = await client.createNotificationRule(
         ctx.input.channel,
         ctx.input.ruleConfig
@@ -94,8 +110,10 @@ Each rule defines which events trigger a notification, with optional filters and
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.ruleId) throw new Error('ruleId is required for "update" action');
-      if (!ctx.input.ruleConfig) throw new Error('ruleConfig is required for "update" action');
+      if (!ctx.input.ruleId)
+        throw createApiServiceError('ruleId is required for "update" action');
+      if (!ctx.input.ruleConfig)
+        throw createApiServiceError('ruleConfig is required for "update" action');
       let result = await client.updateNotificationRule(
         ctx.input.channel,
         ctx.input.ruleId,
@@ -109,7 +127,8 @@ Each rule defines which events trigger a notification, with optional filters and
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.ruleId) throw new Error('ruleId is required for "delete" action');
+      if (!ctx.input.ruleId)
+        throw createApiServiceError('ruleId is required for "delete" action');
       await client.deleteNotificationRule(ctx.input.channel, ctx.input.ruleId);
       return {
         output: { deleted: true },
@@ -117,6 +136,6 @@ Each rule defines which events trigger a notification, with optional filters and
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

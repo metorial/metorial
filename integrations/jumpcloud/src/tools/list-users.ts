@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { orgIdInput, upstream } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listUsers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      orgId: orgIdInput,
       limit: z
         .number()
         .min(1)
@@ -67,42 +69,42 @@ export let listUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      orgId: ctx.config.orgId
-    });
+    const client = clientFor(ctx);
+    try {
+      let result = await client.listUsers({
+        limit: ctx.input.limit,
+        skip: ctx.input.skip,
+        filter: ctx.input.filter,
+        fields: ctx.input.fields,
+        sort: ctx.input.sort
+      });
 
-    let result = await client.listUsers({
-      limit: ctx.input.limit,
-      skip: ctx.input.skip,
-      filter: ctx.input.filter,
-      fields: ctx.input.fields,
-      sort: ctx.input.sort
-    });
+      let users = result.results.map(u => ({
+        userId: u._id,
+        username: u.username,
+        email: u.email,
+        firstname: u.firstname,
+        lastname: u.lastname,
+        displayname: u.displayname,
+        state: u.state,
+        activated: u.activated,
+        company: u.company,
+        department: u.department,
+        jobTitle: u.jobTitle,
+        employeeIdentifier: u.employeeIdentifier,
+        created: u.created,
+        suspended: u.suspended
+      }));
 
-    let users = result.results.map(u => ({
-      userId: u._id,
-      username: u.username,
-      email: u.email,
-      firstname: u.firstname,
-      lastname: u.lastname,
-      displayname: u.displayname,
-      state: u.state,
-      activated: u.activated,
-      company: u.company,
-      department: u.department,
-      jobTitle: u.jobTitle,
-      employeeIdentifier: u.employeeIdentifier,
-      created: u.created,
-      suspended: u.suspended
-    }));
-
-    return {
-      output: {
-        users,
-        totalCount: result.totalCount
-      },
-      message: `Found **${result.totalCount}** users. Returned **${users.length}** users${ctx.input.skip ? ` (skipped ${ctx.input.skip})` : ''}.`
-    };
+      return {
+        output: {
+          users,
+          totalCount: result.totalCount
+        },
+        message: `Found **${result.totalCount}** users. Returned **${users.length}** users${ctx.input.skip ? ` (skipped ${ctx.input.skip})` : ''}.`
+      };
+    } catch (error) {
+      throw upstream(error, client.didWrite);
+    }
   })
   .build();

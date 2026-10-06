@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { listIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listContacts = SlateTool.create(spec, {
@@ -13,7 +14,14 @@ export let listContacts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      listId: z.string().describe('ID of the list to retrieve contacts from'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum results per page, 1–100'),
+      listId: listIdSchema,
       status: z
         .enum(['SUBSCRIBED', 'UNSUBSCRIBED', 'PENDING'])
         .optional()
@@ -22,19 +30,19 @@ export let listContacts = SlateTool.create(spec, {
       createdBefore: z
         .string()
         .optional()
-        .describe('Filter contacts created before this ISO 8601 date'),
+        .describe('Filter contacts created on or before this ISO 8601 date'),
       createdAfter: z
         .string()
         .optional()
-        .describe('Filter contacts created after this ISO 8601 date'),
+        .describe('Filter contacts created on or after this ISO 8601 date'),
       updatedBefore: z
         .string()
         .optional()
-        .describe('Filter contacts updated before this ISO 8601 date'),
+        .describe('Filter contacts updated on or before this ISO 8601 date'),
       updatedAfter: z
         .string()
         .optional()
-        .describe('Filter contacts updated after this ISO 8601 date'),
+        .describe('Filter contacts updated on or after this ISO 8601 date'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )
@@ -44,7 +52,13 @@ export let listContacts = SlateTool.create(spec, {
         z.object({
           contactId: z.string().describe('Unique identifier of the contact'),
           emailAddress: z.string().describe('Email address of the contact'),
-          fields: z.record(z.string(), z.string()).describe('Custom field values'),
+          fields: z
+            .record(z.string(), z.string())
+            .describe('Custom field values as text; null is an empty string'),
+          fieldValues: z
+            .record(z.string(), z.union([z.string(), z.number(), z.null()]))
+            .optional()
+            .describe('Original typed custom field values'),
           tags: z.array(z.string()).describe('Tags assigned to the contact'),
           status: z.string().describe('Subscription status'),
           createdAt: z.string().describe('ISO 8601 creation timestamp'),
@@ -66,7 +80,8 @@ export let listContacts = SlateTool.create(spec, {
       createdAfter: ctx.input.createdAfter,
       updatedBefore: ctx.input.updatedBefore,
       updatedAfter: ctx.input.updatedAfter,
-      startingAfter: ctx.input.startingAfter
+      startingAfter: ctx.input.startingAfter,
+      limit: ctx.input.limit
     });
 
     return {

@@ -18,8 +18,6 @@ import {
   updateOrder,
   updateProduct
 } from './tools';
-import { inboundWebhook, newOrder, newProduct } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +38,5 @@ export let provider = Slate.create({
     listFields,
     createField
   ],
-  triggers: [inboundWebhook, newProduct, newOrder]
+  triggers: []
 });

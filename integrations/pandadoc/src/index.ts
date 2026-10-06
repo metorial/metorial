@@ -29,8 +29,6 @@ import {
   updateDocument,
   updateRecipient
 } from './tools';
-import { documentEvents, templateEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,5 +60,5 @@ export let provider = Slate.create({
     createDocumentFolder,
     renameDocumentFolder
   ],
-  triggers: [documentEvents, templateEvents]
+  triggers: []
 });

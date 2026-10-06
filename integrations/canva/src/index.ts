@@ -9,6 +9,8 @@ import {
   deleteFolder,
   exportDesign,
   getAsset,
+  getAssetUploadJob,
+  getAutofillJob,
   getBrandTemplate,
   getCommentThread,
   getDesign,
@@ -25,8 +27,6 @@ import {
   updateFolder,
   uploadAsset
 } from './tools';
-import { designNotification } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -35,6 +35,8 @@ export let provider = Slate.create({
     updateAsset,
     deleteAsset,
     uploadAsset,
+    getAssetUploadJob,
+    getAutofillJob,
     listDesigns,
     getDesign,
     createDesign,
@@ -54,5 +56,5 @@ export let provider = Slate.create({
     getBrandTemplate,
     autofillBrandTemplate
   ],
-  triggers: [designNotification]
+  triggers: []
 });

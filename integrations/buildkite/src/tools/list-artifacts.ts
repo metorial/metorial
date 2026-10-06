@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { organizationInput, paginationOutput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let artifactSchema = z.object({
@@ -24,7 +25,8 @@ export let listArtifacts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pipelineSlug: z.string().describe('Slug of the pipeline'),
+      ...organizationInput,
+      pipelineSlug: z.string().describe('Pipeline slug from list_pipelines'),
       buildNumber: z.number().describe('Build number'),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
       perPage: z.number().optional().describe('Number of results per page (max 100)')
@@ -32,21 +34,19 @@ export let listArtifacts = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      ...paginationOutput,
       artifacts: z.array(artifactSchema)
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    let client = createClient(ctx);
 
     let artifacts = await client.listArtifacts(ctx.input.pipelineSlug, ctx.input.buildNumber, {
       page: ctx.input.page,
       perPage: ctx.input.perPage
     });
 
-    let mapped = artifacts.map((a: any) => ({
+    let mapped = artifacts.map(a => ({
       artifactId: a.id,
       jobId: a.job_id,
       filename: a.filename,
@@ -58,7 +58,7 @@ export let listArtifacts = SlateTool.create(spec, {
     }));
 
     return {
-      output: { artifacts: mapped },
+      output: { artifacts: mapped, ...client.pagination },
       message: `Found **${mapped.length}** artifact(s) for build #${ctx.input.buildNumber}.`
     };
   });

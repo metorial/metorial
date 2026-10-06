@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, invalid, positiveIds, range } from '../lib/client';
+import { customerIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getMessages = SlateTool.create(spec, {
@@ -8,13 +9,13 @@ export let getMessages = SlateTool.create(spec, {
   key: 'get_messages',
   description: `Retrieve messages published by or received by owned profiles in Sprout Social. Includes posts, comments, direct messages, mentions, reviews, and replies across all connected social networks. Messages include Sprout actions taken (reply, tag, complete, like) and associated case IDs.`,
   instructions: [
-    'The group_id filter is required. Get group IDs from the Get Metadata tool.',
+    'Provide groupId from get_metadata, or select messageId alone without other filters.',
     'Filter format examples: "group_id.eq(12345)", "customer_profile_id.eq(1234, 5678)", "created_time.in(2024-01-01..2024-02-01)", "post_type.eq(TWEET, FACEBOOK_POST)".',
     'Available fields: "network", "created_time", "post_category", "post_type", "perma_link", "text", "from", "profile_guid", "internal.tags.id", "internal.sent_by.id".',
     'Use pageCursor from previous responses to paginate through results.'
   ],
   constraints: [
-    'Only text-based direct messages are retrievable; DMs with images or videos are not supported.'
+    'Direct-message text and metadata are retrievable, but media URLs for direct-message images/videos are nonfunctional.'
   ],
   tags: {
     readOnly: true
@@ -22,7 +23,11 @@ export let getMessages = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      groupId: z.number().describe('Group ID to retrieve messages for (required).'),
+      customerId: customerIdSchema,
+      groupId: z
+        .number()
+        .optional()
+        .describe('Group ID from get_metadata. Required unless selecting messageId alone.'),
       profileIds: z
         .array(z.number())
         .optional()
@@ -46,7 +51,7 @@ export let getMessages = SlateTool.create(spec, {
       fields: z.array(z.string()).optional().describe('Fields to return in the response.'),
       sort: z.array(z.string()).optional().describe('Sort order (e.g., "created_time:desc").'),
       timezone: z.string().optional().describe('IANA timezone (e.g., "America/Chicago").'),
-      limit: z.number().optional().describe('Number of results per page (max 50).'),
+      limit: z.number().optional().describe('Number of results per page (1–100; default 50).'),
       pageCursor: z
         .string()
         .optional()
@@ -65,14 +70,34 @@ export let getMessages = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      customerId: ctx.config.customerId
+      customerId: ctx.input.customerId ?? ctx.config.customerId
     });
 
     let filters: string[] = [];
 
-    if (ctx.input.messageId) {
+    if (ctx.input.messageId !== undefined) {
+      if (
+        !/^[A-Za-z0-9:_-]+$/.test(ctx.input.messageId) ||
+        [
+          ctx.input.profileIds,
+          ctx.input.startTime,
+          ctx.input.endTime,
+          ctx.input.postTypes,
+          ctx.input.tagIds
+        ].some(value => value !== undefined)
+      )
+        throw invalid('Use a nonempty messageId without other message filters.');
       filters.push(`message_id.eq(${ctx.input.messageId})`);
     } else {
+      if (ctx.input.groupId === undefined)
+        throw invalid('Provide groupId from get_metadata, or select messageId alone.');
+      positiveIds([ctx.input.groupId], 'groupId');
+      if (ctx.input.profileIds !== undefined) positiveIds(ctx.input.profileIds, 'profileIds');
+      if (ctx.input.tagIds !== undefined) positiveIds(ctx.input.tagIds, 'tagIds');
+      if ((ctx.input.startTime === undefined) !== (ctx.input.endTime === undefined))
+        throw invalid('Provide both startTime and endTime.');
+      if (ctx.input.startTime !== undefined && ctx.input.endTime !== undefined)
+        range(ctx.input.startTime, ctx.input.endTime);
       filters.push(`group_id.eq(${ctx.input.groupId})`);
       if (ctx.input.profileIds?.length) {
         filters.push(`customer_profile_id.eq(${ctx.input.profileIds.join(', ')})`);
@@ -97,11 +122,11 @@ export let getMessages = SlateTool.create(spec, {
       pageCursor: ctx.input.pageCursor
     });
 
-    let messages = result?.data ?? [];
-    let pageCursor = result?.paging?.page_cursor;
+    let messages = result.data;
+    let pageCursor = result.paging?.next_cursor;
 
     return {
       output: { messages, pageCursor },
-      message: `Retrieved **${messages.length}** messages from group ${ctx.input.groupId}.${pageCursor ? ' More results available with pagination cursor.' : ''}`
+      message: `Retrieved **${messages.length}** messages.${pageCursor ? ' More results available with the returned cursor.' : ''}`
     };
   });

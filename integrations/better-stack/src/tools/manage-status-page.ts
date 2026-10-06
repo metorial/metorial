@@ -1,5 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import {
+  type ApiResource,
+  nextUrlSchema,
+  type ResourceResponse,
+  requireFields,
+  teamNameSchema
+} from '../lib/api';
 import { UptimeClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -11,6 +18,7 @@ let statusPageSchema = z.object({
   customDomain: z.string().nullable().describe('Custom domain for the status page'),
   timezone: z.string().nullable().describe('Timezone'),
   subscribable: z.boolean().nullable().describe('Whether users can subscribe to updates'),
+  published: z.boolean().optional().describe('Whether the status page is publicly published'),
   createdAt: z.string().nullable().describe('Creation timestamp'),
   updatedAt: z.string().nullable().describe('Last update timestamp')
 });
@@ -18,7 +26,8 @@ let statusPageSchema = z.object({
 export let manageStatusPage = SlateTool.create(spec, {
   name: 'Manage Status Page',
   key: 'manage_status_page',
-  description: `List, get, create, update, or delete public status pages. Status pages communicate system health to customers with ongoing incidents, planned maintenance, and service degradation information.`,
+  description: `List, get, create, update, or delete status pages. Pages communicate system health to customers. Creation can publish the page publicly; provide published false to keep it unpublished.`,
+  tags: { readOnly: false, destructive: true },
   instructions: [
     'Use action "list" to list all status pages.',
     'Use action "get" to get details of a specific status page.',
@@ -29,6 +38,7 @@ export let manageStatusPage = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamName: teamNameSchema,
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete'])
         .describe('Action to perform'),
@@ -44,6 +54,11 @@ export let manageStatusPage = SlateTool.create(spec, {
       subscribable: z.boolean().optional().describe('Allow email subscriptions'),
       contactUrl: z.string().optional().describe('Contact URL for support'),
       logoUrl: z.string().optional().describe('Logo URL'),
+      published: z
+        .boolean()
+        .optional()
+        .describe('Publish this page publicly; false keeps it unpublished'),
+      nextUrl: nextUrlSchema,
       page: z.number().optional().describe('Page number for list action'),
       perPage: z.number().optional().describe('Results per page for list action')
     })
@@ -52,6 +67,7 @@ export let manageStatusPage = SlateTool.create(spec, {
     z.object({
       statusPages: z.array(statusPageSchema).optional().describe('List of status pages'),
       statusPage: statusPageSchema.optional().describe('Single status page'),
+      nextUrl: z.string().optional().describe('Next-page URL, when available'),
       hasMore: z.boolean().optional().describe('Whether more results are available'),
       deleted: z.boolean().optional().describe('Whether the status page was deleted')
     })
@@ -59,13 +75,14 @@ export let manageStatusPage = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new UptimeClient({
       token: ctx.auth.token,
-      teamName: ctx.config.teamName
+      tokenType: ctx.auth.tokenType,
+      teamName: ctx.input.teamName ?? ctx.config.teamName
     });
 
     let { action, statusPageId } = ctx.input;
 
-    let mapStatusPage = (item: any) => {
-      let attrs = item.attributes || item;
+    let mapStatusPage = (item: ApiResource) => {
+      let attrs = item.attributes;
       return {
         statusPageId: String(item.id),
         companyName: attrs.company_name || null,
@@ -74,6 +91,7 @@ export let manageStatusPage = SlateTool.create(spec, {
         customDomain: attrs.custom_domain || null,
         timezone: attrs.timezone || null,
         subscribable: attrs.subscribable ?? null,
+        published: attrs.published ?? undefined,
         createdAt: attrs.created_at || null,
         updatedAt: attrs.updated_at || null
       };
@@ -81,18 +99,24 @@ export let manageStatusPage = SlateTool.create(spec, {
 
     if (action === 'list') {
       let result = await client.listStatusPages({
+        nextUrl: ctx.input.nextUrl,
         page: ctx.input.page,
         perPage: ctx.input.perPage
       });
       let statusPages = (result.data || []).map(mapStatusPage);
       return {
-        output: { statusPages, hasMore: !!result.pagination?.next },
+        output: {
+          statusPages,
+          hasMore: !!result.pagination?.next,
+          nextUrl: result.pagination?.next ?? undefined
+        },
         message: `Found **${statusPages.length}** status page(s).`
       };
     }
 
     if (action === 'get') {
-      if (!statusPageId) throw new Error('statusPageId is required for get action');
+      if (!statusPageId)
+        throw createApiServiceError('statusPageId is required for get action');
       let result = await client.getStatusPage(statusPageId);
       return {
         output: { statusPage: mapStatusPage(result.data || result) },
@@ -101,7 +125,8 @@ export let manageStatusPage = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!statusPageId) throw new Error('statusPageId is required for delete action');
+      if (!statusPageId)
+        throw createApiServiceError('statusPageId is required for delete action');
       await client.deleteStatusPage(statusPageId);
       return {
         output: { deleted: true },
@@ -109,7 +134,7 @@ export let manageStatusPage = SlateTool.create(spec, {
       };
     }
 
-    let body: Record<string, any> = {};
+    let body: Record<string, unknown> = {};
     if (ctx.input.companyName) body.company_name = ctx.input.companyName;
     if (ctx.input.companyUrl) body.company_url = ctx.input.companyUrl;
     if (ctx.input.subdomain) body.subdomain = ctx.input.subdomain;
@@ -118,12 +143,15 @@ export let manageStatusPage = SlateTool.create(spec, {
     if (ctx.input.subscribable !== undefined) body.subscribable = ctx.input.subscribable;
     if (ctx.input.contactUrl) body.contact_url = ctx.input.contactUrl;
     if (ctx.input.logoUrl) body.logo_url = ctx.input.logoUrl;
+    if (ctx.input.published !== undefined) body.published = ctx.input.published;
 
-    let result: any;
+    let result: ResourceResponse;
     if (action === 'create') {
+      requireFields(ctx.input.companyName, ctx.input.subdomain);
       result = await client.createStatusPage(body);
     } else {
-      if (!statusPageId) throw new Error('statusPageId is required for update action');
+      if (!statusPageId)
+        throw createApiServiceError('statusPageId is required for update action');
       result = await client.updateStatusPage(statusPageId, body);
     }
 

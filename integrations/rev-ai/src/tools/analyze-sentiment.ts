@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RevAIClient } from '../lib/client';
 import { spec } from '../spec';
@@ -23,18 +23,35 @@ Can submit plain text directly or poll an existing job for results.`,
 })
   .input(
     z.object({
-      text: z.string().optional().describe('Plain text transcript to analyze for sentiment'),
+      text: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('Plain text transcript to analyze for sentiment'),
       jobId: z
         .string()
         .optional()
         .describe('Existing sentiment analysis job ID to retrieve results for'),
-      metadata: z.string().optional().describe('Optional metadata to associate with the job')
+      deleteAfterSeconds: z
+        .number()
+        .int()
+        .min(0)
+        .max(2592000)
+        .optional()
+        .describe('Auto-delete a new job this many seconds after completion'),
+      metadata: z
+        .string()
+        .max(512)
+        .optional()
+        .describe('Optional metadata to associate with the job')
     })
   )
   .output(
     z.object({
-      jobId: z.string().describe('Sentiment analysis job ID'),
+      jobId: z.string().min(1).describe('Sentiment analysis job ID'),
       status: z.string().describe('Job status: "in_progress", "completed", "failed"'),
+      failure: z.string().optional().describe('Failure reason when processing failed'),
+      failureDetail: z.string().optional().describe('Detailed failure information'),
       messages: z
         .array(
           z.object({
@@ -43,6 +60,14 @@ Can submit plain text directly or poll an existing job for results.`,
             sentiment: z
               .string()
               .describe('Sentiment label: "positive", "negative", or "neutral"'),
+            offset: z
+              .number()
+              .optional()
+              .describe('Character offset in plain-text input, excluding newlines'),
+            length: z
+              .number()
+              .optional()
+              .describe('Character length in plain-text input, excluding newlines'),
             ts: z.number().optional().describe('Start timestamp in seconds'),
             endTs: z.number().optional().describe('End timestamp in seconds')
           })
@@ -54,18 +79,24 @@ Can submit plain text directly or poll an existing job for results.`,
   .handleInvocation(async ctx => {
     let client = new RevAIClient({ token: ctx.auth.token });
 
+    if (ctx.input.jobId && ctx.input.text) {
+      throw createApiServiceError(
+        'Provide text for a new analysis or jobId for an existing job, not both.'
+      );
+    }
     let jobId = ctx.input.jobId;
 
     if (!jobId && ctx.input.text) {
       let job = await client.submitSentimentAnalysis({
         text: ctx.input.text,
-        metadata: ctx.input.metadata
+        metadata: ctx.input.metadata,
+        deleteAfterSeconds: ctx.input.deleteAfterSeconds
       });
       jobId = job.jobId;
     }
 
     if (!jobId) {
-      throw new Error('Either text or jobId must be provided');
+      throw createApiServiceError('Either text or jobId must be provided');
     }
 
     let job = await client.getSentimentAnalysisJob(jobId);
@@ -75,6 +106,8 @@ Can submit plain text directly or poll an existing job for results.`,
           content: string;
           score: number;
           sentiment: string;
+          offset?: number;
+          length?: number;
           ts?: number;
           endTs?: number;
         }>
@@ -89,6 +122,8 @@ Can submit plain text directly or poll an existing job for results.`,
       output: {
         jobId,
         status: job.status,
+        failure: job.failure,
+        failureDetail: job.failureDetail,
         messages
       },
       message:

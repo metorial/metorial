@@ -24,15 +24,18 @@ export let getCompany = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RipplingClient({ token: ctx.auth.token });
+    let client = new RipplingClient({
+      token: ctx.auth.token,
+      apiVersion: ctx.config.apiVersion
+    });
     let company = await client.getCompany();
 
     return {
       output: {
-        companyId: company.id || '',
+        companyId: company.id,
         name: company.name,
         primaryEmail: company.primaryEmail,
-        phone: company.phone || company.phoneNumber,
+        phone: company.phone ?? company.phoneNumber,
         address: company.address,
         workLocations: company.workLocations,
         ein: company.ein

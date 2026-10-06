@@ -1,57 +1,15 @@
-# <img src="https://provider-logos.metorial-cdn.com/budibase.png" height="20"> Budibase
+# Budibase
 
-Manage low-code internal business applications, tables, rows, users, and queries. Create, retrieve, update, delete, and search applications, with the ability to publish and unpublish them. Perform full CRUD operations on tables and rows (data records) within applications, including filtered and sorted search. Manage users and their role-based access. Execute pre-configured queries (SQL, REST, etc.) with dynamic parameters. Trigger automations via inbound webhooks by sending JSON payloads to auto-generated URLs.
+Manage applications or workspaces, tables, rows, users and configured queries through the Budibase Public API. Existing tool keys remain available. Native IDs come from discovery or the dashboard workspace URL; `app_metadata` is a metadata document, not an application/workspace ID.
 
-## Tools
+New connections store the exact instance URL ending in `/api/public/v1` with their personal API key. Current instances use `/workspaces`; an explicit legacy route option supports deployed instances requiring the still-documented `/applications` endpoints. Existing unmarked connections continue using their saved instance configuration and legacy application routes. API keys inherit user RBAC; the public API does not provide a current-user identity endpoint.
 
-### Execute Query
+The twelve tools cover application CRUD/discovery/publication, table CRUD/discovery, row CRUD/search, user CRUD/search, configured query discovery/execution, and licensed application export. Table creation requires a name and schema (`{}` is an empty schema). Partial table and row updates preserve current native fields before applying supplied changes; coordinate concurrent edits because these operations are not atomic. Roles and global privileges require a business or enterprise edition. Omitted passwords are not reset.
 
-Execute a pre-configured query in a Budibase application. Queries must first be created in the Budibase builder (e.g. REST API queries, SQL queries). Parameters can be passed dynamically at execution time.
+Row search defaults to a page of 100 with native bookmarks; numeric zero and empty strings are preserved. The conservative per-page maximum is 1000. Configured REST queries can expose their own native continuation fields; execution may affect connected systems. Application, table, user and query discovery returns the documented complete search response within a bounded 5000-item validation limit, without inventing cursor parameters.
 
-### Manage Application
+Publication reports the native deployment SUCCESS or FAILURE receipt. Unpublish uses the documented empty HTTP 204 response. Publication history and downstream effects remain retained. Deleting a workspace, table or row removes associated data.
 
-Create, retrieve, update, or delete a Budibase application. Use the **action** field to specify the operation. For "create", provide a name. For "get", "update", or "delete", provide the appId. For "update", include the fields to change.
+Export creates an unencrypted downloadable native gzip archive through the POST export API; it excludes rows by default. Current workspace export requires enterprise privileges; legacy application export requires business or enterprise privileges. The local limit is 8 MiB compressed and 16 MiB expanded validation, including tar framing and checksums without extracting files. Use the dashboard for larger or password-encrypted exports. No expiry or renewal endpoint is invented.
 
-### Manage Row
-
-Create, retrieve, update, or delete a row in a Budibase table. Retrieving a single row returns it enriched with full related row data rather than just the primary display value.
-
-### Manage Table
-
-Create, retrieve, update, or delete a table within a Budibase application. Use "create" with a name and optional schema to define columns. Use "update" to modify the table name, primary display column, or schema.
-
-### Manage User
-
-Create, retrieve, update, or delete a user in the Budibase tenant. Supports setting email, name, password, roles, and builder/admin privileges.
-
-### Publish Application
-
-Publish or unpublish a Budibase application. Publishing makes the app available to end-users; unpublishing takes it offline and reverts it to development-only.
-
-### Search Applications
-
-Search for Budibase applications by name. Returns a list of applications matching the search criteria, including their IDs, URLs, and status.
-
-### Search Queries
-
-Search for pre-configured queries in a Budibase application by name. Returns query IDs, names, and parameter definitions that can be used with the "Execute Query" tool.
-
-### Search Rows
-
-Search for rows in a Budibase table with filtering, sorting, and pagination. Supports various filter operators including exact match, fuzzy search, range queries, and array operations.
-
-### Search Tables
-
-Search for tables within a Budibase application. Returns table names, IDs, and their column schemas. Requires the application ID to scope the search.
-
-### Search Users
-
-Search for users in the Budibase tenant. Returns user profiles including their email, roles, and privilege levels.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+Official references: [Public API](https://docs.budibase.com/docs/public-api), [current OpenAPI](https://raw.githubusercontent.com/Budibase/budibase/master/packages/server/specs/openapi.yaml), and [public workspace routes](https://github.com/Budibase/budibase/blob/master/packages/server/src/api/routes/public/workspaces.ts).

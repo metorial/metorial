@@ -18,13 +18,6 @@ import {
   searchItems,
   updateItem
 } from './tools';
-import {
-  auditEventsTrigger,
-  inboundWebhook,
-  itemUsageEventsTrigger,
-  signInAttemptEventsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -45,10 +38,5 @@ export let provider = Slate.create({
     getServerHealth,
     getPrometheusMetrics
   ],
-  triggers: [
-    inboundWebhook,
-    auditEventsTrigger,
-    itemUsageEventsTrigger,
-    signInAttemptEventsTrigger
-  ]
+  triggers: []
 });

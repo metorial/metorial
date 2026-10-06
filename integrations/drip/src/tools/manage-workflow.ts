@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema, paging, pagingShape } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageWorkflow = SlateTool.create(spec, {
@@ -13,9 +14,18 @@ export let manageWorkflow = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
+      status: z
+        .enum(['all', 'draft', 'active', 'paused'])
+        .optional()
+        .describe('Workflow status for list.'),
+      sortBy: z.enum(['name', 'created_at']).optional().describe('Sort field for list.'),
+      sortDirection: z.enum(['asc', 'desc']).optional().describe('Sort direction for list.'),
       action: z
         .enum(['list', 'fetch', 'activate', 'pause', 'start_subscriber', 'remove_subscriber'])
-        .describe('The action to perform.'),
+        .describe(
+          'The action to perform. Activation and enrollment may send messages or run external automation actions.'
+        ),
       workflowId: z
         .string()
         .optional()
@@ -64,19 +74,28 @@ export let manageWorkflow = SlateTool.create(spec, {
         .describe('Workflow details.'),
       activated: z.boolean().optional(),
       paused: z.boolean().optional(),
-      started: z.boolean().optional(),
-      removed: z.boolean().optional()
+      started: z
+        .boolean()
+        .optional()
+        .describe(
+          'The start request was accepted for an active workflow; independently verify downstream actions.'
+        ),
+      removed: z.boolean().optional(),
+      ...pagingShape
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId,
+      accountId: ctx.input.accountId ?? ctx.config.accountId,
       tokenType: ctx.auth.tokenType
     });
 
     if (ctx.input.action === 'list') {
       let result = await client.listWorkflows({
+        status: ctx.input.status,
+        sortBy: ctx.input.sortBy,
+        sortDirection: ctx.input.sortDirection,
         page: ctx.input.page,
         perPage: ctx.input.perPage
       });
@@ -87,13 +106,13 @@ export let manageWorkflow = SlateTool.create(spec, {
         createdAt: w.created_at
       }));
       return {
-        output: { workflows },
+        output: { workflows, ...paging(result) },
         message: `Found **${workflows.length}** workflows.`
       };
     }
 
     if (!ctx.input.workflowId) {
-      throw new Error('workflowId is required for this action.');
+      throw createApiServiceError('workflowId is required for this action.');
     }
 
     if (ctx.input.action === 'fetch') {
@@ -116,7 +135,7 @@ export let manageWorkflow = SlateTool.create(spec, {
       await client.activateWorkflow(ctx.input.workflowId);
       return {
         output: { activated: true },
-        message: `Workflow **${ctx.input.workflowId}** activated.`
+        message: 'The selected workflow has been activated.'
       };
     }
 
@@ -124,13 +143,15 @@ export let manageWorkflow = SlateTool.create(spec, {
       await client.pauseWorkflow(ctx.input.workflowId);
       return {
         output: { paused: true },
-        message: `Workflow **${ctx.input.workflowId}** paused.`
+        message: 'The selected workflow has been paused.'
       };
     }
 
     if (ctx.input.action === 'start_subscriber') {
       if (!ctx.input.subscriberEmail) {
-        throw new Error('subscriberEmail is required to start a subscriber on a workflow.');
+        throw createApiServiceError(
+          'subscriberEmail is required to start a subscriber on a workflow.'
+        );
       }
       let sub: Record<string, any> = { email: ctx.input.subscriberEmail };
       if (ctx.input.customFields) sub.custom_fields = ctx.input.customFields;
@@ -138,21 +159,25 @@ export let manageWorkflow = SlateTool.create(spec, {
       await client.startOnWorkflow(ctx.input.workflowId, sub);
       return {
         output: { started: true },
-        message: `**${ctx.input.subscriberEmail}** started on workflow **${ctx.input.workflowId}**.`
+        message:
+          'Drip accepted the request to start the selected subscriber on the active workflow; downstream completion is unconfirmed.'
       };
     }
 
     if (ctx.input.action === 'remove_subscriber') {
       if (!ctx.input.subscriberId) {
-        throw new Error('subscriberId is required to remove a subscriber from a workflow.');
+        throw createApiServiceError(
+          'subscriberId is required to remove a subscriber from a workflow.'
+        );
       }
       await client.removeFromWorkflow(ctx.input.workflowId, ctx.input.subscriberId);
       return {
         output: { removed: true },
-        message: `Subscriber **${ctx.input.subscriberId}** removed from workflow **${ctx.input.workflowId}**.`
+        message:
+          'Drip confirmed the request to remove the selected subscriber from the workflow.'
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

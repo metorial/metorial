@@ -27,8 +27,6 @@ import {
   updateWebFormState,
   uploadDocument
 } from './tools';
-import { agreementEvents, megaSignEvents, webFormEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -58,7 +56,5 @@ export let provider = Slate.create({
     getUser,
     listUsers
   ].map(action => action.build()) as any,
-  triggers: [agreementEvents, webFormEvents, megaSignEvents].map(action =>
-    action.build()
-  ) as any
+  triggers: []
 });

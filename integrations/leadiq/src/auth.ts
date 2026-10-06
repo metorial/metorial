@@ -1,52 +1,26 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+  .output(z.object({ token: z.string() }))
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Key',
     key: 'api_key',
-
     inputSchema: z.object({
       apiKey: z
         .string()
-        .describe('Your LeadIQ Secret Base64 API key. Found in Settings > API Keys.')
+        .describe(
+          'Secret Base64 API key from LeadIQ Settings > API Keys. Paste the encoded value exactly as provided.'
+        )
     }),
-
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.apiKey
-        }
-      };
-    },
-
-    getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.leadiq.com',
-        headers: {
-          'Content-Type': 'application/json',
-
-          Authorization: `Basic ${Buffer.from(`${ctx.output.token}:`).toString('base64')}`
-        }
-      });
-
-      let response = await http.post('/graphql', {
-        query: `{ account { plans { name status productType } } }`
-      });
-
-      let plans = response.data?.data?.account?.plans;
-      let activePlan = plans?.find((p: any) => p.status === 'Active');
-
-      return {
-        profile: {
-          name: activePlan?.name ?? 'LeadIQ Account'
-        }
-      };
+    getOutput: async ctx => ({ output: { token: ctx.input.apiKey.trim() } }),
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let account = await new Client({ token: ctx.output.token }).getAccount();
+      let activePlan = account.plans.find(
+        (plan: { status: string }) => plan.status === 'Active'
+      );
+      return { profile: { name: activePlan?.name ?? 'LeadIQ Account' } };
     }
   });

@@ -1,7 +1,10 @@
-import { SlateTool } from 'slates';
+import { anyOf, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { GMAIL_FULL, GMAIL_MODIFY } from '../auth';
 import { Client, parseMessage } from '../lib/client';
+import { validateComposeInput } from '../lib/mime';
 import {
+  assertReplySubject,
   buildReplyHeaders,
   defaultReplySubject,
   defaultReplyTo,
@@ -17,12 +20,14 @@ export let sendReply = SlateTool.create(spec, {
   instructions: [
     'Always pass **threadId** and **replyToMessageId** (or rely on the latest message when you omit it after loading the thread).',
     'Prefer **get_conversation_context** first if you need bodies; you can copy **replyHints** into this tool.',
-    'Set **isHtml** when **body** contains HTML.'
+    'Set **isHtml** when **body** contains HTML. Sending delivers mail immediately to every To, Cc and Bcc recipient; it cannot be undone.',
+    'A subject override must match the parent subject after the reply prefix. Recipient defaults use the parent To header when replying after your own sent message.'
   ],
   tags: {
     readOnly: false
   }
 })
+  .scopes(anyOf(GMAIL_FULL, GMAIL_MODIFY))
   .input(
     z.object({
       threadId: z.string().describe('Thread to reply in.'),
@@ -47,10 +52,11 @@ export let sendReply = SlateTool.create(spec, {
     z.object({
       messageId: z.string(),
       threadId: z.string(),
-      labelIds: z.array(z.string())
+      labelIds: z.array(z.string()).optional()
     })
   )
   .handleInvocation(async ctx => {
+    validateComposeInput(ctx.input);
     let client = new Client({
       token: ctx.auth.token,
       userId: ctx.config.userId
@@ -61,20 +67,20 @@ export let sendReply = SlateTool.create(spec, {
     let targetRaw = pickReplyTarget(rawMessages, ctx.input.replyToMessageId);
     let targetParsed = parseMessage(targetRaw);
 
-    let { inReplyTo, references } =
-      ctx.input.inReplyTo && ctx.input.references
-        ? { inReplyTo: ctx.input.inReplyTo, references: ctx.input.references }
-        : buildReplyHeaders(targetRaw);
-
-    let to =
-      ctx.input.to && ctx.input.to.length > 0 ? ctx.input.to : defaultReplyTo(targetParsed);
-    if (to.length === 0) {
-      throw new Error('Could not infer recipients; provide **to** explicitly.');
-    }
+    const built =
+      ctx.input.inReplyTo && ctx.input.references ? undefined : buildReplyHeaders(targetRaw);
+    const inReplyTo = ctx.input.inReplyTo ?? built?.inReplyTo;
+    const references = ctx.input.references ?? built?.references;
+    const profile = await client.getProfile();
+    const to = ctx.input.to ?? defaultReplyTo(targetParsed, profile.emailAddress);
+    if (!to.length)
+      throw createApiServiceError('Could not infer recipients; provide to explicitly.');
 
     let subject = ctx.input.subject ?? defaultReplySubject(targetParsed.subject);
 
+    assertReplySubject(subject, targetParsed.subject);
     let sent = await client.sendMessage({
+      from: profile.emailAddress,
       to,
       cc: ctx.input.cc,
       bcc: ctx.input.bcc,
@@ -86,11 +92,15 @@ export let sendReply = SlateTool.create(spec, {
       references
     });
 
+    if (sent.threadId !== ctx.input.threadId)
+      throw createApiServiceError(
+        'Gmail accepted the reply but placed it in a different conversation. Do not retry automatically.'
+      );
     return {
       output: {
         messageId: sent.id,
         threadId: sent.threadId,
-        labelIds: sent.labelIds || []
+        labelIds: sent.labelIds
       },
       message: `Sent reply in thread **${sent.threadId}** as message **${sent.id}**.`
     };

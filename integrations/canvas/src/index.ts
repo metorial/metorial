@@ -23,15 +23,6 @@ import {
   managePageTool,
   sendMessageTool
 } from './tools';
-import {
-  assignmentChangesTrigger,
-  courseChangesTrigger,
-  enrollmentChangesTrigger,
-  inboundWebhook,
-  newAnnouncementsTrigger,
-  newSubmissionsTrigger
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -57,12 +48,5 @@ export let provider = Slate.create({
     listFilesTool,
     getCourseAnalyticsTool
   ],
-  triggers: [
-    inboundWebhook,
-    courseChangesTrigger,
-    newSubmissionsTrigger,
-    enrollmentChangesTrigger,
-    newAnnouncementsTrigger,
-    assignmentChangesTrigger
-  ]
+  triggers: []
 });

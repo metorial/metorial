@@ -40,11 +40,19 @@ import {
   updateVariableTool,
   updateWorkspaceTool
 } from './tools';
-import { runEventsTrigger, workspaceRunsTrigger } from './triggers';
-
+import {
+  deleteTeamWorkspaceAccessTool,
+  getCurrentUserTool,
+  listOrganizationsTool,
+  listTeamWorkspaceAccessTool
+} from './tools/discovery';
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUserTool,
+    listOrganizationsTool,
+    listTeamWorkspaceAccessTool,
+    deleteTeamWorkspaceAccessTool,
     listWorkspacesTool,
     getWorkspaceTool,
     createWorkspaceTool,
@@ -84,5 +92,5 @@ export let provider = Slate.create({
     createRunTriggerTool,
     deleteRunTriggerTool
   ],
-  triggers: [runEventsTrigger, workspaceRunsTrigger]
+  triggers: []
 });

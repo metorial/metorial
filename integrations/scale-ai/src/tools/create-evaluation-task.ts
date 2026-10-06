@@ -6,7 +6,8 @@ import { spec } from '../spec';
 export let createEvaluationTask = SlateTool.create(spec, {
   name: 'Create Evaluation Task',
   key: 'create_evaluation_task',
-  description: `Create an evaluation task in Scale AI — a task with known answers used to measure annotator quality internally. Requires an expected response and optionally an initial response for review-phase evaluations.`,
+  description: `Create an evaluation task for a Scale Rapid project using known answers to measure annotator quality. Requires an expected response and optionally an initial response for review-phase evaluations.`,
+  constraints: ['Available only for Scale Rapid projects.'],
   tags: {
     destructive: false,
     readOnly: false
@@ -16,6 +17,7 @@ export let createEvaluationTask = SlateTool.create(spec, {
     z.object({
       taskType: z
         .string()
+        .regex(/^[a-z][a-z0-9_]*$/)
         .describe('Type of evaluation task (e.g., imageannotation, textcollection)'),
       project: z.string().describe('Project name'),
       expectedResponse: z
@@ -42,26 +44,25 @@ export let createEvaluationTask = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let body: Record<string, any> = {
+    let body: Record<string, unknown> = {
+      ...ctx.input.taskParams,
       project: ctx.input.project,
       expected_response: ctx.input.expectedResponse
     };
     if (ctx.input.initialResponse !== undefined) {
       body.initial_response = ctx.input.initialResponse;
     }
-    if (ctx.input.taskParams) {
-      Object.assign(body, ctx.input.taskParams);
-    }
 
     let result = await client.createEvaluationTask(ctx.input.taskType, body);
+    let taskId = result.task_id ?? result.id;
 
     return {
       output: {
-        taskId: result.task_id,
+        taskId,
         status: result.status,
         ...result
       },
-      message: `Created evaluation task **${result.task_id}** of type \`${ctx.input.taskType}\`.`
+      message: `Created evaluation task **${taskId}** of type \`${ctx.input.taskType}\`.`
     };
   })
   .build();

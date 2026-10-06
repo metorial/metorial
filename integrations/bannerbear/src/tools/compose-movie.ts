@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { stateMessage } from '../lib/contracts';
+import { deliverGeneratedFiles, movieOutput } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let composeMovie = SlateTool.create(spec, {
@@ -15,6 +18,7 @@ export let composeMovie = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       width: z.number().describe('Output video width in pixels'),
       height: z.number().describe('Output video height in pixels'),
       inputs: z
@@ -55,32 +59,25 @@ export let composeMovie = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.createMovie({
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const result = await client.createMovie({
       width: ctx.input.width,
       height: ctx.input.height,
-      inputs: ctx.input.inputs.map(i => ({
-        asset_url: i.assetUrl,
-        trim_to_length_in_seconds: i.trimToLengthInSeconds,
-        mute: i.mute
+      inputs: ctx.input.inputs.map(item => ({
+        asset_url: item.assetUrl,
+        trim_to_length_in_seconds: item.trimToLengthInSeconds,
+        mute: item.mute
       })),
       transition: ctx.input.transition,
       soundtrack_url: ctx.input.soundtrackUrl,
       metadata: ctx.input.metadata,
       webhook_url: ctx.input.webhookUrl
     });
-
+    const output = movieOutput(result);
+    await deliverGeneratedFiles(ctx, 'movie', result);
     return {
-      output: {
-        movieUid: result.uid,
-        status: result.status,
-        videoUrl: result.video_url || null,
-        percentRendered: result.percent_rendered ?? null,
-        totalLengthInSeconds: result.total_length_in_seconds ?? null,
-        createdAt: result.created_at
-      },
-      message: `Movie composition ${result.status === 'completed' ? 'completed' : 'initiated'} (UID: ${result.uid}) with ${ctx.input.inputs.length} clips. ${result.video_url ? `[View movie](${result.video_url})` : 'Movie is still rendering.'}`
+      output,
+      message: `Movie composition ${stateMessage(result.status)} (UID: ${output.movieUid}). Read its status with get_resource.`
     };
   })
   .build();

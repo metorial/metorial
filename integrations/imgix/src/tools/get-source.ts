@@ -1,58 +1,32 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImgixClient } from '../lib/client';
+import { mapSource, publicDeployment, sourceId, sourceOutput } from '../lib/schemas';
 import { spec } from '../spec';
-
-export let getSource = SlateTool.create(spec, {
+export const getSource = SlateTool.create(spec, {
   name: 'Get Source',
   key: 'get_source',
-  description: `Retrieve full details of a specific Imgix source by its ID. Returns the source's configuration including deployment settings, cache behavior, security settings, custom domains, and current deployment status.`,
-  tags: {
-    readOnly: true
-  }
+  description:
+    'Read a source discovered by list_sources, including deployment status and safe configuration. Storage credentials and signing tokens are not returned.',
+  tags: { readOnly: true, destructive: false }
 })
-  .input(
-    z.object({
-      sourceId: z.string().describe('ID of the source to retrieve')
-    })
-  )
+  .input(z.object({ sourceId }))
   .output(
-    z.object({
-      sourceId: z.string().describe('Unique identifier of the source'),
-      name: z.string().describe('Display name of the source'),
-      enabled: z.boolean().describe('Whether the source is currently enabled'),
-      deploymentStatus: z.string().describe('Current deployment status'),
-      deployment: z
-        .record(z.string(), z.any())
-        .optional()
-        .describe(
-          'Full deployment configuration including type, subdomains, and storage-specific settings'
-        ),
+    sourceOutput.extend({
+      deployment: publicDeployment.optional(),
       secureUrlToken: z
         .string()
         .optional()
-        .describe('Token used for generating signed/secure URLs'),
-      dateDeployed: z.number().optional().describe('Unix timestamp of last deployment')
+        .describe(
+          'Deprecated: signing tokens are never returned. Pass sourceId to generate_signed_url or download_asset instead.'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ImgixClient(ctx.auth.token);
-    let result = await client.getSource(ctx.input.sourceId);
-    let s = result.data;
-
-    let output = {
-      sourceId: s.id,
-      name: s.attributes?.name ?? '',
-      enabled: s.attributes?.enabled ?? false,
-      deploymentStatus: s.attributes?.deployment_status ?? 'unknown',
-      deployment: s.attributes?.deployment,
-      secureUrlToken: s.attributes?.secure_url_token,
-      dateDeployed: s.attributes?.date_deployed
-    };
-
+    const source = (await new ImgixClient(ctx.auth.token).getSource(ctx.input.sourceId)).data;
     return {
-      output,
-      message: `Retrieved source **${output.name}** (${output.deploymentStatus}).`
+      output: { ...mapSource(source), deployment: source.attributes.deployment },
+      message: `Source ${source.id} is ${source.attributes.deployment_status}; enabled is ${source.attributes.enabled}.`
     };
   })
   .build();

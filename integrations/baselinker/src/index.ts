@@ -16,8 +16,6 @@ import {
   updateInventoryStockPrices,
   updateOrder
 } from './tools';
-import { inboundWebhook, orderEvents } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -36,5 +34,5 @@ export let provider = Slate.create({
     manageOrderReturns,
     getExternalStorages
   ],
-  triggers: [inboundWebhook, orderEvents]
+  triggers: []
 });

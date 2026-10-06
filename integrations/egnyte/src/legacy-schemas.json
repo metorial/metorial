@@ -1,0 +1,2067 @@
+{
+  "list_folder": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderPath": {
+          "type": "string",
+          "description": "Path to the folder (e.g. \"/Shared/Documents\")"
+        },
+        "count": {
+          "description": "Number of items to return per page (max 1000)",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Zero-based index of the first item to return",
+          "type": "number"
+        },
+        "sortBy": {
+          "description": "Field to sort results by",
+          "type": "string",
+          "enum": ["name", "last_modified", "size"]
+        },
+        "sortDirection": {
+          "description": "Sort direction",
+          "type": "string",
+          "enum": ["asc", "desc"]
+        }
+      },
+      "required": ["folderPath"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Folder name"
+        },
+        "path": {
+          "type": "string",
+          "description": "Full path to the folder"
+        },
+        "folderId": {
+          "description": "Persistent folder ID",
+          "type": "string"
+        },
+        "isFolder": {
+          "type": "boolean",
+          "description": "Always true for folders"
+        },
+        "folders": {
+          "description": "List of subfolders",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "folderId": {
+                "type": "string"
+              },
+              "lastModified": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "path"],
+            "additionalProperties": false
+          }
+        },
+        "files": {
+          "description": "List of files",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "groupId": {
+                "type": "string"
+              },
+              "entryId": {
+                "type": "string"
+              },
+              "size": {
+                "type": "number"
+              },
+              "lastModified": {
+                "type": "string"
+              },
+              "uploadedBy": {
+                "type": "string"
+              },
+              "numVersions": {
+                "type": "number"
+              },
+              "locked": {
+                "type": "boolean"
+              }
+            },
+            "required": ["name", "path"],
+            "additionalProperties": false
+          }
+        },
+        "totalCount": {
+          "description": "Total number of items in the folder",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Current offset",
+          "type": "number"
+        },
+        "count": {
+          "description": "Number of items returned",
+          "type": "number"
+        }
+      },
+      "required": ["name", "path", "isFolder"],
+      "additionalProperties": false
+    }
+  },
+  "get_file_info": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "Path to the file or folder (e.g. \"/Shared/Documents/report.pdf\")",
+          "type": "string"
+        },
+        "fileGroupId": {
+          "description": "Persistent group ID of the file (alternative to path)",
+          "type": "string"
+        },
+        "folderId": {
+          "description": "Persistent folder ID (alternative to path)",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the file or folder"
+        },
+        "path": {
+          "description": "Full path",
+          "type": "string"
+        },
+        "isFolder": {
+          "type": "boolean",
+          "description": "Whether the item is a folder"
+        },
+        "groupId": {
+          "description": "File group ID",
+          "type": "string"
+        },
+        "entryId": {
+          "description": "File entry ID (current version)",
+          "type": "string"
+        },
+        "folderId": {
+          "description": "Folder ID",
+          "type": "string"
+        },
+        "size": {
+          "description": "File size in bytes",
+          "type": "number"
+        },
+        "lastModified": {
+          "description": "Last modification timestamp",
+          "type": "string"
+        },
+        "uploadedBy": {
+          "description": "Username who uploaded the file",
+          "type": "string"
+        },
+        "numVersions": {
+          "description": "Number of file versions",
+          "type": "number"
+        },
+        "locked": {
+          "description": "Whether the file is locked",
+          "type": "boolean"
+        },
+        "lockHolder": {
+          "description": "Username holding the lock",
+          "type": "string"
+        },
+        "checksum": {
+          "description": "File checksum",
+          "type": "string"
+        },
+        "customProperties": {
+          "description": "Custom metadata properties"
+        }
+      },
+      "required": ["name", "isFolder"],
+      "additionalProperties": false
+    }
+  },
+  "create_folder": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderPath": {
+          "type": "string",
+          "description": "Full path for the new folder (e.g. \"/Shared/Projects/NewProject\")"
+        }
+      },
+      "required": ["folderPath"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path of the created folder"
+        }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    }
+  },
+  "copy_item": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sourcePath": {
+          "type": "string",
+          "description": "Path of the source file or folder"
+        },
+        "destinationPath": {
+          "type": "string",
+          "description": "Destination path including the new name"
+        },
+        "permissions": {
+          "description": "How to handle permissions for the copy",
+          "type": "string",
+          "enum": ["inherit_from_parent", "keep_original"]
+        }
+      },
+      "required": ["sourcePath", "destinationPath"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sourcePath": {
+          "type": "string"
+        },
+        "destinationPath": {
+          "type": "string"
+        }
+      },
+      "required": ["sourcePath", "destinationPath"],
+      "additionalProperties": false
+    }
+  },
+  "move_item": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sourcePath": {
+          "type": "string",
+          "description": "Path of the source file or folder"
+        },
+        "destinationPath": {
+          "type": "string",
+          "description": "Destination path including the new name"
+        },
+        "permissions": {
+          "description": "How to handle permissions after move",
+          "type": "string",
+          "enum": ["inherit_from_parent", "keep_original"]
+        }
+      },
+      "required": ["sourcePath", "destinationPath"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "sourcePath": {
+          "type": "string"
+        },
+        "destinationPath": {
+          "type": "string"
+        }
+      },
+      "required": ["sourcePath", "destinationPath"],
+      "additionalProperties": false
+    }
+  },
+  "delete_item": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the file or folder to delete"
+        },
+        "entryId": {
+          "description": "Specific file version entry ID to delete (deletes only that version)",
+          "type": "string"
+        }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "required": ["path", "deleted"],
+      "additionalProperties": false
+    }
+  },
+  "lock_file": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the file"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["lock", "unlock"],
+          "description": "Whether to lock or unlock the file"
+        },
+        "lockToken": {
+          "type": "string",
+          "description": "Token to identify the lock (any unique string)"
+        }
+      },
+      "required": ["path", "action", "lockToken"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        }
+      },
+      "required": ["path", "action"],
+      "additionalProperties": false
+    }
+  },
+  "create_link": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the file or folder to share"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["file", "folder", "upload"],
+          "description": "Type of link: file download, folder access, or upload link"
+        },
+        "accessibility": {
+          "type": "string",
+          "enum": ["anyone", "password", "domain", "recipients"],
+          "description": "\"anyone\" for public, \"password\" for password-protected, \"domain\" for domain users only, \"recipients\" for specific recipients"
+        },
+        "recipients": {
+          "description": "Email addresses of recipients (required when accessibility is \"recipients\")",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sendEmail": {
+          "description": "Whether to send email notifications to recipients",
+          "type": "boolean"
+        },
+        "message": {
+          "description": "Custom message to include in the email notification",
+          "type": "string"
+        },
+        "notify": {
+          "description": "Whether to notify the link creator when the link is accessed",
+          "type": "boolean"
+        },
+        "expiryDate": {
+          "description": "Expiry date for the link (ISO 8601 format)",
+          "type": "string"
+        },
+        "expiryClicks": {
+          "description": "Number of clicks after which the link expires",
+          "type": "number"
+        },
+        "password": {
+          "description": "Password for password-protected links",
+          "type": "string"
+        },
+        "linkToCurrent": {
+          "description": "If true, link points to the current file version only",
+          "type": "boolean"
+        }
+      },
+      "required": ["path", "type", "accessibility"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "linkId": {
+          "type": "string",
+          "description": "Unique identifier for the link"
+        },
+        "url": {
+          "type": "string",
+          "description": "The sharing URL"
+        },
+        "path": {
+          "type": "string",
+          "description": "Path to the shared item"
+        },
+        "type": {
+          "type": "string",
+          "description": "Link type"
+        },
+        "accessibility": {
+          "type": "string",
+          "description": "Access level"
+        },
+        "creationDate": {
+          "description": "When the link was created",
+          "type": "string"
+        },
+        "expiryDate": {
+          "description": "When the link expires",
+          "type": "string"
+        },
+        "expiryClicks": {
+          "description": "Click-based expiry count",
+          "type": "number"
+        }
+      },
+      "required": ["linkId", "url", "path", "type", "accessibility"],
+      "additionalProperties": false
+    }
+  },
+  "list_links": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "Filter links by path prefix",
+          "type": "string"
+        },
+        "username": {
+          "description": "Filter by link creator username",
+          "type": "string"
+        },
+        "createdBefore": {
+          "description": "Filter links created before this date (ISO 8601)",
+          "type": "string"
+        },
+        "createdAfter": {
+          "description": "Filter links created after this date (ISO 8601)",
+          "type": "string"
+        },
+        "type": {
+          "description": "Filter by link type",
+          "type": "string",
+          "enum": ["file", "folder", "upload"]
+        },
+        "accessibility": {
+          "description": "Filter by accessibility level",
+          "type": "string",
+          "enum": ["anyone", "password", "domain", "recipients"]
+        },
+        "offset": {
+          "description": "Pagination offset",
+          "type": "number"
+        },
+        "count": {
+          "description": "Number of results per page",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "linkId": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "accessibility": {
+                "type": "string"
+              },
+              "creationDate": {
+                "type": "string"
+              },
+              "createdBy": {
+                "type": "string"
+              }
+            },
+            "required": ["linkId", "url", "path", "type", "accessibility"],
+            "additionalProperties": false
+          },
+          "description": "List of sharing links"
+        },
+        "totalCount": {
+          "description": "Total number of matching links",
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": ["links"],
+      "additionalProperties": false
+    }
+  },
+  "delete_link": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "linkId": {
+          "type": "string",
+          "description": "ID of the link to delete"
+        }
+      },
+      "required": ["linkId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "linkId": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "required": ["linkId", "deleted"],
+      "additionalProperties": false
+    }
+  },
+  "get_permissions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderPath": {
+          "type": "string",
+          "description": "Path to the folder (e.g. \"/Shared/Projects\")"
+        }
+      },
+      "required": ["folderPath"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userPermissions": {
+          "description": "Map of username to permission level",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "groupPermissions": {
+          "description": "Map of group name to permission level",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "inheritsPermissions": {
+          "description": "Whether the folder inherits permissions from its parent",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "set_permissions": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderPath": {
+          "type": "string",
+          "description": "Path to the folder"
+        },
+        "userPermissions": {
+          "description": "Map of username to permission level",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["Owner", "Full", "Editor", "Viewer", "None"]
+          }
+        },
+        "groupPermissions": {
+          "description": "Map of group name to permission level",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["Owner", "Full", "Editor", "Viewer", "None"]
+          }
+        },
+        "inheritsPermissions": {
+          "description": "Whether the folder should inherit permissions from parent",
+          "type": "boolean"
+        },
+        "keepParentPermissions": {
+          "description": "Whether to keep parent permissions when disabling inheritance",
+          "type": "boolean"
+        }
+      },
+      "required": ["folderPath"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderPath": {
+          "type": "string"
+        },
+        "updated": {
+          "type": "boolean"
+        }
+      },
+      "required": ["folderPath", "updated"],
+      "additionalProperties": false
+    }
+  },
+  "list_users": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "filter": {
+          "description": "SCIM filter expression (e.g. 'userName Eq \"jsmith\"' or 'email co \"@example.com\"')",
+          "type": "string"
+        },
+        "startIndex": {
+          "description": "1-based index of the first result",
+          "type": "number"
+        },
+        "count": {
+          "description": "Number of results per page (max 100)",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "number",
+                "description": "User ID"
+              },
+              "userName": {
+                "type": "string",
+                "description": "Username"
+              },
+              "email": {
+                "description": "Email address",
+                "type": "string"
+              },
+              "givenName": {
+                "description": "First name",
+                "type": "string"
+              },
+              "familyName": {
+                "description": "Last name",
+                "type": "string"
+              },
+              "active": {
+                "description": "Whether the user is active",
+                "type": "boolean"
+              },
+              "authType": {
+                "description": "Authentication type",
+                "type": "string"
+              },
+              "userType": {
+                "description": "User role type",
+                "type": "string"
+              },
+              "locked": {
+                "description": "Whether the user is locked",
+                "type": "boolean"
+              },
+              "createdDate": {
+                "description": "Account creation date",
+                "type": "string"
+              },
+              "lastActiveDate": {
+                "description": "Last activity date",
+                "type": "string"
+              }
+            },
+            "required": ["userId", "userName"],
+            "additionalProperties": false
+          },
+          "description": "List of users"
+        },
+        "totalResults": {
+          "description": "Total number of matching users",
+          "type": "number"
+        },
+        "startIndex": {
+          "type": "number"
+        },
+        "itemsPerPage": {
+          "type": "number"
+        }
+      },
+      "required": ["users"],
+      "additionalProperties": false
+    }
+  },
+  "get_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "Numeric user ID"
+        }
+      },
+      "required": ["userId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "User ID"
+        },
+        "userName": {
+          "type": "string",
+          "description": "Username"
+        },
+        "email": {
+          "description": "Email address",
+          "type": "string"
+        },
+        "givenName": {
+          "description": "First name",
+          "type": "string"
+        },
+        "familyName": {
+          "description": "Last name",
+          "type": "string"
+        },
+        "active": {
+          "description": "Whether the user is active",
+          "type": "boolean"
+        },
+        "authType": {
+          "description": "Authentication type",
+          "type": "string"
+        },
+        "userType": {
+          "description": "User role type",
+          "type": "string"
+        },
+        "locked": {
+          "description": "Whether the user is locked",
+          "type": "boolean"
+        },
+        "createdDate": {
+          "description": "Account creation date",
+          "type": "string"
+        },
+        "lastActiveDate": {
+          "description": "Last activity date",
+          "type": "string"
+        }
+      },
+      "required": ["userId", "userName"],
+      "additionalProperties": false
+    }
+  },
+  "create_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userName": {
+          "type": "string",
+          "description": "Username for the new user"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address"
+        },
+        "givenName": {
+          "type": "string",
+          "description": "First name"
+        },
+        "familyName": {
+          "type": "string",
+          "description": "Last name"
+        },
+        "userType": {
+          "description": "User role type",
+          "type": "string",
+          "enum": ["admin", "power", "standard"]
+        },
+        "authType": {
+          "description": "Authentication type",
+          "type": "string",
+          "enum": ["egnyte", "sso", "ad"]
+        },
+        "sendInvite": {
+          "description": "Whether to send an invitation email",
+          "type": "boolean"
+        },
+        "active": {
+          "description": "Whether the user should be active immediately",
+          "type": "boolean"
+        }
+      },
+      "required": ["userName", "email", "givenName", "familyName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "User ID"
+        },
+        "userName": {
+          "type": "string",
+          "description": "Username"
+        },
+        "email": {
+          "description": "Email address",
+          "type": "string"
+        },
+        "givenName": {
+          "description": "First name",
+          "type": "string"
+        },
+        "familyName": {
+          "description": "Last name",
+          "type": "string"
+        },
+        "active": {
+          "description": "Whether the user is active",
+          "type": "boolean"
+        },
+        "authType": {
+          "description": "Authentication type",
+          "type": "string"
+        },
+        "userType": {
+          "description": "User role type",
+          "type": "string"
+        },
+        "locked": {
+          "description": "Whether the user is locked",
+          "type": "boolean"
+        },
+        "createdDate": {
+          "description": "Account creation date",
+          "type": "string"
+        },
+        "lastActiveDate": {
+          "description": "Last activity date",
+          "type": "string"
+        }
+      },
+      "required": ["userId", "userName"],
+      "additionalProperties": false
+    }
+  },
+  "update_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "Numeric user ID to update"
+        },
+        "email": {
+          "description": "New email address",
+          "type": "string"
+        },
+        "givenName": {
+          "description": "New first name",
+          "type": "string"
+        },
+        "familyName": {
+          "description": "New last name",
+          "type": "string"
+        },
+        "active": {
+          "description": "Set user active/inactive",
+          "type": "boolean"
+        },
+        "userType": {
+          "description": "New user role type",
+          "type": "string",
+          "enum": ["admin", "power", "standard"]
+        },
+        "authType": {
+          "description": "New authentication type",
+          "type": "string",
+          "enum": ["egnyte", "sso", "ad"]
+        }
+      },
+      "required": ["userId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "User ID"
+        },
+        "userName": {
+          "type": "string",
+          "description": "Username"
+        },
+        "email": {
+          "description": "Email address",
+          "type": "string"
+        },
+        "givenName": {
+          "description": "First name",
+          "type": "string"
+        },
+        "familyName": {
+          "description": "Last name",
+          "type": "string"
+        },
+        "active": {
+          "description": "Whether the user is active",
+          "type": "boolean"
+        },
+        "authType": {
+          "description": "Authentication type",
+          "type": "string"
+        },
+        "userType": {
+          "description": "User role type",
+          "type": "string"
+        },
+        "locked": {
+          "description": "Whether the user is locked",
+          "type": "boolean"
+        },
+        "createdDate": {
+          "description": "Account creation date",
+          "type": "string"
+        },
+        "lastActiveDate": {
+          "description": "Last activity date",
+          "type": "string"
+        }
+      },
+      "required": ["userId", "userName"],
+      "additionalProperties": false
+    }
+  },
+  "delete_user": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number",
+          "description": "Numeric user ID to delete"
+        }
+      },
+      "required": ["userId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "number"
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "required": ["userId", "deleted"],
+      "additionalProperties": false
+    }
+  },
+  "list_groups": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "filter": {
+          "description": "SCIM filter expression to search groups",
+          "type": "string"
+        },
+        "startIndex": {
+          "description": "1-based index of the first result",
+          "type": "number"
+        },
+        "count": {
+          "description": "Number of results per page",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "groupId": {
+                "type": "string",
+                "description": "Unique group ID"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Group display name"
+              },
+              "members": {
+                "description": "Group members",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "username": {
+                      "type": "string"
+                    },
+                    "memberId": {
+                      "type": "number"
+                    },
+                    "displayName": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["groupId", "displayName"],
+            "additionalProperties": false
+          },
+          "description": "List of groups"
+        },
+        "totalResults": {
+          "type": "number"
+        }
+      },
+      "required": ["groups"],
+      "additionalProperties": false
+    }
+  },
+  "create_group": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string",
+          "description": "Name for the new group"
+        },
+        "memberIds": {
+          "description": "User IDs to add as initial members",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "required": ["displayName"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "description": "Unique group ID"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Group display name"
+        },
+        "members": {
+          "description": "Group members",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "username": {
+                "type": "string"
+              },
+              "memberId": {
+                "type": "number"
+              },
+              "displayName": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["groupId", "displayName"],
+      "additionalProperties": false
+    }
+  },
+  "update_group": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "description": "ID of the group to update"
+        },
+        "displayName": {
+          "description": "New group name",
+          "type": "string"
+        },
+        "memberIds": {
+          "description": "New member list (replaces existing members). Provide user IDs.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "required": ["groupId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "description": "Unique group ID"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Group display name"
+        },
+        "members": {
+          "description": "Group members",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "username": {
+                "type": "string"
+              },
+              "memberId": {
+                "type": "number"
+              },
+              "displayName": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["groupId", "displayName"],
+      "additionalProperties": false
+    }
+  },
+  "delete_group": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "description": "ID of the group to delete"
+        }
+      },
+      "required": ["groupId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "required": ["groupId", "deleted"],
+      "additionalProperties": false
+    }
+  },
+  "search": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query string (searches filenames and content)"
+        },
+        "folder": {
+          "description": "Limit results to items within this folder path",
+          "type": "string"
+        },
+        "modifiedBefore": {
+          "description": "Only include items modified before this date (ISO 8601, e.g. \"2024-01-15T00:00:00\")",
+          "type": "string"
+        },
+        "modifiedAfter": {
+          "description": "Only include items modified after this date (ISO 8601)",
+          "type": "string"
+        },
+        "offset": {
+          "description": "Zero-based offset for pagination",
+          "type": "number"
+        },
+        "count": {
+          "description": "Number of results per page (max 100)",
+          "type": "number"
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "File or folder name"
+              },
+              "path": {
+                "type": "string",
+                "description": "Full path"
+              },
+              "isFolder": {
+                "type": "boolean"
+              },
+              "size": {
+                "description": "File size in bytes",
+                "type": "number"
+              },
+              "entryId": {
+                "type": "string"
+              },
+              "groupId": {
+                "type": "string"
+              },
+              "lastModified": {
+                "type": "string"
+              },
+              "uploadedBy": {
+                "type": "string"
+              },
+              "snippet": {
+                "description": "Text snippet showing matching content",
+                "type": "string"
+              }
+            },
+            "required": ["name", "path"],
+            "additionalProperties": false
+          },
+          "description": "Search results"
+        },
+        "totalCount": {
+          "description": "Total number of matching items",
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        },
+        "hasMore": {
+          "description": "Whether more results are available",
+          "type": "boolean"
+        }
+      },
+      "required": ["results"],
+      "additionalProperties": false
+    }
+  },
+  "add_comment": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "filePath": {
+          "type": "string",
+          "description": "Path to the file to comment on"
+        },
+        "message": {
+          "type": "string",
+          "description": "Comment text"
+        }
+      },
+      "required": ["filePath", "message"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "commentId": {
+          "type": "string",
+          "description": "Unique comment ID (UUID)"
+        },
+        "message": {
+          "type": "string",
+          "description": "Comment text"
+        },
+        "username": {
+          "description": "Username of the comment author",
+          "type": "string"
+        },
+        "formattedName": {
+          "description": "Display name of the author",
+          "type": "string"
+        },
+        "creationTime": {
+          "description": "When the comment was created",
+          "type": "string"
+        },
+        "filePath": {
+          "description": "Path to the file",
+          "type": "string"
+        },
+        "groupId": {
+          "description": "File group ID",
+          "type": "string"
+        },
+        "canDelete": {
+          "description": "Whether the current user can delete this comment",
+          "type": "boolean"
+        }
+      },
+      "required": ["commentId", "message"],
+      "additionalProperties": false
+    }
+  },
+  "list_comments": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "filePath": {
+          "type": "string",
+          "description": "Path to the file"
+        },
+        "offset": {
+          "description": "Pagination offset",
+          "type": "number"
+        },
+        "count": {
+          "description": "Number of comments per page",
+          "type": "number"
+        }
+      },
+      "required": ["filePath"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "commentId": {
+                "type": "string",
+                "description": "Unique comment ID (UUID)"
+              },
+              "message": {
+                "type": "string",
+                "description": "Comment text"
+              },
+              "username": {
+                "description": "Username of the comment author",
+                "type": "string"
+              },
+              "formattedName": {
+                "description": "Display name of the author",
+                "type": "string"
+              },
+              "creationTime": {
+                "description": "When the comment was created",
+                "type": "string"
+              },
+              "filePath": {
+                "description": "Path to the file",
+                "type": "string"
+              },
+              "groupId": {
+                "description": "File group ID",
+                "type": "string"
+              },
+              "canDelete": {
+                "description": "Whether the current user can delete this comment",
+                "type": "boolean"
+              }
+            },
+            "required": ["commentId", "message"],
+            "additionalProperties": false
+          },
+          "description": "List of comments"
+        },
+        "totalResults": {
+          "description": "Total number of comments",
+          "type": "number"
+        }
+      },
+      "required": ["comments"],
+      "additionalProperties": false
+    }
+  },
+  "delete_comment": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "commentId": {
+          "type": "string",
+          "description": "UUID of the comment to delete"
+        }
+      },
+      "required": ["commentId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "commentId": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        }
+      },
+      "required": ["commentId", "deleted"],
+      "additionalProperties": false
+    }
+  },
+  "set_metadata": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "targetType": {
+          "type": "string",
+          "enum": ["file", "folder"],
+          "description": "Whether the target is a file or folder"
+        },
+        "targetId": {
+          "type": "string",
+          "description": "Group ID for files or folder ID for folders"
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Metadata namespace name"
+        },
+        "properties": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Key-value pairs to set (set a value to null to remove it)"
+        }
+      },
+      "required": ["targetType", "targetId", "namespace", "properties"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "targetType": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "updated": {
+          "type": "boolean"
+        }
+      },
+      "required": ["targetType", "targetId", "namespace", "updated"],
+      "additionalProperties": false
+    }
+  },
+  "list_trash": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "folderPath": {
+          "description": "Path within the trash to list (omit for root trash listing)",
+          "type": "string"
+        },
+        "offset": {
+          "description": "Pagination offset",
+          "type": "number"
+        },
+        "count": {
+          "description": "Number of items per page",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "isFolder": {
+                "type": "boolean"
+              },
+              "size": {
+                "type": "number"
+              },
+              "deletedBy": {
+                "type": "string"
+              },
+              "deletedTime": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "path"],
+            "additionalProperties": false
+          },
+          "description": "Items in the trash"
+        },
+        "totalCount": {
+          "type": "number"
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    }
+  },
+  "restore_from_trash": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "trashItemPath": {
+          "type": "string",
+          "description": "Path of the item in the trash to restore"
+        }
+      },
+      "required": ["trashItemPath"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "trashItemPath": {
+          "type": "string"
+        },
+        "restored": {
+          "type": "boolean"
+        }
+      },
+      "required": ["trashItemPath", "restored"],
+      "additionalProperties": false
+    }
+  },
+  "empty_trash": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "emptied": {
+          "type": "boolean"
+        }
+      },
+      "required": ["emptied"],
+      "additionalProperties": false
+    }
+  },
+  "create_workflow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Workflow name"
+        },
+        "workflowType": {
+          "type": "string",
+          "enum": ["REVIEW_APPROVE"],
+          "description": "Type of workflow"
+        },
+        "fileGroupId": {
+          "type": "string",
+          "description": "Group ID of the file to attach the workflow to"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "stepType": {
+                "type": "string",
+                "enum": ["REVIEW", "APPROVAL"],
+                "description": "Step type"
+              },
+              "assignees": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Usernames of assignees for this step"
+              },
+              "dueDate": {
+                "description": "Due date for this step (ISO 8601)",
+                "type": "string"
+              },
+              "minMustComplete": {
+                "description": "Minimum number of assignees that must complete the step",
+                "type": "number"
+              },
+              "signatureRequired": {
+                "description": "Whether a signature is required",
+                "type": "boolean"
+              }
+            },
+            "required": ["stepType", "assignees"],
+            "additionalProperties": false
+          },
+          "description": "Workflow steps in order"
+        }
+      },
+      "required": ["name", "workflowType", "fileGroupId", "steps"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "Created workflow ID"
+        }
+      },
+      "required": ["workflowId"],
+      "additionalProperties": false
+    }
+  },
+  "get_workflow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "Workflow ID to retrieve"
+        }
+      },
+      "required": ["workflowId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "description": "Workflow status (e.g. IN_PROGRESS, COMPLETED, CANCELLED)",
+          "type": "string"
+        },
+        "creationDate": {
+          "type": "string"
+        },
+        "completionDate": {
+          "type": "string"
+        },
+        "creator": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "stepType": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "tasks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "taskId": {
+                      "type": "string"
+                    },
+                    "assignee": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "completionDate": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["workflowId"],
+      "additionalProperties": false
+    }
+  },
+  "list_workflow_tasks": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "offset": {
+          "description": "Pagination offset",
+          "type": "number"
+        },
+        "count": {
+          "description": "Number of tasks per page",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "taskType": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "creationDate": {
+                "type": "string"
+              },
+              "dueDate": {
+                "type": "string"
+              },
+              "workflowId": {
+                "type": "string"
+              },
+              "workflowName": {
+                "type": "string"
+              },
+              "fileName": {
+                "type": "string"
+              },
+              "filePath": {
+                "type": "string"
+              }
+            },
+            "required": ["taskId"],
+            "additionalProperties": false
+          },
+          "description": "List of workflow tasks"
+        },
+        "totalCount": {
+          "type": "number"
+        }
+      },
+      "required": ["tasks"],
+      "additionalProperties": false
+    }
+  },
+  "cancel_workflow": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string",
+          "description": "ID of the workflow to cancel"
+        }
+      },
+      "required": ["workflowId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "workflowId": {
+          "type": "string"
+        },
+        "cancelled": {
+          "type": "boolean"
+        }
+      },
+      "required": ["workflowId", "cancelled"],
+      "additionalProperties": false
+    }
+  },
+  "create_audit_report": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportType": {
+          "type": "string",
+          "enum": ["logins", "files", "permissions", "users", "groups"],
+          "description": "Type of audit report"
+        },
+        "format": {
+          "description": "Report output format (default: json)",
+          "type": "string",
+          "enum": ["json", "csv"]
+        },
+        "dateStart": {
+          "type": "string",
+          "description": "Start date for the report (ISO 8601)"
+        },
+        "dateEnd": {
+          "type": "string",
+          "description": "End date for the report (ISO 8601)"
+        },
+        "transactionType": {
+          "description": "For file reports: filter by action type (e.g. \"download\", \"preview\", \"upload\")",
+          "type": "string"
+        },
+        "users": {
+          "description": "Filter by specific usernames",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "folders": {
+          "description": "Filter by specific folder paths",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["reportType", "dateStart", "dateEnd"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "description": "ID to retrieve the report results"
+        },
+        "reportType": {
+          "type": "string"
+        }
+      },
+      "required": ["reportId", "reportType"],
+      "additionalProperties": false
+    }
+  },
+  "get_audit_report": {
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportType": {
+          "type": "string",
+          "enum": ["logins", "files", "permissions", "users", "groups"],
+          "description": "Type of audit report"
+        },
+        "reportId": {
+          "type": "string",
+          "description": "Report ID returned from creating the audit report"
+        }
+      },
+      "required": ["reportType", "reportId"],
+      "additionalProperties": false
+    },
+    "output": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string"
+        },
+        "status": {
+          "description": "Report generation status",
+          "type": "string"
+        },
+        "events": {
+          "description": "Report event data (if ready and format is JSON)",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "totalCount": {
+          "type": "number"
+        }
+      },
+      "required": ["reportId"],
+      "additionalProperties": false
+    }
+  }
+}

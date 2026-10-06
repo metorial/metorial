@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { phantom } from '../lib/responses';
 import { spec } from '../spec';
 
 export let listPhantoms = SlateTool.create(spec, {
@@ -48,18 +49,7 @@ export let listPhantoms = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let agents = await client.fetchAllAgents();
 
-    let phantoms = (Array.isArray(agents) ? agents : []).map((agent: any) => ({
-      phantomId: String(agent.id),
-      name: agent.name ?? '',
-      scriptId: agent.scriptId ? String(agent.scriptId) : undefined,
-      launchType: agent.launchType ?? undefined,
-      repeatedLaunchInterval: agent.repeatedLaunchInterval ?? undefined,
-      s3Folder: agent.s3Folder ?? undefined,
-      executionTimeLimit: agent.executionTimeLimit ?? undefined,
-      lastEndMessage: agent.lastEndMessage ?? undefined,
-      lastEndStatus: agent.lastEndStatus ?? undefined,
-      lastLaunchTimestamp: agent.lastLaunch ?? undefined
-    }));
+    let phantoms = agents.map(phantom);
 
     return {
       output: { phantoms },

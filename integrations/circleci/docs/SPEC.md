@@ -71,7 +71,7 @@ CircleCI supports **outbound webhooks** that push event notifications to externa
 
 Setting up an outbound webhook on CircleCI enables your third party service to receive information (referred to as events) from CircleCI, as they happen.
 
-Webhooks are configured at the project level and the API requires an HTTPS receiver URL and a signing secret. Each outgoing request contains a `circleci-signature` header. The integration verifies its v1 HMAC-SHA256 signature when `webhookSigningSecret` is configured. There is a limit of 5 webhooks per project.
+Webhooks are configured at the project level and the API requires an HTTPS receiver URL and a signing secret. Each outgoing request contains a `circleci-signature` header. There is a limit of 5 webhooks per project.
 
 ### Workflow Completed
 

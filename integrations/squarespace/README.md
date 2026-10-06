@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/squarespace.png" height="20"> Squarespace
 
-Manage e-commerce operations for Squarespace merchant sites. Retrieve, create, update, and fulfill orders, including importing orders from third-party channels. Manage products and product variants across physical, service, gift card, and digital products. Track and adjust inventory stock levels across product variants. Manage customer contacts and address book entries through the current Contacts API, while retaining read access to legacy Profiles. Retrieve financial transaction data and contact transaction summaries. Get site information such as name, URL, currency, and time zone. Subscribe to webhooks for order creation and update events.
+Manage e-commerce operations for Squarespace merchant sites. Retrieve, create, update, and fulfill orders, including importing orders from third-party channels. Manage products and product variants across physical, service, gift card, and digital products. Track and adjust inventory stock levels across product variants. Manage customer contacts and address book entries through the current Contacts API, while retaining read access to legacy Profiles. Retrieve financial transaction data and contact transaction summaries. Get site information such as name, URL, currency, and time zone.
 
 ## Tools
 

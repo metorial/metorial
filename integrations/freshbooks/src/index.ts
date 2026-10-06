@@ -2,13 +2,16 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getClient,
+  getIdentity,
   getInvoice,
+  getResource,
   listClients,
   listExpenses,
   listInvoices,
   listItems,
   listPayments,
   listProjects,
+  listResources,
   listTaxes,
   listTimeEntries,
   manageClients,
@@ -22,23 +25,12 @@ import {
   manageTaxes,
   manageTimeEntries
 } from './tools';
-import {
-  billEvents,
-  clientEvents,
-  creditNoteEvents,
-  estimateEvents,
-  expenseEvents,
-  invoiceEvents,
-  itemEvents,
-  paymentEvents,
-  projectEvents,
-  taxEvents,
-  timeEntryEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getIdentity,
+    getResource,
+    listResources,
     manageClients,
     listClients,
     getClient,
@@ -60,17 +52,5 @@ export let provider = Slate.create({
     listItems,
     manageCreditNotes
   ],
-  triggers: [
-    invoiceEvents,
-    clientEvents,
-    estimateEvents,
-    expenseEvents,
-    paymentEvents,
-    projectEvents,
-    timeEntryEvents,
-    billEvents,
-    creditNoteEvents,
-    itemEvents,
-    taxEvents
-  ]
+  triggers: []
 });

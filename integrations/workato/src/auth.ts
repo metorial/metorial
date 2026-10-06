@@ -1,55 +1,46 @@
-import { axios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-import { getApiBaseUrl } from './lib/urls';
-
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string()
-    })
-  )
+import { WorkatoClient } from './lib/client';
+import { workspace } from './lib/mappers';
+import { dataCenters } from './lib/urls';
+export const auth = SlateAuth.create()
+  .output(z.object({ token: z.string(), dataCenter: z.enum(dataCenters).optional() }))
   .addTokenAuth({
     type: 'auth.token',
-    name: 'API Token',
+    name: 'API Client Token',
     key: 'api_token',
-
     inputSchema: z.object({
       token: z
         .string()
         .describe(
-          'Workato API client token (Bearer token). Create one under Workspace admin > API clients.'
+          'Workato Developer API client Bearer token with the required endpoint privileges and project scope.'
         ),
       dataCenter: z
-        .enum(['us', 'eu', 'jp', 'sg', 'au'])
+        .enum(dataCenters)
         .default('us')
-        .describe('Data center region of your Workato workspace')
+        .describe(
+          'Data center of the workspace that issued this token. Private workspaces require separate provider guidance.'
+        )
     }),
-
     getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.token
-        }
-      };
+      new WorkatoClient({ token: ctx.input.token, dataCenter: ctx.input.dataCenter });
+      return { output: { token: ctx.input.token, dataCenter: ctx.input.dataCenter } };
     },
-
     getProfile: async (ctx: {
-      output: { token: string };
-      input: { token: string; dataCenter: string };
+      output: { token: string; dataCenter?: string };
+      input: { token: string; dataCenter?: string };
     }) => {
-      let baseUrl = getApiBaseUrl(ctx.input.dataCenter ?? 'us');
-      let response = await axios.get(`${baseUrl}/users/me`, {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-      let user = response.data;
+      const info = workspace(
+        await new WorkatoClient({
+          token: ctx.output.token,
+          dataCenter: ctx.output.dataCenter ?? ctx.input.dataCenter ?? 'us'
+        }).getWorkspaceInfo()
+      );
       return {
         profile: {
-          id: String(user.id),
-          email: user.email ?? undefined,
-          name: user.name ?? undefined,
-          imageUrl: user.avatar_url ?? undefined
+          id: String(info.workspaceId),
+          name: info.teamName ?? info.name,
+          email: info.email ?? undefined
         }
       };
     }

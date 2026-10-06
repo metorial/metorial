@@ -1,101 +1,115 @@
 import { SlateTool } from 'slates';
-import { z } from 'zod';
 import { DatabaseClient } from '../lib/client';
+import {
+  dbId,
+  exactRecord,
+  mappedRecord,
+  nativeRecord,
+  page,
+  recordOutput,
+  single,
+  tblId
+} from '../lib/schemas';
+import { bytes, connection, fail, paging, z } from '../lib/validation';
 import { spec } from '../spec';
-
-let recordSchema = z.object({
-  recordId: z.string().describe('Unique record identifier'),
-  tableId: z.string().describe('Table the record belongs to'),
-  fields: z
-    .record(z.string(), z.unknown())
-    .describe('Field values of the record (keyed by field ID or name)'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp')
-});
-
-export let getRecords = SlateTool.create(spec, {
+export const getRecords = SlateTool.create(spec, {
   name: 'Get Records',
   key: 'get_records',
-  description: `Retrieve records from a Softr table. Fetch a single record by ID, or list records with pagination. Use the \`fieldNames\` option to get human-readable field names instead of field IDs in the response.`,
-  instructions: [
-    'Set `fieldNames` to true for more readable output with field names as keys instead of IDs.',
-    'Use `offset` and `limit` for pagination. Maximum `limit` is 200.'
-  ],
-  tags: {
-    destructive: false,
-    readOnly: true
-  }
+  description:
+    'Read one exact record or a native page in a table from list_tables. Use list_table_views for a viewId. Optionally prepare a bounded JSON download of the returned record data; this does not create a provider export job.',
+  constraints: ['Local JSON request/download bound:8 MiB; one page at most200 records.'],
+  tags: { readOnly: true }
 })
   .input(
     z.object({
-      databaseId: z.string().describe('ID of the database'),
-      tableId: z.string().describe('ID of the table'),
-      recordId: z
-        .string()
-        .optional()
-        .describe('Specific record ID to retrieve. If omitted, lists records.'),
-      offset: z
-        .number()
-        .optional()
-        .describe('Number of records to skip (for pagination, default 0)'),
-      limit: z
-        .number()
-        .optional()
-        .describe('Maximum number of records to return (default 10, max 200)'),
-      fieldNames: z
+      databaseId: dbId,
+      tableId: tblId,
+      recordId: z.string().optional(),
+      offset: z.number().optional(),
+      limit: z.number().optional(),
+      fieldNames: z.boolean().optional(),
+      viewId: z.string().optional(),
+      download: z
         .boolean()
         .optional()
-        .describe('Use field names instead of IDs as keys in the response'),
-      viewId: z.string().optional().describe('Filter records by a specific view')
+        .describe('Prepare the returned single record or page as a JSON download.')
     })
   )
   .output(
     z.object({
-      records: z.array(recordSchema).optional().describe('List of records (when listing)'),
-      record: recordSchema.optional().describe('Single record (when fetching by ID)'),
-      total: z.number().optional().describe('Total number of records in the table'),
-      offset: z.number().optional().describe('Current offset'),
-      limit: z.number().optional().describe('Current limit')
+      records: z.array(recordOutput).optional(),
+      record: recordOutput.optional(),
+      total: z.number().optional(),
+      offset: z.number().optional(),
+      limit: z.number().optional(),
+      hasMore: z.boolean().optional(),
+      nextOffset: z.number().optional(),
+      filename: z.string().optional(),
+      mimeType: z.string().optional(),
+      size: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new DatabaseClient({ token: ctx.auth.token });
-    let { databaseId, tableId, recordId, offset, limit, fieldNames, viewId } = ctx.input;
-
-    let mapRecord = (r: any) => ({
-      recordId: r.id,
-      tableId: r.tableId,
-      fields: r.fields || {},
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt
-    });
-
-    if (recordId) {
-      let result = await client.getRecord(databaseId, tableId, recordId, { fieldNames });
-      let record = mapRecord(result.data);
-      return {
-        output: { record },
-        message: `Retrieved record \`${recordId}\`.`
+    const client = new DatabaseClient(connection(ctx.auth, ctx.config));
+    let output: Record<string, unknown>;
+    if (ctx.input.recordId !== undefined) {
+      if (
+        ctx.input.offset !== undefined ||
+        ctx.input.limit !== undefined ||
+        ctx.input.viewId !== undefined
+      )
+        fail('A single-record read does not accept page or view filters.');
+      output = {
+        record: mappedRecord(
+          exactRecord(
+            single(
+              nativeRecord,
+              await client.getRecord(
+                ctx.input.databaseId,
+                ctx.input.tableId,
+                ctx.input.recordId,
+                { fieldNames: ctx.input.fieldNames }
+              )
+            ),
+            ctx.input.tableId,
+            ctx.input.recordId
+          )
+        )
+      };
+    } else {
+      const p = paging(ctx.input.offset, ctx.input.limit);
+      output = page(
+        await client.listRecords(ctx.input.databaseId, ctx.input.tableId, {
+          ...p,
+          fieldNames: ctx.input.fieldNames,
+          viewId: ctx.input.viewId
+        }),
+        ctx.input.tableId,
+        p
+      );
+    }
+    if (ctx.input.download) {
+      const content = bytes(output);
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(new Uint8Array(content), {
+          headers: { 'content-type': 'application/json' }
+        }),
+        filename: 'records.json',
+        mimeType: 'application/json'
+      });
+      output = {
+        ...output,
+        filename: 'records.json',
+        mimeType: 'application/json',
+        size: content.length
       };
     }
-
-    let result = await client.listRecords(databaseId, tableId, {
-      offset,
-      limit,
-      fieldNames,
-      viewId
-    });
-    let records = (result.data || []).map(mapRecord);
-    let metadata = result.metadata || {};
-
     return {
-      output: {
-        records,
-        total: metadata.total,
-        offset: metadata.offset,
-        limit: metadata.limit
-      },
-      message: `Retrieved **${records.length}** record(s)${metadata.total !== undefined ? ` out of ${metadata.total} total` : ''}.`
+      output,
+      message: ctx.input.download
+        ? 'Returned record data and prepared its JSON download.'
+        : 'Returned native record data and exact page metadata.'
     };
   })
   .build();

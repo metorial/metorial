@@ -1,4 +1,5 @@
 export * from './execute-query';
+export * from './export-application';
 export * from './manage-application';
 export * from './manage-row';
 export * from './manage-table';

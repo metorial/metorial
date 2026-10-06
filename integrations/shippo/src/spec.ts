@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'shippo',
   name: 'Shippo',
   description:
-    'Multi-carrier shipping API for comparing rates, creating labels, tracking packages, and managing shipments across 85+ carriers.',
+    'Compare connected carrier rates, create labels and shipments, track packages, and download shipping documents.',
   metadata: {},
   config,
   auth

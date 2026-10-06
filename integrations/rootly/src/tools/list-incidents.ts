@@ -15,6 +15,7 @@ Use this to find active incidents, review past incidents, or audit incident hist
   .input(
     z.object({
       search: z.string().optional().describe('Search incidents by text'),
+      kind: z.string().optional().describe('Filter by incident kind, such as normal or test'),
       status: z
         .string()
         .optional()
@@ -31,15 +32,24 @@ Use this to find active incidents, review past incidents, or audit incident hist
           'Sort field, e.g. "-created_at" for newest first, "created_at" for oldest first'
         ),
       pageNumber: z.number().optional().describe('Page number for pagination'),
-      pageSize: z.number().optional().describe('Number of results per page (max 50)')
+      pageSize: z.number().optional().describe('Number of results per page')
     })
   )
   .output(
     z.object({
+      returnedCount: z.number().describe('Number of records returned in this response'),
+      currentPage: z.number().optional().describe('Provider page number, when supplied'),
+      totalPages: z.number().optional().describe('Provider page count, when supplied'),
+      nextCursor: z
+        .string()
+        .optional()
+        .describe('Provider continuation cursor, when supplied'),
+      included: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Requested related resources'),
       incidents: z.array(z.record(z.string(), z.any())).describe('List of incidents'),
-      totalCount: z.number().optional().describe('Total number of matching incidents'),
-      currentPage: z.number().optional().describe('Current page number'),
-      totalPages: z.number().optional().describe('Total number of pages')
+      totalCount: z.number().optional().describe('Total number of matching incidents')
     })
   )
   .handleInvocation(async ctx => {
@@ -47,6 +57,7 @@ Use this to find active incidents, review past incidents, or audit incident hist
 
     let result = await client.listIncidents({
       search: ctx.input.search,
+      kind: ctx.input.kind,
       status: ctx.input.status,
       severity: ctx.input.severity,
       serviceIds: ctx.input.serviceIds,
@@ -60,10 +71,13 @@ Use this to find active incidents, review past incidents, or audit incident hist
 
     return {
       output: {
-        incidents,
-        totalCount: result.meta?.total_count,
+        returnedCount: incidents.length,
         currentPage: result.meta?.current_page,
-        totalPages: result.meta?.total_pages
+        totalPages: result.meta?.total_pages,
+        nextCursor: result.meta?.next_cursor,
+        included: result.included ? flattenResources(result.included) : undefined,
+        incidents,
+        totalCount: result.meta?.total_count
       },
       message: `Found **${incidents.length}** incidents${result.meta?.total_count ? ` (${result.meta.total_count} total)` : ''}.`
     };

@@ -1,69 +1,29 @@
-# <img src="https://provider-logos.metorial-cdn.com/lever.png" height="20"> Lever
+# Lever
 
-Manage candidates, opportunities, and hiring pipelines in Lever's applicant tracking system (ATS) and CRM. Create, update, and list job postings with descriptions, requirements, and categories. Track candidates through pipeline stages, archive or hire them, and manage their contact information, resumes, files, and tags. Schedule and manage interview panels, assign interviewers, and collect structured feedback via customizable forms and templates. View offers including compensation, status, and signature tracking. Create and manage hiring requisitions with headcount tracking, compensation bands, and approval workflows. Manage users with access roles and external directory mappings. Retrieve EEO responses, diversity surveys, audit events, referrals, sources, and archive reasons. Upload files and submit applications on behalf of candidates. Listen for webhooks on candidate stage changes, hires, interview events, contact updates, and application creation.
+Work with opportunities, shared candidate contacts, job postings and the hiring pipeline in Lever. Read related activity, discover resource IDs and download opportunity files or resumes. Existing tools also support users, requisitions and individual interviews on externally managed panels.
 
-## Tools
+| Workflow | Tools |
+| --- | --- |
+| Opportunities | `list_opportunities`, `get_opportunity`, `create_opportunity`, `update_opportunity` |
+| Candidate contact and notes | `update_contact`, `add_note` |
+| Postings | `list_postings`, `manage_posting` |
+| Users | `list_users`, `manage_user` |
+| Interview and requisition management | `manage_interview`, `manage_requisition` |
+| Pipeline and activity discovery | `get_pipeline_metadata`, `get_opportunity_activity` |
+| Exact resource reads | `get_resource`: posting, user, requisition, interview or panel |
+| Additional discovery | `list_resources`: requisitions, panels or feedback templates |
+| Downloads | `download_file`: one opportunity file or resume |
 
-### Add Note
+Use `list_users` to select the acting user required for opportunity, posting and interview creation or updates. Discover opportunities with `list_opportunities`, pipeline IDs with `get_pipeline_metadata`, and panel or requisition IDs with `list_resources`. Listing tools return one page; follow the cursor for that same resource type. A cursor cannot be shared across different activity or metadata collections.
 
-Add a note to an opportunity in Lever. Notes can be used to record internal feedback, observations, or any other relevant information about a candidate.
+Production and sandbox connections support OAuth or an API key. OAuth includes refresh access and requests twenty scopes covering the available tools. API keys use Basic authentication with an empty password. Historical API-key connections created with the previous Bearer behavior must reconnect. Lever documents no suitable authenticated-self endpoint, so `list_users` discovers authorized users without claiming to identify the connection owner.
 
-### Create Opportunity
+Updates to users, requisitions and interviews preserve current writable fields and check a second read for changes. Nested requisition custom fields are merged, while supplied arrays replace their existing values. These checks cannot prevent changes after the final read. Opportunity changes execute sequentially and can partially complete. Contacts are shared across candidacies; changing one affects every associated opportunity.
 
-Create a new opportunity (candidacy) in Lever. Provide candidate contact information and optionally assign to a posting, stage, owner, and tags. Lever automatically deduplicates candidates by email address.
+Interview actions require the opportunity and acting-user IDs. They do not create panels or write panel timezones. Deleting the last interview can delete its panel. Existing interview conference details that cannot be preserved through the documented write format prevent replacement updates. Changing a user to the interviewer role removes that user’s followed profiles. Posting writes bypass Lever’s posting approval workflow. The legacy posting `salaryRange` input is retained but rejected because the authenticated Data API does not document that write; edit salary details in Lever.
 
-### Get Opportunity Activity
+File downloads use exact opportunity and file IDs. This integration does not upload files, submit applications, edit feedback forms, configure webhooks, manage approval chains, or expose payroll, EEO, diversity surveys or audit administration. EU data-center redirects and deployed file delivery have not been verified; authenticated HTTP redirects are rejected.
 
-Retrieve activity for a specific opportunity including notes, feedback, interviews, offers, applications, resumes, and referrals. Select which types of activity to fetch.
-
-### Get Opportunity
-
-Retrieve a single opportunity by ID with full details including contact info, applications, feedback, notes, offers, resumes, and files. Use the expand parameter to include related objects.
-
-### Get Pipeline Metadata
-
-Retrieve pipeline configuration metadata from Lever including stages, archive reasons, sources, and tags. Select which types of metadata to fetch. Useful for looking up stage IDs, archive reason IDs, and available tags/sources.
-
-### List Opportunities
-
-List and search opportunities (candidacies) in Lever. Supports filtering by tags, email, origin, posting, stage, archive status, and date ranges. Returns paginated results with candidate contact information.
-
-### List Postings
-
-List job postings in Lever with optional filtering by state, team, department, location, and commitment. Returns posting details including job descriptions, categories, and distribution channels.
-
-### List Users
-
-List users in the Lever account. Supports filtering by email and including deactivated users.
-
-### Manage Interview
-
-Create, update, or delete interviews and panels for opportunities. Use this to schedule interviews, assign interviewers, and manage interview panels.
-
-### Manage Posting
-
-Create a new job posting or update an existing one. Supports setting posting text, categories (team, department, location, commitment), state, distribution channels, salary ranges, and workplace type.
-
-### Manage Requisition
-
-Create, update, or delete a hiring requisition. Requisitions support headcount tracking, compensation bands, custom fields, and associations to job postings. Requires API-management of requisitions to be enabled.
-
-### Manage User
-
-Create, update, deactivate, or reactivate a Lever user. Supports setting access roles, name, email, and external directory ID for HRIS integration.
-
-### Update Contact
-
-View or update a contact's information in Lever. Contacts represent unique individuals and are shared across all of their opportunities. Updating a contact affects all their opportunities.
-
-### Update Opportunity
-
-Update an opportunity in Lever. Supports changing pipeline stage, archiving/unarchiving, managing tags, links, and sources. Multiple updates can be performed in a single call.
-
-## License
+See the [supported API contracts](docs/SPEC.md), [Lever API documentation](https://hire.lever.co/developer/documentation) and [OAuth guide](https://hire.lever.co/developer/oauth).
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>

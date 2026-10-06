@@ -1,7 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+
+const projectIdSchema = z
+  .string()
+  .optional()
+  .describe(
+    'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+  );
+const aggregateFunctionSchema = z
+  .enum(['average', 'min', 'max', 'median', 'p95', 'p99', 'p90', 'sum', 'count'])
+  .optional()
+  .describe('Metric aggregation function');
 
 export let listRuns = SlateTool.create(spec, {
   name: 'List Experiment Runs',
@@ -16,13 +27,28 @@ export let listRuns = SlateTool.create(spec, {
       project: z
         .string()
         .optional()
-        .describe('Project name or ID. Falls back to the configured default project.'),
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        ),
       datasetId: z.string().optional().describe('Filter by dataset ID'),
+      runIds: z.array(z.string()).optional().describe('Filter by specific run IDs'),
       name: z.string().optional().describe('Filter by run name'),
       status: z.enum(['pending', 'completed']).optional().describe('Filter by status'),
-      page: z.number().optional().default(1).describe('Page number'),
-      limit: z.number().optional().default(20).describe('Results per page'),
-      sortBy: z.string().optional().describe('Field to sort by'),
+      page: z.number().int().min(1).optional().default(1).describe('Page number'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(7500)
+        .optional()
+        .default(20)
+        .describe('Results per page'),
+      sortBy: z
+        .string()
+        .optional()
+        .describe(
+          'Sort field: created_at, updated_at, name, status, or run_id (run_id sorting loads the complete filtered run collection)'
+        ),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort order')
     })
   )
@@ -54,6 +80,7 @@ export let listRuns = SlateTool.create(spec, {
     let data = await client.listRuns({
       project,
       dataset_id: ctx.input.datasetId,
+      run_ids: ctx.input.runIds,
       name: ctx.input.name,
       status: ctx.input.status,
       page: ctx.input.page,
@@ -62,21 +89,23 @@ export let listRuns = SlateTool.create(spec, {
       sort_order: ctx.input.sortOrder
     });
 
-    let runs = (data.evaluations || []).map((r: any) => ({
-      runId: r.run_id || r._id,
-      name: r.name,
-      status: r.status,
-      datasetId: r.dataset_id,
+    let records: Record<string, any>[] = data.evaluations || [];
+    let runs = records.map(r => ({
+      runId: r.run_id || r.id,
+      name: r.name ?? undefined,
+      status: r.status ?? undefined,
+      datasetId: r.dataset_id ?? undefined,
       createdAt: r.created_at
     }));
+    let totalRuns = data.pagination?.total;
 
     return {
       output: {
         runs,
-        totalRuns: data.pagination?.total,
+        totalRuns,
         totalPages: data.pagination?.total_pages
       },
-      message: `Found **${runs.length}** run(s)${data.pagination?.total ? ` (total: ${data.pagination.total})` : ''}.`
+      message: `Found **${runs.length}** run(s) (total: ${totalRuns}).`
     };
   })
   .build();
@@ -84,14 +113,16 @@ export let listRuns = SlateTool.create(spec, {
 export let createRun = SlateTool.create(spec, {
   name: 'Create Experiment Run',
   key: 'create_run',
-  description: `Create a new evaluation/experiment run. Runs associate a set of traced events with a dataset and configuration for structured evaluation and comparison.`
+  description: `Create a new evaluation/experiment run. Runs associate traced events with a dataset and configuration for evaluation and comparison.`
 })
   .input(
     z.object({
       project: z
         .string()
         .optional()
-        .describe('Project ID. Falls back to the configured default project.'),
+        .describe(
+          'Legacy project selector retained for compatibility. The connection API key determines the project; this value does not change its scope.'
+        ),
       name: z.string().describe('Name for the experiment run'),
       eventIds: z.array(z.string()).describe('Event IDs to include in the run'),
       datasetId: z.string().optional().describe('Dataset ID for this run'),
@@ -116,9 +147,6 @@ export let createRun = SlateTool.create(spec, {
     });
 
     let project = ctx.input.project || ctx.config.project;
-    if (!project) {
-      throw new Error('Project name or ID is required.');
-    }
 
     let data = await client.createRun({
       project,
@@ -157,6 +185,7 @@ export let getRun = SlateTool.create(spec, {
       name: z.string().optional().describe('Run name'),
       status: z.string().optional().describe('Run status'),
       project: z.string().optional().describe('Project name'),
+      projectId: z.string().optional().describe('Project ID returned by the provider'),
       datasetId: z.string().optional().describe('Associated dataset ID'),
       eventIds: z.array(z.string()).optional().describe('Event IDs in this run'),
       datapointIds: z.array(z.string()).optional().describe('Datapoint IDs'),
@@ -175,15 +204,21 @@ export let getRun = SlateTool.create(spec, {
       serverUrl: ctx.config.serverUrl
     });
 
-    let data = await client.getRun(ctx.input.runId);
+    let response = await client.getRun(ctx.input.runId);
+    let data = response.evaluation || response;
+    if (data?.run_id !== ctx.input.runId)
+      throw createApiServiceError('HoneyHive did not return the requested run.', {
+        reason: 'honeyhive_invalid_response'
+      });
 
     return {
       output: {
         runId: data.run_id || ctx.input.runId,
-        name: data.name,
-        status: data.status,
+        name: data.name ?? undefined,
+        status: data.status ?? undefined,
         project: data.project,
-        datasetId: data.dataset_id,
+        projectId: data.scope_type === 'project' ? data.scope_id : undefined,
+        datasetId: data.dataset_id ?? undefined,
         eventIds: data.event_ids,
         datapointIds: data.datapoint_ids,
         results: data.results,
@@ -206,7 +241,9 @@ export let getRunResult = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      runId: z.string().describe('ID of the run')
+      runId: z.string().describe('ID of the run'),
+      projectId: projectIdSchema,
+      aggregateFunction: aggregateFunctionSchema
     })
   )
   .output(
@@ -225,11 +262,13 @@ export let getRunResult = SlateTool.create(spec, {
       serverUrl: ctx.config.serverUrl
     });
 
-    let data = await client.getRunResult(ctx.input.runId);
+    let data = await client.getRunResult(ctx.input.runId, {
+      aggregate_function: ctx.input.aggregateFunction
+    });
 
     return {
       output: {
-        status: data.status,
+        status: data.status ?? undefined,
         success: data.success,
         passed: data.passed,
         failed: data.failed,
@@ -252,7 +291,9 @@ export let compareRuns = SlateTool.create(spec, {
   .input(
     z.object({
       newRunId: z.string().describe('ID of the newer run'),
-      oldRunId: z.string().describe('ID of the older (baseline) run')
+      oldRunId: z.string().describe('ID of the older (baseline) run'),
+      projectId: projectIdSchema,
+      aggregateFunction: aggregateFunctionSchema
     })
   )
   .output(
@@ -271,7 +312,9 @@ export let compareRuns = SlateTool.create(spec, {
       serverUrl: ctx.config.serverUrl
     });
 
-    let data = await client.compareRuns(ctx.input.newRunId, ctx.input.oldRunId);
+    let data = await client.compareRuns(ctx.input.newRunId, ctx.input.oldRunId, {
+      aggregate_function: ctx.input.aggregateFunction
+    });
 
     return {
       output: {
@@ -313,6 +356,62 @@ export let deleteRun = SlateTool.create(spec, {
     return {
       output: { success: true },
       message: `Deleted run \`${ctx.input.runId}\`.`
+    };
+  })
+  .build();
+
+export let updateRun = SlateTool.create(spec, {
+  name: 'Update Experiment Run',
+  key: 'update_run',
+  description:
+    'Update an experiment run name, status, configuration, metadata, or associated events and datapoints.'
+})
+  .input(
+    z.object({
+      runId: z.string().describe('Run ID. Call list_runs to discover runs.'),
+      name: z.string().optional().describe('Updated run name'),
+      status: z.enum(['pending', 'completed']).optional().describe('Updated run status'),
+      eventIds: z
+        .array(z.string())
+        .optional()
+        .describe('Additional event IDs to associate with the run'),
+      datasetId: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy update field unavailable on the current API; set datasetId when creating a run.'
+        ),
+      datapointIds: z
+        .array(z.string())
+        .optional()
+        .describe('Additional datapoint IDs to associate with the run'),
+      configuration: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Updated configuration'),
+      metadata: z.record(z.string(), z.unknown()).optional().describe('Updated run metadata')
+    })
+  )
+  .output(z.object({ success: z.boolean(), runId: z.string() }))
+  .handleInvocation(async ctx => {
+    if (
+      Object.entries(ctx.input).every(([key, value]) => key === 'runId' || value === undefined)
+    ) {
+      throw createApiServiceError('Provide at least one field to update.');
+    }
+    let client = new Client({ token: ctx.auth.token, serverUrl: ctx.config.serverUrl });
+    await client.updateRun(ctx.input.runId, {
+      name: ctx.input.name,
+      status: ctx.input.status,
+      event_ids: ctx.input.eventIds,
+      dataset_id: ctx.input.datasetId,
+      datapoint_ids: ctx.input.datapointIds,
+      configuration: ctx.input.configuration,
+      metadata: ctx.input.metadata
+    });
+    return {
+      output: { success: true, runId: ctx.input.runId },
+      message: `Updated experiment run ${ctx.input.runId}.`
     };
   })
   .build();

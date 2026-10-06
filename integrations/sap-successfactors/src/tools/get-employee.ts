@@ -8,8 +8,8 @@ export let getEmployee = SlateTool.create(spec, {
   key: 'get_employee',
   description: `Retrieve detailed employee information from SAP SuccessFactors. Fetches a single employee by user ID, including personal data, employment details, and optionally expanded navigation properties like job info and compensation.`,
   instructions: [
-    'Use the userId field from SuccessFactors (not a numeric ID)',
-    'Use the expand parameter to fetch related data like "EmpJob" or "EmpCompensation" in one request'
+    'Use the exact userId string returned by search_employees, including numeric-looking IDs',
+    'Call get_api_metadata for User to discover exact navigation names before expanding related records'
   ],
   tags: {
     readOnly: true
@@ -28,7 +28,7 @@ export let getEmployee = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Comma-separated navigation properties to expand (e.g., "EmpJob,EmpCompensation,personalInfoNav")'
+          'Comma-separated User navigation properties from get_api_metadata (for example, manager or hr)'
         )
     })
   )
@@ -52,7 +52,7 @@ export let getEmployee = SlateTool.create(spec, {
 
     return {
       output: { employee },
-      message: `Retrieved employee **${(employee as Record<string, unknown>).defaultFullName || ctx.input.userId}**`
+      message: 'Retrieved the employee record.'
     };
   })
   .build();

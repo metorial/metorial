@@ -32,55 +32,43 @@ export let listLeadsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextSkip: z.number().optional().describe('Offset for the next page, when available.'),
       leads: z.array(
         z.object({
           leadId: z.string().describe('Unique lead ID'),
-          name: z.string().describe('Lead/company name'),
+          name: z.string().optional().describe('Lead/company name, when set'),
           statusId: z.string().nullable().describe('Lead status ID'),
           statusLabel: z.string().nullable().describe('Lead status label'),
-          displayName: z.string().describe('Lead display name'),
+          displayName: z.string().optional().describe('Lead display name, when provided'),
           dateCreated: z.string().describe('Creation timestamp'),
           dateUpdated: z.string().describe('Last updated timestamp')
         })
       ),
-      totalResults: z.number().describe('Total number of leads matching the query'),
+      totalResults: z.number().optional().describe('Total number of leads matching the query'),
       hasMore: z
         .boolean()
         .describe('Whether more results are available beyond the current page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
-
-    let limit = ctx.input.limit ?? 100;
-
-    let result = await client.listLeads({
-      query: ctx.input.query,
-      limit,
-      skip: ctx.input.skip
-    });
-
-    let leads = (result.data || []).map((lead: any) => ({
-      leadId: lead.id,
-      name: lead.name || lead.display_name || '',
-      statusId: lead.status_id || null,
-      statusLabel: lead.status_label || null,
-      displayName: lead.display_name || lead.name || '',
-      dateCreated: lead.date_created || '',
-      dateUpdated: lead.date_updated || ''
+    const result = await new Client(ctx.auth).listLeads(ctx.input);
+    const leads = result.data.map(l => ({
+      leadId: l.id,
+      name: l.name ?? undefined,
+      statusId: l.status_id,
+      statusLabel: l.status_label ?? null,
+      displayName: l.display_name,
+      dateCreated: l.date_created,
+      dateUpdated: l.date_updated
     }));
-
-    let totalResults = result.total_results ?? leads.length;
-    let skip = ctx.input.skip ?? 0;
-    let hasMore = skip + leads.length < totalResults;
-
     return {
       output: {
         leads,
-        totalResults,
-        hasMore
+        totalResults: result.total_results ?? undefined,
+        hasMore: result.has_more,
+        nextSkip: result.has_more ? (ctx.input.skip ?? 0) + leads.length : undefined
       },
-      message: `Found **${totalResults}** lead${totalResults !== 1 ? 's' : ''}${ctx.input.query ? ` matching "${ctx.input.query}"` : ''} (showing ${leads.length}${hasMore ? ', more available' : ''})`
+      message: `Returned ${leads.length} lead(s)${result.has_more ? '; more available' : ''}.`
     };
   })
   .build();

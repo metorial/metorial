@@ -1,6 +1,6 @@
 {
   "name": "@metorial/retell-ai",
-  "description": "Build, deploy, and manage AI phone and chat agents. Create and configure voice agents with customizable voices, conversation flows, and knowledge bases. Initiate outbound phone calls, manage inbound calls, and run batch calling campaigns. Purchase and manage phone numbers with separate inbound/outbound agent assignments. Create web-based voice calls via WebRTC. Send SMS messages and manage chat sessions. Define and run batch simulation tests against agents. Monitor call concurrency, retrieve call transcripts, recordings, cost breakdowns, and post-call analysis including sentiment, summaries, and custom insights. Manage Retell LLM configurations, conversation flows, and reusable flow components. Clone and browse voices filtered by provider, gender, accent, and age. Receive real-time webhooks for call lifecycle, transcript updates, and transfer events.",
+  "description": "Build and manage Retell AI voice agents and prompt-based response engines. Create browser voice calls, initiate outbound phone calls and batch campaigns, configure phone numbers, create knowledge bases from text or URLs, browse voices, and inspect call transcripts, recordings, analysis, costs, and concurrency. Download completed call recordings.",
   "categories": [
     "apis-and-http-requests",
     "email-and-messaging",
@@ -8,15 +8,15 @@
   ],
   "skills": [
     "create and manage voice agents",
+    "manage Retell LLM response engines",
+    "publish voice agents",
     "initiate outbound phone calls",
     "run batch calling campaigns",
     "manage phone numbers",
-    "create web calls via WebRTC",
-    "send SMS messages",
-    "manage knowledge bases",
-    "retrieve call transcripts and recordings",
-    "run agent simulation tests",
-    "perform post-call analysis"
+    "create browser voice calls",
+    "create and inspect knowledge bases",
+    "retrieve call transcripts and analysis",
+    "download call recordings"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/retellai.jpeg"
 }

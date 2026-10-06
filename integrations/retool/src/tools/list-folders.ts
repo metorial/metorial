@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
 import { spec } from '../spec';
 
 export let listFolders = SlateTool.create(spec, {
@@ -19,7 +19,12 @@ export let listFolders = SlateTool.create(spec, {
         .max(100)
         .optional()
         .describe('Maximum number of folders to return (1-100)'),
-      nextToken: z.string().optional().describe('Pagination token from a previous response')
+      nextToken: z
+        .string()
+        .optional()
+        .describe(
+          'Local continuation token from a previous response; use the same limit and restart if the inventory changes'
+        )
     })
   )
   .output(
@@ -39,7 +44,7 @@ export let listFolders = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
+    let client = clientFor(ctx);
 
     let result = await client.listFolders({
       limit: ctx.input.limit,

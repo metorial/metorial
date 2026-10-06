@@ -36,8 +36,6 @@ import {
   updateRepositoryImmutableTags,
   verifyRepositoryImmutableTags
 } from './tools';
-import { imagePush } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -76,5 +74,5 @@ export let provider = Slate.create({
     listAuditLogs,
     listAuditLogActions
   ],
-  triggers: [imagePush]
+  triggers: []
 });

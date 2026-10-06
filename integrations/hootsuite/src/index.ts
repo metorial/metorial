@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getFileUrl,
   getUserInfoTool,
   listMessagesTool,
   listSocialProfilesTool,
@@ -11,8 +12,6 @@ import {
   shortenLinkTool,
   uploadMediaTool
 } from './tools';
-import { hootsuiteEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -24,7 +23,8 @@ export let provider = Slate.create({
     getUserInfoTool,
     manageOrganizationMembersTool,
     manageTeamsTool,
-    shortenLinkTool
+    shortenLinkTool,
+    getFileUrl
   ],
-  triggers: [hootsuiteEventsTrigger]
+  triggers: []
 });

@@ -1,23 +1,31 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GhostAdminClient } from '../lib/client';
+import { getClient } from '../lib/client';
+import { invalid, resourceId } from '../lib/schemas';
 import { spec } from '../spec';
 
-let newsletterOutputSchema = z.object({
-  newsletterId: z.string().describe('Unique newsletter ID'),
-  uuid: z.string().describe('Newsletter UUID'),
-  name: z.string().describe('Newsletter name'),
-  slug: z.string().describe('URL-friendly slug'),
-  description: z.string().nullable().describe('Newsletter description'),
-  status: z.string().describe('Newsletter status (active or archived)'),
-  senderName: z.string().nullable().describe('Displayed sender name'),
-  senderEmail: z.string().nullable().describe('Sender email address'),
-  senderReplyTo: z.string().describe('Reply-to setting'),
-  subscribeOnSignup: z.boolean().describe('Auto-subscribe new members'),
-  visibility: z.string().describe('Newsletter visibility'),
-  createdAt: z.string().describe('Creation timestamp'),
-  updatedAt: z.string().describe('Last update timestamp')
-});
+let newsletterOutputSchema = z
+  .object({
+    sentEmailVerification: z
+      .array(z.string())
+      .optional()
+      .describe('Native fields awaiting verification; emails already sent cannot be undone'),
+    newsletterId: z.string().describe('Unique newsletter ID'),
+    uuid: z.string().optional().describe('Newsletter UUID'),
+    name: z.string().optional().describe('Newsletter name'),
+    slug: z.string().optional().describe('URL-friendly slug'),
+    description: z.string().nullable().optional().describe('Newsletter description'),
+    status: z.string().optional().describe('Newsletter status (active or archived)'),
+    senderName: z.string().nullable().optional().describe('Displayed sender name'),
+    senderEmail: z.string().nullable().optional().describe('Sender email address'),
+    senderReplyTo: z.string().optional().describe('Reply-to setting'),
+    subscribeOnSignup: z.boolean().optional().describe('Auto-subscribe new members'),
+    visibility: z.string().optional().describe('Newsletter visibility'),
+    createdAt: z.string().optional().describe('Creation timestamp'),
+    updatedAt: z.string().optional().describe('Last update timestamp')
+  })
+  .partial()
+  .required({ newsletterId: true });
 
 export let manageNewsletter = SlateTool.create(spec, {
   name: 'Manage Newsletter',
@@ -33,7 +41,7 @@ export let manageNewsletter = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['create', 'read', 'update']).describe('Operation to perform'),
-      newsletterId: z.string().optional().describe('Newsletter ID (required for read/update)'),
+      newsletterId: resourceId.optional().describe('Newsletter ID (required for read/update)'),
       name: z.string().optional().describe('Newsletter name'),
       description: z.string().optional().describe('Newsletter description'),
       status: z.enum(['active', 'archived']).optional().describe('Newsletter status'),
@@ -63,20 +71,20 @@ export let manageNewsletter = SlateTool.create(spec, {
   )
   .output(newsletterOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GhostAdminClient({
-      domain: ctx.config.adminDomain,
-      apiKey: ctx.auth.token
-    });
+    let client = getClient(ctx);
 
     let { action } = ctx.input;
 
     if (action === 'read') {
       if (!ctx.input.newsletterId)
-        throw new Error('newsletterId is required for reading a newsletter');
+        throw invalid('newsletterId is required for reading a newsletter');
       let result = await client.readNewsletter(ctx.input.newsletterId);
       let n = result.newsletters[0];
       return {
-        output: mapNewsletter(n),
+        output: {
+          ...mapNewsletter(n),
+          sentEmailVerification: result.meta?.sent_email_verification
+        },
         message: `Retrieved newsletter **"${n.name}"** (${n.status}).`
       };
     }
@@ -107,21 +115,33 @@ export let manageNewsletter = SlateTool.create(spec, {
     if (ctx.input.headerImage !== undefined) data.header_image = ctx.input.headerImage;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for creating a newsletter');
+      if (!ctx.input.name) throw invalid('name is required for creating a newsletter');
       let result = await client.createNewsletter(data);
       let n = result.newsletters[0];
-      return { output: mapNewsletter(n), message: `Created newsletter **"${n.name}"**.` };
+      return {
+        output: {
+          ...mapNewsletter(n),
+          sentEmailVerification: result.meta?.sent_email_verification
+        },
+        message: `Created newsletter **"${n.name}"**.`
+      };
     }
 
     if (action === 'update') {
       if (!ctx.input.newsletterId)
-        throw new Error('newsletterId is required for updating a newsletter');
+        throw invalid('newsletterId is required for updating a newsletter');
       let result = await client.updateNewsletter(ctx.input.newsletterId, data);
       let n = result.newsletters[0];
-      return { output: mapNewsletter(n), message: `Updated newsletter **"${n.name}"**.` };
+      return {
+        output: {
+          ...mapNewsletter(n),
+          sentEmailVerification: result.meta?.sent_email_verification
+        },
+        message: `Updated newsletter **"${n.name}"**.`
+      };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw invalid(`Unknown action: ${action}`);
   })
   .build();
 
@@ -130,12 +150,12 @@ let mapNewsletter = (n: any) => ({
   uuid: n.uuid,
   name: n.name,
   slug: n.slug,
-  description: n.description ?? null,
+  description: n.description,
   status: n.status,
-  senderName: n.sender_name ?? null,
-  senderEmail: n.sender_email ?? null,
+  senderName: n.sender_name,
+  senderEmail: n.sender_email,
   senderReplyTo: n.sender_reply_to,
-  subscribeOnSignup: n.subscribe_on_signup ?? false,
+  subscribeOnSignup: n.subscribe_on_signup,
   visibility: n.visibility,
   createdAt: n.created_at,
   updatedAt: n.updated_at

@@ -13,6 +13,7 @@ import {
   getAccountSummary,
   getAdminLogs,
   getAuthenticationLogs,
+  getResource,
   getTelephonyLogs,
   getUser,
   listAdmins,
@@ -23,13 +24,12 @@ import {
   updateAdmin,
   updateUser
 } from './tools';
-import { adminActionEvents, authenticationEvents, inboundWebhook } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
     listUsers,
     getUser,
+    getResource,
     createUser,
     updateUser,
     deleteUser,
@@ -50,5 +50,5 @@ export let provider = Slate.create({
     getTelephonyLogs,
     getAccountSummary
   ],
-  triggers: [inboundWebhook, authenticationEvents, adminActionEvents]
+  triggers: []
 });

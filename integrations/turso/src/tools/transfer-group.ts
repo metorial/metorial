@@ -1,18 +1,25 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientForContext } from '../lib/client';
 import { spec } from '../spec';
 
 export let transferGroup = SlateTool.create(spec, {
   name: 'Transfer Group',
   key: 'transfer_group',
-  description: `Transfer a database group to another organization. Moves the group and all its databases to the target organization.`,
+  description: `Choose an organization with list_organizations. Transfer a database group to another organization. Moves the group and all its databases to the target organization.`,
   tags: {
+    readOnly: false,
     destructive: true
   }
 })
   .input(
     z.object({
+      organizationSlug: z
+        .string()
+        .optional()
+        .describe(
+          'Organization slug. Call list_organizations to discover authorized organizations; older connections may use their saved organization.'
+        ),
       groupName: z.string().describe('Name of the group to transfer'),
       targetOrganization: z.string().describe('Slug of the target organization')
     })
@@ -24,10 +31,7 @@ export let transferGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationSlug: ctx.config.organizationSlug
-    });
+    const client = clientForContext(ctx);
 
     await client.transferGroup(ctx.input.groupName, ctx.input.targetOrganization);
 

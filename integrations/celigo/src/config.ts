@@ -1,11 +1,5 @@
 import { SlateConfig } from 'slates';
 import { z } from 'zod';
 
-export let config = SlateConfig.create(
-  z.object({
-    region: z
-      .enum(['us', 'eu'])
-      .default('us')
-      .describe('Celigo deployment region. US (North America) or EU (Germany).')
-  })
-);
+// Retain the region on existing configurations; new connections select their auth region.
+export const config = SlateConfig.create(z.object({}).passthrough());

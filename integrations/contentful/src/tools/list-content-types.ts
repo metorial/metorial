@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, pageInfo } from '../lib/helpers';
+import { limitSchema, pageOutput, resourceId, selection, skipSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listContentTypes = SlateTool.create(spec, {
@@ -13,17 +14,25 @@ export let listContentTypes = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Max content types to return (default 100).'),
-      skip: z.number().optional().describe('Number to skip for pagination.')
+      ...selection,
+      api: z
+        .enum(['management', 'delivery', 'preview'])
+        .optional()
+        .describe(
+          'API for legacy token-only connections. Must match the credential type; reconnect if unknown.'
+        ),
+      limit: limitSchema.describe('Max content types to return (default 100).'),
+      skip: skipSchema.describe('Number to skip for pagination.')
     })
   )
   .output(
     z.object({
+      ...pageOutput,
       total: z.number().describe('Total number of content types.'),
       contentTypes: z
         .array(
           z.object({
-            contentTypeId: z.string().describe('Content type ID.'),
+            contentTypeId: resourceId.describe('Content type ID.'),
             name: z.string().describe('Display name.'),
             description: z.string().optional().describe('Content type description.'),
             displayField: z
@@ -57,14 +66,14 @@ export let listContentTypes = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input);
 
     let params: Record<string, string | number | boolean> = {};
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.skip) params.skip = ctx.input.skip;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
+    if (ctx.input.skip !== undefined) params.skip = ctx.input.skip;
 
     let result = await client.getContentTypes(params);
-    let items = result.items || [];
+    let items = result.items;
 
     let contentTypes = items.map((ct: any) => ({
       contentTypeId: ct.sys?.id,
@@ -84,10 +93,11 @@ export let listContentTypes = SlateTool.create(spec, {
 
     return {
       output: {
-        total: result.total || 0,
+        ...pageInfo(result),
+        total: result.total,
         contentTypes
       },
-      message: `Found **${result.total || 0}** content types.`
+      message: `Found **${result.total}** content types.`
     };
   })
   .build();

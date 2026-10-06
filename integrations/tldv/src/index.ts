@@ -2,14 +2,14 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   downloadRecording,
+  getFileUrl,
   getHighlights,
   getMeeting,
+  getNotes,
   getTranscript,
   importMeeting,
   listMeetings
 } from './tools';
-import { meetingReady, transcriptReady } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -17,8 +17,10 @@ export let provider = Slate.create({
     getMeeting,
     getTranscript,
     getHighlights,
+    getNotes,
     downloadRecording,
-    importMeeting
+    importMeeting,
+    getFileUrl
   ],
-  triggers: [meetingReady, transcriptReady]
+  triggers: []
 });

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubActionsClient } from '../lib/client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let cacheSchema = z.object({
@@ -18,7 +19,8 @@ export let manageCaches = SlateTool.create(spec, {
   key: 'manage_caches',
   description: `List, inspect, and delete GitHub Actions caches for a repository. Caches can be filtered by key prefix and git ref. Supports deleting by cache ID or cache key.`,
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -49,11 +51,12 @@ export let manageCaches = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new GitHubActionsClient(ctx.auth.token);
     let { owner, repo, action, cacheId, key, ref, sort, direction, perPage, page } = ctx.input;
 
     if (action === 'delete_by_id') {
-      if (!cacheId) throw new Error('cacheId is required for delete_by_id.');
+      if (!cacheId) throw createApiServiceError('cacheId is required for delete_by_id.');
       await client.deleteCacheById(owner, repo, cacheId);
       return {
         output: { deleted: true },
@@ -62,11 +65,15 @@ export let manageCaches = SlateTool.create(spec, {
     }
 
     if (action === 'delete_by_key') {
-      if (!key) throw new Error('key is required for delete_by_key.');
-      await client.deleteCacheByKey(owner, repo, key, ref);
+      if (!key) throw createApiServiceError('key is required for delete_by_key.');
+      const data = await client.deleteCacheByKey(owner, repo, key, ref);
       return {
-        output: { deleted: true },
-        message: `Deleted caches matching key **${key}** from **${owner}/${repo}**.`
+        output: {
+          deleted: data.total_count > 0,
+          totalCount: data.total_count,
+          caches: data.actions_caches.map(c => ({ cacheId: c.id, key: c.key, ref: c.ref }))
+        },
+        message: `Deleted **${data.total_count}** caches matching key **${key}** from **${owner}/${repo}**.`
       };
     }
 
@@ -78,7 +85,7 @@ export let manageCaches = SlateTool.create(spec, {
       sort,
       direction
     });
-    let caches = (data.actions_caches ?? []).map((c: any) => ({
+    let caches = (data.actions_caches ?? []).map(c => ({
       cacheId: c.id,
       ref: c.ref,
       key: c.key,

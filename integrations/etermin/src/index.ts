@@ -22,8 +22,6 @@ import {
   updateContact,
   updateService
 } from './tools';
-import { appointmentEvent } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -48,5 +46,5 @@ export let provider = Slate.create({
     listVouchers,
     getCompanyInfo
   ],
-  triggers: [appointmentEvent]
+  triggers: []
 });

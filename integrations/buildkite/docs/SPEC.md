@@ -1,120 +1,35 @@
-Now let me get the specific list of webhook events for pipelines:Now I have comprehensive information. Let me compile the specification.
+# Buildkite integration specification
 
-# Slates Specification for Buildkite
+This integration uses the public [REST API v2](https://buildkite.com/docs/apis/rest-api) for pipeline, build, job, agent, artifact and annotation operations. It does not use the separate internal Agent API or require GraphQL access.
 
-## Overview
+## Authentication and discovery
 
-Buildkite is a CI/CD platform that allows teams to run build pipelines on their own infrastructure while managing orchestration through a hosted service. It provides three core products: Pipelines (CI/CD), Test Engine (test analytics), and Package Registries (artifact management).
+Connect with a personal API access token. Authentication identifies its owner through [GET /user](https://buildkite.com/docs/apis/rest-api/user), which requires `read_user`. Select the additional granular scopes required by the operations you intend to use. Organization access, user permissions and an active organization plan also apply.
 
-## Authentication
+`who_am_i` identifies the user. `list_organizations` discovers organization slugs; organization-scoped tools accept an optional `organizationSlug`, falling back to the connection's optional default organization. `list_clusters` and `list_teams` discover cluster and team UUIDs needed for pipeline creation or access assignments. Paginated list tools expose `nextPage`, which is null at the end of the list. Page sizes must be between 1 and 100.
 
-### API Access Tokens (Primary Method)
+## Pipelines
 
-Buildkite API authenticates using access tokens, which can be created from the API access tokens page in your Personal Settings. Basic HTTP authentication is not supported.
+`list_pipelines` and `get_pipeline` discover and inspect pipelines. `create_pipeline` creates a YAML pipeline using a name, repository URL, nonempty configuration and `clusterUuid`. These last two fields retain their optional input shape for compatibility but are required when creating a YAML pipeline. Team assignments use the `teams` map of team UUIDs to access levels; legacy `teamUuids` remain supported and cannot be combined with `teams`.
 
-To authenticate, set the `Authorization` header to `Bearer $TOKEN`:
+`update_pipeline` patches only supplied settings. `archive_pipeline` archives or unarchives the pipeline while retaining its data. `delete_pipeline` permanently removes the pipeline and its associated builds and data. See the [Pipelines API](https://buildkite.com/docs/apis/rest-api/pipelines).
 
-```
-Authorization: Bearer $TOKEN
-```
+## Builds and jobs
 
-Base URL: `https://api.buildkite.com/v2/`
+`list_builds` discovers build numbers. Build-scoped operations require the pipeline's numeric build number, not the globally unique build UUID. `get_build` returns metadata and job UUIDs. Existing string-valued metadata output is preserved; non-string provider metadata values are represented as JSON strings.
 
-API access tokens are issued to individual Buildkite user accounts, not Buildkite organizations. When configuring API access tokens, you can limit their access to individual organizations and permissions, and these tokens can be revoked at any time.
+`create_build` starts a build for an explicit commit and branch. `manage_build` requests cancellation of a scheduled, running or failing build, or rebuilds it using its original commit, branch and settings. Cancellation can return `canceling`; use `get_build` to check the final state. A rebuild does not fetch a newer branch commit. `manage_job` retries a job or unblocks a manual step. Retry produces a new job UUID; use that UUID for subsequent retries. See the [Builds API](https://buildkite.com/docs/apis/rest-api/builds) and [Jobs API](https://buildkite.com/docs/apis/rest-api/jobs).
 
-**Scopes:** Tokens are configured with REST API Scopes, where you select permissions (READ, WRITE, DELETE) for different Buildkite platform features. Each combination of permission and feature is known as a scope. You can also select "Enable GraphQL API access" as an additional scope, which is a full-access option without further granular restrictions.
+## Agents
 
-**Additional token options:**
+`list_agents` returns connected and stopping agents. `get_agent` can inspect a known agent in any connection state. `stop_agent` requests graceful shutdown by default, with optional force; completion is asynchronous. Write permissions and the user's agent-management permissions apply. See the [Agents API](https://buildkite.com/docs/apis/rest-api/agents).
 
-- Configurable token expiry duration.
-- IP address restrictions using CIDR notation.
-- Organization-level access restriction (tokens are scoped to specific organizations).
+## Downloads and annotations
 
-### JWT Authentication (Preview)
+`download_job_log` prepares a plain-text log and returns its byte size without first retrieving the entire log. It requires `read_build_logs`; requesting the optional job environment also requires `read_job_env`. `get_job_log` is deprecated in favor of the downloadable log and retains its legacy inline inspection contract.
 
-API access tokens can be created with a public key pair instead of a static token. The private key can be used to sign JWTs to authenticate API calls. You must use the API access token's UUID as the `iss` claim in the JWT, have an `iat` within 10 seconds of the current time, and an `exp` within 5 minutes of your `iat`.
+`list_artifacts` discovers artifact/job UUIDs and file metadata. `download_artifact` prepares a finished artifact for download using the stable authenticated REST download endpoint. The storage URL returned by that endpoint can expire after 60 seconds; callers use the stable endpoint instead. See the [Artifacts API](https://buildkite.com/docs/apis/rest-api/artifacts).
 
-## Features
+`create_annotation` creates or appends a build annotation. `list_annotations` returns rendered HTML and IDs for readback. `delete_annotation` deletes an annotation by UUID. Read operations require `read_builds`; mutations require `write_builds`. See the [Annotations API](https://buildkite.com/docs/apis/rest-api/annotations).
 
-### Pipeline Management
-
-Create, update, delete, archive, and unarchive CI/CD pipelines within an organization. Pipelines define the build steps that run when code is pushed. Supports configuring repository connections, build steps, environment variables, branch filtering, tags, and team assignments. Pipelines can be organized into clusters for security isolation. Pipeline templates allow standardizing pipeline configurations across an organization.
-
-### Build Management
-
-Trigger, list, cancel, and rebuild builds for pipelines. A build is a single run of a pipeline. You can trigger a build via the dashboard, API, webhook, schedule, or from another pipeline using a trigger step. Builds can be filtered by state (running, scheduled, passed, failed, blocked, canceled, etc.), branch, commit, creator, and creation date. Supports setting environment variables, commit SHA, branch, message, and metadata when creating builds.
-
-### Job Management
-
-Inspect and manage the individual jobs (steps) within builds. Jobs can be retried, canceled, unblocked (for block steps), and their logs and environment details can be retrieved. Job output logs can be fetched for debugging purposes.
-
-### Agent Management
-
-List and inspect connected agents running builds on your infrastructure. Agents can be stopped, paused, and resumed via the API. Only connected agents are returned in listings.
-
-### Cluster and Queue Management
-
-Create and manage clusters to isolate groups of agents and pipelines. Within clusters, manage agent queues for routing jobs to specific agents. Create, update, and revoke agent tokens that agents use to connect to clusters. Manage cluster maintainers and Buildkite secrets.
-
-### Organization and Team Management
-
-List organizations and their members. Create and manage teams with configurable member roles and pipeline access levels. Assign pipelines, test suites, and registries to teams. Invite and manage organization members.
-
-### Build Artifacts and Annotations
-
-List, download, and manage build artifacts (files produced during builds). Create and manage build annotations to display additional context on build pages (supports Markdown/HTML).
-
-### Test Engine
-
-Manage test suites, view test runs, identify and quarantine flaky tests. Query test results and analytics data across builds.
-
-### Package Registries
-
-Create and manage package registries supporting multiple ecosystems (npm, Maven, Docker/OCI, Python, Ruby, Helm, etc.). Publish, list, and manage packages. Manage registry tokens for authentication.
-
-### GraphQL API
-
-Buildkite also provides a GraphQL API that allows for more efficient retrieval of data by enabling you to fetch multiple, nested resources in a single request. The GraphQL API endpoint is `https://graphql.buildkite.com/v1`. Some tasks can only be achieved using the GraphQL API or the REST API. The REST API is a good choice for organization-level tasks with granular access permissions, while GraphQL is more comprehensive for complex data queries.
-
-### Rules
-
-Create and manage rules that control access policies between pipelines and clusters, enabling fine-grained security controls.
-
-## Events
-
-Buildkite provides webhook support for Pipelines, Test Engine, and Package Registries. Webhooks are configured per organization or per registry, and deliver JSON payloads via HTTP POST to your specified URL endpoint. Each webhook includes an `X-Buildkite-Token` header or an `X-Buildkite-Signature` (HMAC-SHA256) header for verifying authenticity.
-
-### Build Events
-
-Notifications when builds change state. Available events: `build.scheduled`, `build.running`, `build.failing`, `build.finished`, `build.skipped`.
-
-- Webhooks can be filtered to specific pipelines, teams, clusters, and branches.
-- Build payloads do not include job data; use job events for that.
-
-### Job Events
-
-Notifications when individual jobs within builds change state. Available events: `job.scheduled`, `job.started`, `job.finished`, `job.activated` (block step unblocked).
-
-- Same filtering options as build events (pipeline, team, cluster, branch).
-
-### Agent Events
-
-Notifications about agent lifecycle changes. Available events: `agent.connected`, `agent.lost`, `agent.disconnected`, `agent.stopping`, `agent.stopped`, `agent.blocked`.
-
-- Useful for automating infrastructure scaling and monitoring agent health.
-
-### Agent Token Events
-
-`cluster_token.registration_blocked` fires when an agent registration attempt is blocked due to IP address restrictions on the agent token.
-
-### Ping Events
-
-`ping` fires when webhook notification settings are changed, useful for verifying webhook connectivity.
-
-### Test Engine Events
-
-Buildkite Test Engine supports webhook events relating to a monitor on a test suite's workflow triggering an alarm or recover action.
-
-### Package Registry Events
-
-You can configure webhooks to be triggered in Package Registries when a package, image, chart, model, module, or file is created. The event is `package.created`.
+There are no event subscriptions in this integration.

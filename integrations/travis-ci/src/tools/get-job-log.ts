@@ -1,14 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TravisCIClient } from '../lib/client';
+import { legacyBaseUrl, TravisCIClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getJobLog = SlateTool.create(spec, {
   name: 'Get Job Log',
   key: 'get_job_log',
-  description: `Retrieve or delete the log output for a specific job. Use the text format for plain text output, or json for structured log data.`,
+  description: `DEPRECATED — use \`manage_job_log\` instead. Retrieve or delete the log output for a specific job. Use the text format for plain text output, or json for structured log data.`,
+  instructions: [
+    'Use manage_job_log for downloadable text or JSON logs. This legacy tool retains its inline content output and delete action for existing workflows.'
+  ],
   tags: {
-    destructive: false
+    destructive: true,
+    deprecated: true
   }
 })
   .input(
@@ -38,7 +42,7 @@ export let getJobLog = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TravisCIClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl
+      baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl(ctx.config)
     });
 
     if (ctx.input.action === 'delete') {

@@ -23,7 +23,7 @@ describe('google-forms provider contract', () => {
         'list_responses',
         'manage_watches'
       ],
-      triggerIds: ['inbound_webhook', 'new_response', 'form_updated'],
+      triggerIds: [],
       authMethodIds: ['oauth'],
       tools: [
         { id: 'create_form', readOnly: false, destructive: false },
@@ -34,14 +34,10 @@ describe('google-forms provider contract', () => {
         { id: 'list_responses', readOnly: true, destructive: false },
         { id: 'manage_watches', readOnly: false, destructive: false }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'new_response', invocationType: 'polling' },
-        { id: 'form_updated', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(10);
+    expect(contract.actions).toHaveLength(7);
 
     let expectedScopes = {
       create_form: googleFormsActionScopes.createForm,
@@ -50,10 +46,7 @@ describe('google-forms provider contract', () => {
       set_publish_settings: googleFormsActionScopes.setPublishSettings,
       get_response: googleFormsActionScopes.getResponse,
       list_responses: googleFormsActionScopes.listResponses,
-      manage_watches: googleFormsActionScopes.manageWatches,
-      inbound_webhook: googleFormsActionScopes.inboundWebhook,
-      new_response: googleFormsActionScopes.newResponse,
-      form_updated: googleFormsActionScopes.formUpdated
+      manage_watches: googleFormsActionScopes.manageWatches
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

@@ -1,101 +1,41 @@
-# Slates Specification for ZoomInfo
+# ZoomInfo API coverage
 
-## Overview
+This integration exposes 15 tools for ZoomInfo data discovery and enrichment. Current connections use the GTM Data API at `https://api.zoominfo.com/gtm`; legacy Enterprise connections retain their original dialect and require independently confirmed availability and entitlement. The supported tools do not create CRM records, send outreach, or register webhooks. See the [current API overview](https://docs.gtm.ai/reference/api-overview).
 
-ZoomInfo is a B2B data intelligence platform with a database of over 200 million business contacts and companies. The API allows users to query the ZoomInfo database for relevant companies and contacts and enrich data records in CRM, Marketing Automation, and other systems. It provides in-depth information such as technologies used, company attributes, corporate hierarchies, funding details, news alerts and scoops.
+## Authentication and connection migration
 
-## Authentication
+OAuth Authorization Code with PKCE uses `https://api.zoominfo.com/gtm/oauth/v1/authorize` and exchanges codes at `https://api.zoominfo.com/gtm/oauth/v1/token`. Requests use S256, callback state, and client credentials in HTTP Basic authentication. The same token endpoint supports client credentials for eligible Standard applications. Partner applications require the user authorization flow. Token lifetimes come from `expires_in`; no fixed lifetime is assumed. See [PKCE](https://docs.gtm.ai/docs/authorization-code-flow-pkce) and [client credentials](https://docs.gtm.ai/docs/client-credentials-flow).
 
-ZoomInfo supports multiple authentication methods depending on the API version being used.
+ZoomInfo rotates refresh tokens and invalidates the used token. A refresh response must supply its replacement; the invalidated token is never retained as a fallback. See [refresh tokens](https://docs.gtm.ai/docs/refresh-tokens-flow).
 
-### New API (OAuth 2.0 with PKCE)
+The five Data API scopes cover contacts, companies, intent, news and scoops. Access also depends on the application's scopes and account entitlements. Usage access validates credentials without claiming an authenticated user identity. See [scopes](https://docs.gtm.ai/docs/zoominfo-oauth-scopes) and [usage](https://docs.gtm.ai/reference/userinterface_userusage).
 
-The current ZoomInfo API uses OAuth 2.0 Authorization Code flow with PKCE (Proof Key for Code Exchange).
+The retained `legacy_password` and `legacy_pki` methods call `https://api.zoominfo.com/authenticate`. PKI requires a username, client ID and RSA private key; the key stays local and signs an RS256 assertion with the documented audience and issuer. The returned JWT's expiry is used only for refresh scheduling. Existing auth method keys and stored configuration remain compatible. New auth output persists the API dialect and takes precedence over legacy configuration fallback. The protocol is grounded in ZoomInfo's [official legacy authentication client](https://github.com/Zoominfo/api-auth-python-client/blob/master/zi_api_auth_client/zi_api_auth_client.py); this does not prove current availability of every legacy data route.
 
-1. **Authorization**: The client application must redirect its users to authenticate through ZoomInfo Login, which uses the Authorization server (Okta) to verify, authenticate, and provide a token. The login URL follows the format: `https://login.zoominfo.com/` with the required query parameters appended.
-2. **PKCE**: The PKCE extension secures the Authorization Code flow by having the client generate a random Code Verifier and a hashed Code Challenge at the start of the flow.
-3. **Token Exchange**: Generate a Basic Authentication header by Base64-encoding the client ID and secret combination, then build the token exchange request body with the authorization code, grant type, redirect URI, and code verifier. Send the POST request to Okta's token endpoint to receive the access token, ID token, refresh token, and granted scopes.
-4. **Token Lifetime**: Access tokens expire after 24 hours in the ZoomInfo Platform. When the access token expires, the application sends the refresh token to the authorization server, which issues a new access token and a new refresh token. The old refresh token is immediately invalidated (token rotation with 30-second grace period).
+## Tools and request boundaries
 
-Scopes can be specified but best practice is to exclude scopes from the login URL; when application access needs to be split across multiple sets of scopes, creating a separate application is recommended.
+| Tools | Current API operation |
+| --- | --- |
+| Search Contacts / Search Companies | POST `/data/v1/contacts/search` / `/data/v1/companies/search` |
+| Enrich Contacts / Enrich Companies | POST `/data/v1/contacts/enrich` / `/data/v1/companies/enrich` |
+| Search Intent / Enrich Intent | POST `/data/v1/intent/search` / `/data/v1/intent/enrich` |
+| Search Scoops | POST `/data/v1/scoops/search` |
+| Search News | POST `/data/v1/news/search`; explicitly authorized company requests use `/data/v1/news/enrich` |
+| Enrich Corporate Hierarchy | POST `/data/v1/companies/corporate-hierarchy/enrich` |
+| Enrich Technographics | POST `/data/v1/companies/technologies/enrich` |
+| Get API Usage | GET `/data/v1/users/usage` |
+| Lookup Data | GET `/data/v1/lookup/{fieldName}` |
+| Lookup Fields | GET `/data/v1/lookup/search` or `/data/v1/lookup/enrich` |
+| WebSights IP Lookup / Compliance Check | Retained legacy-only routes; no current GTM replacement is assumed |
 
-### Legacy Enterprise API (being deprecated)
+Current requests and responses use JSON:API resource envelopes. Search pagination uses `page[number]` and `page[size]`, with page sizes from 1 to 100; totals are included only when supplied by the provider. Contact/company enrichment supports 1–25 matches and selected output fields. The endpoint request schema nests `matchPersonInput` or `matchCompanyInput` and `outputFields` under `data.attributes`. See [contact enrichment](https://docs.gtm.ai/reference/enrichinterface_enrichcontact), [company enrichment](https://docs.gtm.ai/reference/enrichinterface_enrichcompany) and [hierarchy](https://docs.gtm.ai/reference/enrichinterface_enrichcorporatehierarchy). A contact-search tutorial currently shows a conflicting enrichment envelope; the integration follows the endpoint schema.
 
-The legacy API supports Private Key Infrastructure (PKI) and username/password authentication. For both methods, a JWT is returned.
+Current intent requests require subscribed topics; current audience strength uses A–E. Unsupported legacy city, numeric intent-strength, and news keyword inputs remain in their public schemas but receive explicit validation on current connections. Current publishing-date filters require a calendar day and reject timestamp precision loss. Name/domain technology and company-news requests must resolve one exact company before enrichment; callers can supply the company ID directly. Technology product filters are validated before any billable request and applied to the returned data. See [intent](https://docs.gtm.ai/reference/searchinterface_searchintent), [news enrichment](https://docs.gtm.ai/reference/enrichinterface_enrichnews), [technology enrichment](https://docs.gtm.ai/reference/enrichinterface_enrichtechnology) and [field discovery](https://docs.gtm.ai/reference/lookupenrichinterface_lookupenrich).
 
-- **PKI Authentication**: Obtain a Client ID and Private Key pair from the ZoomInfo Admin Portal (Admin Portal > Integrations > API & Webhooks). This method needs a private key and a client ID to generate the JWT token. There is no expiration on the PKI key, but rotation every 90 days is recommended.
-- **Username/Password Authentication**: Authenticate using your ZoomInfo username and password by POSTing to `https://api.zoominfo.com/authenticate`.
-- Both methods result in a JWT that needs to be refreshed every 60 minutes. The JWT contains the expiration time.
+## Costs, errors and verification limits
 
-API access and available endpoints depend on subscription tier and entitlements.
+Search and lookup do not consume enrichment credits, but request and record limits apply. Enrichment can consume credits and establish retained purchased-record/usage history. Failed and unmatched enrichment has endpoint-specific billing rules. No history-deletion workflow is assumed. See [credit usage](https://docs.gtm.ai/docs/credit-usage-and-limits).
 
-## Features
+The client checks response status and envelopes, preserves matching metadata, excludes unmatched results from match counts, and exposes safe failures without transport credentials or raw provider payloads. Redirects are disabled. It does not automatically retry potentially billable enrichment requests.
 
-### Contact Search and Enrichment
-
-Search for contacts and companies using criteria like title, company, location, and other filters. Returns record previews for further enrichment. The Enrich API retrieves full ZoomInfo profiles by matching known contacts/accounts, enriching existing data with in-depth sales intelligence. Available data includes direct dials, email addresses, job titles, company firmographics, technographics, and corporate hierarchy.
-
-- Searches are free; each time you enrich a new ZoomInfo record, you expend one credit. Subsequent enrichment of the same record is free for the next twelve months.
-- You can customize which output fields are returned in enrichment responses.
-
-### Company Data and Corporate Hierarchy
-
-Query detailed company information including firmographics (size, revenue, industry, locations), technographics (installed technologies), corporate hierarchy and subsidiary relationships, and funding details.
-
-- Location-specific enrichment is available for companies with multiple offices.
-- Company Master Data enrichment provides canonical company profiles.
-
-### Intent Data
-
-ZoomInfo Intent data shows which leads or accounts are actively researching topics. Intent Search lets you search for companies and recommended contacts by Intent topics your organization subscribes to. Intent Enrich lets you enrich Intent data for a specific company.
-
-- Intent topics are based on your subscription and must be configured in the ZoomInfo platform before querying via the API.
-- Custom topics can be defined with specific keywords aligned to your business.
-
-### Scoops and News
-
-Scoops are actionable intelligence leads that ZoomInfo sources through surveys and their in-house Research Team. ZoomInfo identifies internal projects and leadership moves to help time outreach effectively. News search retrieves recent news-related data about companies.
-
-- Scoops can be filtered by type, topic, department, or keywords.
-
-### WebSights (Website Visitor Identification)
-
-The WebSights API resolves anonymous website traffic to company-level data. When a prospect visits your site, the API returns firmographic details so marketing can trigger account-based plays or alert sales to engaged accounts.
-
-- Resolves both IPv4 and IPv6 addresses.
-- Returns company profiles and ISP information along with IP geolocation details.
-- Requires separate subscription/entitlement.
-
-### Compliance
-
-The Compliance API helps organizations adhere to data privacy regulations such as GDPR and CCPA. It delivers dedicated endpoints to identify and manage consumer data based on preference and opt-out status at scale.
-
-- Supports programmatic discovery and suppression of opted-out contacts.
-- Requires separate subscription/entitlement.
-
-### Bulk/Scaling Operations
-
-For major bulk processing, ZoomInfo offers dedicated Bulk APIs tuned for intense batch jobs. These bypass Standard API thresholds via asynchronous job handling.
-
-- Bulk Search supports up to 200K results per query.
-- Bulk Enrich processes large record sets asynchronously.
-
-### Usage Tracking
-
-The API provides endpoints and response headers to monitor credit consumption and request usage, allowing you to track how many credits and API calls have been consumed and how many remain.
-
-## Events
-
-ZoomInfo supports webhooks for receiving real-time updates on previously enriched records.
-
-### Record Update Notifications
-
-The Webhooks endpoints let you receive real-time updates for contact or company records that you have previously enriched, by listening to events you subscribe to and sending updates securely to your application. For example, when a contact you have previously enriched has a job title change in the ZoomInfo database, you can be instantly notified.
-
-- **Object types**: Contact and Company.
-- **Event types**: Currently limited to record re-enrichment (attribute changes on previously enriched records).
-- **Payload configuration**: You can customize the payload to receive only relevant fields or the full record payload. The response includes a list of changed attributes.
-- **Security**: A verification token secures communication between ZoomInfo and your target app. When data is sent to your target URL via POST, the verification token is included in the `x-zoominfo-token` request header.
-- You will only receive updates on records that you've purchased using the API within the past 12 months.
-- Webhooks can be configured via the API or through the ZoomInfo Admin Portal UI.
-- No credits are charged to receive webhook updates on records already under management.
+Private live verification requires dedicated-account setup, controlled company/contact fixtures, separate data/credit/retained-history approvals and independent provider readbacks. Usage resource binding is not a verified account or user identity. Legacy routes require separate availability and entitlement confirmation. Static verification alone does not establish live account access or legacy service availability.

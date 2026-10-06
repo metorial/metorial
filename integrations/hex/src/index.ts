@@ -6,7 +6,11 @@ import {
   createProject,
   deactivateUser,
   deleteGroup,
+  exportProject,
+  getCollection,
+  getCurrentUser,
   getDataConnection,
+  getGroup,
   getProject,
   getQueriedTables,
   getRunStatus,
@@ -22,8 +26,6 @@ import {
   runProject,
   updateProjectStatus
 } from './tools';
-import { inboundWebhook, newProject, projectRunCompleted } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -46,7 +48,11 @@ export let provider = Slate.create({
     listCollections,
     listDataConnections,
     getDataConnection,
-    getQueriedTables
+    getQueriedTables,
+    getCurrentUser,
+    getGroup,
+    getCollection,
+    exportProject
   ],
-  triggers: [inboundWebhook, projectRunCompleted, newProject]
+  triggers: []
 });

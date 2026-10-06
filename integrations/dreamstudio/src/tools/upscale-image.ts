@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,17 +6,19 @@ import { spec } from '../spec';
 export let upscaleImage = SlateTool.create(spec, {
   name: 'Upscale Image',
   key: 'upscale_image',
-  description: `Increase image resolution using AI upscaling. Three modes available:
-- **conservative**: Preserves original appearance, outputs up to 4MP. Requires a prompt. (25 credits)
-- **creative**: For heavily degraded images (<1MP), creatively enhances to high-res. Async operation. (25 credits)
+  description: `DEPRECATED — use \`transform_image\` instead. Increase image resolution using AI upscaling. Three modes available:
+- **conservative**: Preserves original appearance, outputs up to 4MP. Requires a prompt. (40 credits)
+- **creative**: For heavily degraded images (<1MP), creatively enhances to high-res. Async operation. (60 credits)
 - **fast**: Quick 4x resolution increase in ~1 second. No prompt needed. (Fewer credits)`,
   instructions: [
+    'Use transform_image to receive a downloadable file with current generation controls.',
     'Use "fast" for quick, no-fuss upscaling of compressed images.',
     'Use "conservative" when you want to preserve the original look at higher resolution.',
     'Use "creative" for very low-resolution or degraded images that need AI-powered enhancement.',
     'Creative upscale is async and may take up to a few minutes.'
   ],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }
@@ -38,7 +40,7 @@ export let upscaleImage = SlateTool.create(spec, {
       creativity: z
         .number()
         .optional()
-        .describe('Creative freedom level. Conservative: 0.2-0.5, Creative: 0-0.35.'),
+        .describe('Creative freedom level. Conservative: 0.2-0.5, Creative: 0.1-0.5.'),
       seed: z
         .number()
         .int()
@@ -92,9 +94,7 @@ export let upscaleImage = SlateTool.create(spec, {
 
         ctx.progress(`Job submitted. Generation ID: ${generationId}. Polling for result...`);
 
-        result = await client.pollAsyncResult(
-          `/v2beta/stable-image/upscale/creative/result/${generationId}`
-        );
+        result = await client.pollAsyncResult(`/v2beta/results/${generationId}`);
         break;
       }
 
@@ -106,7 +106,7 @@ export let upscaleImage = SlateTool.create(spec, {
         break;
 
       default:
-        throw new Error(`Unknown upscale mode: ${input.mode}`);
+        throw createApiServiceError(`Unknown upscale mode: ${input.mode}`);
     }
 
     return {

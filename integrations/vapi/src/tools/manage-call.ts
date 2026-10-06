@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getCallDuration } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageCall = SlateTool.create(spec, {
@@ -42,7 +42,12 @@ export let manageCall = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('ISO 8601 timestamp to schedule the call for a future time'),
-      maxDurationSeconds: z.number().optional().describe('Maximum call duration in seconds'),
+      maxDurationSeconds: z
+        .number()
+        .min(10)
+        .max(43200)
+        .optional()
+        .describe('Maximum call duration in seconds'),
       serverUrl: z
         .string()
         .optional()
@@ -61,6 +66,7 @@ export let manageCall = SlateTool.create(spec, {
         .optional()
         .describe('Call status (scheduled, queued, ringing, in-progress, forwarding, ended)'),
       assistantId: z.string().optional().describe('Assistant ID used for the call'),
+      squadId: z.string().optional().describe('Squad ID used for the call'),
       phoneNumberId: z.string().optional().describe('Phone number ID used'),
       startedAt: z.string().optional().describe('Call start timestamp'),
       endedAt: z.string().optional().describe('Call end timestamp'),
@@ -71,15 +77,20 @@ export let manageCall = SlateTool.create(spec, {
       summary: z.string().optional().describe('AI-generated call summary'),
       costBreakdown: z.any().optional().describe('Cost breakdown by component'),
       messages: z.any().optional().describe('Conversation messages'),
+      webCallUrl: z.string().optional().describe('Join URL for a web call'),
+      webCallToken: z
+        .string()
+        .optional()
+        .describe('Meeting token for a web call when required'),
       deleted: z.boolean().optional().describe('Whether the call was deleted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, ctx.auth.region);
     let { action, callId } = ctx.input;
 
     if (action === 'get') {
-      if (!callId) throw new Error('callId is required for get action');
+      if (!callId) throw createApiServiceError('callId is required for get action');
       let call = await client.getCall(callId);
       return {
         output: {
@@ -87,23 +98,27 @@ export let manageCall = SlateTool.create(spec, {
           type: call.type,
           status: call.status,
           assistantId: call.assistantId,
+          squadId: call.squadId,
           phoneNumberId: call.phoneNumberId,
           startedAt: call.startedAt,
+          webCallUrl: call.transport?.callUrl,
+          webCallToken: call.transport?.callToken,
           endedAt: call.endedAt,
           endedReason: call.endedReason,
-          duration: call.duration,
+          duration: getCallDuration(call),
           transcript: call.artifact?.transcript,
-          recordingUrl: call.artifact?.recordingUrl,
+          recordingUrl:
+            call.artifact?.recording?.mono?.combinedUrl ?? call.artifact?.recordingUrl,
           summary: call.analysis?.summary,
           costBreakdown: call.costBreakdown,
-          messages: call.messages
+          messages: call.artifact?.messages ?? call.messages
         },
         message: `Retrieved call **${call.id}** (status: ${call.status}).`
       };
     }
 
     if (action === 'delete') {
-      if (!callId) throw new Error('callId is required for delete action');
+      if (!callId) throw createApiServiceError('callId is required for delete action');
       await client.deleteCall(callId);
       return {
         output: { callId, deleted: true },
@@ -112,15 +127,46 @@ export let manageCall = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
+      if (ctx.input.workflowId) {
+        throw createApiServiceError(
+          'Vapi retired Workflows on August 18, 2026. Use assistantId or squadId.'
+        );
+      }
+      if ([ctx.input.assistantId, ctx.input.squadId].filter(Boolean).length !== 1) {
+        throw createApiServiceError(
+          'Provide exactly one assistantId or squadId. Use list_assistants or list_squads to discover IDs.'
+        );
+      }
+      if (ctx.input.customerNumber && ctx.input.customerSipUri) {
+        throw createApiServiceError(
+          'Provide either customerNumber or customerSipUri, not both.'
+        );
+      }
+      if ((ctx.input.customerNumber || ctx.input.customerSipUri) && !ctx.input.phoneNumberId) {
+        throw createApiServiceError(
+          'phoneNumberId is required for outbound calls. Use list_phone_numbers to discover IDs.'
+        );
+      }
+      if (ctx.input.phoneNumberId && !ctx.input.customerNumber && !ctx.input.customerSipUri) {
+        throw createApiServiceError(
+          'Provide customerNumber or customerSipUri for an outbound call.'
+        );
+      }
       let body: Record<string, any> = {};
 
       if (ctx.input.assistantId) body.assistantId = ctx.input.assistantId;
       if (ctx.input.squadId) body.squadId = ctx.input.squadId;
       if (ctx.input.workflowId) body.workflowId = ctx.input.workflowId;
       if (ctx.input.phoneNumberId) body.phoneNumberId = ctx.input.phoneNumberId;
-      if (ctx.input.maxDurationSeconds) body.maxDurationSeconds = ctx.input.maxDurationSeconds;
-      if (ctx.input.serverUrl) body.serverUrl = ctx.input.serverUrl;
-      if (ctx.input.scheduledAt) body.scheduledAt = ctx.input.scheduledAt;
+      else body.transport = { provider: 'daily' };
+      let overrides: Record<string, unknown> = {};
+      if (ctx.input.maxDurationSeconds !== undefined)
+        overrides.maxDurationSeconds = ctx.input.maxDurationSeconds;
+      if (ctx.input.serverUrl !== undefined) overrides.server = { url: ctx.input.serverUrl };
+      if (Object.keys(overrides).length) {
+        body[ctx.input.squadId ? 'squadOverrides' : 'assistantOverrides'] = overrides;
+      }
+      if (ctx.input.scheduledAt) body.schedulePlan = { earliestAt: ctx.input.scheduledAt };
 
       if (ctx.input.customerNumber || ctx.input.customerSipUri || ctx.input.customerName) {
         body.customer = {} as Record<string, any>;
@@ -136,13 +182,16 @@ export let manageCall = SlateTool.create(spec, {
           type: call.type,
           status: call.status,
           assistantId: call.assistantId,
+          squadId: call.squadId,
           phoneNumberId: call.phoneNumberId,
-          startedAt: call.startedAt
+          startedAt: call.startedAt,
+          webCallUrl: call.transport?.callUrl,
+          webCallToken: call.transport?.callToken
         },
         message: `Created ${call.type || 'call'} **${call.id}** (status: ${call.status}).`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

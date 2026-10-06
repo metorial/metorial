@@ -1,13 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let summarize = SlateTool.create(spec, {
   name: 'Summarize Text',
   key: 'summarize',
-  description: `Generate a grounded summary of text or a web page URL. The summary stays faithful to the original content. Optionally focus the summary on a specific topic or keyword.`,
+  description:
+    'DEPRECATED — use `chat_completion` instead. AI21 retired the specialized summarization API.',
+  instructions: [
+    'Use chat_completion with task instructions and supplied context, or maestro_run with validation requirements. These APIs do not reproduce the retired response semantics automatically.'
+  ],
   tags: {
+    deprecated: true,
     readOnly: true,
     destructive: false
   }
@@ -24,20 +28,9 @@ export let summarize = SlateTool.create(spec, {
       summary: z.string().describe('Generated summary')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-
-    let result = await client.summarize({
-      source: ctx.input.source,
-      sourceType: ctx.input.sourceType,
-      focus: ctx.input.focus
-    });
-
-    let summary = result.summary ?? '';
-
-    return {
-      output: { summary },
-      message: `Generated summary (${summary.length} chars):\n\n> ${summary.substring(0, 300)}${summary.length > 300 ? '...' : ''}`
-    };
+  .handleInvocation(async () => {
+    throw createApiServiceError(
+      'AI21 retired the specialized summarization API. Use chat_completion with explicit task instructions and context, or maestro_run with validation requirements.'
+    );
   })
   .build();

@@ -1,10 +1,10 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string().min(1)
     })
   )
   .addTokenAuth({
@@ -13,13 +13,15 @@ export let auth = SlateAuth.create()
     key: 'api_key',
 
     inputSchema: z.object({
-      token: z.string().describe('API key from the Cody dashboard API Keys page')
+      token: z.string().describe('Cody API key from https://getcody.ai/settings/api')
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('Enter a nonempty Cody API key.');
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token.trim()
         }
       };
     }

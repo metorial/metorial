@@ -1,6 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BannerbearClient } from '../lib/client';
+import { nativeState, nullableText, stateMessage, uid } from '../lib/contracts';
+import { deliverGeneratedFiles } from '../lib/results';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let joinPdfs = SlateTool.create(spec, {
@@ -14,12 +17,13 @@ export let joinPdfs = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       pdfUrls: z.array(z.string()).describe('List of URLs to PDF files to join, in order'),
       webhookUrl: z
         .string()
         .optional()
         .describe('URL to receive a POST when joining completes'),
-      metadata: z.string().optional().describe('Custom metadata to attach')
+      metadata: z.string().optional().describe('Unsupported V2 PDF-join field; omit it')
     })
   )
   .output(
@@ -30,21 +34,21 @@ export let joinPdfs = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BannerbearClient({ token: ctx.auth.token });
-
-    let result = await client.joinPdfs({
+    const client = new BannerbearClient({ ...ctx.auth, projectId: ctx.input.projectId });
+    const result = await client.joinPdfs({
       pdf_inputs: ctx.input.pdfUrls,
       webhook_url: ctx.input.webhookUrl,
       metadata: ctx.input.metadata
     });
-
+    const output = {
+      joinUid: uid(result.uid),
+      status: nativeState(result.status),
+      joinedPdfUrl: nullableText(result.joined_pdf_url)
+    };
+    await deliverGeneratedFiles(ctx, 'joined_pdf', result);
     return {
-      output: {
-        joinUid: result.uid,
-        status: result.status,
-        joinedPdfUrl: result.joined_pdf_url || null
-      },
-      message: `PDF join ${result.status === 'completed' ? 'completed' : 'initiated'} (UID: ${result.uid}) combining ${ctx.input.pdfUrls.length} PDFs. ${result.joined_pdf_url ? `[Download PDF](${result.joined_pdf_url})` : 'Still processing.'}`
+      output,
+      message: `PDF join ${stateMessage(result.status)} (UID: ${output.joinUid}). Read its status with get_resource.`
     };
   })
   .build();

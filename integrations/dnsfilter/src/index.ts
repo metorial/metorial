@@ -26,14 +26,6 @@ import {
   suggestDomainCategorization,
   updateOrganization
 } from './tools';
-import {
-  inboundWebhook,
-  networkChanges,
-  organizationChanges,
-  policyChanges,
-  roamingClientChanges
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -62,11 +54,5 @@ export let provider = Slate.create({
     getQueryLog,
     getBilling
   ],
-  triggers: [
-    inboundWebhook,
-    organizationChanges,
-    roamingClientChanges,
-    networkChanges,
-    policyChanges
-  ]
+  triggers: []
 });

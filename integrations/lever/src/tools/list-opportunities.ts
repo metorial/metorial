@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { id, invalid, page, pagination, stringList, text, timestamp } from '../lib/contracts';
 import { spec } from '../spec';
 
 export let listOpportunitiesTool = SlateTool.create(spec, {
@@ -22,7 +23,9 @@ export let listOpportunitiesTool = SlateTool.create(spec, {
       archiveStatus: z
         .enum(['archived', 'active'])
         .optional()
-        .describe('Filter by archive status. Defaults to active.'),
+        .describe(
+          'Filter by archive status. Omit to include archived and active opportunities.'
+        ),
       createdAtStart: z
         .string()
         .optional()
@@ -55,37 +58,35 @@ export let listOpportunitiesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, environment: ctx.auth.environment });
-
-    let params: Record<string, any> = {};
-    if (ctx.input.contactEmail) params.email = ctx.input.contactEmail;
-    if (ctx.input.tag) params.tag = ctx.input.tag;
-    if (ctx.input.origin) params.origin = ctx.input.origin;
-    if (ctx.input.postingId) params.posting_id = ctx.input.postingId;
-    if (ctx.input.stageId) params.stage_id = ctx.input.stageId;
-    if (ctx.input.archiveStatus === 'archived') params.archived = true;
-    if (ctx.input.archiveStatus === 'active') params.archived = false;
-    if (ctx.input.createdAtStart)
-      params.created_at_start = new Date(ctx.input.createdAtStart).getTime();
-    if (ctx.input.createdAtEnd)
-      params.created_at_end = new Date(ctx.input.createdAtEnd).getTime();
-    if (ctx.input.updatedAtStart)
-      params.updated_at_start = new Date(ctx.input.updatedAtStart).getTime();
-    if (ctx.input.updatedAtEnd)
-      params.updated_at_end = new Date(ctx.input.updatedAtEnd).getTime();
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.offset) params.offset = ctx.input.offset;
-    if (ctx.input.expand) params.expand = ctx.input.expand;
-
-    let result = await client.listOpportunities(params);
-
+    const params = pagination(ctx.input);
+    if (ctx.input.contactEmail !== undefined)
+      params.email = text(ctx.input.contactEmail, 'Contact email');
+    if (ctx.input.tag !== undefined) params.tag = stringList(ctx.input.tag, 'Tags');
+    if (ctx.input.origin !== undefined) params.origin = ctx.input.origin;
+    if (ctx.input.postingId !== undefined) params.posting_id = id(ctx.input.postingId);
+    if (ctx.input.stageId !== undefined) params.stage_id = id(ctx.input.stageId);
+    if (ctx.input.archiveStatus !== undefined)
+      params.archived = ctx.input.archiveStatus === 'archived';
+    for (const [field, parameter] of [
+      ['createdAtStart', 'created_at_start'],
+      ['createdAtEnd', 'created_at_end'],
+      ['updatedAtStart', 'updated_at_start'],
+      ['updatedAtEnd', 'updated_at_end']
+    ] as const)
+      if (ctx.input[field] !== undefined)
+        params[parameter] = timestamp(ctx.input[field], field);
+    for (const prefix of ['created_at', 'updated_at'])
+      if (
+        typeof params[`${prefix}_start`] === 'number' &&
+        typeof params[`${prefix}_end`] === 'number' &&
+        (params[`${prefix}_start`] as number) > (params[`${prefix}_end`] as number)
+      )
+        invalid('Date range end must be on or after its start.');
+    if (ctx.input.expand !== undefined) params.expand = ctx.input.expand.join(',');
+    const result = page(await new Client(ctx.auth).listOpportunities(params));
     return {
-      output: {
-        opportunities: result.data || [],
-        hasNext: result.hasNext || false,
-        next: result.next || undefined
-      },
-      message: `Found ${(result.data || []).length} opportunities.${result.hasNext ? ' More results available.' : ''}`
+      output: { opportunities: result.data, hasNext: result.hasNext, next: result.next },
+      message: `Retrieved ${result.data.length} opportunities${result.hasNext ? '; more pages available' : ''}.`
     };
   })
   .build();

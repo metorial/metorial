@@ -14,12 +14,25 @@ export let sendChatMessage = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      externalUsername: z
+        .string()
+        .optional()
+        .describe('Integration-side sender name; defaults to username'),
+      incidentId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Optional incident timeline ID'),
+      tags: z.array(z.string()).optional(),
       username: z.string().describe('Username of the sender'),
       text: z.string().describe('Message text to send'),
       monitoringTool: z
         .string()
         .optional()
-        .describe('Name of the monitoring tool sending the message')
+        .describe(
+          'Registered monitoringTool value for the chat integration; required by the provider'
+        )
     })
   )
   .output(
@@ -36,7 +49,10 @@ export let sendChatMessage = SlateTool.create(spec, {
     let result = await client.sendChatMessage({
       username: ctx.input.username,
       text: ctx.input.text,
-      monitoringTool: ctx.input.monitoringTool
+      monitoringTool: ctx.input.monitoringTool,
+      externalUsername: ctx.input.externalUsername,
+      incidentId: ctx.input.incidentId,
+      tags: ctx.input.tags
     });
 
     return {

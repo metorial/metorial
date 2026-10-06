@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listEntities = SlateTool.create(spec, {
   name: 'List Entities',
   key: 'list_entities',
-  description: `List all entities (users, agents, apps, and runs/sessions) registered in Mem0. Optionally filter by entity type. Returns each entity's ID, name, type, memory count, and timestamps.`,
+  description: `List one page of entities (users, agents, apps, and runs/sessions) registered in Mem0. Optionally filter the current page by entity type. Use the entity name with delete_entity, rather than its internal ID.`,
   tags: {
     readOnly: true
   }
@@ -16,7 +16,17 @@ export let listEntities = SlateTool.create(spec, {
       entityType: z
         .enum(['user', 'agent', 'app', 'run'])
         .optional()
-        .describe('Filter entities by type')
+        .describe(
+          'Filter this page by entity type; continue pagination even if the page is empty'
+        ),
+      page: z.number().int().min(1).optional().describe('Page number (default: 1)'),
+      pageSize: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Entities per page (default: 100)')
     })
   )
   .output(
@@ -24,35 +34,49 @@ export let listEntities = SlateTool.create(spec, {
       entities: z
         .array(
           z.object({
-            entityId: z.string().describe('Unique entity identifier'),
+            entityId: z.string().trim().min(1).describe('Unique entity identifier'),
             name: z.string().describe('Entity name'),
-            type: z.string().optional().describe('Entity type: user, agent, app, or run'),
+            type: z
+              .string()
+              .trim()
+              .min(1)
+              .optional()
+              .describe('Entity type: user, agent, app, or run'),
             totalMemories: z
               .number()
               .optional()
               .describe('Number of memories associated with this entity'),
-            owner: z.string().optional().describe('Entity owner'),
-            organization: z.string().optional().describe('Parent organization'),
+            owner: z.string().trim().min(1).optional().describe('Entity owner'),
+            organization: z.string().trim().min(1).optional().describe('Parent organization'),
             metadata: z.record(z.string(), z.unknown()).optional().describe('Entity metadata'),
-            createdAt: z.string().optional().describe('Creation timestamp'),
-            updatedAt: z.string().optional().describe('Last update timestamp')
+            createdAt: z.string().trim().min(1).optional().describe('Creation timestamp'),
+            updatedAt: z.string().trim().min(1).optional().describe('Last update timestamp')
           })
         )
-        .describe('List of entities')
+        .describe('List of entities'),
+      totalEntities: z
+        .number()
+        .describe('Provider total across all entity types before filtering this page'),
+      next: z
+        .string()
+        .optional()
+        .describe('Provider URL for the next page; increment page to continue'),
+      previous: z.string().optional().describe('Provider URL for the previous page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      orgId: ctx.config.orgId,
-      projectId: ctx.config.projectId
+      legacyScope: ctx.config
     });
 
     let results = await client.listEntities({
-      entityType: ctx.input.entityType
+      entityType: ctx.input.entityType,
+      page: ctx.input.page,
+      pageSize: ctx.input.pageSize
     });
 
-    let entities = results.map(e => ({
+    let entities = results.entities.map(e => ({
       entityId: String(e.id || ''),
       name: String(e.name || ''),
       type: e.type ? String(e.type) : undefined,
@@ -66,7 +90,12 @@ export let listEntities = SlateTool.create(spec, {
 
     let typeLabel = ctx.input.entityType || 'all types';
     return {
-      output: { entities },
+      output: {
+        entities,
+        totalEntities: results.totalEntities,
+        next: results.next,
+        previous: results.previous
+      },
       message: `Found **${entities.length}** entities (${typeLabel}).`
     };
   })
@@ -87,32 +116,53 @@ export let deleteEntity = SlateTool.create(spec, {
   .input(
     z.object({
       entityType: z.enum(['user', 'agent', 'app', 'run']).describe('Type of entity to delete'),
-      entityId: z.string().describe('Unique identifier of the entity to delete')
+      entityId: z
+        .string()
+        .trim()
+        .min(1)
+        .describe(
+          'Entity name used as userId, agentId, appId, or runId. Call list_entities and use its name, not its internal entityId.'
+        )
     })
   )
   .output(
     z.object({
-      deleted: z.boolean().describe('Whether the entity was deleted successfully'),
+      deleted: z
+        .boolean()
+        .describe('Whether entity deletion has completed; false while processing is pending'),
       entityType: z.string().describe('Type of the deleted entity'),
-      entityId: z.string().describe('ID of the deleted entity')
+      entityId: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Name of the entity whose deletion was requested'),
+      eventId: z
+        .string()
+        .optional()
+        .describe('Processing event ID. Call get_event to check completion.'),
+      status: z.string().describe('Processing status')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      orgId: ctx.config.orgId,
-      projectId: ctx.config.projectId
+      legacyScope: ctx.config
     });
 
-    await client.deleteEntity(ctx.input.entityType, ctx.input.entityId);
+    let result = await client.deleteEntity(ctx.input.entityType, ctx.input.entityId);
 
     return {
       output: {
-        deleted: true,
+        deleted: result.status === 'SUCCEEDED',
         entityType: ctx.input.entityType,
-        entityId: ctx.input.entityId
+        entityId: ctx.input.entityId,
+        eventId: result.eventId,
+        status: result.status
       },
-      message: `Deleted ${ctx.input.entityType} **${ctx.input.entityId}** and all associated memories.`
+      message:
+        result.status === 'SUCCEEDED'
+          ? `Deleted ${ctx.input.entityType} **${ctx.input.entityId}** and all associated memories.`
+          : `Deletion requested for ${ctx.input.entityType} **${ctx.input.entityId}** and all associated memories. Call get_event with eventId ${result.eventId} to check completion.`
     };
   })
   .build();

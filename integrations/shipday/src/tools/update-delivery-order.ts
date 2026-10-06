@@ -1,13 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ShipdayClient } from '../lib/client';
+import { child, fail, id, items, type Row, text, validateFields } from '../lib/validation';
 import { spec } from '../spec';
 
 let orderItemSchema = z.object({
   name: z.string().describe('Name of the item'),
   quantity: z.number().describe('Quantity of the item'),
   unitPrice: z.number().optional().describe('Unit price of the item'),
-  addOns: z.string().optional().describe('Add-ons or modifications'),
+  addOns: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .describe('Add-ons or modifications'),
   detail: z.string().optional().describe('Additional details')
 });
 
@@ -29,6 +33,12 @@ export let updateDeliveryOrder = SlateTool.create(spec, {
   .input(
     z.object({
       orderId: z.number().describe('Unique Shipday order ID'),
+      currentOrderNumber: z
+        .string()
+        .optional()
+        .describe(
+          'Current reference required for inactive orders; distinct from the updated orderNumber'
+        ),
 
       // Edit fields
       orderNumber: z.string().optional().describe('Updated order number'),
@@ -84,16 +94,22 @@ export let updateDeliveryOrder = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean().describe('Whether the update was successful'),
-      actions: z.array(z.string()).describe('List of actions performed')
+      actions: z.array(z.string()).describe('Confirmed or accepted requests'),
+      pendingActions: z
+        .array(z.string())
+        .optional()
+        .describe('Accepted requests whose completed state is not documented or readable'),
+      orderId: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ShipdayClient({ token: ctx.auth.token });
-    let actions: string[] = [];
-
-    // Edit order details if any edit fields are provided
-    let editFields: Record<string, unknown> = {};
-    let editKeys = [
+    const input = ctx.input;
+    id(input.orderId, 'Order ID');
+    validateFields(input);
+    if (input.carrierId !== undefined) id(input.carrierId, 'Carrier ID');
+    if (input.carrierId !== undefined && input.unassignCarrier)
+      fail('Use carrierId or unassignCarrier, not both.');
+    const editKeys = [
       'orderNumber',
       'customerName',
       'customerAddress',
@@ -113,56 +129,129 @@ export let updateDeliveryOrder = SlateTool.create(spec, {
       'deliveryInstruction',
       'paymentMethod'
     ] as const;
-
-    for (let key of editKeys) {
-      let value = ctx.input[key];
-      if (value !== undefined) {
-        if (key === 'orderNumber') {
-          editFields.orderNo = value;
-        } else {
-          editFields[key] = value;
-        }
+    const editing =
+      editKeys.some(key => input[key] !== undefined) || input.orderItems !== undefined;
+    if (
+      !editing &&
+      input.status === undefined &&
+      input.readyToPickup === undefined &&
+      input.carrierId === undefined &&
+      !input.unassignCarrier
+    )
+      fail('Provide at least one supported update.');
+    if (input.orderItems !== undefined) items(input.orderItems);
+    const client = new ShipdayClient({ token: ctx.auth.token });
+    const before = await client.exactOrder(input.orderId, input.currentOrderNumber);
+    let number = text(before.orderNumber, 'Current order number');
+    const actions: string[] = [],
+      pendingActions: string[] = [];
+    let fields: Row | undefined;
+    if (editing) {
+      const customer = child(before.customer),
+        restaurant = child(before.restaurant),
+        costing = child(before.costing),
+        activity = child(before.activityLog);
+      let paymentMethod: string | undefined = input.paymentMethod;
+      if (paymentMethod === undefined && before.paymentMethod != null) {
+        const current = text(before.paymentMethod, 'Current payment method').toLowerCase();
+        if (current === 'cash') paymentMethod = 'cash';
+        else if (current === 'card' || current === 'credit_card')
+          paymentMethod = 'credit_card';
+        else
+          fail(
+            'The current payment method cannot be represented by the delivery edit API. Provide an explicit supported paymentMethod after reconciling the order; no edit was submitted.'
+          );
       }
+      fields = {
+        orderNo: before.orderNumber,
+        customerName: customer.name,
+        customerAddress: customer.address,
+        customerEmail: customer.emailAddress,
+        customerPhoneNumber: customer.phoneNumber,
+        restaurantName: restaurant.name,
+        restaurantAddress: restaurant.address,
+        restaurantPhoneNumber: restaurant.phoneNumber,
+        pickupLatitude: restaurant.latitude ?? undefined,
+        pickupLongitude: restaurant.longitude ?? undefined,
+        deliveryLatitude: customer.latitude ?? undefined,
+        deliveryLongitude: customer.longitude ?? undefined,
+        expectedDeliveryDate: activity.expectedDeliveryDate,
+        expectedPickupTime: activity.expectedPickupTime,
+        expectedDeliveryTime: activity.expectedDeliveryTime,
+        tip: costing.tip,
+        tax: costing.tax,
+        discountAmount: costing.discountAmount,
+        deliveryFee: costing.deliveryFee,
+        totalCost:
+          typeof costing.totalCost === 'number'
+            ? String(costing.totalCost)
+            : costing.totalCost,
+        deliveryInstruction: before.deliveryInstruction,
+        paymentMethod,
+        orderItems: before.orderItems
+      };
+      for (const key of editKeys)
+        if (input[key] !== undefined)
+          fields[key === 'orderNumber' ? 'orderNo' : key] = input[key];
+      if (input.orderItems !== undefined) fields.orderItems = items(input.orderItems);
+      for (const key of [
+        'orderNo',
+        'customerName',
+        'customerAddress',
+        'customerPhoneNumber',
+        'restaurantName',
+        'restaurantAddress'
+      ])
+        text(fields[key], key);
+      if (typeof fields.customerEmail !== 'string')
+        fail(
+          'The documented edit requires customerEmail; provide it when absent from the current detail record.'
+        );
+      // Existing detail times may be hh:mm; preserve those provider values unless explicitly changed.
+      validateFields(input);
     }
-
-    if (ctx.input.orderItems) {
-      editFields.orderItems = ctx.input.orderItems;
+    try {
+      if (fields) {
+        await client.editDeliveryOrder(input.orderId, fields);
+        actions.push('Order details accepted');
+        number = text(fields.orderNo, 'Updated order number');
+        await client.exactOrder(input.orderId, number);
+      }
+      if (input.status !== undefined) {
+        await client.updateOrderStatus(input.orderId, input.status);
+        actions.push(`Status request accepted: ${input.status}`);
+        const after = await client.exactOrder(input.orderId, number);
+        if ((child(after.orderStatus).orderState ?? after.status) !== input.status)
+          fail('The requested status was not observed. Read current state before continuing.');
+      }
+      if (input.readyToPickup !== undefined) {
+        await client.markOrderReadyToPickup(input.orderId, input.readyToPickup);
+        actions.push('Ready-to-pickup request accepted');
+        pendingActions.push('Ready-to-pickup completion has no documented exact readback');
+      }
+      if (input.unassignCarrier || input.carrierId !== undefined) {
+        if (input.unassignCarrier) await client.unassignOrderFromCarrier(input.orderId);
+        else
+          await client.assignOrderToCarrier(input.orderId, id(input.carrierId, 'Carrier ID'));
+        actions.push(
+          input.unassignCarrier
+            ? 'Carrier removal request accepted'
+            : 'Carrier assignment request accepted'
+        );
+        const assigned = child(
+          (await client.exactOrder(input.orderId, number)).assignedCarrier
+        ).id;
+        if (input.unassignCarrier ? assigned != null : assigned !== input.carrierId)
+          fail(
+            'Requested carrier state was not observed. Read current state before continuing.'
+          );
+      }
+    } catch {
+      client.partial(input.orderId, actions);
     }
-
-    if (Object.keys(editFields).length > 0) {
-      await client.editDeliveryOrder(ctx.input.orderId, editFields);
-      actions.push('Updated order details');
-    }
-
-    // Update status
-    if (ctx.input.status) {
-      await client.updateOrderStatus(ctx.input.orderId, ctx.input.status);
-      actions.push(`Updated status to ${ctx.input.status}`);
-    }
-
-    // Mark ready to pickup
-    if (ctx.input.readyToPickup !== undefined) {
-      await client.markOrderReadyToPickup(ctx.input.orderId, ctx.input.readyToPickup);
-      actions.push(
-        ctx.input.readyToPickup ? 'Marked as ready for pickup' : 'Unmarked ready for pickup'
-      );
-    }
-
-    // Carrier assignment
-    if (ctx.input.unassignCarrier) {
-      await client.unassignOrderFromCarrier(ctx.input.orderId);
-      actions.push('Unassigned carrier');
-    } else if (ctx.input.carrierId) {
-      await client.assignOrderToCarrier(ctx.input.orderId, ctx.input.carrierId);
-      actions.push(`Assigned to carrier ${ctx.input.carrierId}`);
-    }
-
     return {
-      output: {
-        success: true,
-        actions
-      },
-      message: `Updated order **${ctx.input.orderId}**: ${actions.join(', ')}.`
+      output: { success: true, actions, pendingActions, orderId: input.orderId },
+      message: `Shipday confirmed or accepted ${actions.length} update request(s) for order ${input.orderId}.${pendingActions.length ? ' Ready-to-pickup completion remains unverified.' : ''}`
     };
   })
   .build();

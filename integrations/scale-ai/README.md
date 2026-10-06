@@ -1,6 +1,12 @@
-# Scale Ai
+# Scale AI
 
-Create and manage data labeling and annotation projects for AI/ML training data. Submit tasks for image annotation (bounding boxes, polygons, segmentation), video annotation with tracking, 3D LiDAR/sensor fusion annotation, document transcription, and text annotation. Manage projects, batches, and taxonomies/ontologies for structured labeling workflows. Support pre-labeling with model-generated hypotheses, quality auditing, evaluation tasks, and team management for annotation teams. Receive task and batch completion notifications via webhooks.
+Create and manage annotation projects, tasks, and batches through the Scale v1 API. Discover projects and batches, submit annotation tasks, retrieve results, update task metadata and tags, manage deduplication identifiers, and inspect batch progress. Team management, file imports, and Rapid evaluation tasks are also available.
+
+Connect with a Scale API key. Test and live modes use separate keys and resources; live task submission incurs labeling charges. Discover project names with `list_projects` and batch names with `list_batches`. Task lists use `nextToken`; batch lists expose `nextOffset` when more results are available.
+
+The integration does not expose event triggers. Task and batch tools still accept provider callback URLs, and `resend_callback` can retry delivery to a task's existing receiver. See [Scale's callback reference](https://api-reference.scale.com/docs/api-reference/callbacks).
+
+See [the capability reference](./docs/SPEC.md) for constraints and provider sources.
 
 ## License
 

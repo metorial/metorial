@@ -29,6 +29,17 @@ export let downloadArtifact = SlateTool.create(spec, {
     let client = new CloudAgentsClient({ token: ctx.auth.token });
     let result = await client.downloadArtifact(ctx.input.agentId, ctx.input.artifactPath);
 
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.url,
+      refreshReference: {
+        version: 'v0',
+        agentId: ctx.input.agentId,
+        artifactPath: ctx.input.artifactPath
+      },
+      refreshAt: result.expiresAt
+    });
+
     return {
       output: {
         downloadUrl: result.url,

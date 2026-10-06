@@ -17,8 +17,6 @@ import {
   listExchanges,
   searchSymbols
 } from './tools';
-import { inboundWebhook, priceChange } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -38,5 +36,5 @@ export let provider = Slate.create({
     getMutualFundDetails,
     listExchanges
   ],
-  triggers: [inboundWebhook, priceChange]
+  triggers: []
 });

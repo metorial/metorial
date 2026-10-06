@@ -1,12 +1,18 @@
 # <img src="https://provider-logos.metorial-cdn.com/weaviate.png" height="20"> Weaviate
 
-Store, search, and manage data objects with vector embeddings in an AI-native vector database. Create and configure collections with vectorizers and generative modules. Import objects individually or in batches with automatic or custom vector embeddings. Perform semantic (vector) search, hybrid search combining vector and keyword (BM25) matching, and filtered queries. Execute retrieval augmented generation (RAG) using integrated LLMs. Aggregate data across collections for statistical metrics. Manage multi-tenant data isolation, create and restore backups, and administer users and roles with RBAC. Monitor cluster health and node status.
+Store, search, and manage data objects with vector embeddings in an AI-native vector database. Create and configure collections with vectorizers and generative modules. Import objects individually or in batches with automatic or custom vector embeddings. Perform semantic (vector) search, hybrid search combining vector and keyword (BM25) matching, and filtered queries. Execute retrieval augmented generation (RAG) using integrated LLMs. Aggregate data across collections for statistical metrics. Manage multi-tenant data isolation, create and restore backups, and discover the authenticated user identity. Monitor cluster health and node status.
+
+Use an API key, a pre-issued OIDC bearer token (reconnect when it expires), or anonymous access if permitted by the server. Set the instance REST URL at connection setup.
+
+Search defaults to GraphQL. On clusters with GraphQL disabled, select `api=rest` for experimental REST search (Weaviate 1.39+, enabled by default from 1.39.7). RAG and aggregation require GraphQL. Named vectors and nested object properties are supported. No event triggers are exposed.
+
+See [the capability specification](docs/SPEC.md) for provider requirements and limitations.
 
 ## Tools
 
 ### Aggregate Collection
 
-Run aggregation queries over a collection to compute metrics like counts, sums, averages, min/max, top occurrences, and more. Supports grouping by a property and filtering with a where clause. Provide the raw GraphQL aggregation body for full flexibility, or use the simplified parameters.
+Run aggregation queries over a collection to compute metrics like counts, sums, averages, min/max, top occurrences, and more. Supports grouping by a property and filtering with a where clause. Provide a GraphQL metric selection and optional aggregation filters.
 
 ### Batch Create Objects
 
@@ -22,7 +28,7 @@ Get comprehensive information about the Weaviate instance including version, mod
 
 ### Create Collection
 
-Create a new collection (class) in Weaviate with its schema definition. Configure properties, vectorizer, generative module, vector index settings, and multi-tenancy. The vectorizer and generative module **cannot be changed after creation**.
+Create a new collection (class) in Weaviate with its schema definition. Configure properties, vectorizer, generative module, vector index settings, and multi-tenancy. The vectorizer cannot be changed after creation. Generative configuration is mutable on supported server versions.
 
 ### Create Object
 
@@ -38,7 +44,11 @@ Delete a specific object from a collection by its UUID. This permanently removes
 
 ### Generative Search (RAG)
 
-Perform Retrieval Augmented Generation (RAG) by searching a collection and prompting an LLM with the retrieved results. Requires a generative module configured on the collection. Two generation modes: - **Single prompt**: Generates a response for each result individually, using object properties via \
+Search a collection and generate text using a configured generative module. Supports per-object prompt templates and a grouped task over the results. Requires GraphQL, a text vectorizer and server-side model credentials.
+
+### Get Current User
+
+Get the authenticated username, assigned roles and groups on supported servers.
 
 ### Get Collection
 
@@ -46,7 +56,7 @@ Retrieve the full schema definition of a specific collection, including its prop
 
 ### Get Object
 
-Retrieve a specific object from a collection by its UUID. Optionally include the vector embedding and classification info in the response.
+Retrieve a specific object from a collection by its UUID. Optionally include vector embeddings in the response.
 
 ### List Collections
 
@@ -74,7 +84,7 @@ Search for objects in a Weaviate collection using various search methods: - **ne
 
 ### Update Collection
 
-Update an existing collection's settings or add new properties. You can update the description, inverted index config, replication config, and add new properties. Note: You **cannot change** the vectorizer, generative module, or existing properties after creation.
+Update an existing collection's settings or add new properties. You can update the description, inverted index config, replication config, and add new properties. The vectorizer cannot be changed and properties cannot be removed. Replication factor changes require replica movement.
 
 ### Update Object
 

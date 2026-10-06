@@ -6,40 +6,48 @@ import { spec } from '../spec';
 let trackSchema = z.object({
   trackId: z.string().describe('Unique identifier (URN) of the track'),
   title: z.string().describe('Title of the track'),
-  permalinkUrl: z.string().describe('URL to the track on SoundCloud'),
-  duration: z.number().describe('Duration of the track in milliseconds'),
-  genre: z.string().nullable().describe('Genre of the track'),
-  artworkUrl: z.string().nullable().describe('URL to the track artwork'),
-  playbackCount: z.number().describe('Number of plays'),
-  likesCount: z.number().describe('Number of likes'),
-  commentsCount: z.number().describe('Number of comments'),
-  access: z.string().describe('Access level: playable, preview, or blocked'),
-  createdAt: z.string().describe('When the track was created'),
-  username: z.string().describe('Username of the track uploader')
+  permalinkUrl: z.string().nullable().optional().describe('URL to the track on SoundCloud'),
+  duration: z.number().nullable().optional().describe('Duration of the track in milliseconds'),
+  genre: z.string().nullable().optional().describe('Genre of the track'),
+  artworkUrl: z.string().nullable().optional().describe('URL to the track artwork'),
+  playbackCount: z.number().nullable().optional().describe('Number of plays'),
+  likesCount: z.number().nullable().optional().describe('Number of likes'),
+  commentsCount: z.number().nullable().optional().describe('Number of comments'),
+  access: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Access level: playable, preview, or blocked'),
+  createdAt: z.string().nullable().optional().describe('When the track was created'),
+  username: z.string().optional().describe('Username of the track uploader')
 });
 
 let playlistSchema = z.object({
   playlistId: z.string().describe('Unique identifier (URN) of the playlist'),
   title: z.string().describe('Title of the playlist'),
-  permalinkUrl: z.string().describe('URL to the playlist on SoundCloud'),
-  duration: z.number().describe('Total duration in milliseconds'),
-  trackCount: z.number().describe('Number of tracks in the playlist'),
-  likesCount: z.number().describe('Number of likes'),
-  isAlbum: z.boolean().describe('Whether the playlist is marked as an album'),
-  createdAt: z.string().describe('When the playlist was created'),
-  username: z.string().describe('Username of the playlist creator')
+  permalinkUrl: z.string().nullable().optional().describe('URL to the playlist on SoundCloud'),
+  duration: z.number().nullable().optional().describe('Total duration in milliseconds'),
+  trackCount: z.number().nullable().optional().describe('Number of tracks in the playlist'),
+  likesCount: z.number().nullable().optional().describe('Number of likes'),
+  isAlbum: z.boolean().optional().describe('Whether the playlist is marked as an album'),
+  createdAt: z.string().nullable().optional().describe('When the playlist was created'),
+  username: z.string().optional().describe('Username of the playlist creator')
 });
 
 let userSchema = z.object({
-  userId: z.string().describe('Unique identifier (URN) of the user'),
-  username: z.string().describe('Username'),
-  fullName: z.string().describe('Full display name'),
-  permalinkUrl: z.string().describe('URL to the user profile on SoundCloud'),
-  avatarUrl: z.string().describe('URL to the user avatar'),
-  followersCount: z.number().describe('Number of followers'),
-  trackCount: z.number().describe('Number of tracks uploaded'),
-  city: z.string().nullable().describe('User city'),
-  countryCode: z.string().nullable().describe('User country code')
+  userId: z.string().optional().describe('Unique identifier (URN) of the user'),
+  username: z.string().optional().describe('Username'),
+  fullName: z.string().nullable().optional().describe('Full display name'),
+  permalinkUrl: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('URL to the user profile on SoundCloud'),
+  avatarUrl: z.string().nullable().optional().describe('URL to the user avatar'),
+  followersCount: z.number().nullable().optional().describe('Number of followers'),
+  trackCount: z.number().nullable().optional().describe('Number of tracks uploaded'),
+  city: z.string().nullable().optional().describe('User city'),
+  countryCode: z.string().nullable().optional().describe('User country code')
 });
 
 export let searchTracks = SlateTool.create(spec, {
@@ -51,6 +59,12 @@ export let searchTracks = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().describe('Search query string'),
+      nextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact continuation URL returned by this list; keep the same resource and filters'
+        ),
       limit: z
         .number()
         .optional()
@@ -69,14 +83,20 @@ export let searchTracks = SlateTool.create(spec, {
   .output(
     z.object({
       tracks: z.array(trackSchema).describe('List of matching tracks'),
+      nextHref: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native next page URL, when supplied'),
       hasMore: z.boolean().describe('Whether more results are available')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.searchTracks(ctx.input.query, {
-      limit: ctx.input.limit || 20,
+      nextHref: ctx.input.nextHref,
+      limit: ctx.input.limit ?? 20,
       access: ctx.input.access,
       genres: ctx.input.genres,
       bpmFrom: ctx.input.bpmFrom,
@@ -86,7 +106,7 @@ export let searchTracks = SlateTool.create(spec, {
     });
 
     let tracks = result.collection.map(t => ({
-      trackId: t.urn || String(t.id),
+      trackId: t.urn,
       title: t.title,
       permalinkUrl: t.permalink_url,
       duration: t.duration,
@@ -97,11 +117,11 @@ export let searchTracks = SlateTool.create(spec, {
       commentsCount: t.comment_count,
       access: t.access,
       createdAt: t.created_at,
-      username: t.user?.username || ''
+      username: t.user?.username
     }));
 
     return {
-      output: { tracks, hasMore: !!result.next_href },
+      output: { tracks, hasMore: !!result.next_href, nextHref: result.next_href },
       message: `Found **${tracks.length}** tracks matching "${ctx.input.query}"${result.next_href ? ' (more results available)' : ''}.`
     };
   })
@@ -116,6 +136,12 @@ export let searchPlaylists = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().describe('Search query string'),
+      nextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact continuation URL returned by this list; keep the same resource and filters'
+        ),
       limit: z
         .number()
         .optional()
@@ -125,18 +151,24 @@ export let searchPlaylists = SlateTool.create(spec, {
   .output(
     z.object({
       playlists: z.array(playlistSchema).describe('List of matching playlists'),
+      nextHref: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native next page URL, when supplied'),
       hasMore: z.boolean().describe('Whether more results are available')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.searchPlaylists(ctx.input.query, {
-      limit: ctx.input.limit || 20
+      nextHref: ctx.input.nextHref,
+      limit: ctx.input.limit ?? 20
     });
 
     let playlists = result.collection.map(p => ({
-      playlistId: p.urn || String(p.id),
+      playlistId: p.urn,
       title: p.title,
       permalinkUrl: p.permalink_url,
       duration: p.duration,
@@ -144,11 +176,11 @@ export let searchPlaylists = SlateTool.create(spec, {
       likesCount: p.likes_count,
       isAlbum: p.is_album,
       createdAt: p.created_at,
-      username: p.user?.username || ''
+      username: p.user?.username
     }));
 
     return {
-      output: { playlists, hasMore: !!result.next_href },
+      output: { playlists, hasMore: !!result.next_href, nextHref: result.next_href },
       message: `Found **${playlists.length}** playlists matching "${ctx.input.query}"${result.next_href ? ' (more results available)' : ''}.`
     };
   })
@@ -163,6 +195,12 @@ export let searchUsers = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().describe('Search query string'),
+      nextHref: z
+        .string()
+        .optional()
+        .describe(
+          'Exact continuation URL returned by this list; keep the same resource and filters'
+        ),
       limit: z
         .number()
         .optional()
@@ -172,18 +210,24 @@ export let searchUsers = SlateTool.create(spec, {
   .output(
     z.object({
       users: z.array(userSchema).describe('List of matching users'),
+      nextHref: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Native next page URL, when supplied'),
       hasMore: z.boolean().describe('Whether more results are available')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let result = await client.searchUsers(ctx.input.query, {
-      limit: ctx.input.limit || 20
+      nextHref: ctx.input.nextHref,
+      limit: ctx.input.limit ?? 20
     });
 
     let users = result.collection.map(u => ({
-      userId: u.urn || String(u.id),
+      userId: u.urn,
       username: u.username,
       fullName: u.full_name,
       permalinkUrl: u.permalink_url,
@@ -195,7 +239,7 @@ export let searchUsers = SlateTool.create(spec, {
     }));
 
     return {
-      output: { users, hasMore: !!result.next_href },
+      output: { users, hasMore: !!result.next_href, nextHref: result.next_href },
       message: `Found **${users.length}** users matching "${ctx.input.query}"${result.next_href ? ' (more results available)' : ''}.`
     };
   })

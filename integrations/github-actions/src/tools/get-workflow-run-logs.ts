@@ -1,14 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { GitHubActionsClient } from '../lib/client';
+import { GitHubActionsClient, githubHeaders } from '../lib/client';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getWorkflowRunLogs = SlateTool.create(spec, {
   name: 'Get Workflow Run Logs',
   key: 'get_workflow_run_logs',
-  description: `Get download URLs for workflow run logs or individual job logs. Returns a redirect URL to download the log archive. Can also delete run logs.`,
+  description: `Download workflow run logs as a ZIP archive or individual job logs as text. Can also permanently delete run logs.`,
   tags: {
-    readOnly: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -25,16 +27,23 @@ export let getWorkflowRunLogs = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      downloadUrl: z.string().optional().describe('URL to download the log archive'),
+      downloadUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Temporary provider download URL; expires after one minute. Request the download again to obtain a fresh URL while the file exists'
+        ),
       deleted: z.boolean().optional().describe('Whether logs were deleted')
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
     let client = new GitHubActionsClient(ctx.auth.token);
     let { owner, repo, runId, jobId, action } = ctx.input;
 
+    if (runId && jobId) throw createApiServiceError('Provide runId or jobId, not both.');
     if (action === 'delete') {
-      if (!runId) throw new Error('runId is required to delete logs.');
+      if (!runId) throw createApiServiceError('runId is required to delete logs.');
       await client.deleteWorkflowRunLogs(owner, repo, runId);
       return {
         output: { deleted: true },
@@ -43,21 +52,35 @@ export let getWorkflowRunLogs = SlateTool.create(spec, {
     }
 
     if (jobId) {
-      let url = await client.downloadJobLogs(owner, repo, jobId);
+      let file = await client.downloadJobLogs(owner, repo, jobId);
+      await ctx.addAttachment({
+        type: 'url',
+        url: file.apiUrl,
+        mimeType: 'text/plain',
+        filename: `job-${jobId}.log`,
+        headers: { ...githubHeaders, Authorization: `Bearer ${ctx.auth.token}` }
+      });
       return {
-        output: { downloadUrl: typeof url === 'string' ? url : '' },
-        message: `Retrieved log download URL for job **${jobId}**.`
+        output: { downloadUrl: file.downloadUrl },
+        message: `Prepared log download for job **${jobId}**.`
       };
     }
 
     if (runId) {
-      let url = await client.downloadWorkflowRunLogs(owner, repo, runId);
+      let file = await client.downloadWorkflowRunLogs(owner, repo, runId);
+      await ctx.addAttachment({
+        type: 'url',
+        url: file.apiUrl,
+        mimeType: 'application/zip',
+        filename: `workflow-run-${runId}-logs.zip`,
+        headers: { ...githubHeaders, Authorization: `Bearer ${ctx.auth.token}` }
+      });
       return {
-        output: { downloadUrl: typeof url === 'string' ? url : '' },
-        message: `Retrieved log download URL for workflow run **#${runId}**.`
+        output: { downloadUrl: file.downloadUrl },
+        message: `Prepared log archive for workflow run **#${runId}**.`
       };
     }
 
-    throw new Error('Either runId or jobId must be provided.');
+    throw createApiServiceError('Either runId or jobId must be provided.');
   })
   .build();

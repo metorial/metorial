@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SpotifyClient } from '../lib/client';
+import { paging, pagingOutputSchema } from '../lib/types';
 import { spec } from '../spec';
 
 export let getArtist = SlateTool.create(spec, {
@@ -25,6 +26,7 @@ export let getArtist = SlateTool.create(spec, {
           'Comma-separated album types to filter: album, single, appears_on, compilation'
         ),
       market: z.string().optional().describe('ISO 3166-1 alpha-2 country code'),
+      albumOffset: z.number().min(0).optional().describe('Offset for the artist album page'),
       albumLimit: z
         .number()
         .min(1)
@@ -37,9 +39,9 @@ export let getArtist = SlateTool.create(spec, {
     z.object({
       artistId: z.string(),
       name: z.string(),
-      genres: z.array(z.string()),
-      popularity: z.number(),
-      followers: z.number(),
+      genres: z.array(z.string()).optional(),
+      popularity: z.number().optional(),
+      followers: z.number().optional(),
       imageUrl: z.string().nullable(),
       spotifyUrl: z.string(),
       uri: z.string(),
@@ -49,7 +51,7 @@ export let getArtist = SlateTool.create(spec, {
             trackId: z.string(),
             name: z.string(),
             durationMs: z.number(),
-            popularity: z.number(),
+            popularity: z.number().optional(),
             albumName: z.string(),
             spotifyUrl: z.string(),
             uri: z.string()
@@ -69,13 +71,14 @@ export let getArtist = SlateTool.create(spec, {
           })
         )
         .optional(),
+      albumsPaging: pagingOutputSchema.optional(),
       relatedArtists: z
         .array(
           z.object({
             artistId: z.string(),
             name: z.string(),
-            genres: z.array(z.string()),
-            popularity: z.number(),
+            genres: z.array(z.string()).optional(),
+            popularity: z.number().optional(),
             imageUrl: z.string().nullable(),
             spotifyUrl: z.string()
           })
@@ -86,9 +89,14 @@ export let getArtist = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SpotifyClient({
       token: ctx.auth.token,
-      market: ctx.config.market
+      refreshToken: ctx.auth.refreshToken,
+      input: ctx.input,
+      market: ctx.config.market,
+      endpointCompatibility: ctx.config.endpointCompatibility
     });
 
+    if (ctx.input.include?.some(v => ['topTracks', 'relatedArtists'].includes(v)))
+      client.requireLegacy('Artist top tracks and related artists');
     let artist = await client.getArtist(ctx.input.artistId);
     let includes = ctx.input.include ?? [];
 
@@ -106,24 +114,23 @@ export let getArtist = SlateTool.create(spec, {
         )
       : undefined;
 
-    let albumsResult = includes.includes('albums')
-      ? (
-          await client.getArtistAlbums(ctx.input.artistId, {
-            includeGroups: ctx.input.albumTypes,
-            market: ctx.input.market,
-            limit: ctx.input.albumLimit
-          })
-        ).items.map(a => ({
-          albumId: a.id,
-          name: a.name,
-          albumType: a.album_type,
-          totalTracks: a.total_tracks,
-          releaseDate: a.release_date,
-          imageUrl: a.images?.[0]?.url ?? null,
-          spotifyUrl: a.external_urls.spotify
-        }))
+    const albumPage = includes.includes('albums')
+      ? await client.getArtistAlbums(ctx.input.artistId, {
+          includeGroups: ctx.input.albumTypes,
+          market: ctx.input.market,
+          limit: ctx.input.albumLimit,
+          offset: ctx.input.albumOffset
+        })
       : undefined;
-
+    const albumsResult = albumPage?.items.map(a => ({
+      albumId: a.id,
+      name: a.name,
+      albumType: a.album_type,
+      totalTracks: a.total_tracks,
+      releaseDate: a.release_date,
+      imageUrl: a.images?.[0]?.url ?? null,
+      spotifyUrl: a.external_urls.spotify
+    }));
     let relatedArtistsResult = includes.includes('relatedArtists')
       ? (await client.getRelatedArtists(ctx.input.artistId)).artists.map(a => ({
           artistId: a.id,
@@ -141,14 +148,15 @@ export let getArtist = SlateTool.create(spec, {
         name: artist.name,
         genres: artist.genres,
         popularity: artist.popularity,
-        followers: artist.followers.total,
+        followers: artist.followers?.total,
         imageUrl: artist.images?.[0]?.url ?? null,
         spotifyUrl: artist.external_urls.spotify,
         uri: artist.uri,
         topTracks: topTracksResult,
         albums: albumsResult,
+        albumsPaging: albumPage ? paging(albumPage) : undefined,
         relatedArtists: relatedArtistsResult
       },
-      message: `Retrieved artist **${artist.name}** (${artist.followers.total.toLocaleString()} followers, popularity ${artist.popularity}).`
+      message: `Retrieved artist **${artist.name}**. Album results contain one page; top tracks and related artists require confirmed legacy endpoint entitlement.`
     };
   });

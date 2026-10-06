@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GiteaClient } from '../lib/client';
+import { integerInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let prOutputSchema = z.object({
@@ -10,8 +11,8 @@ let prOutputSchema = z.object({
   state: z.string().describe('Pull request state (open, closed)'),
   htmlUrl: z.string().describe('Web URL of the pull request'),
   authorLogin: z.string().describe('Username of the PR author'),
-  headBranch: z.string().describe('Source branch'),
-  baseBranch: z.string().describe('Target branch'),
+  headBranch: z.string().min(1).describe('Source branch'),
+  baseBranch: z.string().min(1).describe('Target branch'),
   isMerged: z.boolean().describe('Whether the PR has been merged'),
   isMergeable: z.boolean().describe('Whether the PR can be merged'),
   labels: z
@@ -41,8 +42,8 @@ export let listPullRequests = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       state: z
         .enum(['open', 'closed', 'all'])
         .optional()
@@ -58,8 +59,8 @@ export let listPullRequests = SlateTool.create(spec, {
         ])
         .optional()
         .describe('Sort order'),
-      page: z.number().optional().describe('Page number'),
-      limit: z.number().optional().describe('Results per page')
+      page: integerInput(1).optional().describe('Page number'),
+      limit: integerInput(0).optional().describe('Results per page')
     })
   )
   .output(
@@ -68,7 +69,7 @@ export let listPullRequests = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let prs = await client.listPullRequests(ctx.input.owner, ctx.input.repo, {
       state: ctx.input.state,
       sort: ctx.input.sort,
@@ -106,21 +107,21 @@ export let listPullRequests = SlateTool.create(spec, {
 export let getPullRequest = SlateTool.create(spec, {
   name: 'Get Pull Request',
   key: 'get_pull_request',
-  description: `Retrieve detailed information about a specific pull request including merge status, reviews, and branch info.`,
+  description: `Retrieve detailed information about a specific pull request including merge status and branch info; use list_pull_request_reviews for reviews.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      prNumber: z.number().describe('Pull request number')
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      prNumber: integerInput(1).describe('Pull request number')
     })
   )
   .output(prOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let pr = await client.getPullRequest(ctx.input.owner, ctx.input.repo, ctx.input.prNumber);
 
     return {
@@ -151,33 +152,38 @@ export let getPullRequest = SlateTool.create(spec, {
 export let createPullRequest = SlateTool.create(spec, {
   name: 'Create Pull Request',
   key: 'create_pull_request',
-  description: `Create a new pull request to merge changes from a head branch into a base branch. Supports assigning reviewers, labels, and milestones.`,
+  description: `Create a new pull request to merge changes from a head branch into a base branch. Supports assignees, reviewers, labels, and milestones.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
       title: z.string().describe('Pull request title'),
       body: z.string().optional().describe('Pull request description (supports Markdown)'),
-      headBranch: z.string().describe('Source branch containing the changes'),
-      baseBranch: z.string().describe('Target branch to merge into'),
-      assignees: z.array(z.string()).optional().describe('Usernames to assign as reviewers'),
+      headBranch: z.string().min(1).describe('Source branch containing the changes'),
+      baseBranch: z.string().min(1).describe('Target branch to merge into'),
+      assignees: z
+        .array(z.string())
+        .optional()
+        .describe('Usernames to assign to the pull request; assignees are not reviewers'),
+      reviewers: z.array(z.string()).optional().describe('Usernames to request reviews from'),
       labelIds: z.array(z.number()).optional().describe('Label IDs to attach'),
       milestoneId: z.number().optional().describe('Milestone ID to assign')
     })
   )
   .output(prOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     let pr = await client.createPullRequest(ctx.input.owner, ctx.input.repo, {
       title: ctx.input.title,
       body: ctx.input.body,
       head: ctx.input.headBranch,
       base: ctx.input.baseBranch,
       assignees: ctx.input.assignees,
+      reviewers: ctx.input.reviewers,
       labels: ctx.input.labelIds,
       milestone: ctx.input.milestoneId
     });
@@ -217,9 +223,9 @@ export let updatePullRequest = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      prNumber: z.number().describe('Pull request number'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      prNumber: integerInput(1).describe('Pull request number'),
       title: z.string().optional().describe('New title'),
       body: z.string().optional().describe('New description'),
       state: z.enum(['open', 'closed']).optional().describe('Set PR state'),
@@ -229,7 +235,13 @@ export let updatePullRequest = SlateTool.create(spec, {
   )
   .output(prOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    if (
+      !Object.entries(ctx.input).some(
+        ([key, value]) => !['owner', 'repo', 'prNumber'].includes(key) && value !== undefined
+      )
+    )
+      throw createApiServiceError('Provide a pull request field to update.');
+    let client = new GiteaClient(ctx.auth);
     let pr = await client.updatePullRequest(
       ctx.input.owner,
       ctx.input.repo,
@@ -273,18 +285,33 @@ export let mergePullRequest = SlateTool.create(spec, {
   key: 'merge_pull_request',
   description: `Merge a pull request using the specified merge strategy. Supports merge commit, rebase, squash, and rebase-merge methods. Optionally deletes the source branch after merging.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
     z.object({
-      owner: z.string().describe('Repository owner'),
-      repo: z.string().describe('Repository name'),
-      prNumber: z.number().describe('Pull request number'),
+      owner: z.string().min(1).describe('Repository owner'),
+      repo: z.string().min(1).describe('Repository name'),
+      prNumber: integerInput(1).describe('Pull request number'),
       mergeMethod: z
-        .enum(['merge', 'rebase', 'rebase-merge', 'squash', 'manually-merged'])
+        .enum([
+          'merge',
+          'rebase',
+          'rebase-merge',
+          'squash',
+          'manually-merged',
+          'fast-forward-only'
+        ])
         .optional()
         .describe('Merge strategy (default: merge)'),
+      headCommitId: z
+        .string()
+        .optional()
+        .describe('Expected head commit SHA to prevent merging changed pull requests'),
+      mergeCommitId: z
+        .string()
+        .optional()
+        .describe('Existing merge commit SHA, required when marking a PR manually merged'),
       mergeMessage: z.string().optional().describe('Custom merge commit message'),
       deleteBranchAfterMerge: z
         .boolean()
@@ -298,15 +325,26 @@ export let mergePullRequest = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new GiteaClient({ token: ctx.auth.token, baseUrl: ctx.auth.baseUrl });
+    let client = new GiteaClient(ctx.auth);
     await client.mergePullRequest(ctx.input.owner, ctx.input.repo, ctx.input.prNumber, {
       mergeMethod: ctx.input.mergeMethod,
+      headCommitId: ctx.input.headCommitId,
+      mergeCommitId: ctx.input.mergeCommitId,
       mergeCommitMessage: ctx.input.mergeMessage,
       deleteBranchAfterMerge: ctx.input.deleteBranchAfterMerge
     });
 
+    const read = await client.getPullRequest(
+      ctx.input.owner,
+      ctx.input.repo,
+      ctx.input.prNumber
+    );
+    if (!read.merged)
+      throw createApiServiceError(
+        'Gitea accepted the merge request but the pull request is not merged yet. Retrieve it with get_pull_request.'
+      );
     return {
-      output: { merged: true },
+      output: { merged: read.merged },
       message: `Merged PR **#${ctx.input.prNumber}** via ${ctx.input.mergeMethod || 'merge'}`
     };
   })

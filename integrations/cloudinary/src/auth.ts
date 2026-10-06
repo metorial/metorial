@@ -1,11 +1,13 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { credentials } from './lib/validation';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string().describe('API Key for Cloudinary authentication'),
-      apiSecret: z.string().describe('API Secret for Cloudinary authentication')
+      apiSecret: z.string().describe('API Secret for Cloudinary authentication'),
+      authorization: z.string().optional().describe('HTTP authentication for file delivery')
     })
   )
   .addCustomAuth({
@@ -26,7 +28,8 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: ctx.input.apiKey,
-          apiSecret: ctx.input.apiSecret
+          apiSecret: ctx.input.apiSecret,
+          authorization: credentials(ctx.input.apiKey, ctx.input.apiSecret)
         }
       };
     }

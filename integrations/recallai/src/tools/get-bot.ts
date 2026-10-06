@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { recordingOutput, recordingSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let statusChangeSchema = z.object({
@@ -44,6 +45,10 @@ export let getBotTool = SlateTool.create(spec, {
       meetingUrl: z.unknown().describe('Parsed meeting URL'),
       joinAt: z.string().nullable().describe('Scheduled join time'),
       status: z.string().describe('Current bot status'),
+      metadata: z.record(z.string(), z.unknown()).describe('Custom bot metadata'),
+      recordings: z
+        .array(recordingSchema)
+        .describe('Recordings captured by this bot, with IDs for get_recording'),
       statusChanges: z.array(statusChangeSchema).describe('History of status changes'),
       meetingParticipants: z.array(participantSchema).describe('Participants in the meeting'),
       meetingMetadata: z
@@ -51,11 +56,24 @@ export let getBotTool = SlateTool.create(spec, {
         .nullable()
         .describe('Meeting metadata'),
       videoUrl: z.string().nullable().describe('Pre-signed URL for the MP4 recording'),
+      outputMedia: z
+        .record(z.string(), z.unknown())
+        .nullable()
+        .optional()
+        .describe('Current bot output media configuration'),
+      automaticAudioOutput: z
+        .record(z.string(), z.unknown())
+        .nullable()
+        .optional()
+        .describe('Automatic audio settings; required before using output_media audio'),
       recordingConfig: z
         .record(z.string(), z.unknown())
         .nullable()
         .describe('Recording configuration'),
-      createdAt: z.string().describe('Bot creation timestamp'),
+      createdAt: z
+        .string()
+        .optional()
+        .describe('Bot creation timestamp when supplied by Recall.ai'),
       mediaRetentionEnd: z.string().nullable().describe('When media will be deleted')
     })
   )
@@ -75,10 +93,14 @@ export let getBotTool = SlateTool.create(spec, {
         joinAt: bot.joinAt,
         status: bot.status,
         statusChanges: bot.statusChanges,
+        metadata: bot.metadata,
+        recordings: bot.recordings.map(recordingOutput),
         meetingParticipants: bot.meetingParticipants,
         meetingMetadata: bot.meetingMetadata,
         videoUrl: bot.videoUrl,
         recordingConfig: bot.recordingConfig,
+        outputMedia: bot.outputMedia,
+        automaticAudioOutput: bot.automaticAudioOutput,
         createdAt: bot.createdAt,
         mediaRetentionEnd: bot.mediaRetentionEnd
       },

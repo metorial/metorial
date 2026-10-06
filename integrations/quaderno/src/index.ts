@@ -26,6 +26,7 @@ import {
   deliverInvoice,
   getContact,
   getCreditNote,
+  getCurrentAccount,
   getEstimate,
   getExpense,
   getInvoice,
@@ -47,18 +48,10 @@ import {
   validateTaxId
 } from './tools';
 
-import {
-  checkoutEvents,
-  contactEvents,
-  deliveryEvents,
-  documentEvents,
-  paymentEvents,
-  thresholdEvents
-} from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentAccount,
     calculateTax,
     validateTaxId,
     listContacts,
@@ -103,12 +96,5 @@ export let provider = Slate.create({
     deleteJurisdiction,
     createTransaction
   ],
-  triggers: [
-    documentEvents,
-    contactEvents,
-    paymentEvents,
-    checkoutEvents,
-    deliveryEvents,
-    thresholdEvents
-  ]
+  triggers: []
 });

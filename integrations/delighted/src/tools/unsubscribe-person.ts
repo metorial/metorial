@@ -1,13 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { rejectUnavailableDelighted, unavailableMessage } from '../lib/unavailable';
 import { spec } from '../spec';
 
 export let unsubscribePerson = SlateTool.create(spec, {
   name: 'Unsubscribe Person',
   key: 'unsubscribe_person',
-  description: `Unsubscribe a person from future Delighted surveys. Equivalent to the person clicking "Unsubscribe" in a survey email. Does not delete historical survey responses.`,
+  description:
+    'DEPRECATED — Delighted customer access ended on July 1, 2026. This legacy tool is retained for compatibility and cannot be executed.',
+  instructions: [unavailableMessage],
   tags: {
+    deprecated: true,
     destructive: false,
     readOnly: false
   }
@@ -22,13 +25,5 @@ export let unsubscribePerson = SlateTool.create(spec, {
       ok: z.boolean().describe('Whether the unsubscribe was successful')
     })
   )
-  .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.unsubscribePerson(ctx.input.email);
-
-    return {
-      output: { ok: result.ok },
-      message: `**${ctx.input.email}** unsubscribed from future surveys.`
-    };
-  })
+  .handleInvocation(async () => rejectUnavailableDelighted())
   .build();

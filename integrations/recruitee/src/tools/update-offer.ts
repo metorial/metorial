@@ -31,14 +31,11 @@ export let updateOffer = SlateTool.create(spec, {
       offerId: z.number().describe('Offer ID'),
       title: z.string().describe('Updated title'),
       status: z.string().describe('Current status'),
-      updatedAt: z.string().describe('Last update timestamp')
+      updatedAt: z.string().optional().describe('Update timestamp when returned')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new RecruiteeClient({
-      token: ctx.auth.token,
-      companyId: ctx.config.companyId
-    });
+    let client = await RecruiteeClient.forContext(ctx);
 
     let result = await client.updateOffer(ctx.input.offerId, {
       title: ctx.input.title,

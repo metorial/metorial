@@ -35,8 +35,6 @@ import {
   updateRepositoryVisibilityTool,
   uploadFileTool
 } from './tools';
-import { repositoryEventsTrigger } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -74,5 +72,5 @@ export let provider = Slate.create({
     runInferenceTool,
     getUserInfoTool
   ],
-  triggers: [repositoryEventsTrigger]
+  triggers: []
 });

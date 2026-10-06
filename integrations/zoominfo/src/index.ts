@@ -8,6 +8,8 @@ import {
   enrichIntent,
   enrichTechnographics,
   getUsage,
+  lookupData,
+  lookupFields,
   searchCompanies,
   searchContacts,
   searchIntent,
@@ -15,8 +17,6 @@ import {
   searchScoops,
   websightsLookup
 } from './tools';
-import { recordUpdated } from './triggers';
-
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,7 +32,9 @@ export let provider = Slate.create({
     getUsage,
     enrichCorporateHierarchy,
     enrichTechnographics,
-    complianceCheck
+    complianceCheck,
+    lookupData,
+    lookupFields
   ],
-  triggers: [recordUpdated]
+  triggers: []
 });

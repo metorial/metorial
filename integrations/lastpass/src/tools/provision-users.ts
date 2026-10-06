@@ -6,12 +6,14 @@ import { spec } from '../spec';
 export let provisionUsers = SlateTool.create(spec, {
   name: 'Provision Users',
   key: 'provision_users',
-  description: `Create new user accounts in LastPass Enterprise. Add one or more users by email, optionally assigning them to groups and setting a full name. Provisioned users receive an email with a temporary password or activation link.`,
+  description: `Create new user accounts in LastPass Enterprise. Add one or more users by email, optionally assigning them to groups and setting a full name. New users may receive activation emails; notifications and audit history cannot be rolled back.`,
   instructions: [
     'Each user requires at minimum a **username** (email address).',
     'Optionally provide **fullname** and **groups** for each user.'
   ],
-  constraints: ['Provisioned users are sent an email notification automatically.'],
+  constraints: [
+    'Provisioning can send email and retain audit history. WARN does not confirm all users were created.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -36,6 +38,10 @@ export let provisionUsers = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      warnings: z
+        .array(z.string())
+        .optional()
+        .describe('Native warnings; some requested changes may not have applied'),
       status: z.string().describe('API response status (OK, WARN, or error)')
     })
   )
@@ -57,9 +63,13 @@ export let provisionUsers = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result.status || 'OK'
+        status: result.status,
+        warnings: result.warnings
       },
-      message: `Provisioned **${ctx.input.users.length}** user(s): ${userList}.`
+      message:
+        result.status === 'WARN'
+          ? 'LastPass reported warnings; verify each requested user before retrying provisioning.'
+          : `LastPass accepted provisioning for **${ctx.input.users.length}** user(s): ${userList}.`
     };
   })
   .build();

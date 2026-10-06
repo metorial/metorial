@@ -1,145 +1,103 @@
-import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
-import { spec } from '../spec';
+import { checkoutOutput, fields, mapCheckout, metadata } from '../lib/schemas';
+import { tool } from '../lib/tool';
+import {
+  countryInput,
+  currencyInput,
+  decimal,
+  decimalInput,
+  idInput,
+  invalid,
+  pageInput,
+  pageOutput,
+  safeInteger,
+  textInput
+} from '../lib/validation';
 
-let checkoutSessionOutputSchema = z.object({
-  sessionId: z.string().optional().describe('Checkout session ID'),
-  status: z.string().optional().describe('Session status'),
-  cancelUrl: z.string().optional().describe('URL to redirect on cancel'),
-  successUrl: z.string().optional().describe('URL to redirect on success'),
-  url: z.string().optional().describe('Checkout page URL'),
-  currency: z.string().optional().describe('Currency code'),
-  customerEmail: z.string().optional().describe('Customer email'),
-  customerTaxId: z.string().optional().describe('Customer tax ID'),
-  customerCountry: z.string().optional().describe('Customer country'),
-  billingAddressCollection: z
-    .boolean()
+const item = z.object({
+  productCode: textInput
     .optional()
-    .describe('Whether billing address is collected')
+    .describe('SKU of an existing product, required by the current checkout API.'),
+  description: z.string().optional(),
+  amount: decimalInput.optional(),
+  quantity: safeInteger.positive().optional(),
+  currency: currencyInput.optional()
 });
-
-export let listCheckoutSessions = SlateTool.create(spec, {
+export const listCheckoutSessions = tool({
   name: 'List Checkout Sessions',
   key: 'list_checkout_sessions',
-  description: `Retrieve a list of checkout sessions from Quaderno. Abandoned sessions are automatically removed after seven days.`,
-  tags: { readOnly: true }
-})
-  .input(
-    z.object({
-      page: z.number().optional().describe('Page number for pagination')
-    })
-  )
-  .output(
-    z.object({
-      sessions: z.array(checkoutSessionOutputSchema)
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let result = await client.listCheckoutSessions({ page: ctx.input.page });
-
-    let sessions = (Array.isArray(result) ? result : []).map((s: any) => ({
-      sessionId: s.id?.toString(),
-      status: s.status,
-      cancelUrl: s.cancel_url,
-      successUrl: s.success_url,
-      url: s.url,
-      currency: s.currency,
-      customerEmail: s.customer_email,
-      customerTaxId: s.customer_tax_id,
-      customerCountry: s.customer_country,
-      billingAddressCollection: s.billing_address_collection
-    }));
-
+  description:
+    'List one cursor page of checkout sessions, or retrieve a session with sessionId alone.',
+  readOnly: true,
+  input: { ...pageInput, sessionId: idInput.optional() },
+  output: { sessions: z.array(z.object(checkoutOutput)), ...pageOutput },
+  run: async (input, client) => {
+    if (input.sessionId) {
+      if (Object.entries(input).some(([k, v]) => k !== 'sessionId' && v !== undefined))
+        throw invalid('Use sessionId alone for an exact checkout read.');
+      return {
+        sessions: [mapCheckout(await client.get('checkout/sessions', input.sessionId))]
+      };
+    }
     return {
-      output: { sessions },
-      message: `Found **${sessions.length}** checkout session(s)`
+      sessions: (await client.list('checkout/sessions', input)).map(mapCheckout),
+      ...client.pagination
     };
-  })
-  .build();
-
-export let createCheckoutSession = SlateTool.create(spec, {
+  }
+});
+export const createCheckoutSession = tool({
   name: 'Create Checkout Session',
   key: 'create_checkout_session',
-  description: `Create a new checkout session in Quaderno. Returns a URL to redirect your customer to complete payment.`,
-  tags: { destructive: false }
-})
-  .input(
-    z.object({
-      successUrl: z.string().describe('URL to redirect the customer after successful payment'),
-      cancelUrl: z.string().describe('URL to redirect the customer if they cancel'),
-      currency: z.string().optional().describe('Currency code (e.g., "USD", "EUR")'),
-      customerEmail: z.string().optional().describe('Pre-fill customer email'),
-      customerTaxId: z.string().optional().describe('Pre-fill customer tax ID'),
-      customerCountry: z.string().optional().describe('Pre-fill customer country code'),
-      billingAddressCollection: z
-        .boolean()
-        .optional()
-        .describe('Whether to collect billing address'),
-      items: z
-        .array(
-          z.object({
-            productCode: z.string().optional().describe('Product code'),
-            description: z.string().optional().describe('Item description'),
-            amount: z.string().optional().describe('Item amount'),
-            quantity: z.number().optional().describe('Quantity'),
-            currency: z.string().optional().describe('Currency code')
-          })
-        )
-        .optional()
-        .describe('Line items for the checkout'),
-      customMetadata: z
-        .record(z.string(), z.string())
-        .optional()
-        .describe('Custom metadata key-value pairs')
-    })
-  )
-  .output(checkoutSessionOutputSchema)
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-
-    let data: Record<string, any> = {
-      success_url: ctx.input.successUrl,
-      cancel_url: ctx.input.cancelUrl
-    };
-
-    if (ctx.input.currency) data.currency = ctx.input.currency;
-    if (ctx.input.customerEmail) data.customer_email = ctx.input.customerEmail;
-    if (ctx.input.customerTaxId) data.customer_tax_id = ctx.input.customerTaxId;
-    if (ctx.input.customerCountry) data.customer_country = ctx.input.customerCountry;
-    if (ctx.input.billingAddressCollection !== undefined)
-      data.billing_address_collection = ctx.input.billingAddressCollection;
-    if (ctx.input.customMetadata) data.custom_metadata = ctx.input.customMetadata;
-
-    if (ctx.input.items) {
-      data.items_attributes = ctx.input.items.map(item => {
-        let mapped: Record<string, any> = {};
-        if (item.productCode) mapped.product_code = item.productCode;
-        if (item.description) mapped.description = item.description;
-        if (item.amount) mapped.amount = item.amount;
-        if (item.quantity !== undefined) mapped.quantity = item.quantity;
-        if (item.currency) mapped.currency = item.currency;
-        return mapped;
-      });
+  description:
+    'Create a checkout session for a customer to complete payment. Requires existing product SKUs and success/cancel URLs. Session creation does not confirm payment.',
+  input: {
+    successUrl: z.string().url(),
+    cancelUrl: z.string().url(),
+    currency: currencyInput.optional().describe('Default currency for supplied items.'),
+    customerEmail: z.string().email().optional(),
+    customerTaxId: z.string().optional(),
+    customerCountry: countryInput.optional(),
+    billingAddressCollection: z.boolean().optional(),
+    items: z.array(item).min(1).max(200).optional(),
+    customMetadata: z.record(z.string().max(40), z.string().max(500)).optional()
+  },
+  output: checkoutOutput,
+  run: async (input, client) => {
+    if (!input.items?.length)
+      throw invalid(
+        'Supply at least one checkout item with a productCode from list_products.'
+      );
+    for (const link of [input.successUrl, input.cancelUrl]) {
+      const url = new URL(link);
+      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password)
+        throw invalid('Use an HTTP(S) redirect URL without embedded credentials.');
     }
-
-    let s = await client.createCheckoutSession(data);
-
-    return {
-      output: {
-        sessionId: s.id?.toString(),
-        status: s.status,
-        cancelUrl: s.cancel_url,
-        successUrl: s.success_url,
-        url: s.url,
-        currency: s.currency,
-        customerEmail: s.customer_email,
-        customerTaxId: s.customer_tax_id,
-        customerCountry: s.customer_country,
-        billingAddressCollection: s.billing_address_collection
-      },
-      message: `Created checkout session${s.url ? ` — [Checkout URL](${s.url})` : ` **${s.id}**`}`
+    const data = {
+      success_url: input.successUrl,
+      cancel_url: input.cancelUrl,
+      customer: fields(input, {
+        customerEmail: 'email',
+        customerTaxId: 'tax_id',
+        customerCountry: 'billing_country'
+      }),
+      billing_details_collection:
+        input.billingAddressCollection === undefined
+          ? undefined
+          : input.billingAddressCollection
+            ? 'required'
+            : 'auto',
+      metadata: metadata(input.customMetadata),
+      items: input.items.map(value => {
+        if (!value.productCode) throw invalid('Each checkout item requires productCode.');
+        return {
+          product: value.productCode,
+          description: value.description,
+          amount: value.amount === undefined ? undefined : decimal(value.amount),
+          quantity: value.quantity,
+          currency: value.currency ?? input.currency
+        };
+      })
     };
-  })
-  .build();
+    return mapCheckout(await client.create('checkout/sessions', data));
+  }
+});

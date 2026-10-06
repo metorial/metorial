@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubActionsClient } from '../lib/client';
+import type { Variable } from '../lib/types';
+import { validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let variableSchema = z.object({
@@ -19,7 +21,8 @@ export let manageVariables = SlateTool.create(spec, {
   key: 'manage_variables',
   description: `List, get, create, update, or delete Actions configuration variables at the repository, organization, or environment level. Unlike secrets, variable values are visible in API responses.`,
   tags: {
-    destructive: false
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -72,6 +75,11 @@ export let manageVariables = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateInput(ctx.input);
+    if (ctx.input.visibility === 'selected' && ctx.input.selectedRepositoryIds === undefined)
+      throw createApiServiceError(
+        'selectedRepositoryIds is required for selected visibility.'
+      );
     let client = new GitHubActionsClient(ctx.auth.token);
     let {
       scope,
@@ -87,22 +95,22 @@ export let manageVariables = SlateTool.create(spec, {
     } = ctx.input;
 
     if (action === 'list') {
-      let data: any;
+      let data: { total_count: number; variables: Variable[] };
       if (scope === 'org') {
-        if (!org) throw new Error('org is required for org scope.');
+        if (!org) throw createApiServiceError('org is required for org scope.');
         data = await client.listOrgVariables(org, { perPage, page });
       } else if (scope === 'environment') {
         if (!owner || !repo || !environmentName)
-          throw new Error('owner, repo, and environmentName are required.');
+          throw createApiServiceError('owner, repo, and environmentName are required.');
         data = await client.listEnvironmentVariables(owner, repo, environmentName, {
           perPage,
           page
         });
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         data = await client.listRepoVariables(owner, repo, { perPage, page });
       }
-      let variables = (data.variables ?? []).map((v: any) => ({
+      let variables = (data.variables ?? []).map(v => ({
         variableName: v.name,
         variableValue: v.value,
         createdAt: v.created_at,
@@ -116,13 +124,24 @@ export let manageVariables = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!variableName) throw new Error('variableName is required.');
-      let variable: any;
+      if (!variableName) throw createApiServiceError('variableName is required.');
+      let variable: Variable;
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         variable = await client.getOrgVariable(org, variableName);
+      } else if (scope === 'environment') {
+        if (!owner || !repo || !environmentName)
+          throw createApiServiceError(
+            'owner, repo, and environmentName are required for environment scope.'
+          );
+        variable = await client.getEnvironmentVariable(
+          owner,
+          repo,
+          environmentName,
+          variableName
+        );
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         variable = await client.getRepoVariable(owner, repo, variableName);
       }
       return {
@@ -141,9 +160,9 @@ export let manageVariables = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!variableName || variableValue === undefined)
-        throw new Error('variableName and variableValue are required.');
+        throw createApiServiceError('variableName and variableValue are required.');
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         await client.createOrgVariable(
           org,
           variableName,
@@ -153,7 +172,7 @@ export let manageVariables = SlateTool.create(spec, {
         );
       } else if (scope === 'environment') {
         if (!owner || !repo || !environmentName)
-          throw new Error('owner, repo, and environmentName are required.');
+          throw createApiServiceError('owner, repo, and environmentName are required.');
         await client.createEnvironmentVariable(
           owner,
           repo,
@@ -162,7 +181,7 @@ export let manageVariables = SlateTool.create(spec, {
           variableValue
         );
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         await client.createRepoVariable(owner, repo, variableName, variableValue);
       }
       return {
@@ -172,9 +191,21 @@ export let manageVariables = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!variableName) throw new Error('variableName is required.');
+      if (scope !== 'org' && variableValue === undefined)
+        throw createApiServiceError(
+          'variableValue is required for repository or environment variable updates.'
+        );
+      if (
+        variableValue === undefined &&
+        ctx.input.visibility === undefined &&
+        ctx.input.selectedRepositoryIds === undefined
+      )
+        throw createApiServiceError(
+          'Provide variableValue, visibility, or selectedRepositoryIds for update.'
+        );
+      if (!variableName) throw createApiServiceError('variableName is required.');
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         await client.updateOrgVariable(org, variableName, {
           name: variableName,
           value: variableValue,
@@ -183,12 +214,12 @@ export let manageVariables = SlateTool.create(spec, {
         });
       } else if (scope === 'environment') {
         if (!owner || !repo || !environmentName)
-          throw new Error('owner, repo, and environmentName are required.');
+          throw createApiServiceError('owner, repo, and environmentName are required.');
         await client.updateEnvironmentVariable(owner, repo, environmentName, variableName, {
           value: variableValue
         });
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         await client.updateRepoVariable(owner, repo, variableName, { value: variableValue });
       }
       return {
@@ -198,16 +229,16 @@ export let manageVariables = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!variableName) throw new Error('variableName is required.');
+      if (!variableName) throw createApiServiceError('variableName is required.');
       if (scope === 'org') {
-        if (!org) throw new Error('org is required.');
+        if (!org) throw createApiServiceError('org is required.');
         await client.deleteOrgVariable(org, variableName);
       } else if (scope === 'environment') {
         if (!owner || !repo || !environmentName)
-          throw new Error('owner, repo, and environmentName are required.');
+          throw createApiServiceError('owner, repo, and environmentName are required.');
         await client.deleteEnvironmentVariable(owner, repo, environmentName, variableName);
       } else {
-        if (!owner || !repo) throw new Error('owner and repo are required.');
+        if (!owner || !repo) throw createApiServiceError('owner and repo are required.');
         await client.deleteRepoVariable(owner, repo, variableName);
       }
       return {
@@ -216,6 +247,6 @@ export let manageVariables = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/Outlook%20SVG%20Icon.svg" height="20"> Outlook
 
-Send, read, reply to, forward, and manage email messages in user mailboxes. Organize messages into folders, apply categories, flags, and importance levels. Manage file and item attachments. Create, update, delete, and respond to calendar events and meetings. Find available meeting times, manage attendees, handle recurrence, and work with shared or delegated calendars. Create, read, update, and delete contacts, organize them into contact folders, and manage contact photos. Manage tasks and task lists via Microsoft To Do, including due dates, reminders, recurrence, and checklist items. Subscribe to webhook notifications for changes to messages, calendar events, and contacts. Support for Focused Inbox, @-mentions, mail tips, send-on-behalf, and send-as capabilities.
+Send, read, reply to, forward, and manage email messages in user mailboxes. Organize messages into folders, apply categories, flags, and importance levels. Manage file and item attachments. Create, update, delete, and respond to calendar events and meetings. Find available meeting times, manage attendees, handle recurrence, and work with shared or delegated calendars. Create, read, update, and delete contacts, organize them into contact folders, and manage contact photos. Manage tasks and task lists via Microsoft To Do, including due dates, reminders, recurrence, and checklist items. Support for Focused Inbox, @-mentions, mail tips, send-on-behalf, and send-as capabilities.
 
 ## Tools
 

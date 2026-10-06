@@ -1,19 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TrayGraphqlClient, TrayRestClient } from '../lib/client';
+import { clientConfig, TrayGraphqlClient, TrayRestClient } from '../lib/client';
+import { pageInput, pageOutput } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listAuthentications = SlateTool.create(spec, {
   name: 'List Authentications',
   key: 'list_authentications',
-  description: `List all service authentications for the authenticated user. Each authentication represents stored credentials for a third-party service connector (e.g., Salesforce, Slack). Returns authentication IDs needed for calling connectors and configuring solution instances.`,
+  description: `List one page of service authentications for the authenticated user. Each authentication represents stored credentials for a third-party service connector (e.g., Salesforce, Slack). Returns authentication IDs needed for calling connectors and configuring solution instances.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object(pageInput))
   .output(
     z.object({
+      ...pageOutput,
       authentications: z.array(
         z.object({
           authenticationId: z.string().describe('Unique authentication ID (UUID)'),
@@ -27,16 +29,13 @@ export let listAuthentications = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TrayGraphqlClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = new TrayGraphqlClient(clientConfig(ctx));
 
-    let authentications = await client.listAuthentications();
+    let authentications = await client.listAuthentications(ctx.input);
 
     return {
-      output: { authentications },
-      message: `Found **${authentications.length}** authentication(s).`
+      output: { authentications: authentications.items, pageInfo: authentications.pageInfo },
+      message: `Found **${authentications.items.length}** authentication(s).`
     };
   })
   .build();
@@ -81,10 +80,7 @@ export let createAuthentication = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TrayGraphqlClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = new TrayGraphqlClient(clientConfig(ctx));
 
     let result = await client.createUserAuthentication({
       name: ctx.input.name,
@@ -105,7 +101,7 @@ export let createAuthentication = SlateTool.create(spec, {
 export let deleteAuthentication = SlateTool.create(spec, {
   name: 'Delete Authentication',
   key: 'delete_authentication',
-  description: `Delete a service authentication from Tray.io. This permanently removes the stored credentials. Any solution instances or connector calls using this authentication will stop working.`,
+  description: `Delete a service authentication from Tray.io. This removes the stored authentication after an exact read and verifies absence. Prior connector or workflow effects and audit history remain. Any solution instances or connector calls using this authentication will stop working.`,
   tags: {
     destructive: true
   }
@@ -121,10 +117,7 @@ export let deleteAuthentication = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TrayRestClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = new TrayRestClient(clientConfig(ctx));
 
     await client.deleteAuthentication(ctx.input.authenticationId);
 

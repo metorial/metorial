@@ -17,7 +17,7 @@ export let getRepoBlocklists = SlateTool.create(spec, {
       repos: z.array(
         z.object({
           repoId: z.string().describe('Blocklist entry ID'),
-          url: z.string().describe('Repository URL'),
+          url: z.url().describe('Repository URL'),
           patterns: z.array(z.string()).describe('Glob patterns that are blocked')
         })
       )
@@ -45,7 +45,7 @@ export let upsertRepoBlocklists = SlateTool.create(spec, {
   key: 'upsert_repo_blocklists',
   description: `Add or update repository blocklist patterns. If a blocklist for the repository URL already exists, its patterns will be updated. Use glob patterns to block files or directories from being indexed or used as context. Requires an Admin API key.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -54,13 +54,16 @@ export let upsertRepoBlocklists = SlateTool.create(spec, {
       repos: z
         .array(
           z.object({
-            url: z.string().describe('Repository URL'),
+            url: z.url().describe('Repository URL'),
             patterns: z
               .array(z.string())
               .describe('Glob patterns to block (e.g. "*.env", "secrets/**")')
           })
         )
-        .describe('List of repositories and their blocklist patterns')
+        .min(1)
+        .describe(
+          'Repository blocklists to replace. Existing patterns for each supplied repository are overwritten.'
+        )
     })
   )
   .output(

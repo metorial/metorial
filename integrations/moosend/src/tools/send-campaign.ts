@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoosendClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,14 +6,15 @@ import { spec } from '../spec';
 export let sendCampaign = SlateTool.create(spec, {
   name: 'Send Campaign',
   key: 'send_campaign',
-  description: `Send a draft campaign immediately, schedule it for later delivery, or remove a previously set schedule. Can also send a test email to verify the campaign before sending to the full list.`,
+  description: `Send a draft campaign immediately, assign a scheduled date, or remove that date. Can also send a test email to verify the campaign before sending to the full list.`,
   instructions: [
-    'The campaign must be in draft status to send or schedule.',
+    'Scheduling only assigns a date; sending must be requested separately to queue delivery.',
+    'Removing a schedule from an already queued campaign can send it immediately. Verify current state first.',
     'Use action "send_test" before sending to the full list to verify the campaign content.',
     'Maximum 5 test email recipients.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -27,7 +28,7 @@ export let sendCampaign = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Date and time to schedule the campaign (e.g. "2024-06-15T10:00:00"). Required when action is "schedule".'
+          'Date and time in the configured account date format (e.g. 24-06-2030 13:17). Required when action is "schedule".'
         ),
       scheduleTimezone: z
         .string()
@@ -60,7 +61,9 @@ export let sendCampaign = SlateTool.create(spec, {
         break;
       case 'schedule':
         if (!ctx.input.scheduleDateTime) {
-          throw new Error('scheduleDateTime is required when action is "schedule"');
+          throw createApiServiceError(
+            'scheduleDateTime is required when action is "schedule"'
+          );
         }
         await client.scheduleCampaign(
           campaignId,
@@ -73,17 +76,17 @@ export let sendCampaign = SlateTool.create(spec, {
         break;
       case 'send_test':
         if (!ctx.input.testEmails || ctx.input.testEmails.length === 0) {
-          throw new Error('testEmails is required when action is "send_test"');
+          throw createApiServiceError('testEmails is required when action is "send_test"');
         }
         await client.sendTestEmail(campaignId, ctx.input.testEmails);
         break;
     }
 
     let actionMessages: Record<string, string> = {
-      send: 'sent immediately',
+      send: 'accepted for sending at its scheduled time or immediately when no date is assigned',
       schedule: `scheduled for ${ctx.input.scheduleDateTime}`,
-      unschedule: 'schedule removed',
-      send_test: `test email sent to ${ctx.input.testEmails?.join(', ')}`
+      unschedule: 'schedule removed; queued delivery may begin immediately',
+      send_test: `test request accepted for ${ctx.input.testEmails?.join(', ')}`
     };
 
     return {

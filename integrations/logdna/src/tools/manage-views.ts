@@ -1,10 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, safeChannels } from '../lib/client';
 import { spec } from '../spec';
 
 let channelSchema = z.object({
-  integration: z.string().describe('Alert integration type: email, webhook, or pagerduty'),
+  integration: z
+    .string()
+    .describe('Alert integration type: email, webhook, slack, or pagerduty'),
   emails: z.array(z.string()).optional().describe('Email addresses for email alerts'),
   url: z.string().optional().describe('Webhook URL for webhook alerts'),
   method: z.string().optional().describe('HTTP method for webhook (POST, PUT, etc.)'),
@@ -60,21 +62,25 @@ export let listViews = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let views = await client.listViews();
-    let viewList = Array.isArray(views) ? views : [];
+    let viewList = views;
 
     return {
       output: {
-        views: viewList.map((v: any) => ({
-          viewId: v.viewID || v.id || '',
+        views: viewList.map(v => ({
+          viewId: v.viewID,
           name: v.name,
           query: v.query,
           apps: v.apps,
           hosts: v.hosts,
           levels: v.levels,
           tags: v.tags,
-          channels: v.channels,
+          channels: safeChannels(v.channels),
           category: v.category,
           presetIds: v.presetIds
         }))
@@ -97,19 +103,23 @@ export let getView = SlateTool.create(spec, {
   )
   .output(viewOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let v = await client.getView(ctx.input.viewId);
 
     return {
       output: {
-        viewId: v.viewID || v.id || ctx.input.viewId,
+        viewId: v.viewID,
         name: v.name,
         query: v.query,
         apps: v.apps,
         hosts: v.hosts,
         levels: v.levels,
         tags: v.tags,
-        channels: v.channels,
+        channels: safeChannels(v.channels),
         category: v.category,
         presetIds: v.presetIds
       },
@@ -145,7 +155,11 @@ export let createView = SlateTool.create(spec, {
   )
   .output(viewOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let v = await client.createView({
       name: ctx.input.name,
       query: ctx.input.query,
@@ -160,14 +174,14 @@ export let createView = SlateTool.create(spec, {
 
     return {
       output: {
-        viewId: v.viewID || v.id || '',
+        viewId: v.viewID,
         name: v.name,
         query: v.query,
         apps: v.apps,
         hosts: v.hosts,
         levels: v.levels,
         tags: v.tags,
-        channels: v.channels,
+        channels: safeChannels(v.channels),
         category: v.category,
         presetIds: v.presetIds
       },
@@ -198,20 +212,24 @@ export let updateView = SlateTool.create(spec, {
   )
   .output(viewOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     let { viewId, ...updates } = ctx.input;
     let v = await client.updateView(viewId, updates);
 
     return {
       output: {
-        viewId: v.viewID || v.id || viewId,
+        viewId: v.viewID,
         name: v.name,
         query: v.query,
         apps: v.apps,
         hosts: v.hosts,
         levels: v.levels,
         tags: v.tags,
-        channels: v.channels,
+        channels: safeChannels(v.channels),
         category: v.category,
         presetIds: v.presetIds
       },
@@ -237,7 +255,11 @@ export let deleteView = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ serviceKey: ctx.auth.token });
+    let client = new Client({
+      serviceKey: ctx.auth.token,
+      authType: ctx.auth.authType,
+      apiEndpoint: ctx.auth.apiEndpoint
+    });
     await client.deleteView(ctx.input.viewId);
 
     return {

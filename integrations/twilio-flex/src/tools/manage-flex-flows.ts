@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FlexClient } from '../lib/client';
+import { fail, validateInput } from '../lib/validation';
 import { spec } from '../spec';
 
 let flexFlowSchema = z.object({
@@ -26,14 +27,20 @@ let flexFlowSchema = z.object({
 export let manageFlexFlowsTool = SlateTool.create(spec, {
   name: 'Manage Flex Flows',
   key: 'manage_flex_flows',
-  description: `Create, read, update, delete, or list Flex Flows. A Flex Flow defines how incoming messages on a given channel (SMS, WhatsApp, web chat, etc.) are routed into the Flex contact center. It links a messaging channel to Flex and specifies the integration type (Studio flow, external webhook, or direct task creation).`,
+  description: `Legacy Programmable Chat in Flex reached end of life on June 1, 2026 and may stop working. Migrate to Flex Conversations and Interactions. This tool preserves documented legacy CRUD. Create, read, update, delete, or list Flex Flows. A Flex Flow defines how incoming messages on a given channel (SMS, WhatsApp, web chat, etc.) are routed into the Flex contact center. It links a messaging channel to Flex and specifies the integration type (Studio flow, external webhook, or direct task creation).`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque continuation from nextPageToken; retain the same resource and filters.'
+        ),
       action: z
         .enum(['create', 'get', 'update', 'delete', 'list'])
         .describe('Action to perform'),
@@ -75,11 +82,17 @@ export let manageFlexFlowsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Native continuation; omitted when this page is exhausted.'),
+      hasMore: z.boolean().optional().describe('Whether a next page is available.'),
       flexFlows: z.array(flexFlowSchema).describe('Flex Flow records')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new FlexClient(ctx.auth.token);
+    validateInput('manage_flex_flows', ctx.input);
+    let client = new FlexClient(ctx.auth.token, ctx.auth.accountSid, ctx.input.pageToken);
 
     if (ctx.input.action === 'list') {
       let result = await client.listFlexFlows(ctx.input.pageSize);
@@ -91,19 +104,19 @@ export let manageFlexFlowsTool = SlateTool.create(spec, {
         contactIdentity: f.contact_identity,
         enabled: f.enabled,
         chatServiceSid: f.chat_service_sid,
-        integrationFlowSid: f.integration?.flow_sid,
-        integrationUrl: f.integration?.url,
+        integrationFlowSid: f.integration?.flow_sid ?? undefined,
+        integrationUrl: f.integration?.url ?? undefined,
         dateCreated: f.date_created,
         dateUpdated: f.date_updated
       }));
       return {
-        output: { flexFlows },
+        output: { flexFlows, nextPageToken: result.nextPageToken, hasMore: result.hasMore },
         message: `Found **${flexFlows.length}** Flex Flows.`
       };
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.flexFlowSid) throw new Error('flexFlowSid is required');
+      if (!ctx.input.flexFlowSid) throw fail('flexFlowSid is required');
       let f = await client.getFlexFlow(ctx.input.flexFlowSid);
       return {
         output: {
@@ -116,8 +129,8 @@ export let manageFlexFlowsTool = SlateTool.create(spec, {
               contactIdentity: f.contact_identity,
               enabled: f.enabled,
               chatServiceSid: f.chat_service_sid,
-              integrationFlowSid: f.integration?.flow_sid,
-              integrationUrl: f.integration?.url,
+              integrationFlowSid: f.integration?.flow_sid ?? undefined,
+              integrationUrl: f.integration?.url ?? undefined,
               dateCreated: f.date_created,
               dateUpdated: f.date_updated
             }
@@ -128,9 +141,9 @@ export let manageFlexFlowsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.friendlyName) throw new Error('friendlyName is required');
-      if (!ctx.input.chatServiceSid) throw new Error('chatServiceSid is required');
-      if (!ctx.input.channelType) throw new Error('channelType is required');
+      if (!ctx.input.friendlyName) throw fail('friendlyName is required');
+      if (!ctx.input.chatServiceSid) throw fail('chatServiceSid is required');
+      if (!ctx.input.channelType) throw fail('channelType is required');
       let params: Record<string, string | undefined> = {
         FriendlyName: ctx.input.friendlyName,
         ChatServiceSid: ctx.input.chatServiceSid,
@@ -156,8 +169,8 @@ export let manageFlexFlowsTool = SlateTool.create(spec, {
               contactIdentity: f.contact_identity,
               enabled: f.enabled,
               chatServiceSid: f.chat_service_sid,
-              integrationFlowSid: f.integration?.flow_sid,
-              integrationUrl: f.integration?.url,
+              integrationFlowSid: f.integration?.flow_sid ?? undefined,
+              integrationUrl: f.integration?.url ?? undefined,
               dateCreated: f.date_created,
               dateUpdated: f.date_updated
             }
@@ -168,7 +181,7 @@ export let manageFlexFlowsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.flexFlowSid) throw new Error('flexFlowSid is required');
+      if (!ctx.input.flexFlowSid) throw fail('flexFlowSid is required');
       let params: Record<string, string | undefined> = {
         FriendlyName: ctx.input.friendlyName,
         ChatServiceSid: ctx.input.chatServiceSid,
@@ -194,8 +207,8 @@ export let manageFlexFlowsTool = SlateTool.create(spec, {
               contactIdentity: f.contact_identity,
               enabled: f.enabled,
               chatServiceSid: f.chat_service_sid,
-              integrationFlowSid: f.integration?.flow_sid,
-              integrationUrl: f.integration?.url,
+              integrationFlowSid: f.integration?.flow_sid ?? undefined,
+              integrationUrl: f.integration?.url ?? undefined,
               dateCreated: f.date_created,
               dateUpdated: f.date_updated
             }
@@ -206,7 +219,7 @@ export let manageFlexFlowsTool = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.flexFlowSid) throw new Error('flexFlowSid is required');
+    if (!ctx.input.flexFlowSid) throw fail('flexFlowSid is required');
     await client.deleteFlexFlow(ctx.input.flexFlowSid);
     return {
       output: {

@@ -25,6 +25,12 @@ export let updateWorkspaceTool = SlateTool.create(spec, {
         .enum(['remote', 'local', 'agent'])
         .optional()
         .describe('Execution mode for the workspace'),
+      agentPoolId: z
+        .string()
+        .optional()
+        .describe(
+          'Agent pool ID for agent execution mode; required when creating an agent-mode workspace.'
+        ),
       terraformVersion: z.string().optional().describe('Terraform version to use'),
       workingDirectory: z
         .string()
@@ -39,6 +45,12 @@ export let updateWorkspaceTool = SlateTool.create(spec, {
       description: z.string(),
       autoApply: z.boolean(),
       executionMode: z.string(),
+      agentPoolId: z
+        .string()
+        .optional()
+        .describe(
+          'Agent pool ID for agent execution mode; required when creating an agent-mode workspace.'
+        ),
       terraformVersion: z.string(),
       workingDirectory: z.string(),
       locked: z.boolean(),

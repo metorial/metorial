@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { clientFor } from '../lib/client';
+import { recordSchema } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listBills = SlateTool.create(spec, {
@@ -33,20 +34,21 @@ export let listBills = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter bills due before this date (ISO 8601)'),
-      invoiceNumber: z.string().optional().describe('Filter by invoice number')
+      invoiceNumber: z.string().optional().describe('Filter by invoice number'),
+      isArchived: z
+        .boolean()
+        .optional()
+        .describe('Return archived bills instead of active bills.')
     })
   )
   .output(
     z.object({
-      bills: z.array(z.any()).describe('List of bill objects'),
+      bills: z.array(recordSchema).describe('List of bill objects'),
       nextCursor: z.string().optional().describe('Cursor for fetching the next page')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      environment: ctx.config.environment
-    });
+    let client = clientFor(ctx);
 
     let result = await client.listBills({
       start: ctx.input.cursor,
@@ -58,7 +60,8 @@ export let listBills = SlateTool.create(spec, {
       paymentStatus: ctx.input.paymentStatus,
       fromDueDate: ctx.input.fromDueDate,
       toDueDate: ctx.input.toDueDate,
-      invoiceNumber: ctx.input.invoiceNumber
+      invoiceNumber: ctx.input.invoiceNumber,
+      isArchived: ctx.input.isArchived
     });
 
     return {

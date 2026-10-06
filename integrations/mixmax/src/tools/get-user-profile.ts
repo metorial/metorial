@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getUserProfile = SlateTool.create(spec, {
   name: 'Get User Profile',
   key: 'get_user_profile',
-  description: `Retrieve the authenticated user's profile and preferences. Returns account details and user preferences including calendar settings and default configuration.`,
+  description: `Retrieve the authenticated user's profile and preferences. Returns the documented user ID and available preferences; email and name are returned only if supplied by the provider.`,
   tags: {
     readOnly: true
   }
@@ -33,7 +33,7 @@ export let getUserProfile = SlateTool.create(spec, {
         name: user.name,
         preferences: prefs
       },
-      message: `Retrieved profile for ${user.email}.`
+      message: `Retrieved profile for user ${user._id}.`
     };
   })
   .build();

@@ -9,8 +9,7 @@
     "filter results by date or ID",
     "search submission data",
     "sort and paginate results",
-    "manage webhooks",
-    "receive result completed events"
+    "manage webhooks"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/formsite.png"
 }

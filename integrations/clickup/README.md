@@ -196,10 +196,6 @@ Update an existing ClickUp task. Modify its name, description, status, priority,
 
 Retrieve members for the Workspace selected by **workspaceId**. Call **Get Workspaces** to discover authorized Workspace IDs.
 
-## Webhook Triggers
-
-Task and Workspace event triggers subscribe across every Workspace authorized for the connection. Each emitted event identifies the Workspace that delivered it.
-
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

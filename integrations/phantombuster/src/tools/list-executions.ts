@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { execution } from '../lib/responses';
 import { spec } from '../spec';
 
 export let listExecutions = SlateTool.create(spec, {
@@ -14,7 +15,17 @@ export let listExecutions = SlateTool.create(spec, {
   .input(
     z.object({
       phantomId: z.string().describe('ID of the Phantom to list executions for'),
-      limit: z.number().optional().describe('Maximum number of executions to return')
+      limit: z.number().optional().describe('Maximum number of executions to return'),
+      beforeEndedAt: z
+        .string()
+        .optional()
+        .describe(
+          'Provider end-date boundary for an older history page. Keep the same Phantom and mode for subsequent pages.'
+        ),
+      mode: z
+        .enum(['all', 'finalized'])
+        .optional()
+        .describe('Include all executions or only finalized executions.')
     })
   )
   .output(
@@ -39,17 +50,14 @@ export let listExecutions = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let containers = await client.fetchAllContainers(ctx.input.phantomId, ctx.input.limit);
+    let containers = await client.fetchAllContainers(
+      ctx.input.phantomId,
+      ctx.input.limit,
+      ctx.input.beforeEndedAt,
+      ctx.input.mode
+    );
 
-    let executions = (Array.isArray(containers) ? containers : []).map((c: any) => ({
-      containerId: String(c.id),
-      status: c.status ?? c.lastEndStatus ?? undefined,
-      exitCode: c.exitCode ?? undefined,
-      exitMessage: c.exitMessage ?? c.lastEndMessage ?? undefined,
-      launchTimestamp: c.launchDate ?? c.queueDate ?? undefined,
-      endTimestamp: c.endDate ?? undefined,
-      launchType: c.launchType ?? undefined
-    }));
+    let executions = containers.map(execution);
 
     return {
       output: { executions },

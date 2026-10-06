@@ -9,13 +9,13 @@ export let getDocumentDeltas = SlateTool.create(spec, {
   description: `Retrieve incremental document changes (inserts, updates, deletes) from a Convex deployment using the Streaming Export API.
 Returns a cursor-based change feed of document-level modifications since a given cursor position.
 Useful for syncing external systems, building audit trails, or tracking data changes over time.
-Requires deploy key authentication.`,
+Requires deployment administration permission and Streaming Export availability on your plan.`,
   instructions: [
     'Provide a cursor from a previous response to get only new changes',
-    'On first call without a cursor, returns the initial set of changes',
+    'Start with snapshotId from a completed list_documents snapshot; a cursor is required',
     'Use tableName to filter changes for a specific table'
   ],
-  constraints: ['Requires deploy key (admin) authentication'],
+  constraints: ['Requires deployment data-view permission and Streaming Export availability'],
   tags: {
     readOnly: true
   }
@@ -25,7 +25,9 @@ Requires deploy key authentication.`,
       cursor: z
         .string()
         .optional()
-        .describe('Cursor from a previous response to resume fetching changes'),
+        .describe(
+          'Required decimal timestamp: snapshotId from a completed list_documents snapshot, or cursor from a previous change response'
+        ),
       tableName: z.string().optional().describe('Filter changes to a specific table')
     })
   )
